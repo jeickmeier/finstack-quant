@@ -5,9 +5,9 @@ use crate::build::rates::build_rate_instrument;
 use crate::build::BuildCtx;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
-use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
-use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+use finstack_quant_valuations_rates::deposit::Deposit;
+use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
+use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use rust_decimal::Decimal;
 
 use crate::quotes::ids::Pillar;
@@ -126,8 +126,8 @@ fn test_build_futures() {
 
     if let Some(future) = instrument
         .as_any()
-        .downcast_ref::<finstack_quant_valuations::instruments::rates::ir_future::InterestRateFuture>()
-    {
+        .downcast_ref::<finstack_quant_valuations_rates::ir_future::InterestRateFuture>(
+    ) {
         assert_eq!(
             future.period_start,
             Some(Date::from_calendar_date(2025, time::Month::June, 18).unwrap())
@@ -159,7 +159,7 @@ fn test_build_euribor_futures() {
 
     let future = instrument
         .as_any()
-        .downcast_ref::<finstack_quant_valuations::instruments::rates::ir_future::InterestRateFuture>()
+        .downcast_ref::<finstack_quant_valuations_rates::ir_future::InterestRateFuture>()
         .expect("Expected InterestRateFuture");
     assert_eq!(future.terms.currency, Currency::EUR);
     assert_eq!(

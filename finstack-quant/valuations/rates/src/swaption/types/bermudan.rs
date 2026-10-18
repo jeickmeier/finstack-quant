@@ -98,6 +98,64 @@ pub struct BermudanSwaption {
 }
 
 impl BermudanSwaption {
+    /// Parse a persisted `bermudan_swaption` instrument envelope.
+    ///
+    /// Accepts exactly the wire form the umbrella crate writes for this
+    /// instrument — `{"schema": "finstack_quant.instrument/1", "instrument":
+    /// {"type": "bermudan_swaption", "spec": { ... }}}` — under the same
+    /// input-size, depth and strict-structure policy as the closed-world
+    /// loader, then runs the instrument's pricing validation. Consumers that
+    /// only need this instrument (the LMM base-vol calibration) read it here
+    /// without depending on the full `InstrumentJson` union.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Complete UTF-8 JSON text of one instrument envelope, at most
+    ///   `MAX_JSON_BYTES` (16 MiB) long. Unknown fields anywhere in the
+    ///   envelope are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when the text exceeds the size cap, is
+    /// malformed, carries a schema marker other than
+    /// `finstack_quant.instrument/1`, names any instrument `type` other than
+    /// `bermudan_swaption`, or when the parsed swaption fails
+    /// [`validate`](Self::validate).
+    pub fn from_envelope_json(json: &str) -> Result<Self> {
+        use finstack_quant_core::contract::{deserialize_json_value, parse_json_value, LoadLimits};
+        use finstack_quant_valuations_core::instruments::envelope::{
+            instrument_load_error, InstrumentSchema, MAX_JSON_BYTES,
+        };
+        use finstack_quant_valuations_core::instruments::Instrument;
+
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Envelope {
+            schema: InstrumentSchema,
+            instrument: Tagged,
+        }
+        #[derive(serde::Deserialize)]
+        #[serde(
+            tag = "type",
+            content = "spec",
+            rename_all = "snake_case",
+            deny_unknown_fields
+        )]
+        enum Tagged {
+            BermudanSwaption(BermudanSwaption),
+        }
+
+        let limits = LoadLimits::default().with_max_bytes(MAX_JSON_BYTES);
+        let value = parse_json_value(json.as_bytes(), &limits).map_err(instrument_load_error)?;
+        let Envelope {
+            schema,
+            instrument: Tagged::BermudanSwaption(swaption),
+        } = deserialize_json_value(value, &limits).map_err(instrument_load_error)?;
+        debug_assert_eq!(schema, InstrumentSchema::CURRENT);
+        swaption.validate_for_pricing()?;
+        Ok(swaption)
+    }
+
     /// Validate the underlying swap and the complete exercise schedule.
     pub fn validate(&self) -> Result<()> {
         let context = format!("Bermudan swaption '{}'", self.id.as_str());

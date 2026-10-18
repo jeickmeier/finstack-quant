@@ -18,8 +18,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
-use finstack_quant_valuations::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_credit::cds_tranche::CdsTranchePricer;
 use std::sync::Arc;
 
 /// Prepared CDS tranche quote paired with its normalized detachment percentage.
@@ -423,7 +423,7 @@ impl BootstrapTarget for BaseCorrelationTarget {
         let tranche = pq
             .instrument
             .as_any()
-            .downcast_ref::<finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche>()
+            .downcast_ref::<finstack_quant_valuations_credit::cds_tranche::CdsTranche>()
             .ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
                     "Base correlation calibration requires a CdsTranche instrument".to_string(),

@@ -3,7 +3,7 @@
 use super::ids::QuoteId;
 use super::validate;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations::market::conventions::ids::CdsConventionKey;
+use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
 use serde::{Deserialize, Serialize};
 
 /// Market quote for a CDS index tranche.
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 /// ```rust
 /// use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
 /// use finstack_quant_calibration::quotes::ids::QuoteId;
-/// use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+/// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::currency::Currency;
 ///
@@ -85,7 +85,7 @@ impl CdsTrancheQuote {
     /// ```rust
     /// use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
     /// use finstack_quant_calibration::quotes::ids::QuoteId;
-    /// use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+    /// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
     /// use finstack_quant_core::dates::Date;
     /// use finstack_quant_core::currency::Currency;
     ///

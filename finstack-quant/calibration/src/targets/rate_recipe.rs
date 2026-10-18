@@ -17,7 +17,7 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::market::conventions::ids::IrFutureContractId;
+use finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId;
 
 impl From<&CalibrationMethod> for RateCalibrationMethod {
     fn from(method: &CalibrationMethod) -> Self {

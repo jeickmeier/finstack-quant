@@ -12,18 +12,16 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::{Error, InputError, Result};
-use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
-use finstack_quant_valuations::instruments::rates::ir_future::{
-    FutureContractSpecs, InterestRateFuture,
-};
-use finstack_quant_valuations::instruments::rates::irs::{InterestRateSwap, IrsLegConventions};
-use finstack_quant_valuations::instruments::{
+use finstack_quant_valuations_core::instruments::{
     FixedLegSpec, FloatLegSpec, Instrument, ListedFutureTerms, PayReceive, Position,
 };
-use finstack_quant_valuations::market::conventions::{
+use finstack_quant_valuations_core::market::conventions::{
     ConventionRegistry, IrFutureReferencePeriod, RateIndexConventions, RateIndexKind,
 };
+use finstack_quant_valuations_rates::deposit::Deposit;
+use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
+use finstack_quant_valuations_rates::ir_future::{FutureContractSpecs, InterestRateFuture};
+use finstack_quant_valuations_rates::irs::{InterestRateSwap, IrsLegConventions};
 use rust_decimal::Decimal;
 
 /// Build an interest rate instrument from a [`RateQuote`].
@@ -331,7 +329,7 @@ fn resolve_rate_quote_dates(
             let maturity =
                 resolve_pillar_date(pillar, start, cal, conv.market_business_day_convention)?;
             let pillar_date = if swap_use_payment_delay {
-                finstack_quant_valuations::instruments::pricing::swap_legs::add_payment_delay(
+                finstack_quant_valuations_core::instruments::pricing::swap_legs::add_payment_delay(
                     maturity,
                     conv.default_payment_lag_days,
                     Some(&conv.market_calendar_id),
@@ -693,7 +691,7 @@ mod tests {
         let instrument = build_rate_instrument(&quote, &ctx)?;
 
         // Downcast to InterestRateSwap to access spread_bp
-        use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+        use finstack_quant_valuations_rates::irs::InterestRateSwap;
         let swap = instrument
             .as_any()
             .downcast_ref::<InterestRateSwap>()
@@ -731,7 +729,7 @@ mod tests {
         let instrument = build_rate_instrument(&quote, &ctx)?;
 
         // Should build successfully
-        use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+        use finstack_quant_valuations_rates::irs::InterestRateSwap;
         let swap = instrument
             .as_any()
             .downcast_ref::<InterestRateSwap>()
@@ -777,7 +775,7 @@ mod tests {
 
             let instrument = build_rate_instrument(&quote, &ctx)?;
 
-            use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+            use finstack_quant_valuations_rates::irs::InterestRateSwap;
             let swap = instrument
                 .as_any()
                 .downcast_ref::<InterestRateSwap>()
@@ -892,7 +890,7 @@ mod tests {
 
         let instrument = build_rate_instrument(&quote, &ctx)?;
 
-        use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
+        use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
         let fra = instrument
             .as_any()
             .downcast_ref::<ForwardRateAgreement>()
@@ -938,7 +936,7 @@ mod tests {
         };
 
         let instrument = build_rate_instrument(&quote, &ctx)?;
-        use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+        use finstack_quant_valuations_rates::irs::InterestRateSwap;
         let swap = instrument
             .as_any()
             .downcast_ref::<InterestRateSwap>()
@@ -980,7 +978,7 @@ mod tests {
         };
 
         let instrument = build_rate_instrument(&quote, &ctx)?;
-        use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+        use finstack_quant_valuations_rates::irs::InterestRateSwap;
         let swap = instrument
             .as_any()
             .downcast_ref::<InterestRateSwap>()

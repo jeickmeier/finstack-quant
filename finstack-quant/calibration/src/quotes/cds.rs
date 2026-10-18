@@ -3,7 +3,7 @@
 use super::ids::{Pillar, QuoteId};
 use super::validate;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations::market::conventions::ids::CdsConventionKey;
+use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
 use serde::{Deserialize, Serialize};
 
 /// Standard fixed running coupons for ISDA-style upfront CDS quotes.
@@ -35,7 +35,7 @@ fn is_standard_upfront_running_coupon_bp(coupon_bp: f64) -> bool {
 /// ```rust
 /// use finstack_quant_calibration::quotes::cds::CdsQuote;
 /// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-/// use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+/// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 /// use finstack_quant_core::currency::Currency;
 ///
 /// # fn example() -> finstack_quant_core::Result<()> {
@@ -58,7 +58,7 @@ fn is_standard_upfront_running_coupon_bp(coupon_bp: f64) -> bool {
 /// ```rust
 /// use finstack_quant_calibration::quotes::cds::CdsQuote;
 /// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-/// use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+/// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 /// use finstack_quant_core::currency::Currency;
 ///
 /// # fn example() -> finstack_quant_core::Result<()> {
@@ -127,7 +127,7 @@ impl CdsQuote {
     /// ```rust
     /// use finstack_quant_calibration::quotes::cds::CdsQuote;
     /// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-    /// use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+    /// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
     /// use finstack_quant_core::currency::Currency;
     ///
     /// # fn example() -> finstack_quant_core::Result<()> {

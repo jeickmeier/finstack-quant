@@ -6,12 +6,20 @@ fitting, and cached quote-space recalibration for `finstack-quant`.
 The dependency direction is one-way:
 
 ```text
-calibration -> valuations -> core/models/cashflows
+calibration -> valuations-core + valuations-rates + valuations-credit -> core/models/cashflows
 ```
 
-`finstack-quant-valuations` owns the object-safe recalibration contract and
-pricing concerns. This crate implements that contract with
-`CachedRecalibrationProvider`; valuations never depends on this crate.
+`finstack-quant-valuations-core` owns the object-safe recalibration contract
+and the pricing framework; the rates and credit family crates own the
+instruments this crate builds from quotes (deposits, FRAs, futures, swaps,
+swaptions, inflation swaps, CDS, tranches). This crate implements the
+recalibration contract with `CachedRecalibrationProvider`; no valuations
+crate depends on it. The umbrella `finstack-quant-valuations` is a
+dev-dependency only (its tests round-trip `InstrumentJson` envelopes), so a
+structured-credit, equity, FX or exotics edit never rebuilds calibration.
+`lmm::calibrate_bermudan_lmm_base_vol_from_json` reads its envelope through
+`BermudanSwaption::from_envelope_json` rather than the closed instrument
+union.
 
 Public modules:
 

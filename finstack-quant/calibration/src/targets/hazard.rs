@@ -20,8 +20,8 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
-use finstack_quant_valuations::market::conventions::{
+use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+use finstack_quant_valuations_core::market::conventions::{
     CdsConvention, CdsConventionSpec, ConventionRegistry,
 };
 use std::str::FromStr;
@@ -38,7 +38,7 @@ use std::str::FromStr;
 /// - Knot times must be strictly increasing.
 ///
 /// # See Also
-/// - [`finstack_quant_valuations::instruments::credit_derivatives::cds`] for details on the underlying instruments.
+/// - [`finstack_quant_valuations_credit::cds`] for details on the underlying instruments.
 pub(crate) struct HazardCurveTarget {
     /// Parameters defining the hazard curve structure and IDs.
     pub(crate) params: HazardCurveParams,
@@ -431,9 +431,7 @@ impl HazardCurveTarget {
                     let cds = prepared
                         .instrument
                         .as_any()
-                        .downcast_ref::<
-                            finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap,
-                        >()
+                        .downcast_ref::<finstack_quant_valuations_credit::cds::CreditDefaultSwap>()
                         .ok_or_else(|| {
                             finstack_quant_core::Error::Validation(format!(
                                 "cannot derive par-spread replay input for upfront quote '{}': \

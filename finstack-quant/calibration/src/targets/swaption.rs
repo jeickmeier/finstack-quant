@@ -17,12 +17,12 @@ use finstack_quant_core::market_data::surfaces::VolCube;
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_core::Result;
 use finstack_quant_models::{SabrCalibrator, SabrParameters, SabrShift};
-use finstack_quant_valuations::instruments::rates::swaption::contractual_swap_tenor_years;
-use finstack_quant_valuations::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_rates::swaption::contractual_swap_tenor_years;
 use std::collections::BTreeMap;
 
 #[cfg(test)]
-use finstack_quant_valuations::market::conventions::ids::SwaptionConventionId;
+use finstack_quant_valuations_core::market::conventions::ids::SwaptionConventionId;
 
 /// Bootstrapper for calibrating swaption volatility surfaces.
 ///

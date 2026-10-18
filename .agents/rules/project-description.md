@@ -50,7 +50,8 @@ Workspace (umbrella crate: finstack-quant)
  │  valuations           ← umbrella: re-exports core + the family crates under unchanged     │
  │                         paths; basket, real estate, composite, json_loader, STANDARD        │
  │                         registries, schemas (the closed world)                              │
- │  calibration          ← curve/hazard/vol bootstraps and global calibration on valuations   │
+ │  calibration          ← curve/hazard/vol bootstraps and global calibration on valuations/  │
+ │                         {core, rates, credit} (the umbrella is a dev-dependency only)       │
  │  attribution          ← multi-period P&L attribution (waterfall, Taylor, metrics-based)     │
  │  statements           ← model graph (Value > Forecast > Formula), evaluation                │
  │  statements-analytics ← DCF, scenario sets, sensitivity, ECL, backtesting                   │
@@ -73,7 +74,7 @@ Dependency direction (read off the manifests):
   valuations/core → valuations/{rates, fixed-income, credit, equity, fx, exotics} (in parallel)
   valuations/fixed-income + valuations/rates → valuations/structured-credit
   valuations/core + the six family crates + valuations/structured-credit → valuations
-  valuations (+ core, cashflows, models) → calibration
+  valuations/{core, rates, credit} (+ core, cashflows, models) → calibration
   calibration + valuations → attribution
   valuations (+ core, cashflows) → statements → statements-analytics (+ covenants, models)
   {attribution, calibration, models, statements, valuations} → scenarios
@@ -94,8 +95,9 @@ Dependency direction (read off the manifests):
   `models` depends on `analytics`, `cashflows` and `core` only; Monte Carlo and
   factor models are modules of it (`models::monte_carlo`, `models::factor`),
   not crates.
-  `calibration` depends on `valuations` (it calibrates against valuations
-  pricers); `valuations` does not depend on `calibration`.
+  `calibration` depends on `valuations/{core, rates, credit}` (it calibrates against
+  the rates and credit pricers) and dev-depends on the umbrella for its
+  `InstrumentJson` tests; no valuations crate depends on `calibration`.
   Bindings depend on the Rust crates; no Rust crate depends on a binding.
 ```
 

@@ -142,6 +142,10 @@ pub mod pricing {
     pub use super::common_impl::pricing::GenericInstrumentPricer;
 }
 
+/// The persisted instrument-envelope contract: schema marker, size cap,
+/// load-error mapping.
+pub mod envelope;
+
 /// Per-flow cashflow export with DF / survival / PV columns.
 ///
 /// See [`cashflow_export::export_cashflows`] for the engine behind the

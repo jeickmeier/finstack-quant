@@ -37,7 +37,7 @@ use finstack_quant_core::contract::ContractError;
 use finstack_quant_core::contract::{
     Diagnostic, LoadLimits, LoadPhase, Severity, ValidationReport as ContractValidationReport,
 };
-use finstack_quant_valuations::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 
 /// Result of [`validate`]. Always contains the dependency graph; `errors` is
 /// empty when the envelope is structurally valid.
@@ -635,7 +635,7 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::types::IndexId;
-    use finstack_quant_valuations::market::conventions::ids::{
+    use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause, IrFutureContractId,
     };
 

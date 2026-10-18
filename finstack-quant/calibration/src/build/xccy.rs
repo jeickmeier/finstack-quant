@@ -9,10 +9,10 @@ use finstack_quant_core::dates::{adjust, resolve_joint_calendar};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::rates::xccy_swap::{XccySwap, XccySwapLeg};
-use finstack_quant_valuations::instruments::FloatLegSpec;
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::instruments::FloatLegSpec;
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_rates::xccy_swap::{XccySwap, XccySwapLeg};
 use rust_decimal::Decimal;
 
 /// Build a cross-currency swap instrument from an [`XccyQuote`].
@@ -146,10 +146,10 @@ pub(crate) fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result
 /// * `forward_curve_id` - Pricing-curve override that must not re-type the leg.
 fn contractual_leg_compounding(
     contractual_index_id: &str,
-    contractual_index: &finstack_quant_valuations::market::conventions::RateIndexConventions,
+    contractual_index: &finstack_quant_valuations_core::market::conventions::RateIndexConventions,
     forward_curve_id: &str,
 ) -> Result<finstack_quant_cashflows::builder::FloatingLegCompounding> {
-    use finstack_quant_valuations::instruments::pricing::overnight_conventions::{
+    use finstack_quant_valuations_core::instruments::pricing::overnight_conventions::{
         compounding_from_conventions, rate_index_conventions,
     };
 

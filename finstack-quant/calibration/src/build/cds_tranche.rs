@@ -13,11 +13,9 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CdsTranche, CdsTrancheParams,
-};
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_credit::cds_tranche::{CdsTranche, CdsTrancheParams};
 
 /// Overrides for CDS tranche schedule conventions.
 ///
@@ -195,7 +193,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{adjust, Date};
     use finstack_quant_core::HashMap;
-    use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+    use finstack_quant_valuations_core::market::conventions::ids::{
+        CdsConventionKey, CdsDocClause,
+    };
     use time::Month;
 
     #[test]

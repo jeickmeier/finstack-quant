@@ -337,9 +337,11 @@ fn example_07_swaption_vol_surface_builds_queryable_surface() {
 
     // swaption_vol calibration produces a VolCube (SABR params on expiry x tenor
     // grid). Resolve through the valuations-owned volatility source resolver.
-    let surface =
-        finstack_quant_valuations::market::resolve_vol_source(&market, "USD-SWAPTION-NORMAL-VOL")
-            .expect("swaption vol cube present after calibration");
+    let surface = finstack_quant_valuations_core::market::resolve_vol_source(
+        &market,
+        "USD-SWAPTION-NORMAL-VOL",
+    )
+    .expect("swaption vol cube present after calibration");
 
     // Sanity-query the produced surface at a representative (expiry, tenor, strike).
     // Use a 1y expiry × 5y swap × ATM-ish strike. With normal vols, ATM-ish for

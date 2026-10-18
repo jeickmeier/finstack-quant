@@ -5,7 +5,7 @@ use super::validate;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::market::conventions::ids::IrFutureContractId;
+use finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId;
 use serde::{Deserialize, Serialize};
 
 /// Market quote for interest rate instruments.
@@ -212,7 +212,7 @@ impl RateQuote {
     /// ```rust
     /// use finstack_quant_calibration::quotes::rates::RateQuote;
     /// use finstack_quant_calibration::quotes::ids::QuoteId;
-    /// use finstack_quant_valuations::market::conventions::ids::IrFutureContractId;
+    /// use finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId;
     /// use time::macros::date;
     ///
     /// let quote = RateQuote::Futures {

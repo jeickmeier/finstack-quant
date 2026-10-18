@@ -16,8 +16,8 @@ use finstack_quant_calibration::quotes::xccy::XccyQuote;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::types::UnderlyingId;
-use finstack_quant_valuations::instruments::OptionType;
-use finstack_quant_valuations::market::conventions::ids::{
+use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_valuations_core::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, InflationSwapConventionId, XccyConventionId,
 };
 use finstack_quant_valuations_test_support::tolerances;

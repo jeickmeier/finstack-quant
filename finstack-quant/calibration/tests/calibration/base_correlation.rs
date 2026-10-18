@@ -19,12 +19,10 @@ use finstack_quant_core::market_data::term_structures::{
     BaseCorrelationCurve, CreditIndexData, DiscountCurve, HazardCurve,
 };
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CdsTranche, CdsTranchePricer,
-};
-use finstack_quant_valuations::instruments::{Attributes, PayReceive};
-use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
-use finstack_quant_valuations::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::instruments::{Attributes, PayReceive};
+use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_credit::cds_tranche::{CdsTranche, CdsTranchePricer};
 use std::sync::Arc;
 use time::Month;
 

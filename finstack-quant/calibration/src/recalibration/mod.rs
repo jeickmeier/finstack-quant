@@ -10,7 +10,7 @@
 //! # Convention
 //!
 //! Rate/spread quote shocks use the valuations-owned
-//! [`QuoteBump`](finstack_quant_valuations::recalibration::QuoteBump).
+//! [`QuoteBump`](finstack_quant_valuations_core::recalibration::QuoteBump).
 //! Direct curve and surface shocks use core `BumpSpec`/`Bumpable` instead.
 //!
 //! # Calibration policy

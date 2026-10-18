@@ -11,12 +11,12 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
-use finstack_quant_valuations::instruments::{
+use finstack_quant_valuations_core::instruments::{
     Attributes, PayReceive, PremiumLegSpec, ProtectionLegSpec,
 };
-use finstack_quant_valuations::market::conventions::ids::CdsConventionKey;
-use finstack_quant_valuations::market::conventions::{CdsConventionSpec, ConventionRegistry};
+use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
+use finstack_quant_valuations_core::market::conventions::{CdsConventionSpec, ConventionRegistry};
+use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
 use rust_decimal::Decimal;
 
 /// Resolved CDS dates used by both builders and calibration prepared quotes.
@@ -150,7 +150,7 @@ fn resolve_cds_dates(
 /// use finstack_quant_calibration::build::build_cds_instrument;
 /// use finstack_quant_calibration::quotes::cds::CdsQuote;
 /// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-/// use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+/// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::HashMap;
@@ -185,7 +185,7 @@ fn resolve_cds_dates(
 /// use finstack_quant_calibration::build::build_cds_instrument;
 /// use finstack_quant_calibration::quotes::cds::CdsQuote;
 /// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-/// use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+/// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::HashMap;
@@ -324,7 +324,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::HashMap;
-    use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+    use finstack_quant_valuations_core::market::conventions::ids::{
+        CdsConventionKey, CdsDocClause,
+    };
     use time::Month;
 
     fn cds_build_ctx() -> BuildCtx {

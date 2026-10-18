@@ -14,11 +14,11 @@ use crate::quotes::MarketQuote;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_valuations::instruments::rates::InflationSwap;
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::market::conventions::ids::{
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, InflationSwapConventionId,
 };
+use finstack_quant_valuations_rates::InflationSwap;
 use time::Month;
 
 // Comprehensive quote-to-instrument construction test for canonical calibration engine.

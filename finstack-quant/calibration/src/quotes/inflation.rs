@@ -7,7 +7,7 @@ use super::ids::QuoteId;
 use super::validate;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::Result;
-use finstack_quant_valuations::market::conventions::ids::InflationSwapConventionId;
+use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId;
 
 /// Inflation instrument quotes for CPI and inflation curve calibration.
 ///
@@ -21,7 +21,7 @@ use finstack_quant_valuations::market::conventions::ids::InflationSwapConvention
 /// ```rust
 /// use finstack_quant_calibration::quotes::inflation::InflationQuote;
 /// use finstack_quant_calibration::quotes::ids::QuoteId;
-/// use finstack_quant_valuations::market::conventions::ids::InflationSwapConventionId;
+/// use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId;
 /// use finstack_quant_core::dates::Date;
 ///
 /// let quote = InflationQuote::InflationSwap {
@@ -37,7 +37,7 @@ use finstack_quant_valuations::market::conventions::ids::InflationSwapConvention
 /// ```rust
 /// use finstack_quant_calibration::quotes::inflation::InflationQuote;
 /// use finstack_quant_calibration::quotes::ids::QuoteId;
-/// use finstack_quant_valuations::market::conventions::ids::InflationSwapConventionId;
+/// use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId;
 /// use finstack_quant_core::dates::{Date, Tenor};
 ///
 /// # fn example() -> finstack_quant_core::Result<()> {
@@ -116,7 +116,7 @@ impl InflationQuote {
     /// ```rust
     /// use finstack_quant_calibration::quotes::inflation::InflationQuote;
     /// use finstack_quant_calibration::quotes::ids::QuoteId;
-    /// use finstack_quant_valuations::market::conventions::ids::InflationSwapConventionId;
+    /// use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId;
     /// use finstack_quant_core::dates::Date;
     ///
     /// let quote = InflationQuote::InflationSwap {

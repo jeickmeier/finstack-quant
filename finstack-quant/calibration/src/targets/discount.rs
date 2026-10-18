@@ -967,7 +967,7 @@ mod tests {
         let delay = 2;
         let cal_id = "usny";
         let pay_date =
-            finstack_quant_valuations::instruments::pricing::swap_legs::add_payment_delay(
+            finstack_quant_valuations_core::instruments::pricing::swap_legs::add_payment_delay(
                 maturity,
                 delay,
                 Some(cal_id),
@@ -993,23 +993,21 @@ mod tests {
         });
 
         // Mock instrument using Deposit with all required fields
-        let instrument = std::sync::Arc::new(
-            finstack_quant_valuations::instruments::rates::deposit::Deposit {
-                id: InstrumentId::new("DEP-1Y"),
-                fixed_rate: Some(rust_decimal::Decimal::try_from(0.02).expect("valid decimal")),
-                discount_curve_id: CurveId::new("USD-OIS"),
-                instrument_pricing_overrides: Default::default(),
-                metric_pricing_overrides: Default::default(),
-                scenario_pricing_overrides: Default::default(),
-                attributes: Default::default(),
-                business_day_convention: BusinessDayConvention::Following,
-                calendar_id: None,
-                start_date: base_date,
-                maturity: pay_date,
-                notional: Money::from((1_i64, Currency::USD)),
-                day_count: DayCount::Act360,
-            },
-        );
+        let instrument = std::sync::Arc::new(finstack_quant_valuations_rates::deposit::Deposit {
+            id: InstrumentId::new("DEP-1Y"),
+            fixed_rate: Some(rust_decimal::Decimal::try_from(0.02).expect("valid decimal")),
+            discount_curve_id: CurveId::new("USD-OIS"),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
+            attributes: Default::default(),
+            business_day_convention: BusinessDayConvention::Following,
+            calendar_id: None,
+            start_date: base_date,
+            maturity: pay_date,
+            notional: Money::from((1_i64, Currency::USD)),
+            day_count: DayCount::Act360,
+        });
 
         let pq = PreparedQuote::new(
             std::sync::Arc::new(quote),
@@ -1057,23 +1055,21 @@ mod tests {
         };
 
         // Dummy Instrument for PreparedQuote
-        let instrument = std::sync::Arc::new(
-            finstack_quant_valuations::instruments::rates::deposit::Deposit {
-                id: InstrumentId::new("DEP-1Y"),
-                fixed_rate: Some(rust_decimal::Decimal::try_from(rate).expect("valid decimal")),
-                discount_curve_id: CurveId::new("USD-OIS"),
-                instrument_pricing_overrides: Default::default(),
-                metric_pricing_overrides: Default::default(),
-                scenario_pricing_overrides: Default::default(),
-                attributes: Default::default(),
-                business_day_convention: BusinessDayConvention::Following,
-                calendar_id: None,
-                start_date: base_date,
-                maturity,
-                notional: Money::from((1_i64, Currency::USD)),
-                day_count: DayCount::Act360,
-            },
-        );
+        let instrument = std::sync::Arc::new(finstack_quant_valuations_rates::deposit::Deposit {
+            id: InstrumentId::new("DEP-1Y"),
+            fixed_rate: Some(rust_decimal::Decimal::try_from(rate).expect("valid decimal")),
+            discount_curve_id: CurveId::new("USD-OIS"),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
+            attributes: Default::default(),
+            business_day_convention: BusinessDayConvention::Following,
+            calendar_id: None,
+            start_date: base_date,
+            maturity,
+            notional: Money::from((1_i64, Currency::USD)),
+            day_count: DayCount::Act360,
+        });
 
         let pq = PreparedQuote::new(std::sync::Arc::new(quote), instrument, maturity, p_time);
         let quotes = vec![pq];
@@ -1129,8 +1125,8 @@ mod tests {
                     rate,
                 };
 
-                let instrument = std::sync::Arc::new(
-                    finstack_quant_valuations::instruments::rates::deposit::Deposit {
+                let instrument =
+                    std::sync::Arc::new(finstack_quant_valuations_rates::deposit::Deposit {
                         id: InstrumentId::new(format!("DEP-{}D", days)),
                         fixed_rate: Some(
                             rust_decimal::Decimal::try_from(rate).expect("valid decimal"),
@@ -1146,8 +1142,7 @@ mod tests {
                         maturity,
                         notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
                         day_count: DayCount::Act360,
-                    },
-                );
+                    });
 
                 let pq =
                     PreparedQuote::new(std::sync::Arc::new(quote), instrument, maturity, p_time);
@@ -1236,7 +1231,7 @@ mod tests {
             let quote = crate::quotes::rates::RateQuote::Futures {
                 id: crate::quotes::ids::QuoteId::new("FUT-3M"),
                 contract:
-                    finstack_quant_valuations::market::conventions::ids::IrFutureContractId::new(
+                    finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId::new(
                         "CME:SR3",
                     ),
                 expiry: maturity,
@@ -1245,8 +1240,8 @@ mod tests {
             };
             // Use a Deposit instrument as a placeholder -- initial_guess only
             // inspects the quote, not the instrument.
-            let instrument = std::sync::Arc::new(
-                finstack_quant_valuations::instruments::rates::deposit::Deposit {
+            let instrument =
+                std::sync::Arc::new(finstack_quant_valuations_rates::deposit::Deposit {
                     id: InstrumentId::new("FUT-3M"),
                     fixed_rate: Some(rust_decimal::Decimal::try_from(0.05).expect("valid decimal")),
                     discount_curve_id: CurveId::new("USD-OIS"),
@@ -1260,8 +1255,7 @@ mod tests {
                     maturity,
                     notional: Money::from((1_i64, Currency::USD)),
                     day_count: DayCount::Act360,
-                },
-            );
+                });
 
             PreparedQuote::new(std::sync::Arc::new(quote), instrument, maturity, p_time)
         };
@@ -1321,7 +1315,7 @@ mod tests {
             RateQuote::Futures {
                 id: crate::quotes::ids::QuoteId::new("FUT"),
                 contract:
-                    finstack_quant_valuations::market::conventions::ids::IrFutureContractId::new(
+                    finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId::new(
                         "CME:SR3",
                     ),
                 expiry: date,

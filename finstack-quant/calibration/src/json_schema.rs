@@ -176,7 +176,7 @@ fn build_artifacts() -> Vec<SchemaArtifact> {
             "Calibration",
             "Canonical typed calibration request and result envelope.",
         )
-        .with_packager(finstack_quant_valuations::schema::package_valuations_schema)
+        .with_packager(finstack_quant_valuations_core::schema::package_valuations_schema)
         .with_kind(SchemaKind::Input)
         .with_summary(
             "Build a market from quotes: a calibration plan, flat market data, and any pre-built curves or surfaces.",
@@ -188,7 +188,7 @@ fn build_artifacts() -> Vec<SchemaArtifact> {
             "Calibration Result",
             "Canonical typed calibration result envelope.",
         )
-        .with_packager(finstack_quant_valuations::schema::package_valuations_schema)
+        .with_packager(finstack_quant_valuations_core::schema::package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_summary(
             "The calibrated market snapshot with the plan-level and per-step fit reports.",
@@ -200,7 +200,7 @@ fn build_artifacts() -> Vec<SchemaArtifact> {
             "Calibration Validation Report",
             "Structural validation findings and the static step dependency graph.",
         )
-        .with_packager(finstack_quant_valuations::schema::package_valuations_schema)
+        .with_packager(finstack_quant_valuations_core::schema::package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_summary("Dry-run findings for a calibration envelope; nothing is solved.")
         .with_examples(calibration_validation_report_examples),
@@ -210,7 +210,7 @@ fn build_artifacts() -> Vec<SchemaArtifact> {
             "Market Quote",
             "Canonical tagged market quote.",
         )
-        .with_packager(finstack_quant_valuations::schema::package_valuations_schema)
+        .with_packager(finstack_quant_valuations_core::schema::package_valuations_schema)
         .with_summary("One market observation, tagged by asset class.")
         .with_examples(market_quote_examples),
         component::<crate::api::schema::StepParams>(
@@ -304,5 +304,5 @@ fn component<T: finstack_quant_core::schema::SerdeSchema>(
     description: &'static str,
 ) -> SchemaArtifact {
     SchemaArtifact::new::<T>(relative_path, id, title, description)
-        .with_packager(finstack_quant_valuations::schema::package_valuations_schema)
+        .with_packager(finstack_quant_valuations_core::schema::package_valuations_schema)
 }

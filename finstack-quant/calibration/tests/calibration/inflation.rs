@@ -18,9 +18,9 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwap;
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::market::conventions::ids::InflationSwapConventionId;
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use rust_decimal::Decimal;
 
 use crate::calibration::calibration_support as cal_utils;

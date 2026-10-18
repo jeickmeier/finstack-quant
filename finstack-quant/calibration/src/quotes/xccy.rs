@@ -3,7 +3,7 @@
 use super::ids::{Pillar, QuoteId};
 use super::validate;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::market::conventions::ids::XccyConventionId;
+use finstack_quant_valuations_core::market::conventions::ids::XccyConventionId;
 use serde::{Deserialize, Serialize};
 
 /// Market quote for a cross-currency basis swap.

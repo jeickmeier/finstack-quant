@@ -19,7 +19,7 @@
 //!
 //! `XccySwap` instances priced through `value_raw` honour `NotionalExchange::MtmResetting`
 //! transparently — the per-period notional and resetting-leg rebalancing cashflows are
-//! computed via the CIP no-FX-vol approximation in `finstack_quant_valuations::instruments::rates::xccy_swap::pricing_mtm`.
+//! computed via the CIP no-FX-vol approximation in `finstack_quant_valuations_rates::xccy_swap::pricing_mtm`.
 //! Today the `XccyBasisTarget` consumes generic `RateQuote::{Deposit, Fra, Swap}` to build
 //! a foreign discount curve.
 
@@ -377,7 +377,7 @@ mod xccy_quote_calibration_tests {
     use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations::market::conventions::ids::XccyConventionId;
+    use finstack_quant_valuations_core::market::conventions::ids::XccyConventionId;
     use std::sync::Arc;
     use time::Month;
 

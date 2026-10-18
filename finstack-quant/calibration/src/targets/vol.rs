@@ -349,7 +349,7 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_models::SabrParameters;
-    use finstack_quant_valuations::instruments::OptionType;
+    use finstack_quant_valuations_core::instruments::OptionType;
     use time::Month;
 
     fn params(alpha: f64, beta: f64, nu: f64, rho: f64, shift: f64) -> SabrParameters {

@@ -28,17 +28,15 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::instruments::rates::InflationSwap;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::{
-    ForwardRateAgreement, InterestRateFuture, InterestRateSwap,
-};
-use finstack_quant_valuations::market::conventions::ids::{
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, InflationSwapConventionId, IrFutureContractId,
 };
-use finstack_quant_valuations::market::conventions::ConventionRegistry;
-use finstack_quant_valuations::recalibration::QuoteBump;
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::recalibration::QuoteBump;
+use finstack_quant_valuations_rates::InflationSwap;
+use finstack_quant_valuations_rates::{ForwardRateAgreement, InterestRateFuture, InterestRateSwap};
 use rust_decimal::Decimal;
 use time::Month;
 

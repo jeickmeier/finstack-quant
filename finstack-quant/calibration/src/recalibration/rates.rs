@@ -29,7 +29,7 @@ use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::types::CurveId;
 #[cfg(test)]
 use finstack_quant_core::types::IndexId;
-use finstack_quant_valuations::recalibration::QuoteBump;
+use finstack_quant_valuations_core::recalibration::QuoteBump;
 #[cfg(test)]
 use std::cell::Cell;
 use std::sync::Arc;
@@ -972,7 +972,7 @@ mod tests {
         RateCalibrationMethod, RateCalibrationOisCompounding, RateCalibrationPillar,
     };
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_valuations::market::conventions::ids::IrFutureContractId;
+    use finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId;
 
     fn linked_single_curve_ois_market(
         forward_discount_curve_id: CurveId,

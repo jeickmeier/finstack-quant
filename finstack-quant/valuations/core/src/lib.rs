@@ -75,6 +75,9 @@ pub mod pricer;
 pub mod recalibration;
 /// Valuation result envelopes and metadata.
 pub mod results;
+/// JSON-Schema packaging for schemas built on the valuations wire types.
+#[cfg(feature = "json-schema")]
+pub mod schema;
 #[doc(hidden)]
 pub mod serde_defaults;
 

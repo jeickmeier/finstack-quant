@@ -29,7 +29,7 @@ use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::market::conventions::ids::{
+use finstack_quant_valuations_core::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, SwaptionConventionId,
 };
 use time::Month;

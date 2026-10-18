@@ -10,34 +10,8 @@ use finstack_quant_core::contract::{
 use finstack_quant_core::Result;
 use serde::{Deserialize, Serialize};
 
-/// Maximum permitted size of a JSON instrument definition, in bytes.
-///
-/// 16 MiB is far larger than any realistic single-instrument JSON payload
-/// (the largest observed real-world instruments are well under 1 MiB), but
-/// small enough to prevent unbounded allocations from malicious or
-/// accidentally huge inputs.  The capped loaders enforce this limit before
-/// handing bytes to the JSON parser, so a multi-gigabyte input can never
-/// cause an OOM allocation.
-pub const MAX_JSON_BYTES: usize = 16 * 1024 * 1024; // 16 MiB
-
-/// Map bounded loading diagnostics into the ordinary pricing error surface.
-pub(crate) fn instrument_load_error(error: ContractError) -> finstack_quant_core::Error {
-    let message = match error {
-        ContractError::Report(report) if !report.diagnostics.is_empty() => report
-            .diagnostics
-            .iter()
-            .map(|diagnostic| match diagnostic.pointer.as_deref() {
-                Some(pointer) if !pointer.is_empty() => {
-                    format!("{pointer}: {}", diagnostic.message)
-                }
-                _ => diagnostic.message.clone(),
-            })
-            .collect::<Vec<_>>()
-            .join("; "),
-        error => error.to_string(),
-    };
-    finstack_quant_core::Error::Validation(format!("invalid instrument envelope JSON: {message}"))
-}
+pub(crate) use finstack_quant_valuations_core::instruments::envelope::instrument_load_error;
+pub use finstack_quant_valuations_core::instruments::envelope::{InstrumentSchema, MAX_JSON_BYTES};
 
 // Strict callers retain their supplied limits.
 fn decode_json<T: serde::de::DeserializeOwned>(
@@ -45,34 +19,6 @@ fn decode_json<T: serde::de::DeserializeOwned>(
     limits: &LoadLimits,
 ) -> std::result::Result<T, ContractError> {
     deserialize_json_value(parse_json_value(bytes, limits)?, limits)
-}
-
-/// Canonical schema marker for persisted instrument envelopes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub enum InstrumentSchema {
-    /// The sole supported instrument contract.
-    #[serde(rename = "finstack_quant.instrument/1")]
-    Instrument,
-}
-
-impl InstrumentSchema {
-    /// The exact marker required by every persisted instrument envelope.
-    pub const CURRENT: Self = Self::Instrument;
-
-    /// Return the persisted schema marker.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Instrument => "finstack_quant.instrument/1",
-        }
-    }
-}
-
-impl std::fmt::Display for InstrumentSchema {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.as_str())
-    }
 }
 
 /// Versioned envelope for JSON instrument definitions.

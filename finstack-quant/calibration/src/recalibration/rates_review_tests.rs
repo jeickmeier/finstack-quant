@@ -10,12 +10,12 @@ use finstack_quant_core::market_data::term_structures::{
     RateCalibrationMethod, RateCalibrationPillar, ValidationMode,
 };
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::rates::irs::{ConventionSwapParams, InterestRateSwap};
-use finstack_quant_valuations::instruments::{Instrument, PayReceive};
-use finstack_quant_valuations::market::conventions::ConventionRegistry;
-use finstack_quant_valuations::recalibration::{
+use finstack_quant_valuations_core::instruments::{Instrument, PayReceive};
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::recalibration::{
     RateMarketRecalibrationRequest, RecalibrationProvider,
 };
+use finstack_quant_valuations_rates::irs::{ConventionSwapParams, InterestRateSwap};
 use serde_json::{json, Value};
 
 type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
