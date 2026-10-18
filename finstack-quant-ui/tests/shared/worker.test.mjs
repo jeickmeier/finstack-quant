@@ -63,10 +63,8 @@ function direct(request) {
   }
 }
 function same(actual, expected) {
-  if (actual.ok && expected.ok) {
-    expect(typeof actual.value.meta.timestamp).toBe("string");
-    expected.value.meta.timestamp = actual.value.meta.timestamp;
-  }
+  // Pricing metadata is deterministic: results carry no wall-clock timestamp.
+  if (actual.ok) expect(actual.value.meta.timestamp).toBeUndefined();
   expect(actual).toEqual(expected);
 }
 beforeAll(async () => {
