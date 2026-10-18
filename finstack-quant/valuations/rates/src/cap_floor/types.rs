@@ -405,6 +405,39 @@ impl CapFloor {
             .ok_or(finstack_quant_core::InputError::ConversionOverflow.into())
     }
 
+    /// Holder NPV: the model option value less the discounted unsettled premium.
+    ///
+    /// Every cap/floor pricer (Black76/Normal via `base_value`, Hull-White)
+    /// routes its gross option value through here so all models report the
+    /// same premium-net value. A premium paid on or before `as_of` is settled
+    /// and excluded.
+    ///
+    /// # Arguments
+    ///
+    /// * `option_value` - Gross option PV at `as_of` in the notional currency.
+    /// * `market` - Market context holding `discount_curve_id`, used to
+    ///   discount the premium from its payment date to `as_of`.
+    /// * `as_of` - Valuation date; only premiums paid strictly after it count.
+    pub(crate) fn net_of_premium(
+        &self,
+        option_value: Money,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Money> {
+        let Some((payment_date, premium)) = self
+            .premium
+            .filter(|(payment_date, _)| *payment_date > as_of)
+        else {
+            return Ok(option_value);
+        };
+        let discount = market.get_discount(self.discount_curve_id.clone())?;
+        let discount_factor = discount.df_between_dates(as_of, payment_date)?;
+        Money::new(
+            option_value.amount() - premium.amount() * discount_factor,
+            option_value.currency(),
+        )
+    }
+
     /// Index margin as a decimal rate (`spread_bp / 10_000`).
     pub(crate) fn spread_rate(&self) -> finstack_quant_core::Result<f64> {
         let spread_bp = self
@@ -839,18 +872,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let option_value = crate::cap_floor::pricing::pricer::price_cap_floor(self, curves, as_of)?;
-        let Some((payment_date, premium)) = self
-            .premium
-            .filter(|(payment_date, _)| *payment_date > as_of)
-        else {
-            return Ok(option_value);
-        };
-        let discount = curves.get_discount(self.discount_curve_id.clone())?;
-        let discount_factor = discount.df_between_dates(as_of, payment_date)?;
-        Money::new(
-            option_value.amount() - premium.amount() * discount_factor,
-            option_value.currency(),
-        )
+        self.net_of_premium(option_value, curves, as_of)
     }
 
     fn market_dependencies(
@@ -1459,6 +1481,42 @@ mod tests {
                 .df_between_dates(as_of, payment_date)
                 .expect("premium discount factor");
         assert!((net.amount() - (gross.amount() - premium_pv)).abs() < 1.0e-8);
+    }
+
+    /// The registered default-model (Black76) pricer must report the same
+    /// premium-net value as `value()`; bindings and the JSON pricer price
+    /// through the registry, so a gross price there misreports the holder NPV.
+    #[test]
+    fn registry_default_price_is_net_of_future_premium() {
+        use finstack_quant_valuations_core::instruments::PricingOptions;
+
+        let as_of = date(2024, 1, 1);
+        let market = test_market_context(as_of);
+        let mut cap = CapFloor::new(
+            "CAP-REGISTRY-PREMIUM",
+            RateOptionType::Cap,
+            Money::from((1_000_000_i64, Currency::USD)),
+            0.04,
+            date(2024, 3, 1),
+            date(2025, 3, 1),
+            Some(Tenor::quarterly()),
+            DayCount::Act360,
+            "TEST-DISC",
+            "USD-SOFR-3M",
+            "TEST-VOL",
+        )
+        .expect("valid cap");
+        cap.premium = Some((date(2024, 2, 1), Money::from((25_000_i64, Currency::USD))));
+        let net = cap.value(&market, as_of).expect("net value").amount();
+        let registry = cap
+            .price_with_metrics(&market, as_of, &[], PricingOptions::default())
+            .expect("registry price")
+            .value
+            .amount();
+        assert!(
+            (registry - net).abs() < 1.0e-8,
+            "registry price {registry} must equal premium-net value {net}"
+        );
     }
 
     #[test]

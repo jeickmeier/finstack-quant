@@ -692,7 +692,15 @@ impl Pricer for BermudanSwaptionPricer {
     ) -> finstack_quant_core::Result<()> {
         let mut swaption = context.instrument_as::<BermudanSwaption>()?.clone();
         let ttm = swaption.time_to_maturity(context.as_of)?;
+        let exercise_metric =
+            finstack_quant_valuations_core::metrics::MetricId::ExpectedExerciseTime;
         if ttm <= 0.0 || swaption.exercise_times(context.as_of)?.is_empty() {
+            // No remaining exercise: the tree policy publishes zero.
+            if self.method == BermudanPricingMethod::HullWhiteTree
+                && metrics.contains(&exercise_metric)
+            {
+                context.computed.insert(exercise_metric, 0.0);
+            }
             return Ok(());
         }
         let cached = self.config.prepared_model.as_ref();
@@ -718,8 +726,6 @@ impl Pricer for BermudanSwaptionPricer {
         config.hw1f_mean_reversion = Some(params.kappa);
         config.hw1f_sigma = Some(params.sigma);
         config.tree_steps = Some(steps);
-        let exercise_metric =
-            finstack_quant_valuations_core::metrics::MetricId::ExpectedExerciseTime;
         if metrics.contains(&exercise_metric) {
             if self.method != BermudanPricingMethod::HullWhiteTree {
                 return Err(finstack_quant_core::Error::Validation(
