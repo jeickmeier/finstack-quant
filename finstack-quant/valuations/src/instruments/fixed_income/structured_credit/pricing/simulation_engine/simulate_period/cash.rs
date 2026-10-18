@@ -39,7 +39,7 @@ pub(super) fn record_opening_accruals(
         )?;
         if matches!(
             tranche.coupon,
-            crate::instruments::fixed_income::loan_terms::RateSpec::Floating(_)
+            finstack_quant_cashflows::builder::RateSpec::Floating(_)
         ) {
             rate = (rate + state.floating_rate_shift).max(0.0);
         }

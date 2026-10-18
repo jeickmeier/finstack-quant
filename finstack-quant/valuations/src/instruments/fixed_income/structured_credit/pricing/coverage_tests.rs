@@ -447,8 +447,8 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
         )?
     } else {
         match &tranche.coupon {
-            crate::instruments::fixed_income::loan_terms::RateSpec::Fixed { rate } => *rate,
-            crate::instruments::fixed_income::loan_terms::RateSpec::Floating(spec) => {
+            finstack_quant_cashflows::builder::RateSpec::Fixed { rate } => *rate,
+            finstack_quant_cashflows::builder::RateSpec::Floating(spec) => {
                 use rust_decimal::prelude::ToPrimitive;
                 spec.spread_bp.to_f64().unwrap_or_default() / 10_000.0
             }
@@ -457,10 +457,10 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
     // A floating coupon rides the simulated rate path (shift-then-floor,
     // matching the engine's interest-due kernel). Fixed coupons are contractual.
     let rate = match tranche.coupon {
-        crate::instruments::fixed_income::loan_terms::RateSpec::Floating(_) => {
+        finstack_quant_cashflows::builder::RateSpec::Floating(_) => {
             (rate + context.floating_rate_shift).max(0.0)
         }
-        crate::instruments::fixed_income::loan_terms::RateSpec::Fixed { .. } => rate,
+        finstack_quant_cashflows::builder::RateSpec::Fixed { .. } => rate,
     };
     // The waterfall spec defines the CLAIM the test measures coverage of:
     // capped claims accrue at the capped rate (applied after the shift, like
@@ -708,10 +708,10 @@ fn uncapped_claims(ids: &[&'static str]) -> HashMap<&'static str, Option<f64>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::types::{
         AssetPool, DealType, Tranche, TrancheSeniority, TrancheStructure,
     };
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use time::Month;
@@ -1234,11 +1234,11 @@ mod tests {
 #[cfg(test)]
 mod haircut_tests {
     use super::*;
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::types::{
         AssetPool, DealType, PoolAsset, Tranche, TrancheSeniority, TrancheStructure,
     };
     use finstack_quant_cashflows::builder::FloatingRateSpec;
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;

@@ -66,9 +66,10 @@ impl MetricCalculator for ImpliedVolCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::rates::irs::{FixedLegSpec, FloatLegSpec, FloatingLegCompounding};
+    use crate::instruments::rates::irs::{FixedLegSpec, FloatLegSpec};
     use crate::instruments::rates::swaption::CashSettlementMethod;
     use crate::instruments::{OptionType, SettlementType, VolatilityModel};
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;

@@ -17,6 +17,7 @@
 //! idiosyncratic dispersion, so the strict inequality holds only on the
 //! patched engine.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -26,7 +27,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, PoolGranularity, StochasticDefaultSpec, StochasticPrepaySpec,
 };
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, PoolAsset, StochasticPricingResult, StructuredCredit,
     StructuredCreditPricingMode, Tranche, TrancheSeniority, TrancheStructure,

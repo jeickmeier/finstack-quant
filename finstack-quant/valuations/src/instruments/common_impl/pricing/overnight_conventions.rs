@@ -3,8 +3,8 @@
 //! IRS, revolvers, basis swaps, XCCY, and TRS use this module so an overnight
 //! RFR index cannot silently price as a term fixing.
 
-use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::market::conventions::{ConventionRegistry, RateIndexConventions, RateIndexKind};
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::Result;
 

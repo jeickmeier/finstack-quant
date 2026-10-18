@@ -413,11 +413,11 @@ impl<S: PeriodShockSource> PoolFlowSource for InstrumentPathFlowSource<'_, S> {
 mod tests {
     use super::*;
     use crate::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule, CashflowSpec};
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::types::{
         AssetPool, CallExercisePolicy, DealType, DefaultModelSpec, InstrumentCollateral,
         PrepaymentModelSpec, PutExercisePolicy, Tranche, TrancheSeniority, TrancheStructure,
     };
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Tenor;
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;

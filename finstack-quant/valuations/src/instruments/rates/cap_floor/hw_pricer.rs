@@ -486,9 +486,9 @@ mod tests {
     use crate::instruments::rates::cap_floor::{
         OvernightCouponConvention, OvernightSpreadCompounding,
     };
-    use crate::instruments::rates::irs::FloatingLegCompounding;
     use date_support::date;
     use discount_forward_curve_support::{flat_discount_with_tenor, flat_forward_with_tenor};
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{calendar_by_id_strict, DateExt, DayCount, DayCountContext};
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;

@@ -171,6 +171,7 @@ fn test_tranche_convexity_matches_analytic() {
 /// Discount margin (DM) for floating-rate structured-credit tranches.
 mod discount_margin_tests {
     use finstack_quant_cashflows::builder::FloatingRateSpec;
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -178,7 +179,6 @@ mod discount_margin_tests {
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         calculate_tranche_discount_margin, calculate_tranche_metrics, calculate_tranche_z_spread,
         AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority,
@@ -443,6 +443,7 @@ mod discount_margin_tests {
 
 /// Break-even CDR for structured-credit tranches.
 mod breakeven_cdr_tests {
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{
         DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
     };
@@ -451,7 +452,6 @@ mod breakeven_cdr_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         calculate_tranche_breakeven_cdr, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
         TrancheSeniority, TrancheStructure,
@@ -550,13 +550,13 @@ mod breakeven_cdr_tests {
 
 /// Scenario / yield table for structured-credit tranches.
 mod scenario_table_tests {
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{PrepaymentModelSpec, RecoveryModelSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         scenario_table, AssetPool, DealType, PoolAsset, ScenarioGrid, StructuredCredit, Tranche,
         TrancheSeniority, TrancheStructure,
@@ -688,6 +688,7 @@ mod scenario_table_tests {
 
 /// Option-adjusted spread (rate/credit/both coupling).
 mod oas_tests {
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{
         DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
     };
@@ -696,7 +697,6 @@ mod oas_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         calculate_tranche_oas, calculate_tranche_z_spread, AssetPool, DealType, OasConfig,
         PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,

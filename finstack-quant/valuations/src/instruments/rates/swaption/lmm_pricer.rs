@@ -7,7 +7,6 @@
 use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::common_impl::parameters::SettlementType;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::instruments::rates::swaption::bermudan::apply_exercise_today;
 use crate::instruments::rates::swaption::pricing::lmm_bermudan::price_bermudan_lmm;
 use crate::instruments::rates::swaption::BermudanSwaption;
@@ -16,6 +15,7 @@ use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;

@@ -213,11 +213,11 @@ mod tests {
     use super::*;
     use crate::instruments::fixed_income::revolving_credit::ThreeFactorPathData;
 
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::revolving_credit::{
         CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit, RevolvingCreditFees,
         StochasticUtilizationSpec, UtilizationProcess,
     };
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::dates::DayCount;
 
     use finstack_quant_core::market_data::context::MarketContext;

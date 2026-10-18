@@ -295,12 +295,12 @@ fn production_structured_metrics_credit_model_risks_move_pv() {
 #[test]
 fn production_structured_metrics_discount_margin_settles_clean_price_at_quote_date() {
     use finstack_quant_cashflows::builder::FloatingRateSpec;
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::{
         dates::{DayCount, Tenor},
         market_data::{scalars::ScalarTimeSeries, term_structures::ForwardCurve},
         types::CurveId,
     };
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::calculate_tranche_discount_margin;
     use rust_decimal_macros::dec;
     let (mut deal, market) = deal_and_market();

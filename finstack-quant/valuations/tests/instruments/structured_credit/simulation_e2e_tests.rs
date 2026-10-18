@@ -7,6 +7,7 @@
 //! Each test documents the expected values analytically so failures
 //! can be traced to specific calculation steps.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -15,7 +16,6 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche,
     TrancheSeniority, TrancheStructure,

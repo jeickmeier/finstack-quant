@@ -219,10 +219,8 @@ pub(super) fn tranche_period_interest_due(
     // fixed coupon is contractual and unaffected. Floored at zero so a deeply
     // negative path cannot manufacture a negative coupon.
     let raw = match tranche.coupon {
-        crate::instruments::fixed_income::loan_terms::RateSpec::Floating(_) => {
-            (raw + rate_shift).max(0.0)
-        }
-        crate::instruments::fixed_income::loan_terms::RateSpec::Fixed { .. } => raw,
+        finstack_quant_cashflows::builder::RateSpec::Floating(_) => (raw + rate_shift).max(0.0),
+        finstack_quant_cashflows::builder::RateSpec::Fixed { .. } => raw,
     };
     // The AFC cap is applied AFTER the shift: the cap tracks the collateral's
     // net WAC, which is itself shifted, so capping the unshifted rate would

@@ -485,7 +485,7 @@ fn test_recovery_rate_golden_industry_standards() {
     // Industry standard recovery rates by asset class, as applied by the
     // deal-type constructors from the embedded assumptions registry.
     // Reference: Moody's Default Study, S&P Recovery Studies
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
     };

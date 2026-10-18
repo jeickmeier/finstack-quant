@@ -9,8 +9,8 @@ use crate::instruments::common_impl::pricing::overnight::{
     OvernightProjectionCurve,
 };
 use crate::instruments::common_impl::pricing::overnight_conventions;
-use crate::instruments::fixed_income::loan_terms::RateSpec;
-use crate::instruments::rates::irs::FloatingLegCompounding;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::market_data::fixings::fixing_series_id;

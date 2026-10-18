@@ -891,7 +891,7 @@ mod tests {
         .expect("swap");
         swap.float_leg.forward_curve_id = swap.fixed_leg.discount_curve_id.clone();
         swap.float_leg.compounding =
-            crate::instruments::rates::irs::FloatingLegCompounding::CompoundedInArrears {
+            finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears {
                 lookback_days: 0,
             };
         let market = MarketContext::new().insert(

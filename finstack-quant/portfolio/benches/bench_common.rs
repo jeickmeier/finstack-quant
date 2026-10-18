@@ -8,6 +8,7 @@
 
 #![allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
 use finstack_quant_core::currency::Currency;
@@ -49,7 +50,6 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
 use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
     DeflationProtection, IndexationMethod, InflationLinkedBond,
 };
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
@@ -778,8 +778,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             fixing_calendar_id: None,
             start: expiry,
             end: swap_end,
-            compounding:
-                finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::Simple,
+            compounding: finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,
             payment_lag_days: 0,
             end_of_month: false,
         };

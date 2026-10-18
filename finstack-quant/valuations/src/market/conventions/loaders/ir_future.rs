@@ -10,7 +10,7 @@ use finstack_quant_core::HashMap;
 #[serde(deny_unknown_fields)]
 struct IrFutureConventionsRecord {
     index_id: String,
-    compounding: crate::instruments::rates::irs::FloatingLegCompounding,
+    compounding: finstack_quant_cashflows::builder::FloatingLegCompounding,
     reference_period: IrFutureReferencePeriod,
     calendar_id: String,
     settlement_days: i32,
@@ -115,7 +115,7 @@ mod tests {
         assert_eq!(euribor.index_id, IndexId::new("EUR-EURIBOR-3M"));
         assert_eq!(
             euribor.compounding,
-            crate::instruments::rates::irs::FloatingLegCompounding::Simple
+            finstack_quant_cashflows::builder::FloatingLegCompounding::Simple
         );
         assert_eq!(
             euribor.reference_period,

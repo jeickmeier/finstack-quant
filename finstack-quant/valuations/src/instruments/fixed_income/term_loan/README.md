@@ -17,7 +17,7 @@ Import path:
 | Item | Purpose |
 |------|---------|
 | `TermLoan` | The runtime instrument. Build with `TermLoan::builder()`; examples: `example`, `example_floating_with_ddtl`, `example_callable`. |
-| `RateSpec` | The shared `loan_terms::RateSpec`: `Fixed { rate }` (decimal) or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
+| `RateSpec` | The cashflows `finstack_quant_cashflows::builder::RateSpec`: `Fixed { rate }` (decimal) or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
 | `AmortizationSpec` | The shared cashflows `AmortizationSpec`: `None` (bullet), `LinearBetween { start, end }`, `PercentOfRemainingPerPeriod { pct }`, `PercentOfOriginalPerPeriod { pct }`, `CustomPrincipal { items }`; `LinearTo` and `StepRemaining` are rejected. |
 | `DdtlSpec`, `DrawEvent`, `CommitmentStep`, `CommitmentFeeBase` | Delayed-draw commitment, draw calendar, step-downs (the `loan_terms::CommitmentStep` shared with the revolver; no reduction fee), commitment/usage fee bases. |
 | `TermLoanCovenantEvents`, `MarginStep`, `PikToggle`, `CashSweepEvent` | Covenant-driven margin steps (`margin_steps`), PIK toggles, cash sweeps, draw-stop dates. |

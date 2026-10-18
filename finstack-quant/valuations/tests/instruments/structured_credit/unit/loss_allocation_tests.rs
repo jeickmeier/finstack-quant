@@ -4,13 +4,13 @@
 //! default, so a CLO Class D lost its coupon while equity kept receiving
 //! residual cash.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, AssetPool, DealType, LossAllocationPolicy, LossRecognition, PoolAsset,
     StepDownSpec, StepDownTrigger, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,

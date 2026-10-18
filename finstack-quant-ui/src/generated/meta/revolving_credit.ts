@@ -1320,7 +1320,7 @@ export default [
   {
     "path": "#/$defs/d_3c319da7190ff52c5100",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RateSpec",
-    "description": "Contractual coupon of a loan facility or note: a fixed all-in rate or a\nfloating index plus spread.\n\nShared by `TermLoan.rate`, `RevolvingCredit.rate`, `AssetBackedFacility.rate`\nand structured-credit `Tranche.coupon`.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;\n\nlet fixed = RateSpec::Fixed { rate: 0.06 }; // 6% all-in\nassert!(matches!(fixed, RateSpec::Fixed { .. }));\n```"
+    "description": "Contractual coupon of a loan facility or note: a fixed all-in rate or a\nfloating index plus spread.\n\nShared by the valuations term loan, revolving credit facility, asset-backed\nfacility and structured-credit tranche coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RateSpec;\n\nlet fixed = RateSpec::Fixed { rate: 0.06 }; // 6% all-in\nassert!(matches!(fixed, RateSpec::Fixed { .. }));\n```"
   },
   {
     "path": "#/$defs/d_3c319da7190ff52c5100/oneOf/0",
@@ -1340,7 +1340,7 @@ export default [
   {
     "path": "#/$defs/d_3c319da7190ff52c5100/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RateSpec/oneOf/1",
-    "description": "Floating index plus spread, with the canonical floor, cap, gearing and\nreset conventions of [`FloatingRateSpec`]."
+    "description": "Floating index plus spread, with the canonical floor, cap, gearing and\nreset conventions of [`FloatingRateSpec`](super::FloatingRateSpec)."
   },
   {
     "path": "#/$defs/d_3c319da7190ff52c5100/oneOf/1/properties/floating",

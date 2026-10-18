@@ -3,11 +3,11 @@
 use super::components::compute_upfront_fee_pv;
 use super::results::PathResult;
 use super::unified::RevolvingCreditPricer;
-use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::revolving_credit::cashflow_engine::{
     CashflowEngine, PathAwareCashflowSchedule, ThreeFactorPathData,
 };
 use crate::instruments::fixed_income::revolving_credit::types::{DrawRepaySpec, RevolvingCredit};
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;

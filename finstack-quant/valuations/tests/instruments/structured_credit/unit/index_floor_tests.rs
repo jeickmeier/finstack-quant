@@ -1,11 +1,11 @@
 //! Collateral index floors: a floating row pays `max(index, floor) + spread`,
 //! so a floor above the forward lifts the pool coupon and the tranche OAS.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_oas, run_simulation_with_diagnostics, AssetPool, DealType, OasConfig,
     PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,

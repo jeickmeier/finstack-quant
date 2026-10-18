@@ -3,6 +3,7 @@
 //! Tests end-to-end waterfall execution and cashflow scheduling
 //! across different deal types.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -13,7 +14,6 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, AssetType, DealType, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };

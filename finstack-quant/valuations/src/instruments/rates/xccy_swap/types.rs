@@ -468,7 +468,7 @@ impl XccySwap {
 
     fn validate_leg(&self, leg: &XccySwapLeg) -> Result<()> {
         if leg.leg.compounding
-            == crate::instruments::rates::irs::FloatingLegCompounding::SimpleAverage
+            == finstack_quant_cashflows::builder::FloatingLegCompounding::SimpleAverage
         {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "XccySwap '{}' leg.compounding = simple_average is not supported; \
@@ -608,7 +608,7 @@ impl XccySwap {
             OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
         use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
-        use crate::instruments::rates::irs::FloatingLegCompounding;
+        use finstack_quant_cashflows::builder::FloatingLegCompounding;
 
         let projected = if !matches!(leg.leg.compounding, FloatingLegCompounding::Simple) {
             let calendar = self.resolve_leg_calendar(leg)?;
@@ -1623,7 +1623,7 @@ mod tests {
         use crate::instruments::common_impl::pricing::overnight::{
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
-        use crate::instruments::rates::irs::FloatingLegCompounding;
+        use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::dates::calendar_by_id_strict;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
@@ -1708,7 +1708,7 @@ mod tests {
 
     #[test]
     fn overnight_unresolvable_calendar_without_fallback_errors() {
-        use crate::instruments::rates::irs::FloatingLegCompounding;
+        use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
         let start = Date::from_calendar_date(2025, time::Month::January, 2).expect("date");
@@ -1789,7 +1789,8 @@ mod tests {
     fn validate_rejects_simple_compounding_on_overnight_index() {
         let mut swap = XccySwap::example().expect("example");
         swap.leg1.leg.forward_curve_id = CurveId::new("USD-SOFR-OIS");
-        swap.leg1.leg.compounding = crate::instruments::rates::irs::FloatingLegCompounding::Simple;
+        swap.leg1.leg.compounding =
+            finstack_quant_cashflows::builder::FloatingLegCompounding::Simple;
         let err = swap
             .validate()
             .expect_err("Simple on USD-SOFR-OIS must fail");

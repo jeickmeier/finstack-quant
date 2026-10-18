@@ -26,7 +26,7 @@ mod tests {
     use time::Month;
 
     use super::super::types::{DrawRepaySpec, RevolvingCredit, RevolvingCreditFees};
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
+    use finstack_quant_cashflows::builder::RateSpec;
 
     #[test]
     fn test_unified_pricer_key() {

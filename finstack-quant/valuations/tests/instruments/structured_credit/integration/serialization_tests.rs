@@ -3,13 +3,13 @@
 //! Tests that all structured credit types serialize/deserialize correctly
 //! and maintain wire format compatibility.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
 };
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::RepLine;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CoverageTrigger, DealType, DefaultModelSpec, HedgeSwap, PoolAsset,

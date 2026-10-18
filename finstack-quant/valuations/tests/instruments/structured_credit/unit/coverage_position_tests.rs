@@ -3,6 +3,7 @@
 //! The 2026-09-15 audit found a D-only OC test deferring the B and C coupons
 //! because every failing test diverted the whole subordinated interest tier.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -10,7 +11,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, run_simulation_with_diagnostics, AssetPool, CoverageTestAction,
     CoverageTestSpec, DealType, PoolAsset, SimulationRun, StructuredCredit, Tranche,

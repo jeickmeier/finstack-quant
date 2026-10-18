@@ -351,13 +351,13 @@ pub fn calibrate_bermudan_lmm_base_vol_from_json(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Tenor;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
-    use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
     use finstack_quant_valuations::instruments::rates::swaption::lmm_pricer::lmm_bermudan_mc_config;
     use finstack_quant_valuations::instruments::rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
     use finstack_quant_valuations::instruments::rates::swaption::{

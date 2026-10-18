@@ -300,8 +300,8 @@ fn test_waterfall_engine_add_tier() {
 
 #[test]
 fn abs_template_does_not_trap_junior_coupon() {
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::dates::Date;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         Tranche, TrancheSeniority, TrancheStructure,
     };

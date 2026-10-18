@@ -1,11 +1,10 @@
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::{
     dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor},
     money::Money,
     types::{CurveId, InstrumentId},
 };
-use finstack_quant_valuations::instruments::rates::irs::{
-    FloatingLegCompounding, InterestRateSwap,
-};
+use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
 use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
 use rust_decimal::Decimal;
 

@@ -9,9 +9,8 @@ use crate::instruments::common_impl::vol_resolution::{
     resolve_volatility, validate_sigma, ResolvedVolatility, VolatilityRequest,
 };
 use crate::instruments::pricing_overrides::VolSurfaceExtrapolation;
-use crate::instruments::rates::irs::{
-    FixedLegSpec, FloatLegSpec, FloatingLegCompounding, InterestRateSwap, PayReceive,
-};
+use crate::instruments::rates::irs::{FixedLegSpec, FloatLegSpec, InterestRateSwap, PayReceive};
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

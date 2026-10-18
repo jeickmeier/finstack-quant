@@ -17,6 +17,7 @@
 //! Market Standards Review (Week 5)
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -24,9 +25,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::rates::irs::{
-    FloatingLegCompounding, InterestRateSwap, PayReceive,
-};
+use finstack_quant_valuations::instruments::rates::irs::{InterestRateSwap, PayReceive};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
 use finstack_quant_valuations::metrics::MetricId;

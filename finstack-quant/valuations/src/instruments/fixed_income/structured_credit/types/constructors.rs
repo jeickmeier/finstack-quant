@@ -8,10 +8,10 @@ use super::{
     PoolAsset, PrepaymentModelSpec, RecoveryModelSpec, StructuredCredit, Tranche, TrancheSeniority,
     TrancheStructure,
 };
-use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::structured_credit::assumptions::{
     embedded_registry_or_panic, required_assumption,
 };
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};

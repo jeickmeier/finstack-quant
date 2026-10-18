@@ -461,9 +461,9 @@ fn receive_vs_pay_legs_have_opposite_signs() {
 
 #[test]
 fn estr_overnight_versus_euribor_float_leg_prices() {
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 
     let base = d(2025, 1, 2);
     let maturity = d(2026, 1, 2);
@@ -491,10 +491,10 @@ fn estr_overnight_versus_euribor_float_leg_prices() {
 
 #[test]
 fn mtm_reset_still_emits_notional_rebals_with_overnight_leg() {
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
     use finstack_quant_valuations::instruments::rates::xccy_swap::ResettingSide;
 
     let base = d(2025, 1, 2);

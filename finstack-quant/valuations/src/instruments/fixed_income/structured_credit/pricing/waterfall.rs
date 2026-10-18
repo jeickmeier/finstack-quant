@@ -4,13 +4,13 @@
 //! All type definitions are in `types::waterfall`.
 
 use super::coverage_tests::TestContext;
-use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::structured_credit::types::{
     AfcSpec, AllocationMode, AssetPool, CoverageRules, CoverageTestAction, CoverageTestSpec,
     DiversionRecord, EquityHistory, FundingSource, LiveCollateral, PaymentCalculation,
     PaymentRecord, PaymentType, Recipient, RecipientType, RoundingConvention, Tranche,
     TrancheStructure, Waterfall, WaterfallDistribution, WaterfallTier,
 };
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -1508,12 +1508,12 @@ mod coverage_position_tests {
     //! the `CoverageTest::calculate` level in `coverage_tests.rs`.
     use super::execute_waterfall;
     use super::WaterfallContext;
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::types::{
         AllocationMode, AssetPool, AssetType, CoverageTestSpec, DealType, PaymentCalculation,
         PaymentType, PoolAsset, Recipient, RecipientType, Tranche, TrancheSeniority,
         TrancheStructure, Waterfall, WaterfallTier,
     };
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -2194,11 +2194,11 @@ mod coverage_position_tests {
 #[cfg(test)]
 mod water_fill_tests {
     use super::*;
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::types::{
         AllocationMode, AssetPool, DealType, PaymentType, Recipient, Tranche, TrancheSeniority,
         TrancheStructure, Waterfall, WaterfallTier,
     };
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::money::Money;

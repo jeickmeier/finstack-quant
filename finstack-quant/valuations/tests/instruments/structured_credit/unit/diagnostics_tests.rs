@@ -3,13 +3,13 @@
 //! XIRR of the equity flows (including reserve interest paid straight to the
 //! residual class), and the diagnostics round-trip through JSON.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_equity_metrics, run_simulation_with_diagnostics, AssetPool, CoverageTestSpec,
     DealType, PoolAsset, ReserveInterestDestination, SimulationDiagnostics, StructuredCredit,

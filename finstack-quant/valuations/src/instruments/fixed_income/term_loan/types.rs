@@ -50,11 +50,11 @@ use super::spec::{
 };
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-pub use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::loan_terms::UpfrontFee;
 use crate::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::FloatingRateSpec;
+pub use finstack_quant_cashflows::builder::RateSpec;
 
 fn default_settlement_days() -> u32 {
     2

@@ -29,7 +29,7 @@ impl HwSwaptionCashflows {
         exercise: Date,
         as_of: Date,
     ) -> Result<Self> {
-        use crate::instruments::rates::irs::FloatingLegCompounding;
+        use finstack_quant_cashflows::builder::FloatingLegCompounding;
         let compounded = match float.compounding {
             FloatingLegCompounding::Simple => false,
             FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }

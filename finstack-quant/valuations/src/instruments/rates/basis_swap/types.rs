@@ -322,7 +322,8 @@ impl BasisSwap {
     }
 
     fn validate_leg_lags(id: &str, leg_name: &str, leg: &FloatLegSpec) -> Result<()> {
-        if leg.compounding == crate::instruments::rates::irs::FloatingLegCompounding::SimpleAverage
+        if leg.compounding
+            == finstack_quant_cashflows::builder::FloatingLegCompounding::SimpleAverage
         {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "BasisSwap '{id}' {leg_name}_leg.compounding = simple_average is not supported; \
@@ -412,7 +413,7 @@ impl BasisSwap {
         let currency = self.notional.currency();
         if !matches!(
             leg.compounding,
-            crate::instruments::rates::irs::FloatingLegCompounding::Simple
+            finstack_quant_cashflows::builder::FloatingLegCompounding::Simple
         ) {
             let schedule = self.floating_leg_schedule(leg, market, as_of)?;
             let mut acc = finstack_quant_core::math::NeumaierAccumulator::new();
@@ -547,7 +548,7 @@ impl BasisSwap {
 
         let overnight = !matches!(
             leg.compounding,
-            crate::instruments::rates::irs::FloatingLegCompounding::Simple
+            finstack_quant_cashflows::builder::FloatingLegCompounding::Simple
         );
         let overnight_calendar = if overnight {
             Some(
@@ -642,7 +643,7 @@ impl BasisSwap {
     ) -> Result<CashFlowSchedule> {
         if !matches!(
             leg.compounding,
-            crate::instruments::rates::irs::FloatingLegCompounding::Simple
+            finstack_quant_cashflows::builder::FloatingLegCompounding::Simple
         ) {
             return self.overnight_leg_schedule(leg, market, as_of);
         }
@@ -1612,7 +1613,7 @@ mod tests {
         use crate::instruments::common_impl::pricing::overnight::{
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
-        use crate::instruments::rates::irs::FloatingLegCompounding;
+        use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::dates::calendar_by_id_strict;
 
         let start = date(2025, 1, 2);
@@ -1731,7 +1732,7 @@ mod tests {
         use crate::instruments::common_impl::pricing::overnight::{
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
-        use crate::instruments::rates::irs::FloatingLegCompounding;
+        use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::dates::calendar_by_id_strict;
 
         let start = date(2025, 1, 2);
@@ -1847,7 +1848,7 @@ mod tests {
 
     #[test]
     fn overnight_annuity_uses_projector_year_fraction() {
-        use crate::instruments::rates::irs::FloatingLegCompounding;
+        use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::dates::calendar_by_id_strict;
 
         let start = date(2025, 7, 4);
@@ -1992,7 +1993,7 @@ mod tests {
             spread_bp: Decimal::ZERO,
             payment_lag_days: 0,
             reset_lag_days: 0,
-            compounding: crate::instruments::rates::irs::FloatingLegCompounding::Simple,
+            compounding: finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,
         };
         let term = FloatLegSpec {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),

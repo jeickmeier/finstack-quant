@@ -1,5 +1,6 @@
 //! Exchange settlement tests for arithmetic and compounded overnight futures.
 
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -8,7 +9,6 @@ use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_valuations::instruments::rates::ir_future::{
     FutureContractSpecs, InterestRateFuture,
 };
-use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 use time::macros::date;
 

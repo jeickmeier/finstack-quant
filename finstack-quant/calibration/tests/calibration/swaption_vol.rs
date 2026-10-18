@@ -14,6 +14,7 @@ use finstack_quant_calibration::api::schema::{
 use finstack_quant_calibration::quotes::ids::QuoteId;
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::CalibrationConfig;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
@@ -24,9 +25,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::instruments::rates::irs::{
-    FixedLegSpec, FloatLegSpec, FloatingLegCompounding,
-};
+use finstack_quant_valuations::instruments::rates::irs::{FixedLegSpec, FloatLegSpec};
 use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
 use finstack_quant_valuations::instruments::{OptionType, SettlementType, VolatilityModel};
 use finstack_quant_valuations::market::conventions::ids::SwaptionConventionId;

@@ -25,7 +25,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use rust_decimal::Decimal;
 
-use crate::instruments::rates::irs::{FloatingLegCompounding, InterestRateSwap, PayReceive};
+use crate::instruments::rates::irs::{InterestRateSwap, PayReceive};
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_cashflows::builder::{
     build_periods, merge_cashflow_schedules, BuildPeriodsParams, CashFlowSchedule,
     FloatingCouponSpec, FloatingRateSpec, Notional, PrincipalExchange, SchedulePeriod,

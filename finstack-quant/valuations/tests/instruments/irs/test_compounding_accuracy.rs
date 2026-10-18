@@ -1,5 +1,6 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, Tenor};
@@ -9,9 +10,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::rates::irs::{
-    FixedLegSpec, FloatLegSpec, FloatingLegCompounding, PayReceive,
-};
+use finstack_quant_valuations::instruments::rates::irs::{FixedLegSpec, FloatLegSpec, PayReceive};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::InterestRateSwap;
 use time::Month;

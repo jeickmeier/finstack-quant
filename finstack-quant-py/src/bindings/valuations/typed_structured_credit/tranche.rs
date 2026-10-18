@@ -9,8 +9,8 @@ use crate::bindings::valuations::convert::{
     rate_decimal_from_py,
 };
 use crate::errors::core_to_py;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     CoverageTrigger, Tranche, TrancheSeniority,
 };

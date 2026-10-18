@@ -8,12 +8,12 @@
 //! - Senior/subordination calculations
 //! - Coverage triggers
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     CoverageTrigger, Tranche, TrancheSeniority, TrancheStructure, TriggerConsequence,
 };

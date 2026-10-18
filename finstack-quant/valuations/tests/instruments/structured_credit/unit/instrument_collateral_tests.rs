@@ -1,5 +1,6 @@
 //! Instrument-backed collateral: representation, validation and materialization.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
@@ -7,7 +8,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_pool_stats, AssetPool, AssetType, CallExercisePolicy, DealType, InstrumentCollateral,

@@ -769,13 +769,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::revolving_credit::{
         DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
     };
     use crate::instruments::fixed_income::structured_credit::StructuredCredit;
     use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
     use crate::instruments::{Instrument, ScenarioPricingOverrides};
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};

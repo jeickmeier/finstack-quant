@@ -3,13 +3,13 @@
 //! target, and the final-date principal cover. The 2026-09-17 audit found
 //! the template had no reserve replenishment, target or release at all.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation_with_diagnostics, AssetPool, DealType, PoolAsset, ReserveAccountSpec,
     ReserveTarget, SimulationRun, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,

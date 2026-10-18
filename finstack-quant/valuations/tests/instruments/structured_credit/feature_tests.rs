@@ -5,6 +5,7 @@
 //! 3. OC/IC cure amount diversion mechanism
 //! 4. Clean-up call modeling
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -13,7 +14,6 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche,
     TrancheSeniority, TrancheStructure,
@@ -377,6 +377,7 @@ fn waterfall_with_coverage_triggers_still_works() {
 
 /// Available-funds cap (net-WAC cap) layered on via `waterfall_rules`.
 mod afc_tests {
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{
         DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
     };
@@ -385,7 +386,6 @@ mod afc_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         AfcSpec, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority,
         TrancheStructure, WaterfallRules,
@@ -590,6 +590,7 @@ mod afc_tests {
 
 /// Excess-spread / spread-account capture, trigger-gated retention, and release.
 mod excess_spread_tests {
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{
         DefaultModelSpec, FloatingRateSpec, PrepaymentModelSpec, RecoveryModelSpec,
     };
@@ -600,7 +601,6 @@ mod excess_spread_tests {
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         run_simulation, AssetPool, DealType, ExcessSpreadSpec, PoolAsset, StructuredCredit,
         Tranche, TrancheSeniority, TrancheStructure, WaterfallRules,
@@ -878,6 +878,7 @@ mod excess_spread_tests {
 
 /// Step-down: trigger-gated switch of principal allocation to pro-rata.
 mod step_down_tests {
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{
         DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
     };
@@ -886,7 +887,6 @@ mod step_down_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         run_simulation, AssetPool, DealType, PoolAsset, StepDownSpec, StepDownTrigger,
         StructuredCredit, Tranche, TrancheSeniority, TrancheStructure, WaterfallRules,
@@ -1130,6 +1130,7 @@ mod step_down_tests {
 
 /// Shifting interest: scheduled senior principal share (lockout then release).
 mod shifting_interest_tests {
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{
         DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
     };
@@ -1139,7 +1140,6 @@ mod shifting_interest_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::InstrumentId;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         run_simulation, AssetPool, AssetType, DealType, PoolAsset, ShiftingInterestSpec,
         ShiftingInterestStep, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
@@ -1493,6 +1493,7 @@ mod shifting_interest_tests {
 /// Early amortization: a revolving (master-trust) deal ends its revolving
 /// period early on a cumulative-loss breach and begins amortizing.
 mod early_amortization_tests {
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{
         DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
     };
@@ -1501,7 +1502,6 @@ mod early_amortization_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         run_simulation, AssetPool, DealType, EarlyAmortizationSpec, PoolAsset,
         ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche, TrancheSeniority,
@@ -1630,6 +1630,7 @@ mod early_amortization_tests {
 
 /// Controlled accumulation: principal held in a funding account until a bullet.
 mod controlled_accumulation_tests {
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{
         DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
     };
@@ -1638,7 +1639,6 @@ mod controlled_accumulation_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         run_simulation, AssetPool, ControlledAccumulationSpec, DealType, PoolAsset,
         StructuredCredit, Tranche, TrancheSeniority, TrancheStructure, WaterfallRules,

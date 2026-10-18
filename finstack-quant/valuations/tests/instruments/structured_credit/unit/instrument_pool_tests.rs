@@ -1,6 +1,7 @@
 //! Deterministic pools of real instruments: schedule-driven flows, reserve
 //! funding of draws, replenishment, and call/put exercise policies.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
@@ -12,7 +13,6 @@ use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, CashflowSpec,
 };
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };

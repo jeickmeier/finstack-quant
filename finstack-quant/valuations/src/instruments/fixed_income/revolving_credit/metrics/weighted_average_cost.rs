@@ -31,10 +31,10 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
         let facility: &RevolvingCredit = context.instrument_as()?;
 
         let base_rate = match &facility.rate {
-            crate::instruments::fixed_income::loan_terms::RateSpec::Fixed { rate } => {
+            finstack_quant_cashflows::builder::RateSpec::Fixed { rate } => {
                 *rate + facility.margin_delta_bp_at(context.as_of) * 1e-4
             }
-            crate::instruments::fixed_income::loan_terms::RateSpec::Floating(spec) => {
+            finstack_quant_cashflows::builder::RateSpec::Floating(spec) => {
                 let fwd = context.curves.get_forward(spec.forward_curve_id.as_str())?;
                 let index_rate = average_forward_rate(&fwd, facility, context.as_of)?;
                 let mut params =
@@ -123,8 +123,8 @@ fn average_forward_rate(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::revolving_credit::{DrawRepaySpec, RevolvingCreditFees};
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Tenor};
     use finstack_quant_core::money::Money;

@@ -1,8 +1,8 @@
 use super::{DealType, StructuredCredit, TrancheSeniority};
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::model_params::ModelParamsSnapshot;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::{
     schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
 };

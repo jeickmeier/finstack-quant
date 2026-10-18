@@ -821,7 +821,7 @@ pub(super) mod tests {
     }
 
     fn revolving_credit_json(invalid_gearing: bool, with_credit: bool) -> String {
-        use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
+        use finstack_quant_cashflows::builder::RateSpec;
         use finstack_quant_valuations::instruments::{InstrumentJson, RevolvingCredit};
 
         let mut facility = RevolvingCredit::example().expect("facility");

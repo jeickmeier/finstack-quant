@@ -93,24 +93,14 @@
 //! - swap metrics module for swap-specific risk metrics
 
 pub(crate) mod cashflow;
-pub mod compounding;
 pub(crate) mod metrics;
 /// Interest rate swap pricer implementation
 pub(crate) mod pricer;
 mod types;
 
-pub use compounding::FloatingLegCompounding;
 pub use types::{
     ConventionSwapParams, FixedLegSpec, FloatLegSpec, InterestRateSwap, InterestRateSwapBuilder,
     IrsLegConventions, PayReceive,
 };
 
-/// Error for a swap float leg set to `simple_average`, which the swap
-/// projectors do not implement (they compound or take one term forward).
-pub(crate) fn simple_average_unsupported() -> finstack_quant_core::Error {
-    finstack_quant_core::Error::Validation(
-        "float_leg.compounding = simple_average is not supported on swap legs; \
-         use simple or a compounded_* variant"
-            .to_string(),
-    )
-}
+pub(crate) use crate::instruments::common_impl::parameters::legs::simple_average_unsupported;

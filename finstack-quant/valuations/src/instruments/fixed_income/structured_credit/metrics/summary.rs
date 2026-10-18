@@ -7,7 +7,6 @@
 //! cashflows, reusing the standalone calculators the registry wraps.
 
 use crate::constants::ONE_BASIS_POINT;
-use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::structured_credit::metrics::{
     calculate_tranche_cs01, calculate_tranche_spread_convexity, calculate_tranche_wal,
     calculate_tranche_z_spread,
@@ -17,6 +16,7 @@ use crate::instruments::fixed_income::structured_credit::{
     TrancheSeniority,
 };
 use crate::instruments::Instrument;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{

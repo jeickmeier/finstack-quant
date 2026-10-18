@@ -37,7 +37,7 @@ use super::super::types::{
     CreditSpreadProcessSpec, InterestRateProcessSpec, McConfig, RevolvingCredit,
     RevolvingCreditMcRun, StochasticUtilizationSpec, UtilizationProcess,
 };
-use crate::instruments::fixed_income::loan_terms::RateSpec;
+use finstack_quant_cashflows::builder::RateSpec;
 
 /// Generate 3-factor MC paths using the existing process infrastructure.
 ///

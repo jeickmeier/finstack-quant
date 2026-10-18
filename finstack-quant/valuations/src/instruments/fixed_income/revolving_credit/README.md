@@ -19,7 +19,7 @@ Import path:
 | Item | Purpose |
 |------|---------|
 | `RevolvingCredit` | The instrument. Build with `RevolvingCredit::builder()`; `RevolvingCredit::example()` for a canonical facility. |
-| `RateSpec` | The shared `loan_terms::RateSpec`: `Fixed { rate }` (decimal) or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
+| `RateSpec` | The cashflows `finstack_quant_cashflows::builder::RateSpec`: `Fixed { rate }` (decimal) or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
 | `RevolvingCreditFees` | `upfront_fee`, `commitment_fee_tiers`, `usage_fee_tiers`, `facility_fee_bp`. Helper: `flat(..)`. |
 | `DrawRepaySpec`, `DrawRepayEvent` | `Deterministic(Vec<DrawRepayEvent>)` or `Stochastic(Box<StochasticUtilizationSpec>)`. |
 | `CommitmentStep`, `MarginStep`, `FeeStep` (from `loan_terms`) | Dated commitment, margin and fee changes; see "Dated terms". |
@@ -58,7 +58,7 @@ revolving_credit/
 ## Construction
 
 ```rust
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };

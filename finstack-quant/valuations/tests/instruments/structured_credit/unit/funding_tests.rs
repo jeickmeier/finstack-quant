@@ -4,6 +4,7 @@
 //! strictly separated by tier type, so a senior coupon shortfall deferred
 //! even with ample principal in the deal.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -11,7 +12,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     execute_waterfall, run_simulation, AssetPool, CoverageTestSpec, DealType, FundingSource,
     PaymentType, PoolAsset, Recipient, StructuredCredit, Tranche, TrancheCashflows,

@@ -7,6 +7,7 @@ use crate::config::CalibrationConfig;
 use crate::quotes::vol::VolQuote;
 use crate::quotes::MarketQuote;
 use crate::CalibrationReport;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{
     adjust, BusinessDayConvention, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };
@@ -16,7 +17,6 @@ use finstack_quant_core::market_data::surfaces::VolCube;
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_core::Result;
 use finstack_quant_models::{SabrCalibrator, SabrParameters, SabrShift};
-use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::rates::swaption::contractual_swap_tenor_years;
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use std::collections::BTreeMap;

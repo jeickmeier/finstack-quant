@@ -6,10 +6,10 @@
 use crate::builder::ModelBuilder;
 use crate::error::Result;
 use crate::types::{CapitalStructureSpec, DebtInstrumentSpec, FinancialStatementInstrument};
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
-use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::{Bond, FixedLegSpec, FloatLegSpec, InterestRateSwap};
 use rust_decimal::Decimal;
 

@@ -2,11 +2,11 @@
 mod cases {
     use super::super::*;
 
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::{
         AssetPool, DealType, DefaultModelSpec, PoolAsset, PrepaymentModelSpec, RecoveryModelSpec,
         Tranche, TrancheSeniority, TrancheStructure,
     };
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::fixings::fixing_series_id;
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;

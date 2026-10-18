@@ -1,10 +1,10 @@
 //! Interest rate option instrument types and Black model greeks.
 
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::instruments::{ExerciseStyle, SettlementType};
 use crate::market::conventions::defs::RateIndexKind;
 use crate::market::conventions::ConventionRegistry;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
 };

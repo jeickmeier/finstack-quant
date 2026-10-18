@@ -1414,12 +1414,12 @@ fn expected_shortfall(losses: &mut [f64], confidence: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
     use crate::instruments::fixed_income::structured_credit::{
         AssetPool, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec, Tranche,
         TrancheCashflows, TrancheSeniority, TrancheStructure,
     };
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DateExt};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -1974,12 +1974,12 @@ mod per_name_copula_tests {
     }
 
     use super::*;
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
     use crate::instruments::fixed_income::structured_credit::{
         AssetPool, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec, Tranche,
         TrancheSeniority, TrancheStructure,
     };
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;

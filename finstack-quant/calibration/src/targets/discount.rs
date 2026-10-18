@@ -549,11 +549,9 @@ impl DiscountCurveTarget {
     /// downstream single-curve OIS pricing apply the *same* compounded fast-path
     /// decision (see `projected_compounded_float_leg_schedule`).
     fn calibration_ois_cutoff_days(
-        ois_compounding: Option<
-            &finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding,
-        >,
+        ois_compounding: Option<&finstack_quant_cashflows::builder::FloatingLegCompounding>,
     ) -> Option<i32> {
-        use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
+        use finstack_quant_cashflows::builder::FloatingLegCompounding;
         match ois_compounding {
             Some(FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days })
                 if *cutoff_days > 0 =>

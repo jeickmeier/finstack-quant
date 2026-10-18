@@ -2,7 +2,7 @@
 
 // InterestSpec removed with loan; retain coupon for metadata only
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::fixed_income::loan_terms::RateSpec;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;

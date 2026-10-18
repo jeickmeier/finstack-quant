@@ -3,6 +3,7 @@
 //! recycled principal buys. The 2026-09-15 audit found reinvestment silently
 //! inert unless every note also carried per-tranche revolving flags.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -11,7 +12,6 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, AssetPool, CoverageTestAction, CoverageTestSpec, DealType,
     InstrumentCollateral, PoolAsset, ReinvestmentAssumptions, ReinvestmentCriteria,

@@ -15,11 +15,11 @@
 //! - **Fee allocations**: Exact expected values with `CASH_TOLERANCE`
 //! - **Interest calculations**: Exact expected values with `CASH_TOLERANCE`
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::WaterfallContext;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::WaterfallDistribution;

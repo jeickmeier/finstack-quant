@@ -2,13 +2,13 @@
 //! the amount that holds the pool's OC at the target, from interest first,
 //! and the collections above the requirement are released to equity.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation_with_diagnostics, AssetPool, AssetType, DealType, PoolAsset, SimulationRun,
     StructuredCredit, TargetOcSpec, Tranche, TrancheSeniority, TrancheStructure, WaterfallRules,

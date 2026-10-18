@@ -127,7 +127,7 @@ fn prepare_hw_swaption_input(
     let periods = SwaptionVolTarget::build_fixed_leg_periods(swap_start, swap_end, &conventions)?;
     let floating_periods =
         SwaptionVolTarget::build_float_leg_periods(swap_start, swap_end, &conventions)?;
-    use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     let floating_is_compounded = match conventions.float_compounding {
         FloatingLegCompounding::Simple => false,
         FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }

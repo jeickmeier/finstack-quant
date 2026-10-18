@@ -31,7 +31,7 @@ use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
-use crate::instruments::rates::irs::FloatingLegCompounding;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 

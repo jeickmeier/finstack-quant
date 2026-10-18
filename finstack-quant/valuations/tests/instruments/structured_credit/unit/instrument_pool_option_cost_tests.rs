@@ -2,10 +2,10 @@
 //! valued against the path's fair spread, allocated to tranches by running
 //! the waterfall on actual and on fairly priced draw interest.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_models::credit::pool::StochasticDefaultSpec;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     CreditSpreadProcessSpec, RevolvingCreditPricer,
 };

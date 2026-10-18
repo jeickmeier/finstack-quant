@@ -58,7 +58,7 @@ actually reach for: the builders (`CapFloorBuilder`,
 `SwaptionBuilder`, `RepoBuilder`, `InflationSwapBuilder`,
 `YoYInflationSwapBuilder`, `InflationCapFloorBuilder`), `CapFloorVolType`,
 `OvernightCouponConvention`, `OvernightSpreadCompounding`,
-`irs::FloatingLegCompounding`, `swaption::{SABRParameters, BermudanSchedule, BermudanType,
+`swaption::{SABRParameters, BermudanSchedule, BermudanType,
 CashSettlementMethod, BermudanPricingMethod, BermudanSwaptionPricer,
 BermudanSwaptionTreeValuator, SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer}`,
 `xccy_swap::{NotionalExchange, ResettingSide,
@@ -68,6 +68,10 @@ Reusable `HullWhiteParams` and Hull-White equations live at
 `finstack_quant_models::rates::hull_white`; the HW1F Monte Carlo and LSMC
 engines at `finstack_quant_models::rates::hw1f`.
 
+Floating-leg compounding is the cashflows enum
+`finstack_quant_cashflows::builder::FloatingLegCompounding`; there is no
+valuations alias for it.
+
 Swaptions use the shared `ExerciseStyle`, `SettlementType` and
 `VolatilityModel` (`black` / `normal`) re-exported at
 `finstack_quant_valuations::instruments`.
@@ -75,7 +79,7 @@ Swaptions use the shared `ExerciseStyle`, `SettlementType` and
 Inside a leaf, `metrics/`, `types.rs`/`types/`, `pricer.rs`/`pricing/` and the
 model-specific pricers (`hw_pricer.rs`, `lmm_pricer.rs`, `bermudan/`) are `pub(crate)` or private; supported
 items surface through each leaf's `pub use`. Genuinely public submodules are
-`irs::compounding`, `cms_option::pricer`, `cms_option::replication_pricer`,
+`cms_option::pricer`, `cms_option::replication_pricer`,
 `cms_swap::pricer` and `forward_swap_rate`; `cms_fixings` is `pub(crate)`.
 
 ## Family conventions

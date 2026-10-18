@@ -5,8 +5,8 @@
 //! frequencies, and settlement lags that are required for accurate instrument construction
 //! and pricing.
 
-use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::market::conventions::ids::CdsDocClause;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::types::IndexId;
@@ -304,7 +304,7 @@ pub struct IrFutureConventions {
     /// Underlying rate index identifier.
     pub index_id: IndexId,
     /// Exchange-defined averaging or fixing method for final settlement.
-    pub compounding: crate::instruments::rates::irs::FloatingLegCompounding,
+    pub compounding: finstack_quant_cashflows::builder::FloatingLegCompounding,
     /// Rule used to derive the rate reference period from the quoted expiry.
     pub reference_period: IrFutureReferencePeriod,
     /// Calendar for business day adjustments.

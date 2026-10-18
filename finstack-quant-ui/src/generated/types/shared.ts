@@ -14987,13 +14987,13 @@ export type RateOptionType = "cap" | "floor" | "caplet" | "floorlet";
  * Contractual coupon of a loan facility or note: a fixed all-in rate or a
  * floating index plus spread.
  *
- * Shared by `TermLoan.rate`, `RevolvingCredit.rate`, `AssetBackedFacility.rate`
- * and structured-credit `Tranche.coupon`.
+ * Shared by the valuations term loan, revolving credit facility, asset-backed
+ * facility and structured-credit tranche coupons.
  *
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
+ * use finstack_quant_cashflows::builder::RateSpec;
  *
  * let fixed = RateSpec::Fixed { rate: 0.06 }; // 6% all-in
  * assert!(matches!(fixed, RateSpec::Fixed { .. }));

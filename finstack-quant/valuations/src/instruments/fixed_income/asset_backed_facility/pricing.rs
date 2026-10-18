@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use super::types::{AmortizationEvent, AssetBackedFacility};
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::structured_credit::{
     run_simulation_with_diagnostics, CallAssumption, CoverageRules, CoverageTestSpec,
     EarlyAmortizationSpec, LossAllocationPolicy, MarketConditions, Metadata, ReinvestmentCriteria,
@@ -21,6 +20,7 @@ use crate::instruments::fixed_income::structured_credit::{
     TrancheSeniority, TrancheStructure, WaterfallRules,
 };
 use crate::instruments::fixed_income::structured_credit::{TrancheDraw, TrancheReadvance};
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::{
     schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
 };

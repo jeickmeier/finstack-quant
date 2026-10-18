@@ -4,6 +4,7 @@ use crate::build::helpers::resolve_spot_date;
 use crate::build::BuildCtx;
 use crate::quotes::ids::Pillar;
 use crate::quotes::rates::RateQuote;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
     adjust, third_wednesday, BusinessDayConvention, Date, DateExt, TenorUnit,
@@ -16,7 +17,6 @@ use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
 use finstack_quant_valuations::instruments::rates::ir_future::{
     FutureContractSpecs, InterestRateFuture,
 };
-use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::rates::irs::{InterestRateSwap, IrsLegConventions};
 use finstack_quant_valuations::instruments::{
     FixedLegSpec, FloatLegSpec, Instrument, ListedFutureTerms, PayReceive, Position,

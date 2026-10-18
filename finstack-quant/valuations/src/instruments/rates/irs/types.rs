@@ -22,7 +22,7 @@ use crate::market::conventions::ConventionRegistry;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_margin::types::OtcMarginSpec;
 
-use super::compounding::FloatingLegCompounding;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 
 pub use crate::instruments::common_impl::parameters::legs::PayReceive;
 

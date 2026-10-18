@@ -32,9 +32,9 @@
 //! - **ISDA 2021 Definitions**: Current term-rate and compounded-RFR framework `docs/REFERENCES.md#isda-2021-definitions`
 //! - **ISDA 2006 Definitions**: Legacy term-rate transactions `docs/REFERENCES.md#isda-2006-definitions`
 
-use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::instruments::InterestRateSwap;
 use crate::metrics::{MetricCalculator, MetricContext};
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 
 /// Present value calculator for the floating leg of an interest rate swap.
 ///

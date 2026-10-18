@@ -4,6 +4,7 @@
 //! figures next to the `*_to_call` twins, and the clean-up call is exercised
 //! only when the liquidation proceeds cover the notes.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{
     DefaultModelSpec, FloatingRateSpec, PrepaymentModelSpec, RecoveryModelSpec,
 };
@@ -12,7 +13,6 @@ use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_metrics, run_simulation, AssetPool, CallAssumption, DealType, PoolAsset,
     ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows,

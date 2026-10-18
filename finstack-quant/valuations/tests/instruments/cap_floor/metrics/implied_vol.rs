@@ -2,6 +2,7 @@
 //!
 //! Validates solving for Black volatility from market prices.
 
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -12,7 +13,6 @@ use finstack_quant_valuations::instruments::rates::cap_floor::{
     CapFloor, CapFloorVolType, OvernightCouponConvention, OvernightSpreadCompounding,
     RateOptionType,
 };
-use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{ExerciseStyle, SettlementType};
 use finstack_quant_valuations::metrics::MetricId;

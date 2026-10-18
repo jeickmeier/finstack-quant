@@ -1,13 +1,12 @@
 //! Bucketed DV01 metric tests - Risk by tenor bucket.
 
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::rates::irs::{
-    FloatingLegCompounding, InterestRateSwap, PayReceive,
-};
+use finstack_quant_valuations::instruments::rates::irs::{InterestRateSwap, PayReceive};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;

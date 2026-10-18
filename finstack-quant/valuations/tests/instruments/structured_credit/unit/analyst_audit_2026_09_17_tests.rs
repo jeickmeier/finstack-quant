@@ -8,6 +8,7 @@
 //! `constant_cpr(0)`, `constant_cdr(0)`, `RecoveryModelSpec::with_lag(0.40, 0)`
 //! unless a test says otherwise.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
@@ -15,7 +16,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     execute_waterfall, run_simulation, run_simulation_with_diagnostics, AllocationMode, AssetPool,
     AssetType, CallAssumption, CardPortfolioSpec, ControlledAccumulationSpec, CoverageRules,

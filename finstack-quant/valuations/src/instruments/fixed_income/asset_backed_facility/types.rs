@@ -9,10 +9,11 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::fixed_income::loan_terms::{DrawEvent, RateSpec};
+use crate::instruments::fixed_income::loan_terms::DrawEvent;
 use crate::instruments::fixed_income::structured_credit::{
     AssetPool, BorrowingBaseReport, BorrowingBaseRules, CreditModelConfig, DealFees,
 };
+use finstack_quant_cashflows::builder::RateSpec;
 
 /// Event that ends the revolving period early and turns the facility out
 /// (principal collections then repay the lender sequentially).

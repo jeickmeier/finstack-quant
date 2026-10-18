@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Loan coupon spec owned by `finstack-quant-cashflows`
+
+#### Changed
+
+- `RateSpec` (fixed all-in rate or floating index plus spread) moves from `finstack_quant_valuations::instruments::fixed_income::loan_terms` to `finstack_quant_cashflows::builder::RateSpec`; the wire form is unchanged. The loan-only terms stay in `loan_terms`.
+- `finstack_quant_valuations::instruments::rates::irs::compounding` and its `FloatingLegCompounding` re-export are removed; import `finstack_quant_cashflows::builder::FloatingLegCompounding`.
+
 ### Hull-White one-factor engine moved to `finstack-quant-models`
 
 #### Changed

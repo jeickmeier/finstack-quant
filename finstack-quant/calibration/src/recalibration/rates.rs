@@ -283,7 +283,7 @@ fn discount_replay_conventions(
 ) -> finstack_quant_core::Result<(
     CalibrationMethod,
     DayCount,
-    Option<finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding>,
+    Option<finstack_quant_cashflows::builder::FloatingLegCompounding>,
     Option<CurveId>,
 )> {
     let projection_curve_id = match &recipe.role {
@@ -395,7 +395,7 @@ fn forward_replay_conventions(
 ) -> finstack_quant_core::Result<(
     CalibrationMethod,
     DayCount,
-    Option<finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding>,
+    Option<finstack_quant_cashflows::builder::FloatingLegCompounding>,
     CurveId,
 )> {
     let discount_curve_id = match &recipe.role {
@@ -1928,7 +1928,7 @@ mod tests {
             conventions: RatesStepConventions {
                 curve_day_count: Some(DayCount::Act365F),
                 ois_compounding: Some(
-                    finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::CompoundedWithRateCutoff {
+                    finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedWithRateCutoff {
                         cutoff_days: 1,
                     },
                 ),

@@ -630,10 +630,10 @@ pub(crate) fn build_oid_eir_schedule(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::term_loan::spec::{
         AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent,
     };
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
     use time::macros::date;

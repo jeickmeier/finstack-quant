@@ -4,6 +4,7 @@
 //! the engine runs. The 2026-09-15 audit found the previous
 //! `CoverageTestConfig` haircut maps silently inert.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
@@ -13,7 +14,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
 use finstack_quant_core::HashMap;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, run_simulation_with_diagnostics, AssetPool, CccBucketRule, CoverageRules,
     CoverageTestSpec, DealType, DefaultedValuation, DiscountObligationRule, InstrumentCollateral,

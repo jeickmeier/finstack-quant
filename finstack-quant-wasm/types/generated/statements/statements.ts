@@ -1470,8 +1470,8 @@ export type UpfrontFee =
  * Contractual coupon of a loan facility or note: a fixed all-in rate or a
  * floating index plus spread.
  *
- * Shared by `TermLoan.rate`, `RevolvingCredit.rate`, `AssetBackedFacility.rate`
- * and structured-credit `Tranche.coupon`.
+ * Shared by the valuations term loan, revolving credit facility, asset-backed
+ * facility and structured-credit tranche coupons.
  */
 export type RateSpec =
   | {

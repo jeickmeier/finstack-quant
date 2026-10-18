@@ -28,7 +28,7 @@ use finstack_quant_cashflows::builder::{CashFlowSchedule, SchedulePeriod};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 
 use super::types::{DrawRepaySpec, RevolvingCredit};
-use crate::instruments::fixed_income::loan_terms::RateSpec;
+use finstack_quant_cashflows::builder::RateSpec;
 
 /// Path data from 3-factor Monte Carlo simulation.
 ///
@@ -1307,8 +1307,8 @@ pub fn calculate_drawn_balance_at_date(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::revolving_credit::RevolvingCreditFees;
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use time::macros::date;

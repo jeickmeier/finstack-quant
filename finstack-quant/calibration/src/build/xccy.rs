@@ -148,7 +148,7 @@ fn contractual_leg_compounding(
     contractual_index_id: &str,
     contractual_index: &finstack_quant_valuations::market::conventions::RateIndexConventions,
     forward_curve_id: &str,
-) -> Result<finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding> {
+) -> Result<finstack_quant_cashflows::builder::FloatingLegCompounding> {
     use finstack_quant_valuations::instruments::pricing::overnight_conventions::{
         compounding_from_conventions, rate_index_conventions,
     };

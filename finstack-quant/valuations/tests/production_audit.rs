@@ -630,13 +630,12 @@ fn b2_cap_auto_uses_normal_quote_metadata_and_rejects_black_mismatch() {
 
 #[test]
 fn b3_shifted_swaption_prices_shifted_positive_rates() {
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::dates::{BusinessDayConvention, StubKind, Tenor};
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_models::volatility::sabr::SabrParameters;
-    use finstack_quant_valuations::instruments::rates::irs::{
-        FixedLegSpec, FloatLegSpec, FloatingLegCompounding,
-    };
+    use finstack_quant_valuations::instruments::rates::irs::{FixedLegSpec, FloatLegSpec};
     use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
     use finstack_quant_valuations::instruments::{OptionType, SettlementType, VolatilityModel};
     use rust_decimal::Decimal;

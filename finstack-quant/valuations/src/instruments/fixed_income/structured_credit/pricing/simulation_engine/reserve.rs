@@ -165,10 +165,10 @@ pub(super) fn route_reserve_interest(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::{
         AssetPool, DealType, PoolAsset, Tranche, TrancheStructure,
     };
+    use finstack_quant_cashflows::builder::RateSpec;
     use time::macros::date;
 
     fn usd(amount: f64) -> Money {

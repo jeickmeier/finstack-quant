@@ -51,7 +51,7 @@ use crate::instruments::common_impl::pricing::overnight::{
 use crate::instruments::common_impl::pricing::time::{
     rate_between_on_dates, relative_df_discount_curve,
 };
-use crate::instruments::rates::irs::FloatingLegCompounding;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 
 /// Project one financing-leg accrual period's floating rate, excluding spread.
@@ -682,7 +682,7 @@ mod tests {
     use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
     use crate::instruments::common_impl::pricing::swap_legs;
     use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
-    use crate::instruments::rates::irs::FloatingLegCompounding;
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_cashflows::builder::ScheduleParams;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{
@@ -1411,7 +1411,7 @@ mod tests {
         use crate::instruments::common_impl::pricing::overnight::{
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
-        use crate::instruments::rates::irs::FloatingLegCompounding;
+        use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::dates::calendar_by_id_strict;
 
         let start = date(2025, 1, 2);

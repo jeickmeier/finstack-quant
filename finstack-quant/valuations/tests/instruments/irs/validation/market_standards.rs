@@ -11,6 +11,7 @@
 //! - Market practice for USD swaps
 
 use crate::instruments::test_support::rates as test_utils;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
@@ -22,7 +23,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_valuations::instruments::rates::irs::{
-    FixedLegSpec, FloatLegSpec, FloatingLegCompounding, InterestRateSwap, PayReceive,
+    FixedLegSpec, FloatLegSpec, InterestRateSwap, PayReceive,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::market::conventions::ConventionRegistry;

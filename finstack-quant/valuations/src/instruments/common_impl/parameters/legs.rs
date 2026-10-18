@@ -1,5 +1,15 @@
 //! Common leg specification types for interest rate and credit instruments.
 
+/// Error for a swap float leg set to `simple_average`, which the swap
+/// projectors do not implement (they compound or take one term forward).
+pub(crate) fn simple_average_unsupported() -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Validation(
+        "float_leg.compounding = simple_average is not supported on swap legs; \
+         use simple or a compounded_* variant"
+            .to_string(),
+    )
+}
+
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::types::CurveId;
 use rust_decimal::Decimal;
@@ -246,7 +256,7 @@ pub struct FloatLegSpec {
     /// started) compounded swaps, pricing requires explicit fixings for observation
     /// dates prior to `as_of`.
     #[serde(default)]
-    pub compounding: crate::instruments::rates::irs::FloatingLegCompounding,
+    pub compounding: finstack_quant_cashflows::builder::FloatingLegCompounding,
     /// Payment lag in business days after period end (default: 0).
     ///
     /// Bloomberg OIS swaps typically use 2 business days payment lag.
@@ -288,7 +298,8 @@ impl FloatLegSpec {
     /// Returns an error stating both dates when `start >= end`, and when
     /// `compounding` is `simple_average`, which swap legs do not implement.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        if self.compounding == crate::instruments::rates::irs::FloatingLegCompounding::SimpleAverage
+        if self.compounding
+            == finstack_quant_cashflows::builder::FloatingLegCompounding::SimpleAverage
         {
             return Err(crate::instruments::rates::irs::simple_average_unsupported());
         }
@@ -428,7 +439,7 @@ pub struct FinancingLegSpec {
     /// compounding convexity (typically 12–15 bp of rate on an upward curve).
     /// `simple_average` is rejected.
     #[serde(default)]
-    pub compounding: crate::instruments::rates::irs::FloatingLegCompounding,
+    pub compounding: finstack_quant_cashflows::builder::FloatingLegCompounding,
 }
 
 impl FinancingLegSpec {
@@ -456,7 +467,7 @@ impl FinancingLegSpec {
             forward_curve_id.as_str(),
         ) {
             Ok(Some(registered)) => registered,
-            Ok(None) | Err(_) => crate::instruments::rates::irs::FloatingLegCompounding::Simple,
+            Ok(None) | Err(_) => finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,
         };
         Self {
             discount_curve_id: discount_curve_id.into(),
@@ -475,7 +486,7 @@ impl FinancingLegSpec {
     ///   projecting the TRS funding leg.
     pub fn with_compounding(
         mut self,
-        compounding: crate::instruments::rates::irs::FloatingLegCompounding,
+        compounding: finstack_quant_cashflows::builder::FloatingLegCompounding,
     ) -> Self {
         self.compounding = compounding;
         self
@@ -497,7 +508,8 @@ impl FinancingLegSpec {
                 "{context} requires a non-empty financing forward_curve_id"
             )));
         }
-        if self.compounding == crate::instruments::rates::irs::FloatingLegCompounding::SimpleAverage
+        if self.compounding
+            == finstack_quant_cashflows::builder::FloatingLegCompounding::SimpleAverage
         {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{context} financing_leg.compounding = simple_average is not supported; \
@@ -560,7 +572,7 @@ mod tests {
             fixing_calendar_id: None,
             start,
             end,
-            compounding: crate::instruments::rates::irs::FloatingLegCompounding::default(),
+            compounding: finstack_quant_cashflows::builder::FloatingLegCompounding::default(),
             payment_lag_days: 0,
             end_of_month: false,
         }
@@ -632,14 +644,14 @@ mod tests {
         let ois = FinancingLegSpec::new("USD-OIS", "USD-SOFR-OIS", Decimal::ZERO, DayCount::Act360);
         assert_eq!(
             ois.compounding,
-            crate::instruments::rates::irs::FloatingLegCompounding::CompoundedInArrears {
+            finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears {
                 lookback_days: 0
             }
         );
         let term = FinancingLegSpec::new("USD-OIS", "USD-SOFR-3M", Decimal::ZERO, DayCount::Act360);
         assert_eq!(
             term.compounding,
-            crate::instruments::rates::irs::FloatingLegCompounding::Simple
+            finstack_quant_cashflows::builder::FloatingLegCompounding::Simple
         );
     }
 
@@ -650,7 +662,7 @@ mod tests {
             forward_curve_id: CurveId::new("USD-SOFR-OIS"),
             spread_bp: Decimal::ZERO,
             day_count: DayCount::Act360,
-            compounding: crate::instruments::rates::irs::FloatingLegCompounding::Simple,
+            compounding: finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,
         };
         let err = spec
             .validate("TRS")

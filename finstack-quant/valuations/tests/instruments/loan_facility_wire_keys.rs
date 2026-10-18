@@ -447,8 +447,8 @@ fn migrated_inputs_reprice_to_recorded_reference() {
 #[test]
 fn floating_facility_wire_rate_matches_canonical_rate_spec() {
     use finstack_quant_cashflows::builder::FloatingRateSpec;
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::dates::Tenor;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use rust_decimal::Decimal;
     use serde_json::json;
 
@@ -566,7 +566,7 @@ fn retired_facility_limit_keys_are_rejected() {
 #[test]
 // schema-rejection-test: RateSpec fixed `rate_bp`, TermLoan amortization `bp`, LoanCallType make_whole `treasury_spread_bp`
 fn retired_term_loan_keys_are_rejected() {
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::term_loan::{
         AmortizationSpec, LoanCallType,
     };

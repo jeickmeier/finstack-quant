@@ -8,6 +8,7 @@
 //! - Fee tiering
 //! - As-of filtering
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -15,7 +16,6 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::UpfrontFee;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,

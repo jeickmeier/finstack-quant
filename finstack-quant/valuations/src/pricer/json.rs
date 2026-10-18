@@ -1656,7 +1656,7 @@ mod tests {
 
     #[test]
     fn revolving_credit_custom_metrics_use_as_of_drawn_balance() {
-        use crate::instruments::fixed_income::loan_terms::RateSpec;
+        use finstack_quant_cashflows::builder::RateSpec;
 
         // `drawn` (10M of 50M) is the balance at the valuation date;
         // the example's 5M draw on 2024-03-01 lies in the future and must not

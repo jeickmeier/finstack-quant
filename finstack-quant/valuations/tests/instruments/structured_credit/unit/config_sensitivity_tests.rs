@@ -6,6 +6,7 @@
 //! reaches the engine produces bit-identical results under a fixed seed, so
 //! each test here varies exactly one input and asserts the output changes.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -15,7 +16,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
 };
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_metrics, run_simulation_with_diagnostics, AssetPool, CoverageTestSpec,
     DealType, LossAllocationPolicy, PoolAsset, ReinvestmentCriteria, ReinvestmentPeriod,

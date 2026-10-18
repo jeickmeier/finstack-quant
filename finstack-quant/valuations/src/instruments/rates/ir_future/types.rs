@@ -39,8 +39,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IndexId, InstrumentId, Rate};
 use time::macros::date;
 
-use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::instruments::Position;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 
 /// Error for an IR future `compounding` outside the exchange reference-rate
 /// methods (`simple`, `simple_average`, zero-lookback `compounded_in_arrears`).
@@ -431,7 +431,7 @@ impl InterestRateFuture {
             resolve_overnight_fixing_calendar, OvernightArithmeticProjectionInput,
             OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
-        use crate::instruments::rates::irs::FloatingLegCompounding;
+        use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::market_data::fixings::{
             get_fixing_series, require_fixing_value_exact,
         };
