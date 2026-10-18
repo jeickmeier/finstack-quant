@@ -46,7 +46,7 @@ pub enum CalibrationParameter {
 #[serde(deny_unknown_fields)]
 pub struct MertonMcCalibrationSpec {
     /// Target market quote to match (interpreted at quote/settlement date).
-    pub target: crate::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteInput,
+    pub target: super::bond_quote::BondQuoteInput,
     /// Which structural parameter to solve for.
     pub parameter: CalibrationParameter,
     /// Number of independent MC estimators used during calibration iterations (low paths).
@@ -65,7 +65,7 @@ pub struct MertonMcCalibrationSpec {
 impl Default for MertonMcCalibrationSpec {
     fn default() -> Self {
         Self {
-            target: crate::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteInput::ZSpread(0.0),
+            target: super::bond_quote::BondQuoteInput::ZSpread(0.0),
             parameter: CalibrationParameter::DebtBarrier,
             low_paths: 2_000,
             max_iterations: 40,

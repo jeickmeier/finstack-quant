@@ -8,6 +8,7 @@
 //! - **bermudan_call**: Issuer call provision shared by callable rate exotics
 
 pub mod bermudan_call;
+pub mod bond_quote;
 pub mod conventions;
 pub mod convertible;
 pub mod legs;

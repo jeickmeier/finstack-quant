@@ -558,6 +558,15 @@ impl FxSpot {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for FxSpot {
+    fn with_bumped_fx_quote(
+        &self,
+        relative: f64,
+    ) -> Option<Box<dyn crate::instruments::common_impl::traits::Instrument>> {
+        let mut bumped = self.clone();
+        *bumped.quoted_spot.as_mut()? *= 1.0 + relative;
+        Some(Box::new(bumped))
+    }
+
     impl_instrument_base!(
         crate::pricer::InstrumentType::FxSpot,
         crate::instruments::fx::FX

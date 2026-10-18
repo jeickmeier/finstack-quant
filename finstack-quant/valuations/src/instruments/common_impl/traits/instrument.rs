@@ -941,6 +941,25 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         None
     }
 
+    /// Copy of the instrument with its own quoted FX level moved by
+    /// `relative`.
+    ///
+    /// FX instruments that carry a spot or forward quote price off that quote
+    /// rather than the market FX matrix, so the FX01 calculator bumps the
+    /// quote. `Some(copy)` holds every quoted level scaled by `1 + relative`
+    /// in the instrument's quoting direction; `None` means the instrument
+    /// prices off the market alone and the calculator bumps the market FX
+    /// pairs instead. The default is `None`.
+    ///
+    /// # Arguments
+    ///
+    /// * `relative` - Signed relative move of the quoted level as a decimal
+    ///   (`0.01` for +1%).
+    fn with_bumped_fx_quote(&self, relative: f64) -> Option<Box<dyn Instrument>> {
+        let _ = relative;
+        None
+    }
+
     /// Rebuild the instrument for a rate scenario when its projected
     /// cashflows respond to rates.
     ///

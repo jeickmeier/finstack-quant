@@ -1,10 +1,11 @@
 use super::spread_price::{
     price_from_asw_market, price_from_dm, price_from_oas, price_from_z_spread,
 };
-use super::types::{BondQuoteInput, BondQuoteSet};
+use super::types::BondQuoteSet;
 use super::yield_price::{
     clean_price_from_japanese_simple_yield, price_from_i_spread, price_from_ytm, price_from_ytw,
 };
+use super::BondQuoteInput;
 use crate::constants::numerical::ZERO_TOLERANCE;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;

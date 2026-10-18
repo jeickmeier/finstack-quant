@@ -831,6 +831,26 @@ impl Ndf {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for Ndf {
+    fn with_bumped_fx_quote(
+        &self,
+        relative: f64,
+    ) -> Option<Box<dyn crate::instruments::common_impl::traits::Instrument>> {
+        let mut bumped = self.clone();
+        // An observed fixing settles the contract; the quote no longer prices it.
+        if bumped.observed_fixing.is_none() {
+            let quote = if bumped.quoted_forward.is_some() {
+                bumped.quoted_forward.as_mut()?
+            } else {
+                bumped.quoted_spot.as_mut()?
+            };
+            match bumped.quote_convention {
+                NdfQuoteConvention::SettlementPerBase => *quote *= 1.0 + relative,
+                NdfQuoteConvention::BasePerSettlement => *quote /= 1.0 + relative,
+            }
+        }
+        Some(Box::new(bumped))
+    }
+
     impl_instrument_base!(
         crate::pricer::InstrumentType::Ndf,
         crate::instruments::fx::FX

@@ -14,13 +14,14 @@ mod spread_price;
 mod types;
 mod yield_price;
 
+pub use crate::instruments::common_impl::parameters::bond_quote::BondQuoteInput;
 pub use annuity::{
     asset_swap_forward_components, fixed_leg_annuity, par_rate_and_annuity_from_discount,
     periods_per_year,
 };
 pub use compute::compute_quotes;
 pub use spread_price::{price_from_dm, price_from_oas, price_from_z_spread};
-pub use types::{BondQuoteInput, BondQuoteSet, YieldCompounding};
+pub use types::{BondQuoteSet, YieldCompounding};
 pub use yield_price::{
     df_from_yield, price_from_ytm, price_from_ytm_compounded_params, price_from_ytw,
 };
