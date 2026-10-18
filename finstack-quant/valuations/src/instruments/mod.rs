@@ -162,7 +162,9 @@ pub mod commodity {
 /// Generic cross-asset composite and synthetic instruments.
 pub mod composite;
 /// Credit derivatives: CDS and related instruments.
-pub mod credit_derivatives;
+pub mod credit_derivatives {
+    pub use finstack_quant_valuations_credit::*;
+}
 /// Equity instruments and equity derivatives.
 pub mod equity;
 /// Exotic and path-dependent options.

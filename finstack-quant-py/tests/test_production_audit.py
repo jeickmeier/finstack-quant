@@ -436,9 +436,12 @@ def test_tba_delivery_excludes_prior_receivable_and_adjusts_payment_date() -> No
 
 
 def test_credit_tranche_loss_and_complete_issuer_coverage() -> None:
-    fixtures = Path(__file__).resolve().parents[2] / "finstack-quant/valuations/tests/fixtures"
-    f = json.loads((fixtures / "production_credit_tranche.json").read_text())
-    reference = json.loads((fixtures / "production_tranche_loss_reference.json").read_text())
+    valuations = Path(__file__).resolve().parents[2] / "finstack-quant/valuations"
+    f = json.loads((valuations / "tests/fixtures/production_credit_tranche.json").read_text())
+    # The SciPy reference pins live with the Rust test that shares them, in the credit crate.
+    reference = json.loads(
+        (valuations / "credit/tests/fixtures/production_tranche_loss_reference.json").read_text()
+    )
     result = price_instrument(
         json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "hazard_rate", ["expected_loss"]
     )

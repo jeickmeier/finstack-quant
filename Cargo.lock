@@ -1063,6 +1063,7 @@ dependencies = [
  "finstack-quant-models",
  "finstack-quant-test-utils",
  "finstack-quant-valuations-core",
+ "finstack-quant-valuations-credit",
  "finstack-quant-valuations-exotics",
  "finstack-quant-valuations-fx",
  "finstack-quant-valuations-macros",
@@ -1104,6 +1105,25 @@ dependencies = [
  "smallvec",
  "strum",
  "thiserror",
+ "time",
+ "tracing",
+]
+
+[[package]]
+name = "finstack-quant-valuations-credit"
+version = "0.10.0"
+dependencies = [
+ "finstack-quant-cashflows",
+ "finstack-quant-core",
+ "finstack-quant-margin",
+ "finstack-quant-models",
+ "finstack-quant-valuations-core",
+ "finstack-quant-valuations-macros",
+ "finstack-quant-valuations-test-support",
+ "rust_decimal",
+ "schemars",
+ "serde",
+ "serde_json",
  "time",
  "tracing",
 ]

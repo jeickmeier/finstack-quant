@@ -18,7 +18,6 @@
 
 mod common;
 
-mod test_parameters;
 mod test_types;
 
 mod test_greeks;
@@ -35,3 +34,4 @@ mod test_metrics_registry;
 mod test_bloomberg_cdsw_parity;
 mod test_cdx_hy_price_strike;
 mod test_cdx_ig_46_cdso_regressions;
+mod test_cdx_ig_46_quadrature;

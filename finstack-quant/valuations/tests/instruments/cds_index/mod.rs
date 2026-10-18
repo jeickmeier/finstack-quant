@@ -21,5 +21,4 @@ mod metrics_risk;
 mod pricing_constituents;
 mod pricing_parity;
 mod pricing_single_curve;
-mod test_imm_factor_cs01;
 mod test_utils;

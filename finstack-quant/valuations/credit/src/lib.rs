@@ -1,0 +1,103 @@
+#![forbid(unsafe_code)]
+#![warn(clippy::float_cmp)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::unreachable)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::indexing_slicing,
+        clippy::float_cmp,
+    )
+)]
+// Allow expect() in doc tests (they are test code)
+#![doc(test(attr(allow(clippy::expect_used))))]
+
+//! Credit derivatives: CDS and related instruments.
+//!
+//! This module provides credit derivative instruments following ISDA standard
+//! conventions. All instruments are priced using hazard rate curves derived
+//! from market CDS spreads via the ISDA CDS Standard Model.
+//!
+//! # Features
+//!
+//! - **Single-Name CDS**: Credit protection on individual reference entities
+//! - **CDS Indices**: Portfolio credit exposure (CDX.NA.IG, CDX.NA.HY, iTraxx)
+//! - **CDS Tranches**: Mezzanine credit exposure via synthetic CDOs
+//! - **CDS Options**: Volatility exposure on CDS spreads (payer/receiver swaptions)
+//!
+//! # Pricing Framework
+//!
+//! Credit derivatives are priced using:
+//! - **Hazard rate curves**: Bootstrapped from CDS spread quotes
+//! - **Recovery rates**: Standard 40% for senior, 20% for subordinated
+//! - **Accrual-on-default**: analytical piecewise-constant integration over
+//!   hazard/discount knots (ISDA Standard Model; see
+//!   `cds::pricer::engine::accrual_on_default_isda_standard_model_cond`)
+//!
+//! # ISDA Conventions
+//!
+//! Single-name CDS valuation defaults to Bloomberg CDSW clean
+//! (`CdsValuationConvention::BloombergCdswClean`). ISDA dirty is opt-in.
+//!
+//! Post-Big Bang (2009) standardization:
+//! - Standard coupons: 100bp or 500bp running spread
+//! - IMM maturities: 20th of Mar/Jun/Sep/Dec
+//! - Day count: ACT/360 for premium leg
+//! - Settlement: Cash (auction) or physical delivery
+//!
+//! # Quick Example
+//!
+//! ```
+//! use finstack_quant_valuations_credit::CreditDefaultSwap;
+//!
+//! // Canonical 5-year investment-grade CDS with standard ISDA conventions.
+//! let cds = CreditDefaultSwap::example().expect("example");
+//! cds.validate().unwrap();
+//! ```
+//!
+//! # References
+//!
+//! - ISDA CDS Standard Model v1.8.2 (October 2009) `docs/REFERENCES.md#isda-cds-standard-model`
+//! - O'Kane, D. (2008). *Modelling Single-name and Multi-name Credit Derivatives* `docs/REFERENCES.md#o-kane-2008`
+//!
+//! # See Also
+//!
+//! - [`CreditDefaultSwap`] for single-name CDS
+//! - [`CdsIndex`] for credit indices
+//! - [`CdsTranche`] for synthetic CDO tranches
+//! - hazard curve calibration targets in `calibration::targets::hazard`
+
+/// CDS module - Single-name credit default swaps.
+pub mod cds;
+/// CDS index module - Credit indices (CDX, iTraxx).
+pub mod cds_index;
+/// CDS option module - Options on CDS spreads.
+pub mod cds_option;
+/// CDS tranche module - Synthetic CDO tranches.
+pub mod cds_tranche;
+pub(crate) mod cs01;
+
+mod family;
+pub use family::CREDIT;
+
+pub use cds::CreditDefaultSwap;
+pub use cds_index::CdsIndex;
+pub use cds_option::{CdsOption, CdsOptionStrike, CdsOptionStrikeKind};
+pub use cds_tranche::CdsTranche;
+
+extern crate self as finstack_quant_valuations_credit;
+
+/// Compiles the crate `README.md` Rust samples as doctests.
+///
+/// The README is *not* included in the rendered crate documentation — this
+/// item exists only under `cfg(doctest)` so that every ` ```rust ` block in the
+/// README is compiled and run by `cargo test --doc`.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

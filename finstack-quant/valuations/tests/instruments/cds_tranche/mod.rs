@@ -15,6 +15,5 @@ mod helpers;
 mod market_standards_tests;
 mod metrics_calculator_tests;
 mod numerical_stability_tests;
-mod params_tests;
 mod pricing_tests;
 mod risk_metrics_tests;
