@@ -3,10 +3,10 @@
 use crate::instruments::common_impl::parameters::QuantoSpec;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::common_impl::validation;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IndexId, InstrumentId, PriceId};
+use finstack_quant_core::validation;
 
 /// Specifies how the range bounds are interpreted.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

@@ -144,20 +144,20 @@ impl FxBarrierOption {
 
     /// Validate FX barrier option currency invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        crate::instruments::common_impl::validation::validate_distinct_currencies(
+        finstack_quant_core::validation::validate_distinct_currencies(
             self.base_currency,
             self.quote_currency,
             "FxBarrierOption",
         )?;
-        crate::instruments::common_impl::validation::validate_f64_positive(
+        finstack_quant_core::validation::validate_f64_positive(
             self.strike,
             "FxBarrierOption strike",
         )?;
-        crate::instruments::common_impl::validation::validate_f64_positive(
+        finstack_quant_core::validation::validate_f64_positive(
             self.barrier,
             "FxBarrierOption barrier",
         )?;
-        crate::instruments::common_impl::validation::validate_money_finite(
+        finstack_quant_core::validation::validate_money_finite(
             self.notional,
             "FxBarrierOption notional",
         )?;
@@ -181,7 +181,7 @@ impl FxBarrierOption {
             }
             // A zero rebate is economically identical to `None` and stays
             // accepted; only negative or non-finite amounts are rejected.
-            crate::instruments::common_impl::validation::validate_f64_non_negative(
+            finstack_quant_core::validation::validate_f64_non_negative(
                 rebate.amount(),
                 "FxBarrierOption rebate",
             )?;

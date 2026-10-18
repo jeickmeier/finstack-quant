@@ -15,11 +15,11 @@
 //! The dividend-yield scalar may be stored as either `MarketScalar::Unitless`
 //! or `MarketScalar::Price`; both are read through `scalar_numeric_value`.
 
-use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::metrics::{
     replace_scalar_value, scalar_numeric_value, scaled_central_diff_by_width, MetricContext,
 };
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::types::PriceId;
 use finstack_quant_core::Result;
 

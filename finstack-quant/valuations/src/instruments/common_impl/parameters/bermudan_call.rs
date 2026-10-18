@@ -67,7 +67,7 @@ impl BermudanCallProvision {
     /// - Call dates are sorted ascending
     /// - Call price is positive
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        use crate::instruments::common_impl::validation;
+        use finstack_quant_core::validation;
 
         validation::require_with(!self.call_dates.is_empty(), || {
             "BermudanCallProvision requires at least one call date".to_string()

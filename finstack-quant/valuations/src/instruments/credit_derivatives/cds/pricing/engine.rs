@@ -5,11 +5,12 @@ use super::helpers::{
     date_from_hazard_time, haz_t, isda_standard_model_boundaries, settlement_date, sp_cond_to,
     validate_recovery_consistency,
 };
-use crate::constants::{credit, numerical, BASIS_POINTS_PER_UNIT};
+use crate::constants::{credit, numerical};
 use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_core::dates::{Date, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
 use rust_decimal::prelude::ToPrimitive;

@@ -17,10 +17,9 @@
 //!
 //! # Quick Example
 //! ```rust
-//! use finstack_quant_valuations::instruments::pricing::time::compounding_frequency;
 //! use finstack_quant_core::dates::Tenor;
 //!
-//! assert_eq!(compounding_frequency(Tenor::quarterly()), 4.0);
+//! assert_eq!(Tenor::quarterly().compounding_frequency(), 4.0);
 //! ```
 
 use finstack_quant_core::cashflow::CFKind;
@@ -28,10 +27,10 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
+use finstack_quant_core::math::z_spread_discount_factor;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
-use crate::instruments::common_impl::pricing::time::z_spread_discount_factor;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 
 /// Absolute sanity bound on a solved discount margin, decimal (±5000 bp).
@@ -52,7 +51,7 @@ pub const DISCOUNT_MARGIN_BOUND: f64 = 0.50;
 /// * `settlement` - Anchor date the flows are discounted to.
 /// * `disc` - Discount curve of the instrument.
 /// * `compounds_per_year` - Compounding frequency of the zero-rate shift, from
-///   [`crate::instruments::pricing::time::compounding_frequency`].
+///   [`Tenor::compounding_frequency`](finstack_quant_core::dates::Tenor::compounding_frequency).
 /// * `dm` - Discount margin, decimal (`0.025` = 250 bp).
 ///
 /// # Errors

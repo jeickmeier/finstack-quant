@@ -17,7 +17,6 @@
 //! Hagan, P. S. (2003). "Convexity Conundrums: Pricing CMS Swaps, Caps, and Floors."
 //! *Wilmott Magazine*, March, 38-44. `docs/REFERENCES.md#hagan-2003-cms-convexity`
 
-use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cms_swap::types::CmsSwap;
 #[cfg(test)]
@@ -98,7 +97,9 @@ impl CmsSwapPricer {
                 payment_date,
                 convexity_scale,
             )?;
-            let df_pay = relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
+            let df_pay = discount_curve
+                .as_ref()
+                .df_between_dates(as_of, payment_date)?;
 
             total_pv += coupon_rate * accrual_fraction * df_pay * inst.notional.amount();
         }
@@ -118,7 +119,7 @@ impl CmsSwapPricer {
             .iter()
             .filter(|flow| flow.date > as_of)
             .try_fold(0.0, |pv, flow| {
-                let df = relative_df_discount_curve(discount_curve.as_ref(), as_of, flow.date)?;
+                let df = discount_curve.as_ref().df_between_dates(as_of, flow.date)?;
                 Ok(pv + direction * flow.amount.amount() * df)
             })
     }
@@ -258,7 +259,9 @@ impl CmsSwapReplicationPricer {
             if payment_date <= as_of {
                 continue;
             }
-            let df_pay = relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
+            let df_pay = discount_curve
+                .as_ref()
+                .df_between_dates(as_of, payment_date)?;
 
             // Seasoned coupon: known rate off the recorded fixing — identical
             // to the Hagan pricer's seasoned branch (convexity scale is
@@ -592,7 +595,6 @@ mod tests {
     }
 
     use super::*;
-    use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
     use date_support::date;
     use discount_forward_curve_support::{flat_discount_with_tenor, flat_forward_with_tenor};
     use finstack_quant_core::currency::Currency;
@@ -666,7 +668,7 @@ mod tests {
         assert!((growth / accrual - growth / curve_accrual).abs() > 1e-6);
         assert!((flow.amount.amount() - expected_cashflow).abs() < 1e-7);
         let discount = market.get_discount("USD-OIS").expect("discount");
-        let df = relative_df_discount_curve(discount.as_ref(), as_of, end).expect("df");
+        let df = discount.as_ref().df_between_dates(as_of, end).expect("df");
         let pv = CmsSwapPricer::new()
             .pv_funding_leg(&swap, &market, as_of)
             .expect("funding pv");
@@ -723,7 +725,10 @@ mod tests {
             assert_eq!(flow.date, period.payment_date);
             assert_eq!(flow.reset_date, Some(period.reset_date));
             expected_pv += flow.amount.amount()
-                * relative_df_discount_curve(discount.as_ref(), as_of, flow.date).expect("df");
+                * discount
+                    .as_ref()
+                    .df_between_dates(as_of, flow.date)
+                    .expect("df");
         }
         let actual = CmsSwapPricer::new()
             .pv_funding_leg(&swap, &market, as_of)
@@ -790,11 +795,14 @@ mod tests {
         let fwd = market
             .get_forward("USD-LIBOR-3M")
             .expect("forward curve should exist");
-        let first_rate =
-            rate_between_on_dates(fwd.as_ref(), as_of, date(2025, 4, 1), 0.25).expect("first rate");
-        let second_rate =
-            rate_between_on_dates(fwd.as_ref(), date(2025, 4, 1), date(2025, 7, 1), 0.25)
-                .expect("second rate");
+        let first_rate = fwd
+            .as_ref()
+            .rate_between_dates(as_of, date(2025, 4, 1), 0.25)
+            .expect("first rate");
+        let second_rate = fwd
+            .as_ref()
+            .rate_between_dates(date(2025, 4, 1), date(2025, 7, 1), 0.25)
+            .expect("second rate");
         let expected = swap.notional.amount() * (first_rate + second_rate) * 0.25;
         assert!(
             (pv - expected).abs() < 1e-8,

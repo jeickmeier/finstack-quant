@@ -16,12 +16,12 @@ pub(crate) struct FundingRiskCalculator;
 
 impl MetricCalculator for FundingRiskCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        const ONE_BP: f64 = 1e-4; // 1 basis point as decimal
         let repo = context.instrument_as::<crate::instruments::rates::repo::Repo>()?;
         let base_pv = repo.value(&context.curves, context.as_of)?.amount();
         let mut repo_bumped = repo.clone();
-        repo_bumped.repo_rate += Decimal::try_from(ONE_BP)
-            .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
+        repo_bumped.repo_rate +=
+            Decimal::try_from(finstack_quant_core::math::units::ONE_BASIS_POINT)
+                .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
         let bumped_pv = repo_bumped.value(&context.curves, context.as_of)?.amount();
         // dPV/dy convention: ΔPV for a +1bp bump (NOT the negated change).
         Ok(bumped_pv - base_pv)

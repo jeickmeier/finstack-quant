@@ -413,6 +413,55 @@ impl std::fmt::Display for Compounding {
     }
 }
 
+/// Discount factor of one cashflow under a periodically compounded zero rate
+/// shifted by an additive z-spread.
+///
+/// The base curve's discount factor is inverted to a zero rate compounded
+/// `compounds_per_year` times a year, the spread is added, and the cashflow is
+/// re-discounted at the shifted rate.
+///
+/// # Arguments
+///
+/// * `df_base` - Positive, finite base-curve discount factor for the cashflow.
+/// * `t` - Cashflow time in years on the discount curve clock; non-positive
+///   times return `df_base` unchanged.
+/// * `z` - Additive decimal spread on the periodically compounded zero rate.
+/// * `compounds_per_year` - Compounding periods per year, floored at one.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `df_base` is non-finite or non-positive
+/// (a curve-data error), or when the spread-adjusted compounding base
+/// `1 + (base_rate + z) / m` is non-positive or non-finite, which only happens
+/// for spreads too negative to be meaningful.
+pub fn z_spread_discount_factor(
+    df_base: f64,
+    t: f64,
+    z: f64,
+    compounds_per_year: f64,
+) -> crate::Result<f64> {
+    if t <= 0.0 {
+        return Ok(df_base);
+    }
+    if !df_base.is_finite() || df_base <= 0.0 {
+        return Err(crate::Error::Validation(format!(
+            "z_spread_discount_factor: non-positive or non-finite base discount factor ({df_base}); \
+             this is a curve-data error"
+        )));
+    }
+    let m = compounds_per_year.max(1.0);
+    let base_rate = m * (df_base.powf(-1.0 / (m * t)) - 1.0);
+    let denom = 1.0 + (base_rate + z) / m;
+    if denom <= 0.0 || !denom.is_finite() {
+        return Err(crate::Error::Validation(format!(
+            "z_spread_discount_factor: non-positive compounding denominator ({denom}) \
+             for z={z:.6e}, base_rate={base_rate:.6e}, m={m}; \
+             spread is too negative for this cashflow"
+        )));
+    }
+    Ok(denom.powf(-m * t))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -24,7 +24,7 @@ use time::macros::date;
 
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::common_impl::validation;
+use finstack_quant_core::validation;
 
 /// Simple deposit instrument with optional quoted rate.
 ///

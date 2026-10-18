@@ -1,8 +1,5 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
-use crate::instruments::common_impl::pricing::time::{
-    rate_between_on_dates, relative_df_discount_curve,
-};
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
 };
@@ -160,16 +157,16 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
     for period in &sched_float {
         let accrual = period.accrual_year_fraction;
         let coupon = if let Some(curve) = &fwd_curve {
-            rate_between_on_dates(
-                curve.as_ref(),
-                period.accrual_start,
-                period.accrual_end,
-                accrual,
-            )? * accrual
+            curve
+                .as_ref()
+                .rate_between_dates(period.accrual_start, period.accrual_end, accrual)?
+                * accrual
         } else {
             disc.df_on_date(period.accrual_start)? / disc.df_on_date(period.accrual_end)? - 1.0
         };
-        let df = relative_df_discount_curve(disc.as_ref(), inputs.as_of, period.payment_date)?;
+        let df = disc
+            .as_ref()
+            .df_between_dates(inputs.as_of, period.payment_date)?;
         pv_float += coupon * df;
     }
 
@@ -276,7 +273,9 @@ mod tests {
                         .expect("lagged payment");
                     expected += (disc.df_on_date(a).expect("df") / disc.df_on_date(b).expect("df")
                         - 1.0)
-                        * relative_df_discount_curve(disc.as_ref(), as_of, payment)
+                        * disc
+                            .as_ref()
+                            .df_between_dates(as_of, payment)
                             .expect("payment df");
                 }
                 assert!(
@@ -284,9 +283,8 @@ mod tests {
                     "business_day_convention={business_day_convention:?}, lag={lag}"
                 );
                 if business_day_convention == BusinessDayConvention::Unadjusted && lag == 0 {
-                    let telescope = relative_df_discount_curve(disc.as_ref(), as_of, start)
-                        .expect("df")
-                        - relative_df_discount_curve(disc.as_ref(), as_of, end).expect("df");
+                    let telescope = disc.as_ref().df_between_dates(as_of, start).expect("df")
+                        - disc.as_ref().df_between_dates(as_of, end).expect("df");
                     assert!((expected - telescope).abs() < 1e-12);
                 }
             }

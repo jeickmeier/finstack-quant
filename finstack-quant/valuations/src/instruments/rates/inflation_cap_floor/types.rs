@@ -40,7 +40,6 @@
 
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::common_impl::validation;
 use crate::instruments::common_impl::vol_resolution::{
     resolve_volatility, ResolvedVolatility, VolatilityRequest,
 };
@@ -55,6 +54,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::validation;
 use finstack_quant_models::volatility::VolatilityConvention;
 use rust_decimal::Decimal;
 
@@ -465,11 +465,7 @@ impl InflationCapFloor {
 
             // Date-based DF from as_of to payment: correct when the curve base
             // date differs from as_of.
-            let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-                disc.as_ref(),
-                as_of,
-                pay,
-            )?;
+            let df = disc.as_ref().df_between_dates(as_of, pay)?;
 
             // Volatility at the option strike (smile) prices the Black-76 /
             // Bachelier payoff.

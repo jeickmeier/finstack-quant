@@ -1076,9 +1076,8 @@ impl<'a> CashflowEngine<'a> {
                                                 period_end,
                                                 period.accrual_year_fraction,
                                             )?;
-                                            let reset_time = crate::instruments::common_impl::pricing::time::curve_time(
-                                                fwd.as_ref(), reset_effective,
-                                            )?;
+                                            let reset_time =
+                                                fwd.as_ref().curve_time(reset_effective)?;
                                             // Replace the raw curve baseline while preserving
                                             // any additive contractual-rate shock on the path.
                                             simulated + contractual_index - fwd.rate(reset_time)

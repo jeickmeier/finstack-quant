@@ -17,9 +17,9 @@ use rust_decimal::Decimal;
 use crate::instruments::common_impl::pricing::overnight_conventions;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::common_impl::validation;
 use crate::market::conventions::ConventionRegistry;
 use finstack_quant_core::types::IndexId;
+use finstack_quant_core::validation;
 use finstack_quant_margin::types::OtcMarginSpec;
 
 use finstack_quant_cashflows::builder::FloatingLegCompounding;

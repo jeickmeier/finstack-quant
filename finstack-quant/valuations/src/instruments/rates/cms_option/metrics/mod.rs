@@ -4,7 +4,6 @@
 //! Note: Some metrics (delta, convexity adjustment risk) require the CMS pricer
 //! to be fully implemented to compute forward swap rates and convexity adjustments.
 
-use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::rates::cms_common::ConvexityAdjustmentRiskCalculator;
 use crate::instruments::rates::cms_option::pricer::convexity_adjustment_with_frequency;
 use crate::instruments::rates::cms_option::types::CmsOption;
@@ -230,7 +229,9 @@ impl MetricCalculator for VannaCalculator {
             // Vanna_Black = - N'(d1) * d2 / sigma
             // Gamma_Black = N'(d1) / (F * sigma * sqrt(T))
             // Discount factor uses curve-consistent relative DF
-            let df_pay = relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
+            let df_pay = discount_curve
+                .as_ref()
+                .df_between_dates(as_of, payment_date)?;
 
             // Use combined d1_d2 for efficiency
             let (d1, d2) = d1_d2_black76(adjusted_rate, strike, vol, time_to_fixing);

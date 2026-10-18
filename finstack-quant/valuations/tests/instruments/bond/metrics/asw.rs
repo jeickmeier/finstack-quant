@@ -91,27 +91,13 @@ fn test_asw_par_tracks_coupon_minus_par_rate() {
     let annuity: f64 = periods
         .iter()
         .map(|p| {
-            finstack_quant_valuations::instruments::pricing::time::relative_df_discount_curve(
-                &disc,
-                as_of,
-                p.payment_date,
-            )
-            .expect("df")
-                * p.accrual_year_fraction
+            disc.df_between_dates(as_of, p.payment_date).expect("df") * p.accrual_year_fraction
         })
         .sum();
-    let p0 = finstack_quant_valuations::instruments::pricing::time::relative_df_discount_curve(
-        &disc,
-        as_of,
-        bond.issue_date,
-    )
-    .expect("df");
-    let pn = finstack_quant_valuations::instruments::pricing::time::relative_df_discount_curve(
-        &disc,
-        as_of,
-        periods.last().expect("periods").payment_date,
-    )
-    .expect("df");
+    let p0 = disc.df_between_dates(as_of, bond.issue_date).expect("df");
+    let pn = disc
+        .df_between_dates(as_of, periods.last().expect("periods").payment_date)
+        .expect("df");
     let par_rate = (p0 - pn) / annuity;
 
     let rate_f64 = rust_decimal::prelude::ToPrimitive::to_f64(&spec.rate).unwrap_or(0.0);

@@ -251,7 +251,6 @@ pub(crate) fn quote_dirty_at_as_of(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
@@ -299,7 +298,10 @@ mod tests {
         let carried =
             model_dirty_at_quote_date(&bond, &market, as_of, quote_date, pv_as_of).expect("carry");
         let disc = market.get_discount("USD-OIS").expect("curve");
-        let df = relative_df_discount_curve(disc.as_ref(), as_of, quote_date).expect("df");
+        let df = disc
+            .as_ref()
+            .df_between_dates(as_of, quote_date)
+            .expect("df");
         assert!((carried - pv_as_of / df).abs() < 1e-9);
         let restored = quote_dirty_at_as_of(&bond, &market, as_of, quote_date, carried)
             .expect("reverse carry");

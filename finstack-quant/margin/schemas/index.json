@@ -128,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/margin_constants.schema.json",
-      "bytes": 4780,
+      "bytes": 4824,
       "kind": "output",
       "path": "schemas/margin/1/margin_constants.schema.json",
       "summary": "Margin constants a host needs to interpret inputs and results.",

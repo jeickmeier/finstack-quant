@@ -158,7 +158,6 @@ pub mod pricing {
     pub use super::common_impl::pricing::overnight::default_rate_calendar_id;
     pub use super::common_impl::pricing::overnight_conventions;
     pub use super::common_impl::pricing::swap_legs;
-    pub use super::common_impl::pricing::time;
     #[doc(hidden)]
     pub use super::common_impl::pricing::GenericInstrumentPricer;
 }
@@ -171,7 +170,6 @@ pub mod cashflow_export {
     pub use super::common_impl::cashflow_export::*;
 }
 
-pub use common_impl::fx_dates::fx_spot_date_for_pair;
 pub use finstack_quant_core::dates::{resolve_calendar, resolve_joint_calendar};
 
 /// Model parameter snapshots used by attribution.

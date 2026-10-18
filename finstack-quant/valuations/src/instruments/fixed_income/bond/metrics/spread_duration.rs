@@ -10,9 +10,9 @@
 //! ```
 
 use super::cs01::z_spread_bumped_pvs;
-use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 
 const RELATIVE_BASE_PV_EPSILON: f64 = 1e-12;
 

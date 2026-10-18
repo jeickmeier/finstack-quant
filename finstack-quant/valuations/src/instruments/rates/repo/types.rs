@@ -465,8 +465,8 @@ impl Repo {
                 rate_adjustment_bp, ..
             } => {
                 if let Some(adjustment_bp) = rate_adjustment_bp {
-                    const ONE_BP: f64 = 1e-4;
-                    base_rate + (adjustment_bp * ONE_BP) // Convert bp to decimal
+                    base_rate + (adjustment_bp * finstack_quant_core::math::units::ONE_BASIS_POINT)
+                // Convert bp to decimal
                 } else {
                     base_rate
                 }

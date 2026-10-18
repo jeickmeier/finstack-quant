@@ -2,10 +2,10 @@
 
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::common_impl::validation;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::validation;
 use rust_decimal::Decimal;
 
 /// Target Redemption Note (TARN).

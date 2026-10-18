@@ -13,11 +13,11 @@ use crate::instruments::rates::repo::Repo;
 use crate::instruments::PayReceive;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_margin::constants::{
-    self, CALENDAR_DAYS_PER_YEAR, DURATION_APPROXIMATION_FACTOR, ONE_BP,
-    STANDARD_CDS_MATURITY_YEARS,
+    self, CALENDAR_DAYS_PER_YEAR, DURATION_APPROXIMATION_FACTOR, STANDARD_CDS_MATURITY_YEARS,
 };
 use finstack_quant_margin::{
     ClearingStatus, Marginable, NettingSetId, OtcMarginSpec, RepoMarginSpec,
@@ -277,7 +277,7 @@ impl Marginable for InterestRateSwap {
         let total_dv01 = self.notional.amount().abs()
             * years_to_maturity
             * DURATION_APPROXIMATION_FACTOR
-            * ONE_BP;
+            * ONE_BASIS_POINT;
 
         let sign = match self.side {
             crate::instruments::rates::irs::PayReceive::Pay => 1.0,
@@ -378,7 +378,7 @@ impl Marginable for CreditDefaultSwap {
         let risky_duration = years_to_maturity
             * (1.0 - self.protection_leg.recovery_rate)
             * DURATION_APPROXIMATION_FACTOR;
-        let cs01 = self.notional.amount().abs() * risky_duration * ONE_BP;
+        let cs01 = self.notional.amount().abs() * risky_duration * ONE_BASIS_POINT;
         let signed_cs01 = match self.side {
             crate::instruments::common_impl::parameters::legs::PayReceive::Pay => cs01,
             crate::instruments::common_impl::parameters::legs::PayReceive::Receive => -cs01,
@@ -448,7 +448,7 @@ impl Marginable for CdsIndex {
         let recovery_rate = self.protection_leg.recovery_rate;
         let risky_duration =
             years_to_maturity * (1.0 - recovery_rate) * DURATION_APPROXIMATION_FACTOR;
-        let cs01 = self.notional.amount().abs() * risky_duration * ONE_BP;
+        let cs01 = self.notional.amount().abs() * risky_duration * ONE_BASIS_POINT;
         let signed_cs01 = match self.side {
             crate::instruments::common_impl::parameters::legs::PayReceive::Pay => cs01,
             crate::instruments::common_impl::parameters::legs::PayReceive::Receive => -cs01,
@@ -533,7 +533,7 @@ impl Marginable for FiIndexTotalReturnSwap {
 
         let duration = self.index_duration(market)?;
 
-        let dv01 = self.notional.amount().abs() * duration * ONE_BP;
+        let dv01 = self.notional.amount().abs() * duration * ONE_BASIS_POINT;
 
         let signed_dv01 = match self.side {
             PayReceive::Receive => -dv01, // Long bond = short rates
@@ -587,7 +587,7 @@ impl Marginable for Repo {
         let years_to_maturity = days_to_maturity / CALENDAR_DAYS_PER_YEAR;
 
         // DV01 approximation for short-term lending
-        let dv01 = self.cash_amount.amount() * years_to_maturity * ONE_BP;
+        let dv01 = self.cash_amount.amount() * years_to_maturity * ONE_BASIS_POINT;
 
         // Assign to shortest tenor bucket (3M for very short, otherwise 6M)
         let tenor = if years_to_maturity <= constants::tenor_buckets::BUCKET_3M {
@@ -736,9 +736,10 @@ mod tests {
 
         // The flat duration ≈ maturity proxy total (the OLD behavior) for a
         // ~10y swap: notional × 10 × 0.0001 (DURATION_APPROXIMATION_FACTOR) ×
-        // ONE_BP, signed positive for Pay-fixed. The repriced curve-aware DV01
+        // ONE_BASIS_POINT, signed positive for Pay-fixed. The repriced curve-aware DV01
         // genuinely differs from this crude proxy.
-        let proxy_total = notional.amount().abs() * 10.0 * DURATION_APPROXIMATION_FACTOR * ONE_BP;
+        let proxy_total =
+            notional.amount().abs() * 10.0 * DURATION_APPROXIMATION_FACTOR * ONE_BASIS_POINT;
         assert!(
             (repriced_total - proxy_total).abs() > 1e-6,
             "repriced DV01 ({repriced_total}) must differ from the duration proxy ({proxy_total})"

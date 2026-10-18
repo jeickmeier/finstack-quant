@@ -126,7 +126,7 @@
       "type": "integer"
     },
     "ONE_BP": {
-      "description": "[`ONE_BP`]: one basis point as a decimal.",
+      "description": "One basis point as a decimal ([`finstack_quant_core::math::units::ONE_BASIS_POINT`]).",
       "format": "double",
       "type": "number"
     },

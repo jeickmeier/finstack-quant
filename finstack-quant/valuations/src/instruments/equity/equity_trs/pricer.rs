@@ -4,7 +4,6 @@
 //! a cost-of-carry forward model with dividend yield.
 
 use super::types::{EquityTotalReturnSwap, TrsDividendSettlement};
-use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::pricing::{
     PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
 };
@@ -142,7 +141,7 @@ impl TrsReturnModel for EquityReturnModel<'_> {
             let mut values = Vec::new();
             for (div_date, amount) in &self.trs.discrete_dividends {
                 if *div_date > as_of && *div_date <= target {
-                    let df = relative_df_discount_curve(disc.as_ref(), as_of, *div_date)?;
+                    let df = disc.as_ref().df_between_dates(as_of, *div_date)?;
                     values.push(*amount * df);
                 }
             }
@@ -159,14 +158,14 @@ impl TrsReturnModel for EquityReturnModel<'_> {
                 self.period_end_level(period_end, as_of)?,
             )
         } else if t_start < 0.0 {
-            let df_end = relative_df_discount_curve(disc.as_ref(), as_of, period_end)?;
+            let df_end = disc.as_ref().df_between_dates(as_of, period_end)?;
             let start_level = self.period_start_level(period_start)?;
             let ex_div_spot = self.spot - pv_discrete_dividends_to(period_end)?;
             let fwd_spot_end = ex_div_spot * df_end.recip() * (-carry_div_yield * t_end).exp();
             (start_level, fwd_spot_end)
         } else {
-            let df_start = relative_df_discount_curve(disc.as_ref(), as_of, period_start)?;
-            let df_end = relative_df_discount_curve(disc.as_ref(), as_of, period_end)?;
+            let df_start = disc.as_ref().df_between_dates(as_of, period_start)?;
+            let df_end = disc.as_ref().df_between_dates(as_of, period_end)?;
             let fwd_start = (self.spot - pv_discrete_dividends_to(period_start)?)
                 * df_start.recip()
                 * (-carry_div_yield * t_start).exp();
@@ -185,7 +184,7 @@ impl TrsReturnModel for EquityReturnModel<'_> {
 
         if uses_discrete_dividends {
             let payment_date = self.trs.schedule.payment_date_for(period_end)?;
-            let payment_df = relative_df_discount_curve(disc.as_ref(), as_of, payment_date)?;
+            let payment_df = disc.as_ref().df_between_dates(as_of, payment_date)?;
             let mut net_dividends = Vec::new();
             for (dividend_date, amount) in &self.trs.discrete_dividends {
                 let in_period = *dividend_date > period_start && *dividend_date <= period_end;
@@ -198,8 +197,7 @@ impl TrsReturnModel for EquityReturnModel<'_> {
                 }
                 let settlement_ratio = match self.trs.dividend_settlement {
                     TrsDividendSettlement::OnDividendDate => {
-                        relative_df_discount_curve(disc.as_ref(), as_of, *dividend_date)?
-                            / payment_df
+                        disc.as_ref().df_between_dates(as_of, *dividend_date)? / payment_df
                     }
                     TrsDividendSettlement::AtPeriodEnd => 1.0,
                 };
@@ -216,8 +214,8 @@ impl TrsReturnModel for EquityReturnModel<'_> {
                 // Spot cancels analytically for a fully future proportional
                 // return. Evaluate the carry ratio directly to avoid numerical
                 // spot sensitivity from dividing two projected spot levels.
-                let df_start = relative_df_discount_curve(disc.as_ref(), as_of, period_start)?;
-                let df_end = relative_df_discount_curve(disc.as_ref(), as_of, period_end)?;
+                let df_start = disc.as_ref().df_between_dates(as_of, period_start)?;
+                let df_end = disc.as_ref().df_between_dates(as_of, period_end)?;
                 df_start / df_end * (-carry_div_yield * (t_end - t_start)).exp() - 1.0
             } else {
                 (fwd_end - fwd_start) / fwd_start
@@ -455,18 +453,12 @@ mod tests {
         .period_return(&inputs, &context)
         .expect("period return without dividend");
 
-        let df_d = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-            &disc,
-            period_start,
-            div_date,
-        )
-        .expect("df to ex-date");
-        let df_pe = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-            &disc,
-            period_start,
-            period_end,
-        )
-        .expect("df to period end");
+        let df_d = disc
+            .df_between_dates(period_start, div_date)
+            .expect("df to ex-date");
+        let df_pe = disc
+            .df_between_dates(period_start, period_end)
+            .expect("df to period end");
 
         // Δreturn = [−D·df_d/df_pe + D] / S0 — the funding carry of settling
         // the dividend at period end instead of its ex-date.

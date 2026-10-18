@@ -54,22 +54,14 @@ pub(crate) fn compute_pv(
             }
             realized_variance(&prices, Some(annualization_factor(inst)))?
         };
-        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-            disc.as_ref(),
-            as_of,
-            settlement_date,
-        )?;
+        let df = disc.as_ref().df_between_dates(as_of, settlement_date)?;
         return inst.payoff(realized_var)?.checked_mul_f64(df);
     }
 
     if as_of < inst.start_date {
         let forward_var = remaining_forward_variance(inst, curves, as_of)?;
         let undiscounted = inst.payoff(forward_var)?;
-        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-            disc.as_ref(),
-            as_of,
-            settlement_date,
-        )?;
+        let df = disc.as_ref().df_between_dates(as_of, settlement_date)?;
         return undiscounted.checked_mul_f64(df);
     }
 
@@ -79,11 +71,7 @@ pub(crate) fn compute_pv(
     // variance implied by this PV (W-32/W-33).
     let expected_var = seasoned_expected_variance(inst, curves, as_of)?;
     let undiscounted = inst.payoff(expected_var)?;
-    let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-        disc.as_ref(),
-        as_of,
-        settlement_date,
-    )?;
+    let df = disc.as_ref().df_between_dates(as_of, settlement_date)?;
     undiscounted.checked_mul_f64(df)
 }
 
@@ -384,11 +372,7 @@ fn spot_variance_to_date(
     )?;
     // Date-based zero rate over [as_of, target_date]: avoids the
     // axis bias of `disc.zero(t)` when curve base != as_of.
-    let df_mat = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-        disc.as_ref(),
-        as_of,
-        target_date,
-    )?;
+    let df_mat = disc.as_ref().df_between_dates(as_of, target_date)?;
     let r = crate::instruments::common_impl::helpers::zero_rate_from_df(
         df_mat,
         t,
@@ -827,12 +811,10 @@ mod tests {
         let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
         let expected_var = realized * count_w + forward * (1.0 - count_w);
         let disc = market.get_discount("USD-OIS").expect("curve");
-        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-            disc.as_ref(),
-            as_of,
-            swap.maturity,
-        )
-        .expect("df");
+        let df = disc
+            .as_ref()
+            .df_between_dates(as_of, swap.maturity)
+            .expect("df");
         let expected_pv = swap
             .payoff(expected_var)
             .expect("valid payoff")

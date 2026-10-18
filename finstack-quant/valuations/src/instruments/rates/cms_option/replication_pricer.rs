@@ -16,7 +16,6 @@
 //!
 //! Reference: <https://www.deriscope.com/docs/Hagan_Convexity_Conundrums.pdf>.
 
-use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cms_common::annuity_weight;
 use crate::instruments::rates::cms_option::types::CmsOption;
@@ -227,8 +226,9 @@ impl CmsReplicationPricer {
                     inst.cms_tenor.to_years(),
                     fixing_date,
                 )?;
-                let df_pay =
-                    relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
+                let df_pay = discount_curve
+                    .as_ref()
+                    .df_between_dates(as_of, payment_date)?;
                 let intrinsic = match inst.option_type {
                     OptionType::Call => (observed - strike).max(0.0),
                     OptionType::Put => (strike - observed).max(0.0),
@@ -265,7 +265,9 @@ impl CmsReplicationPricer {
                 DayCount::Act365F.year_fraction(as_of, fixing_date, DayCountContext::default())?;
 
             // DF to payment date from discount curve (relative to as_of)
-            let df_pay = relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
+            let df_pay = discount_curve
+                .as_ref()
+                .df_between_dates(as_of, payment_date)?;
 
             // --- Static Replication (shared engine) ---
             let period_pv = replicated_cms_optionlet(

@@ -14,11 +14,11 @@
 //! the workspace (see `sensitivity_central_diff` and the zero-coupon
 //! `Inflation01Calculator`).
 
-use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::inflation_swap::YoYInflationSwap;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::Result;
 
 /// Inflation01 calculator for YoY inflation swaps.

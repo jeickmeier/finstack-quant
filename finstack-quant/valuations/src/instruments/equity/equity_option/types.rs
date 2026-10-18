@@ -73,7 +73,7 @@ use time::macros::date;
 
 use super::parameters::{EquityOptionMarketData, EquityOptionParams};
 use crate::instruments::common_impl::traits::impl_instrument_base;
-use crate::instruments::common_impl::validation;
+use finstack_quant_core::validation;
 
 /// Observed exercise or expiry state for an equity option.
 ///

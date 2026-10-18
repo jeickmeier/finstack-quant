@@ -224,7 +224,7 @@ pub struct FxOption {
 impl FxOption {
     /// Validate FX option currency invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        crate::instruments::common_impl::validation::validate_distinct_currencies(
+        finstack_quant_core::validation::validate_distinct_currencies(
             self.base_currency,
             self.quote_currency,
             "FxOption",
@@ -249,11 +249,8 @@ impl FxOption {
                 "FxOption delta convention venue must not be blank".to_string(),
             ));
         }
-        crate::instruments::common_impl::validation::validate_money_finite(
-            self.notional,
-            "FxOption notional",
-        )?;
-        crate::instruments::common_impl::validation::validate_money_gt(
+        finstack_quant_core::validation::validate_money_finite(self.notional, "FxOption notional")?;
+        finstack_quant_core::validation::validate_money_gt(
             self.notional,
             0.0,
             "FxOption notional",

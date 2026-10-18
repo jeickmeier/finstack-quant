@@ -20,7 +20,7 @@
 //! `FinancingLegSpec.compounding` setting:
 //!
 //! - `simple` — the **discount-factor-implied simple forward** over the accrual
-//!   period ([`rate_between_on_dates`]), correct for a term-rate-financed TRS
+//!   period ([`ForwardCurve::rate_between_dates`]), correct for a term-rate-financed TRS
 //!   (e.g. 3M Term SOFR) where the period length matches the index tenor.
 //! - `compounded_*` — **daily-compounds** the overnight forward via
 //!   [`crate::instruments::common_impl::pricing::overnight::project_overnight_coupon`]
@@ -47,9 +47,6 @@ use rust_decimal::prelude::ToPrimitive;
 use crate::instruments::common_impl::pricing::overnight::{
     adjust_overnight_accrual_boundaries, project_overnight_coupon, OvernightCouponProjectionInput,
     OvernightProjectionCurve,
-};
-use crate::instruments::common_impl::pricing::time::{
-    rate_between_on_dates, relative_df_discount_curve,
 };
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
@@ -132,7 +129,7 @@ fn financing_period_projection(
                     as_of,
                 )?
             } else {
-                rate_between_on_dates(fwd, period_start, period_end, period_year_fraction)?
+                fwd.rate_between_dates(period_start, period_end, period_year_fraction)?
             };
             FinancingPeriodProjection::new(
                 rate,
@@ -334,7 +331,7 @@ impl TrsEngine {
         for (date, amount) in
             Self::cashflows_total_return_leg_with_model(params, market, as_of, model)?
         {
-            pv.add(amount.amount() * relative_df_discount_curve(disc.as_ref(), as_of, date)?);
+            pv.add(amount.amount() * disc.as_ref().df_between_dates(as_of, date)?);
         }
         Money::new(pv.total(), currency)
     }
@@ -420,7 +417,7 @@ impl TrsEngine {
         for (date, amount) in
             Self::cashflows_financing_leg(financing, schedule, notional, market, as_of)?
         {
-            pv.add(amount.amount() * relative_df_discount_curve(disc.as_ref(), as_of, date)?);
+            pv.add(amount.amount() * disc.as_ref().df_between_dates(as_of, date)?);
         }
         Money::new(pv.total(), currency)
     }
@@ -583,7 +580,7 @@ impl TrsEngine {
             )?
             .year_fraction;
 
-            let df = relative_df_discount_curve(disc.as_ref(), as_of, payment_date)?;
+            let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
 
             annuity.add(df * yf);
         }
@@ -664,7 +661,7 @@ impl TrsEngine {
             )?;
             let payment = projected.unsigned_coupon(notional.amount(), 0.0);
 
-            let df = relative_df_discount_curve(disc.as_ref(), as_of, payment_date)?;
+            let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
             total_pv.add(payment * df);
         }
 
@@ -681,7 +678,6 @@ mod tests {
     use crate::instruments::common_impl::parameters::legs::FinancingLegSpec;
     use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
     use crate::instruments::common_impl::pricing::swap_legs;
-    use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_cashflows::builder::ScheduleParams;
     use finstack_quant_core::currency::Currency;
@@ -959,7 +955,7 @@ mod tests {
         for i in 1..period_schedule.dates.len() {
             let _period_start = period_schedule.dates[i - 1];
             let period_end = period_schedule.dates[i];
-            let df = relative_df_discount_curve(&disc, as_of, period_end).expect("df");
+            let df = disc.df_between_dates(as_of, period_end).expect("df");
             let t_end = schedule
                 .params
                 .day_count
@@ -1053,7 +1049,7 @@ mod tests {
             let growth = fwd.df_on_date(period_start).expect("start projection DF")
                 / fwd.df_on_date(period_end).expect("end projection DF")
                 - 1.0;
-            let df = relative_df_discount_curve(&disc, as_of, period_end).expect("df");
+            let df = disc.df_between_dates(as_of, period_end).expect("df");
             expected += 1_000_000.0 * growth * df;
             let curve_accrual = fwd
                 .day_count()

@@ -552,7 +552,7 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyMbsPassthroug
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate_coupon_consistency()?;
-        crate::instruments::common_impl::validation::validate_date_range_strict(
+        finstack_quant_core::validation::validate_date_range_strict(
             self.issue_date,
             self.maturity,
             "MBS issue-to-maturity",

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Curve-time, validation, FX-date and unit helpers moved to `finstack-quant-core`
+
+#### Added
+
+- `ForwardCurve::curve_time`, `ForwardCurve::rate_between_dates` and `ForwardCurve::rate_period_between_dates` (date-based forward lookups on the curve's own clock); `Tenor::compounding_frequency`; `finstack_quant_core::math::z_spread_discount_factor`; `finstack_quant_core::math::stats::{compensated_mean, compensated_variance, compensated_covariance}`; `finstack_quant_core::math::units::{ONE_BASIS_POINT, BASIS_POINTS_PER_UNIT, DECIMAL_TO_PERCENT}`; `finstack_quant_core::dates::fx::{fx_spot_date_for_pair, add_fx_standard_tenor}`; the Money, date, rate and recovery validators in `finstack_quant_core::validation`.
+
+#### Removed
+
+- `finstack_quant_valuations::instruments::pricing::time` (use the core curve methods and `Discounting::df_between_dates`), the crate-private `common_impl::validation` and `common_impl::fx_dates`, the `instruments::fx_spot_date_for_pair` re-export, `valuations::constants::{ONE_BASIS_POINT, BASIS_POINTS_PER_UNIT, DECIMAL_TO_PERCENT, numerical::DF_EPSILON}` and `finstack_quant_margin::constants::ONE_BP`.
+
 ### Loan coupon spec owned by `finstack-quant-cashflows`
 
 #### Changed

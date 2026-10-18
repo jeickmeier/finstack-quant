@@ -80,10 +80,7 @@ impl BarrierOptionHestonMcPricer {
             }
         };
 
-        crate::instruments::common_impl::validation::validate_f64_positive(
-            spot,
-            "BarrierOption Heston spot",
-        )?;
+        finstack_quant_core::validation::validate_f64_positive(spot, "BarrierOption Heston spot")?;
         let q = crate::instruments::common_impl::helpers::resolve_optional_dividend_yield(
             market,
             inst.div_yield_id.as_ref(),

@@ -3,12 +3,12 @@
 use crate::build::BuildCtx;
 use crate::quotes::ids::Pillar;
 use crate::quotes::xccy::XccyQuote;
+use finstack_quant_core::dates::fx::fx_spot_date_for_pair;
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::dates::{adjust, resolve_joint_calendar};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::fx_spot_date_for_pair;
 use finstack_quant_valuations::instruments::rates::xccy_swap::{XccySwap, XccySwapLeg};
 use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::PayReceive;

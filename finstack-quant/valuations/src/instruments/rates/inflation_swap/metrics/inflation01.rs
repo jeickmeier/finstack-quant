@@ -42,11 +42,11 @@
 //! The bumped-curve `value()` already carries the leg signs, so the finite
 //! difference reproduces the correct sign without an explicit branch.
 
-use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::inflation_swap::InflationSwap;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::Result;
 
 /// Calculates Inflation01 (1bp inflation rate sensitivity) for zero-coupon

@@ -140,25 +140,25 @@ pub struct FxDigitalOption {
 impl FxDigitalOption {
     /// Validate FX digital option input invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        crate::instruments::common_impl::validation::validate_distinct_currencies(
+        finstack_quant_core::validation::validate_distinct_currencies(
             self.base_currency,
             self.quote_currency,
             "FxDigitalOption",
         )?;
-        crate::instruments::common_impl::validation::validate_f64_positive(
+        finstack_quant_core::validation::validate_f64_positive(
             self.strike,
             "FxDigitalOption strike",
         )?;
-        crate::instruments::common_impl::validation::validate_f64_finite(
+        finstack_quant_core::validation::validate_f64_finite(
             self.strike,
             "FxDigitalOption strike",
         )?;
-        crate::instruments::common_impl::validation::validate_money_gt(
+        finstack_quant_core::validation::validate_money_gt(
             self.notional,
             0.0,
             "FxDigitalOption notional",
         )?;
-        crate::instruments::common_impl::validation::validate_money_finite(
+        finstack_quant_core::validation::validate_money_finite(
             self.notional,
             "FxDigitalOption notional",
         )?;

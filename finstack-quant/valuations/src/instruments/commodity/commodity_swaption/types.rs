@@ -190,24 +190,24 @@ impl CommoditySwaption {
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.underlying.validate("CommoditySwaption")?;
         // expiry <= underlying_start_date < underlying_maturity
-        crate::instruments::common_impl::validation::validate_date_range_non_strict(
+        finstack_quant_core::validation::validate_date_range_non_strict(
             self.expiry,
             self.underlying_start_date,
             "CommoditySwaption expiry/underlying_start_date",
         )?;
-        crate::instruments::common_impl::validation::validate_date_range_strict(
+        finstack_quant_core::validation::validate_date_range_strict(
             self.underlying_start_date,
             self.underlying_maturity,
             "CommoditySwaption underlying_start_date/underlying_maturity",
         )?;
         // quantity > 0
-        crate::instruments::common_impl::validation::validate_f64_positive(
+        finstack_quant_core::validation::validate_f64_positive(
             self.quantity,
             "CommoditySwaption quantity",
         )?;
         // This instrument is dispatched to unshifted Black-76, whose logarithm
         // requires a strictly positive strike.
-        crate::instruments::common_impl::validation::validate_f64_positive(
+        finstack_quant_core::validation::validate_f64_positive(
             self.fixed_price,
             "CommoditySwaption fixed_price",
         )?;

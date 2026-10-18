@@ -251,7 +251,7 @@ impl QuantoOption {
 
     /// Validate quanto option economics at construction boundaries.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        crate::instruments::common_impl::validation::validate_distinct_currencies(
+        finstack_quant_core::validation::validate_distinct_currencies(
             self.base_currency,
             self.quote_currency,
             "QuantoOption",

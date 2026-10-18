@@ -160,7 +160,7 @@ pub struct CommodityAsianOption {
 
 impl CommodityAsianOption {
     fn validate_structure(&self) -> finstack_quant_core::Result<()> {
-        use crate::instruments::common_impl::validation;
+        use finstack_quant_core::validation;
 
         self.underlying.validate("CommodityAsianOption")?;
         validation::validate_f64_positive(self.strike, "CommodityAsianOption strike")?;

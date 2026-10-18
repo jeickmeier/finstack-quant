@@ -1677,7 +1677,7 @@ export interface MarginConstants {
    */
   HAIRCUT_MPOR_DAYS: number;
   /**
-   * [`ONE_BP`]: one basis point as a decimal.
+   * One basis point as a decimal ([`finstack_quant_core::math::units::ONE_BASIS_POINT`]).
    */
   ONE_BP: number;
   /**

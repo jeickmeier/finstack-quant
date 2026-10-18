@@ -760,8 +760,7 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
                 DayCountContext::default(),
             )?;
             let coupon = if let Some(fwd) = &forward {
-                finstack_quant_valuations::instruments::pricing::time::rate_between_on_dates(
-                    fwd.as_ref(),
+                fwd.as_ref().rate_between_dates(
                     period.accrual_start,
                     period.accrual_end,
                     period.accrual_year_fraction,

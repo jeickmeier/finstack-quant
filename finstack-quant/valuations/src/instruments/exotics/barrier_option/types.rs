@@ -200,7 +200,7 @@ impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
     impl_instrument_base!(crate::pricer::InstrumentType::BarrierOption);
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
-        use crate::instruments::common_impl::validation;
+        use finstack_quant_core::validation;
         // Strike and barrier must satisfy the closed-form model domain
         // (`validate_barrier_inputs` rejects non-positive values with a NaN
         // sentinel); rejecting them here surfaces a `Validation` error at the

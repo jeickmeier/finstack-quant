@@ -91,8 +91,9 @@ items surface through each leaf's `pub use`. Genuinely public submodules are
   tests fail otherwise.
 - **Clocks.** Year fractions for discounting come from the *curve's* day count
   measured from the *curve's* base date, not from the instrument's. Use
-  `instruments::pricing::time` (`relative_df_discount_curve`, `curve_time`,
-  `rate_period_on_dates`); do not call `disc.df(t)` with an
+  core's date-based curve methods (`DiscountCurve::df_between_dates`,
+  `ForwardCurve::curve_time`, `ForwardCurve::rate_between_dates`,
+  `ForwardCurve::rate_period_between_dates`); do not call `disc.df(t)` with an
   instrument-derived `t`.
 - **Leg pricing is shared.** `instruments::pricing::swap_legs` owns fixed-leg
   valuation and payment-delay handling. Floating coupons use the canonical

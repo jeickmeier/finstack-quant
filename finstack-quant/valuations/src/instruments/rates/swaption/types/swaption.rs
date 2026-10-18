@@ -4,7 +4,6 @@ use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::common_impl::validation;
 use crate::instruments::common_impl::vol_resolution::{
     resolve_volatility, validate_sigma, ResolvedVolatility, VolatilityRequest,
 };
@@ -17,6 +16,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
+use finstack_quant_core::validation;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::volatility::VolatilityConvention;
 use finstack_quant_models::SabrParameters;
@@ -637,19 +637,20 @@ impl Swaption {
     pub fn annuity(&self, disc: &dyn Discounting, as_of: Date, forward_rate: f64) -> Result<f64> {
         match self.settlement {
             SettlementType::Physical => self.swap_annuity(disc, as_of),
-            SettlementType::Cash => match self.cash_settlement_method {
-                CashSettlementMethod::CollateralizedCashPrice
-                | CashSettlementMethod::IsdaParPar => self.swap_annuity(disc, as_of),
-                CashSettlementMethod::ParYield => {
-                    use crate::instruments::common_impl::pricing::time::relative_df_discounting;
-                    // The cash amount is paid on the settlement date, which is
-                    // the underlying swap's effective date.
-                    let df =
-                        relative_df_discounting(disc, as_of, self.get_underlying_start_date())?;
-                    Ok(self.cash_annuity_par_yield(forward_rate)? * df)
+            SettlementType::Cash => {
+                match self.cash_settlement_method {
+                    CashSettlementMethod::CollateralizedCashPrice
+                    | CashSettlementMethod::IsdaParPar => self.swap_annuity(disc, as_of),
+                    CashSettlementMethod::ParYield => {
+                        // The cash amount is paid on the settlement date, which is
+                        // the underlying swap's effective date.
+                        let df =
+                        finstack_quant_core::market_data::traits::Discounting::df_between_dates(disc, as_of, self.get_underlying_start_date())?;
+                        Ok(self.cash_annuity_par_yield(forward_rate)? * df)
+                    }
+                    CashSettlementMethod::ZeroCoupon => self.cash_annuity_zero_coupon(disc, as_of),
                 }
-                CashSettlementMethod::ZeroCoupon => self.cash_annuity_zero_coupon(disc, as_of),
-            },
+            }
         }
     }
 
@@ -657,7 +658,7 @@ impl Swaption {
     ///
     /// # Time Basis
     ///
-    /// Uses curve-consistent relative discount factors via `relative_df_discounting`:
+    /// Uses curve-consistent relative discount factors via `Discounting::df_between_dates`:
     /// - DF from `as_of` to each payment date is computed using the discount curve's
     ///   own base_date and day_count (not the instrument's day_count).
     /// - Accrual fractions use the instrument's day_count (correct for coupon calculation).
@@ -734,14 +735,16 @@ impl Swaption {
     /// This method treats the entire swap as a single zero-coupon payment
     /// at maturity. Rarely used in modern markets; included for completeness.
     pub fn cash_annuity_zero_coupon(&self, disc: &dyn Discounting, as_of: Date) -> Result<f64> {
-        use crate::instruments::common_impl::pricing::time::relative_df_discounting;
-
         let tenor = year_fraction(
             self.get_fixed_day_count(),
             self.get_underlying_start_date(),
             self.get_underlying_maturity(),
         )?;
-        let df = relative_df_discounting(disc, as_of, self.get_underlying_maturity())?;
+        let df = finstack_quant_core::market_data::traits::Discounting::df_between_dates(
+            disc,
+            as_of,
+            self.get_underlying_maturity(),
+        )?;
         Ok(tenor * df)
     }
 
@@ -989,7 +992,6 @@ fn single_curve_float_leg_pv(
     periods: &[finstack_quant_cashflows::builder::SchedulePeriod],
     spread: f64,
 ) -> Result<(f64, f64)> {
-    use crate::instruments::common_impl::pricing::time::relative_df_discounting;
     use finstack_quant_core::math::NeumaierAccumulator;
 
     let mut float_leg = NeumaierAccumulator::new();
@@ -1002,9 +1004,21 @@ fn single_curve_float_leg_pv(
         if tau.abs() <= f64::EPSILON {
             continue;
         }
-        let df_start = relative_df_discounting(disc, as_of, period.accrual_start)?;
-        let df_end = relative_df_discounting(disc, as_of, period.accrual_end)?;
-        let df_pay = relative_df_discounting(disc, as_of, period.payment_date)?;
+        let df_start = finstack_quant_core::market_data::traits::Discounting::df_between_dates(
+            disc,
+            as_of,
+            period.accrual_start,
+        )?;
+        let df_end = finstack_quant_core::market_data::traits::Discounting::df_between_dates(
+            disc,
+            as_of,
+            period.accrual_end,
+        )?;
+        let df_pay = finstack_quant_core::market_data::traits::Discounting::df_between_dates(
+            disc,
+            as_of,
+            period.payment_date,
+        )?;
         float_leg.add((df_start / df_end - 1.0 + spread * tau) * df_pay);
         annuity.add(tau * df_pay);
     }

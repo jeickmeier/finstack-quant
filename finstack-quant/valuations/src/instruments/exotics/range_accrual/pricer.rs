@@ -49,10 +49,7 @@ fn asset_spot(inst: &RangeAccrual, curves: &MarketContext) -> Result<f64> {
             money.amount()
         }
     };
-    crate::instruments::common_impl::validation::validate_f64_positive(
-        spot,
-        "RangeAccrual asset spot",
-    )?;
+    finstack_quant_core::validation::validate_f64_positive(spot, "RangeAccrual asset spot")?;
     Ok(spot)
 }
 
@@ -94,10 +91,7 @@ fn asset_growth(
             money.amount()
         }
     };
-    crate::instruments::common_impl::validation::validate_f64_positive(
-        fx_spot,
-        "RangeAccrual quanto FX spot",
-    )?;
+    finstack_quant_core::validation::validate_f64_positive(fx_spot, "RangeAccrual quanto FX spot")?;
     let fx_forward = fx_spot * asset_df / payoff_df;
     let sigma_fx = resolve_sigma_at(
         &Default::default(),

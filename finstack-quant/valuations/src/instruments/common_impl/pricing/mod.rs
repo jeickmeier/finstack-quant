@@ -8,7 +8,6 @@
 //! - [`generic`]: Generic pricers for instruments implementing the Instrument trait
 //! - [`trs`]: Total Return Swap pricing engine
 //! - [`swap_legs`]: Shared floating/fixed leg pricing for swaps
-//! - [`time`]: Shared time-mapping and discount factor helpers for consistent curve usage
 //! - [`hw1f_params`]: Hull-White 1F κ/σ resolution from pricing overrides or calibrated market scalars
 
 pub(crate) mod floating_reset_descriptors;
@@ -18,7 +17,6 @@ pub(crate) mod overnight;
 pub mod overnight_conventions;
 pub(crate) mod rates_credit;
 pub mod swap_legs;
-pub mod time;
 mod trs;
 pub(crate) mod variance_observations;
 pub mod variance_replication;

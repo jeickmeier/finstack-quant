@@ -52,7 +52,7 @@
 //! from the synthetic underlying CDS in its native day count (Act/360 for
 //! USD CDX/iTraxx Main).
 
-use crate::constants::{bloomberg_cdso, numerical, BASIS_POINTS_PER_UNIT};
+use crate::constants::{bloomberg_cdso, numerical};
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::credit_derivatives::cds::pricing::CdsPricer;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
@@ -62,6 +62,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use rust_decimal::Decimal;

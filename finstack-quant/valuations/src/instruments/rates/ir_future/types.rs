@@ -458,17 +458,15 @@ impl InterestRateFuture {
                     })
                 } else {
                     Ok(RateFutureProjection {
-                        rate:
-                            crate::instruments::common_impl::pricing::time::rate_between_on_dates(
-                                fwd.as_ref(),
+                        rate: fwd.as_ref().rate_between_dates(
+                            period_start,
+                            period_end,
+                            self.day_count.year_fraction(
                                 period_start,
                                 period_end,
-                                self.day_count.year_fraction(
-                                    period_start,
-                                    period_end,
-                                    DayCountContext::default(),
-                                )?,
+                                DayCountContext::default(),
                             )?,
+                        )?,
                         parallel_forward_sensitivity: 1.0,
                     })
                 }

@@ -11,11 +11,11 @@
 //! Uses numerical differentiation with 1bp bumps to the inflation curve.
 
 use crate::constants::numerical::ZERO_TOLERANCE;
-use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::market_data::bumps::BumpSpec;
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::Result;
 
 use super::inflation01::bumped_inflation_market;

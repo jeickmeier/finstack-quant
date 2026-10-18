@@ -1,6 +1,5 @@
 //! Hull-White 1F Monte Carlo pricer for callable range accruals.
 
-use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual;
 use crate::instruments::pricing::hw1f_params::{resolve_hw1f_params, Hw1fParamFamily};
@@ -534,8 +533,9 @@ fn build_schedule(
                 inst.id.as_str()
             ))
         })?;
-    let final_payment_discount_factor =
-        relative_df_discount_curve(discount_curve.as_ref(), as_of, final_payment_date)?;
+    let final_payment_discount_factor = discount_curve
+        .as_ref()
+        .df_between_dates(as_of, final_payment_date)?;
 
     let index_tenor = range
         .index_tenor

@@ -8,10 +8,10 @@
 //! shock moves the prepaid-forward-equivalent yield and proportionally scales
 //! future cash dividends while preserving dates.
 
-use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::equity::dividend01::dividend01_central_diff;
 use crate::instruments::equity::equity_option::EquityOption;
 use crate::metrics::{MetricCalculator, MetricContext};
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::Result;
 
 /// Dividend risk calculator for equity options.

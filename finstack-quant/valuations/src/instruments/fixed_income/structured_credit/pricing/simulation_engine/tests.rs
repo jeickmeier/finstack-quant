@@ -906,15 +906,15 @@ mod cases {
 
         let shared_end =
             Date::from_calendar_date(2025, Month::July, 1).expect("shared waterfall end");
-        let old_shared_6m = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
-            &curve_6m,
-            period_start,
-            shared_end,
-            DayCount::Act360
-                .year_fraction(period_start, shared_end, DayCountContext::default())
-                .expect("shared accrual"),
-        )
-        .expect("old shared-window rate");
+        let old_shared_6m = curve_6m
+            .rate_between_dates(
+                period_start,
+                shared_end,
+                DayCount::Act360
+                    .year_fraction(period_start, shared_end, DayCountContext::default())
+                    .expect("shared accrual"),
+            )
+            .expect("old shared-window rate");
         assert!((rate_6m - old_shared_6m).abs() > 1e-6);
     }
 

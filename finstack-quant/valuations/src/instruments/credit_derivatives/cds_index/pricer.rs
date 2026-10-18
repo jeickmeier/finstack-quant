@@ -11,7 +11,7 @@
 //! risky PV01, and leg PVs. Heavy numerical work is delegated to
 //! `crate::instruments::credit_derivatives::cds::pricing::CdsPricer`.
 
-use crate::constants::{credit, BASIS_POINTS_PER_UNIT};
+use crate::constants::credit;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::credit_derivatives::cds::pricing::{
     date_from_hazard_time, CdsPricer, CdsPricerConfig,
@@ -33,6 +33,7 @@ use finstack_quant_cashflows::{
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{Error, Result};

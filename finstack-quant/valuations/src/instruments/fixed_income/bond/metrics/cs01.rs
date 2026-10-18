@@ -45,11 +45,11 @@
 //! [`ZSpreadCalculator`]: crate::instruments::fixed_income::bond::ZSpreadCalculator
 
 use super::risk_view::{active_model_consumes_credit, with_bond_risk_view};
-use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::BondZSpreadPricingKernel;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use std::borrow::Cow;
 
 pub(super) fn z_spread_bumped_pvs(

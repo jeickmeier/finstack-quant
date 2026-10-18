@@ -100,7 +100,7 @@ impl CreditParams {
     /// Returns an error stating the attempted value and the required range when
     /// `recovery_rate` is not finite or lies outside `[0.0, 1.0)`.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        crate::instruments::common_impl::validation::validate_recovery_rate(self.recovery_rate)
+        finstack_quant_core::validation::validate_recovery_rate(self.recovery_rate)
     }
 }
 

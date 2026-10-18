@@ -1,6 +1,6 @@
 //! Bond pricing methods, validation, and cashflow projection.
 
-use crate::instruments::common_impl::validation;
+use finstack_quant_core::validation;
 use finstack_quant_core::Result;
 use rust_decimal::prelude::ToPrimitive;
 

@@ -1021,6 +1021,68 @@ impl OnlineCovariance {
     }
 }
 
+/// Compensated (Neumaier) sample mean.
+///
+/// A naive `iter().sum()` loses low-order bits when many values of similar
+/// magnitude are added (for example per-path Monte Carlo payoffs); compensated
+/// summation keeps the mean accurate at large counts.
+///
+/// # Arguments
+///
+/// * `xs` - Sample values; an empty slice yields `0.0`.
+#[must_use]
+pub fn compensated_mean(xs: &[f64]) -> f64 {
+    if xs.is_empty() {
+        return 0.0;
+    }
+    let mut acc = crate::math::summation::NeumaierAccumulator::new();
+    for &x in xs {
+        acc.add(x);
+    }
+    acc.total() / xs.len() as f64
+}
+
+/// Compensated (Neumaier) unbiased sample variance about a supplied mean.
+///
+/// # Arguments
+///
+/// * `xs` - Sample values; fewer than two yield `0.0`.
+/// * `mean` - Sample mean of `xs`, typically from [`compensated_mean`].
+#[must_use]
+pub fn compensated_variance(xs: &[f64], mean: f64) -> f64 {
+    let n = xs.len();
+    if n < 2 {
+        return 0.0;
+    }
+    let mut acc = crate::math::summation::NeumaierAccumulator::new();
+    for &x in xs {
+        let d = x - mean;
+        acc.add(d * d);
+    }
+    acc.total() / (n as f64 - 1.0)
+}
+
+/// Compensated (Neumaier) unbiased sample covariance about supplied means.
+///
+/// # Arguments
+///
+/// * `xs` - First sample; only the first `min(xs.len(), ys.len())` pairs are used.
+/// * `ys` - Second sample.
+/// * `mean_x` - Sample mean of `xs`.
+/// * `mean_y` - Sample mean of `ys`.
+#[must_use]
+pub fn compensated_covariance(xs: &[f64], ys: &[f64], mean_x: f64, mean_y: f64) -> f64 {
+    let n = xs.len().min(ys.len());
+    if n < 2 {
+        return 0.0;
+    }
+    let mut acc = crate::math::summation::NeumaierAccumulator::new();
+    for (&x, &y) in xs.iter().zip(ys.iter()) {
+        acc.add((x - mean_x) * (y - mean_y));
+    }
+    acc.total() / (n as f64 - 1.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

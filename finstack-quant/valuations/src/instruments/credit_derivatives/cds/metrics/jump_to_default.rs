@@ -42,11 +42,11 @@
 //! `default_exposure` retains its clean definition of eligible signed LGD less
 //! the current mark in all these states; it is not a pending-coupon cashflow model.
 
-use crate::constants::BASIS_POINTS_PER_UNIT;
 use crate::instruments::credit_derivatives::cds::pricing::{AccrualDayCountPolicy, CdsPricer};
 use crate::instruments::credit_derivatives::cds::{CreditDefaultSwap, PayReceive};
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::Result;
 use rust_decimal::prelude::ToPrimitive;
 

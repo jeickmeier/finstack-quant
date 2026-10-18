@@ -532,7 +532,7 @@ pub struct ConversionSpec {
 
 impl ConvertibleBond {
     fn validate(&self) -> finstack_quant_core::Result<()> {
-        use crate::instruments::common_impl::validation;
+        use finstack_quant_core::validation;
 
         validation::validate_date_range_strict(self.issue_date, self.maturity, "convertible bond")?;
         validation::validate_money_finite(self.notional, "convertible bond notional")?;

@@ -1,6 +1,5 @@
 //! Spread calculators for structured credit (Z-spread, CS01, Spread Duration).
 
-use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::fixed_income::structured_credit::types::constants::{
     Z_SPREAD_INITIAL_BRACKET, Z_SPREAD_SOLVER_TOLERANCE,
 };
@@ -13,6 +12,7 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 

@@ -24,7 +24,6 @@
 //!   curve), any basis between the discount curve and the projection index
 //!   curve is included in the solved DM.
 
-use crate::instruments::common_impl::pricing::time::compounding_frequency;
 use crate::instruments::fixed_income::loan_quotes::{
     pv_with_discount_margin, solve_discount_margin,
 };
@@ -99,7 +98,7 @@ impl MetricCalculator for DiscountMarginCalculator {
         let disc = context
             .curves
             .get_discount(loan.discount_curve_id.as_str())?;
-        let compounding = compounding_frequency(loan.frequency);
+        let compounding = loan.frequency.compounding_frequency();
         let pv_given_dm = |dm: f64| {
             pv_with_discount_margin(&flows, settlement_date, disc.as_ref(), compounding, dm)
         };

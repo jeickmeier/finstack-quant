@@ -9,6 +9,9 @@ use crate::pricer::{
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::math::stats::{
+    compensated_covariance, compensated_mean, compensated_variance,
+};
 use finstack_quant_core::money::Money;
 
 // MC-specific imports
@@ -126,52 +129,6 @@ fn asian_drift_and_fixing_multipliers(
         })
         .collect::<finstack_quant_core::Result<Vec<_>>>()?;
     Ok((drift, multipliers))
-}
-
-/// Compensated (Neumaier) sample mean of `xs`.
-///
-/// The control-variate machinery sums up to `num_paths` per-path discounted
-/// payoffs; a naive `iter().sum()` loses low-order bits at large path counts.
-/// Compensated summation keeps the mean accurate (W-05).
-fn compensated_mean(xs: &[f64]) -> f64 {
-    if xs.is_empty() {
-        return 0.0;
-    }
-    let mut acc = finstack_quant_core::math::NeumaierAccumulator::new();
-    for &x in xs {
-        acc.add(x);
-    }
-    acc.total() / xs.len() as f64
-}
-
-/// Compensated (Neumaier) unbiased sample variance of `xs`.
-fn compensated_variance(xs: &[f64], mean: f64) -> f64 {
-    let n = xs.len();
-    if n < 2 {
-        return 0.0;
-    }
-    let mut acc = finstack_quant_core::math::NeumaierAccumulator::new();
-    for &x in xs {
-        let d = x - mean;
-        acc.add(d * d);
-    }
-    acc.total() / (n as f64 - 1.0)
-}
-
-/// Compensated (Neumaier) unbiased sample covariance of `xs` and `ys`.
-///
-/// Replaces the naive-sum covariance so the control-variate coefficient stays
-/// accurate at large path counts (W-05).
-fn compensated_covariance(xs: &[f64], ys: &[f64], mean_x: f64, mean_y: f64) -> f64 {
-    let n = xs.len().min(ys.len());
-    if n < 2 {
-        return 0.0;
-    }
-    let mut acc = finstack_quant_core::math::NeumaierAccumulator::new();
-    for (&x, &y) in xs.iter().zip(ys.iter()) {
-        acc.add((x - mean_x) * (y - mean_y));
-    }
-    acc.total() / (n as f64 - 1.0)
 }
 
 /// Closed-form value of a **seasoned** geometric-average Asian option, used as

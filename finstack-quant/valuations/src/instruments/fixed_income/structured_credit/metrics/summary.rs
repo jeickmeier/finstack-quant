@@ -6,7 +6,6 @@
 //! assembles the same metrics **per tranche**, from that tranche's own projected
 //! cashflows, reusing the standalone calculators the registry wraps.
 
-use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::fixed_income::structured_credit::metrics::{
     calculate_tranche_cs01, calculate_tranche_spread_convexity, calculate_tranche_wal,
     calculate_tranche_z_spread,
@@ -23,6 +22,7 @@ use finstack_quant_core::market_data::bumps::{
     BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
 };
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use serde::{Deserialize, Serialize};

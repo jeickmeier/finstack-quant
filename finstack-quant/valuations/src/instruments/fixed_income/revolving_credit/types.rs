@@ -13,12 +13,12 @@ use rust_decimal::Decimal;
 
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::common_impl::validation;
 use crate::instruments::fixed_income::loan_terms::{
     CommitmentStep, FeeStep, LetterOfCreditSpec, MarginStep, OidEirSpec, ScheduledFee, UpfrontFee,
 };
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{evaluate_fee_tiers, FeeTier, FloatingRateSpec};
+use finstack_quant_core::validation;
 use rust_decimal::prelude::ToPrimitive;
 
 /// Revolving credit facility instrument.

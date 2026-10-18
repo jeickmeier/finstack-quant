@@ -180,7 +180,7 @@ impl TryFrom<FxSwapUnchecked> for FxSwap {
 impl FxSwap {
     /// Validate FX swap economics at construction boundaries.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        crate::instruments::common_impl::validation::validate_distinct_currencies(
+        finstack_quant_core::validation::validate_distinct_currencies(
             self.base_currency,
             self.quote_currency,
             "FxSwap",
@@ -192,15 +192,8 @@ impl FxSwap {
                 self.base_currency
             )));
         }
-        crate::instruments::common_impl::validation::validate_money_finite(
-            self.notional,
-            "FxSwap notional",
-        )?;
-        crate::instruments::common_impl::validation::validate_money_gt(
-            self.notional,
-            0.0,
-            "FxSwap notional",
-        )?;
+        finstack_quant_core::validation::validate_money_finite(self.notional, "FxSwap notional")?;
+        finstack_quant_core::validation::validate_money_gt(self.notional, 0.0, "FxSwap notional")?;
         if self.near_date > self.far_date {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "FxSwap near_date ({}) must be <= far_date ({})",
@@ -259,9 +252,7 @@ impl FxSwap {
         business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
-        use crate::instruments::common_impl::fx_dates::{
-            add_fx_standard_tenor, fx_spot_date_for_pair,
-        };
+        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date_for_pair};
         // CLS-consistent spot roll: a US holiday on an intermediate day does not
         // delay a USD pair's spot date (FX spot convention
         // finding).

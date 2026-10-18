@@ -141,7 +141,7 @@ fn build_swap(notional_exchange: NotionalExchange, spread_bp: Decimal) -> XccySw
 ///
 /// Regression test for the bug where `pv_mtm_reset` used absolute
 /// `df_on_date(t)` instead of
-/// `relative_df_discount_curve(curve, as_of, t)` — producing identical results
+/// `curve.df_between_dates(as_of, t)` — producing identical results
 /// only when `as_of == curve.base_date` (i.e., the calibration date itself) and
 /// silently biasing every intraday revaluation against the calibrated curves.
 ///
@@ -208,7 +208,7 @@ fn cip_invariance_holds_when_as_of_after_curve_base_date() {
         (pv_fixed - pv_mtm).abs() < tol,
         "CIP invariance failed with as_of != curve.base_date: pv_fixed={pv_fixed:.4}, \
          pv_mtm={pv_mtm:.4}, diff={:.4e}, tol={tol:.4e}. This indicates a DF discounting \
-         bug — pricing_mtm.rs must use relative_df_discount_curve(curve, as_of, t), not \
+         bug — pricing_mtm.rs must use curve.df_between_dates(as_of, t), not \
          absolute df_on_date(t).",
         pv_fixed - pv_mtm
     );

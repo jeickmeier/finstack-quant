@@ -188,9 +188,7 @@ impl TermLoanDiscountingPricer {
                 &flows,
                 settlement_date,
                 disc.as_ref(),
-                crate::instruments::common_impl::pricing::time::compounding_frequency(
-                    loan.frequency,
-                ),
+                loan.frequency.compounding_frequency(),
                 spread,
             )?;
             Money::new(pv, loan.currency)

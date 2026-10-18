@@ -9,7 +9,6 @@
 //! not SABR static replication. Conditional Black integration of the short rate
 //! leaves one 20-node Gaussian quadrature over the long rate.
 
-use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cms_spread_option::CmsSpreadOption;
 use crate::instruments::OptionType;
@@ -85,8 +84,9 @@ impl CmsSpreadOptionPricer {
         }
 
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
-        let discount_factor =
-            relative_df_discount_curve(discount_curve.as_ref(), as_of, inst.payment_date)?;
+        let discount_factor = discount_curve
+            .as_ref()
+            .df_between_dates(as_of, inst.payment_date)?;
 
         // Seasoned options (expiry already past) have zero time to expiry;
         // the year fraction is only defined for `as_of <= expiry`.

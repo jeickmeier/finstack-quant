@@ -27,11 +27,11 @@ use finstack_quant_core::{
 };
 
 use crate::instruments::common_impl::traits::impl_instrument_base;
-use crate::instruments::common_impl::validation;
 use finstack_quant_cashflows::builder::{
     merge_cashflow_schedules, CashFlowSchedule, CouponType, FloatingCouponSpec,
     FloatingRateFallback, FloatingRateSpec, Notional, PrincipalExchange,
 };
+use finstack_quant_core::validation;
 use rust_decimal::Decimal;
 
 use crate::instruments::common_impl::parameters::legs::FloatLegSpec;
@@ -421,12 +421,7 @@ impl BasisSwap {
                 if flow.date <= as_of {
                     continue;
                 }
-                let df =
-                    crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-                        disc.as_ref(),
-                        as_of,
-                        flow.date,
-                    )?;
+                let df = disc.as_ref().df_between_dates(as_of, flow.date)?;
                 acc.add(flow.amount.amount() * df);
             }
             return Money::new(acc.total(), currency);
@@ -495,13 +490,9 @@ impl BasisSwap {
                 )?
             };
             let coupon = self.notional.amount()
-                * (index_rate + spread_bp * crate::constants::ONE_BASIS_POINT)
+                * (index_rate + spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT)
                 * period.accrual_year_fraction;
-            let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-                disc.as_ref(),
-                as_of,
-                period.payment_date,
-            )?;
+            let df = disc.as_ref().df_between_dates(as_of, period.payment_date)?;
             acc.add(coupon * df);
         }
 
@@ -581,11 +572,7 @@ impl BasisSwap {
             if period.payment_date <= as_of {
                 continue;
             }
-            let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-                disc.as_ref(),
-                as_of,
-                period.payment_date,
-            )?;
+            let df = disc.as_ref().df_between_dates(as_of, period.payment_date)?;
             let year_fraction =
                 if let (Some(calendar), Some(fwd)) = (overnight_calendar, overnight_fwd.as_ref()) {
                     use crate::instruments::common_impl::pricing::overnight::{
@@ -769,13 +756,13 @@ impl BasisSwap {
                 crate::instruments::common_impl::pricing::overnight::overnight_coupon_amount(
                     self.notional.amount(),
                     &projection,
-                    spread_bp * crate::constants::ONE_BASIS_POINT,
+                    spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT,
                 );
             let all_in_rate = if projection.accrual_year_fraction.abs() > f64::EPSILON {
                 (projection.compound_factor - 1.0) / projection.accrual_year_fraction
-                    + spread_bp * crate::constants::ONE_BASIS_POINT
+                    + spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT
             } else {
-                spread_bp * crate::constants::ONE_BASIS_POINT
+                spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT
             };
             flows.push(CashFlow::new(
                 period.payment_date,
@@ -1927,12 +1914,10 @@ mod tests {
             if period.payment_date <= start {
                 continue;
             }
-            let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-                disc.as_ref(),
-                start,
-                period.payment_date,
-            )
-            .expect("df");
+            let df = disc
+                .as_ref()
+                .df_between_dates(start, period.payment_date)
+                .expect("df");
             schedule_yf += period.accrual_year_fraction * df;
             let (accrual_start, accrual_end) =
                 crate::instruments::common_impl::pricing::overnight::adjust_overnight_accrual_boundaries(

@@ -4,9 +4,9 @@ use super::{
     Recipient, RecipientType, RecoveryModelSpec, StructuredCredit, TemplateFees, TrancheSeniority,
     Waterfall,
 };
-use crate::constants::DECIMAL_TO_PERCENT;
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
 use finstack_quant_core::dates::BusinessDayConvention;
+use finstack_quant_core::math::units::DECIMAL_TO_PERCENT;
 use finstack_quant_core::money::Money;
 
 impl Default for MarketConditions {

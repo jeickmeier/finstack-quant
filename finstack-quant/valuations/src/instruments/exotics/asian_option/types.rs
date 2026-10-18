@@ -140,7 +140,7 @@ pub struct AsianOption {
 
 impl AsianOption {
     fn validate_structure(&self) -> finstack_quant_core::Result<()> {
-        use crate::instruments::common_impl::validation;
+        use finstack_quant_core::validation;
 
         if self.underlying_ticker.trim().is_empty() {
             return Err(finstack_quant_core::Error::Validation(

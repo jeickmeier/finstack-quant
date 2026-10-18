@@ -14,11 +14,6 @@ pub use finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR;
 /// assuming reasonable yield levels (2-5% range).
 pub const DURATION_APPROXIMATION_FACTOR: f64 = 0.9;
 
-/// One basis point (0.01%).
-///
-/// Used for DV01 and CS01 calculations.
-pub const ONE_BP: f64 = 0.0001;
-
 /// Standard CDS maturity for SIMM bucketing.
 ///
 /// 5Y is the most liquid CDS tenor and standard for SIMM sensitivity assignment.
@@ -60,7 +55,7 @@ pub struct MarginConstants {
     /// [`DURATION_APPROXIMATION_FACTOR`]: modified duration per year to maturity.
     #[serde(rename = "DURATION_APPROXIMATION_FACTOR")]
     pub duration_approximation_factor: f64,
-    /// [`ONE_BP`]: one basis point as a decimal.
+    /// One basis point as a decimal ([`finstack_quant_core::math::units::ONE_BASIS_POINT`]).
     #[serde(rename = "ONE_BP")]
     pub one_bp: f64,
     /// [`STANDARD_CDS_MATURITY_YEARS`]: CDS tenor used for SIMM bucketing, in years.
@@ -114,7 +109,7 @@ impl MarginConstants {
         Self {
             calendar_days_per_year: CALENDAR_DAYS_PER_YEAR,
             duration_approximation_factor: DURATION_APPROXIMATION_FACTOR,
-            one_bp: ONE_BP,
+            one_bp: finstack_quant_core::math::units::ONE_BASIS_POINT,
             standard_cds_maturity_years: STANDARD_CDS_MATURITY_YEARS,
             tenor_buckets: TenorBucketYears {
                 bucket_3m: tenor_buckets::BUCKET_3M,

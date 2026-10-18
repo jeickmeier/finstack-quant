@@ -4,7 +4,7 @@
 
 use super::helpers::{date_from_hazard_time, haz_t, settlement_date, sp_cond_to};
 use super::*;
-use crate::constants::{credit, ONE_BASIS_POINT};
+use crate::constants::credit;
 use crate::instruments::credit_derivatives::cds::{
     CdsValuationConvention, CreditDefaultSwap, PayReceive,
 };
@@ -13,6 +13,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 use time::macros::date;

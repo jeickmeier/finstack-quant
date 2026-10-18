@@ -1,6 +1,5 @@
 //! Pricers for snowball and inverse-floater structured notes.
 
-use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::snowball::{Snowball, SnowballVariant};
 use crate::instruments::pricing::hw1f_params::{resolve_hw1f_params, Hw1fParamFamily};
@@ -279,7 +278,7 @@ impl SnowballDiscountingPricer {
         let maturity = *inst.payment_dates.last().ok_or_else(|| {
             finstack_quant_core::Error::Validation("Snowball requires payment dates".to_string())
         })?;
-        let redemption_df = relative_df_discount_curve(discount_curve.as_ref(), as_of, maturity)?;
+        let redemption_df = discount_curve.as_ref().df_between_dates(as_of, maturity)?;
         pv += inst.notional.amount() * redemption_df;
         Money::new(pv, inst.notional.currency())
     }
@@ -636,7 +635,7 @@ fn coupon_events(
                 inst.id.as_str()
             )));
         }
-        let discount_factor = relative_df_discount_curve(discount_curve.as_ref(), as_of, end)?;
+        let discount_factor = discount_curve.as_ref().df_between_dates(as_of, end)?;
 
         let (forward_coeffs, needs_path_sample) = if start > as_of {
             // Forward-starting coupon: in-advance fixing sampled from the
@@ -987,21 +986,22 @@ mod tests {
                     // In-advance fixing: simple forward over the fixing window
                     // [max(start, as_of), end] implied by the discount curve.
                     let fixing_start = start.max(as_of);
-                    let p_start = relative_df_discount_curve(disc.as_ref(), as_of, fixing_start)
+                    let p_start = disc
+                        .as_ref()
+                        .df_between_dates(as_of, fixing_start)
                         .expect("p_start");
-                    let p_end =
-                        relative_df_discount_curve(disc.as_ref(), as_of, end).expect("p_end");
+                    let p_end = disc.as_ref().df_between_dates(as_of, end).expect("p_end");
                     (p_start / p_end - 1.0) / accrual
                 }
             };
-            let df = relative_df_discount_curve(disc.as_ref(), as_of, end).expect("df");
+            let df = disc.as_ref().df_between_dates(as_of, end).expect("df");
             let coupon = inst.compute_coupon(rate, prev_coupon);
             pv += coupon * accrual * inst.notional.amount() * df;
             prev_coupon = coupon;
         }
 
         let maturity = *inst.payment_dates.last().expect("maturity");
-        let df = relative_df_discount_curve(disc.as_ref(), as_of, maturity).expect("df");
+        let df = disc.as_ref().df_between_dates(as_of, maturity).expect("df");
         pv += inst.notional.amount() * df;
         pv
     }
@@ -1025,7 +1025,7 @@ mod tests {
     /// agree on the **fixing convention** for the *same* inverse floater.
     ///
     /// Both pricers fix the floating index *in advance* — the discounting
-    /// pricer via `rate_period_on_dates(forward_curve, start.max(as_of), end)`,
+    /// pricer via `forward_curve.rate_period_between_dates(start.max(as_of), end)`,
     /// the HW1F MC via the term-forward reconstruction at the short rate
     /// sampled at the period start. On [`consistent_market`] the projection
     /// curve carries the discount curve's own instantaneous forward, so with a

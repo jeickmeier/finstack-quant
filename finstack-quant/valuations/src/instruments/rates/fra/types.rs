@@ -7,7 +7,6 @@
 use crate::instruments::common_impl::parameters::legs::PayReceive;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::common_impl::validation;
 use crate::market::conventions::ConventionRegistry;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
@@ -18,6 +17,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
+use finstack_quant_core::validation;
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -310,12 +310,8 @@ impl ForwardRateAgreement {
             })?
         } else {
             let fwd = context.get_forward(&self.forward_curve_id)?;
-            crate::instruments::common_impl::pricing::time::rate_between_on_dates(
-                fwd.as_ref(),
-                self.start_date,
-                self.maturity,
-                tau,
-            )?
+            fwd.as_ref()
+                .rate_between_dates(self.start_date, self.maturity, tau)?
         };
 
         // Warn if forward rate is outside reasonable bounds (likely data error)

@@ -36,12 +36,7 @@ pub(crate) fn term_rate_for_period(
         )?;
     let accrual_year_fraction =
         day_count.year_fraction(fixing_date, reset_end, DayCountContext::default())?;
-    crate::instruments::common_impl::pricing::time::rate_between_on_dates(
-        fwd,
-        fixing_date,
-        reset_end,
-        accrual_year_fraction,
-    )
+    fwd.rate_between_dates(fixing_date, reset_end, accrual_year_fraction)
 }
 
 /// Contractual coupon inputs for one floating collateral asset.

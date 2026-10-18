@@ -1021,13 +1021,9 @@ mod tests {
         let mut expected_swap_pv = 0.0;
         for p in periods {
             let tau = p.accrual_year_fraction;
-            let forward = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
-                &fwd,
-                p.accrual_start,
-                p.accrual_end,
-                tau,
-            )
-            .expect("forward");
+            let forward = fwd
+                .rate_between_dates(p.accrual_start, p.accrual_end, tau)
+                .expect("forward");
             let df = disc
                 .df_between_dates(base_date, p.payment_date)
                 .expect("df");

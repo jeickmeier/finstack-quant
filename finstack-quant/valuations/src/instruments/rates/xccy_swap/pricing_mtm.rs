@@ -19,7 +19,6 @@
 //! Canonical citation: `docs/REFERENCES.md`
 //! (`#andersen-piterbarg-xccy-mtm-reset`).
 
-use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::rates::xccy_swap::types::{
     initial_principal_sign, ResettingSide, XccySwap,
 };
@@ -122,7 +121,7 @@ pub(crate) fn pv_mtm_reset(
         } else {
             &resetting_discount
         };
-        let df = relative_df_discount_curve(curve.as_ref(), as_of, cashflow.date)?;
+        let df = curve.as_ref().df_between_dates(as_of, cashflow.date)?;
         let df = require_positive_df(df, &swap.id, "native cashflow", cashflow.date)?;
         let amount = cashflow.amount.amount() * df;
         let converted = if cashflow.amount.currency() == swap.reporting_currency {
@@ -418,7 +417,7 @@ pub(crate) fn mtm_cashflow_schedule(
 /// Per-period resetting-leg notional under CIP no-FX-vol: `N_C / X_t^FRA`.
 ///
 /// Uses *relative* discount factors from `as_of` via
-/// [`relative_df_discount_curve`] so the CIP forward FX
+/// [`DiscountCurve::df_between_dates`] so the CIP forward FX
 /// `X_t^FRA = spot_x_at_as_of · P_R(as_of, t) / P_C(as_of, t)` is consistent
 /// with the spot rate observed at `as_of`. Using absolute DFs from each curve's
 /// base date would only agree when `as_of == curve.base_date` — i.e., the same
@@ -436,9 +435,9 @@ fn compute_resetting_notional_and_df_r(
     disc_r: &finstack_quant_core::market_data::term_structures::DiscountCurve,
     swap_id: &finstack_quant_core::types::InstrumentId,
 ) -> Result<(f64, f64)> {
-    let p_c = relative_df_discount_curve(disc_c, as_of, date)?;
+    let p_c = disc_c.df_between_dates(as_of, date)?;
     let p_c = require_positive_df(p_c, swap_id, "constant-leg", date)?;
-    let p_r = relative_df_discount_curve(disc_r, as_of, date)?;
+    let p_r = disc_r.df_between_dates(as_of, date)?;
     let p_r = require_positive_df(p_r, swap_id, "resetting-leg", date)?;
     let x_t = spot_x_at_as_of * (p_r / p_c);
     if !x_t.is_finite() || x_t <= 0.0 {

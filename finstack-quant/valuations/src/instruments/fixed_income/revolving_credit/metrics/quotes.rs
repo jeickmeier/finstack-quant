@@ -13,7 +13,6 @@
 //! `settlement_days = 0` the model discount margin of a par facility on a
 //! flat consistent curve is exactly its contractual margin.
 
-use crate::instruments::common_impl::pricing::time::compounding_frequency;
 use std::sync::Arc;
 
 use finstack_quant_core::cashflow::CFKind;
@@ -186,7 +185,7 @@ impl MetricCalculator for DiscountMarginCalculator {
         let disc = context
             .curves
             .get_discount(facility.discount_curve_id.as_str())?;
-        let compounds = compounding_frequency(facility.frequency);
+        let compounds = facility.frequency.compounding_frequency();
         solve_discount_margin(
             |dm| pv_with_discount_margin(&flows, settlement, disc.as_ref(), compounds, dm),
             target,
@@ -235,7 +234,7 @@ impl MetricCalculator for PriceFromDmCalculator {
             &flows,
             settlement,
             disc.as_ref(),
-            compounding_frequency(facility.frequency),
+            facility.frequency.compounding_frequency(),
             dm,
         )?;
         let accrued = accrued_interest(facility, &schedule, settlement)?;

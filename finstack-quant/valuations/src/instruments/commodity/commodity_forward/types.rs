@@ -238,7 +238,7 @@ pub struct CommodityForward {
 
 impl CommodityForward {
     fn validate(&self) -> Result<()> {
-        use crate::instruments::common_impl::validation;
+        use finstack_quant_core::validation;
 
         self.underlying.validate("CommodityForward")?;
         validation::validate_f64_positive(self.quantity, "CommodityForward quantity")?;

@@ -4,7 +4,6 @@ use super::config::{
     CdsTranchePricer, DiscountAt, EffectiveStructure, ProjectedDiscountedRow, ProjectionInputs,
     BESPOKE_SETTLEMENT_DAYS, INDEX_SETTLEMENT_DAYS, PROBABILITY_CLIP,
 };
-use crate::constants::BASIS_POINTS_PER_UNIT;
 use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use crate::instruments::PayReceive;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
@@ -12,6 +11,7 @@ use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::dates::{calendar_by_id_strict, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error as CoreError, Result};
 use finstack_quant_models::correlation::copula::{Copula, CopulaSpec, GaussianCopula};

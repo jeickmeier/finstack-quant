@@ -30,8 +30,7 @@ impl MetricCalculator for FraParRateCalculator {
             )));
         }
 
-        crate::instruments::common_impl::pricing::time::rate_between_on_dates(
-            fwd.as_ref(),
+        fwd.as_ref().rate_between_dates(
             fra.start_date,
             fra.maturity,
             fra.day_count.year_fraction(

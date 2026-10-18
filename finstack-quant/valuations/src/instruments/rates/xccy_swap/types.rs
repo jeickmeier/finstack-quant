@@ -13,7 +13,6 @@
 //!   projector. Historical fixings are required once the fixing date is past.
 
 use crate::instruments::common_impl::parameters::legs::FloatLegSpec;
-use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::PayReceive;
 use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule, Notional};
@@ -607,7 +606,6 @@ impl XccySwap {
             adjust_overnight_accrual_boundaries, project_overnight_coupon,
             OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
-        use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
 
         let projected = if !matches!(leg.leg.compounding, FloatingLegCompounding::Simple) {
@@ -667,8 +665,7 @@ impl XccySwap {
                     as_of,
                 )?
             } else {
-                rate_between_on_dates(
-                    fwd,
+                fwd.rate_between_dates(
                     period.accrual_start,
                     period.accrual_end,
                     period.accrual_year_fraction,
@@ -878,7 +875,7 @@ impl XccySwap {
             NotionalExchange::InitialAndFinal | NotionalExchange::MtmResetting { .. }
         ) && leg.leg.start > as_of
         {
-            let df = relative_df_discount_curve(disc.as_ref(), as_of, leg.leg.start)?;
+            let df = disc.as_ref().df_between_dates(as_of, leg.leg.start)?;
             let cf_leg_currency = initial_principal_sign(leg.side) * leg.notional.amount() * df;
             let cf_rep = convert_pv(cf_leg_currency)?;
             pv.add(cf_rep);
@@ -892,7 +889,7 @@ impl XccySwap {
                 | NotionalExchange::MtmResetting { .. }
         ) && leg.leg.end > as_of
         {
-            let df = relative_df_discount_curve(disc.as_ref(), as_of, leg.leg.end)?;
+            let df = disc.as_ref().df_between_dates(as_of, leg.leg.end)?;
             let cf_leg_currency = leg.side.sign() * leg.notional.amount() * df;
             let cf_rep = convert_pv(cf_leg_currency)?;
             pv.add(cf_rep);
@@ -923,7 +920,7 @@ impl XccySwap {
             let coupon = leg.side.sign() * projected.unsigned_coupon(leg.notional.amount(), spread);
 
             // Use relative date-based discounting for numerical stability.
-            let df = relative_df_discount_curve(disc.as_ref(), as_of, period.payment_date)?;
+            let df = disc.as_ref().df_between_dates(as_of, period.payment_date)?;
             let cf_leg_currency = coupon * df;
 
             let cf_rep = convert_pv(cf_leg_currency)?;

@@ -175,7 +175,7 @@ impl FixedLegSpec {
     /// # Errors
     /// Returns an error stating both dates when `start >= end`.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        crate::instruments::common_impl::validation::validate_date_range_strict(
+        finstack_quant_core::validation::validate_date_range_strict(
             self.start,
             self.end,
             "FixedLegSpec",
@@ -303,7 +303,7 @@ impl FloatLegSpec {
         {
             return Err(crate::instruments::rates::irs::simple_average_unsupported());
         }
-        crate::instruments::common_impl::validation::validate_date_range_strict(
+        finstack_quant_core::validation::validate_date_range_strict(
             self.start,
             self.end,
             "FloatLegSpec",
@@ -404,7 +404,7 @@ impl ProtectionLegSpec {
     /// # Errors
     /// Returns an error if recovery rate is outside the valid range.
     pub fn validate_recovery_rate(recovery_rate: f64) -> finstack_quant_core::Result<()> {
-        crate::instruments::common_impl::validation::validate_recovery_rate(recovery_rate)
+        finstack_quant_core::validation::validate_recovery_rate(recovery_rate)
     }
 }
 

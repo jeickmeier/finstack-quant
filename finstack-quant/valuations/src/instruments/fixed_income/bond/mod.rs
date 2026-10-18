@@ -902,12 +902,9 @@ mod tests {
         let market = flat_discount_market(0.03);
         let quote_date = settlement::settlement_date(&bond, as_of).expect("settlement date");
         let curve = market.get_discount("USD-OIS").expect("discount curve");
-        let settlement_df =
-            crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-                curve.as_ref(),
-                as_of,
-                quote_date,
-            )
+        let settlement_df = curve
+            .as_ref()
+            .df_between_dates(as_of, quote_date)
             .expect("settlement df");
 
         let pv = bond.value(&market, as_of).expect("value");

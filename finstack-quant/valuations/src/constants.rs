@@ -19,56 +19,6 @@
 //! When writing new code outside hot paths, prefer the core types for clarity and
 //! compile-time unit safety.
 
-/// One basis point (0.01%) as a decimal.
-///
-/// Use this constant instead of hardcoded `0.0001` or `1e-4` for clarity
-/// when calculating sensitivity to 1bp changes in rates, spreads, etc.
-///
-/// **Prefer [`finstack_quant_core::types::Bps`]** for type-safe basis point arithmetic
-/// outside hot paths. This raw constant is appropriate for sensitivity bumps
-/// (DV01, CS01) and conversions in tight pricing loops where values are already `f64`.
-///
-/// # Examples
-/// ```rust
-/// use finstack_quant_valuations::constants::ONE_BASIS_POINT;
-///
-/// let rate_change = 100.0 * ONE_BASIS_POINT; // 1% or 100bp
-/// let notional = 1_000_000.0;
-/// let duration = 5.0;
-/// let dv01 = notional * duration * ONE_BASIS_POINT;
-/// assert_eq!(dv01, 500.0);
-/// ```
-pub const ONE_BASIS_POINT: f64 = 0.0001;
-
-/// Basis points per unit (inverse of ONE_BASIS_POINT).
-///
-/// Use this to convert decimals to basis points in performance-sensitive code.
-///
-/// **Prefer [`finstack_quant_core::types::Rate::as_bp()`]** or
-/// [`finstack_quant_core::types::Bps`] for type-safe conversions outside hot paths.
-///
-/// # Examples
-/// ```rust
-/// use finstack_quant_valuations::constants::BASIS_POINTS_PER_UNIT;
-///
-/// let spread_decimal = 0.0025;
-/// let spread_bp = spread_decimal * BASIS_POINTS_PER_UNIT; // 25bp
-/// ```
-pub const BASIS_POINTS_PER_UNIT: f64 = 10_000.0;
-
-/// Convert decimal to percentage (0.01 = 1%).
-///
-/// **Prefer [`finstack_quant_core::types::Rate::as_percent()`]** for type-safe conversions outside hot paths.
-///
-/// # Examples
-/// ```rust
-/// use finstack_quant_valuations::constants::DECIMAL_TO_PERCENT;
-///
-/// let rate_decimal = 0.05;
-/// let rate_pct = rate_decimal * DECIMAL_TO_PERCENT; // 5.0%
-/// ```
-pub const DECIMAL_TO_PERCENT: f64 = 100.0;
-
 /// Numerical constants for floating-point comparisons and integration.
 ///
 /// These constants replace magic numbers scattered throughout the codebase,
@@ -93,23 +43,6 @@ pub mod numerical {
     // guard — for a denominator of exactly 0 it still yields `numerator * 1e15`
     // (garbage) rather than a clean error. Guard small denominators with an
     // explicit `if denom.abs() < tol { ... }` check instead.
-
-    /// Minimum threshold for discount factor values to avoid numerical instability.
-    ///
-    /// Set to 1e-10 to protect against division by near-zero discount factors
-    /// that can arise from extreme rate scenarios or very long time horizons.
-    ///
-    /// # Numerical Justification
-    ///
-    /// For extreme rate scenarios:
-    /// - At +50% rates over 50 years: DF ≈ exp(-0.50 × 50) = exp(-25) ≈ 1.4e-11
-    /// - At +60% rates over 50 years: DF ≈ exp(-0.60 × 50) = exp(-30) ≈ 9.4e-14
-    ///
-    /// The threshold of 1e-10 catches pathological cases while allowing reasonable
-    /// stress testing up to ~48% rates over 50 years or ~96% over 25 years.
-    /// This aligns with ISDA stress testing requirements for rates ranging
-    /// from -10% to +50%.
-    pub const DF_EPSILON: f64 = 1e-10;
 }
 
 /// Bloomberg CDSO numerical-quadrature conventions.

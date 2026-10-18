@@ -90,7 +90,7 @@ pub struct Equity {
 
 impl Equity {
     fn validate(&self) -> finstack_quant_core::Result<()> {
-        use crate::instruments::common_impl::validation;
+        use finstack_quant_core::validation;
 
         if self.ticker.trim().is_empty() {
             return Err(finstack_quant_core::Error::Validation(
@@ -207,7 +207,7 @@ impl Equity {
             MarketScalar::Price(m) => self.convert_price_to_currency(*m, market, as_of),
             MarketScalar::Unitless(v) => Ok(Money::new(*v, self.currency)?),
         }?;
-        crate::instruments::common_impl::validation::validate_f64_non_negative(
+        finstack_quant_core::validation::validate_f64_non_negative(
             price.amount(),
             "Equity market price",
         )?;

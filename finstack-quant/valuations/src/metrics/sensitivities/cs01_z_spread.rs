@@ -42,7 +42,7 @@
 //!
 //! [canonical]: crate::metrics::sensitivities::cs01
 //! [`bond::metrics::cs01`]: crate::instruments::fixed_income::bond::metrics::cs01
-//! [`z_spread_discount_factor`]: crate::instruments::common_impl::pricing::time::z_spread_discount_factor
+//! [`z_spread_discount_factor`]: finstack_quant_core::math::z_spread_discount_factor
 
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -50,11 +50,11 @@ use std::sync::Arc;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::z_spread_discount_factor;
 use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 
-use crate::instruments::common_impl::pricing::time::z_spread_discount_factor;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::cs01::{

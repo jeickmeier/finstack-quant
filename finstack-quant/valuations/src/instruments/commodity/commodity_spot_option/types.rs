@@ -232,15 +232,15 @@ impl CommoditySpotOption {
     /// Validate the static economic inputs shared by builders and JSON loads.
     pub fn validate(&self) -> Result<()> {
         self.underlying.validate("CommoditySpotOption")?;
-        crate::instruments::common_impl::validation::validate_f64_positive(
+        finstack_quant_core::validation::validate_f64_positive(
             self.strike,
             "CommoditySpotOption strike",
         )?;
-        crate::instruments::common_impl::validation::validate_f64_positive(
+        finstack_quant_core::validation::validate_f64_positive(
             self.quantity,
             "CommoditySpotOption quantity",
         )?;
-        crate::instruments::common_impl::validation::validate_f64_positive(
+        finstack_quant_core::validation::validate_f64_positive(
             self.multiplier,
             "CommoditySpotOption multiplier",
         )?;
@@ -251,7 +251,7 @@ impl CommoditySpotOption {
             ));
         }
         if let Some(exercise) = &self.exercise {
-            crate::instruments::common_impl::validation::validate_f64_positive(
+            finstack_quant_core::validation::validate_f64_positive(
                 exercise.spot,
                 "commodity exercise spot",
             )?;
@@ -326,7 +326,7 @@ impl CommoditySpotOption {
         let spot = self.spot_price(market)?.ok_or_else(|| finstack_quant_core::Error::Validation(
             "CommoditySpotOption requires observed spot_id for spot exercise or simulation; use CommodityFutureOption for futures".into()
         ))?;
-        crate::instruments::common_impl::validation::validate_f64_positive(spot, "commodity spot")?;
+        finstack_quant_core::validation::validate_f64_positive(spot, "commodity spot")?;
         Ok(spot)
     }
 

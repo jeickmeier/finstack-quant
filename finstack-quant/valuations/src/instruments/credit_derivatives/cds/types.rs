@@ -50,7 +50,6 @@
 
 use crate::constants::isda::STANDARD_RECOVERY_SENIOR;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::common_impl::validation;
 use crate::market::conventions::ids::CdsDocClause;
 use crate::market::conventions::CdsConvention;
 use finstack_quant_core::currency::Currency;
@@ -58,6 +57,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
+use finstack_quant_core::validation;
 use finstack_quant_margin::types::OtcMarginSpec;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;

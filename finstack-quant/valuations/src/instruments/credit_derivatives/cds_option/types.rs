@@ -278,7 +278,7 @@ impl CdsOption {
 
     /// Validate the CdsOption parameters.
     fn validate(&self) -> finstack_quant_core::Result<()> {
-        use crate::instruments::common_impl::validation;
+        use finstack_quant_core::validation;
 
         super::parameters::validate_common_terms(
             &self.strike,
@@ -323,7 +323,7 @@ impl CdsOption {
         }
 
         // Recovery rate: the shared credit-instrument invariant, `[0, 1)`.
-        crate::instruments::common_impl::validation::validate_recovery_rate(self.recovery_rate)?;
+        finstack_quant_core::validation::validate_recovery_rate(self.recovery_rate)?;
 
         // Realized index loss validation
         if !(0.0..=1.0).contains(&self.realized_loss) {

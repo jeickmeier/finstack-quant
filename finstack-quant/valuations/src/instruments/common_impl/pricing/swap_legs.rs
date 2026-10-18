@@ -7,7 +7,7 @@
 //! # Capabilities
 //!
 //! - Numerically stable relative discount factors via
-//!   [`super::time::relative_df_discount_curve`]
+//!   [`DiscountCurve::df_between_dates`](finstack_quant_core::market_data::term_structures::DiscountCurve::df_between_dates)
 //! - Neumaier compensated summation for long-dated swaps
 //! - Holiday-aware payment delay handling
 
@@ -87,7 +87,6 @@ pub fn add_payment_delay(date: Date, delay_days: i32, calendar_id: Option<&str>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::CurveId;
@@ -111,8 +110,9 @@ mod tests {
         let base_date = date(2024, 1, 1);
         let disc = test_discount_curve(base_date);
 
-        let df =
-            relative_df_discount_curve(&disc, base_date, date(2025, 1, 1)).expect("should succeed");
+        let df = disc
+            .df_between_dates(base_date, date(2025, 1, 1))
+            .expect("should succeed");
         assert!(df > 0.0 && df <= 1.0, "DF should be in (0, 1]: {}", df);
     }
 
@@ -131,7 +131,7 @@ mod tests {
             .expect("curve should build");
 
         // DF(target) / DF(as_of) = 1e-15 / 1e-12 = 0.001.
-        let result = relative_df_discount_curve(&disc, as_of, target);
+        let result = disc.df_between_dates(as_of, target);
         assert!(
             result.is_ok(),
             "Small absolute DFs should be accepted if relative DF is valid: {:?}",
@@ -177,7 +177,9 @@ mod tests {
 
         // When as_of == base_date, DF(as_of to target) is just DF(target)
         let target = date(2025, 1, 1);
-        let df = relative_df_discount_curve(&disc, base_date, target).expect("should succeed");
+        let df = disc
+            .df_between_dates(base_date, target)
+            .expect("should succeed");
         assert!(df > 0.0 && df < 1.0, "DF should be in (0,1): {}", df);
     }
 
@@ -190,7 +192,9 @@ mod tests {
         let as_of = date(2024, 7, 1);
         let target = date(2025, 1, 1);
 
-        let df = relative_df_discount_curve(&disc, as_of, target).expect("should succeed");
+        let df = disc
+            .df_between_dates(as_of, target)
+            .expect("should succeed");
         // Should be the relative DF from as_of to target, which is valid and positive
         assert!(df > 0.0, "Relative DF should be positive: {}", df);
     }
@@ -213,7 +217,9 @@ mod tests {
 
         // 30Y forward date - long horizon but should still work
         let target = date(2054, 1, 1);
-        let df = relative_df_discount_curve(&curve, base_date, target).expect("should succeed");
+        let df = curve
+            .df_between_dates(base_date, target)
+            .expect("should succeed");
         assert!(df > 0.0, "Long-horizon DF should be positive: {}", df);
     }
 
@@ -229,7 +235,9 @@ mod tests {
         let disc = test_discount_curve(base_date);
 
         let target = date(2025, 1, 1);
-        let df = relative_df_discount_curve(&disc, base_date, target).expect("should succeed");
+        let df = disc
+            .df_between_dates(base_date, target)
+            .expect("should succeed");
         assert!(df > 0.0, "DF must be positive: {}", df);
     }
 }

@@ -145,24 +145,24 @@ pub struct FxTouchOption {
 impl FxTouchOption {
     /// Validate FX touch option input invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        crate::instruments::common_impl::validation::validate_distinct_currencies(
+        finstack_quant_core::validation::validate_distinct_currencies(
             self.base_currency,
             self.quote_currency,
             "FxTouchOption",
         )?;
-        crate::instruments::common_impl::validation::validate_f64_positive(
+        finstack_quant_core::validation::validate_f64_positive(
             self.barrier,
             "FxTouchOption barrier",
         )?;
-        crate::instruments::common_impl::validation::validate_f64_finite(
+        finstack_quant_core::validation::validate_f64_finite(
             self.barrier,
             "FxTouchOption barrier",
         )?;
-        crate::instruments::common_impl::validation::validate_f64_non_negative(
+        finstack_quant_core::validation::validate_f64_non_negative(
             self.payout_amount.amount(),
             "FxTouchOption payout_amount",
         )?;
-        crate::instruments::common_impl::validation::validate_money_finite(
+        finstack_quant_core::validation::validate_money_finite(
             self.payout_amount,
             "FxTouchOption payout_amount",
         )?;

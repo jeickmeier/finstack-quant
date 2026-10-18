@@ -3,7 +3,6 @@
 use crate::instruments::common_impl::parameters::legs::PayReceive;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::common_impl::validation;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
@@ -14,6 +13,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
+use finstack_quant_core::validation;
 use rust_decimal::Decimal;
 
 /// Zero-coupon Inflation Swap instrument.
@@ -286,11 +286,7 @@ impl InflationSwap {
         // Date-based DF from as_of to payment: correct when the curve base
         // date differs from as_of.
         let payment_date = self.adjusted_payment_date(self.maturity)?;
-        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-            disc.as_ref(),
-            as_of,
-            payment_date,
-        )?;
+        let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
 
         fixed_payment.checked_mul_f64(df)
     }
@@ -370,11 +366,7 @@ impl InflationSwap {
         // Date-based DF from as_of to payment: correct when the curve base
         // date differs from as_of.
         let payment_date = self.adjusted_payment_date(self.maturity)?;
-        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-            disc.as_ref(),
-            as_of,
-            payment_date,
-        )?;
+        let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
 
         inflation_payment.checked_mul_f64(df)
     }
@@ -430,11 +422,7 @@ impl InflationSwap {
         }
 
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-            disc.as_ref(),
-            as_of,
-            payment_date,
-        )?;
+        let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
 
         let tau_accrual = self.fixed_accrual()?;
         let fixed_rate = self.fixed_rate.as_f64();
@@ -864,11 +852,7 @@ impl YoYInflationSwap {
 
             // Date-based DF from as_of to payment: correct when the curve base
             // date differs from as_of.
-            let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-                disc.as_ref(),
-                as_of,
-                pay,
-            )?;
+            let df = disc.as_ref().df_between_dates(as_of, pay)?;
             pv += net * df;
         }
 
@@ -915,11 +899,7 @@ impl YoYInflationSwap {
             }
             let cpi_end = self.cpi_value(market, as_of, end)?;
 
-            let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-                disc.as_ref(),
-                as_of,
-                pay,
-            )?;
+            let df = disc.as_ref().df_between_dates(as_of, pay)?;
 
             // Inflation leg contribution: DF × (CPI_end / CPI_start - 1)
             sum_infl_pv += df * (cpi_end / cpi_start - 1.0);

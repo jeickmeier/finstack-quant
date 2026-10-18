@@ -110,12 +110,9 @@ mod tests {
         // Everything that borrows `market` must be evaluated before it is moved
         // into the `MetricContext`.
         let pv = compute_pv(&swap, &market, as_of).expect("seasoned pv");
-        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-            market.get_discount("USD-OIS").expect("curve").as_ref(),
-            as_of,
-            swap.maturity,
-        )
-        .expect("df");
+        let df = (market.get_discount("USD-OIS").expect("curve").as_ref())
+            .df_between_dates(as_of, swap.maturity)
+            .expect("df");
 
         // Calendar-time blend, used only to prove the schedule is non-uniform so
         // this test is a real regression guard.

@@ -322,12 +322,10 @@ fn test_equity_trs_financing_leg_matches_provider_schedule() {
             .schedule
             .payment_date_for(*payment_end)
             .expect("payment date");
-        let df = finstack_quant_valuations::instruments::pricing::time::relative_df_discount_curve(
-            discount.as_ref(),
-            as_of,
-            payment_date,
-        )
-        .expect("relative df");
+        let df = discount
+            .as_ref()
+            .df_between_dates(as_of, payment_date)
+            .expect("relative df");
         expected_pv += flow.amount.amount() * df;
     }
 

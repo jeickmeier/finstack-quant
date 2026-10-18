@@ -1,6 +1,3 @@
-use crate::instruments::common_impl::pricing::time::{
-    curve_time, rate_between_on_dates, rate_period_on_dates,
-};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -341,8 +338,9 @@ fn asset_swap_projection_rate(
                 "asset-swap overnight projection requires a future positive accrual period".into(),
             ));
         }
-        let curve_accrual = curve_time(fwd, end)? - curve_time(fwd, start)?;
-        let rate = rate_period_on_dates(fwd, start, end)? * (curve_accrual / accrual_year_fraction);
+        let curve_accrual = fwd.curve_time(end)? - fwd.curve_time(start)?;
+        let rate =
+            fwd.rate_period_between_dates(start, end)? * (curve_accrual / accrual_year_fraction);
         if !rate.is_finite() || curve_accrual <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
                 "asset-swap overnight projection produced an invalid rate or curve accrual".into(),
@@ -350,7 +348,7 @@ fn asset_swap_projection_rate(
         }
         Ok(rate)
     } else {
-        rate_between_on_dates(fwd, start, end, accrual_year_fraction)
+        fwd.rate_between_dates(start, end, accrual_year_fraction)
     }
 }
 

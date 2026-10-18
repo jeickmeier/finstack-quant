@@ -305,7 +305,7 @@ impl FxSpot {
     ///   applied from this date; an explicit `settlement_date` is only
     ///   business-day-adjusted and ignores `as_of`.
     pub fn effective_settlement_date(&self, as_of: Date) -> Result<Date> {
-        use crate::instruments::common_impl::fx_dates::fx_spot_date_for_pair;
+        use finstack_quant_core::dates::fx::fx_spot_date_for_pair;
         use finstack_quant_core::dates::{adjust, resolve_joint_calendar};
 
         // Check if we should use joint calendar logic
@@ -464,7 +464,7 @@ impl FxSpot {
     }
 
     fn validate_economics(&self) -> finstack_quant_core::Result<()> {
-        crate::instruments::common_impl::validation::validate_distinct_currencies(
+        finstack_quant_core::validation::validate_distinct_currencies(
             self.base_currency,
             self.quote_currency,
             "FxSpot",

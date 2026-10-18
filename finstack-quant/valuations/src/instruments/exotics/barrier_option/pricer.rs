@@ -75,10 +75,7 @@ pub(crate) fn resolve_spot(
             value.amount()
         }
     };
-    crate::instruments::common_impl::validation::validate_f64_positive(
-        spot,
-        "BarrierOption asset spot",
-    )?;
+    finstack_quant_core::validation::validate_f64_positive(spot, "BarrierOption asset spot")?;
     Ok(spot)
 }
 

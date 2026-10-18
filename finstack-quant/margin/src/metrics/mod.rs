@@ -341,8 +341,8 @@ impl Haircut01 {
     /// Returns an error when the one-basis-point PV change overflows the
     /// Decimal amount range.
     pub fn calculate(collateral_value: Money, current_haircut: f64) -> Result<Self> {
-        const ONE_BP: f64 = 0.0001;
-        let pv_change = collateral_value.checked_mul_f64(ONE_BP)?;
+        let pv_change =
+            collateral_value.checked_mul_f64(finstack_quant_core::math::units::ONE_BASIS_POINT)?;
 
         Ok(Self {
             collateral_value,

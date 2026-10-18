@@ -1,6 +1,5 @@
 //! Hull-White 1F Monte Carlo pricer for TARNs.
 
-use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::tarn::Tarn;
 use crate::instruments::pricing::hw1f_params::{resolve_hw1f_params, Hw1fParamFamily};
@@ -347,7 +346,7 @@ impl TarnPricer {
                 )));
             }
 
-            let discount_factor = relative_df_discount_curve(discount_curve.as_ref(), as_of, end)?;
+            let discount_factor = discount_curve.as_ref().df_between_dates(as_of, end)?;
 
             // TARN coupons fix in advance: the floating rate is set at the
             // period start and applies over `[start, end]`.
@@ -704,7 +703,7 @@ mod tests {
                 continue;
             }
             let accrual = day_count.year_fraction(start, end, ctx).expect("accrual");
-            let p_end = relative_df_discount_curve(disc.as_ref(), as_of, end).expect("p_end");
+            let p_end = disc.as_ref().df_between_dates(as_of, end).expect("p_end");
             let projection_time = projection
                 .day_count()
                 .signed_year_fraction(projection.base_date(), start.max(as_of), ctx)
@@ -724,7 +723,7 @@ mod tests {
 
         if !redeemed {
             let maturity = *tarn.payment_dates.last().expect("maturity");
-            let df = relative_df_discount_curve(disc.as_ref(), as_of, maturity).expect("df");
+            let df = disc.as_ref().df_between_dates(as_of, maturity).expect("df");
             pv += tarn.notional.amount() * df;
         }
         pv
@@ -818,7 +817,7 @@ mod tests {
             tarn.day_count = day_count;
             let maturity = *tarn.payment_dates.last().expect("maturity");
             let expected = tarn.notional.amount()
-                * relative_df_discount_curve(disc.as_ref(), as_of, maturity).expect("df");
+                * disc.as_ref().df_between_dates(as_of, maturity).expect("df");
 
             let pv = deterministic_pricer(4)
                 .price_estimate(&tarn, &market, as_of)

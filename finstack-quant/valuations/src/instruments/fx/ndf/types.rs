@@ -577,15 +577,8 @@ impl Ndf {
                 self.base_currency
             )));
         }
-        crate::instruments::common_impl::validation::validate_money_finite(
-            self.notional,
-            "NDF notional",
-        )?;
-        crate::instruments::common_impl::validation::validate_money_gt(
-            self.notional,
-            0.0,
-            "NDF notional",
-        )?;
+        finstack_quant_core::validation::validate_money_finite(self.notional, "NDF notional")?;
+        finstack_quant_core::validation::validate_money_gt(self.notional, 0.0, "NDF notional")?;
         if self.fixing_date > self.maturity {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "NDF fixing_date ({}) must be <= maturity ({})",
@@ -653,9 +646,7 @@ impl Ndf {
         business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
-        use crate::instruments::common_impl::fx_dates::{
-            add_fx_standard_tenor, fx_spot_date_for_pair,
-        };
+        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date_for_pair};
         use finstack_quant_core::dates::{adjust, resolve_joint_calendar, DateExt};
 
         // CLS-consistent spot roll: a US holiday on an intermediate day does not

@@ -233,7 +233,7 @@ impl crate::instruments::common_impl::traits::Instrument for LookbackOption {
     impl_instrument_base!(crate::pricer::InstrumentType::LookbackOption);
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
-        use crate::instruments::common_impl::validation;
+        use finstack_quant_core::validation;
         // Fixed-strike lookbacks feed `strike` into ln-based closed forms that
         // require a strictly positive strike; rejecting here surfaces a
         // `Validation` error instead of a NaN sentinel reaching pricing.

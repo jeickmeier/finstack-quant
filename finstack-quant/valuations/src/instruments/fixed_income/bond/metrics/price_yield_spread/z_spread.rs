@@ -1,14 +1,12 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::instruments::common_impl::pricing::time::{
-    compounding_frequency, z_spread_discount_factor,
-};
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::z_spread_discount_factor;
 use std::cell::RefCell;
 
 /// Z-spread solver tolerance on the spread axis (decimal, not bp).
@@ -159,7 +157,7 @@ impl BondZSpreadPricingKernel {
         Ok(Self {
             quote_date,
             cached_flows,
-            compounds_per_year: compounding_frequency(bond.cashflow_spec.frequency()),
+            compounds_per_year: bond.cashflow_spec.frequency().compounding_frequency(),
         })
     }
 

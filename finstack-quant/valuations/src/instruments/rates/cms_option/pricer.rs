@@ -58,7 +58,7 @@ impl CmsOptionPricer {
     ///
     /// - Vol surface lookups use the instrument's day_count for time_to_fixing
     ///   (market convention for vol surfaces).
-    /// - Discount factors use curve-consistent relative DFs via `relative_df_discount_curve`.
+    /// - Discount factors use curve-consistent relative DFs via `DiscountCurve::df_between_dates`.
     ///
     /// # Errors
     ///
@@ -72,8 +72,6 @@ impl CmsOptionPricer {
         as_of: Date,
         convexity_scale: f64,
     ) -> Result<Money> {
-        use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
-
         inst.validate()?;
         let mut total_pv = 0.0;
         let strike = inst.strike_f64()?;
@@ -107,8 +105,9 @@ impl CmsOptionPricer {
                     crate::instruments::OptionType::Call => (observed - strike).max(0.0),
                     crate::instruments::OptionType::Put => (strike - observed).max(0.0),
                 };
-                let df_pay =
-                    relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
+                let df_pay = discount_curve
+                    .as_ref()
+                    .df_between_dates(as_of, payment_date)?;
                 total_pv += option_val * accrual_fraction * df_pay;
                 continue;
             }
@@ -208,7 +207,9 @@ impl CmsOptionPricer {
             };
 
             // 4. Discount to present using curve-consistent relative DF
-            let df_pay = relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
+            let df_pay = discount_curve
+                .as_ref()
+                .df_between_dates(as_of, payment_date)?;
 
             let period_pv = option_val * accrual_fraction * df_pay;
             total_pv += period_pv;

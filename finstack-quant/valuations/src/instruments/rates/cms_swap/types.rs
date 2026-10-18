@@ -573,8 +573,6 @@ impl CmsSwap {
         as_of: Date,
         include_valuation_date: bool,
     ) -> finstack_quant_core::Result<Vec<CashFlow>> {
-        use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
-
         let mut flows = Vec::new();
         let (periods, day_count) = match &self.funding_leg {
             FundingLeg::Fixed {
@@ -609,8 +607,7 @@ impl CmsSwap {
                             as_of,
                         )?
                     } else {
-                        rate_between_on_dates(
-                            fwd_curve.as_ref(),
+                        fwd_curve.as_ref().rate_between_dates(
                             period.accrual_start,
                             period.accrual_end,
                             period.accrual_year_fraction,
@@ -1043,11 +1040,10 @@ mod tests {
     ///   cms_leg_flows[i] = +coupon_rate_i * accrual_i * N (positive, Receive side)
     ///   => sum_i df_i * cms_leg_flows[i]  must equal  base_value
     ///
-    /// We use `relative_df_discount_curve` (same helper the pricer uses) to
+    /// We use `DiscountCurve::df_between_dates` (same helper the pricer uses) to
     /// discount, so that any curve-interpolation details cancel exactly.
     #[test]
     fn cms_leg_flows_reconcile_with_base_value_capped() {
-        use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
         use crate::instruments::common_impl::traits::Instrument;
 
         let as_of = date(2025, 1, 1);
@@ -1071,7 +1067,9 @@ mod tests {
         let discounted_sum: f64 = flows
             .iter()
             .map(|flow| {
-                let df = relative_df_discount_curve(discount_curve.as_ref(), as_of, flow.date)
+                let df = discount_curve
+                    .as_ref()
+                    .df_between_dates(as_of, flow.date)
                     .expect("df");
                 df * flow.amount.amount()
             })
@@ -1096,7 +1094,6 @@ mod tests {
     /// option) causes this test to FAIL.
     #[test]
     fn cms_leg_flows_reconcile_with_base_value_floored() {
-        use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
         use crate::instruments::common_impl::traits::Instrument;
 
         let as_of = date(2025, 1, 1);
@@ -1118,7 +1115,9 @@ mod tests {
         let discounted_sum: f64 = flows
             .iter()
             .map(|flow| {
-                let df = relative_df_discount_curve(discount_curve.as_ref(), as_of, flow.date)
+                let df = discount_curve
+                    .as_ref()
+                    .df_between_dates(as_of, flow.date)
                     .expect("df");
                 df * flow.amount.amount()
             })

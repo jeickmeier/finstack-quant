@@ -146,8 +146,7 @@ pub(crate) fn resolve_optioned_coupon(
         })?;
         series.value_on_exact(fixing_date)?
     } else {
-        crate::instruments::common_impl::pricing::time::rate_between_on_dates(
-            forward_curve.as_ref(),
+        forward_curve.as_ref().rate_between_dates(
             period.accrual_start,
             period.accrual_end,
             period.accrual_year_fraction,
@@ -177,11 +176,9 @@ pub(crate) fn resolve_optioned_caplet_inputs(
     let coupon = resolve_optioned_coupon(cap_floor, period, market, as_of)?;
     let discount_factor = if coupon.payment_date > as_of {
         let discount = market.get_discount(cap_floor.discount_curve_id.as_ref())?;
-        crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-            discount.as_ref(),
-            as_of,
-            coupon.payment_date,
-        )?
+        discount
+            .as_ref()
+            .df_between_dates(as_of, coupon.payment_date)?
     } else {
         0.0
     };
@@ -317,16 +314,15 @@ mod tests {
             .expect("one period");
         let projection =
             resolve_optioned_coupon(&caplet, &period, &market, as_of).expect("projection");
-        let simple = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
-            market
-                .get_forward(caplet.forward_curve_id.as_ref())
-                .expect("forward")
-                .as_ref(),
-            period.accrual_start,
-            period.accrual_end,
-            period.accrual_year_fraction,
-        )
-        .expect("simple forward");
+        let simple = market
+            .get_forward(caplet.forward_curve_id.as_ref())
+            .expect("forward")
+            .rate_between_dates(
+                period.accrual_start,
+                period.accrual_end,
+                period.accrual_year_fraction,
+            )
+            .expect("simple forward");
 
         assert_eq!(projection.fixing_date, date!(2025 - 03 - 31));
         assert_eq!(projection.payment_date, date!(2025 - 04 - 04));
@@ -424,16 +420,15 @@ mod tests {
         let period = caplet.pricing_periods().expect("periods").remove(0);
         let projected =
             resolve_optioned_coupon(&caplet, &period, &market, as_of).expect("term projection");
-        let simple = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
-            market
-                .get_forward(caplet.forward_curve_id.as_ref())
-                .expect("forward")
-                .as_ref(),
-            period.accrual_start,
-            period.accrual_end,
-            period.accrual_year_fraction,
-        )
-        .expect("simple forward");
+        let simple = market
+            .get_forward(caplet.forward_curve_id.as_ref())
+            .expect("forward")
+            .rate_between_dates(
+                period.accrual_start,
+                period.accrual_end,
+                period.accrual_year_fraction,
+            )
+            .expect("simple forward");
 
         assert!((projected.forward - (simple + 0.01)).abs() < 1.0e-12);
     }

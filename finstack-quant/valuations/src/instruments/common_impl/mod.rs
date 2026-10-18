@@ -29,11 +29,9 @@ pub(crate) mod example_constants {
 pub(crate) mod helpers;
 pub(crate) mod listed;
 // Shared volatility override/surface resolution.
-pub(crate) mod validation;
 pub(crate) mod vol_resolution;
 
 // Common parameter types shared across instruments
-pub(crate) mod fx_dates;
 pub(crate) mod parameters;
 
 // Common pricing patterns and infrastructure

@@ -21,8 +21,6 @@
 //! - Hull, J. C. (2018). *Options, Futures, and Other Derivatives*. Chapter 7. `docs/REFERENCES.md#hull-options-futures`
 //! - Kahan, W. (1965). "Further Remarks on Reducing Truncation Errors." `docs/REFERENCES.md#kahan-1965`
 
-use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
-
 use crate::instruments::rates::irs::{InterestRateSwap, PayReceive};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -82,7 +80,7 @@ impl InterestRateSwap {
             )?;
         let mut acc = NeumaierAccumulator::new();
         for flow in schedule.get_flows() {
-            let df = relative_df_discount_curve(disc, as_of, flow.date)?;
+            let df = disc.df_between_dates(as_of, flow.date)?;
             acc.add(flow.amount.amount() * df);
         }
         Ok(acc.total())
@@ -111,7 +109,7 @@ impl InterestRateSwap {
     /// # Errors
     ///
     /// Returns a validation error if the valuation date discount factor is below
-    /// the numerical stability threshold (DF_EPSILON = 1e-10).
+    /// the curve-level positivity check in `df_between_dates`.
     pub(crate) fn pv_fixed_leg(
         &self,
         disc: &finstack_quant_core::market_data::term_structures::DiscountCurve,
@@ -128,7 +126,7 @@ impl InterestRateSwap {
                         | finstack_quant_cashflows::primitives::CFKind::Stub
                 )
             {
-                let discount = relative_df_discount_curve(disc, as_of, flow.date)?;
+                let discount = disc.df_between_dates(as_of, flow.date)?;
                 pv.add(flow.amount.amount() * discount);
             }
         }
@@ -213,7 +211,7 @@ impl InterestRateSwap {
             if payment_date <= as_of {
                 continue;
             }
-            let df = relative_df_discount_curve(disc.as_ref(), as_of, payment_date)?;
+            let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
             acc.add(flow.amount.amount() * df);
         }
         Ok(acc.total())
@@ -475,7 +473,7 @@ mod tests {
         }
 
         let payment_date = add_payment_delay(end, 0, None).expect("payment delay");
-        let df = relative_df_discount_curve(&disc, as_of, payment_date).expect("df");
+        let df = disc.df_between_dates(as_of, payment_date).expect("df");
         let expected = 1_000_000.0 * (acc - 1.0) * df;
 
         let diff = (pv.amount() - expected).abs();

@@ -177,7 +177,7 @@ fn default_pay_receive() -> PayReceive {
 
 impl CommoditySwap {
     fn validate(&self) -> Result<()> {
-        use crate::instruments::common_impl::validation;
+        use finstack_quant_core::validation;
 
         self.underlying.validate("CommoditySwap")?;
         validation::validate_f64_positive(self.quantity, "CommoditySwap quantity")?;

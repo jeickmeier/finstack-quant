@@ -228,13 +228,13 @@ pub(crate) fn projected_compounded_float_leg_schedule(
             crate::instruments::common_impl::pricing::overnight::overnight_coupon_amount(
                 irs.notional.amount(),
                 &projection,
-                spread_bp * crate::constants::ONE_BASIS_POINT,
+                spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT,
             );
         let all_in_rate = if accrual_year_fraction.abs() > f64::EPSILON {
             (compound_factor - 1.0) / accrual_year_fraction
-                + spread_bp * crate::constants::ONE_BASIS_POINT
+                + spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT
         } else {
-            spread_bp * crate::constants::ONE_BASIS_POINT
+            spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT
         };
         flows.push(CashFlow::new(
             period.payment_date,
@@ -503,13 +503,16 @@ pub(crate) fn fixed_leg_annuity(
     as_of: finstack_quant_core::dates::Date,
     paid_after: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
-    use crate::instruments::common_impl::pricing::time::relative_df_discounting;
     let mut annuity = finstack_quant_core::math::NeumaierAccumulator::new();
     for period in periods {
         if period.payment_date <= paid_after {
             continue;
         }
-        let df = relative_df_discounting(disc, as_of, period.payment_date)?;
+        let df = finstack_quant_core::market_data::traits::Discounting::df_between_dates(
+            disc,
+            as_of,
+            period.payment_date,
+        )?;
         annuity.add(period.accrual_year_fraction * df);
     }
     Ok(annuity.total())

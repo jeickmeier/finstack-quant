@@ -142,7 +142,7 @@ assumption is applied it is stamped in `ResultsMeta::fx_policy_applied` (see
 otherwise. Fields and arguments named `*_bp` are basis points. Calibration bump
 quote-recalibration requests (`QuoteBump::ParallelBp`) are in basis points;
 volatility bumps use `VolBumpRequest` because absolute-vs-relative semantics
-differ. `constants::ONE_BASIS_POINT` exists for hot paths; prefer
+differ. `finstack_quant_core::math::units::ONE_BASIS_POINT` exists for hot paths; prefer
 `finstack_quant_core::types::{Rate, Bps}` elsewhere.
 
 **Day count and calendars.** Conventions come from the embedded registries in

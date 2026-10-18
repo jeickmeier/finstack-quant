@@ -6,7 +6,6 @@
 
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::common_impl::validation;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_core::currency::Currency;
@@ -14,6 +13,7 @@ use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::validation;
 use finstack_quant_core::Result;
 use time::macros::date;
 
@@ -328,9 +328,7 @@ impl FxForward {
         business_day_convention: Option<finstack_quant_core::dates::BusinessDayConvention>,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
-        use crate::instruments::common_impl::fx_dates::{
-            add_fx_standard_tenor, fx_spot_date_for_pair,
-        };
+        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date_for_pair};
         let settlement_days = settlement_days
             .unwrap_or_else(|| Self::standard_settlement_days(base_currency, quote_currency));
         let business_day_convention =

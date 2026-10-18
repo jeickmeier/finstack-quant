@@ -140,8 +140,9 @@ pub mod special_functions;
 pub mod stats;
 pub mod summation;
 pub mod time_grid;
+pub mod units;
 
-pub use compounding::Compounding;
+pub use compounding::{z_spread_discount_factor, Compounding};
 pub use distributions::{binomial_pmf_all, binomial_pmf_all_into};
 pub use integration::{
     gauss_legendre_grid, gauss_legendre_integrate_composite, GaussHermiteQuadrature,
