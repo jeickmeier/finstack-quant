@@ -108,7 +108,7 @@ mod tests {
         VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-PRICER"))
             .terms(
-                finstack_quant_valuations_core::instruments::common_impl::listed::ListedFutureTerms::new(
+                finstack_quant_valuations_core::instruments::ListedFutureTerms::new(
                     1.0,
                     1_000.0,
                     Currency::USD,

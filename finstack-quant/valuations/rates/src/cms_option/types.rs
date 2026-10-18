@@ -1,0 +1,328 @@
+//! CMS option instrument definition.
+
+use crate::cms_common::CmsReferenceSwap;
+use finstack_quant_core::dates::{Date, DayCount, Tenor};
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::IndexId;
+use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::OptionType;
+use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
+
+/// CMS option instrument (cap/floor on CMS rates).
+#[derive(
+    PartialEq,
+    Clone,
+    Debug,
+    finstack_quant_valuations_macros::FinancialBuilder,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CmsOption {
+    /// Unique instrument identifier
+    pub id: InstrumentId,
+    /// Strike (fixed rate for CMS option)
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub strike: Decimal,
+    /// Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based.
+    pub cms_tenor: Tenor,
+    /// Observation/fixing dates for CMS rate
+    #[serde(with = "finstack_quant_core::wire::dates")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
+    pub fixing_dates: Vec<Date>,
+    /// Payment dates for each period (usually fixing date + lag or period end)
+    #[serde(with = "finstack_quant_core::wire::dates")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
+    pub payment_dates: Vec<Date>,
+    /// Finite nonnegative accrual fractions for each period; zero gives a zero coupon.
+    pub accrual_fractions: Vec<f64>,
+    /// Option type (call or put on CMS rate)
+    pub option_type: OptionType,
+    /// Notional amount
+    pub notional: Money,
+    /// Day count convention for the option accrual
+    pub day_count: DayCount,
+
+    /// Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
+    ///
+    /// When set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,
+    /// `swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still
+    /// override the convention when explicitly set. Required for USD CMS.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_id: Option<IndexId>,
+    /// Fixed leg frequency of the underlying swap (overrides convention if set)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_fixed_frequency: Option<Tenor>,
+    /// Floating leg frequency of the underlying swap (overrides convention if set)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_float_frequency: Option<Tenor>,
+    /// Day count convention of the underlying swap fixed leg (overrides convention if set)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_fixed_day_count: Option<DayCount>,
+    /// Optional day count convention of the underlying swap floating leg
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_float_day_count: Option<DayCount>,
+
+    /// Discount curve ID for present value calculations
+    pub discount_curve_id: CurveId,
+    /// Forward/projection curve ID for CMS rate projection
+    pub forward_curve_id: CurveId,
+    /// Volatility surface ID for CMS rates
+    pub vol_surface_id: CurveId,
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides:
+        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+    /// Attributes for scenario selection and grouping
+    #[serde(default)]
+    #[builder(default)]
+    pub attributes: Attributes,
+}
+
+impl CmsOption {
+    /// Reference swap observed by this instrument's CMS fixings.
+    pub fn reference_swap(&self) -> CmsReferenceSwap<'_> {
+        CmsReferenceSwap {
+            label: "CMS option",
+            currency: self.notional.currency(),
+            index_id: self.index_id.as_ref(),
+            swap_fixed_frequency: self.swap_fixed_frequency,
+            swap_float_frequency: self.swap_float_frequency,
+            swap_fixed_day_count: self.swap_fixed_day_count,
+            swap_float_day_count: self.swap_float_day_count,
+            discount_curve_id: &self.discount_curve_id,
+            forward_curve_id: &self.forward_curve_id,
+        }
+    }
+
+    /// Validate CMS option schedule vectors.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        crate::cms_common::cms_tenor_months(self.cms_tenor, "CmsOption cms_tenor")?;
+        if self.fixing_dates.len() != self.payment_dates.len()
+            || self.fixing_dates.len() != self.accrual_fractions.len()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CMS option vectors must have equal length: fixing_dates={}, payment_dates={}, accrual_fractions={}",
+                self.fixing_dates.len(),
+                self.payment_dates.len(),
+                self.accrual_fractions.len(),
+            )));
+        }
+        for (index, accrual) in self.accrual_fractions.iter().enumerate() {
+            if !accrual.is_finite() || *accrual < 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CmsOption accrual_fractions[{index}] must be finite and nonnegative, got {accrual}"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn strike_f64(&self) -> finstack_quant_core::Result<f64> {
+        self.strike
+            .to_f64()
+            .ok_or(finstack_quant_core::InputError::ConversionOverflow.into())
+    }
+
+    /// Create a canonical example CMS option (10Y CMS caplet style).
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        use finstack_quant_core::currency::Currency;
+
+        let fixing_dates = vec![
+            time::macros::date!(2025 - 03 - 20),
+            time::macros::date!(2025 - 06 - 20),
+            time::macros::date!(2025 - 09 - 22),
+            time::macros::date!(2025 - 12 - 22),
+        ];
+        let payment_dates = vec![
+            time::macros::date!(2025 - 06 - 20),
+            time::macros::date!(2025 - 09 - 22),
+            time::macros::date!(2025 - 12 - 22),
+            time::macros::date!(2026 - 03 - 20),
+        ];
+        let accrual_fractions = vec![0.25, 0.25, 0.25, 0.25];
+
+        CmsOption::builder()
+            .id(InstrumentId::new("CMSOPT-10Y-USD"))
+            .strike(Decimal::try_from(0.025).map_err(|e: rust_decimal::Error| {
+                finstack_quant_core::Error::Validation(e.to_string())
+            })?)
+            .cms_tenor(Tenor::new(
+                10,
+                finstack_quant_core::dates::TenorUnit::Years,
+            )?)
+            .fixing_dates(fixing_dates)
+            .payment_dates(payment_dates)
+            .accrual_fractions(accrual_fractions)
+            .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
+            .day_count(DayCount::Act365F)
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
+            .swap_float_day_count_opt(Some(DayCount::Act360))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
+            .attributes(Attributes::new())
+            .build()
+    }
+}
+
+impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for CmsOption {
+    impl_instrument_base!(
+        finstack_quant_valuations_core::pricer::InstrumentType::CmsOption,
+        crate::RATES
+    );
+    fn last_payment_date(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<Option<finstack_quant_core::dates::Date>> {
+        let schedule =
+            finstack_quant_cashflows::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
+        Ok(schedule
+            .get_flows()
+            .iter()
+            .map(|flow| flow.date)
+            .chain(self.expiry())
+            .max())
+    }
+
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
+    fn default_model(&self) -> finstack_quant_valuations_core::pricer::ModelKey {
+        finstack_quant_valuations_core::pricer::ModelKey::Black76
+    }
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_forward_curve(self.forward_curve_id.clone());
+        deps.add_volatility_dependency(
+            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                None,
+                Some(self.strike_f64()?),
+            ),
+        );
+        deps.add_series_id(
+            finstack_quant_core::market_data::fixings::cms_fixing_series_id(
+                self.forward_curve_id.as_str(),
+                self.cms_tenor.to_years(),
+            ),
+        );
+        Ok(deps)
+    }
+
+    fn base_value(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        self.validate()?;
+        crate::cms_option::pricer::compute_pv(self, market, as_of)
+    }
+
+    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+}
+
+// Declare canonical market dependencies for the DV01 calculator.
+finstack_quant_valuations_core::impl_empty_cashflow_provider!(
+    CmsOption,
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
+);
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+    use time::Month;
+
+    fn test_date(month: Month, day: u8) -> Date {
+        Date::from_calendar_date(2026, month, day).expect("valid date")
+    }
+
+    #[test]
+    fn builder_rejects_misaligned_schedule_vectors() {
+        let result = CmsOption::builder()
+            .id(InstrumentId::new("CMSOPT-BAD"))
+            .strike(Decimal::try_from(0.025).expect("valid decimal"))
+            .cms_tenor(
+                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+            )
+            .fixing_dates(vec![
+                test_date(Month::March, 20),
+                test_date(Month::June, 20),
+            ])
+            .payment_dates(vec![test_date(Month::June, 20)])
+            .accrual_fractions(vec![0.25, 0.25])
+            .option_type(OptionType::Call)
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .day_count(DayCount::Act365F)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
+            .build();
+
+        assert!(
+            result.is_err(),
+            "CMS option builder must reject schedule vector length mismatches"
+        );
+    }
+    #[test]
+    fn accruals_require_finite_nonnegative_values() {
+        let mut inst = CmsOption::example().expect("example");
+        for invalid in [-0.25, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            inst.accrual_fractions[0] = invalid;
+            let error = inst.validate().expect_err("invalid accrual").to_string();
+            assert!(error.contains("accrual_fractions[0]"));
+        }
+        for valid in [0.0, 0.25] {
+            inst.accrual_fractions[0] = valid;
+            inst.validate().expect("nonnegative accrual");
+        }
+    }
+}

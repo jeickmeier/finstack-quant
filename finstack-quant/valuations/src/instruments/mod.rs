@@ -176,7 +176,9 @@ pub mod fx {
     pub use finstack_quant_valuations_fx::*;
 }
 /// Interest rate derivatives and money market instruments.
-pub mod rates;
+pub mod rates {
+    pub use finstack_quant_valuations_rates::*;
+}
 
 pub use fixed_income::{
     AgencyCmo, AgencyMbsPassthrough, AgencyProgram, AgencyTba, AssetBackedFacility, Bond,
@@ -219,11 +221,6 @@ pub use commodity::{
 };
 
 pub use rates::InterestRateFutureOption;
-
-pub use common_impl::listed::{
-    FutureOptionExercise, FutureOptionModel, FutureOptionPremiumStyle, FutureOptionSettlement,
-    FutureOptionTerms, ListedDeliveryObligation, ListedFutureSettlement, ListedFutureTerms,
-};
 
 pub use composite::{
     CompositeExposureReport, CompositeHistoryRow, CompositeInstrument, CompositeLegSpec,

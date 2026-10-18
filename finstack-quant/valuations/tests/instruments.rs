@@ -65,37 +65,9 @@ mod bond_future;
 
 // Interest Rate Derivatives
 
-/// Basis swap tests - Multi-curve basis swaps (e.g., 3m vs 6m LIBOR)
-#[path = "instruments/basis_swap/mod.rs"]
-mod basis_swap;
-
-/// Cap/Floor tests - Interest rate caps and floors
-#[path = "instruments/cap_floor/mod.rs"]
-mod cap_floor;
-
-/// Forward Rate Agreement (FRA) tests - Single period rate agreements
-#[path = "instruments/fra/mod.rs"]
-mod fra;
-
-/// CMS Option tests - Constant Maturity Swap caps and floors
-#[path = "instruments/cms_option/mod.rs"]
-mod cms_option;
-
-/// Interest rate future tests - Exchange-traded IR futures
-#[path = "instruments/ir_future/mod.rs"]
-mod ir_future;
-
-/// Inflation swap tests - Zero-coupon and year-on-year inflation swaps
-#[path = "instruments/inflation_swap/mod.rs"]
-mod inflation_swap;
-
 /// Inflation cap/floor tests - YoY inflation caps/floors
 #[path = "instruments/inflation_cap_floor/mod.rs"]
 mod inflation_cap_floor;
-
-/// Interest Rate Swap (IRS) tests - Fixed-for-floating swaps
-#[path = "instruments/irs/mod.rs"]
-mod irs;
 
 /// Futures-option tests - Shared option-on-future wrappers
 #[path = "instruments/future_option/mod.rs"]
@@ -166,10 +138,6 @@ mod fx_variance_swap;
 /// NDF tests - Non-deliverable forwards for restricted currencies
 #[path = "instruments/ndf/mod.rs"]
 mod ndf;
-
-/// XCCY swap tests - Cross-currency swaps (multi-currency floating legs)
-#[path = "instruments/xccy_swap/mod.rs"]
-mod xccy_swap;
 
 // Commodity Derivatives
 

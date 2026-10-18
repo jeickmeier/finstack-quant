@@ -18,6 +18,7 @@ finstack-quant-covenants = { path = "../covenants", version = "0.10.0", default-
 finstack-quant-margin = { path = "../margin", version = "0.10.0", default-features = false }
 finstack-quant-models = { path = "../models", version = "0.10.0", default-features = false }
 finstack-quant-valuations-core = { path = "core", version = "0.10.0", default-features = false }
+finstack-quant-valuations-rates = { path = "rates", version = "0.10.0", default-features = false }
 finstack-quant-valuations-equity = { path = "equity", version = "0.10.0", default-features = false }
 finstack-quant-valuations-credit = { path = "credit", version = "0.10.0", default-features = false }
 finstack-quant-valuations-exotics = { path = "exotics", version = "0.10.0", default-features = false }
@@ -57,6 +58,7 @@ default = ["json-schema", "jsonschema-validate"]
 json-schema = [
     "dep:schemars",
     "finstack-quant-valuations-core/json-schema",
+    "finstack-quant-valuations-rates/json-schema",
     "finstack-quant-valuations-equity/json-schema",
     "finstack-quant-valuations-credit/json-schema",
     "finstack-quant-valuations-exotics/json-schema",

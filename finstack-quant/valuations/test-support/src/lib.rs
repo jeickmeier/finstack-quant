@@ -22,6 +22,8 @@
 //!   money shorthands and Black-Scholes reference formulas.
 //! - [`date`], [`discount_forward_curves`], [`volatility`],
 //!   [`commodity_curves`]: one-line curve and surface constructors.
+//! - [`inflation`]: inflation curves, CPI index series and the standard
+//!   inflation markets of the inflation-swap and cap/floor tests.
 //!
 //! # Example
 //!
@@ -45,6 +47,8 @@ pub mod date;
 /// Flat discount and forward curves with a configurable far knot.
 pub mod discount_forward_curves;
 pub mod fixtures;
+/// Inflation curves, CPI index series and inflation market contexts.
+pub mod inflation;
 pub mod parity;
 pub mod test_helpers;
 pub mod tolerances;

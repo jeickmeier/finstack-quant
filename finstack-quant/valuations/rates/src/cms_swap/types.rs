@@ -1,0 +1,1294 @@
+//! CMS swap instrument definition.
+//!
+//! A CMS (Constant Maturity Swap) swap has one leg paying a CMS rate
+//! (the par swap rate for a reference tenor, e.g., 10Y) and the other
+//! leg paying a fixed or floating rate.
+//!
+//! The CMS rate requires a convexity adjustment because the forward
+//! swap rate is a martingale under the annuity measure, not the payment
+//! measure. The adjustment depends on volatility and the rate level.
+//!
+//! # Reference
+//!
+//! Hagan, P. S. (2003). "Convexity Conundrums: Pricing CMS Swaps, Caps,
+//! and Floors." *Wilmott Magazine*, March, 38-44. `docs/REFERENCES.md#hagan-2003-cms-convexity`
+
+use crate::cms_common::CmsReferenceSwap;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::CashFlowAccrual;
+use finstack_quant_core::dates::{Date, DayCount, Tenor};
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::IndexId;
+use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use rust_decimal::Decimal;
+
+/// CMS (Constant Maturity Swap) swap instrument.
+///
+/// One leg pays a CMS rate (the par swap rate for a reference tenor, e.g., 10Y)
+/// observed on each fixing date, and the other leg pays a fixed or floating rate.
+///
+/// The CMS rate requires a convexity adjustment because the CMS rate is not a
+/// martingale under the payment measure. The adjustment depends on the correlation
+/// between the CMS rate and the numeraire (annuity).
+///
+/// # Reference
+///
+/// Hagan, P. S. (2003). "Convexity Conundrums: Pricing CMS Swaps, Caps, and Floors."
+/// *Wilmott Magazine*, March, 38-44. `docs/REFERENCES.md#hagan-2003-cms-convexity`
+#[derive(
+    Clone,
+    Debug,
+    finstack_quant_valuations_macros::FinancialBuilder,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CmsSwap {
+    /// Unique instrument identifier.
+    pub id: InstrumentId,
+    /// Notional amount.
+    pub notional: Money,
+    /// Pay direction: `Pay` means pay CMS leg, receive funding leg.
+    pub side:
+        finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive,
+
+    // ── CMS Leg ──────────────────────────────────────────────────────────
+    /// Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based.
+    pub cms_tenor: Tenor,
+    /// Fixing dates for CMS rate observations.
+    #[serde(with = "finstack_quant_core::wire::dates")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
+    pub fixing_dates: Vec<Date>,
+    /// Payment dates for the CMS leg.
+    #[serde(with = "finstack_quant_core::wire::dates")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
+    pub payment_dates: Vec<Date>,
+    /// Accrual fractions for each CMS period.
+    pub accrual_fractions: Vec<f64>,
+    /// Day count convention for CMS leg accrual.
+    pub day_count: DayCount,
+    /// Additive spread over the CMS rate in basis points (10 = 10bp).
+    #[serde(default, with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    #[builder(default)]
+    pub cms_spread_bp: Decimal,
+    /// Optional cap on the CMS rate (decimal).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cms_cap: Option<f64>,
+    /// Optional floor on the CMS rate (decimal).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cms_floor: Option<f64>,
+
+    /// Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
+    /// Required for USD CMS; legacy contracts must name their legacy index explicitly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_id: Option<IndexId>,
+    /// Fixed leg frequency of the underlying swap (overrides convention).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_fixed_frequency: Option<Tenor>,
+    /// Floating leg frequency of the underlying swap (overrides convention).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_float_frequency: Option<Tenor>,
+    /// Day count of the underlying swap fixed leg (overrides convention).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_fixed_day_count: Option<DayCount>,
+    /// Day count of the underlying swap floating leg (overrides convention).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_float_day_count: Option<DayCount>,
+
+    // ── Funding Leg ──────────────────────────────────────────────────────
+    /// Funding leg definition (fixed or floating).
+    pub funding_leg: FundingLeg,
+
+    // ── Market References ────────────────────────────────────────────────
+    /// Discount curve ID for present value calculations.
+    pub discount_curve_id: CurveId,
+    /// Forward/projection curve ID for CMS rate projection.
+    pub forward_curve_id: CurveId,
+    /// Volatility surface ID for CMS convexity adjustment.
+    pub vol_surface_id: CurveId,
+
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides:
+        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+    /// Attributes for scenario selection and grouping.
+    #[serde(default)]
+    #[builder(default)]
+    pub attributes: Attributes,
+}
+
+/// Contractual dates and accrual fraction of one CMS funding coupon.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FundingPeriod {
+    /// Inclusive accrual start, independent of the CMS observation date.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub accrual_start: Date,
+    /// Exclusive accrual end, independent of payment-date adjustment.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub accrual_end: Date,
+    /// Contractual payment date after business-day adjustment.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub payment_date: Date,
+    /// Floating index observation date; ignored for fixed funding.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub reset_date: Date,
+    /// Positive year fraction measured using the funding leg day count.
+    pub accrual_year_fraction: f64,
+}
+
+impl From<finstack_quant_cashflows::builder::SchedulePeriod> for FundingPeriod {
+    /// Retain the contractual dates and accrual of a generated funding period.
+    ///
+    /// # Arguments
+    ///
+    /// * `period` - Canonical generated schedule period; an absent reset date
+    ///   denotes a simple funding coupon observed on its accrual start.
+    fn from(period: finstack_quant_cashflows::builder::SchedulePeriod) -> Self {
+        Self {
+            accrual_start: period.accrual_start,
+            accrual_end: period.accrual_end,
+            payment_date: period.payment_date,
+            reset_date: period.reset_date.unwrap_or(period.accrual_start),
+            accrual_year_fraction: period.accrual_year_fraction,
+        }
+    }
+}
+
+/// Funding leg specification for a CMS swap.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "type")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum FundingLeg {
+    /// Fixed rate funding leg with explicit contractual periods.
+    Fixed {
+        /// Fixed coupon rate as a decimal annual rate (0.03 = 3%).
+        #[serde(with = "finstack_quant_core::wire::decimal")]
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DecimalWire")
+        )]
+        rate: Decimal,
+        /// Funding accrual and payment schedule, in chronological order.
+        periods: Vec<FundingPeriod>,
+        /// Day count convention used to calculate period year fractions.
+        day_count: DayCount,
+    },
+    /// Simple floating funding coupons with independent reset/accrual/payment dates.
+    Floating {
+        /// Additive spread over the floating index in basis points (10 = 10bp).
+        #[serde(with = "finstack_quant_core::wire::decimal")]
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DecimalWire")
+        )]
+        spread_bp: Decimal,
+        /// Funding accrual, reset and payment schedule, in chronological order.
+        periods: Vec<FundingPeriod>,
+        /// Day count convention used to calculate period year fractions.
+        day_count: DayCount,
+        /// Forward curve for floating rate projection.
+        forward_curve_id: CurveId,
+    },
+}
+
+impl CmsSwap {
+    /// Reference swap observed by this instrument's CMS fixings.
+    pub fn reference_swap(&self) -> CmsReferenceSwap<'_> {
+        CmsReferenceSwap {
+            label: "CMS swap",
+            currency: self.notional.currency(),
+            index_id: self.index_id.as_ref(),
+            swap_fixed_frequency: self.swap_fixed_frequency,
+            swap_float_frequency: self.swap_float_frequency,
+            swap_fixed_day_count: self.swap_fixed_day_count,
+            swap_float_day_count: self.swap_float_day_count,
+            discount_curve_id: &self.discount_curve_id,
+            forward_curve_id: &self.forward_curve_id,
+        }
+    }
+
+    /// CMS-leg spread as a decimal rate (`cms_spread_bp / 10_000`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `cms_spread_bp` cannot be represented as `f64`.
+    pub(crate) fn cms_spread_rate(&self) -> finstack_quant_core::Result<f64> {
+        Ok(self.cms_spread_bp.as_f64() / 10_000.0)
+    }
+
+    /// Validate CMS and funding leg schedule vectors.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        crate::cms_common::cms_tenor_months(self.cms_tenor, "CmsSwap cms_tenor")?;
+        if self.fixing_dates.len() != self.payment_dates.len()
+            || self.fixing_dates.len() != self.accrual_fractions.len()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CMS swap vectors must have equal length: fixing_dates={}, payment_dates={}, accrual_fractions={}",
+                self.fixing_dates.len(),
+                self.payment_dates.len(),
+                self.accrual_fractions.len(),
+            )));
+        }
+
+        let (FundingLeg::Fixed { periods, .. } | FundingLeg::Floating { periods, .. }) =
+            &self.funding_leg;
+        for (i, period) in periods.iter().enumerate() {
+            if period.accrual_start >= period.accrual_end
+                || period.payment_date < period.accrual_start
+                || period.reset_date > period.accrual_start
+                || !period.accrual_year_fraction.is_finite()
+                || period.accrual_year_fraction <= 0.0
+                || (i > 0 && periods[i - 1].accrual_end != period.accrual_start)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "invalid CMS funding period at index {i}: require contiguous accrual dates, reset no later than start, and positive finite accrual"
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Create a CMS swap from schedule parameters.
+    ///
+    /// Generates fixing/payment dates for both legs from start, end, and
+    /// frequency. Calendar and reset lag come from the `index_id` rate-index convention.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Trade identifier stored on the swap and used in results and serialization.
+    /// * `start_date` - Inclusive schedule or accrual start date in the instrument calendar
+    /// * `maturity` - Final payment or expiry date of the instrument being constructed
+    /// * `cms_frequency` - Payment and fixing frequency used to generate both the CMS and
+    ///   funding schedules.
+    /// * `cms_tenor` - Reference swap tenor for the CMS rate (e.g. 10Y); must be month- or
+    ///   year-based.
+    /// * `cms_spread_bp` - Additive spread on the CMS rate in basis points (e.g. `10` = 10bp).
+    /// * `funding_leg` - Fixed or floating other leg; its schedule is generated from the same
+    ///   start, maturity, and CMS frequency.
+    /// * `notional` - Trade notional amount in the instrument currency's major units
+    /// * `day_count` - Day-count convention for CMS-leg accrual fractions.
+    /// * `index_id` - Rate-index convention-registry key (e.g. `USD-SOFR-OIS`) supplying the
+    ///   calendar and reset lag used to build both schedules; stored as the reference-swap index.
+    /// * `side` - Trade side (buy/sell or pay/receive) controlling sign conventions
+    /// * `discount_curve_id` - Identifier of the discount curve used for present-value calculations.
+    /// * `forward_curve_id` - Identifier of the forward curve used to project floating rates.
+    /// * `vol_surface_id` - Identifier of the volatility surface used for option pricing.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_schedule(
+        id: impl Into<InstrumentId>,
+        start_date: Date,
+        maturity: Date,
+        cms_frequency: Tenor,
+        cms_tenor: Tenor,
+        cms_spread_bp: Decimal,
+        funding_leg: FundingLegSpec,
+        notional: Money,
+        day_count: DayCount,
+        index_id: IndexId,
+        side: finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive,
+        discount_curve_id: impl Into<CurveId>,
+        forward_curve_id: impl Into<CurveId>,
+        vol_surface_id: impl Into<CurveId>,
+    ) -> finstack_quant_core::Result<Self> {
+        use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+        use finstack_quant_core::dates::{BusinessDayConvention, StubKind};
+
+        let reference_conventions =
+            finstack_quant_valuations_core::market::conventions::ConventionRegistry::try_global()?
+                .require_rate_index(&index_id)?;
+        let calendar_id = &reference_conventions.market_calendar_id;
+        let reset_lag_days = reference_conventions.market_settlement_days;
+
+        let cms_periods = build_periods(BuildPeriodsParams {
+            start: start_date,
+            end: maturity,
+            frequency: cms_frequency,
+            stub: StubKind::ShortFront,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            calendar_id,
+            end_of_month: false,
+            day_count,
+            payment_lag_days: 0,
+            reset_lag_days: Some(reset_lag_days),
+            adjust_accrual_dates: false,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+        })?;
+
+        if cms_periods.is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "CMS swap schedule produced no periods".to_string(),
+            ));
+        }
+
+        let fixing_dates: Vec<Date> = cms_periods
+            .iter()
+            .map(|p| p.reset_date.unwrap_or(p.accrual_start))
+            .collect();
+        let payment_dates: Vec<Date> = cms_periods.iter().map(|p| p.payment_date).collect();
+        let accrual_fractions: Vec<f64> = cms_periods
+            .iter()
+            .map(|p| p.accrual_year_fraction)
+            .collect();
+
+        let funding_leg = match funding_leg {
+            FundingLegSpec::Fixed {
+                rate,
+                day_count: funding_day_count,
+            } => {
+                let fund_periods = build_periods(BuildPeriodsParams {
+                    start: start_date,
+                    end: maturity,
+                    frequency: cms_frequency,
+                    stub: StubKind::ShortFront,
+                    business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                    calendar_id,
+                    end_of_month: false,
+                    day_count: funding_day_count,
+                    payment_lag_days: 0,
+                    reset_lag_days: None,
+                    adjust_accrual_dates: false,
+                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+                })?;
+                FundingLeg::Fixed {
+                    rate,
+                    periods: fund_periods.into_iter().map(FundingPeriod::from).collect(),
+                    day_count: funding_day_count,
+                }
+            }
+            FundingLegSpec::Floating {
+                spread_bp,
+                day_count: funding_day_count,
+                forward_curve_id,
+            } => {
+                let fund_periods = build_periods(BuildPeriodsParams {
+                    start: start_date,
+                    end: maturity,
+                    frequency: cms_frequency,
+                    stub: StubKind::ShortFront,
+                    business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                    calendar_id,
+                    end_of_month: false,
+                    day_count: funding_day_count,
+                    payment_lag_days: 0,
+                    reset_lag_days: None,
+                    adjust_accrual_dates: false,
+                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+                })?;
+                FundingLeg::Floating {
+                    spread_bp,
+                    periods: fund_periods.into_iter().map(FundingPeriod::from).collect(),
+                    day_count: funding_day_count,
+                    forward_curve_id,
+                }
+            }
+        };
+
+        CmsSwap::builder()
+            .id(id.into())
+            .notional(notional)
+            .side(side)
+            .cms_tenor(cms_tenor)
+            .fixing_dates(fixing_dates)
+            .payment_dates(payment_dates)
+            .accrual_fractions(accrual_fractions)
+            .day_count(day_count)
+            .cms_spread_bp(cms_spread_bp)
+            .index_id_opt(Some(index_id))
+            .funding_leg(funding_leg)
+            .discount_curve_id(discount_curve_id.into())
+            .forward_curve_id(forward_curve_id.into())
+            .vol_surface_id(vol_surface_id.into())
+            .build()
+            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))
+    }
+
+    /// Create a canonical example CMS swap (pay 10Y CMS, receive fixed).
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        use finstack_quant_core::currency::Currency;
+
+        let fixing_dates = vec![
+            time::macros::date!(2025 - 03 - 20),
+            time::macros::date!(2025 - 06 - 20),
+            time::macros::date!(2025 - 09 - 22),
+            time::macros::date!(2025 - 12 - 22),
+        ];
+        let payment_dates = vec![
+            time::macros::date!(2025 - 06 - 20),
+            time::macros::date!(2025 - 09 - 22),
+            time::macros::date!(2025 - 12 - 22),
+            time::macros::date!(2026 - 03 - 20),
+        ];
+        let accrual_fractions = vec![0.25, 0.25, 0.25, 0.25];
+
+        CmsSwap::builder()
+            .id(InstrumentId::new("CMSSWAP-10Y-USD"))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
+            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .cms_tenor(Tenor::new(
+                10,
+                finstack_quant_core::dates::TenorUnit::Years,
+            )?)
+            .fixing_dates(fixing_dates.clone())
+            .payment_dates(payment_dates.clone())
+            .accrual_fractions(accrual_fractions.clone())
+            .day_count(DayCount::Act365F)
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
+            .swap_float_day_count_opt(Some(DayCount::Act360))
+            .funding_leg(FundingLeg::Fixed {
+                rate: Decimal::new(3, 2),
+                periods: fixing_dates
+                    .iter()
+                    .zip(&payment_dates)
+                    .zip(&accrual_fractions)
+                    .map(|((&start, &end), &accrual)| FundingPeriod {
+                        accrual_start: start,
+                        accrual_end: end,
+                        payment_date: end,
+                        reset_date: start,
+                        accrual_year_fraction: accrual,
+                    })
+                    .collect(),
+                day_count: DayCount::Thirty360,
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
+            .attributes(Attributes::new())
+            .build()
+    }
+
+    fn cms_leg_flows(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Vec<CashFlow>> {
+        let mut flows = Vec::new();
+        let mut accrual_start = self.fixing_dates.first().copied().unwrap_or(as_of);
+
+        for (i, &fixing_date) in self.fixing_dates.iter().enumerate() {
+            let payment_date = self.payment_dates[i];
+            let accrual_fraction = self.accrual_fractions[i];
+
+            if payment_date < as_of {
+                accrual_start = payment_date;
+                continue;
+            }
+
+            let coupon_rate = super::pricer::cms_coupon_rate(
+                self,
+                market,
+                as_of,
+                fixing_date,
+                payment_date,
+                1.0,
+            )?;
+            let signed_amount = match self.side {
+                finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay => {
+                    -coupon_rate * accrual_fraction * self.notional.amount()
+                }
+                finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive => {
+                    coupon_rate * accrual_fraction * self.notional.amount()
+                }
+            };
+            flows.push(
+                CashFlow::new(
+                    payment_date,
+                    Some(fixing_date),
+                    Money::new(signed_amount, self.notional.currency())?,
+                    CFKind::FloatReset,
+                    accrual_fraction,
+                    Some(coupon_rate),
+                )
+                .with_accrual(CashFlowAccrual {
+                    coupon_period: None,
+                    end_is_termination_date: false,
+                    calendar_id: None,
+                    start: accrual_start,
+                    end: payment_date,
+                    day_count: self.day_count,
+                    projected_index_rate: None,
+                }),
+            );
+            accrual_start = payment_date;
+        }
+
+        Ok(flows)
+    }
+
+    pub(super) fn funding_leg_flows(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+        include_valuation_date: bool,
+    ) -> finstack_quant_core::Result<Vec<CashFlow>> {
+        let mut flows = Vec::new();
+        let (periods, day_count) = match &self.funding_leg {
+            FundingLeg::Fixed {
+                periods, day_count, ..
+            }
+            | FundingLeg::Floating {
+                periods, day_count, ..
+            } => (periods, *day_count),
+        };
+        for period in periods {
+            if period.payment_date < as_of
+                || (!include_valuation_date && period.payment_date == as_of)
+            {
+                continue;
+            }
+            let (rate, index_rate, kind, reset_date) = match &self.funding_leg {
+                FundingLeg::Fixed { rate, .. } => (rate.as_f64(), None, CFKind::Fixed, None),
+                FundingLeg::Floating {
+                    spread_bp,
+                    forward_curve_id,
+                    ..
+                } => {
+                    let fwd_curve = market.get_forward(forward_curve_id.as_ref())?;
+                    let index_rate = if period.reset_date < as_of {
+                        let series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
+                            forward_curve_id.as_str(),
+                        );
+                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                            market.get_series(&series_id).ok(),
+                            forward_curve_id.as_str(),
+                            period.reset_date,
+                            as_of,
+                        )?
+                    } else {
+                        fwd_curve.as_ref().rate_between_dates(
+                            period.accrual_start,
+                            period.accrual_end,
+                            period.accrual_year_fraction,
+                        )?
+                    };
+                    (
+                        index_rate + spread_bp.as_f64() / 10_000.0,
+                        Some(index_rate),
+                        CFKind::FloatReset,
+                        Some(period.reset_date),
+                    )
+                }
+            };
+            let unsigned = rate * period.accrual_year_fraction * self.notional.amount();
+            let signed = match self.side {
+                finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay => unsigned,
+                finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive => -unsigned,
+            };
+            flows.push(
+                CashFlow::new(
+                    period.payment_date,
+                    reset_date,
+                    Money::new(signed, self.notional.currency())?,
+                    kind,
+                    period.accrual_year_fraction,
+                    Some(rate),
+                )
+                .with_accrual(CashFlowAccrual {
+                    coupon_period: None,
+                    end_is_termination_date: false,
+                    calendar_id: None,
+                    start: period.accrual_start,
+                    end: period.accrual_end,
+                    day_count,
+                    projected_index_rate: index_rate,
+                }),
+            );
+        }
+        Ok(flows)
+    }
+}
+
+/// Simplified funding leg specification for [`CmsSwap::from_schedule`].
+pub enum FundingLegSpec {
+    /// Fixed rate funding leg.
+    Fixed {
+        /// Fixed coupon rate as a decimal annual rate (0.03 = 3%).
+        rate: Decimal,
+        /// Day count convention.
+        day_count: DayCount,
+    },
+    /// Floating rate funding leg.
+    Floating {
+        /// Additive spread over the floating index in basis points (10 = 10bp).
+        spread_bp: Decimal,
+        /// Day count convention.
+        day_count: DayCount,
+        /// Forward curve for floating rate projection.
+        forward_curve_id: CurveId,
+    },
+}
+
+impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for CmsSwap {
+    impl_instrument_base!(
+        finstack_quant_valuations_core::pricer::InstrumentType::CmsSwap,
+        crate::RATES
+    );
+    fn last_payment_date(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<Option<finstack_quant_core::dates::Date>> {
+        let schedule =
+            finstack_quant_cashflows::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
+        Ok(schedule
+            .get_flows()
+            .iter()
+            .map(|flow| flow.date)
+            .chain(self.expiry())
+            .max())
+    }
+
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        CmsSwap::validate(self)
+    }
+
+    fn default_model(&self) -> finstack_quant_valuations_core::pricer::ModelKey {
+        finstack_quant_valuations_core::pricer::ModelKey::Black76
+    }
+
+    fn base_value(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        crate::cms_swap::pricer::compute_pv(self, market, as_of)
+    }
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_forward_curve(self.forward_curve_id.clone());
+        deps.add_volatility_dependency(
+            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                None,
+                None,
+            ),
+        );
+        for strike in [self.cms_cap, self.cms_floor].into_iter().flatten() {
+            deps.add_volatility_dependency(
+                finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                    self.vol_surface_id.clone(),
+                    None,
+                    Some(strike),
+                ),
+            );
+        }
+        deps.add_series_id(
+            finstack_quant_core::market_data::fixings::cms_fixing_series_id(
+                self.forward_curve_id.as_str(),
+                self.cms_tenor.to_years(),
+            ),
+        );
+        if let FundingLeg::Floating {
+            forward_curve_id, ..
+        } = &self.funding_leg
+        {
+            deps.add_forward_curve(forward_curve_id.clone());
+            deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                forward_curve_id.as_str(),
+            ));
+        }
+        Ok(deps)
+    }
+
+    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+}
+
+impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
+    }
+
+    fn raw_cashflow_schedule(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<CashFlowSchedule> {
+        self.validate()?;
+        let mut projected_fixings = Vec::new();
+        for &fixing_date in &self.fixing_dates {
+            if fixing_date > as_of {
+                projected_fixings.push(finstack_quant_cashflows::fixings::ProjectedFixing {
+                    series_id: finstack_quant_core::market_data::fixings::cms_fixing_series_id(
+                        self.forward_curve_id.as_str(),
+                        self.cms_tenor.to_years(),
+                    ),
+                    date: fixing_date,
+                    value: Some(
+                        super::pricer::cms_forward_and_ttf(self, market, as_of, fixing_date)?.0,
+                    ),
+                });
+            }
+        }
+        let funding_flows = self.funding_leg_flows(market, as_of, true)?;
+        if let FundingLeg::Floating {
+            forward_curve_id, ..
+        } = &self.funding_leg
+        {
+            for flow in &funding_flows {
+                if let (Some(date), Some(accrual)) = (flow.reset_date, &flow.accrual) {
+                    projected_fixings.push(finstack_quant_cashflows::fixings::ProjectedFixing {
+                        series_id: finstack_quant_core::market_data::fixings::fixing_series_id(
+                            forward_curve_id.as_str(),
+                        ),
+                        date,
+                        value: accrual.projected_index_rate,
+                    });
+                }
+            }
+        }
+        let flows = self
+            .cms_leg_flows(market, as_of)?
+            .into_iter()
+            .chain(funding_flows)
+            .collect();
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
+            flows,
+            self.day_count,
+            finstack_quant_cashflows::ScheduleBuildOpts {
+                notional_hint: Some(self.notional),
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    projected_fixings,
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
+            },
+        );
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use finstack_quant_valuations_core::instruments::Instrument;
+
+    fn funding_period(start: Date, end: Date, accrual: f64) -> super::super::types::FundingPeriod {
+        super::super::types::FundingPeriod {
+            accrual_start: start,
+            accrual_end: end,
+            payment_date: end,
+            reset_date: start,
+            accrual_year_fraction: accrual,
+        }
+    }
+
+    use finstack_quant_valuations_test_support::date as date_support;
+    use finstack_quant_valuations_test_support::discount_forward_curves as discount_forward_curve_support;
+    use finstack_quant_valuations_test_support::volatility as volatility_support;
+
+    use super::*;
+    use date_support::date;
+    use discount_forward_curve_support::{flat_discount_with_tenor, flat_forward_with_tenor};
+    use finstack_quant_cashflows::CashflowProvider;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::fixings::{cms_fixing_series_id, fixing_series_id};
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+    use volatility_support::flat_vol_surface;
+
+    #[test]
+    fn market_dependencies_retain_surface_and_every_optional_strike() {
+        let mut swap = CmsSwap::example().expect("example");
+        swap.cms_cap = Some(0.06);
+        swap.cms_floor = Some(0.01);
+
+        let deps =
+            finstack_quant_valuations_core::instruments::Instrument::market_dependencies(&swap)
+                .expect("dependencies");
+        assert_eq!(
+            deps.volatility_dependencies
+                .iter()
+                .map(|dependency| {
+                    (
+                        dependency.vol_surface_id.clone(),
+                        dependency.reference_strike,
+                    )
+                })
+                .collect::<Vec<_>>(),
+            vec![
+                (swap.vol_surface_id.clone(), None),
+                (swap.vol_surface_id.clone(), Some(0.06)),
+                (swap.vol_surface_id.clone(), Some(0.01)),
+            ]
+        );
+        assert_eq!(deps.unique_vol_surface_ids(), vec![swap.vol_surface_id]);
+    }
+
+    #[test]
+    fn cms_swap_cashflow_provider_emits_signed_modeled_flows() {
+        let as_of = date(2025, 1, 1);
+        let swap = CmsSwap::example().expect("example");
+        let market = finstack_quant_core::market_data::context::MarketContext::new()
+            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.0, 2.0))
+            .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.04, 2.0))
+            .insert_surface(flat_vol_surface(
+                "USD-CMS10Y-VOL",
+                &[0.25, 1.0],
+                &[0.03, 0.05],
+                0.20,
+            ));
+
+        let flows = swap
+            .dated_cashflows(&market, as_of)
+            .expect("cms contractual schedule should build");
+        let schedule = swap
+            .cashflow_schedule(&market, as_of)
+            .expect("classified cms schedule");
+
+        assert_eq!(
+            flows.len(),
+            swap.payment_dates.len() + swap.payment_dates.len(),
+            "cms swap should emit one cms row and one funding row per period"
+        );
+        assert!(flows.iter().any(|(_, money)| money.amount() > 0.0));
+        assert!(flows.iter().any(|(_, money)| money.amount() < 0.0));
+        assert_eq!(
+            schedule
+                .get_flows()
+                .iter()
+                .filter(|flow| flow.kind == CFKind::FloatReset)
+                .count(),
+            swap.payment_dates.len()
+        );
+        assert_eq!(
+            schedule
+                .get_flows()
+                .iter()
+                .filter(|flow| flow.kind == CFKind::Fixed)
+                .count(),
+            swap.payment_dates.len()
+        );
+        assert!(schedule
+            .get_flows()
+            .iter()
+            .all(|flow| flow.accrual.is_some()));
+    }
+
+    /// Build a shared market context for reconciliation tests: flat 3% OIS,
+    /// flat 3% forward curve, flat 25% vol surface with enough knots.
+    fn recon_market(as_of: Date) -> finstack_quant_core::market_data::context::MarketContext {
+        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::types::CurveId;
+
+        let strikes = vec![0.005, 0.02, 0.03, 0.04, 0.06, 0.10];
+        let expiries = vec![0.25, 1.0, 2.0, 5.0, 15.0];
+        let mut builder = VolSurface::builder(CurveId::new("USD-CMS10Y-VOL"))
+            .expiries(&expiries)
+            .strikes(&strikes);
+        for _ in &expiries {
+            builder = builder.row(&vec![0.25_f64; strikes.len()]);
+        }
+        let vol_surface = builder.build().expect("vol surface");
+
+        finstack_quant_core::market_data::context::MarketContext::new()
+            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 15.0))
+            .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.03, 15.0))
+            .insert_surface(vol_surface)
+    }
+
+    /// Build a 1-period CMS swap that settles well in the future (1Y fixing,
+    /// 1.25Y payment), with a zero-rate funding leg so base_value == pv_cms_leg.
+    fn one_period_cms_swap(cap: Option<f64>, floor: Option<f64>) -> CmsSwap {
+        let fixing = date(2026, 1, 1);
+        let pay = date(2026, 4, 1);
+        let mut builder = CmsSwap::builder()
+            .id(InstrumentId::new("CMS-RECON"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            // Receive CMS so base_value = pv_cms − pv_funding
+            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .cms_tenor(
+                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+            )
+            .fixing_dates(vec![fixing])
+            .payment_dates(vec![pay])
+            .accrual_fractions(vec![0.25])
+            .day_count(DayCount::Act365F)
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
+            // Zero fixed rate so pv_funding = 0 and base_value == pv_cms
+            .funding_leg(FundingLeg::Fixed {
+                rate: Decimal::ZERO,
+                periods: vec![funding_period(fixing, pay, 0.25)],
+                day_count: DayCount::Act365F,
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"));
+        if let Some(c) = cap {
+            builder = builder.cms_cap_opt(Some(c));
+        }
+        if let Some(f) = floor {
+            builder = builder.cms_floor_opt(Some(f));
+        }
+        builder.build().expect("CMS swap should build")
+    }
+
+    #[test]
+    fn production_risk_cms_buckets_cover_projection_horizon() {
+        use finstack_quant_core::market_data::term_structures::ForwardCurve;
+        use finstack_quant_valuations_core::metrics::MetricId;
+        let as_of = date(2025, 1, 1);
+        let swap = one_period_cms_swap(None, None);
+        let forward = ForwardCurve::builder("USD-LIBOR-3M", 0.25)
+            .base_date(as_of)
+            .knots(
+                (0..=30)
+                    .map(|year| (f64::from(year), 0.03))
+                    .collect::<Vec<_>>(),
+            )
+            .build()
+            .expect("dense forward");
+        let market = recon_market(as_of).insert(forward);
+        let result = swap
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Dv01, MetricId::BucketedDv01],
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
+            )
+            .expect("risk");
+        let key = "bucketed_dv01::USD-LIBOR-3M::10y";
+        let actual = result.measures[key];
+        assert!(
+            actual.abs() > 0.01,
+            "CMS coupons project beyond payment: {actual}"
+        );
+        assert!((result.measures["bucketed_dv01"] - result.measures["dv01"]).abs() < 0.01);
+    }
+
+    /// C13 regression: discounting cms_leg_flows must reconcile with base_value
+    /// for a CMS swap with an OTM cap (the hard-clamp bug makes them diverge).
+    ///
+    /// For a Receive CMS swap with zero funding leg:
+    ///   base_value = pv_cms_leg = sum_i coupon_rate_i * accrual_i * df_i * N
+    ///   cms_leg_flows[i] = +coupon_rate_i * accrual_i * N (positive, Receive side)
+    ///   => sum_i df_i * cms_leg_flows[i]  must equal  base_value
+    ///
+    /// We use `DiscountCurve::df_between_dates` (same helper the pricer uses) to
+    /// discount, so that any curve-interpolation details cancel exactly.
+    #[test]
+    fn cms_leg_flows_reconcile_with_base_value_capped() {
+        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+
+        let as_of = date(2025, 1, 1);
+        let market = recon_market(as_of);
+
+        // OTM cap: forward CMS rate ~3%; cap at 6% — clamp is a no-op but
+        // the embedded caplet carries positive time value.
+        let swap = one_period_cms_swap(Some(0.06), None);
+
+        // base_value uses the pricer (embedded-option path) — this is the ground truth.
+        let base_pv = swap
+            .base_value(&market, as_of)
+            .expect("base_value")
+            .amount();
+
+        // Discount cms_leg_flows using the same curve + helper the pricer uses.
+        let discount_curve = market
+            .get_discount(swap.discount_curve_id.as_ref())
+            .expect("discount curve");
+        let flows = swap.cms_leg_flows(&market, as_of).expect("cms_leg_flows");
+        let discounted_sum: f64 = flows
+            .iter()
+            .map(|flow| {
+                let df = discount_curve
+                    .as_ref()
+                    .df_between_dates(as_of, flow.date)
+                    .expect("df");
+                df * flow.amount.amount()
+            })
+            .sum();
+
+        // Reconciliation: must agree within 1 currency unit on a 1M notional.
+        assert!(
+            (discounted_sum - base_pv).abs() < 1.0,
+            "capped CMS: discounted cms_leg_flows ({discounted_sum:.4}) must match \
+             base_value ({base_pv:.4}); gap = {:.4}",
+            (discounted_sum - base_pv).abs()
+        );
+    }
+
+    /// C13 regression (floor variant): same reconciliation for an ITM floor.
+    ///
+    /// ITM floor: forward ~3%, floor at 4% — the buggy clamp gives only
+    /// intrinsic (floor − forward = 0.01), but the embedded floorlet has
+    /// substantial additional time value (~hundreds of USD on 1M notional)
+    /// that the old hard-clamp would miss.  This ensures the old bug
+    /// (clamping the convexity-adjusted mean instead of pricing an embedded
+    /// option) causes this test to FAIL.
+    #[test]
+    fn cms_leg_flows_reconcile_with_base_value_floored() {
+        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+
+        let as_of = date(2025, 1, 1);
+        let market = recon_market(as_of);
+
+        // ITM floor: floor (4%) > forward (~3%), so the old clamp gives only
+        // intrinsic but the correct floorlet includes substantial time value.
+        let swap = one_period_cms_swap(None, Some(0.04));
+
+        let base_pv = swap
+            .base_value(&market, as_of)
+            .expect("base_value")
+            .amount();
+
+        let discount_curve = market
+            .get_discount(swap.discount_curve_id.as_ref())
+            .expect("discount curve");
+        let flows = swap.cms_leg_flows(&market, as_of).expect("cms_leg_flows");
+        let discounted_sum: f64 = flows
+            .iter()
+            .map(|flow| {
+                let df = discount_curve
+                    .as_ref()
+                    .df_between_dates(as_of, flow.date)
+                    .expect("df");
+                df * flow.amount.amount()
+            })
+            .sum();
+
+        assert!(
+            (discounted_sum - base_pv).abs() < 1.0,
+            "floored CMS: discounted cms_leg_flows ({discounted_sum:.4}) must match \
+             base_value ({base_pv:.4}); gap = {:.4}",
+            (discounted_sum - base_pv).abs()
+        );
+    }
+
+    #[test]
+    fn cms_leg_flows_use_recorded_fixing_for_seasoned_coupon() {
+        let fixing = date(2024, 12, 1);
+        let as_of = date(2025, 1, 1);
+        let pay = date(2025, 3, 1);
+        let swap = CmsSwap::builder()
+            .id(InstrumentId::new("CMS-SEASONED-FLOWS"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .cms_tenor(
+                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+            )
+            .fixing_dates(vec![fixing])
+            .payment_dates(vec![pay])
+            .accrual_fractions(vec![0.25])
+            .day_count(DayCount::Act365F)
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
+            .funding_leg(FundingLeg::Fixed {
+                rate: Decimal::ZERO,
+                periods: vec![funding_period(fixing, pay, 0.25)],
+                day_count: DayCount::Act365F,
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
+            .build()
+            .expect("CMS swap should build");
+        let market = recon_market(as_of);
+
+        let err = swap
+            .cms_leg_flows(&market, as_of)
+            .expect_err("seasoned flow without fixing should error");
+        assert!(
+            err.to_string().contains("FIXING:CMS-10Y:USD-LIBOR-3M"),
+            "error must identify missing CMS fixing series: {err}"
+        );
+
+        let observed = 0.0412;
+        let series = ScalarTimeSeries::new(
+            cms_fixing_series_id("USD-LIBOR-3M", 10.0),
+            vec![(fixing, observed)],
+            None,
+        )
+        .expect("fixing series");
+        let market = market.insert_series(series);
+
+        let flows = swap
+            .cms_leg_flows(&market, as_of)
+            .expect("seasoned CMS leg flows");
+
+        assert_eq!(flows.len(), 1);
+        assert_eq!(flows[0].date, pay);
+        let expected = observed * 0.25 * 1_000_000.0;
+        assert!(
+            (flows[0].amount.amount() - expected).abs() < 0.01,
+            "seasoned flow must use recorded fixing: expected {expected}, got {}",
+            flows[0].amount.amount()
+        );
+    }
+
+    #[test]
+    fn generated_cms_funding_flows_require_started_reset_fixing() {
+        let reset = date(2024, 12, 1);
+        let as_of = date(2025, 1, 1);
+        let pay = date(2025, 3, 1);
+        let swap = CmsSwap::builder()
+            .id(InstrumentId::new("CMS-FUNDING-SEASONED"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .cms_tenor(
+                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+            )
+            .fixing_dates(vec![reset])
+            .payment_dates(vec![pay])
+            .accrual_fractions(vec![0.25])
+            .day_count(DayCount::Act365F)
+            .funding_leg(FundingLeg::Floating {
+                spread_bp: Decimal::TEN,
+                periods: vec![funding_period(reset, pay, 0.25)],
+                day_count: DayCount::Act360,
+                forward_curve_id: CurveId::new("USD-LIBOR-3M"),
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
+            .build()
+            .expect("CMS swap");
+        let market = recon_market(as_of);
+
+        let error = swap
+            .funding_leg_flows(&market, as_of, true)
+            .expect_err("started funding reset without fixing must fail");
+        assert!(error.to_string().contains("FIXING:USD-LIBOR-3M"));
+
+        let observed = 0.042;
+        let series = ScalarTimeSeries::new(
+            fixing_series_id("USD-LIBOR-3M"),
+            vec![(reset, observed)],
+            None,
+        )
+        .expect("funding fixing");
+        let flows = swap
+            .funding_leg_flows(&market.insert_series(series), as_of, true)
+            .expect("funding flows with fixing");
+        let expected = (observed + 0.001) * 0.25 * 1_000_000.0;
+        assert!((flows[0].amount.amount() - expected).abs() < 1e-8);
+    }
+
+    #[test]
+    fn builder_rejects_misaligned_cms_leg_vectors() {
+        let result = CmsSwap::builder()
+            .id(InstrumentId::new("CMSSWAP-BAD-CMS"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .cms_tenor(
+                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+            )
+            .fixing_dates(vec![date(2026, 3, 20), date(2026, 6, 20)])
+            .payment_dates(vec![date(2026, 6, 20)])
+            .accrual_fractions(vec![0.25, 0.25])
+            .day_count(DayCount::Act365F)
+            .funding_leg(FundingLeg::Fixed {
+                rate: Decimal::new(3, 2),
+                periods: vec![
+                    funding_period(date(2026, 3, 20), date(2026, 6, 20), 0.25),
+                    funding_period(date(2026, 6, 20), date(2026, 9, 20), 0.25),
+                ],
+                day_count: DayCount::Thirty360,
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
+            .build();
+
+        assert!(
+            result.is_err(),
+            "CMS swap builder must reject CMS leg vector length mismatches"
+        );
+    }
+
+    #[test]
+    fn builder_rejects_invalid_funding_period_accrual() {
+        let result = CmsSwap::builder()
+            .id(InstrumentId::new("CMSSWAP-BAD-FUNDING"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .cms_tenor(
+                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+            )
+            .fixing_dates(vec![date(2026, 3, 20)])
+            .payment_dates(vec![date(2026, 6, 20)])
+            .accrual_fractions(vec![0.25])
+            .day_count(DayCount::Act365F)
+            .funding_leg(FundingLeg::Floating {
+                spread_bp: Decimal::TEN,
+                periods: vec![
+                    funding_period(date(2026, 3, 20), date(2026, 6, 20), -0.25),
+                    funding_period(date(2026, 6, 20), date(2026, 9, 20), 0.25),
+                ],
+                day_count: DayCount::Act360,
+                forward_curve_id: CurveId::new("USD-LIBOR-3M"),
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
+            .build();
+
+        assert!(
+            result.is_err(),
+            "CMS swap builder must reject negative funding accrual fractions"
+        );
+    }
+}

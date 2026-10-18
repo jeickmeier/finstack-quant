@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1003198,
+      "bytes": 1003205,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -290,7 +290,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1011111,
+      "bytes": 1011118,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -488,7 +488,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1010088,
+      "bytes": 1010095,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -767,7 +767,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1101202,
+      "bytes": 1101209,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -776,7 +776,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json",
-      "bytes": 21396,
+      "bytes": 21387,
       "kind": "input",
       "path": "schemas/instruments/1/rates/basis_swap.schema.json",
       "summary": "Floating-versus-floating swap between two indices or tenors.",
@@ -785,7 +785,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json",
-      "bytes": 26497,
+      "bytes": 26513,
       "kind": "input",
       "path": "schemas/instruments/1/rates/bermudan_swaption.schema.json",
       "summary": "Bermudan-exercise swaption valued on a short-rate lattice.",
@@ -947,7 +947,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1012719,
+      "bytes": 1012726,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",

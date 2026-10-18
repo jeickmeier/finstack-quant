@@ -1,0 +1,49 @@
+[package]
+name = "finstack-quant-valuations-rates"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Interest-rate and inflation instruments of Finstack Quant valuations: deposits, FRAs, futures, swaps, basis and cross-currency swaps, caps/floors, swaptions, CMS products, repos and inflation derivatives"
+autotests = false
+
+[dependencies]
+finstack-quant-cashflows = { path = "../../cashflows", version = "0.10.0", default-features = false }
+finstack-quant-core = { path = "../../core", version = "0.10.0", default-features = false }
+finstack-quant-margin = { path = "../../margin", version = "0.10.0", default-features = false }
+finstack-quant-models = { path = "../../models", version = "0.10.0", default-features = false }
+finstack-quant-valuations-macros = { path = "../macros", version = "0.10.0" }
+finstack-quant-valuations-core = { path = "../core", version = "0.10.0", default-features = false }
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true }
+rust_decimal = { workspace = true }
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+schemars = { workspace = true, optional = true }
+
+[dev-dependencies]
+finstack-quant-valuations-test-support = { path = "../test-support", version = "0.10.0" }
+finstack-quant-test-utils = { path = "../../test-utils", version = "0.10.0" }
+time = { workspace = true, features = ["macros"] }
+rust_decimal_macros = { workspace = true }
+proptest = "1.11.0"
+
+[features]
+default = ["json-schema"]
+json-schema = [
+    "dep:schemars",
+    "finstack-quant-valuations-core/json-schema",
+    "finstack-quant-cashflows/json-schema",
+    "finstack-quant-core/json-schema",
+    "finstack-quant-margin/json-schema",
+    "finstack-quant-models/json-schema",
+]
+
+[lints]
+workspace = true
+
+[[test]]
+name = "rates"
+path = "tests/main.rs"
