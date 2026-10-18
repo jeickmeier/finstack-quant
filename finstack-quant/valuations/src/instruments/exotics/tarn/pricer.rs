@@ -301,7 +301,7 @@ impl TarnPricer {
         }
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
         let forward_curve = market.get_forward(inst.forward_curve_id.as_ref())?;
-        crate::instruments::rates::forward_swap_rate::validate_term_curve_tenor(
+        crate::instruments::pricing::term_fixings::validate_term_curve_tenor(
             forward_curve.as_ref(),
             inst.index_tenor,
             inst.id.as_str(),
@@ -366,7 +366,7 @@ impl TarnPricer {
                 let tenor = inst.index_tenor.to_years();
                 let coeffs = term_forward.period_coeffs(fixing_time, tenor);
                 let discount_forward = term_forward.curve_forward(fixing_time, tenor);
-                let basis = crate::instruments::rates::forward_swap_rate::term_fixing_on_date(
+                let basis = crate::instruments::pricing::term_fixings::term_fixing_on_date(
                     forward_curve.as_ref(),
                     start,
                 )? - discount_forward;
@@ -383,7 +383,7 @@ impl TarnPricer {
                 // fixing; discount-curve reconstruction alone would erase the
                 // projection/discount basis precisely at inception.
                 let projected_rate =
-                    crate::instruments::rates::forward_swap_rate::term_fixing_on_date(
+                    crate::instruments::pricing::term_fixings::term_fixing_on_date(
                         forward_curve.as_ref(),
                         start,
                     )?;

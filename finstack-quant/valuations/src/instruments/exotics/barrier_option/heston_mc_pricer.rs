@@ -87,7 +87,7 @@ impl BarrierOptionHestonMcPricer {
         )?;
 
         let heston_params =
-            crate::instruments::equity::equity_option::heston_market::heston_params_from_market_strict(
+            crate::instruments::pricing::heston_market::heston_params_from_market_strict(
                 market, r, q,
             )?;
         let v0 = heston_params.v0;

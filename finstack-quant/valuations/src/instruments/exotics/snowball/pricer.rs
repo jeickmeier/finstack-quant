@@ -261,7 +261,7 @@ impl SnowballDiscountingPricer {
             }
 
             let projection_start = start.max(as_of);
-            let floating_rate = crate::instruments::rates::forward_swap_rate::term_fixing_on_date(
+            let floating_rate = crate::instruments::pricing::term_fixings::term_fixing_on_date(
                 forward_curve.as_ref(),
                 projection_start,
             )?;
@@ -613,7 +613,7 @@ fn coupon_events(
 ) -> Result<Vec<CouponEvent>> {
     let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
     let forward_curve = market.get_forward(inst.forward_curve_id.as_ref())?;
-    crate::instruments::rates::forward_swap_rate::validate_term_curve_tenor(
+    crate::instruments::pricing::term_fixings::validate_term_curve_tenor(
         forward_curve.as_ref(),
         inst.index_tenor,
         inst.id.as_str(),
@@ -646,7 +646,7 @@ fn coupon_events(
             let tenor = inst.index_tenor.to_years();
             let coeffs = term_forward.period_coeffs(fixing_time, tenor);
             let discount_forward = term_forward.curve_forward(fixing_time, tenor);
-            let basis = crate::instruments::rates::forward_swap_rate::term_fixing_on_date(
+            let basis = crate::instruments::pricing::term_fixings::term_fixing_on_date(
                 forward_curve.as_ref(),
                 start,
             )? - discount_forward;
@@ -655,7 +655,7 @@ fn coupon_events(
             // At inception the first fixing is projected from the explicit
             // projection curve. Do not substitute the discount-curve short
             // rate, which would remove the index/discount basis.
-            let seasoned_rate = crate::instruments::rates::forward_swap_rate::term_fixing_on_date(
+            let seasoned_rate = crate::instruments::pricing::term_fixings::term_fixing_on_date(
                 forward_curve.as_ref(),
                 start,
             )?;

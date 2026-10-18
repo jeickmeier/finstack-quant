@@ -128,8 +128,10 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
         // Validation is still enforced inside `HestonParams::new`.
         let err_ctx = crate::pricer::PricingErrorContext::from_instrument(equity_option)
             .model(crate::pricer::ModelKey::HestonFourier);
-        let params = crate::instruments::equity::equity_option::heston_market::heston_params_from_market_strict(market, r, q)
-            .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;
+        let params = crate::instruments::pricing::heston_market::heston_params_from_market_strict(
+            market, r, q,
+        )
+        .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;
 
         let price = heston_price(
             spot,

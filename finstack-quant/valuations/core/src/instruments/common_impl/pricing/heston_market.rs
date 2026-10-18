@@ -5,7 +5,25 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_models::closed_form::heston::HestonPricingParams;
 
 /// Resolve all required Heston scalars from a valuation market context.
-pub(crate) fn heston_params_from_market_strict(
+///
+/// Reads the unitless scalars `HESTON_KAPPA`, `HESTON_THETA`, `HESTON_SIGMA_V`,
+/// `HESTON_RHO` and `HESTON_V0` and combines them with the caller's rates into
+/// [`HestonPricingParams`]. Every scalar is required: a missing or non-unitless
+/// entry is a validation error naming the scalar.
+///
+/// # Arguments
+///
+/// * `market` - Market context holding the five `HESTON_*` unitless scalars.
+/// * `rate` - Continuously compounded risk-free rate, as a decimal, for the
+///   option's discount currency.
+/// * `dividend_yield` - Continuous dividend (or foreign) yield of the
+///   underlying, as a decimal; pass `0.0` for a non-dividend asset.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when a scalar is missing or carries a unit, or
+/// when [`HestonPricingParams::new`] rejects the parameter set.
+pub fn heston_params_from_market_strict(
     market: &MarketContext,
     rate: f64,
     dividend_yield: f64,

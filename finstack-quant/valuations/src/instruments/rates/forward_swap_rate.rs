@@ -1,40 +1,9 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
-use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-
-/// Validate that a term-index curve represents the instrument's contractual
-/// reset tenor.
-pub(crate) fn validate_term_curve_tenor(
-    curve: &ForwardCurve,
-    tenor: Tenor,
-    instrument: &str,
-) -> Result<()> {
-    let expected = tenor.to_years();
-    if (curve.tenor() - expected).abs() > 1e-8 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "{instrument} index_tenor {expected} does not match forward curve '{}' tenor {}",
-            curve.id(),
-            curve.tenor()
-        )));
-    }
-    Ok(())
-}
-
-/// Fixed-tenor index fixing at a reset date.
-pub(crate) fn term_fixing_on_date(curve: &ForwardCurve, date: Date) -> Result<f64> {
-    let t = curve.day_count().signed_year_fraction(
-        curve.base_date(),
-        date,
-        DayCountContext::default(),
-    )?;
-    Ok(curve.rate(t))
-}
 
 /// Inputs for forward swap rate calculation.
 pub struct ForwardSwapRateInputs<'a> {
@@ -128,7 +97,7 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
             .market
             .get_forward(inputs.forward_curve_id.as_ref())?;
         if inputs.enforce_forward_tenor {
-            validate_term_curve_tenor(
+            crate::instruments::pricing::term_fixings::validate_term_curve_tenor(
                 curve.as_ref(),
                 inputs.float_frequency,
                 "CMS reference swap",

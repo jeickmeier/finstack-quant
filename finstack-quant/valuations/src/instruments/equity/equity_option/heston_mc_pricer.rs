@@ -91,7 +91,9 @@ impl EquityOptionHestonMcPricer {
         // representative SPX defaults. The canonical `HestonPricingParams::new`
         // enforces positive κ/θ/σᵥ/v₀ and ρ ∈ (−1, 1) for both Monte Carlo and
         // Fourier paths.
-        let params = crate::instruments::equity::equity_option::heston_market::heston_params_from_market_strict(market, r, q)?;
+        let params = crate::instruments::pricing::heston_market::heston_params_from_market_strict(
+            market, r, q,
+        )?;
         let process = HestonProcess::new(params);
         let discretization = QeHeston::new();
 

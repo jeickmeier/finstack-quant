@@ -123,12 +123,16 @@ impl EquityOptionHestonPdePricer {
 
         // Source production Heston parameters from explicit market scalars.
         // Validation is still enforced inside `HestonParams::new`.
-        let cf_params = crate::instruments::equity::equity_option::heston_market::heston_params_from_market_strict(market, r, q).map_err(|e| {
-            PricingError::model_failure_with_context(
-                e.to_string(),
-                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
+        let cf_params =
+            crate::instruments::pricing::heston_market::heston_params_from_market_strict(
+                market, r, q,
             )
-        })?;
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
+                )
+            })?;
         let theta_v = cf_params.theta;
         let v0 = cf_params.v0;
 
