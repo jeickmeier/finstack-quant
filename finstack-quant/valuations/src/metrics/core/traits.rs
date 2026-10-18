@@ -5,7 +5,6 @@
 //! while `MetricContext` provides the execution environment with caching.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::fixed_income::structured_credit::TrancheCashflows;
 use crate::metrics::risk::MarketHistory;
 use crate::metrics::MetricId;
 use crate::pricer::PricingDispatch;
@@ -17,6 +16,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 
 use finstack_quant_core::config::FinstackConfig;
+use std::any::{Any, TypeId};
 use std::borrow::Cow;
 use std::sync::Arc;
 
@@ -201,18 +201,8 @@ pub struct MetricContext {
     /// `Instrument::value_raw` directly without consulting the cache.
     pub(crate) internal_schedule: Option<Arc<CashFlowSchedule>>,
 
-    /// Tranche-level detailed cashflow results (for structured credit)
-    pub detailed_tranche_cashflows: Option<TrancheCashflows>,
-
-    /// Bond yield-to-worst path at the quoted price, shared by the workout
-    /// metrics (YTW, durations, convexity, yield DV01, I-spread, ASW).
-    /// `Some(None)` records that the bond has no quoted workout path.
-    pub(crate) bond_workout_path:
-        Option<Option<crate::instruments::fixed_income::bond::metrics::QuotedWorkoutPath>>,
-
-    /// Deal-level contractual accrual records from the projected waterfall.
-    pub(crate) structured_credit_accruals:
-        Option<Vec<crate::instruments::fixed_income::structured_credit::TrancheAccrualPeriod>>,
+    /// Family-owned caches keyed by type; see [`MetricContext::ext`].
+    extensions: finstack_quant_core::HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 
     /// Cached discount curve ID.
     pub discount_curve_id: Option<CurveId>,
@@ -278,9 +268,7 @@ impl MetricContext {
             cashflows: None,
             tagged_cashflows: None,
             internal_schedule: None,
-            detailed_tranche_cashflows: None,
-            bond_workout_path: None,
-            structured_credit_accruals: None,
+            extensions: finstack_quant_core::HashMap::default(),
             discount_curve_id: None,
             day_count: None,
             notional: None,
@@ -492,9 +480,51 @@ impl MetricContext {
     }
 
     /// Temporarily replace the instrument view during a scoped metric calculation.
+    ///
+    /// Every family cache stored with [`MetricContext::set_ext`] describes the
+    /// previous instrument view, so all of them are dropped.
     pub(crate) fn set_instrument(&mut self, instrument: Arc<dyn Instrument>) {
         self.inputs.instrument = instrument;
-        self.bond_workout_path = None;
+        self.extensions.clear();
+    }
+
+    /// Borrow the family cache of type `T` stored on this context, if any.
+    ///
+    /// Instrument families keep intermediate results that several of their
+    /// calculators share (a bond's quoted workout path, a deal's projected
+    /// tranche cashflows) here, keyed by the cache's own type, so the
+    /// context itself names no family. A cache is valid for the current
+    /// instrument view only; [`MetricContext::set_instrument`] drops them all.
+    ///
+    /// # Returns
+    ///
+    /// The stored value when a cache of exactly type `T` was set.
+    pub fn ext<T: Any + Send + Sync>(&self) -> Option<&T> {
+        self.extensions
+            .get(&TypeId::of::<T>())
+            .and_then(|value| value.downcast_ref::<T>())
+    }
+
+    /// Mutably borrow the family cache of type `T`, if any.
+    ///
+    /// # Returns
+    ///
+    /// The stored value when a cache of exactly type `T` was set.
+    pub fn ext_mut<T: Any + Send + Sync>(&mut self) -> Option<&mut T> {
+        self.extensions
+            .get_mut(&TypeId::of::<T>())
+            .and_then(|value| value.downcast_mut::<T>())
+    }
+
+    /// Store `value` as the family cache of type `T`, replacing any previous
+    /// value of that type.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Cache contents for the current instrument view; later
+    ///   [`MetricContext::ext`] calls with the same type return it.
+    pub fn set_ext<T: Any + Send + Sync>(&mut self, value: T) {
+        self.extensions.insert(TypeId::of::<T>(), Box::new(value));
     }
 
     /// Replace the request's base value during test or nested metric setup.

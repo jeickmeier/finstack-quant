@@ -257,6 +257,11 @@ impl TrancheCashflows {
     }
 }
 
+/// Deal-level contractual accrual records from the projected waterfall,
+/// cached on the metric context for the accrued-interest calculators.
+#[derive(Debug, Clone)]
+pub(crate) struct DealAccruals(pub(crate) Vec<TrancheAccrualPeriod>);
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -112,8 +112,7 @@ impl YtmCalculator {
         deal: &crate::instruments::fixed_income::structured_credit::StructuredCredit,
     ) -> finstack_quant_core::Result<(f64, finstack_quant_core::dates::DayCount)> {
         let tranche = context
-            .detailed_tranche_cashflows
-            .as_ref()
+            .ext::<crate::instruments::fixed_income::structured_credit::TrancheCashflows>()
             .and_then(|flows| {
                 deal.tranches
                     .tranches

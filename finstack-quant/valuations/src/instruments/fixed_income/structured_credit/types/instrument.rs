@@ -1,4 +1,4 @@
-use super::{DealType, StructuredCredit, TrancheSeniority};
+use super::{DealAccruals, DealType, StructuredCredit, TrancheSeniority};
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::model_params::ModelParamsSnapshot;
@@ -185,7 +185,7 @@ impl Instrument for StructuredCredit {
                     .collect(),
             );
             context.tagged_cashflows = Some(flows);
-            context.structured_credit_accruals = Some(accruals);
+            context.set_ext(DealAccruals(accruals));
         }
     }
 

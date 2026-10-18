@@ -690,6 +690,7 @@ impl MetricCalculator for BucketedCs01Calculator {
 #[cfg(test)]
 mod zspread_quote_tests {
     use super::*;
+    use crate::instruments::fixed_income::structured_credit::types::DealAccruals;
     use crate::instruments::MarketQuoteOverrides;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -719,7 +720,6 @@ mod zspread_quote_tests {
         context.discount_curve_id = Some(discount_curve_id);
         context.notional = Some(Money::from((100_i64, Currency::USD)));
         context.computed.insert(MetricId::DirtyPrice, 95.0);
-        context.structured_credit_accruals = Some(Vec::new());
         context
     }
 
@@ -733,6 +733,7 @@ mod zspread_quote_tests {
             .market_quotes
             .quoted_clean_price_pct = Some(quoted_price_pct);
         context.set_instrument(Arc::new(deal));
+        context.set_ext(DealAccruals(Vec::new()));
         context
     }
 

@@ -56,7 +56,7 @@ pub struct WalCalculator;
 
 impl MetricCalculator for WalCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        if let Some(details) = context.detailed_tranche_cashflows.as_ref() {
+        if let Some(details) = context.ext::<TrancheCashflows>() {
             return calculate_tranche_wal(details, context.as_of);
         }
 

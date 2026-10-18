@@ -77,6 +77,7 @@ pub use waterfall::{
     WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier,
 };
 
+pub(crate) use results::DealAccruals;
 pub use results::{TrancheAccrualPeriod, TrancheCashflows, TrancheValuation};
 pub use tranche_view::StructuredCreditTranche;
 

@@ -61,7 +61,7 @@ pub(crate) fn reprice_in_scope(
     deal: &crate::instruments::fixed_income::structured_credit::StructuredCredit,
     as_of: finstack_quant_core::dates::Date,
 ) -> finstack_quant_core::Result<f64> {
-    match context.detailed_tranche_cashflows.as_ref() {
+    match context.ext::<crate::instruments::fixed_income::structured_credit::TrancheCashflows>() {
         Some(flows) => Ok(deal
             .value_tranche(&flows.tranche_id, context.curves.as_ref(), as_of)?
             .amount()),

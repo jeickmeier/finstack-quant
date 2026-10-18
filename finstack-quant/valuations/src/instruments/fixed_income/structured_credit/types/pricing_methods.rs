@@ -544,7 +544,7 @@ impl StructuredCredit {
         );
         metric_context.cashflows = Some(cashflow_result.cashflows.clone());
         metric_context.tagged_cashflows = Some(cashflow_result.detailed_flows.clone());
-        metric_context.detailed_tranche_cashflows = Some(cashflow_result.clone());
+        metric_context.set_ext(cashflow_result.clone());
         metric_context.discount_curve_id = Some(self.discount_curve_id.to_owned());
         metric_context.notional = Some(tranche.current_balance);
         let mut requested = metrics.to_vec();

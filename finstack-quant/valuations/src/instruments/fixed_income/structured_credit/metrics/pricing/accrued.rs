@@ -1,5 +1,6 @@
 //! Accrued interest from contractual boundaries and opening note balances.
 
+use crate::instruments::fixed_income::structured_credit::types::{DealAccruals, TrancheCashflows};
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
@@ -25,29 +26,29 @@ pub(crate) fn accrued_at(
     context: &mut MetricContext,
     settlement: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
-    if let Some(details) = context.detailed_tranche_cashflows.as_ref() {
+    if let Some(details) = context.ext::<TrancheCashflows>() {
         return details
             .accrual_periods
             .iter()
             .try_fold(0.0, |sum, period| Ok(sum + period.accrued(settlement)?));
     }
-    if context.structured_credit_accruals.is_none() {
+    if context.ext::<DealAccruals>().is_none() {
         let deal = context.instrument_as::<StructuredCredit>()?;
         let results = crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
             deal,
             &context.curves,
             context.as_of,
         )?;
-        context.structured_credit_accruals = Some(
+        context.set_ext(DealAccruals(
             results
                 .into_values()
                 .flat_map(|result| result.accrual_periods)
                 .collect(),
-        );
+        ));
     }
     context
-        .structured_credit_accruals
-        .as_deref()
+        .ext::<DealAccruals>()
+        .map(|accruals| accruals.0.as_slice())
         .unwrap_or_default()
         .iter()
         .try_fold(0.0, |sum, period| Ok(sum + period.accrued(settlement)?))

@@ -114,8 +114,8 @@ pub(crate) fn bond_risk_basis(
 pub(crate) fn context_workout_path(
     context: &mut crate::metrics::MetricContext,
 ) -> finstack_quant_core::Result<Option<QuotedWorkoutPath>> {
-    if let Some(cached) = &context.bond_workout_path {
-        return Ok(cached.clone());
+    if let Some(cached) = context.ext::<WorkoutPathCache>() {
+        return Ok(cached.0.clone());
     }
     let path = {
         let bond: &crate::instruments::Bond = context.instrument_as()?;
@@ -127,7 +127,7 @@ pub(crate) fn context_workout_path(
                 .quoted_clean_price_pct
                 .is_some();
         if !may_have_workout {
-            context.bond_workout_path = Some(None);
+            context.set_ext(WorkoutPathCache(None));
             return Ok(None);
         }
         let quote_ctx =
@@ -139,9 +139,13 @@ pub(crate) fn context_workout_path(
         let flows = quote_ctx.entitled_flows(bond, &context.curves, context.as_of)?;
         quoted_workout_path(bond, context.curves.as_ref(), context.as_of, &flows)?
     };
-    context.bond_workout_path = Some(path.clone());
+    context.set_ext(WorkoutPathCache(path.clone()));
     Ok(path)
 }
+
+/// Quoted workout path cached on the metric context for the bond under
+/// evaluation; `None` records that the bond has no quoted workout path.
+struct WorkoutPathCache(Option<QuotedWorkoutPath>);
 
 pub(crate) fn quoted_workout_path(
     bond: &crate::instruments::Bond,
