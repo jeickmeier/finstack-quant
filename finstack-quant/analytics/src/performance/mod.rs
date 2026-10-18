@@ -549,7 +549,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::Invalid`] when inputs are empty,
+    /// Returns [`Error::Validation`](finstack_quant_core::Error::Validation) when inputs are empty,
     /// the column count does not match `ticker_names`, any return column has
     /// the wrong length, the benchmark name is unknown, any ticker lacks a
     /// contiguous finite return span, ticker names are duplicated, or any active return value is `<= -1.0`.
@@ -745,7 +745,7 @@ impl Performance {
     ///
     /// # Returns
     ///
-    /// `Ok(())` on success, or an [`crate::error::InputError::Invalid`] if `ticker` is
+    /// `Ok(())` on success, or an [`Error::Validation`](finstack_quant_core::Error::Validation) if `ticker` is
     /// not found among the loaded tickers.
     pub fn reset_bench_ticker(&mut self, ticker: &str) -> crate::Result<()> {
         let idx = self

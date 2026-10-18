@@ -125,7 +125,7 @@ def test_non_finite_sabr_shift_is_rejected() -> None:
 def test_normal_sabr_rejects_nonpositive_shifted_levels_for_positive_beta() -> None:
     cev = [{"alpha": 0.01, "beta": 0.5, "rho": -0.2, "nu": 0.4}]
     cube = VolCube("CEV", [1.0], [2.0], cev, [-0.01])
-    with pytest.raises(ValueError, match="Invalid input data"):
+    with pytest.raises(ValueError, match="(?i)sabr"):
         get_cube_normal_vol(cube, 1.0, 2.0, -0.01)
     assert math.isnan(get_cube_normal_vol_clamped(cube, 1.0, 2.0, -0.01))
 

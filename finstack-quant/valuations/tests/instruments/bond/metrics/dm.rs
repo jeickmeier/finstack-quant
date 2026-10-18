@@ -463,7 +463,7 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
 /// An `Amortizing { base: Floating }` bond has floating coupons
 /// (`Bond::has_floating_coupons()`), and discount margin is the market
 /// convention for quoting amortizing floaters. The calculator previously
-/// rejected them with `InputError::Invalid` by matching only
+/// rejected them with a validation error by matching only
 /// `CashflowSpec::Floating`.
 #[test]
 fn test_dm_amortizing_frn_is_supported() {

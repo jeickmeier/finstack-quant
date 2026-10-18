@@ -145,7 +145,7 @@ fn builder_requires_explicit_base_date() {
         .knots([(0.0, 1.0), (1.0, 0.98)])
         .build()
         .expect_err("discount curve should require an explicit base date");
-    assert!(matches!(err, finstack_quant_core::Error::Input(_)));
+    assert!(err.to_string().contains("requires base_date"), "{err}");
 }
 
 #[test]

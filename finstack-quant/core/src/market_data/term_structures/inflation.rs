@@ -709,7 +709,9 @@ impl InflationCurveBuilder {
                 "base_cpi must be finite and strictly positive".to_string(),
             ));
         }
-        let base_date = self.base_date.ok_or(InputError::Invalid)?;
+        let base_date = self.base_date.ok_or_else(|| {
+            crate::Error::Validation("InflationCurve requires base_date".to_string())
+        })?;
         if self.points.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }

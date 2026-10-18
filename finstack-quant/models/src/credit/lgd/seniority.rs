@@ -128,7 +128,9 @@ impl BetaRecovery {
     /// * `std_dev` - Non-negative distribution standard deviation in modeled-variable units.
     pub fn new(mean: f64, std_dev: f64) -> Result<Self> {
         if !mean.is_finite() || mean <= 0.0 || mean >= 1.0 {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "beta distribution mean must be finite and in (0, 1)".to_string(),
+            ));
         }
         if !std_dev.is_finite() || std_dev <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
@@ -136,7 +138,9 @@ impl BetaRecovery {
         let variance = std_dev * std_dev;
         let m1m = mean * (1.0 - mean);
         if variance >= m1m {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "beta distribution variance must be below mean * (1 - mean)".to_string(),
+            ));
         }
         let common = m1m / variance - 1.0;
         let alpha = mean * common;

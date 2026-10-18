@@ -47,7 +47,9 @@ impl InterpRollState {
         });
         state.offset += years;
         if !state.offset.is_finite() {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "roll offset must be finite".to_string(),
+            ));
         }
         Ok((state.offset >= 0.0).then_some(state))
     }
@@ -63,7 +65,9 @@ impl InterpRollState {
         validation: ValidationPolicy,
     ) -> crate::Result<Interp> {
         if !self.offset.is_finite() {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "roll state offset must be finite".to_string(),
+            ));
         }
         let (knots, values): (Vec<_>, Vec<_>) = self.source_points.iter().copied().unzip();
         style.build_enum(
@@ -116,7 +120,9 @@ impl InterpRollState {
             .map(|&t| shocked_state.interp(&shocked, t))
             .collect();
         if values.iter().any(|value| !value.is_finite()) {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "shocked pillar values must be finite".to_string(),
+            ));
         }
         Ok((shocked_state, values))
     }

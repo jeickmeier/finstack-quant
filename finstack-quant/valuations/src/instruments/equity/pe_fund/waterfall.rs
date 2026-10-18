@@ -201,11 +201,15 @@ impl PeFundWaterfallSpec {
                     let sum = lp_share + gp_share;
                     validation::require_or(
                         lp_share.is_finite() && gp_share.is_finite(),
-                        finstack_quant_core::InputError::Invalid,
+                        finstack_quant_core::Error::Validation(
+                            "promote tier lp_share and gp_share must be finite".to_string(),
+                        ),
                     )?;
                     validation::require_or(
                         (sum - 1.0).abs() <= 1e-6,
-                        finstack_quant_core::InputError::Invalid,
+                        finstack_quant_core::Error::Validation(
+                            "promote tier lp_share and gp_share must sum to one".to_string(),
+                        ),
                     )?;
                     validation::require_or(
                         *lp_share >= 0.0 && *gp_share >= 0.0,
@@ -1356,10 +1360,11 @@ impl<'a> EquityWaterfallEngine<'a> {
         let Some(last_event_date) = events.last().map(|event| event.date) else {
             return Ok(Vec::new());
         };
-        let periods = self
-            .periods
-            .as_ref()
-            .ok_or(finstack_quant_core::InputError::Invalid)?;
+        let periods = self.periods.as_ref().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "PE fund cashflow periods are required to project distributions".to_string(),
+            )
+        })?;
         let mut dates: Vec<Date> = periods
             .iter()
             .filter(|period| period.start <= last_event_date)

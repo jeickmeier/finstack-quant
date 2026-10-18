@@ -1550,11 +1550,7 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
         day_count_constructor,
         "act365l(): DayCount;"
     ));
-    for sig in [
-        "fromName(name: string): DayCount;",
-        "parse(s: string): DayCount;",
-        "nl365(): DayCount;",
-    ] {
+    for sig in ["fromName(name: string): DayCount;", "nl365(): DayCount;"] {
         assert!(
             contains_signature(day_count_constructor, sig),
             "DayCountConstructor: {sig}"

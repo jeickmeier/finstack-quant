@@ -346,7 +346,9 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
         for i in 1..n - 1 {
             l[i] = 2.0 * (knots[i + 1] - knots[i - 1]) - h[i - 1] * mu[i - 1];
             if l[i].abs() < f64::EPSILON {
-                return Err(crate::error::InputError::Invalid.into());
+                return Err(crate::Error::Validation(
+                    "cubic spline system is singular (degenerate knot spacing)".to_string(),
+                ));
             }
             mu[i] = h[i] / l[i];
             z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];

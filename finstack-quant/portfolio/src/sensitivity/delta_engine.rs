@@ -10,7 +10,7 @@ use finstack_quant_core::market_data::bumps::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::{Error, InputError, Result};
+use finstack_quant_core::{Error, Result};
 use finstack_quant_models::factor::{
     BumpSizeConfig, FactorDefinition, MarketMapping, SensitivityMatrix,
 };
@@ -46,7 +46,9 @@ impl DeltaBasedEngine {
         let bump_size = bump_config.bump_size_for_factor(&factor.id, &factor.factor_type);
         let bump_units = factor.factor_type.bump_units();
         if !bump_size.is_finite() || bump_size.abs() < f64::EPSILON {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "factor bump size must be finite and non-zero".to_string(),
+            ));
         }
 
         let up_market = market.bump(mapping_to_market_bumps(

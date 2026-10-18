@@ -218,7 +218,7 @@ fn derive_amortization_setup(
                 | AmortizationSpec::LinearBetween { .. }
         )
     {
-        return Err(InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation("schedule-based amortization needs at least one accrual boundary, but the schedule produced none".to_string()));
     }
 
     let rule = match &notional.amort {

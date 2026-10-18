@@ -74,9 +74,9 @@ fn solve_ytm_timed_with(
 ) -> Result<f64> {
     let target = target_price.amount();
     if target <= 0.0 {
-        return Err(finstack_quant_core::Error::from(
-            finstack_quant_core::InputError::Invalid,
-        ));
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "target price must be positive, got {target}"
+        )));
     }
     if cashflows.is_empty() {
         return Err(finstack_quant_core::Error::from(

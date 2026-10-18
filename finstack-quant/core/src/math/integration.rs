@@ -340,7 +340,7 @@ impl GaussHermiteQuadrature {
 ///
 /// # Errors
 ///
-/// Returns [`InputError::Invalid`] when:
+/// Returns [`Error::Validation`](crate::Error::Validation) when:
 /// - `n` is zero
 /// - `n` is not an even number
 ///
@@ -363,7 +363,9 @@ where
     F2: Fn(f64) -> f64,
 {
     if n == 0 || !n.is_multiple_of(2) {
-        return Err(InputError::Invalid.into());
+        return Err(crate::Error::Validation(format!(
+            "Simpson's rule needs a positive even number of intervals, got {n}"
+        )));
     }
 
     let h = (b - a) / n as f64;
@@ -407,7 +409,7 @@ where
 ///
 /// # Errors
 ///
-/// Returns [`InputError::Invalid`] for non-finite endpoints, or a negative or
+/// Returns [`Error::Validation`](crate::Error::Validation) for non-finite endpoints, or a negative or
 /// non-finite tolerance.
 ///
 /// Returns [`Error::Input`] wrapping [`InputError::SolverConvergenceFailed`] if the
@@ -449,7 +451,9 @@ where
     F2: Fn(f64) -> f64 + Copy,
 {
     if !a.is_finite() || !b.is_finite() || !tol.is_finite() || tol < 0.0 {
-        return Err(InputError::Invalid.into());
+        return Err(crate::Error::Validation(
+            "adaptive Simpson endpoints and tolerance must be finite with tol >= 0".to_string(),
+        ));
     }
     #[allow(clippy::too_many_arguments)]
     fn adaptive_simpson_inner<F2>(
@@ -604,7 +608,9 @@ fn gl_nodes_weights(order: usize) -> Result<(&'static [f64], &'static [f64]), Er
                 0.027_152_459_411_754_095,
             ],
         )),
-        _ => Err(InputError::Invalid.into()),
+        _ => Err(crate::Error::Validation(
+            "unsupported Gauss-Legendre order; supported orders are 2, 4, 8 and 16".to_string(),
+        )),
     }
 }
 
@@ -634,7 +640,7 @@ fn gl_nodes_weights(order: usize) -> Result<(&'static [f64], &'static [f64]), Er
 ///
 /// # Errors
 ///
-/// Returns [`InputError::Invalid`] when:
+/// Returns [`Error::Validation`](crate::Error::Validation) when:
 /// - `a` or `b` is not finite (NaN or infinity)
 /// - `order` is not one of the supported values (2, 4, 8, 16)
 ///
@@ -666,7 +672,9 @@ where
     F2: Fn(f64) -> f64,
 {
     if !(a.is_finite() && b.is_finite()) {
-        return Err(InputError::Invalid.into());
+        return Err(crate::Error::Validation(
+            "Gauss-Legendre integration bounds must be finite".to_string(),
+        ));
     }
     // Exact comparison: zero-width integration interval is a standard degenerate case.
     #[allow(clippy::float_cmp)]
@@ -699,7 +707,7 @@ where
 ///
 /// # Errors
 ///
-/// Returns [`InputError::Invalid`] when either bound is non-finite, the
+/// Returns [`Error::Validation`](crate::Error::Validation) when either bound is non-finite, the
 /// interval is empty or reversed, `panels` is zero, or `order` is unsupported.
 pub fn gauss_legendre_grid(
     a: f64,
@@ -708,7 +716,9 @@ pub fn gauss_legendre_grid(
     panels: usize,
 ) -> Result<Vec<(f64, f64)>, Error> {
     if panels == 0 || !(a.is_finite() && b.is_finite()) || b <= a {
-        return Err(InputError::Invalid.into());
+        return Err(crate::Error::Validation(
+            "Gauss-Legendre grid needs finite bounds with b > a and at least one panel".to_string(),
+        ));
     }
     let (nodes, weights) = gl_nodes_weights(order)?;
     let width = (b - a) / panels as f64;
@@ -746,7 +756,7 @@ pub fn gauss_legendre_grid(
 ///
 /// # Errors
 ///
-/// Returns [`InputError::Invalid`] when:
+/// Returns [`Error::Validation`](crate::Error::Validation) when:
 /// - `panels` is zero
 /// - `order` is unsupported (see [`gauss_legendre_integrate`])
 ///
@@ -765,7 +775,9 @@ where
     F2: Fn(f64) -> f64,
 {
     if panels == 0 {
-        return Err(InputError::Invalid.into());
+        return Err(crate::Error::Validation(
+            "Gauss-Legendre integration needs at least one panel".to_string(),
+        ));
     }
     let h = (b - a) / panels as f64;
     let mut sum = 0.0;
@@ -801,7 +813,7 @@ where
 ///
 /// # Errors
 ///
-/// Returns [`InputError::Invalid`] for non-finite endpoints, a negative or
+/// Returns [`Error::Validation`](crate::Error::Validation) for non-finite endpoints, a negative or
 /// non-finite tolerance, or an unsupported quadrature order. Returns
 /// [`InputError::SolverConvergenceFailed`] when the summed error estimate
 /// exceeds `tol` at `max_depth`, or the value or error estimate is non-finite.
@@ -853,7 +865,10 @@ where
     F2: Fn(f64) -> f64 + Copy,
 {
     if !a.is_finite() || !b.is_finite() || !tol.is_finite() || tol < 0.0 {
-        return Err(InputError::Invalid.into());
+        return Err(crate::Error::Validation(
+            "adaptive Gauss-Legendre endpoints and tolerance must be finite with tol >= 0"
+                .to_string(),
+        ));
     }
     gl_nodes_weights(order)?;
 

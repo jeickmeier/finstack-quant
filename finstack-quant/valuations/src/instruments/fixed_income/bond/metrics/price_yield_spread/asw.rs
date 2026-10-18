@@ -201,7 +201,9 @@ fn schedule_params(spec: &CashflowSpec) -> finstack_quant_core::Result<&Schedule
         CashflowSpec::Floating(spec) => Ok(&spec.schedule),
         CashflowSpec::StepUp(spec) => Ok(&spec.schedule),
         CashflowSpec::Amortizing { base, .. } => match &**base {
-            CashflowSpec::Amortizing { .. } => Err(finstack_quant_core::InputError::Invalid.into()),
+            CashflowSpec::Amortizing { .. } => Err(finstack_quant_core::Error::Validation(
+                "amortizing cashflow spec cannot nest another amortizing spec".to_string(),
+            )),
             base => schedule_params(base),
         },
     }
@@ -422,9 +424,11 @@ pub fn asw_par_with_forward(
         let pv_coupon = pv_coupon_from_custom_schedule(disc.as_ref(), custom, as_of)?;
         pv_coupon / (bond.notional.amount() * ann)
     } else {
-        bond.cashflow_spec
-            .plain_fixed_rate()?
-            .ok_or(finstack_quant_core::InputError::Invalid)?
+        bond.cashflow_spec.plain_fixed_rate()?.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "asset swap spread requires a plain fixed coupon rate".to_string(),
+            )
+        })?
     };
     Ok((eq_coupon * fixed_ann - float_pv) / float_ann)
 }
@@ -511,9 +515,11 @@ pub fn asw_market_with_forward(
         let pv_coupon = pv_coupon_from_custom_schedule(disc.as_ref(), custom, as_of)?;
         pv_coupon / (notional * ann)
     } else {
-        bond.cashflow_spec
-            .plain_fixed_rate()?
-            .ok_or(finstack_quant_core::InputError::Invalid)?
+        bond.cashflow_spec.plain_fixed_rate()?.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "asset swap spread requires a plain fixed coupon rate".to_string(),
+            )
+        })?
     };
     let par_asw = (eq_coupon * fixed_ann - float_pv) / float_ann;
     Ok(par_asw + (1.0 - price_pct) / float_ann)
@@ -595,10 +601,11 @@ impl MetricCalculator for AssetSwapParCalculator {
             ));
         }
         // Use stated coupon for non-custom bonds; for custom bonds, this branch is not reached
-        let coupon = bond
-            .cashflow_spec
-            .plain_fixed_rate()?
-            .ok_or(finstack_quant_core::InputError::Invalid)?;
+        let coupon = bond.cashflow_spec.plain_fixed_rate()?.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "asset swap spread requires a plain fixed coupon rate".to_string(),
+            )
+        })?;
         if let Some((float_pv, fixed_ann, float_ann)) = forward_components {
             Ok((coupon * fixed_ann - float_pv) / float_ann)
         } else {

@@ -551,7 +551,9 @@ fn build_commitment_fee_flows(
         // reduce the commitment base for the interval that ends on `d`.
         let limit = ddtl.limit_in_force_at(prev);
         if limit.currency() != loan.currency {
-            return Err(finstack_quant_core::InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "delayed-draw commitment currency must match the loan currency".to_string(),
+            ));
         }
 
         let base = match ddtl.fee_base {

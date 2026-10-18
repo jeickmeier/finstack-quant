@@ -96,10 +96,12 @@ impl TimeGrid {
     /// ```
     pub fn uniform(t_max: f64, num_steps: usize) -> Result<Self> {
         if !t_max.is_finite() || t_max <= 0.0 {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(invalid(format!(
+                "t_max must be finite and positive, got {t_max}"
+            )));
         }
         if num_steps == 0 {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(invalid("num_steps must be greater than zero"));
         }
 
         let max_f64_capacity = isize::MAX as usize / std::mem::size_of::<f64>();
@@ -270,25 +272,31 @@ impl TimeGrid {
     /// ```
     pub fn from_times(times: Vec<f64>) -> Result<Self> {
         if times.is_empty() {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(invalid("times must not be empty"));
         }
         if !times[0].is_finite() {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(invalid("times[0] must be finite"));
         }
         if times[0] != 0.0 {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(invalid(format!(
+                "times must start at 0.0, got {}",
+                times[0]
+            )));
         }
 
         const MIN_DT_THRESHOLD: f64 = 1e-12;
         for i in 1..times.len() {
             if !times[i].is_finite() {
-                return Err(crate::error::InputError::Invalid.into());
+                return Err(invalid(format!("times[{i}] must be finite")));
             }
             if times[i] <= times[i - 1] {
                 return Err(crate::error::InputError::NonMonotonicKnots.into());
             }
             if (times[i] - times[i - 1]).abs() < MIN_DT_THRESHOLD {
-                return Err(crate::error::InputError::Invalid.into());
+                return Err(invalid(format!(
+                    "time step between times[{}] and times[{i}] is below the 1e-12 minimum",
+                    i - 1
+                )));
             }
         }
 
@@ -302,7 +310,7 @@ impl TimeGrid {
         for i in 0..times.len() - 1 {
             let dt = times[i + 1] - times[i];
             if !dt.is_finite() {
-                return Err(crate::error::InputError::Invalid.into());
+                return Err(invalid(format!("time step {i} is not finite")));
             }
             dts.push(dt);
         }
@@ -310,7 +318,9 @@ impl TimeGrid {
         const MIN_DT: f64 = 1e-10;
         if let Some(&min_dt) = dts.iter().min_by(|a, b| a.total_cmp(b)) {
             if min_dt < MIN_DT {
-                return Err(crate::error::InputError::Invalid.into());
+                return Err(invalid(format!(
+                    "minimum time step {min_dt} is below the 1e-10 floor"
+                )));
             }
         }
 

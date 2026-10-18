@@ -6,7 +6,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::{Error, InputError};
+use finstack_quant_core::Error;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::valuation::{PortfolioValuationOptions, RequestedMetrics};
@@ -153,7 +153,7 @@ impl Instrument for ValueOnlyInstrument {
         _metrics: &[finstack_quant_valuations::metrics::MetricId],
         _options: finstack_quant_valuations::instruments::PricingOptions,
     ) -> finstack_quant_valuations::Result<ValuationResult> {
-        Err(Error::Input(InputError::Invalid).into())
+        Err(Error::Validation("pricing always fails".to_string()).into())
     }
 }
 
@@ -200,7 +200,7 @@ fn valuation_falls_back_when_metrics_fail() {
     assert!(
         pv.risk_error
             .as_deref()
-            .is_some_and(|msg| msg.contains("Invalid")),
+            .is_some_and(|msg| msg.contains("pricing always fails")),
         "expected the underlying metrics failure to be surfaced"
     );
 }
@@ -304,7 +304,7 @@ fn empty_metric_request_uses_the_pv_only_path() {
         position
             .risk_error
             .as_deref()
-            .is_some_and(|msg| msg.contains("Invalid")),
+            .is_some_and(|msg| msg.contains("pricing always fails")),
         "PV-only fallback must record the canonical pricing failure, got {:?}",
         position.risk_error
     );

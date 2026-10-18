@@ -235,12 +235,12 @@ impl BasketCalculator {
                     as_of,
                 )?;
                 if let Some(units) = constituent.units {
-                    let s = shares.ok_or(finstack_quant_core::Error::Input(
-                        finstack_quant_core::InputError::Invalid,
+                    let s = shares.ok_or(finstack_quant_core::Error::Validation(
+                        "basket constituent units require the basket share count".to_string(),
                     ))?;
                     if s <= 0.0 {
-                        return Err(finstack_quant_core::Error::Input(
-                            finstack_quant_core::InputError::Invalid,
+                        return Err(finstack_quant_core::Error::Validation(
+                            "basket share count must be positive".to_string(),
                         ));
                     }
                     base_value.checked_mul_f64(units)?.checked_div_f64(s)?
@@ -286,8 +286,8 @@ impl BasketCalculator {
                     )?;
                     base_value.checked_mul_f64(constituent.weight * s)?
                 } else {
-                    return Err(finstack_quant_core::Error::Input(
-                        finstack_quant_core::InputError::Invalid,
+                    return Err(finstack_quant_core::Error::Validation(
+                        "basket total value mode needs units, aum or shares".to_string(),
                     ));
                 }
             }

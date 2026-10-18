@@ -152,7 +152,10 @@ impl CollateralSpec {
                 money.currency()
             }
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(_) => {
-                return Err(Error::Input(finstack_quant_core::InputError::Invalid));
+                return Err(Error::Validation(
+                    "repo collateral price must carry a currency; unitless prices are rejected"
+                        .to_string(),
+                ));
             }
         };
 
@@ -477,11 +480,15 @@ impl Repo {
     /// Therefore: `Collateral_value = Cash_lent / (1 - Haircut)`
     pub fn required_collateral_value(&self) -> Result<Money> {
         if self.haircut >= 1.0 {
-            return Err(Error::Input(finstack_quant_core::InputError::Invalid));
+            return Err(Error::Validation(
+                "repo haircut must be below 100%".to_string(),
+            ));
         }
         let factor = 1.0 - self.haircut;
         if factor <= 0.0 {
-            return Err(Error::Input(finstack_quant_core::InputError::Invalid));
+            return Err(Error::Validation(
+                "repo haircut must be below 100%".to_string(),
+            ));
         }
         self.cash_amount.checked_div_f64(factor)
     }

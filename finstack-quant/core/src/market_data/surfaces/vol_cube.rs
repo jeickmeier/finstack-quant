@@ -163,7 +163,9 @@ impl VolCube {
             return Err(InputError::DimensionMismatch.into());
         }
         if forwards.iter().any(|f| !f.is_finite()) {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "vol cube forwards must be finite".to_string(),
+            ));
         }
         Ok(Self {
             id: CurveId::new(id.as_ref()),

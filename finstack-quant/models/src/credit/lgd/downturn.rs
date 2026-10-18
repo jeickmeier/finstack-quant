@@ -167,14 +167,18 @@ impl DownturnLgd {
                     || asset_correlation <= 0.0
                     || asset_correlation >= 1.0
                 {
-                    return Err(InputError::Invalid.into());
+                    return Err(finstack_quant_core::Error::Validation(
+                        "asset_correlation must be finite and in (0, 1)".to_string(),
+                    ));
                 }
                 if !lgd_sensitivity.is_finite() || lgd_sensitivity < 0.0 {
                     return Err(InputError::NegativeValue.into());
                 }
                 if !stress_quantile.is_finite() || stress_quantile <= 0.0 || stress_quantile >= 1.0
                 {
-                    return Err(InputError::Invalid.into());
+                    return Err(finstack_quant_core::Error::Validation(
+                        "stress_quantile must be finite and in (0, 1)".to_string(),
+                    ));
                 }
             }
             DownturnMethod::RegulatoryFloor { add_on, floor } => {
@@ -182,7 +186,9 @@ impl DownturnLgd {
                     return Err(InputError::NegativeValue.into());
                 }
                 if !floor.is_finite() || !(0.0..=1.0).contains(&floor) {
-                    return Err(InputError::Invalid.into());
+                    return Err(finstack_quant_core::Error::Validation(
+                        "regulatory LGD floor must be finite and in [0, 1]".to_string(),
+                    ));
                 }
             }
         }
@@ -238,7 +244,9 @@ impl DownturnLgd {
     /// Returns an error if `base_lgd` is not in \[0, 1\].
     pub fn adjust(&self, base_lgd: f64) -> Result<f64> {
         if !base_lgd.is_finite() || !(0.0..=1.0).contains(&base_lgd) {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "base_lgd must be finite and in [0, 1]".to_string(),
+            ));
         }
         let adjusted = match self.method {
             DownturnMethod::StressedApproximation {
@@ -397,7 +405,10 @@ mod tests {
         let err = dt
             .validate()
             .expect_err("negative asset_correlation must fail validate");
-        assert_eq!(err, InputError::Invalid.into());
+        assert!(
+            matches!(err, finstack_quant_core::Error::Validation(_)),
+            "{err}"
+        );
     }
 
     #[test]
@@ -409,7 +420,10 @@ mod tests {
         let err = dt
             .validate()
             .expect_err("stress_quantile = 1.0 must fail validate");
-        assert_eq!(err, InputError::Invalid.into());
+        assert!(
+            matches!(err, finstack_quant_core::Error::Validation(_)),
+            "{err}"
+        );
     }
 
     #[test]

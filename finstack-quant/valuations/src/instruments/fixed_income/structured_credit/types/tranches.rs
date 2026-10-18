@@ -203,10 +203,14 @@ impl Tranche {
         maturity: Date,
     ) -> finstack_quant_core::Result<Self> {
         if attach_pct < 0.0 || detach_pct <= attach_pct {
-            return Err(finstack_quant_core::InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "tranche attach_pct must be non-negative and below detach_pct".to_string(),
+            ));
         }
         if detach_pct > 100.0 {
-            return Err(finstack_quant_core::InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "tranche detach_pct must not exceed 100".to_string(),
+            ));
         }
 
         Ok(Self {
@@ -253,7 +257,7 @@ impl Tranche {
     ///
     /// # Errors
     ///
-    /// Returns `InputError::Invalid` when `original_balance` is not positive.
+    /// Returns `Error::Validation` when `original_balance` is not positive.
     pub fn from_balance(
         id: impl Into<String>,
         seniority: TrancheSeniority,
@@ -262,7 +266,9 @@ impl Tranche {
         maturity: Date,
     ) -> finstack_quant_core::Result<Self> {
         if original_balance.amount() <= 0.0 {
-            return Err(finstack_quant_core::InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "tranche original_balance must be positive".to_string(),
+            ));
         }
         let mut tranche = Self::new(
             id,
@@ -600,7 +606,9 @@ impl TrancheBuilder {
     /// [`TrancheStructure::new`] derives them from the balance shares;
     /// supplying only one of the two is an error.
     pub fn build(self) -> finstack_quant_core::Result<Tranche> {
-        let id = self.id.ok_or(finstack_quant_core::InputError::Invalid)?;
+        let id = self.id.ok_or_else(|| {
+            finstack_quant_core::Error::Validation("Tranche requires id".to_string())
+        })?;
         let points = match (self.attach_pct, self.detach_pct) {
             (Some(attachment), Some(detachment)) => Some((attachment, detachment)),
             (None, None) => None,
@@ -612,23 +620,25 @@ impl TrancheBuilder {
                 ))
             }
         };
-        let seniority = self
-            .seniority
-            .ok_or(finstack_quant_core::InputError::Invalid)?;
-        let original_balance = self
-            .original_balance
-            .ok_or(finstack_quant_core::InputError::Invalid)?;
+        let seniority = self.seniority.ok_or_else(|| {
+            finstack_quant_core::Error::Validation("Tranche requires seniority".to_string())
+        })?;
+        let original_balance = self.original_balance.ok_or_else(|| {
+            finstack_quant_core::Error::Validation("Tranche requires original_balance".to_string())
+        })?;
 
         if original_balance.amount() <= 0.0 {
-            return Err(finstack_quant_core::InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "tranche original_balance must be positive".to_string(),
+            ));
         }
 
-        let coupon = self
-            .coupon
-            .ok_or(finstack_quant_core::InputError::Invalid)?;
-        let maturity = self
-            .maturity
-            .ok_or(finstack_quant_core::InputError::Invalid)?;
+        let coupon = self.coupon.ok_or_else(|| {
+            finstack_quant_core::Error::Validation("Tranche requires coupon".to_string())
+        })?;
+        let maturity = self.maturity.ok_or_else(|| {
+            finstack_quant_core::Error::Validation("Tranche requires maturity".to_string())
+        })?;
 
         let mut tranche = match points {
             Some((attach_pct, detach_pct)) => Tranche::new(
@@ -885,7 +895,9 @@ impl TrancheStructure {
             if !tranche.effective_attach_pct().is_finite()
                 || !tranche.effective_detach_pct().is_finite()
             {
-                return Err(finstack_quant_core::InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "tranche attachment and detachment points must be finite".to_string(),
+                ));
             }
         }
 
@@ -901,17 +913,21 @@ impl TrancheStructure {
 
         for tranche in &sorted_tranches {
             if (tranche.effective_attach_pct() - expected_attachment).abs() > TOLERANCE {
-                return Err(finstack_quant_core::InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(format!("tranche attachment {} does not continue from the previous detachment {expected_attachment}", tranche.effective_attach_pct())));
             }
             if tranche.effective_detach_pct() <= tranche.effective_attach_pct() {
-                return Err(finstack_quant_core::InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "tranche detachment must exceed its attachment".to_string(),
+                ));
             }
             expected_attachment = tranche.effective_detach_pct();
         }
 
         // Should reach 100%
         if (expected_attachment - 100.0).abs() > TOLERANCE {
-            return Err(finstack_quant_core::InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "tranche structure must detach at 100% of the capital structure".to_string(),
+            ));
         }
 
         // Reconcile declared tranche thickness against the actual balance

@@ -644,7 +644,7 @@ class TestForwardCurveParity:
             knots=[(0.0, 0.04), (1.0, 0.045)],
             base_date=date(2024, 1, 1),
         )
-        with pytest.raises(ValueError, match=r"(rate_between requires|Invalid input|invalid input)"):
+        with pytest.raises(ValueError, match=r"rate_between (requires|interval endpoints must be finite)"):
             curve.rate_between(t1, t2)
 
     def test_constructor_runtime_signature_matches_stub(self) -> None:

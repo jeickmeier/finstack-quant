@@ -76,7 +76,7 @@ class TestStructuredCreditTyped:
         assert StructuredCredit.from_json(deal.to_json()).id == "ABS-1"
 
     def test_tranche_builder_validates_attach_detach(self) -> None:
-        with pytest.raises(ValueError, match="Invalid"):
+        with pytest.raises(ValueError, match="attach_pct must be non-negative and below detach_pct"):
             (
                 Tranche
                 .builder()

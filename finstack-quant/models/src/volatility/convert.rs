@@ -82,17 +82,23 @@ pub fn convert_atm_volatility(
     }
 
     if !forward_rate.is_finite() {
-        return Err(InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "forward rate must be finite".to_string(),
+        ));
     }
 
     if let VolatilityConvention::ShiftedLognormal { shift } = from_convention {
         if !shift.is_finite() {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "shifted-lognormal shift of the source convention must be finite".to_string(),
+            ));
         }
     }
     if let VolatilityConvention::ShiftedLognormal { shift } = to_convention {
         if !shift.is_finite() {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "shifted-lognormal shift of the target convention must be finite".to_string(),
+            ));
         }
     }
 

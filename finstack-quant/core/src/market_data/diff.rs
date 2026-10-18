@@ -97,7 +97,9 @@ impl TenorSamplingMethod {
 /// Reject an empty tenor grid or a non-finite tenor.
 fn validate_measurement_grid(sample_points: &[f64]) -> Result<()> {
     if sample_points.is_empty() || sample_points.iter().any(|t| !t.is_finite()) {
-        return Err(crate::InputError::Invalid.into());
+        return Err(crate::Error::Validation(
+            "measurement tenor grid must be non-empty and finite".to_string(),
+        ));
     }
     Ok(())
 }
@@ -111,7 +113,9 @@ fn measure_average_shift(
 ) -> Result<f64> {
     validate_measurement_grid(sample_points)?;
     if !scaling_factor.is_finite() {
-        return Err(crate::InputError::Invalid.into());
+        return Err(crate::Error::Validation(
+            "shift scaling factor must be finite".to_string(),
+        ));
     }
     let mut total_shift = 0.0;
     let mut count = 0;
@@ -123,7 +127,9 @@ fn measure_average_shift(
         let v0 = value_t0(t);
         let v1 = value_t1(t);
         if !v0.is_finite() || !v1.is_finite() {
-            return Err(crate::InputError::Invalid.into());
+            return Err(crate::Error::Validation(format!(
+                "curve values at tenor {t} must be finite"
+            )));
         }
 
         let shift = if values_are_effectively_equal(v0, v1) {
@@ -133,7 +139,9 @@ fn measure_average_shift(
         };
         total_shift += shift;
         if !total_shift.is_finite() {
-            return Err(crate::InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "accumulated curve shift is not finite".to_string(),
+            ));
         }
         count += 1;
     }
@@ -143,7 +151,9 @@ fn measure_average_shift(
     }
     let average = total_shift / count as f64;
     if !average.is_finite() {
-        return Err(crate::InputError::Invalid.into());
+        return Err(crate::Error::Validation(
+            "average curve shift is not finite".to_string(),
+        ));
     }
     Ok(average)
 }
@@ -276,7 +286,9 @@ pub fn measure_per_tenor_par_spread_shift(
             if shift.is_finite() {
                 Ok(shift)
             } else {
-                Err(crate::InputError::Invalid.into())
+                Err(crate::Error::Validation(format!(
+                    "par spread shift at tenor {t} is not finite"
+                )))
             }
         })
         .collect()
@@ -371,7 +383,9 @@ pub fn measure_per_tenor_credit_curve_shift(
             if shift.is_finite() {
                 Ok(shift)
             } else {
-                Err(crate::InputError::Invalid.into())
+                Err(crate::Error::Validation(format!(
+                    "zero-rate shift at tenor {t} is not finite"
+                )))
             }
         })
         .collect()
@@ -444,7 +458,9 @@ pub fn measure_inflation_index_shift(
     let (_, level_t0) = index_t0.get_latest_observation()?;
     let (_, level_t1) = index_t1.get_latest_observation()?;
     if !level_t0.is_finite() || !level_t1.is_finite() || level_t0 <= 0.0 || level_t1 <= 0.0 {
-        return Err(crate::InputError::Invalid.into());
+        return Err(crate::Error::Validation(
+            "inflation index levels must be finite and positive".to_string(),
+        ));
     }
     Ok((level_t1 / level_t0 - 1.0) * 10_000.0)
 }

@@ -3,7 +3,7 @@ use super::{
     PikSchedule,
 };
 use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
-use finstack_quant_core::{InputError, Result};
+use finstack_quant_core::Result;
 use finstack_quant_models::credit::{AssetDynamics, CreditState, MertonBarrierType};
 use smallvec::SmallVec;
 
@@ -110,7 +110,9 @@ impl MertonMcEngine {
         let (notional, coupon_rate, maturity_years) =
             (terms.notional, terms.coupon_rate, terms.maturity_years);
         if !matches!(config.merton.dynamics(), AssetDynamics::GeometricBrownian) {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "Merton MC engine requires geometric Brownian asset dynamics".to_string(),
+            ));
         }
         Self::validate_pik_schedule(&config.pik_schedule)?;
         // A single estimator has no variance estimate (division by n-1 = 0)
@@ -618,7 +620,9 @@ impl MertonMcEngine {
                     || *pik_fraction < 0.0
                     || (*cash_fraction + *pik_fraction - 1.0).abs() > 1e-10
                 {
-                    return Err(InputError::Invalid.into());
+                    return Err(finstack_quant_core::Error::Validation(
+                        "cash and PIK fractions must be non-negative and sum to one".to_string(),
+                    ));
                 }
             }
             Ok(())

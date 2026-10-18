@@ -182,7 +182,9 @@ impl PiecewiseLinearAdjustment {
         let mut breakpoints: Vec<f64> = self.segments.iter().map(|segment| segment.start).collect();
         breakpoints.extend(extra);
         if breakpoints.iter().any(|time| !time.is_finite()) {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "adjustment breakpoints must be finite".to_string(),
+            ));
         }
         breakpoints.sort_by(f64::total_cmp);
         breakpoints.dedup();

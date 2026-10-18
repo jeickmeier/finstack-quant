@@ -92,7 +92,9 @@ impl crate::metrics::MetricCalculator for CmbsDscrCalculator {
         let cmbs = context.instrument_as::<StructuredCredit>()?;
 
         if cmbs.deal_type != DealType::Cmbs {
-            return Err(finstack_quant_core::InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "CMBS DSCR metric requires a CMBS deal".to_string(),
+            ));
         }
 
         // Pool DSCR: loan-level NOI over debt service on each loan's live

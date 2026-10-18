@@ -89,7 +89,7 @@ impl std::fmt::Display for CagrDayCount {
 ///
 /// # Errors
 ///
-/// Returns [`crate::error::InputError::Invalid`] when `returns` is empty or the
+/// Returns [`Error::Validation`](finstack_quant_core::Error::Validation) when `returns` is empty or the
 /// date range has a non-positive span. Propagates
 /// [`crate::error::InputError::MissingCalendarForBus252`] when Bus/252 is
 /// requested without a calendar.
@@ -102,7 +102,9 @@ pub(crate) fn cagr(
 ) -> crate::Result<f64> {
     if returns.is_empty() {
         tracing::debug!(reason = "empty_returns", "invalid CAGR input");
-        return Err(crate::error::InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "returns must not be empty".to_string(),
+        ));
     }
 
     let years = annualized_years(start, end, day_count, calendar)?;
@@ -114,7 +116,9 @@ pub(crate) fn cagr(
             reason = "non_positive_date_span",
             "invalid CAGR input"
         );
-        return Err(crate::error::InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "CAGR date range must have a positive span".to_string(),
+        ));
     }
     let mut engine = crate::returns::WealthEngine::new();
     for &r in returns {
@@ -1011,7 +1015,9 @@ mod tests {
     fn cagr_from_factor(returns: &[f64], ann_factor: f64) -> crate::Result<f64> {
         if returns.is_empty() {
             tracing::debug!(reason = "empty_returns", "invalid CAGR input");
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "invalid CAGR input".to_string(),
+            ));
         }
         if !ann_factor.is_finite() || ann_factor <= 0.0 {
             tracing::debug!(
@@ -1019,7 +1025,9 @@ mod tests {
                 reason = "invalid_annualization_factor",
                 "invalid CAGR input"
             );
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "invalid CAGR input".to_string(),
+            ));
         }
         let years = returns.len() as f64 / ann_factor;
         if years > 0.0 {
@@ -1029,7 +1037,9 @@ mod tests {
             }
             Ok((engine.log_growth() / years).exp_m1())
         } else {
-            Err(crate::error::InputError::Invalid.into())
+            Err(finstack_quant_core::Error::Validation(
+                "invalid CAGR input".to_string(),
+            ))
         }
     }
 

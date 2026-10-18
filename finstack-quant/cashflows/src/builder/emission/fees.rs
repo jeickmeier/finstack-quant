@@ -5,7 +5,6 @@ use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 
 use super::super::compiler::PeriodicFee;
@@ -109,7 +108,10 @@ pub(in crate::builder) fn emit_fees_on(
                     FeeBase::Drawn => effective_outstanding,
                     FeeBase::Undrawn { commitment } => {
                         if commitment.currency() != ccy {
-                            return Err(InputError::Invalid.into());
+                            return Err(finstack_quant_core::Error::Validation(
+                                "undrawn fee commitment currency must match the cashflow currency"
+                                    .to_string(),
+                            ));
                         }
                         let commitment_dec = f64_to_decimal(commitment.amount())?;
                         (commitment_dec - effective_outstanding).max(Decimal::ZERO)

@@ -39,7 +39,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::Invalid`] if the active range has
+    /// Returns [`Error::Validation`](finstack_quant_core::Error::Validation) if the active range has
     /// no valid positive holding period. Propagates day-count errors,
     /// including a missing calendar for Bus/252.
     ///

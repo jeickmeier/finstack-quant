@@ -320,7 +320,9 @@ impl Rate {
     /// quotient.
     pub fn checked_div(self, rhs: f64) -> Result<Self> {
         if rhs == 0.0 {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "cannot divide a rate by zero".to_string(),
+            ));
         }
         Self::from_decimal(self.0 / rhs)
     }
@@ -564,12 +566,14 @@ impl Bps {
     ///
     /// # Errors
     ///
-    /// Returns `InputError::Invalid` for a zero divisor, or
+    /// Returns `Error::Validation` for a zero divisor, or
     /// `InputError::ConversionOverflow` for the unrepresentable
     /// `i32::MIN / -1` quotient.
     pub fn checked_div(self, rhs: i32) -> Result<Self> {
         if rhs == 0 {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "cannot divide basis points by zero".to_string(),
+            ));
         }
         self.0
             .checked_div(rhs)

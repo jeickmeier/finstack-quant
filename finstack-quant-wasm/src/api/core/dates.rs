@@ -931,7 +931,11 @@ mod tests {
             "Act/Act ICMA".parse::<RustDayCount>().expect("lenient"),
             RustDayCount::ActActIsma
         );
-        assert!("ACT/360".parse::<RustDayCount>().is_err());
+        assert_eq!(
+            "ACT/360".parse::<RustDayCount>().expect("lenient"),
+            RustDayCount::Act360
+        );
+        assert!("act360".parse::<RustDayCount>().is_err());
     }
 
     #[test]

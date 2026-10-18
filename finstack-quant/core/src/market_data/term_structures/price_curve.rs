@@ -687,7 +687,9 @@ impl PriceCurveBuilder {
     /// zero-time knot, or the selected
     /// interpolation/extrapolation combination rejects the grid.
     pub fn build(self) -> crate::Result<PriceCurve> {
-        let base = self.base.ok_or(InputError::Invalid)?;
+        let base = self
+            .base
+            .ok_or_else(|| crate::Error::Validation("PriceCurve requires base_date".to_string()))?;
         if self.points.len() < 2 {
             return Err(InputError::TooFewPoints.into());
         }
@@ -696,17 +698,25 @@ impl PriceCurveBuilder {
         crate::math::interp::utils::validate_knots(&kvec)?;
 
         if pvec.iter().any(|price| !price.is_finite()) {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "price curve pillar values must be finite".to_string(),
+            ));
         }
 
         // Infer spot price only when the first knot is explicitly anchored at t=0.
         let spot_price = match self.spot_price {
             Some(spot) => spot,
-            None => infer_spot_from_knots(&kvec, &pvec).ok_or(InputError::Invalid)?,
+            None => infer_spot_from_knots(&kvec, &pvec).ok_or_else(|| {
+                crate::Error::Validation(
+                    "PriceCurve requires spot_price unless the first knot is at t = 0".to_string(),
+                )
+            })?,
         };
 
         if !spot_price.is_finite() {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "price curve spot must be finite".to_string(),
+            ));
         }
 
         let origin = kvec.partition_point(|&t| t < 0.0);

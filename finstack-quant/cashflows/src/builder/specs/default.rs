@@ -97,7 +97,7 @@ impl DefaultModelSpec {
     /// - cumulative-loss severity is outside `(0, 1]` or the implied defaults
     ///   are non-finite
     ///
-    /// Returns `InputError::NegativeValue`/`InputError::Invalid` if the
+    /// Returns `InputError::NegativeValue`/`Error::Validation` if the
     /// constant `cdr` is negative or non-finite.
     ///
     /// # References

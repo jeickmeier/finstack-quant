@@ -103,10 +103,6 @@ pub enum InputError {
     #[error("Input dimensions do not match")]
     DimensionMismatch,
 
-    /// Fallback for miscellaneous validation problems not yet covered by a specific variant.
-    #[error("Invalid input data")]
-    Invalid,
-
     /// Requested allocation or data structure exceeds configured limit.
     #[error("Allocation too large for {what}: requested {requested_bytes} bytes, limit {limit_bytes} bytes")]
     TooLarge {

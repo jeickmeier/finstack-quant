@@ -106,7 +106,9 @@ impl TryFrom<RawDynamicRecoverySpec> for DynamicRecoverySpec {
 impl DynamicRecoverySpec {
     fn new(base_recovery: f64, base_notional: f64, model: DynamicRecoveryModel) -> Result<Self> {
         if !(0.0..=1.0).contains(&base_recovery) {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "base_recovery must lie in [0, 1]".to_string(),
+            ));
         }
         if !base_notional.is_finite() || base_notional <= 0.0 {
             return Err(InputError::NonPositiveValue.into());

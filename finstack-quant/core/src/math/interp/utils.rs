@@ -62,7 +62,7 @@ where
 /// # Errors
 ///
 /// Returns [`InputError::TooFewPoints`] for fewer than two knots,
-/// [`InputError::Invalid`] for NaN or infinity, and
+/// [`Error::Validation`](crate::Error::Validation) for NaN or infinity, and
 /// [`InputError::NonMonotonicKnots`] when any consecutive pair is equal or
 /// decreasing.
 pub fn validate_knots(knots: &[f64]) -> crate::Result<()> {
@@ -70,7 +70,7 @@ pub fn validate_knots(knots: &[f64]) -> crate::Result<()> {
         return Err(InputError::TooFewPoints.into());
     }
     if knots.iter().any(|k| !k.is_finite()) {
-        return Err(InputError::Invalid.into());
+        return Err(crate::Error::Validation("knots must be finite".to_string()));
     }
     if knots.windows(2).any(|w| w[1] <= w[0]) {
         return Err(InputError::NonMonotonicKnots.into());
@@ -129,7 +129,9 @@ pub(crate) fn validate_positive_series(values: &[f64]) -> crate::Result<()> {
 /// Validate that all values are finite (no NaN/Inf).
 pub(crate) fn validate_finite_series(values: &[f64]) -> crate::Result<()> {
     if values.iter().any(|&v| !v.is_finite()) {
-        return Err(InputError::Invalid.into());
+        return Err(crate::Error::Validation(
+            "series values must be finite".to_string(),
+        ));
     }
     Ok(())
 }

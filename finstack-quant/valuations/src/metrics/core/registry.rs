@@ -718,8 +718,8 @@ mod tests {
 
     impl MetricCalculator for FailCalculator {
         fn calculate(&self, _ctx: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-            Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid,
+            Err(finstack_quant_core::Error::Validation(
+                "mock calculator always fails".to_string(),
             ))
         }
     }

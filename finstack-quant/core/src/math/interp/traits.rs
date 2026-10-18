@@ -112,7 +112,7 @@ pub trait InterpolationStrategy: Send + Sync + Debug {
     ///   Insufficient knots for the strategy (e.g., cubic requires ≥ 4 points)
     /// - [`InputError::NonPositiveValue`](crate::error::InputError::NonPositiveValue):
     ///   Log-based strategies require positive values for logarithm
-    /// - [`InputError::Invalid`](crate::error::InputError::Invalid):
+    /// - [`Error::Validation`](crate::Error::Validation):
     ///   General validation failure (non-finite values, degenerate segments)
     ///
     /// # Implementation Note

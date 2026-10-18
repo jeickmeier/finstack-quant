@@ -213,7 +213,9 @@ impl DividendSchedule {
                 }
                 DividendKind::Yield(y) => {
                     if !y.is_finite() {
-                        return Err(Error::Input(crate::error::InputError::Invalid));
+                        return Err(Error::Validation(
+                            "dividend yield must be finite".to_string(),
+                        ));
                     }
                     if *y < 0.0 {
                         return Err(Error::Input(crate::error::InputError::NegativeValue));
@@ -221,7 +223,9 @@ impl DividendSchedule {
                 }
                 DividendKind::Stock { ratio } => {
                     if !ratio.is_finite() {
-                        return Err(Error::Input(crate::error::InputError::Invalid));
+                        return Err(Error::Validation(
+                            "stock dividend ratio must be finite".to_string(),
+                        ));
                     }
                     if *ratio < 0.0 {
                         return Err(Error::Input(crate::error::InputError::NegativeValue));

@@ -213,7 +213,9 @@ impl InflationCapFloor {
         )?;
         validation::require_or(
             self.frequency.count() != 0,
-            finstack_quant_core::InputError::Invalid,
+            finstack_quant_core::Error::Validation(
+                "frequency count must be greater than zero".to_string(),
+            ),
         )?;
         Ok(())
     }
@@ -333,8 +335,8 @@ impl InflationCapFloor {
         )?;
 
         if periods.is_empty() {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid,
+            return Err(finstack_quant_core::Error::Validation(
+                "inflation cap/floor schedule produced no periods".to_string(),
             ));
         }
 

@@ -260,7 +260,7 @@ pub fn implied_vol_black(
 ///
 /// | Condition | Error |
 /// |-----------|-------|
-/// | Forward or strike non-finite | [`InputError::Invalid`] |
+/// | Forward or strike non-finite | [`Error::Validation`](finstack_quant_core::Error::Validation) |
 /// | `t ≤ 0` or non-finite | [`InputError::InvalidTimeToExpiry`] |
 /// | `price < 0` or non-finite | [`InputError::NegativeValue`] |
 /// | `price < intrinsic` (arbitrage) | [`InputError::InvalidVolatility`] |
@@ -297,7 +297,9 @@ pub fn implied_vol_bachelier(
     is_call: bool,
 ) -> finstack_quant_core::Result<f64> {
     if !forward.is_finite() || !strike.is_finite() {
-        return Err(InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "forward and strike must be finite".to_string(),
+        ));
     }
     validate_time(t)?;
     validate_price(price)?;

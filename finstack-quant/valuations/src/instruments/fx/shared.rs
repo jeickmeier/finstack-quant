@@ -62,7 +62,9 @@ pub(crate) fn collect_fx_forward_inputs(
     request: FxForwardRateRequest<'_>,
 ) -> finstack_quant_core::Result<FxForwardInputs> {
     if request.maturity < request.as_of {
-        return Err(finstack_quant_core::InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "FX forward maturity must not precede the valuation date".to_string(),
+        ));
     }
     let domestic = request
         .market

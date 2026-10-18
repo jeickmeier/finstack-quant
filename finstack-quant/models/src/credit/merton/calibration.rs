@@ -56,7 +56,7 @@ impl MertonModel {
     /// # Errors
     ///
     /// Returns [`Error::Validation`] if `horizon` is not positive or the
-    /// model uses `JumpDiffusion` dynamics, and [`InputError::Invalid`] if
+    /// model uses `JumpDiffusion` dynamics, and [`Error::Validation`](finstack_quant_core::Error::Validation) if
     /// the implied equity value or `N(d1)` is below the well-posed floor (the
     /// firm is economically in default).
     pub fn implied_equity(&self, horizon: f64) -> Result<(f64, f64)> {
@@ -91,7 +91,9 @@ impl MertonModel {
         let equity = v * exp_neg_qt * nd1 - b * (-r * horizon).exp() * nd2;
 
         if !equity.is_finite() || equity <= Self::MIN_EQUITY_FRACTION * v || nd1 <= Self::MIN_ND1 {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "implied equity value or N(d1) is below the well-posed floor".to_string(),
+            ));
         }
 
         let equity_vol = nd1 * exp_neg_qt * sigma * v / equity;
@@ -129,7 +131,7 @@ impl MertonModel {
     /// # Errors
     ///
     /// Returns [`InputError::NonPositiveValue`] or [`InputError::NegativeValue`]
-    /// for out-of-domain inputs, [`InputError::Invalid`] when equity is a
+    /// for out-of-domain inputs, [`Error::Validation`](finstack_quant_core::Error::Validation) when equity is a
     /// negligible fraction of firm value or `N(d1)` collapses to zero
     /// (deep-out-of-the-money, economically in default), and
     /// [`InputError::SolverConvergenceFailed`] if the fixed point does not
@@ -149,7 +151,9 @@ impl MertonModel {
             || !payout_rate.is_finite()
             || !maturity.is_finite()
         {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "Merton calibration inputs must be finite".to_string(),
+            ));
         }
         if equity_vol < 0.0 {
             return Err(InputError::NegativeValue.into());
@@ -164,7 +168,7 @@ impl MertonModel {
         // test is relative to the initial firm-value estimate so it scales
         // with the reporting units.
         if equity_value <= Self::MIN_EQUITY_FRACTION * (equity_value + total_debt) {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation("equity value is a negligible fraction of firm value; the KMV inversion is ill-conditioned".to_string()));
         }
 
         let e = equity_value;
@@ -196,7 +200,9 @@ impl MertonModel {
             // inf/NaN, which makes the relative-change test silently never
             // fire. Reject explicitly rather than burning all iterations.
             if nd1 <= Self::MIN_ND1 {
-                return Err(InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "N(d1) collapsed to zero during the KMV iteration".to_string(),
+                ));
             }
 
             // E = V*exp(-qT)*N(d1) - B*exp(-rT)*N(d2)
@@ -316,7 +322,9 @@ impl MertonModel {
             || !payout_rate.is_finite()
             || !recovery.is_finite()
         {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "Merton calibration inputs must be finite".to_string(),
+            ));
         }
         if total_debt <= 0.0 || maturity <= 0.0 || asset_value <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
@@ -482,7 +490,7 @@ impl MertonModel {
     /// # Errors
     ///
     /// Returns [`InputError::NonPositiveValue`] if `asset_value`,
-    /// `asset_vol`, or `maturity` is non-positive, and [`InputError::Invalid`]
+    /// `asset_vol`, or `maturity` is non-positive, and [`Error::Validation`](finstack_quant_core::Error::Validation)
     /// if any input is non-finite or `target_pd` is outside `(0, 1)`.
     pub fn from_target_pd(
         asset_value: f64,
@@ -499,20 +507,26 @@ impl MertonModel {
             || !target_pd.is_finite()
             || !maturity.is_finite()
         {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "Merton calibration inputs must be finite".to_string(),
+            ));
         }
         if asset_value <= 0.0 || asset_vol <= 0.0 || maturity <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
         }
         if !(0.0..1.0).contains(&target_pd) || target_pd <= 0.0 {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "target_pd must lie in (0, 1), got {target_pd}"
+            )));
         }
 
         let d2 = -standard_normal_inv_cdf(target_pd);
         let mu = risk_free_rate - payout_rate - 0.5 * asset_vol * asset_vol;
         let barrier = asset_value * (mu * maturity - d2 * asset_vol * maturity.sqrt()).exp();
         if !barrier.is_finite() || barrier <= 0.0 {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "implied default barrier must be finite and positive".to_string(),
+            ));
         }
 
         Self::new_with_dynamics(
@@ -587,7 +601,9 @@ impl MertonModel {
             || !risk_free_rate.is_finite()
             || !mean_recovery.is_finite()
         {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "CreditGrades inputs must be finite".to_string(),
+            ));
         }
         if equity_value <= 0.0 || total_debt <= 0.0 {
             return Err(InputError::NonPositiveValue.into());

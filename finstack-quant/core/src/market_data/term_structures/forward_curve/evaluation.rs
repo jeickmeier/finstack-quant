@@ -70,7 +70,9 @@ impl CurveTransform {
 
     pub(super) fn validate(&self) -> crate::Result<()> {
         if !self.offset.is_finite() || !self.scale.is_finite() {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "forward curve transform offset and scale must be finite".to_string(),
+            ));
         }
         self.adjustment.validate()
     }

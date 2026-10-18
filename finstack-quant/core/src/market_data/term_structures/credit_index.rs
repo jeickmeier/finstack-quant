@@ -120,7 +120,9 @@ impl CreditIndexData {
     fn validate(&self) -> Result<()> {
         super::common::validate_unit_range(self.recovery_rate, "recovery_rate")?;
         if self.num_constituents == 0 {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "credit index num_constituents must be greater than zero".to_string(),
+            ));
         }
         validate_issuer_curves(&self.issuer_credit_curves, self.num_constituents)?;
         validate_issuer_recovery_rates(&self.issuer_credit_curves, &self.issuer_recovery_rates)?;
@@ -332,9 +334,9 @@ impl CreditIndexDataBuilder {
 
     /// Build the credit index data.
     pub fn build(self) -> Result<CreditIndexData> {
-        let num_constituents = self
-            .num_constituents
-            .ok_or_else(|| crate::Error::from(crate::error::InputError::Invalid))?;
+        let num_constituents = self.num_constituents.ok_or_else(|| {
+            crate::Error::Validation("CreditIndexData requires num_constituents".to_string())
+        })?;
 
         let recovery_rate = self.recovery_rate.ok_or_else(|| {
             crate::Error::Validation(
@@ -342,13 +344,13 @@ impl CreditIndexDataBuilder {
             )
         })?;
 
-        let index_credit_curve = self
-            .index_credit_curve
-            .ok_or_else(|| crate::Error::from(crate::error::InputError::Invalid))?;
+        let index_credit_curve = self.index_credit_curve.ok_or_else(|| {
+            crate::Error::Validation("CreditIndexData requires index_credit_curve".to_string())
+        })?;
 
-        let base_correlation_curve = self
-            .base_correlation_curve
-            .ok_or_else(|| crate::Error::from(crate::error::InputError::Invalid))?;
+        let base_correlation_curve = self.base_correlation_curve.ok_or_else(|| {
+            crate::Error::Validation("CreditIndexData requires base_correlation_curve".to_string())
+        })?;
 
         let data = CreditIndexData {
             num_constituents,

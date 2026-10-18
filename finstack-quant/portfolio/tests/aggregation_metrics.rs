@@ -166,7 +166,7 @@ impl Instrument for MetricFailingInstrument {
         _metrics: &[MetricId],
         _options: finstack_quant_valuations::instruments::PricingOptions,
     ) -> finstack_quant_valuations::Result<ValuationResult> {
-        Err(finstack_quant_core::Error::Input(finstack_quant_core::InputError::Invalid).into())
+        Err(finstack_quant_core::Error::Validation("pricing always fails".to_string()).into())
     }
 }
 

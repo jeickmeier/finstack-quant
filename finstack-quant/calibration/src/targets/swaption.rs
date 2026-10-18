@@ -736,15 +736,15 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
         // PV01/annuity using a proper fixed-leg schedule.
         let pv01 = Self::calculate_pv01_proper(swap_start, swap_end, leg_conv, disc.as_ref())?;
         if !pv01.is_finite() || pv01 <= 1e-16 {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid,
+            return Err(finstack_quant_core::Error::Validation(
+                "swaption annuity (PV01) must be finite and positive".to_string(),
             ));
         }
 
         let float_periods = Self::build_float_leg_periods(swap_start, swap_end, leg_conv)?;
         if float_periods.is_empty() {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid,
+            return Err(finstack_quant_core::Error::Validation(
+                "swaption floating leg produced no periods".to_string(),
             ));
         }
         let forward = params
@@ -836,8 +836,8 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
     ) -> Result<f64> {
         let periods = Self::build_fixed_leg_periods(start, end, leg_conv)?;
         if periods.is_empty() {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid,
+            return Err(finstack_quant_core::Error::Validation(
+                "swaption fixed leg produced no periods".to_string(),
             ));
         }
 

@@ -57,10 +57,9 @@ pub(super) fn cached_full_schedule(
             )?;
         context.internal_schedule = Some(Arc::new(schedule));
     }
-    let arc = context
-        .internal_schedule
-        .as_ref()
-        .ok_or(finstack_quant_core::InputError::Invalid)?;
+    let arc = context.internal_schedule.as_ref().ok_or_else(|| {
+        finstack_quant_core::Error::Validation("term loan schedule was not cached".to_string())
+    })?;
     Ok(Arc::clone(arc))
 }
 

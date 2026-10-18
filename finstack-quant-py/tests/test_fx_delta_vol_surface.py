@@ -49,7 +49,7 @@ def test_construction_and_accessors() -> None:
 
 def test_pillar_vols_out_of_range_raises_value_error() -> None:
     surface = _example_surface()
-    with pytest.raises(ValueError, match="Invalid input data"):
+    with pytest.raises(ValueError, match="out of range for the FX delta surface"):
         get_fx_delta_pillar_vols(surface, 99)
 
 

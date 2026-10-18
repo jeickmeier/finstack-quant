@@ -105,17 +105,19 @@ impl FloatingRateParams {
     ///
     /// # Errors
     ///
-    /// Returns `InputError::Invalid` when any numeric input is non-finite,
+    /// Returns `Error::Validation` when any numeric input is non-finite,
     /// gearing is non-positive, or a floor exceeds its paired cap.
     pub fn validate(&self) -> Result<()> {
-        use finstack_quant_core::InputError;
-
         if !self.spread_bp.is_finite() {
-            return Err(finstack_quant_core::Error::Input(InputError::Invalid));
+            return Err(finstack_quant_core::Error::Validation(
+                "floating rate spread_bp must be finite".to_string(),
+            ));
         }
 
         if !self.gearing.is_finite() || self.gearing <= 0.0 {
-            return Err(finstack_quant_core::Error::Input(InputError::Invalid));
+            return Err(finstack_quant_core::Error::Validation(
+                "floating rate gearing must be finite and positive".to_string(),
+            ));
         }
 
         for v in [
@@ -128,19 +130,25 @@ impl FloatingRateParams {
         .flatten()
         {
             if !v.is_finite() {
-                return Err(finstack_quant_core::Error::Input(InputError::Invalid));
+                return Err(finstack_quant_core::Error::Validation(
+                    "floating rate caps and floors must be finite".to_string(),
+                ));
             }
         }
 
         if let (Some(floor), Some(cap)) = (self.index_floor_bp, self.index_cap_bp) {
             if floor > cap {
-                return Err(finstack_quant_core::Error::Input(InputError::Invalid));
+                return Err(finstack_quant_core::Error::Validation(
+                    "index floor must not exceed index cap".to_string(),
+                ));
             }
         }
 
         if let (Some(floor), Some(cap)) = (self.all_in_floor_bp, self.all_in_cap_bp) {
             if floor > cap {
-                return Err(finstack_quant_core::Error::Input(InputError::Invalid));
+                return Err(finstack_quant_core::Error::Validation(
+                    "all-in floor must not exceed all-in cap".to_string(),
+                ));
             }
         }
 

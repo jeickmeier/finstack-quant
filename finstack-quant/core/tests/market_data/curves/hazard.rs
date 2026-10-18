@@ -85,7 +85,10 @@ fn builder_rejects_empty_knots() {
         .recovery_rate(0.40)
         .build()
         .expect_err("no points should fail");
-    assert!(matches!(err, finstack_quant_core::Error::Input(_)));
+    assert!(
+        matches!(err, finstack_quant_core::Error::Validation(_)),
+        "{err}"
+    );
 }
 
 #[test]
@@ -95,7 +98,10 @@ fn builder_rejects_negative_hazard_rate() {
         .recovery_rate(0.40)
         .build()
         .expect_err("negative lambda should fail");
-    assert!(matches!(err, finstack_quant_core::Error::Input(_)));
+    assert!(
+        matches!(err, finstack_quant_core::Error::Validation(_)),
+        "{err}"
+    );
 }
 
 // Survival and Default Probability Tests

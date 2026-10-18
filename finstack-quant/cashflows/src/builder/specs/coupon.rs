@@ -2,7 +2,6 @@
 
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 
 use super::schedule::ScheduleParams;
@@ -61,7 +60,9 @@ impl CouponType {
                     || pik_fraction < Decimal::ZERO
                     || pik_fraction > Decimal::ONE
                 {
-                    return Err(InputError::Invalid.into());
+                    return Err(finstack_quant_core::Error::Validation(
+                        "cash and PIK fractions must lie in [0, 1]".to_string(),
+                    ));
                 }
                 let sum = cash_fraction + pik_fraction;
                 let tol = Decimal::new(1, 9); // 1e-9
@@ -73,7 +74,9 @@ impl CouponType {
                 if diff <= tol {
                     Ok((cash_fraction, pik_fraction))
                 } else {
-                    Err(InputError::Invalid.into())
+                    Err(finstack_quant_core::Error::Validation(
+                        "cash and PIK fractions must sum to one".to_string(),
+                    ))
                 }
             }
         }

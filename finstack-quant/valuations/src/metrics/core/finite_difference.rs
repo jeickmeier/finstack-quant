@@ -412,7 +412,9 @@ pub(crate) fn bump_surfaces_vol_absolute(
     };
 
     if !bump_abs.is_finite() {
-        return Err(finstack_quant_core::InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "absolute bump must be finite".to_string(),
+        ));
     }
     if bump_abs == 0.0 {
         return Ok(context.clone());

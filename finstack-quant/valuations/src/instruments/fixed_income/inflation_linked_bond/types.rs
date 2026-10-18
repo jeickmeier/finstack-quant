@@ -571,7 +571,9 @@ impl InflationLinkedBond {
         };
 
         if !clean_price.is_finite() || clean_price <= 0.0 {
-            return Err(finstack_quant_core::InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "clean price must be finite and positive, got {clean_price}"
+            )));
         }
 
         // 1. Build real cashflows (unadjusted for inflation)

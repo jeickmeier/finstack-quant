@@ -169,7 +169,10 @@ pub(super) fn price_from_asw_market(
     asw_market: f64,
 ) -> Result<f64> {
     if bond.custom_cashflows.is_some() || !matches!(bond.cashflow_spec, CashflowSpec::Fixed(_)) {
-        return Err(finstack_quant_core::InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "ASW market quotes require a plain fixed-coupon bond without custom cashflows"
+                .to_string(),
+        ));
     }
     let (coupon_pv, float_pv, float_annuity) =
         crate::instruments::fixed_income::bond::metrics::price_yield_spread::asw::settlement_asw_components(bond, curves, as_of)?;

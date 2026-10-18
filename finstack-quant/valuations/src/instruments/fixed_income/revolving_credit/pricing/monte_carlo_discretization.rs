@@ -37,14 +37,21 @@ impl RevolvingCreditDiscretization {
         let cholesky_factor = if let Some(corr) = correlation {
             // Convert 3x3 array to row-major vector
             let corr_vec: Vec<f64> = corr.iter().flat_map(|row| row.iter().copied()).collect();
-            Some(cholesky_correlation(&corr_vec, 3).map_err(|e| match e {
-                CholeskyError::NotPositiveDefinite { .. } => {
-                    finstack_quant_core::Error::Input(finstack_quant_core::InputError::Invalid)
+            Some(cholesky_correlation(&corr_vec, 3).map_err(|e| {
+                match e {
+                    CholeskyError::NotPositiveDefinite { .. } => {
+                        finstack_quant_core::Error::Validation(
+                            "utilization/rate/credit correlation matrix is not positive definite"
+                                .to_string(),
+                        )
+                    }
+                    CholeskyError::DimensionMismatch { .. } => finstack_quant_core::Error::Input(
+                        finstack_quant_core::InputError::DimensionMismatch,
+                    ),
+                    _ => finstack_quant_core::Error::Validation(
+                        "Cholesky factorization of the correlation matrix failed".to_string(),
+                    ),
                 }
-                CholeskyError::DimensionMismatch { .. } => finstack_quant_core::Error::Input(
-                    finstack_quant_core::InputError::DimensionMismatch,
-                ),
-                _ => finstack_quant_core::Error::Input(finstack_quant_core::InputError::Invalid),
             })?)
         } else {
             None

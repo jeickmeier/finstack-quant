@@ -333,6 +333,9 @@ mod tests {
 
         let error = build_initial_context(&prior, &data, &CalibrationConfig::default())
             .expect_err("zero constituents must be rejected");
-        assert!(matches!(error, finstack_quant_core::Error::Input(_)));
+        assert!(
+            matches!(error, finstack_quant_core::Error::Validation(_)),
+            "{error}"
+        );
     }
 }

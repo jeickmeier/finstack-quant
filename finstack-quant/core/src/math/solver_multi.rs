@@ -48,8 +48,6 @@
 //! - **Calibration Applications**:
 //! - Hagan, P. S., et al. (2002). "Managing Smile Risk." *Wilmott Magazine*, September 2002.
 //!   (SABR calibration techniques) `docs/REFERENCES.md#hagan-2002-sabr`
-
-use crate::error::InputError;
 use crate::Result;
 
 /// Pre-allocated scratch buffers for finite-difference Jacobian computation.
@@ -395,12 +393,13 @@ impl LevenbergMarquardtSolver {
             }
         }
 
-        cholesky_decomposition_into(&ws.matrix, n, &mut ws.chol)
-            .map_err(|_| crate::error::InputError::Invalid)?;
+        cholesky_decomposition_into(&ws.matrix, n, &mut ws.chol).map_err(|_| {
+            crate::Error::Validation("normal-equations matrix is not positive definite".to_string())
+        })?;
 
         ws.step.fill(0.0);
         cholesky_solve(&ws.chol, &ws.rhs, &mut ws.step)
-            .map_err(|_| crate::error::InputError::Invalid)?;
+            .map_err(|_| crate::Error::Validation("normal-equations solve failed".to_string()))?;
 
         Ok(())
     }
@@ -417,7 +416,9 @@ impl LevenbergMarquardtSolver {
         Jac: FnMut(&[f64], &[f64], &mut usize, &mut [f64]),
     {
         if params.is_empty() || n_residuals == 0 {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "solver needs at least one parameter and one residual".to_string(),
+            ));
         }
         if params.iter().any(|value| !value.is_finite()) {
             return Err(crate::Error::Validation(
@@ -614,7 +615,9 @@ impl LevenbergMarquardtSolver {
         D: AnalyticalDerivatives,
     {
         if initial.is_empty() {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "solver needs at least one initial parameter".to_string(),
+            ));
         }
         let n_residuals = derivatives.residual_count();
 

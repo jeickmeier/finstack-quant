@@ -360,7 +360,9 @@ impl BasisSpreadCurveBuilder {
     /// supplied knot grid and values cannot construct the selected
     /// interpolation/extrapolation strategy.
     pub fn build(self) -> crate::Result<BasisSpreadCurve> {
-        let base = self.base.ok_or(InputError::Invalid)?;
+        let base = self.base.ok_or_else(|| {
+            crate::Error::Validation("BasisSpreadCurve requires base_date".to_string())
+        })?;
         if self.points.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }

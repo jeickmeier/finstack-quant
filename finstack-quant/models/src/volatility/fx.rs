@@ -275,7 +275,9 @@ impl FxVolSurfaceBuilder {
             return Err(InputError::NonPositiveValue.into());
         }
         if !self.domestic_rate.is_finite() || !self.foreign_rate.is_finite() {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "domestic and foreign rates must be finite".to_string(),
+            ));
         }
         if self.expiries.is_empty() || self.atm_vols.is_empty() {
             return Err(InputError::TooFewPoints.into());
@@ -304,7 +306,10 @@ impl FxVolSurfaceBuilder {
         if self.rr_25d.is_some() != self.bf_25d.is_some()
             || self.rr_10d.is_some() != self.bf_10d.is_some()
         {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "risk reversal and butterfly quotes must be supplied together for each delta"
+                    .to_string(),
+            ));
         }
         let has_wings = self.rr_25d.is_some();
 
@@ -314,7 +319,9 @@ impl FxVolSurfaceBuilder {
             }
             for &v in rr {
                 if !v.is_finite() {
-                    return Err(InputError::Invalid.into());
+                    return Err(finstack_quant_core::Error::Validation(
+                        "25-delta risk reversal quotes must be finite".to_string(),
+                    ));
                 }
             }
         }
@@ -324,7 +331,9 @@ impl FxVolSurfaceBuilder {
             }
             for &v in bf {
                 if !v.is_finite() {
-                    return Err(InputError::Invalid.into());
+                    return Err(finstack_quant_core::Error::Validation(
+                        "25-delta butterfly quotes must be finite".to_string(),
+                    ));
                 }
             }
         }
@@ -334,7 +343,9 @@ impl FxVolSurfaceBuilder {
             }
             for &v in rr {
                 if !v.is_finite() {
-                    return Err(InputError::Invalid.into());
+                    return Err(finstack_quant_core::Error::Validation(
+                        "10-delta risk reversal quotes must be finite".to_string(),
+                    ));
                 }
             }
         }
@@ -344,7 +355,9 @@ impl FxVolSurfaceBuilder {
             }
             for &v in bf {
                 if !v.is_finite() {
-                    return Err(InputError::Invalid.into());
+                    return Err(finstack_quant_core::Error::Validation(
+                        "10-delta butterfly quotes must be finite".to_string(),
+                    ));
                 }
             }
         }
@@ -354,7 +367,9 @@ impl FxVolSurfaceBuilder {
 
         if has_wings {
             let (Some(rr), Some(bf)) = (self.rr_25d.as_ref(), self.bf_25d.as_ref()) else {
-                return Err(InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "25-delta wings require both risk reversal and butterfly quotes".to_string(),
+                ));
             };
             let wings_10d = match (self.rr_10d.as_ref(), self.bf_10d.as_ref()) {
                 (Some(rr10), Some(bf10)) => Some((rr10, bf10)),
@@ -616,10 +631,11 @@ pub fn get_fx_delta_pillar_vols(
     surface: &FxDeltaVolSurface,
     expiry_index: usize,
 ) -> Result<(f64, f64, f64)> {
-    let atm = *surface
-        .atm_vols()
-        .get(expiry_index)
-        .ok_or(InputError::Invalid)?;
+    let atm = *surface.atm_vols().get(expiry_index).ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "expiry index {expiry_index} is out of range for the FX delta surface"
+        ))
+    })?;
     let rr = surface.rr_25d()[expiry_index];
     let bf = surface.bf_25d()[expiry_index];
     let (put, call) = recover_fx_wing_vols(atm, rr, bf);

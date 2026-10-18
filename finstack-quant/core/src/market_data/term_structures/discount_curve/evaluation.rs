@@ -62,7 +62,9 @@ impl CurveTransform {
     fn refresh_normalization(&mut self, interp: &Interp) -> crate::Result<()> {
         self.adjustment.validate()?;
         if !self.offset.is_finite() {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "discount curve roll offset must be finite".to_string(),
+            ));
         }
         self.normalization = interp.interp(self.offset);
         if !self.normalization.is_finite() || self.normalization <= 0.0 {
