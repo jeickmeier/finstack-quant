@@ -283,11 +283,7 @@ pub(crate) fn price_expired_barrier(
     let spot = if let Some(fixing) = inst.expiry_fixing {
         fixing
     } else if as_of == inst.expiry {
-        let spot_scalar = curves.get_price(&inst.spot_id)?;
-        match spot_scalar {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-        }
+        resolve_spot(inst, curves)?
     } else {
         return Err(finstack_quant_core::Error::Validation(format!(
             "BarrierOption '{}' requires expiry_fixing when valued after expiry {}",
@@ -385,10 +381,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
 
         if as_of >= barrier_opt.expiry {
             let pv = price_expired_barrier(barrier_opt, market, as_of).map_err(|error| {
-                PricingError::model_failure_with_context(
-                    error.to_string(),
-                    PricingErrorContext::default(),
-                )
+                PricingError::from_core(error, PricingErrorContext::from_instrument(barrier_opt))
             })?;
             return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, pv));
         }
@@ -398,10 +391,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
             return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, value));
         }
         let bs_inputs = collect_barrier_inputs(barrier_opt, market, as_of).map_err(|error| {
-            PricingError::model_failure_with_context(
-                error.to_string(),
-                PricingErrorContext::default(),
-            )
+            PricingError::from_core(error, PricingErrorContext::from_instrument(barrier_opt))
         })?;
         let (spot, q, sigma, t, df) = (
             bs_inputs.spot,
@@ -1125,5 +1115,49 @@ mod tests {
              Likely cause: maturity_step is set one step too early.",
             (mc_pv - bs_price_t1).abs()
         );
+    }
+
+    #[test]
+    fn missing_discount_curve_surfaces_as_not_found() {
+        let as_of = date(2025, 1, 2);
+        let curves = market(as_of, 100.0, 0.2, 0.03, 0.0);
+        let mut option = down_and_out_call(date(2026, 1, 2), 100.0, 80.0);
+        option.discount_curve_id = "MISSING_DISC".into();
+        let err = option.value(&curves, as_of).expect_err("missing curve");
+        assert!(
+            matches!(
+                err,
+                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound { .. })
+            ),
+            "missing discount curve must stay NotFound, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn expired_barrier_rejects_foreign_currency_spot_price() {
+        let expiry = date(2024, 7, 1);
+        let curves = MarketContext::new().insert_price(
+            "SPX",
+            MarketScalar::Price(Money::new(120.0, Currency::EUR).expect("valid money fixture")),
+        );
+        let alive_knock_out = BarrierOption {
+            observed_barrier_breached: Some(false),
+            ..down_and_out_call(expiry, 100.0, 80.0)
+        };
+        let err = price_expired_barrier(&alive_knock_out, &curves, expiry).expect_err("ccy");
+        assert!(
+            matches!(
+                err,
+                finstack_quant_core::Error::CurrencyMismatch {
+                    expected: Currency::USD,
+                    actual: Currency::EUR,
+                }
+            ),
+            "{err:?}"
+        );
+        let err = alive_knock_out
+            .value(&curves, expiry)
+            .expect_err("value at expiry");
+        assert!(err.to_string().contains("Currency mismatch"), "{err:?}");
     }
 }

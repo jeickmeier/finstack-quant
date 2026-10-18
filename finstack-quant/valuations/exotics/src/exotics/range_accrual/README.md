@@ -39,7 +39,7 @@ range_accrual/
 ├── types.rs        # RangeAccrual, RangeAccrualTerms, BoundsType, builders, examples, validate
 ├── pricer.rs       # RangeAccrualStaticReplicationPricer, RangeAccrualMcPricer, npv_analytic
 ├── monte_carlo.rs  # RangeAccrualPayoff for the shared MC path-dependent pricer
-└── metrics/        # rho.rs plus generic FD greeks registered in mod.rs
+└── metrics/        # generic FD greeks and curve risk registered in mod.rs
 ```
 
 ## Pricing
@@ -205,7 +205,7 @@ finite-difference:
 |-----------|-----------|
 | `Delta`, `Gamma` | `GenericFdDelta` / `GenericFdGamma` |
 | `Vega`, `Vanna`, `Volga` | `GenericFdVega` / `GenericFdVanna` / `GenericFdVolga` |
-| `Rho` | `rho::RhoCalculator` |
+| `Rho` | `UnifiedDv01Calculator` with `parallel_discount_only()` (central bump, selected model) |
 | `Dv01`, `BucketedDv01` | Parallel and triangular key-rate curve risk |
 
 `Theta` is registered universally by `metrics::standard_registry()`.

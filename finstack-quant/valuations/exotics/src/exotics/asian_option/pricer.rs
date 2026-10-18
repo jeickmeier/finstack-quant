@@ -2128,4 +2128,30 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn missing_discount_curve_surfaces_as_not_found_for_both_averaging_methods() {
+        let as_of = date(2025, 1, 2);
+        let curves = market(as_of, 100.0, 0.2, 0.03, 0.0);
+        for averaging in [AveragingMethod::Geometric, AveragingMethod::Arithmetic] {
+            let mut option = asian_option(
+                averaging,
+                OptionType::Call,
+                date(2026, 1, 2),
+                100.0,
+                vec![date(2025, 7, 1), date(2026, 1, 2)],
+            );
+            option.discount_curve_id = CurveId::new("MISSING-OIS");
+            let err = option.value(&curves, as_of).expect_err("missing curve");
+            assert!(
+                matches!(
+                    err,
+                    finstack_quant_core::Error::Input(
+                        finstack_quant_core::InputError::NotFound { .. }
+                    )
+                ),
+                "{averaging:?}: missing discount curve must stay NotFound, got {err:?}"
+            );
+        }
+    }
 }
