@@ -1,0 +1,21 @@
+{
+  "manual JsonSchema implementation": "impl schemars::JsonSchema for Foo {}",
+  "handwritten json_schema macro": "schemars::json_schema!({})",
+  "schema_with override": "#[schemars(schema_with = \"x\")]",
+  "serde compatibility alias": "#[serde(default, alias = \"old\")]",
+  "serde_json::Value schema projection": "#[schemars(with = \"serde_json::Value\")]",
+  "schema-only single-instrument shadow enum": "pub enum SingleInstrumentJson {}",
+  "obsolete schema assembly helper": "fn postprocess_schema() {} NormalizedEnum optimize_portfolio_typed",
+  "retired skipped-path field": "num_skipped: usize",
+  "retired scalar arbitrage-forward field": "forward: Option<f64>",
+  "retired schema contract symbol": "spot_ids CacheStrategy bilateral_cva",
+  "retired abbreviated contract identifier": "freq dc bdc asof_spreads surface_ids notional_ccy spread_bps",
+  "retired margin registry identifier": "valuations.margin_registry.v1",
+  "retired PascalCase convertible enum value": "{\"anti_dilution\": \"FullRatchet\", \"policy\": \"Voluntary\"}",
+  "retired tranche behavior_type field": "{\"behavior_type\": 1}",
+  "retired PascalCase tranche seniority": "{\"seniority\": \"Senior\"}",
+  "retired PascalCase typed result value": "{\"model_key\": \"Black76\"}",
+  "retired calibration marker": "finstack_quant.calibration/2 schemas/calibration/0",
+  "retired numeric schema version": "{\"schema_version\": 2}",
+  "malformed repeated canonical name": "trade_currencyrenc spread_bp_bp"
+}
