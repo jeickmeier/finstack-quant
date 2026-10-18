@@ -297,6 +297,42 @@ pub(crate) fn collect_fx_option_inputs(
     })
 }
 
+/// One volatility scenario: the instrument and market to reprice.
+pub(crate) type VolScenario<I> = (I, MarketContext);
+
+/// Central volatility bump on the source pricing reads.
+///
+/// An instrument with an `implied_volatility` override is bumped on that
+/// quote (the market is left unchanged); otherwise the named surface is bumped
+/// in parallel. With an override the half-width is capped at half the quoted
+/// vol so the down scenario stays positive.
+///
+/// `overrides` must be the instrument's own pricing overrides; they decide
+/// whether the quote or the surface is the active source.
+///
+/// Returns `(bump_abs, up, down)`, where `bump_abs` is the half-width actually
+/// applied (absolute vol, `0.01` = one vol point).
+pub(crate) fn active_vol_scenarios<I>(
+    instrument: &I,
+    overrides: &InstrumentPricingOverrides,
+    market: &MarketContext,
+    surface_id: &str,
+    requested_bump_abs: f64,
+) -> finstack_quant_core::Result<(f64, VolScenario<I>, VolScenario<I>)>
+where
+    I: finstack_quant_valuations_core::instruments::Instrument + Clone,
+{
+    use finstack_quant_valuations_core::metrics::bump_active_volatility;
+
+    let bump_abs = overrides
+        .market_quotes
+        .implied_volatility
+        .map_or(requested_bump_abs, |vol| requested_bump_abs.min(vol * 0.5));
+    let up = bump_active_volatility(instrument, market, surface_id, bump_abs)?;
+    let down = bump_active_volatility(instrument, market, surface_id, -bump_abs)?;
+    Ok((bump_abs, up, down))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
