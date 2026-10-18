@@ -66,7 +66,7 @@ fn build_forward(id: &str, base: Date, zero: f64) -> ForwardCurve {
 ///
 /// Uses the same `SimpleFxProvider` pattern from the existing
 /// `base_value_dispatches_mtm_resetting_to_pricing_mtm` test in
-/// `finstack-quant/valuations/src/instruments/rates/xccy_swap/types.rs`.
+/// `finstack-quant/valuations/rates/src/xccy_swap/types.rs`.
 fn build_fx_matrix(spot_eur_to_usd: f64) -> FxMatrix {
     let provider = Arc::new(SimpleFxProvider::new());
     provider

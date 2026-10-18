@@ -22,5 +22,7 @@ mod ir_future;
 mod irs;
 #[path = "repo/mod.rs"]
 mod repo;
+#[path = "swaption/mod.rs"]
+mod swaption;
 #[path = "xccy_swap/mod.rs"]
 mod xccy_swap;

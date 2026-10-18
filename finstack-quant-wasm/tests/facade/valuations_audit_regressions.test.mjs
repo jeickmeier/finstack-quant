@@ -533,7 +533,7 @@ test('large homogeneous credit-pool loss meets the independent LHP reference', (
   const reference = JSON.parse(
     readFileSync(
       new URL(
-        '../../../finstack-quant/valuations/tests/fixtures/production_tranche_loss_reference.json',
+        '../../../finstack-quant/valuations/credit/tests/fixtures/production_tranche_loss_reference.json',
         import.meta.url
       )
     )

@@ -56,14 +56,13 @@ in a different crate, reached by the MC instrument pricers.
 | [`json.rs`](json.rs) | Envelope parse/validate, model + metric discovery, the JSON pricing entry points | `pub mod` |
 | [`family.rs`](family.rs) | `Family`: the registration unit, its per-family pricer and metric registries built on first use, `Family::unregistered` | private mod, type re-exported |
 
-Registration tables live with the instruments. Each family root declares a
-`static Family` with its pricer and metric tables: `instruments/rates/family.rs`
-(`RATES`), `instruments/fixed_income/family.rs` (`FIXED_INCOME`),
-`instruments/fixed_income/structured_credit/family.rs` (`STRUCTURED_CREDIT`),
-`instruments/credit_derivatives/family.rs` (`CREDIT`),
-`instruments/equity/family.rs` (`EQUITY`), `instruments/fx/family.rs` (`FX`) and
-`instruments/exotics/family.rs` (`EXOTICS`, which also owns the commodity
-leaves). The two hand-written registry adapters (`CdsHazardPricer`,
+Registration tables live with the instruments. Each family crate declares a
+`static Family` with its pricer and metric tables: `rates/src/family.rs`
+(`RATES`), `fixed-income/src/family.rs` (`FIXED_INCOME`),
+`structured-credit/src/structured_credit/family.rs` (`STRUCTURED_CREDIT`),
+`credit/src/family.rs` (`CREDIT`), `equity/src/family.rs` (`EQUITY`),
+`fx/src/family.rs` (`FX`) and `exotics/src/exotics/family.rs` (`EXOTICS`, which
+also owns the commodity leaves). The two hand-written registry adapters (`CdsHazardPricer`,
 `StructuredCreditStochasticPricer`) sit in their family files. `STANDARD` in
 `mod.rs` merges every family and adds `Composite` and `Basket`; an instrument
 priced without an explicit registry resolves its own family through

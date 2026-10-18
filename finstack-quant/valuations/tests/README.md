@@ -50,10 +50,10 @@ tests/
 │   └── builders.rs         # TestOptionBuilder, simple_call_option, simple_put_option
 │
 ├── support/                # Instrument builders shared across several targets
-│   ├── rates.rs            # usd_irs_swap
+│   ├── rates.rs            # usd_irs_swap (path-included from ../rates/tests/support/)
 │   ├── credit.rs           # CDS builders and calibrated hazard curves (needs calibration)
 │   ├── equity_fx_options.rs
-│   └── calibration.rs      # quote-set and MarketContext splitting helpers
+│   └── calibration.rs      # quote-set and MarketContext splitting helpers (path-included from ../../calibration/tests/support/)
 │
 ├── instruments/            # 48 instrument dirs + contract tests + generated fixtures
 ├── calibration/            # incl. term_structures/ property tests

@@ -19915,7 +19915,7 @@ export interface ScenarioPricingOverrides3 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;
+ * use finstack_quant_valuations_structured_credit::asset_backed_facility::AssetBackedFacility;
  *
  * let facility = AssetBackedFacility::example()?;
  * let report = facility.borrowing_base()?;
@@ -20084,7 +20084,7 @@ export interface ConcentrationLimit {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::structured_credit::CardPortfolioSpec;
+ * use finstack_quant_valuations_structured_credit::structured_credit::CardPortfolioSpec;
  *
  * // 15% monthly payment rate, 18% portfolio yield, 5% annual charge-offs.
  * let spec = CardPortfolioSpec::new(0.15, 0.18, 0.05);
@@ -20710,7 +20710,7 @@ export interface Money7 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::structured_credit::BalloonSpec;
+ * use finstack_quant_valuations_structured_credit::structured_credit::BalloonSpec;
  *
  * // 30% of the balloon extends two years at 7%; 10% defaults at 40% severity
  * // with an 18-month workout.
@@ -20777,7 +20777,7 @@ export interface BalloonSpec {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::structured_credit::LiquidationSpec;
+ * use finstack_quant_valuations_structured_credit::structured_credit::LiquidationSpec;
  *
  * // Two-year workout: 55% gross proceeds less 5% carry, 20% re-performs at 4%.
  * let spec = LiquidationSpec {
@@ -28004,7 +28004,7 @@ export interface Money31 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+ * use finstack_quant_valuations_structured_credit::structured_credit::{
  *     AdvancingPolicy, DelinquencyModel,
  * };
  *
@@ -51800,7 +51800,7 @@ export interface StructuredCredit {
    * # Examples
    *
    * ```
-   * use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
+   * use finstack_quant_valuations_structured_credit::structured_credit::CoverageTestSpec;
    *
    * // Class B must maintain 120% OC (tested on A + B) and 115% IC.
    * let tests = vec![
@@ -51988,7 +51988,7 @@ export interface Attributes75 {
  *
  * ```rust
  * use finstack_quant_core::dates::Date;
- * use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+ * use finstack_quant_valuations_structured_credit::structured_credit::{
  *     CallAssumption, CallScope,
  * };
  * use time::Month;

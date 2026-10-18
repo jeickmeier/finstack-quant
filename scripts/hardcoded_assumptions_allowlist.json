@@ -1730,37 +1730,37 @@
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/commodity/commodity_forward/types.rs",
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_forward/types.rs",
       "category": "contract_spec",
       "contains": ".multiplier(1.0)",
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/commodity/commodity_spot_option/types.rs",
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_spot_option/types.rs",
       "category": "contract_spec",
       "contains": ".multiplier(1.0)",
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/commodity/commodity_spot_option/types.rs",
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_spot_option/types.rs",
       "category": "contract_spec",
       "contains": "Ok(vega_abs * 0.01 * self.quantity * self.multiplier)",
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/common/cashflow_export.rs",
+      "path": "finstack-quant/valuations/core/src/instruments/cashflow_export.rs",
       "category": "credit_assumption",
       "contains": "\"instrument declares no hazard curve; hazard_rate model requires one\".into(),",
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/common/cashflow_export.rs",
+      "path": "finstack-quant/valuations/core/src/instruments/cashflow_export.rs",
       "category": "market_convention",
       "contains": "\"instrument has no declared discount curve; cannot compute cashflow DFs\".into(),",
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/common/cashflow_export.rs",
+      "path": "finstack-quant/valuations/core/src/instruments/cashflow_export.rs",
       "category": "structured_credit",
       "contains": "(Some(r), CFKind::Amortization | CFKind::Notional | CFKind::PrePayment) => r * (1.0 - sp),",
       "reason": "Financial formula or unit conversion, not an external default to configure."
@@ -1832,19 +1832,19 @@
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/common/parameters/underlying.rs",
+      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/underlying.rs",
       "category": "contract_spec",
       "contains": "contract_size: 1.0,",
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/common/parameters/underlying.rs",
+      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/underlying.rs",
       "category": "market_convention",
       "contains": "\"no default OIS curve for currency {other}; supply the discount curve ID explicitly\"",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/common/pricing/swap_legs.rs",
+      "path": "finstack-quant/valuations/core/src/instruments/common_impl/pricing/swap_legs.rs",
       "category": "market_convention",
       "contains": "\"Reset calendar '{}' not found in registry; cannot apply reset lag.\",",
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
@@ -1868,91 +1868,91 @@
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds/metrics/expected_loss.rs",
+      "path": "finstack-quant/valuations/credit/src/cds/metrics/expected_loss.rs",
       "category": "credit_assumption",
       "contains": "let lgd = 1.0 - cds.protection.recovery_rate;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds/metrics/jump_to_default.rs",
+      "path": "finstack-quant/valuations/credit/src/cds/metrics/jump_to_default.rs",
       "category": "credit_assumption",
       "contains": "let lgd = 1.0 - cds.protection.recovery_rate;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds/pricing/integration.rs",
+      "path": "finstack-quant/valuations/credit/src/cds/pricing/integration.rs",
       "category": "credit_assumption",
       "contains": "let lgd = 1.0 - recovery;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds/types.rs",
+      "path": "finstack-quant/valuations/credit/src/cds/types.rs",
       "category": "credit_assumption",
       "contains": "credit_curve_id: finstack_quant_core::types::CurveId::new(\"CORP-HAZARD\"),",
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds/types.rs",
+      "path": "finstack-quant/valuations/credit/src/cds/types.rs",
       "category": "credit_assumption",
       "contains": "credit_curve_id: finstack_quant_core::types::CurveId::new(\"EU-CORP-HAZARD\"),",
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_index/metrics/expected_loss.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/expected_loss.rs",
       "category": "credit_assumption",
       "contains": "let lgd = 1.0 - constituent.credit.recovery_rate;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_index/metrics/expected_loss.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/expected_loss.rs",
       "category": "credit_assumption",
       "contains": "let lgd = 1.0 - index.protection.recovery_rate;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_index/metrics/jump_to_default.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/jump_to_default.rs",
       "category": "credit_assumption",
       "contains": "let lgd = 1.0 - constituent.credit.recovery_rate;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_index/metrics/jump_to_default.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/jump_to_default.rs",
       "category": "credit_assumption",
       "contains": "let lgd = 1.0 - index.protection.recovery_rate;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_index/metrics/recovery01.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/recovery01.rs",
       "category": "credit_assumption",
       "contains": "bumped.protection.recovery_rate = (base + delta).clamp(0.0, 1.0);",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_index/metrics/recovery01.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/recovery01.rs",
       "category": "credit_assumption",
       "contains": "con.credit.recovery_rate = (base + delta).clamp(0.0, 1.0);",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_index/pricer.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_index/pricer.rs",
       "category": "credit_assumption",
       "contains": "if !(0.0..=1.0).contains(&c.credit.recovery_rate) {",
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_index/pricer.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_index/pricer.rs",
       "category": "credit_assumption",
       "contains": "let loss_given_default = 1.0 - cds.protection.recovery_rate;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_index/types.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_index/types.rs",
       "category": "credit_assumption",
       "contains": "credit_curve_id: CurveId::new(\"CDX.NA.IG.HAZARD\"),",
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_index/types.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_index/types.rs",
       "category": "credit_assumption",
       "contains": "recovery_rate: 0.40,",
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
@@ -1964,73 +1964,73 @@
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_option/metrics/recovery01.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_option/metrics/recovery01.rs",
       "category": "credit_assumption",
       "contains": "option_down.recovery_rate = (base_recovery - RECOVERY_BUMP).clamp(0.001, 0.999);",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_option/metrics/recovery01.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_option/metrics/recovery01.rs",
       "category": "credit_assumption",
       "contains": "option_up.recovery_rate = (base_recovery + RECOVERY_BUMP).clamp(0.001, 0.999);",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_option/pricer.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_option/pricer.rs",
       "category": "credit_assumption",
       "contains": "(1.0 - recovery) * integral",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_option/types.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_option/types.rs",
       "category": "credit_assumption",
       "contains": "\"CORP-HAZARD\",",
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_option/types.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_option/types.rs",
       "category": "credit_assumption",
       "contains": "\"recovery_rate must be in (0, 1), got {}\",",
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_tranche/pricing/heterogeneous.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/pricing/heterogeneous.rs",
       "category": "credit_assumption",
       "contains": "lgd_i = vec![(1.0 - index_data.recovery_rate).max(self.params.lgd_floor); count];",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_tranche/pricing/sensitivities.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/pricing/sensitivities.rs",
       "category": "credit_assumption",
       "contains": "let individual_loss = individual_weight * (1.0 - recovery);",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_tranche/pricing/sensitivities.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/pricing/sensitivities.rs",
       "category": "credit_assumption",
       "contains": "let loss_given_default = 1.0 - recovery_rate;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_tranche/types.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/types.rs",
       "category": "credit_assumption",
       "contains": "CurveId::new(\"CDX.NA.IG.HAZARD\"),",
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/credit_derivatives/cds_tranche/types.rs",
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/types.rs",
       "category": "market_convention",
       "contains": "calendar_id: \"weekends_only\".to_string(),",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/equity/equity_trs/types.rs",
+      "path": "finstack-quant/valuations/equity/src/equity_trs/types.rs",
       "category": "contract_spec",
       "contains": "contract_size: 1.0,",
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/equity/equity_trs/types.rs",
+      "path": "finstack-quant/valuations/equity/src/equity_trs/types.rs",
       "category": "market_convention",
       "contains": "calendar_id: \"weekends_only\".to_string(),",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
@@ -2042,343 +2042,343 @@
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/equity/variance_swap/types.rs",
+      "path": "finstack-quant/valuations/equity/src/variance_swap/types.rs",
       "category": "market_convention",
       "contains": "\"VarianceSwap valuation as_of date ({}) is before discount curve '{}' base date ({}). \\",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/cashflow_spec.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/cashflow_spec.rs",
       "category": "market_convention",
       "contains": "calendar_id: \"weekends_only\".to_string(),",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/cashflow_spec.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/cashflow_spec.rs",
       "category": "market_convention",
       "contains": "let calendar = calendar_id.unwrap_or_else(|| \"weekends_only\".to_string());",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/pricing/engine/hazard.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/engine/hazard.rs",
       "category": "credit_assumption",
       "contains": "if recovery > 0.0 {",
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/pricing/engine/hazard.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/engine/hazard.rs",
       "category": "credit_assumption",
       "contains": "let recovery = hazard.recovery_rate().clamp(0.0, 1.0);",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/pricing/engine/merton_mc/engine.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/engine/merton_mc/engine.rs",
       "category": "credit_assumption",
       "contains": "-(1.0 - pd).ln() / coupon_t",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/pricing/engine/tree/bond_valuator.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/engine/tree/bond_valuator.rs",
       "category": "credit_assumption",
       "contains": "let p_surv = (-hazard.max(0.0) * dt).exp();",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/pricing/ytm_solver.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/ytm_solver.rs",
       "category": "contract_spec",
       "contains": "let (maturity_date, face_value) = &cashflows[0];",
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/types/construction.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/construction.rs",
       "category": "contract_spec",
       "contains": "CurveId::new(\"USD-SOFR-3M\")",
       "reason": "Example floating-rate note fixture; production conventions are registry-backed."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/types/construction.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/construction.rs",
       "category": "market_convention",
       "contains": "calendar_id: \"weekends_only\"",
       "reason": "Bond example fixture calendar, not a mutable production default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/types/construction.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/construction.rs",
       "category": "market_convention",
       "contains": "settlement_days: 2",
       "reason": "Bond example/default settlement fixture; exchange contract specs are registry-backed where applicable."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/types/definitions.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/definitions.rs",
       "category": "market_convention",
       "contains": "settlement_days: helper.settlement_days.unwrap_or(0),",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/types/pricing.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/pricing.rs",
       "category": "market_convention",
       "contains": ".unwrap_or_else(|_| discount_curve.zero(0.0));",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/types/tests_stepup.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/tests_stepup.rs",
       "category": "market_convention",
       "contains": ".expect(\"DiscountCurve builder should succeed in test\"),",
       "reason": "Test fixture or test utility value; not a production mutable assumption."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/types/tests_stepup.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/tests_stepup.rs",
       "category": "market_convention",
       "contains": "DiscountCurve::builder(\"USD-OIS\")",
       "reason": "Test fixture or test utility value; not a production mutable assumption."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond_future/pricer.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond_future/pricer.rs",
       "category": "contract_spec",
       "contains": "\"Standard coupon rate {} yields half_rate {} <= -1.0, cannot compute conversion factor\",",
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond_future/pricer.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond_future/pricer.rs",
       "category": "contract_spec",
       "contains": "let half_rate = standard_coupon / 2.0;",
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/cmo/pricer.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/cmo/pricer.rs",
       "category": "margin_regulatory",
       "contains": ".id(InstrumentId::new(format!(\"{}-COLLATERAL\", cmo.id.as_str())))",
       "reason": "Binding metadata, repr text, or module/export label; not a mutable financial assumption."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/cmo/tranches/pac_support.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/cmo/tranches/pac_support.rs",
       "category": "structured_credit",
       "contains": "1.0 - (1.0 - cpr).powf(1.0 / 12.0)",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/convertible/pricing/valuator.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/pricing/valuator.rs",
       "category": "credit_assumption",
       "contains": "let risky_fwd = raw_risky_fwd * (1.0 - recovery) + rf_fwd * recovery;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/convertible/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/types.rs",
       "category": "market_convention",
       "contains": "calendar_id: \"weekends_only\".to_string(),",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/fi_trs/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/fi_trs/types.rs",
       "category": "market_convention",
       "contains": "calendar_id: \"weekends_only\".to_string(),",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/inflation_linked_bond/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/inflation_linked_bond/types.rs",
       "category": "market_convention",
       "contains": "calendar_id: Some(\"jpto\".into()),",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/metrics/mc_oas.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/metrics/mc_oas.rs",
       "category": "contract_spec",
       "contains": "(base_smm * multiplier).clamp(0.0, SMM_SAFETY_CAP)",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/metrics/mc_oas.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/metrics/mc_oas.rs",
       "category": "structured_credit",
       "contains": "\"MBS prepayment model returned invalid SMM={base_smm} at seasoning {seasoning} months on MC path; expected finite value in [0.0, 1.0]\"",
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/metrics/mc_oas.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/metrics/mc_oas.rs",
       "category": "structured_credit",
       "contains": "balance = (balance - scheduled_principal - prepayment).max(0.0);",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/pricer.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/pricer.rs",
       "category": "market_convention",
       "contains": "let pv = discount_schedule(&schedule, &discount_curve, as_of, 0.0)?;",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/pricer.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/pricer.rs",
       "category": "structured_credit",
       "contains": "\"MBS prepayment model returned invalid SMM={raw_smm} at seasoning {seasoning} months; expected finite value in [0.0, 1.0]\"",
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/pricer.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/pricer.rs",
       "category": "structured_credit",
       "contains": "let prepayment = (balance - scheduled_principal).max(0.0) * smm;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/types.rs",
       "category": "structured_credit",
       "contains": ".prepayment_spec(PrepaymentModelSpec::psa(1.0))",
       "reason": "Structured-credit formula, named standard factory, or diagnostic; mutable assumptions live in structured-credit/TBA registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/revolving_credit/cashflow_engine.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/cashflow_engine.rs",
       "category": "market_convention",
       "contains": "\"forward curve required for floating rate\".into(),",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/revolving_credit/pricing/path_generator.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/pricing/path_generator.rs",
       "category": "credit_assumption",
       "contains": "let one_minus_r = (1.0 - facility.recovery_rate).max(1e-6);",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/revolving_credit/pricing/unified.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/pricing/unified.rs",
       "category": "credit_assumption",
       "contains": "if facility.recovery_rate > 0.0 {",
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/revolving_credit/pricing/unified.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/pricing/unified.rs",
       "category": "credit_assumption",
       "contains": "let hazard_rate = credit_spreads[i] / (1.0 - recovery_rate).max(1e-6);",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/revolving_credit/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/types.rs",
       "category": "contract_spec",
       "contains": "CurveId::new(\"USD-SOFR-3M\")",
       "reason": "Example revolving-credit fixture index, not a production default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/revolving_credit/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/types.rs",
       "category": "credit_assumption",
       "contains": "\"RevolvingCredit recovery_rate must be in [0, {:.6}), got {}\",",
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/revolving_credit/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/types.rs",
       "category": "credit_assumption",
       "contains": ".recovery_rate(0.0)",
       "reason": "Example revolving-credit fixture recovery, not a production credit assumption."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/revolving_credit/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/types.rs",
       "category": "credit_assumption",
       "contains": "MAX_RECOVERY_RATE",
       "reason": "Recovery validation bound, not a recovery default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/revolving_credit/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/types.rs",
       "category": "credit_assumption",
       "contains": "Recovery rate must be",
       "reason": "Validation error text, not a recovery default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/revolving_credit/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/types.rs",
       "category": "market_convention",
       "contains": "calendar_id: \"weekends_only\".to_string(),",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/revolving_credit/utils.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/utils.rs",
       "category": "market_convention",
       "contains": ".get_meta(\"calendar_id\")",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/pool/characteristics.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/characteristics.rs",
       "category": "structured_credit",
       "contains": "(cdr * speed_multiplier).clamp(0.0, 1.0)",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/pool/mod.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/mod.rs",
       "category": "rating_agency",
       "contains": "pub use warf::CloWarfCalculator;",
       "reason": "Rating scale or WARF API plumbing; rating factors and scales are sourced from the rating-scale registry."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/pool/mod.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/mod.rs",
       "category": "rating_agency",
       "contains": "pub(crate) mod warf;",
       "reason": "Rating scale or WARF API plumbing; rating factors and scales are sourced from the rating-scale registry."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/pool/warf.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/warf.rs",
       "category": "rating_agency",
       "contains": "let rating_factor = asset",
       "reason": "Rating scale or WARF API plumbing; rating factors and scales are sourced from the rating-scale registry."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/pool/warf.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/warf.rs",
       "category": "rating_agency",
       "contains": "weighted_sum += balance * rating_factor;",
       "reason": "Rating scale or WARF API plumbing; rating factors and scales are sourced from the rating-scale registry."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/risk/default01.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/default01.rs",
       "category": "structured_credit",
       "contains": "cdr: (instrument.credit_model.default_spec.cdr + DEFAULT_BUMP_CDR).max(0.0),",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/risk/default01.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/default01.rs",
       "category": "structured_credit",
       "contains": "cdr: (instrument.credit_model.default_spec.cdr - DEFAULT_BUMP_CDR).max(0.0),",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/risk/prepayment01.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/prepayment01.rs",
       "category": "structured_credit",
       "contains": "cpr: (instrument.credit_model.prepayment_spec.cpr + PREPAYMENT_BUMP_CPR).max(0.0),",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/risk/prepayment01.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/prepayment01.rs",
       "category": "structured_credit",
       "contains": "cpr: (instrument.credit_model.prepayment_spec.cpr - PREPAYMENT_BUMP_CPR).max(0.0),",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/coverage_tests.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/coverage_tests.rs",
       "category": "margin_regulatory",
       "contains": "amount *= 1.0 - haircut;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/simulation_engine/simulate_period/mod.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/simulate_period/mod.rs",
       "category": "credit_assumption",
       "contains": "(pool_flows.default.amount() - pool_flows.recovery.amount()).max(0.0)",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/simulation_engine/orchestration.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/orchestration.rs",
       "category": "market_convention",
       "contains": "schedule generation. Specify a valid calendar ID (e.g., 'nyse', 'target2') \\",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/types/mod.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/mod.rs",
       "category": "structured_credit",
       "contains": "return Some(1.0 - (1.0 - cdr).powf(1.0 / 12.0));",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/types/pool.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/pool.rs",
       "category": "credit_assumption",
       "contains": "recovery_rate: 0.0,   // Computed separately if needed",
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/types/stochastic.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/stochastic.rs",
       "category": "structured_credit",
       "contains": "StochasticDefaultSpec::gaussian_copula(self.credit_model.default_spec.cdr, 0.10),",
       "reason": "Structured-credit formula, named standard factory, or diagnostic; mutable assumptions live in structured-credit/TBA registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/utils/rate_helpers.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/utils/rate_helpers.rs",
       "category": "contract_spec",
       "contains": "id: \"asset.index_id\".to_string(),",
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."
@@ -2432,97 +2432,97 @@
       "reason": "Structured-credit formula, named standard factory, or diagnostic; mutable assumptions live in structured-credit/TBA registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/tba/pricer.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/tba/pricer.rs",
       "category": "structured_credit",
       "contains": ".prepayment_spec(PrepaymentModelSpec::psa(1.0))",
       "reason": "Structured-credit formula, named standard factory, or diagnostic; mutable assumptions live in structured-credit/TBA registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/tba/pricer.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/tba/pricer.rs",
       "category": "structured_credit",
       "contains": "let servicing_fee = 0.0025; // 25 bp",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/term_loan/pricing/tree_engine.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/pricing/tree_engine.rs",
       "category": "credit_assumption",
       "contains": "let p_surv = (-hazard.max(0.0) * dt).exp();",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/term_loan/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/types.rs",
       "category": "contract_spec",
       "contains": "CurveId::new(\"USD-SOFR-3M\")",
       "reason": "Example term-loan fixture index, not a production default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/term_loan/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/types.rs",
       "category": "market_convention",
       "contains": ".settlement_days(2)",
       "reason": "Example term-loan fixture settlement days, not a production default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/term_loan/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/types.rs",
       "category": "market_convention",
       "contains": "calendar_id: \"weekends_only\"",
       "reason": "Example term-loan fixture calendar, not a mutable production default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/term_loan/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/types.rs",
       "category": "market_convention",
       "contains": "id: format!(\"calendar:{}\", calendar_id),",
       "reason": "Binding metadata, repr text, or module/export label; not a mutable financial assumption."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/term_loan/types.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/types.rs",
       "category": "market_convention",
       "contains": "if self.settlement_days == 0",
       "reason": "Settlement-day validation bound, not a convention default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/basis_swap/types.rs",
+      "path": "finstack-quant/valuations/rates/src/basis_swap/types.rs",
       "category": "market_convention",
       "contains": "\"BasisSwap payment lag must be non-negative\".to_string(),",
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/fra/types.rs",
+      "path": "finstack-quant/valuations/rates/src/fra/types.rs",
       "category": "market_convention",
       "contains": ".reset_lag(2)",
       "reason": "Example FRA fixture reset lag, not a production convention default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/fra/types.rs",
+      "path": "finstack-quant/valuations/rates/src/fra/types.rs",
       "category": "market_convention",
       "contains": "fixing calendar is required",
       "reason": "Validation error text, not a calendar default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/fra/types.rs",
+      "path": "finstack-quant/valuations/rates/src/fra/types.rs",
       "category": "market_convention",
       "contains": "reset_lag has an unexpectedly large magnitude",
       "reason": "Validation error text, not a reset-lag default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/fra/types.rs",
+      "path": "finstack-quant/valuations/rates/src/fra/types.rs",
       "category": "market_convention",
       "contains": "validation::require_with(self.reset_lag.abs() <= 31, || {",
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/ir_future/types.rs",
+      "path": "finstack-quant/valuations/rates/src/ir_future/types.rs",
       "category": "contract_spec",
       "contains": "contracts_scale = if self.contract_specs.face_value > 0.0",
       "reason": "Runtime scale guard, not a contract-spec default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/irs/cashflow.rs",
+      "path": "finstack-quant/valuations/rates/src/irs/cashflow.rs",
       "category": "market_convention",
       "contains": "forward curve",
       "reason": "Error text for missing forward curve, not a convention default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/irs/cashflow.rs",
+      "path": "finstack-quant/valuations/rates/src/irs/cashflow.rs",
       "category": "market_convention",
       "contains": "observation_shift.unwrap_or(0)",
       "reason": "Fallback arithmetic for caller-supplied observation shift, not a convention default."
@@ -2534,79 +2534,79 @@
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/irs/types.rs",
+      "path": "finstack-quant/valuations/rates/src/irs/types.rs",
       "category": "market_convention",
       "contains": "Dual-curve discounting is not supported",
       "reason": "Validation error text, not a market convention default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/irs/types.rs",
+      "path": "finstack-quant/valuations/rates/src/irs/types.rs",
       "category": "market_convention",
       "contains": "Invalid floating reset lag",
       "reason": "Validation error text, not a market convention default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/irs/types.rs",
+      "path": "finstack-quant/valuations/rates/src/irs/types.rs",
       "category": "market_convention",
       "contains": "Invalid observation shift",
       "reason": "Validation error text, not a market convention default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/irs/types.rs",
+      "path": "finstack-quant/valuations/rates/src/irs/types.rs",
       "category": "market_convention",
       "contains": "calendar_id: Some(\"usny\".to_string()),",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/irs/types.rs",
+      "path": "finstack-quant/valuations/rates/src/irs/types.rs",
       "category": "market_convention",
       "contains": "differs from floating leg discount curve '{}'. \\",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/repo/metrics/haircut01.rs",
+      "path": "finstack-quant/valuations/rates/src/repo/metrics/haircut01.rs",
       "category": "margin_regulatory",
       "contains": "repo_down.haircut = (repo.haircut - HAIRCUT_BUMP).max(0.0);",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/repo/metrics/haircut01.rs",
+      "path": "finstack-quant/valuations/rates/src/repo/metrics/haircut01.rs",
       "category": "margin_regulatory",
       "contains": "repo_up.haircut = (repo.haircut + HAIRCUT_BUMP).max(0.0);",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/repo/types.rs",
+      "path": "finstack-quant/valuations/rates/src/repo/types.rs",
       "category": "margin_regulatory",
       "contains": "CollateralSpec::new(\"UST-10Y\"",
       "reason": "Example fixture collateral identifier and quantity, not a production repo margin default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/repo/types.rs",
+      "path": "finstack-quant/valuations/rates/src/repo/types.rs",
       "category": "margin_regulatory",
       "contains": "Unknown collateral type",
       "reason": "Collateral type parser error text; repo default haircut and calendar settings are sourced from the contract-spec registry."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/repo/types.rs",
+      "path": "finstack-quant/valuations/rates/src/repo/types.rs",
       "category": "margin_regulatory",
       "contains": "if self.haircut >= 1.0",
       "reason": "Haircut validation bound; repo constructor default haircut is sourced from the contract-spec registry."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/repo/types.rs",
+      "path": "finstack-quant/valuations/rates/src/repo/types.rs",
       "category": "margin_regulatory",
       "contains": "let factor = 1.0 - self.haircut",
       "reason": "Required-collateral formula, not a repo margin default."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/repo/types.rs",
+      "path": "finstack-quant/valuations/rates/src/repo/types.rs",
       "category": "market_convention",
       "contains": "Specify a valid calendar ID",
       "reason": "Validation guidance text; repo constructor default calendar is sourced from the contract-spec registry."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/repo/types.rs",
+      "path": "finstack-quant/valuations/rates/src/repo/types.rs",
       "category": "market_convention",
       "contains": "calendar_id:{} (available: {})",
       "reason": "Unknown-calendar error text; repo constructor default calendar is sourced from the contract-spec registry."
@@ -2630,31 +2630,31 @@
       "reason": "Binding metadata or validation around registry-backed defaults; not a separate mutable assumption."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/swaption/pricing/lmm_bermudan.rs",
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/lmm_bermudan.rs",
       "category": "binding_default",
       "contains": "if config.basis_degree >= 2 {",
       "reason": "Binding metadata or validation around registry-backed defaults; not a separate mutable assumption."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/swaption/pricing/lmm_bermudan.rs",
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/lmm_bermudan.rs",
       "category": "binding_default",
       "contains": "if config.basis_degree >= 3 {",
       "reason": "Binding metadata or validation around registry-backed defaults; not a separate mutable assumption."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/swaption/pricing/lmm_bermudan.rs",
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/lmm_bermudan.rs",
       "category": "binding_default",
       "contains": "if itm_indices.len() > config.basis_degree + 3 {",
       "reason": "Binding metadata or validation around registry-backed defaults; not a separate mutable assumption."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/swaption/pricing/lmm_bermudan.rs",
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/lmm_bermudan.rs",
       "category": "binding_default",
       "contains": "let mut b = Vec::with_capacity(config.basis_degree + 3);",
       "reason": "Binding metadata or validation around registry-backed defaults; not a separate mutable assumption."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/rates/xccy_swap/types.rs",
+      "path": "finstack-quant/valuations/rates/src/xccy_swap/types.rs",
       "category": "market_convention",
       "contains": "\"XccySwap payment lag must be non-negative\".to_string(),",
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."

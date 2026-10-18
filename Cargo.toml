@@ -72,7 +72,7 @@ default-members = [
 # Coverage configuration: only run on core Rust library, not bindings
 exclude = ["finstack-quant-py", "finstack-quant-wasm"]
 # Additional patterns to exclude from coverage reports
-ignore-filename-regex = ["tests?/", "target/", "\\.cargo/", ".*finstack-quant-py/.*", ".*finstack-quant-wasm/.*"]
+ignore-filename-regex = ["tests?/", "test-support/", "target/", "\\.cargo/", ".*finstack-quant-py/.*", ".*finstack-quant-wasm/.*"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

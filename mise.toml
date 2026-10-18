@@ -312,10 +312,10 @@ cargo llvm-cov nextest --no-report --remap-path-prefix \
 cargo llvm-cov nextest --no-report --remap-path-prefix \
   -p finstack-quant-wasm --lib --test dts_contract --test wasm --no-fail-fast
 cargo llvm-cov report --remap-path-prefix \
-  --ignore-filename-regex '(tests?/|target/|\\.cargo/|finstack-quant-py/)' \
+  --ignore-filename-regex '(tests?/|test-support/|target/|\\.cargo/|finstack-quant-py/)' \
   --lcov --output-path coverage/rust/lcov.info
 cargo llvm-cov report --remap-path-prefix \
-  --ignore-filename-regex '(tests?/|target/|\\.cargo/|finstack-quant-py/)' \
+  --ignore-filename-regex '(tests?/|test-support/|target/|\\.cargo/|finstack-quant-py/)' \
   --html --output-dir target/llvm-cov
 echo "HTML report: target/llvm-cov/html/index.html"
 echo "LCOV report: coverage/rust/lcov.info"

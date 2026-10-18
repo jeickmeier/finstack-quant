@@ -13,9 +13,9 @@ Use this map to connect quant review concerns to source locations.
 
 - Valuation integrations: `finstack-quant/valuations/src/`
 - Attribution: `finstack-quant/valuations/src/attribution/`
-- Fixed income instruments: `finstack-quant/valuations/src/instruments/fixed_income/`
-- Structured credit metrics: `finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/`
-- Convertible metrics: `finstack-quant/valuations/src/instruments/fixed_income/convertible/metrics/`
+- Fixed income instruments: `finstack-quant/valuations/fixed-income/src/`
+- Structured credit metrics: `finstack-quant/valuations/structured-credit/src/structured_credit/metrics/`
+- Convertible metrics: `finstack-quant/valuations/fixed-income/src/convertible/metrics/`
 
 ## Portfolio, Scenarios, And Margin
 

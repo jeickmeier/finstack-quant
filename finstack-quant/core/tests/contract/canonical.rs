@@ -266,19 +266,19 @@ fn persisted_contract_fields_do_not_use_fx_hash_maps() {
         ),
         ("calibration/src/api/schema.rs", "CalibrationPlan"),
         (
-            "valuations/src/instruments/fixed_income/structured_credit/types/mod.rs",
+            "valuations/structured-credit/src/structured_credit/types/mod.rs",
             "MarketConditions",
         ),
         (
-            "valuations/src/instruments/fixed_income/structured_credit/types/results.rs",
+            "valuations/structured-credit/src/structured_credit/types/results.rs",
             "TrancheValuation",
         ),
         (
-            "valuations/src/instruments/fixed_income/structured_credit/types/waterfall/mod.rs",
+            "valuations/structured-credit/src/structured_credit/types/waterfall/mod.rs",
             "WaterfallDistribution",
         ),
         (
-            "valuations/src/instruments/fixed_income/structured_credit/types/waterfall/coverage.rs",
+            "valuations/structured-credit/src/structured_credit/types/waterfall/coverage.rs",
             "CoverageRules",
         ),
         ("margin/src/regulatory/sa_ccr/types.rs", "EadResult"),
