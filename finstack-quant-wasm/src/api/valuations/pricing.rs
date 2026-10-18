@@ -1011,7 +1011,7 @@ pub(super) mod tests {
         use finstack_quant_valuations::instruments::exotics::range_accrual::{
             BoundsType, RangeAccrualTerms,
         };
-        use finstack_quant_valuations::instruments::rates::hw1f::bermudan_call::BermudanCallProvision;
+        use finstack_quant_valuations::instruments::BermudanCallProvision;
         use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
         use time::Month;
 

@@ -31,7 +31,8 @@
 //! - `fourier`: Characteristic functions and COS-method pricing engines
 //! - `factor`: Factor definitions, matching, covariance, sensitivity matrices,
 //!   and hierarchical credit-factor calibration
-//! - `rates`: Interest-rate models and dynamic term-structure engines
+//! - `rates`: Interest-rate models, the HW1F Monte Carlo / LSMC engines and dynamic
+//!   term-structure engines
 //! - `liquidity`: Liquidity risk estimators and market-impact models
 //! - `volatility`: Volatility models (SABR) and Black-Scholes helper functions
 //! - `trees`: Tree-based methods (Binomial, Trinomial, Multi-factor, Short-rate)

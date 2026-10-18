@@ -40,16 +40,14 @@ use finstack_quant_models::monte_carlo::process::ou::{
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream};
 use finstack_quant_models::monte_carlo::TimeGrid;
-use finstack_quant_valuations::instruments::rates::hw1f::{
-    initial_short_rate_from_curve, prepare_hw1f_params,
-};
+use finstack_quant_models::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
 use time::Month;
 
 /// Simulate `E[exp(−∫₀ᵀ r dt)]` for each maturity in `maturities` on a uniform
 /// time grid, using the supplied HW1F params and the exact stepper. Returns
 /// `(mc_discount_factor, standard_error)` per maturity.
 ///
-/// This deliberately mirrors `RateExoticHw1fMcPricer::price` (hw1f/
+/// This deliberately mirrors `Hw1fMcPricer::price` (hw1f/
 /// hw1f_mc.rs): exact HW1F discretization, Philox substreams, no antithetic.
 /// The path integral `∫r dt` is accumulated with the trapezoidal rule.
 fn simulate_zcb_prices(

@@ -13,18 +13,16 @@
 //! # Usage
 //!
 //! ```text
-//! use finstack_quant_valuations::instruments::rates::hw1f::RateExoticMcConfig;
+//! use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 //! use finstack_quant_valuations::instruments::rates::swaption::pricing::monte_carlo_lsmc::SwaptionLsmcPricer;
 //! use finstack_quant_models::monte_carlo::process::ou::{HullWhite1FProcess, HullWhite1FParams};
 //!
 //! let hw_params = HullWhite1FParams::new(0.03, 0.01, 0.03).expect("valid parameters");
 //! let hw_process = HullWhite1FProcess::new(hw_params);
 //!
-//! let pricer = SwaptionLsmcPricer::with_config(RateExoticMcConfig::default(), hw_process);
+//! let pricer = SwaptionLsmcPricer::with_config(Hw1fMcConfig::default(), hw_process);
 //! ```
 
-use crate::instruments::rates::hw1f::hw1f_mc::money_estimate_from_pairs;
-use crate::instruments::rates::hw1f::mc_config::RateExoticMcConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
@@ -35,6 +33,8 @@ use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream};
 use finstack_quant_models::monte_carlo::TimeGrid;
+use finstack_quant_models::rates::hw1f::config::Hw1fMcConfig;
+use finstack_quant_models::rates::hw1f::mc::money_estimate_from_pairs;
 
 fn regression_with_aux_basis<B: BasisFunctions>(
     swap_rates: &[f64],
@@ -73,7 +73,7 @@ fn regression_with_aux_basis<B: BasisFunctions>(
 pub struct SwaptionLsmcPricer {
     /// Monte Carlo configuration (`num_paths`, `seed` and `antithetic` are
     /// read here, together with `oos_lsmc`; the regression basis is supplied per call).
-    config: RateExoticMcConfig,
+    config: Hw1fMcConfig,
     /// Hull-White process parameters
     hw_process: HullWhite1FProcess,
 }
@@ -87,7 +87,7 @@ impl SwaptionLsmcPricer {
     ///   (each simulated as a `(Z, -Z)` pair when `antithetic` is set), `seed`
     ///   the Philox root seed.
     /// * `hw_process` - Hull-White 1F process with curve-calibrated θ(t).
-    pub fn with_config(config: RateExoticMcConfig, hw_process: HullWhite1FProcess) -> Self {
+    pub fn with_config(config: Hw1fMcConfig, hw_process: HullWhite1FProcess) -> Self {
         Self { config, hw_process }
     }
 
@@ -330,7 +330,7 @@ impl SwaptionLsmcPricer {
         let bank_factors: Vec<Vec<f64>> = paths
             .iter()
             .map(|path| {
-                crate::instruments::rates::hw1f::bank_account::accumulate_bank_factors(
+                finstack_quant_models::rates::hw1f::bank_account::accumulate_bank_factors(
                     path, time_grid,
                 )
             })
@@ -460,7 +460,7 @@ mod tests {
 
     fn pricer(num_paths: usize, antithetic: bool, oos_lsmc: bool) -> SwaptionLsmcPricer {
         SwaptionLsmcPricer::with_config(
-            RateExoticMcConfig {
+            Hw1fMcConfig {
                 num_paths,
                 antithetic,
                 oos_lsmc,

@@ -5,7 +5,9 @@
 //! - **legs**: Leg specifications for swaps and structured products
 //! - **market**: Market-specific parameters for options and derivatives
 //! - **conventions**: Standard market conventions for bonds and swaps
+//! - **bermudan_call**: Issuer call provision shared by callable rate exotics
 
+pub mod bermudan_call;
 pub mod conventions;
 pub mod legs;
 pub mod market;
@@ -15,6 +17,7 @@ pub mod trs_common;
 pub mod underlying;
 pub mod volatility;
 
+pub use bermudan_call::BermudanCallProvision;
 pub use conventions::{BondConvention, CommodityConvention};
 pub use finstack_quant_models::types::OptionMarketParams;
 pub use legs::{

@@ -7,7 +7,7 @@
 //! 1. **Forward pass.** For each path the harness runs the full simulation
 //!    (accumulating the pathwise money-market numeraire `B(t)`, exposed to
 //!    payoffs via `StateKey::BankAccount`) and records per-path the time-0
-//!    PV reported by [`finstack_quant_models::monte_carlo::traits::Payoff::value`], as well
+//!    PV reported by [`crate::monte_carlo::traits::Payoff::value`], as well
 //!    as the short rate, undiscounted exercise value, bank factor, and
 //!    inactive flag at each exercise date.
 //! 2. **Backward pass.** Starting from maturity, the harness decomposes each
@@ -15,8 +15,8 @@
 //!    exercise date, via [`ExerciseBoundaryPayoff::value_after`]) and a
 //!    post-exercise component. It regresses the at-exercise continuation of
 //!    the *post-exercise* component (`(cashflow[p] − pre[p]) · B_p(t_ex)`) via
-//!    [`finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares`] against the
-//!    [`standard_basis`] (ITM + active paths only) and rolls the per-path
+//!    [`crate::monte_carlo::pricer::lsq::solve_least_squares`] against the
+//!    [`crate::rates::hw1f::ShortRateBasis`] (ITM + active paths only) and rolls the per-path
 //!    cashflow vector back, overwriting only the post-exercise portion with
 //!    the pathwise-discounted call value (`cashflow[p] = pre[p] +
 //!    exercise_value / B_p(t_ex)`) whenever exercise is optimal — coupons
@@ -28,7 +28,7 @@
 //!    as the LSMC PV estimate together with a 95% confidence interval.
 //!
 //! Product payoffs implement [`ExerciseBoundaryPayoff`] (a supertrait of
-//! [`finstack_quant_models::monte_carlo::traits::Payoff`]); the harness is entirely agnostic to the product-specific
+//! [`crate::monte_carlo::traits::Payoff`]); the harness is entirely agnostic to the product-specific
 //! cashflow logic.
 //!
 //! # In-sample upward bias and split-sample option
@@ -40,7 +40,7 @@
 //! setups with `num_paths ≳ 10⁴` and the default basis, but grows with richer
 //! bases and fewer paths.
 //!
-//! Setting [`RateExoticMcConfig::oos_lsmc`](crate::instruments::rates::hw1f::mc_config::RateExoticMcConfig::oos_lsmc)
+//! Setting [`Hw1fMcConfig::oos_lsmc`]
 //! to `true` switches to a split-sample estimator: even-indexed raw streams
 //! drive the regression, odd-indexed streams are priced under that fitted
 //! policy. The pricing half evaluates an out-of-sample (sub-optimal but
@@ -54,32 +54,28 @@
 //! - Longstaff-Schwartz LSMC and Monte Carlo exercise: `docs/REFERENCES.md#glasserman-2004-monte-carlo`
 //! - Hull-White short-rate context: `docs/REFERENCES.md#hull-options-futures`
 
-use crate::instruments::rates::hw1f::bank_account::bank_step_factor;
-use crate::instruments::rates::hw1f::exercise::ExerciseBoundaryPayoff;
-use crate::instruments::rates::hw1f::hw1f_mc::{
-    build_event_aligned_grid, money_estimate_from_pairs,
-};
-use crate::instruments::rates::hw1f::mc_config::RateExoticMcConfig;
+use crate::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
+use crate::monte_carlo::pricer::lsq::solve_least_squares;
+use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
+use crate::monte_carlo::results::MoneyEstimate;
+use crate::monte_carlo::rng::philox::PhiloxRng;
+use crate::monte_carlo::traits::{Discretization, PathState, RandomStream, StateKey};
+use crate::monte_carlo::TimeGrid;
+use crate::rates::hw1f::bank_account::bank_step_factor;
+use crate::rates::hw1f::config::Hw1fMcConfig;
+use crate::rates::hw1f::exercise::ExerciseBoundaryPayoff;
+use crate::rates::hw1f::mc::{build_event_aligned_grid, money_estimate_from_pairs};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;
-use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
-use finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares;
-use finstack_quant_models::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
-use finstack_quant_models::monte_carlo::results::MoneyEstimate;
-use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-use finstack_quant_models::monte_carlo::traits::{
-    Discretization, PathState, RandomStream, StateKey,
-};
-use finstack_quant_models::monte_carlo::TimeGrid;
 
 /// Generic HW1F LSMC pricer for callable rate exotics.
-pub struct RateExoticHw1fLsmcPricer {
+pub struct Hw1fLsmcPricer {
     /// Fully-specified HW1F short-rate parameters: κ, σ, and the
     /// time-dependent mean-reversion level θ(t).
     ///
     /// The simulated short rate follows `dr_t = κ·(θ(t) - r_t)·dt + σ·dW_t`.
     /// θ(t) MUST be bootstrapped from the product's discount curve (see
-    /// [`crate::instruments::rates::hw1f::prepare_hw1f_params`])
+    /// [`crate::rates::hw1f::prepare_hw1f_params`])
     /// so the simulated short rate reprices the initial curve — a constant θ
     /// makes the process a plain Vasicek that mis-reprices any non-flat curve.
     pub process_params: HullWhite1FParams,
@@ -94,12 +90,12 @@ pub struct RateExoticHw1fLsmcPricer {
     /// or prices the call independently.
     pub exercise_times: Vec<f64>,
     /// Runtime Monte Carlo configuration.
-    pub config: RateExoticMcConfig,
+    pub config: Hw1fMcConfig,
     /// Currency for the returned PV estimate.
     pub currency: Currency,
 }
 
-impl RateExoticHw1fLsmcPricer {
+impl Hw1fLsmcPricer {
     /// Run the LSMC pricing: forward pass records path state, backward pass
     /// fits continuation values and applies optimal exercise.
     ///
@@ -108,7 +104,7 @@ impl RateExoticHw1fLsmcPricer {
     /// Returns a validation error if `event_times` is empty or not strictly
     /// increasing, if `exercise_times` are not a subset of `event_times`,
     /// or if the time-grid construction fails. Propagates errors from
-    /// [`finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares`].
+    /// [`crate::monte_carlo::pricer::lsq::solve_least_squares`].
     pub fn price<F, P>(&self, payoff_factory: F) -> Result<MoneyEstimate>
     where
         F: Fn() -> P + Sync,
@@ -118,7 +114,7 @@ impl RateExoticHw1fLsmcPricer {
 
         let Some(&maturity) = self.event_times.last() else {
             return Err(finstack_quant_core::Error::Validation(
-                "RateExoticHw1fLsmcPricer requires at least one event time".into(),
+                "Hw1fLsmcPricer requires at least one event time".into(),
             ));
         };
 
@@ -233,7 +229,7 @@ impl RateExoticHw1fLsmcPricer {
         // -- Phase 2: backward LSMC induction ----------------------------------
         let mut cashflow = deterministic_pv.clone();
 
-        // Split-sample partition (see `RateExoticMcConfig::split`): only
+        // Split-sample partition (see `Hw1fMcConfig::split`): only
         // train paths feed the continuation regression.
 
         // Regression scratch buffers hoisted out of the exercise-date loop;
@@ -355,12 +351,12 @@ impl RateExoticHw1fLsmcPricer {
     fn validate_inputs(&self) -> Result<()> {
         if self.event_times.is_empty() {
             return Err(finstack_quant_core::Error::Validation(
-                "RateExoticHw1fLsmcPricer requires at least one event time".into(),
+                "Hw1fLsmcPricer requires at least one event time".into(),
             ));
         }
         if self.exercise_times.is_empty() {
             return Err(finstack_quant_core::Error::Validation(
-                "RateExoticHw1fLsmcPricer requires at least one exercise time".into(),
+                "Hw1fLsmcPricer requires at least one exercise time".into(),
             ));
         }
         for pair in self.event_times.windows(2) {
@@ -412,11 +408,11 @@ fn build_grid_with_exercise_map(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::rates::hw1f::standard_basis;
+    use crate::monte_carlo::traits::Payoff;
+    use crate::rates::hw1f::ShortRateBasis;
     use finstack_quant_core::money::Money;
-    use finstack_quant_models::monte_carlo::traits::Payoff;
 
-    use finstack_quant_models::monte_carlo::traits::StateKey;
+    use crate::monte_carlo::traits::StateKey;
 
     /// Zero-coupon-bond payoff: pays `notional` at maturity (the last event),
     /// discounted pathwise via the bank-account numeraire exposed by the
@@ -450,7 +446,7 @@ mod tests {
             Money::new(self.notional, ccy)
         }
         fn continuation_basis(&self, _i: usize, t: f64, r: f64) -> Vec<f64> {
-            standard_basis(t, r)
+            ShortRateBasis::new(2).row(t, r)
         }
     }
 
@@ -467,13 +463,13 @@ mod tests {
     /// price `notional · E[1/B(2)] ≈ notional · e^{−r0·2}`.
     #[test]
     fn noexercise_equals_discounted_par() {
-        let pricer = RateExoticHw1fLsmcPricer {
+        let pricer = Hw1fLsmcPricer {
             process_params: HullWhite1FParams::new(0.05, 0.001, 0.03)
                 .expect("valid Hull-White parameters"),
             r0: 0.03,
             event_times: vec![1.0, 2.0],
             exercise_times: vec![1.0, 2.0],
-            config: RateExoticMcConfig {
+            config: Hw1fMcConfig {
                 num_paths: 1000,
                 ..Default::default()
             },
@@ -532,7 +528,7 @@ mod tests {
             Money::new(self.notional, ccy)
         }
         fn continuation_basis(&self, _i: usize, t: f64, r: f64) -> Vec<f64> {
-            standard_basis(t, r)
+            ShortRateBasis::new(2).row(t, r)
         }
         fn value_after(&self, _i: usize, ccy: Currency) -> finstack_quant_core::Result<Money> {
             Money::new(self.notional / self.bank_at_maturity, ccy)
@@ -549,14 +545,14 @@ mod tests {
         }
     }
 
-    fn coupon_pricer(r0: f64) -> RateExoticHw1fLsmcPricer {
-        RateExoticHw1fLsmcPricer {
+    fn coupon_pricer(r0: f64) -> Hw1fLsmcPricer {
+        Hw1fLsmcPricer {
             process_params: HullWhite1FParams::new(0.05, 0.001, r0)
                 .expect("valid Hull-White parameters"),
             r0,
             event_times: vec![1.0, 1.5, 2.0],
             exercise_times: vec![1.5],
-            config: RateExoticMcConfig {
+            config: Hw1fMcConfig {
                 num_paths: 1000,
                 ..Default::default()
             },
@@ -598,13 +594,13 @@ mod tests {
     /// value on the no-call setup, and report stats over the pricing half only.
     #[test]
     fn oos_lsmc_noexercise_equals_discounted_par_and_uses_half_paths() {
-        let pricer = RateExoticHw1fLsmcPricer {
+        let pricer = Hw1fLsmcPricer {
             process_params: HullWhite1FParams::new(0.05, 0.001, 0.03)
                 .expect("valid Hull-White parameters"),
             r0: 0.03,
             event_times: vec![1.0, 2.0],
             exercise_times: vec![1.0, 2.0],
-            config: RateExoticMcConfig {
+            config: Hw1fMcConfig {
                 num_paths: 400,
                 antithetic: false, // partition by raw stream parity is easiest to verify without anti
                 oos_lsmc: true,

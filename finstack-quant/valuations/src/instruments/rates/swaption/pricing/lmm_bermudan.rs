@@ -28,10 +28,6 @@
 //! - Glasserman, P. (2003). *Monte Carlo Methods in Financial Engineering*,
 //!   Ch. 8, Springer. `docs/REFERENCES.md#glasserman-2004-monte-carlo`
 
-use crate::instruments::rates::hw1f::hw1f_mc::{
-    build_event_aligned_grid, money_estimate_from_pairs,
-};
-use crate::instruments::rates::hw1f::mc_config::RateExoticMcConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
@@ -42,6 +38,8 @@ use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
 use finstack_quant_models::monte_carlo::TimeGrid;
+use finstack_quant_models::rates::hw1f::config::Hw1fMcConfig;
+use finstack_quant_models::rates::hw1f::mc::{build_event_aligned_grid, money_estimate_from_pairs};
 
 const EXERCISE_TIME_TOLERANCE: f64 = 1e-10;
 
@@ -64,7 +62,7 @@ const EXERCISE_TIME_TOLERANCE: f64 = 1e-10;
 ///   least two independent pricing observations (2 estimators in-sample, 4
 ///   with out-of-sample pricing). `min_steps_between_events` is the minimum number
 ///   of simulation sub-steps between consecutive exercise dates. Use
-///   [`RateExoticMcConfig::lmm_bermudan`] for the registry defaults.
+///   [`crate::instruments::rates::swaption::lmm_pricer::lmm_bermudan_mc_config`] for the registry defaults.
 ///
 /// # Returns
 ///
@@ -86,7 +84,7 @@ pub fn price_bermudan_lmm(
     notional: f64,
     discount_factor_terminal: f64,
     currency: Currency,
-    config: &RateExoticMcConfig,
+    config: &Hw1fMcConfig,
 ) -> Result<MoneyEstimate> {
     validate_path_config(config)?;
     let (time_grid, exercise_step_indices) =
@@ -165,7 +163,7 @@ pub fn price_bermudan_lmm(
     // time-0 price with a single `× P(0, T_N)`.
     let mut cashflow = vec![0.0_f64; total_paths];
 
-    // Split-sample partition (see `RateExoticMcConfig::split`).
+    // Split-sample partition (see `Hw1fMcConfig::split`).
     let split = config.split();
 
     // Polynomial basis: [1, S, A, S^2, S*A, S^3, ...]
@@ -449,7 +447,7 @@ fn validate_exercise_schedule(exercise_times: &[f64], maturity: f64) -> Result<(
     Ok(())
 }
 
-fn validate_path_config(config: &RateExoticMcConfig) -> Result<()> {
+fn validate_path_config(config: &Hw1fMcConfig) -> Result<()> {
     if config.simulated_path_count() > MAX_NUM_PATHS {
         return Err(finstack_quant_core::Error::Validation(format!(
             "LMM Bermudan simulated path count {} (num_paths {} with antithetic={}) exceeds maximum {MAX_NUM_PATHS}",
@@ -573,8 +571,8 @@ mod tests {
         .expect("valid params")
     }
 
-    fn test_config(num_paths: usize, antithetic: bool, oos_lsmc: bool) -> RateExoticMcConfig {
-        RateExoticMcConfig {
+    fn test_config(num_paths: usize, antithetic: bool, oos_lsmc: bool) -> Hw1fMcConfig {
+        Hw1fMcConfig {
             num_paths,
             seed: 7,
             basis_degree: 2,
@@ -783,7 +781,7 @@ mod tests {
         let exercise_times = vec![1.0, 2.0, 3.0];
         let strike = 0.025; // ITM payer swaption (forwards ~3-3.6%)
         let df_terminal = (-0.03 * 4.0_f64).exp();
-        let config = RateExoticMcConfig {
+        let config = Hw1fMcConfig {
             num_paths: 2500,
             seed: 123,
             basis_degree: 2,
@@ -827,7 +825,7 @@ mod tests {
             1_000_000.0,
             df_terminal,
             Currency::USD,
-            &RateExoticMcConfig::lmm_bermudan(),
+            &crate::instruments::rates::swaption::lmm_pricer::lmm_bermudan_mc_config(),
         )
         .expect("default price");
         assert_eq!(
@@ -844,7 +842,7 @@ mod tests {
         let params = test_lmm_params();
         let strike = 0.030;
         let df_terminal = (-0.03 * 4.0_f64).exp();
-        let config = RateExoticMcConfig {
+        let config = Hw1fMcConfig {
             num_paths: 5000,
             seed: 42,
             basis_degree: 2,
@@ -895,7 +893,7 @@ mod tests {
         let exercise_times = vec![1.0, 2.0, 3.0];
         let strike = 0.025;
         let df_terminal = (-0.03 * 4.0_f64).exp();
-        let base = RateExoticMcConfig {
+        let base = Hw1fMcConfig {
             num_paths: 8_000,
             seed: 123,
             basis_degree: 2,
@@ -903,7 +901,7 @@ mod tests {
             min_steps_between_events: 4,
             oos_lsmc: false,
         };
-        let oos = RateExoticMcConfig {
+        let oos = Hw1fMcConfig {
             oos_lsmc: true,
             ..base
         };

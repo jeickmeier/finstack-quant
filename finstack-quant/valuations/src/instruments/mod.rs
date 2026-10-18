@@ -154,6 +154,7 @@ mod marginable;
 
 /// Shared pricing helpers used by this crate and `finstack-quant-calibration`.
 pub mod pricing {
+    pub use super::common_impl::pricing::hw1f_params;
     pub use super::common_impl::pricing::overnight::default_rate_calendar_id;
     pub use super::common_impl::pricing::overnight_conventions;
     pub use super::common_impl::pricing::swap_legs;
@@ -268,10 +269,11 @@ pub use common_impl::traits::{
 };
 
 pub use common_impl::parameters::{
-    BondConvention, CommodityUnderlyingParams, CreditParams, EquityUnderlyingParams, ExerciseStyle,
-    FinancingLegSpec, FixedLegSpec, FloatLegSpec, FxUnderlyingParams, IndexUnderlyingParams,
-    Monitoring, OptionMarketParams, OptionType, PayReceive, PremiumLegSpec, ProtectionLegSpec,
-    QuantoSpec, SettlementType, TotalReturnLegSpec, VolatilityModel,
+    BermudanCallProvision, BondConvention, CommodityUnderlyingParams, CreditParams,
+    EquityUnderlyingParams, ExerciseStyle, FinancingLegSpec, FixedLegSpec, FloatLegSpec,
+    FxUnderlyingParams, IndexUnderlyingParams, Monitoring, OptionMarketParams, OptionType,
+    PayReceive, PremiumLegSpec, ProtectionLegSpec, QuantoSpec, SettlementType, TotalReturnLegSpec,
+    VolatilityModel,
 };
 
 pub use common_impl::parameters::trs_common::TrsScheduleSpec;

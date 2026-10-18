@@ -221,7 +221,7 @@ impl CmsReplicationPricer {
             // cap/floor pricer) — never on a rate re-projected from the live
             // curve, which books phantom P&L.
             if fixing_date < as_of {
-                let observed = crate::instruments::rates::hw1f::fixings::historical_cms_fixing(
+                let observed = crate::instruments::rates::cms_fixings::historical_cms_fixing(
                     curves,
                     &inst.forward_curve_id,
                     inst.cms_tenor.to_years(),

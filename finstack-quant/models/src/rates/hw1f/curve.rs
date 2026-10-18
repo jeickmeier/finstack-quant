@@ -6,7 +6,7 @@
 //! 1. **θ(t) preparation (defect M6).** The Hull-White 1-factor model fits the
 //!    initial discount curve only when its mean-reversion *level* θ is
 //!    time-dependent (Brigo–Mercurio §3.3.1). [`prepare_hw1f_params`] wraps
-//!    the canonical `finstack_quant_models::monte_carlo::process::ou::calibrate_theta_from_curve`
+//!    the canonical `crate::monte_carlo::process::ou::calibrate_theta_from_curve`
 //!    bootstrap, presenting the discount curve as the `P(as_of, as_of+t)`
 //!    closure the deterministic process builder expects.
 //!
@@ -35,15 +35,13 @@
 //! Brigo & Mercurio (2006) *Interest Rate Models — Theory and Practice*
 //! §3.3.1 (HW1F affine bond price, eqs. 3.39–3.40); Hull & White (1990). `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models` `docs/REFERENCES.md#hull-white-1990-pricing-ird`
 
+use crate::monte_carlo::process::ou::{calibrate_theta_from_curve, HullWhite1FParams};
+use crate::rates::hull_white::{
+    fd_instantaneous_forward, hw_b, hw_ln_a, HullWhiteCalibrationParams,
+};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
-use finstack_quant_models::monte_carlo::process::ou::{
-    calibrate_theta_from_curve, HullWhite1FParams,
-};
-use finstack_quant_models::rates::hull_white::{
-    fd_instantaneous_forward, hw_b, hw_ln_a, HullWhiteCalibrationParams,
-};
 
 /// Spacing (years) of the piecewise-constant θ(t) grid.
 ///
@@ -73,7 +71,7 @@ fn rebased_discount_fn<'a>(
     curve: &'a dyn Discounting,
     as_of: Date,
 ) -> Result<impl Fn(f64) -> f64 + 'a> {
-    let model_curve = finstack_quant_models::rates::clock::ModelDiscountCurve::new(curve, as_of)?;
+    let model_curve = crate::rates::clock::ModelDiscountCurve::new(curve, as_of)?;
     Ok(move |t| model_curve.df(t))
 }
 
@@ -81,7 +79,7 @@ fn rebased_discount_fn<'a>(
 ///
 /// Fits a piecewise-constant θ(t) on a monthly grid so the simulated short
 /// rate follows the initial curve. The fit is the canonical
-/// `finstack_quant_models::monte_carlo::process::ou::calibrate_theta_from_curve`,
+/// `crate::monte_carlo::process::ou::calibrate_theta_from_curve`,
 /// which matches the curve-implied short-rate mean at every grid boundary
 /// from forward levels alone, so it holds for log-linear and linear discount
 /// curves whose forwards jump at knots as well as for smooth curves.

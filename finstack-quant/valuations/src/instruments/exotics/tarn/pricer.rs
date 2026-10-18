@@ -3,13 +3,7 @@
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::tarn::Tarn;
-use crate::instruments::rates::hw1f::cumulative_coupon::{CouponEvent, CumulativeCouponTracker};
-use crate::instruments::rates::hw1f::hw1f_curve::{
-    initial_short_rate_from_curve, prepare_hw1f_params, Hw1fTermForward, PeriodForwardCoeffs,
-};
-use crate::instruments::rates::hw1f::hw1f_mc::RateExoticHw1fMcPricer;
-use crate::instruments::rates::hw1f::mc_config::RateExoticMcConfig;
-use crate::instruments::rates::hw1f::{resolve_hw1f_params, Hw1fParamFamily};
+use crate::instruments::pricing::hw1f_params::{resolve_hw1f_params, Hw1fParamFamily};
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -22,6 +16,12 @@ use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
 use finstack_quant_models::rates::clock::model_time;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
+use finstack_quant_models::rates::hw1f::config::Hw1fMcConfig;
+use finstack_quant_models::rates::hw1f::cumulative_coupon::{CouponEvent, CumulativeCouponTracker};
+use finstack_quant_models::rates::hw1f::curve::{
+    initial_short_rate_from_curve, prepare_hw1f_params, Hw1fTermForward, PeriodForwardCoeffs,
+};
+use finstack_quant_models::rates::hw1f::mc::Hw1fMcPricer;
 use std::sync::Arc;
 
 /// Path-local TARN payoff accumulator.
@@ -209,7 +209,7 @@ impl Payoff for TarnPayoff {
 #[derive(Debug, Clone)]
 pub struct TarnPricer {
     hw_params: Option<HullWhiteCalibrationParams>,
-    config: RateExoticMcConfig,
+    config: Hw1fMcConfig,
 }
 
 impl TarnPricer {
@@ -217,7 +217,7 @@ impl TarnPricer {
     pub fn new() -> Self {
         Self {
             hw_params: None,
-            config: RateExoticMcConfig::default(),
+            config: Hw1fMcConfig::default(),
         }
     }
 
@@ -225,7 +225,7 @@ impl TarnPricer {
     pub fn with_hw_params(hw_params: HullWhiteCalibrationParams) -> Self {
         Self {
             hw_params: Some(hw_params),
-            config: RateExoticMcConfig::default(),
+            config: Hw1fMcConfig::default(),
         }
     }
 
@@ -235,7 +235,7 @@ impl TarnPricer {
     /// # Arguments
     ///
     /// * `config` - Base Hull-White Monte Carlo configuration.
-    pub fn with_config(mut self, config: RateExoticMcConfig) -> Self {
+    pub fn with_config(mut self, config: Hw1fMcConfig) -> Self {
         self.config = config;
         self
     }
@@ -255,7 +255,7 @@ impl TarnPricer {
         )
     }
 
-    fn effective_config(&self, inst: &Tarn) -> RateExoticMcConfig {
+    fn effective_config(&self, inst: &Tarn) -> Hw1fMcConfig {
         self.config.with_instrument_overrides(
             &inst.id,
             inst.instrument_pricing_overrides.model_config.mc_paths,
@@ -302,7 +302,7 @@ impl TarnPricer {
         }
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
         let forward_curve = market.get_forward(inst.forward_curve_id.as_ref())?;
-        crate::instruments::rates::hw1f::forward_swap_rate::validate_term_curve_tenor(
+        crate::instruments::rates::forward_swap_rate::validate_term_curve_tenor(
             forward_curve.as_ref(),
             inst.index_tenor,
             inst.id.as_str(),
@@ -367,7 +367,7 @@ impl TarnPricer {
                 let tenor = inst.index_tenor.to_years();
                 let coeffs = term_forward.period_coeffs(fixing_time, tenor);
                 let discount_forward = term_forward.curve_forward(fixing_time, tenor);
-                let basis = crate::instruments::rates::hw1f::forward_swap_rate::term_fixing_on_date(
+                let basis = crate::instruments::rates::forward_swap_rate::term_fixing_on_date(
                     forward_curve.as_ref(),
                     start,
                 )? - discount_forward;
@@ -384,7 +384,7 @@ impl TarnPricer {
                 // fixing; discount-curve reconstruction alone would erase the
                 // projection/discount basis precisely at inception.
                 let projected_rate =
-                    crate::instruments::rates::hw1f::forward_swap_rate::term_fixing_on_date(
+                    crate::instruments::rates::forward_swap_rate::term_fixing_on_date(
                         forward_curve.as_ref(),
                         start,
                     )?;
@@ -434,7 +434,7 @@ impl TarnPricer {
         let horizon = event_times.last().copied().unwrap_or(0.0);
         let process_params =
             prepare_hw1f_params(hw_params, discount_curve.as_ref(), as_of, horizon)?;
-        let mc = RateExoticHw1fMcPricer {
+        let mc = Hw1fMcPricer {
             process_params,
             r0,
             event_times,
@@ -478,7 +478,7 @@ impl Default for TarnPricer {
 fn deterministic_estimate(
     inst: &Tarn,
     events: &[CouponEvent],
-    config: &RateExoticMcConfig,
+    config: &Hw1fMcConfig,
 ) -> finstack_quant_core::Result<MoneyEstimate> {
     let mut payoff = TarnPayoff::new(
         inst.fixed_rate.as_f64(),
@@ -627,7 +627,7 @@ mod tests {
 
     fn deterministic_pricer(paths: usize) -> TarnPricer {
         TarnPricer::with_hw_params(HullWhiteCalibrationParams::new(0.05, 1e-12).expect("hw params"))
-            .with_config(RateExoticMcConfig {
+            .with_config(Hw1fMcConfig {
                 num_paths: paths,
                 antithetic: false,
                 min_steps_between_events: 1,
@@ -934,7 +934,7 @@ mod tests {
             .price_estimate(&instrument, &market, as_of)
             .expect("default price");
         let explicit = pricer
-            .with_config(RateExoticMcConfig {
+            .with_config(Hw1fMcConfig {
                 num_paths: 10_000,
                 seed: 42,
                 antithetic: true,
@@ -982,7 +982,7 @@ mod tests {
 
         let low =
             TarnPricer::with_hw_params(HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw"))
-                .with_config(RateExoticMcConfig {
+                .with_config(Hw1fMcConfig {
                     num_paths: 100,
                     antithetic: true,
                     min_steps_between_events: 1,
@@ -993,7 +993,7 @@ mod tests {
                 .expect("low path price");
         let high =
             TarnPricer::with_hw_params(HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw"))
-                .with_config(RateExoticMcConfig {
+                .with_config(Hw1fMcConfig {
                     num_paths: 1000,
                     antithetic: true,
                     min_steps_between_events: 1,

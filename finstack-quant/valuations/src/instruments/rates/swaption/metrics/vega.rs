@@ -74,7 +74,7 @@ pub(crate) struct HwSigmaVegaCalculator;
 
 impl MetricCalculator for HwSigmaVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        use crate::instruments::rates::hw1f::{
+        use crate::instruments::pricing::hw1f_params::{
             resolve_hw1f_params, Hw1fParamFamily, HW_SIGMA_BUMP,
         };
         if context.pricing_model() != Some(crate::pricer::ModelKey::HullWhite1F) {

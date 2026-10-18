@@ -1,7 +1,7 @@
 //! Pricing-engine components for fixed-income bonds.
 //!
 use super::super::super::super::types::Bond;
-use crate::instruments::rates::hw1f::{resolve_hw1f_params, Hw1fParamFamily};
+use crate::instruments::pricing::hw1f_params::{resolve_hw1f_params, Hw1fParamFamily};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::types::CurveId;

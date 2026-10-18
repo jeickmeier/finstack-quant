@@ -1,6 +1,6 @@
 //! LSMC harness smoke test via a simplified "swaption-like" proxy payoff.
 //!
-//! This test verifies that [`RateExoticHw1fLsmcPricer`] returns a finite,
+//! This test verifies that [`Hw1fLsmcPricer`] returns a finite,
 //! non-negative PV when driven with a trivial payoff whose deterministic
 //! value is zero but whose call-at-par at each exercise date makes the
 //! harness roll forward a positive PV via backward induction.
@@ -27,11 +27,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff};
-use finstack_quant_valuations::instruments::rates::hw1f::exercise::{
-    standard_basis, ExerciseBoundaryPayoff,
-};
-use finstack_quant_valuations::instruments::rates::hw1f::hw1f_lsmc::RateExoticHw1fLsmcPricer;
-use finstack_quant_valuations::instruments::rates::hw1f::mc_config::RateExoticMcConfig;
+use finstack_quant_models::rates::hw1f::config::Hw1fMcConfig;
+use finstack_quant_models::rates::hw1f::lsmc::Hw1fLsmcPricer;
+use finstack_quant_models::rates::hw1f::{ExerciseBoundaryPayoff, ShortRateBasis};
 
 /// Simplified swaption-proxy payoff: records no path-dependent cashflows
 /// (deterministic PV = 0) and exposes a receiver-style intrinsic via the
@@ -70,19 +68,19 @@ impl ExerciseBoundaryPayoff for SwaptionProxy {
         )
     }
     fn continuation_basis(&self, _idx: usize, t_years: f64, short_rate: f64) -> Vec<f64> {
-        standard_basis(t_years, short_rate)
+        ShortRateBasis::new(2).row(t_years, short_rate)
     }
 }
 
 #[test]
 fn lsmc_proxy_price_is_nonnegative_and_stable() {
-    let pricer = RateExoticHw1fLsmcPricer {
+    let pricer = Hw1fLsmcPricer {
         process_params: HullWhite1FParams::new(0.05, 0.012, 0.0)
             .expect("valid Hull-White parameters"),
         r0: 0.025,
         event_times: vec![1.0, 2.0, 3.0, 4.0],
         exercise_times: vec![1.0, 2.0, 3.0, 4.0],
-        config: RateExoticMcConfig {
+        config: Hw1fMcConfig {
             num_paths: 10_000,
             seed: 7,
             ..Default::default()

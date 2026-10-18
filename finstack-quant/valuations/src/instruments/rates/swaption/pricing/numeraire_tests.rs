@@ -49,8 +49,8 @@ use finstack_quant_models::monte_carlo::TimeGrid;
 use super::lmm_bermudan::{build_exercise_aligned_grid, price_bermudan_lmm};
 use super::monte_carlo_lsmc::SwaptionLsmcPricer;
 use super::swap_rate_utils::HullWhiteBondPrice;
-use crate::instruments::rates::hw1f::hw1f_mc::build_event_aligned_grid;
-use crate::instruments::rates::hw1f::RateExoticMcConfig;
+use finstack_quant_models::rates::hw1f::mc::build_event_aligned_grid;
+use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 
 // LMM / BGM — numéraire-consistent co-terminal European reference
 
@@ -217,7 +217,7 @@ fn lmm_single_exercise_matches_numeraire_correct_reference() {
 
     // Non-antithetic ⇒ engine and reference draw bit-identical paths, so the
     // comparison isolates the discounting convention exactly.
-    let config = RateExoticMcConfig {
+    let config = Hw1fMcConfig {
         num_paths,
         seed,
         basis_degree: 2,
@@ -277,7 +277,7 @@ fn lmm_bermudan_respects_coterminal_lower_bound() {
     let num_paths = 30_000;
     let seed = 7;
 
-    let config = RateExoticMcConfig {
+    let config = Hw1fMcConfig {
         num_paths,
         seed,
         basis_degree: 2,
@@ -603,7 +603,7 @@ fn lsmc_european_uses_pathwise_money_market_numeraire() {
 
     // Non-antithetic so the engine and the reference draw bit-identical
     // paths — the test then isolates the discounting convention exactly.
-    let config = RateExoticMcConfig {
+    let config = Hw1fMcConfig {
         num_paths,
         seed,
         antithetic: false,
@@ -702,7 +702,7 @@ fn lsmc_bermudan_matches_pathwise_numeraire_reference() {
     let seed = 7;
     let exercise_times = [1.0, 2.0, 3.0, 4.0];
 
-    let config = RateExoticMcConfig {
+    let config = Hw1fMcConfig {
         num_paths,
         seed,
         antithetic: false,

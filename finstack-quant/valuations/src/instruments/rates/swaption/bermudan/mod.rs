@@ -1,7 +1,7 @@
 //! Bermudan swaption pricer implementations.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::rates::hw1f::{resolve_hw1f_params, Hw1fParamFamily};
+use crate::instruments::pricing::hw1f_params::{resolve_hw1f_params, Hw1fParamFamily};
 use crate::instruments::rates::swaption::pricing::BermudanSwaptionTreeValuator;
 use crate::instruments::rates::swaption::BermudanSwaption;
 use crate::pricer::{
@@ -21,8 +21,6 @@ use finstack_quant_models::trees::HullWhiteTreeConfig;
 use std::sync::Arc;
 
 // LSMC imports (gated by feature)
-use crate::instruments::rates::hw1f::hw1f_mc::build_event_aligned_grid;
-use crate::instruments::rates::hw1f::RateExoticMcConfig;
 use crate::instruments::rates::swaption::pricing::hw_cashflows::{
     value_with_exercise_today, HwExerciseTerms, HwSwaptionCashflows,
 };
@@ -33,6 +31,8 @@ use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::process::ou::{
     calibrate_theta_from_curve, HullWhite1FProcess,
 };
+use finstack_quant_models::rates::hw1f::mc::build_event_aligned_grid;
+use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 
 /// Pricing method for Bermudan swaptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -207,7 +207,7 @@ pub struct BermudanSwaptionPricerConfig {
     /// Monte Carlo settings for LSMC pricing: path count (overridable per
     /// instrument via `model_config.mc_paths`), seed, antithetic sampling,
     /// minimum sub-steps between exercise dates and regression basis degree.
-    pub mc: RateExoticMcConfig,
+    pub mc: Hw1fMcConfig,
     /// Prepared Hull-White tree for model reuse.
     ///
     /// When set, the pricer reuses this prepared tree directly. This avoids
@@ -231,7 +231,7 @@ impl BermudanSwaptionPricerConfig {
     /// value), increase to 250,000 estimators. The regression
     /// uses a cubic polynomial basis with at least two simulation sub-steps
     /// between exercise dates.
-    pub const DEFAULT_MC: RateExoticMcConfig = RateExoticMcConfig {
+    pub const DEFAULT_MC: Hw1fMcConfig = Hw1fMcConfig {
         num_paths: 50_000,
         seed: 42,
         antithetic: true,
@@ -623,7 +623,7 @@ impl BermudanSwaptionPricer {
         let hw_process = HullWhite1FProcess::new(hw_params.clone());
 
         let mc_paths = self.effective_mc_paths(swaption);
-        let lsmc_config = RateExoticMcConfig {
+        let lsmc_config = Hw1fMcConfig {
             num_paths: mc_paths,
             ..self.config.mc
         };
@@ -859,7 +859,7 @@ mod lsmc_diagnostics_tests {
             for oos_lsmc in [false, true] {
                 let pricer =
                     BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-                        mc: RateExoticMcConfig {
+                        mc: Hw1fMcConfig {
                             // The instrument override supplies the 64 actual streams.
                             num_paths: 16,
                             antithetic,

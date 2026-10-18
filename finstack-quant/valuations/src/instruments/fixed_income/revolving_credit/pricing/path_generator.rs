@@ -25,12 +25,12 @@ use crate::instruments::fixed_income::revolving_credit::pricing::monte_carlo_pro
     CreditSpreadParams, InterestRateSpec, RevolvingCreditProcess, RevolvingCreditProcessParams,
     UtilizationParams,
 };
-use crate::instruments::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
 use finstack_quant_models::monte_carlo::TimeGrid;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
+use finstack_quant_models::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
 
 use super::super::cashflow_engine::ThreeFactorPathData;
 use super::super::types::{

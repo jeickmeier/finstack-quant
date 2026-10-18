@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Hull-White one-factor engine moved to `finstack-quant-models`
+
+#### Changed
+
+- The HW1F Monte Carlo and Longstaff-Schwartz engines, θ(t) curve preparation, term-forward reconstruction, bank-account numéraire, cumulative-coupon tracker and exercise-boundary protocol move from `finstack_quant_valuations::instruments::rates::hw1f` to `finstack_quant_models::rates::hw1f`. `RateExoticHw1fMcPricer`, `RateExoticHw1fLsmcPricer` and `RateExoticMcConfig` are now `Hw1fMcPricer`, `Hw1fLsmcPricer` and `Hw1fMcConfig`. The old path is removed, not re-exported.
+- `Hw1fMcConfig::default()` reads the new `rust.hw1f` block of the models Monte Carlo defaults registry (overridable through the `monte_carlo.defaults.v1` config extension); the `rate_exotics` block leaves the valuations product defaults. `Hw1fMcConfig::lmm_bermudan()` is replaced by `finstack_quant_valuations::instruments::rates::swaption::lmm_pricer::lmm_bermudan_mc_config()`.
+- `standard_basis`, `extended_basis` and `basis_for_degree` are replaced by `finstack_quant_models::rates::hw1f::ShortRateBasis`, which implements `BasisFunctions` and reproduces the same feature rows.
+- Valuations keeps the pricing glue at new paths: `instruments::pricing::hw1f_params::{resolve_hw1f_params, Hw1fParamFamily, HW_SIGMA_BUMP}`, `instruments::BermudanCallProvision`, `instruments::rates::forward_swap_rate` and the crate-private `rates::cms_fixings`.
+
 ### Core API simplification
 
 #### Added

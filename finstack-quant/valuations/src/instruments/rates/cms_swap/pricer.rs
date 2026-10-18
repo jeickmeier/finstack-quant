@@ -371,7 +371,7 @@ pub(super) fn cms_coupon_rate(
     // phantom P&L. The rate is known, so there is no convexity adjustment and
     // embedded cap/floor optionality collapses to intrinsic (time_to_fixing=0).
     if fixing_date < as_of {
-        let observed = crate::instruments::rates::hw1f::fixings::historical_cms_fixing(
+        let observed = crate::instruments::rates::cms_fixings::historical_cms_fixing(
             market,
             &inst.forward_curve_id,
             inst.cms_tenor.to_years(),

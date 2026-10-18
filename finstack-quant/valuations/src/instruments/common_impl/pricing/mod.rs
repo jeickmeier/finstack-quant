@@ -9,9 +9,11 @@
 //! - [`trs`]: Total Return Swap pricing engine
 //! - [`swap_legs`]: Shared floating/fixed leg pricing for swaps
 //! - [`time`]: Shared time-mapping and discount factor helpers for consistent curve usage
+//! - [`hw1f_params`]: Hull-White 1F κ/σ resolution from pricing overrides or calibrated market scalars
 
 pub(crate) mod floating_reset_descriptors;
 mod generic;
+pub mod hw1f_params;
 pub(crate) mod overnight;
 pub mod overnight_conventions;
 pub(crate) mod rates_credit;

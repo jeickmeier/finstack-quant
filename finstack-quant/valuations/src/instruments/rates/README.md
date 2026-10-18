@@ -29,19 +29,22 @@ rather than repeating it.
 | `cms_spread_option/` | Options on the spread between two CMS rates (steepener/flattener) | SABR marginals joined by a Gaussian copula, with CMS convexity from static replication. Default model is `StaticReplication` | no |
 | `inflation_swap/` | Zero-coupon and year-on-year inflation swaps | Compounded fixed breakeven against the CPI ratio; 3-month index lag; CPI-U (USD), HICP ex-tobacco (EUR), RPI or CPI (GBP). Calibrates the real curve | no |
 | `inflation_cap_floor/` | Caps and floors on YoY inflation | Black-76 or Bachelier on the forward YoY inflation rate derived from the inflation curve or index fixings | no |
-| `hw1f/` | **Not an instrument.** Shared Hull-White 1-factor calibration and Monte Carlo engine, plus the exotic-rate helper set | θ(t) curve calibration and caplet/swaption surface calibration, bank-account numéraire, forward swap rate and annuity, coupon profiles, cumulative-coupon tracking, Bermudan call provisions, LSMC exercise bases | no |
 
-`hw1f/` is the one directory here that is not an instrument, and its consumers
-reach well outside this family: `swaption` (HW tree, LSMC), `cap_floor`, all
-three CMS leaves, `exotics::{tarn, snowball, callable_range_accrual}`,
-`fixed_income::mbs_passthrough` (MC OAS) and
-`fixed_income::revolving_credit` (path generator). Treat changes to it as
-cross-family.
+Two non-instrument files sit beside the leaves: `forward_swap_rate.rs` (forward
+swap rate, annuity and term-curve checks shared by the CMS leaves and
+`ir_future`) and `cms_fixings.rs` (historical CMS fixing lookup, crate-private).
+The Hull-White 1-factor Monte Carlo and LSMC engines that the swaption,
+cap/floor, CMS, TARN, snowball, callable range accrual, MBS OAS and revolver
+pricers drive live in `finstack_quant_models::rates::hw1f`; the κ/σ resolution
+from pricing overrides or calibrated market scalars is
+`finstack_quant_valuations::instruments::pricing::hw1f_params`, and the shared
+`BermudanCallProvision` contract term is re-exported at
+`finstack_quant_valuations::instruments`.
 
 ## Public surface
 
 Import path: `finstack_quant_valuations::instruments::rates::<leaf>`. All
-sixteen directories are `pub mod`, `hw1f` included. The headline types are also
+fifteen directories are `pub mod`. The headline types are also
 re-exported flat at `finstack_quant_valuations::instruments`:
 
 `InterestRateSwap`, `BasisSwap`, `XccySwap`, `CapFloor`, `RateOptionType`,
@@ -60,9 +63,10 @@ CashSettlementMethod, BermudanPricingMethod, BermudanSwaptionPricer,
 BermudanSwaptionTreeValuator, SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer}`,
 `xccy_swap::{NotionalExchange, ResettingSide,
 XccySwapLeg}`, `cms_swap::{FundingLeg, FundingLegSpec}`,
-`ir_future::FutureContractSpecs`, and `hw1f`.
+`ir_future::FutureContractSpecs`, and `forward_swap_rate`.
 Reusable `HullWhiteParams` and Hull-White equations live at
-`finstack_quant_models::rates::hull_white`.
+`finstack_quant_models::rates::hull_white`; the HW1F Monte Carlo and LSMC
+engines at `finstack_quant_models::rates::hw1f`.
 
 Swaptions use the shared `ExerciseStyle`, `SettlementType` and
 `VolatilityModel` (`black` / `normal`) re-exported at
@@ -72,8 +76,7 @@ Inside a leaf, `metrics/`, `types.rs`/`types/`, `pricer.rs`/`pricing/` and the
 model-specific pricers (`hw_pricer.rs`, `lmm_pricer.rs`, `bermudan/`) are `pub(crate)` or private; supported
 items surface through each leaf's `pub use`. Genuinely public submodules are
 `irs::compounding`, `cms_option::pricer`, `cms_option::replication_pricer`,
-`cms_swap::pricer`, and every module under `hw1f` except `hw1f::fixings`, which
-is `pub(crate)`.
+`cms_swap::pricer` and `forward_swap_rate`; `cms_fixings` is `pub(crate)`.
 
 ## Family conventions
 
@@ -107,7 +110,8 @@ is `pub(crate)`.
   `ForwardRateAgreement` and `InterestRateSwap` expose `from_conventions`
   constructors that go through it.
 - **Determinism.** LSMC, LMM and HW1F Monte Carlo take explicit seeds via
-  `hw1f::RateExoticMcConfig` and must reproduce bit-identically.
+  `finstack_quant_models::rates::hw1f::Hw1fMcConfig` and must reproduce
+  bit-identically.
 
 ## Registration
 
@@ -146,7 +150,7 @@ Integration tests live in `../../../tests/instruments/<leaf>/`, compiled into
 the single `instruments` target. Dedicated directories exist for `irs`,
 `basis_swap`, `cap_floor`, `deposit`, `fra`, `ir_future`,
 `cms_option`, `inflation_swap`, `inflation_cap_floor`, `repo`, `swaption` and
-`xccy_swap`. `cms_swap`, `cms_spread_option` and `hw1f` are covered by colocated
+`xccy_swap`. `cms_swap` and `cms_spread_option` are covered by colocated
 `#[cfg(test)]` modules plus the registry/serde/dependency contract tests;
 `swaption/pricing/numeraire_tests.rs` holds the in-crate no-arbitrage numéraire
 checks for the Bermudan engines.
@@ -160,7 +164,10 @@ cargo nextest run -p finstack-quant-valuations --test valuations instruments::sw
 cargo nextest run -p finstack-quant-valuations --test valuations instruments::irs::
 
 # colocated unit tests
-cargo nextest run -p finstack-quant-valuations --lib rates::hw1f
+cargo nextest run -p finstack-quant-valuations --lib rates::cms_swap
+
+# the HW1F engines themselves
+cargo nextest run -p finstack-quant-models --lib rates::hw1f
 
 # whole workspace, what CI runs
 mise run rust-test

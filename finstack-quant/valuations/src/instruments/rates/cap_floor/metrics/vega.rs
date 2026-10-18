@@ -96,7 +96,7 @@ fn hull_white_surface_vega_per_pct(option: &CapFloor, context: &MetricContext) -
 
 fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> Result<f64> {
     let market = context.curves.as_ref();
-    let bump = crate::instruments::rates::hw1f::HW_SIGMA_BUMP;
+    let bump = crate::instruments::pricing::hw1f_params::HW_SIGMA_BUMP;
     let base = resolve_capfloor_hw1f_model_params(option, market)?;
     let with_sigma = |shift: f64| -> Result<CapFloor> {
         let mut bumped = option.clone();

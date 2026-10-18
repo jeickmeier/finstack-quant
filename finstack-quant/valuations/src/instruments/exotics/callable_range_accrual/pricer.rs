@@ -3,11 +3,7 @@
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual;
-use crate::instruments::rates::hw1f::{
-    basis_for_degree, initial_short_rate_from_curve, prepare_hw1f_params, resolve_hw1f_params,
-    ExerciseBoundaryPayoff, Hw1fParamFamily, Hw1fTermForward, PeriodForwardCoeffs,
-    RateExoticHw1fLsmcPricer, RateExoticHw1fMcPricer, RateExoticMcConfig,
-};
+use crate::instruments::pricing::hw1f_params::{resolve_hw1f_params, Hw1fParamFamily};
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -20,6 +16,10 @@ use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
 use finstack_quant_models::rates::clock::model_time;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
+use finstack_quant_models::rates::hw1f::{
+    initial_short_rate_from_curve, prepare_hw1f_params, ExerciseBoundaryPayoff, Hw1fLsmcPricer,
+    Hw1fMcConfig, Hw1fMcPricer, Hw1fTermForward, PeriodForwardCoeffs, ShortRateBasis,
+};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy)]
@@ -92,8 +92,8 @@ struct CallableRangeAccrualPayoff {
     /// Pathwise bank-account numeraire observed at the final payment event;
     /// 0.0 until recorded.
     bank_at_final_payment: f64,
-    /// LSMC regression basis degree from `RateExoticMcConfig::basis_degree`
-    /// (2 → `standard_basis`, 3+ → `extended_basis`).
+    /// LSMC regression basis degree from `Hw1fMcConfig::basis_degree`
+    /// (see `ShortRateBasis`: 2 → four-term row, 3+ → six-term row).
     basis_degree: usize,
 }
 
@@ -276,7 +276,7 @@ impl ExerciseBoundaryPayoff for CallableRangeAccrualPayoff {
     }
 
     fn continuation_basis(&self, _exercise_idx: usize, t_years: f64, short_rate: f64) -> Vec<f64> {
-        basis_for_degree(self.basis_degree, t_years, short_rate)
+        ShortRateBasis::new(self.basis_degree).row(t_years, short_rate)
     }
 }
 
@@ -284,7 +284,7 @@ impl ExerciseBoundaryPayoff for CallableRangeAccrualPayoff {
 #[derive(Debug, Clone)]
 pub struct CallableRangeAccrualPricer {
     hw_params: Option<HullWhiteCalibrationParams>,
-    config: RateExoticMcConfig,
+    config: Hw1fMcConfig,
 }
 
 impl CallableRangeAccrualPricer {
@@ -292,7 +292,7 @@ impl CallableRangeAccrualPricer {
     pub fn new() -> Self {
         Self {
             hw_params: None,
-            config: RateExoticMcConfig::default(),
+            config: Hw1fMcConfig::default(),
         }
     }
 
@@ -300,7 +300,7 @@ impl CallableRangeAccrualPricer {
     pub fn with_hw_params(hw_params: HullWhiteCalibrationParams) -> Self {
         Self {
             hw_params: Some(hw_params),
-            config: RateExoticMcConfig::default(),
+            config: Hw1fMcConfig::default(),
         }
     }
 
@@ -310,7 +310,7 @@ impl CallableRangeAccrualPricer {
     /// # Arguments
     ///
     /// * `config` - Base Hull-White Monte Carlo configuration.
-    pub fn with_config(mut self, config: RateExoticMcConfig) -> Self {
+    pub fn with_config(mut self, config: Hw1fMcConfig) -> Self {
         self.config = config;
         self
     }
@@ -330,7 +330,7 @@ impl CallableRangeAccrualPricer {
         )
     }
 
-    fn effective_config(&self, inst: &CallableRangeAccrual) -> RateExoticMcConfig {
+    fn effective_config(&self, inst: &CallableRangeAccrual) -> Hw1fMcConfig {
         self.config.with_instrument_overrides(
             &inst.id,
             inst.instrument_pricing_overrides.model_config.mc_paths,
@@ -422,7 +422,7 @@ impl CallableRangeAccrualPricer {
         let process_params =
             prepare_hw1f_params(hw_params, discount_curve.as_ref(), as_of, horizon)?;
         if schedule.exercise_times.is_empty() {
-            let mc = RateExoticHw1fMcPricer {
+            let mc = Hw1fMcPricer {
                 process_params,
                 r0,
                 event_times: schedule.event_times,
@@ -432,7 +432,7 @@ impl CallableRangeAccrualPricer {
             return mc.price(|| payoff.clone());
         }
 
-        let lsmc = RateExoticHw1fLsmcPricer {
+        let lsmc = Hw1fLsmcPricer {
             process_params,
             r0,
             event_times: schedule.event_times,
@@ -666,7 +666,7 @@ fn zero_estimate(currency: finstack_quant_core::currency::Currency) -> MoneyEsti
 mod tests {
     use super::*;
     use crate::instruments::exotics::range_accrual::{BoundsType, RangeAccrualTerms};
-    use crate::instruments::rates::hw1f::bermudan_call::BermudanCallProvision;
+    use crate::instruments::BermudanCallProvision;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -748,7 +748,7 @@ mod tests {
         CallableRangeAccrualPricer::with_hw_params(
             HullWhiteCalibrationParams::new(0.05, 1e-12).expect("hw params"),
         )
-        .with_config(RateExoticMcConfig {
+        .with_config(Hw1fMcConfig {
             num_paths: paths,
             antithetic: false,
             min_steps_between_events: 1,
@@ -757,8 +757,8 @@ mod tests {
     }
 
     /// `mc_basis_degree` must be a live config surface: degree 3+ switches the
-    /// LSMC continuation regression from the degree-2 `standard_basis` to the
-    /// degree-3 `extended_basis`, which changes the fitted exercise rule and
+    /// LSMC continuation regression from the four-term degree-2 row to the
+    /// six-term degree-3 row, which changes the fitted exercise rule and
     /// therefore the price. Guards against the recurring silently-inert-config
     /// defect class (config parsed and clamped but never read by the pricer).
     #[test]
@@ -773,7 +773,7 @@ mod tests {
             CallableRangeAccrualPricer::with_hw_params(
                 HullWhiteCalibrationParams::new(0.05, 0.01).expect("hw params"),
             )
-            .with_config(RateExoticMcConfig {
+            .with_config(Hw1fMcConfig {
                 num_paths: 256,
                 antithetic: false,
                 min_steps_between_events: 1,
@@ -817,7 +817,7 @@ mod tests {
         let default = CallableRangeAccrualPricer::with_hw_params(hw_params)
             .price_estimate(&inst, &curves, as_of)
             .expect("default price");
-        let explicit_config = RateExoticMcConfig {
+        let explicit_config = Hw1fMcConfig {
             num_paths: 10_000,
             seed: 42,
             antithetic: true,
@@ -843,7 +843,7 @@ mod tests {
         // Unlike the replay above, this changes both estimator count and path
         // pairing, proving the explicit configuration is consumed.
         let reduced = CallableRangeAccrualPricer::with_hw_params(hw_params)
-            .with_config(RateExoticMcConfig {
+            .with_config(Hw1fMcConfig {
                 num_paths: 127,
                 antithetic: false,
                 ..explicit_config

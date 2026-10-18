@@ -26,7 +26,7 @@
 //!   Practice*, Chapter 4. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::rates::hw1f::{resolve_hw1f_params, Hw1fParamFamily};
+use crate::instruments::pricing::hw1f_params::{resolve_hw1f_params, Hw1fParamFamily};
 use crate::instruments::rates::swaption::types::Swaption;
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,

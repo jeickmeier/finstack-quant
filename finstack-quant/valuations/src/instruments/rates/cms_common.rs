@@ -10,7 +10,7 @@
 //! [`CmsSpreadOption`]: crate::instruments::rates::cms_spread_option::CmsSpreadOption
 //! [`CmsReferenceSwap`]: crate::instruments::rates::cms_common::CmsReferenceSwap
 
-use crate::instruments::rates::hw1f::forward_swap_rate::{
+use crate::instruments::rates::forward_swap_rate::{
     calculate_forward_swap_rate, ForwardSwapRateInputs,
 };
 use finstack_quant_core::currency::Currency;

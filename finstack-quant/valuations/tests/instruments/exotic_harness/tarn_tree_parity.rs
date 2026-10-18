@@ -55,9 +55,9 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
+use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 use finstack_quant_models::{HullWhiteTree, HullWhiteTreeConfig};
 use finstack_quant_valuations::instruments::exotics::tarn::{Tarn, TarnPricer};
-use finstack_quant_valuations::instruments::rates::hw1f::RateExoticMcConfig;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::Pricer;
 use time::Month;
@@ -239,7 +239,7 @@ fn tarn_floating_note_mc_matches_hw_tree() {
 
     // --- Monte-Carlo (M6/M7 path) -------------------------------------------
     let mc_result = TarnPricer::with_hw_params(hw)
-        .with_config(RateExoticMcConfig {
+        .with_config(Hw1fMcConfig {
             num_paths: 60_000,
             antithetic: true,
             min_steps_between_events: 8,

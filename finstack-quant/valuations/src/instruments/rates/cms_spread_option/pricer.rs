@@ -154,7 +154,7 @@ impl CmsSpreadOptionPricer {
         // rate is known, so there is no convexity adjustment and the payoff
         // collapses to intrinsic on the observed rates.
         if inst.expiry < as_of {
-            let observed = crate::instruments::rates::hw1f::fixings::historical_cms_fixing(
+            let observed = crate::instruments::rates::cms_fixings::historical_cms_fixing(
                 market,
                 &inst.forward_curve_id,
                 tenor_years,

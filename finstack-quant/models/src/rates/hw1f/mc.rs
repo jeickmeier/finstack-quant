@@ -1,10 +1,10 @@
 //! Generic HW1F Monte Carlo orchestrator for rate exotic products.
 //!
-//! The pricer is generic over a user-supplied [`finstack_quant_models::monte_carlo::traits::Payoff`] that:
+//! The pricer is generic over a user-supplied [`crate::monte_carlo::traits::Payoff`] that:
 //! 1. Exposes event-times (year fractions from valuation date) via construction.
-//! 2. Consumes [`finstack_quant_models::monte_carlo::traits::PathState`] updates at each simulation step, reading the
+//! 2. Consumes [`crate::monte_carlo::traits::PathState`] updates at each simulation step, reading the
 //!    short rate and recording on-path discounted cashflows.
-//! 3. Returns the accumulated PV via [`finstack_quant_models::monte_carlo::traits::Payoff::value`] in the requested currency.
+//! 3. Returns the accumulated PV via [`crate::monte_carlo::traits::Payoff::value`] in the requested currency.
 //!
 //! The pricer handles: time-grid construction aligned to event dates,
 //! HW1F process + exact discretization, RNG streams with antithetic
@@ -13,38 +13,36 @@
 //!
 //! At every step the pricer also accumulates the pathwise money-market
 //! numeraire `B(t) = exp(∫₀ᵗ r ds)` (trapezoidal rule, see
-//! [`crate::instruments::rates::hw1f::bank_account`]) and exposes it
+//! [`crate::rates::hw1f::bank_account`]) and exposes it
 //! to payoffs through `StateKey::BankAccount`. Payoffs must discount
 //! simulated cashflows with this pathwise factor — not the deterministic
 //! time-0 curve DF, which would drop the payoff/numeraire correlation.
 
-use crate::instruments::rates::hw1f::bank_account::bank_step_factor;
-use crate::instruments::rates::hw1f::mc_config::{RateExoticMcConfig, SampleSplit};
+use crate::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
+use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
+use crate::monte_carlo::results::MoneyEstimate;
+use crate::monte_carlo::rng::philox::PhiloxRng;
+use crate::monte_carlo::traits::{Discretization, PathState, Payoff, RandomStream, StateKey};
+use crate::monte_carlo::OnlineStats;
+use crate::monte_carlo::TimeGrid;
+use crate::rates::hw1f::bank_account::bank_step_factor;
+use crate::rates::hw1f::config::{Hw1fMcConfig, SampleSplit};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;
-use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
-use finstack_quant_models::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
-use finstack_quant_models::monte_carlo::results::MoneyEstimate;
-use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-use finstack_quant_models::monte_carlo::traits::{
-    Discretization, PathState, Payoff, RandomStream, StateKey,
-};
-use finstack_quant_models::monte_carlo::OnlineStats;
-use finstack_quant_models::monte_carlo::TimeGrid;
 
 /// HW1F Monte Carlo pricer for path-dependent rate exotics without exercise.
 ///
-/// The pricer drives a user-supplied [`finstack_quant_models::monte_carlo::traits::Payoff`] along simulated short-rate paths
+/// The pricer drives a user-supplied [`crate::monte_carlo::traits::Payoff`] along simulated short-rate paths
 /// produced by an exact HW1F discretization. The payoff is responsible for all
 /// product-specific cashflow accumulation (including discounting); the pricer
 /// only aggregates the per-path PVs into a [`MoneyEstimate`].
-pub struct RateExoticHw1fMcPricer {
+pub struct Hw1fMcPricer {
     /// Fully-specified HW1F short-rate parameters: κ, σ, and the
     /// time-dependent mean-reversion level θ(t).
     ///
     /// The simulated short rate follows `dr_t = κ·(θ(t) - r_t)·dt + σ·dW_t`.
     /// θ(t) MUST be bootstrapped from the product's discount curve (see
-    /// [`crate::instruments::rates::hw1f::prepare_hw1f_params`])
+    /// [`crate::rates::hw1f::prepare_hw1f_params`])
     /// so the simulated short rate reprices the initial curve — a constant θ
     /// makes the process a plain Vasicek that mis-reprices any non-flat curve.
     pub process_params: HullWhite1FParams,
@@ -53,12 +51,12 @@ pub struct RateExoticHw1fMcPricer {
     /// Event times (year fractions), strictly increasing and strictly positive.
     pub event_times: Vec<f64>,
     /// Runtime Monte Carlo configuration (paths, seed, antithetic, step density).
-    pub config: RateExoticMcConfig,
+    pub config: Hw1fMcConfig,
     /// Currency for the returned PV estimate.
     pub currency: Currency,
 }
 
-impl RateExoticHw1fMcPricer {
+impl Hw1fMcPricer {
     /// Run the simulation, invoking `payoff_factory` once per path to obtain a
     /// fresh payoff accumulator.
     ///
@@ -91,13 +89,13 @@ impl RateExoticHw1fMcPricer {
         }
         let Some(&maturity) = self.event_times.last() else {
             return Err(finstack_quant_core::Error::Validation(
-                "RateExoticHw1fMcPricer requires at least one event time".into(),
+                "Hw1fMcPricer requires at least one event time".into(),
             ));
         };
         for pair in self.event_times.windows(2) {
             if pair[1] <= pair[0] {
                 return Err(finstack_quant_core::Error::Validation(
-                    "RateExoticHw1fMcPricer event_times must be strictly increasing".into(),
+                    "Hw1fMcPricer event_times must be strictly increasing".into(),
                 ));
             }
         }
@@ -200,7 +198,7 @@ impl RateExoticHw1fMcPricer {
 /// Returns a validation error for incomplete path groups or fewer than two
 /// independent pricing estimators. The 95% mean interval uses Student-t
 /// critical values with one fewer degree of freedom than the estimator count.
-pub(crate) fn money_estimate_from_pairs(
+pub fn money_estimate_from_pairs(
     path_values: &[f64],
     split: SampleSplit,
     scale: f64,
@@ -257,11 +255,21 @@ pub(crate) fn money_estimate_from_pairs(
 /// segment up to `maturity` is subdivided the same way. Shared by the HW1F
 /// exotic, HW1F Bermudan LSMC and LMM Bermudan engines.
 ///
+/// # Arguments
+///
+/// * `event_times` - Strictly increasing, strictly positive event times in
+///   year fractions from the valuation date; each becomes a grid node.
+/// * `maturity` - Final simulation time in year fractions, at or after the
+///   last event; the grid ends there.
+/// * `min_steps_between` - Minimum number of sub-steps between consecutive
+///   events (and before the first, and up to `maturity`); values below `1`
+///   are raised to `1`, and long gaps get more steps.
+///
 /// # Errors
 ///
 /// Returns [`finstack_quant_core::Error::Validation`] if `event_times` are not
 /// strictly increasing and positive.
-pub(crate) fn build_event_aligned_grid(
+pub fn build_event_aligned_grid(
     event_times: &[f64],
     maturity: f64,
     min_steps_between: usize,
@@ -396,12 +404,12 @@ mod tests {
             (1, true, false),
             (3, true, true),
         ] {
-            let pricer = RateExoticHw1fMcPricer {
+            let pricer = Hw1fMcPricer {
                 process_params: HullWhite1FParams::new(0.05, 0.01, 0.03)
                     .expect("valid Hull-White parameters"),
                 r0: 0.03,
                 event_times: vec![1.0],
-                config: RateExoticMcConfig {
+                config: Hw1fMcConfig {
                     num_paths,
                     antithetic,
                     oos_lsmc,
@@ -422,12 +430,12 @@ mod tests {
     #[test]
     fn pathwise_bank_account_discounts_zcb() {
         let r0 = 0.03;
-        let pricer = RateExoticHw1fMcPricer {
+        let pricer = Hw1fMcPricer {
             process_params: HullWhite1FParams::new(0.05, 1e-12, r0)
                 .expect("valid Hull-White parameters"),
             r0,
             event_times: vec![1.0],
-            config: RateExoticMcConfig {
+            config: Hw1fMcConfig {
                 num_paths: 8,
                 ..Default::default()
             },
@@ -444,12 +452,12 @@ mod tests {
 
     #[test]
     fn trivial_payoff_equals_one() {
-        let pricer = RateExoticHw1fMcPricer {
+        let pricer = Hw1fMcPricer {
             process_params: HullWhite1FParams::new(0.05, 0.01, 0.0)
                 .expect("valid Hull-White parameters"),
             r0: 0.03,
             event_times: vec![1.0],
-            config: RateExoticMcConfig {
+            config: Hw1fMcConfig {
                 num_paths: 100,
                 ..Default::default()
             },
@@ -483,12 +491,12 @@ mod tests {
         let r0 = 0.03;
         // Equal simulation budget: 2,000 antithetic estimators (4,000
         // simulated paths) against 4,000 i.i.d. estimators.
-        let make = |num_paths: usize, antithetic: bool| RateExoticHw1fMcPricer {
+        let make = |num_paths: usize, antithetic: bool| Hw1fMcPricer {
             process_params: HullWhite1FParams::new(0.05, 0.01, r0)
                 .expect("valid Hull-White parameters"),
             r0,
             event_times: vec![1.0],
-            config: RateExoticMcConfig {
+            config: Hw1fMcConfig {
                 num_paths,
                 antithetic,
                 ..Default::default()

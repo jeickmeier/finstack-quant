@@ -1,12 +1,14 @@
-//! Monte Carlo configuration for rate exotic products.
+//! Monte Carlo configuration for the HW1F engines.
 //!
 //! Defines typed runtime settings and derives the simulated path count.
+//! Defaults come from the `rust.hw1f` block of the embedded Monte Carlo
+//! defaults registry ([`crate::monte_carlo::registry`]).
 
 use serde::{Deserialize, Serialize};
 
-/// Runtime Monte Carlo configuration shared across rate exotic pricers.
+/// Runtime Monte Carlo configuration shared by the HW1F Monte Carlo and LSMC pricers.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct RateExoticMcConfig {
+pub struct Hw1fMcConfig {
     /// Number of independent Monte Carlo estimators (RNG streams).
     ///
     /// With `antithetic = true` each estimator simulates a `(Z, -Z)` pair, so
@@ -20,7 +22,7 @@ pub struct RateExoticMcConfig {
     /// observation/coupon dates. Ensures accurate short-rate dynamics.
     pub min_steps_between_events: usize,
     /// Polynomial basis degree for LSMC regression (only used by
-    /// [`crate::instruments::rates::hw1f::hw1f_lsmc`]).
+    /// [`crate::rates::hw1f::lsmc`]; see [`crate::rates::hw1f::ShortRateBasis`]).
     pub basis_degree: usize,
     /// Split-sample (out-of-sample) LSMC pricing.
     ///
@@ -37,9 +39,11 @@ pub struct RateExoticMcConfig {
     pub oos_lsmc: bool,
 }
 
-impl Default for RateExoticMcConfig {
+impl Default for Hw1fMcConfig {
     fn default() -> Self {
-        let defaults = &crate::pricer::defaults::embedded_defaults_or_panic().rate_exotics;
+        let defaults = &crate::monte_carlo::registry::embedded_defaults_or_panic()
+            .rust
+            .hw1f;
         Self {
             num_paths: defaults.num_paths,
             seed: defaults.seed,
@@ -51,36 +55,18 @@ impl Default for RateExoticMcConfig {
     }
 }
 
-impl RateExoticMcConfig {
-    /// Defaults for the LMM/BGM Bermudan swaption engine, read from the
-    /// `lmm_bermudan` block of the embedded pricer-defaults registry.
-    ///
-    /// The LMM engine simulates more paths and uses a cubic regression basis
-    /// by default; `min_steps_between_events` is the minimum number of
-    /// simulation sub-steps between consecutive exercise dates.
-    pub fn lmm_bermudan() -> Self {
-        let defaults = &crate::pricer::defaults::embedded_defaults_or_panic().lmm_bermudan;
-        Self {
-            num_paths: defaults.num_paths,
-            seed: defaults.seed,
-            antithetic: defaults.antithetic,
-            min_steps_between_events: defaults.min_steps_between_exercises,
-            basis_degree: defaults.basis_degree,
-            oos_lsmc: false,
-        }
-    }
-
-    /// Apply per-instrument overrides: an optional independent-estimator
-    /// count (at least one) and a seed derived deterministically from the
-    /// instrument id and the optional seed label (`"base"` when absent).
+impl Hw1fMcConfig {
+    /// Apply instrument-level Monte Carlo overrides and derive the RNG seed.
     ///
     /// # Arguments
     ///
-    /// * `instrument_id` - Instrument identifier that seeds the RNG stream.
-    /// * `mc_paths` - Optional independent-estimator count from
-    ///   `instrument_pricing_overrides.model_config.mc_paths`.
-    /// * `mc_seed_scenario` - Optional seed label from
-    ///   `instrument_pricing_overrides.model_config.mc_seed_scenario`.
+    /// * `instrument_id` - Instrument identifier hashed with the scenario label
+    ///   into the root seed, so two instruments never share a random stream.
+    /// * `mc_paths` - Optional override of the number of independent
+    ///   estimators; values below `1` are raised to `1`. `None` keeps the
+    ///   configured count.
+    /// * `mc_seed_scenario` - Optional scenario label mixed into the seed;
+    ///   `None` uses `"base"`.
     #[must_use]
     pub fn with_instrument_overrides(
         mut self,
@@ -91,7 +77,7 @@ impl RateExoticMcConfig {
         if let Some(paths) = mc_paths {
             self.num_paths = paths.max(1);
         }
-        self.seed = finstack_quant_models::monte_carlo::seed::derive_seed(
+        self.seed = crate::monte_carlo::seed::derive_seed(
             instrument_id,
             mc_seed_scenario.unwrap_or("base"),
         );
@@ -118,7 +104,7 @@ impl RateExoticMcConfig {
     }
 }
 
-/// Train/price partition of simulated paths (see [`RateExoticMcConfig::split`]).
+/// Train/price partition of simulated paths (see [`Hw1fMcConfig::split`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SampleSplit {
     /// Paths per raw RNG stream: 2 with antithetic sampling, else 1.
@@ -147,7 +133,7 @@ mod tests {
 
     #[test]
     fn split_partitions_by_stream_parity() {
-        let in_sample = RateExoticMcConfig {
+        let in_sample = Hw1fMcConfig {
             antithetic: true,
             oos_lsmc: false,
             ..Default::default()
@@ -155,7 +141,7 @@ mod tests {
         .split();
         assert!((0..8).all(|p| in_sample.is_train(p) && in_sample.is_price(p)));
 
-        let oos = RateExoticMcConfig {
+        let oos = Hw1fMcConfig {
             antithetic: true,
             oos_lsmc: true,
             ..Default::default()
@@ -171,7 +157,7 @@ mod tests {
 
     #[test]
     fn default_values() {
-        let cfg = RateExoticMcConfig::default();
+        let cfg = Hw1fMcConfig::default();
         assert_eq!(cfg.num_paths, 10_000);
         assert_eq!(cfg.seed, 42);
         assert!(cfg.antithetic);
@@ -181,13 +167,13 @@ mod tests {
 
     #[test]
     fn simulated_path_count_doubles_estimators_under_antithetic() {
-        let a = RateExoticMcConfig {
+        let a = Hw1fMcConfig {
             num_paths: 101,
             antithetic: true,
             ..Default::default()
         };
         assert_eq!(a.simulated_path_count(), 202);
-        let b = RateExoticMcConfig {
+        let b = Hw1fMcConfig {
             num_paths: 101,
             antithetic: false,
             ..Default::default()
@@ -198,7 +184,7 @@ mod tests {
     #[test]
     fn mc_paths_override_counts_independent_estimators() {
         let id = finstack_quant_core::types::InstrumentId::new("X");
-        let cfg = RateExoticMcConfig::default().with_instrument_overrides(&id, Some(1), None);
+        let cfg = Hw1fMcConfig::default().with_instrument_overrides(&id, Some(1), None);
         assert_eq!(cfg.num_paths, 1);
         assert_eq!(cfg.simulated_path_count(), 2);
     }

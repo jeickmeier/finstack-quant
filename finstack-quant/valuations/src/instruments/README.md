@@ -27,7 +27,7 @@ instruments/
 │                         # digital, touch, variance swap, quanto
 └── rates/                # irs, basis swap, xccy swap, cap/floor, swaption,
                           # deposit, fra, repo, IR future, CMS family,
-                          # inflation swap / cap-floor, hw1f
+                          # inflation swap / cap-floor
 ```
 
 A typical instrument directory contains `types.rs` (or `types/`), pricing logic

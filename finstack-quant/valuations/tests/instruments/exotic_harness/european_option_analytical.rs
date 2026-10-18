@@ -10,7 +10,7 @@
 //! For a European call struck at `K`,
 //! `E[(r_T − K)⁺] = (μ − K)·Φ(d) + σ_r·φ(d)` with `d = (μ − K)/σ_r`.
 //!
-//! The test runs a large batch of paths through [`RateExoticHw1fMcPricer`]
+//! The test runs a large batch of paths through [`Hw1fMcPricer`]
 //! and checks the MC estimator against the closed-form expectation within
 //! 5 × stderr. θ is set to 0 so `μ = r0·e^{-κT}` (pure OU).
 
@@ -22,8 +22,8 @@ use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
-use finstack_quant_valuations::instruments::rates::hw1f::hw1f_mc::RateExoticHw1fMcPricer;
-use finstack_quant_valuations::instruments::rates::hw1f::mc_config::RateExoticMcConfig;
+use finstack_quant_models::rates::hw1f::config::Hw1fMcConfig;
+use finstack_quant_models::rates::hw1f::mc::Hw1fMcPricer;
 
 /// Standard-normal PDF φ(x) = exp(−x²/2) / √(2π).
 fn normal_pdf(x: f64) -> f64 {
@@ -68,12 +68,12 @@ fn short_rate_european_call_matches_analytical() {
     let expected = notional * ((mu - strike) * norm_cdf(d) + sig_r * normal_pdf(d));
 
     // Constant θ = 0 ⇒ pure Ornstein-Uhlenbeck, matching the analytical μ above.
-    let pricer = RateExoticHw1fMcPricer {
+    let pricer = Hw1fMcPricer {
         process_params: HullWhite1FParams::new(kappa, sigma, 0.0)
             .expect("valid Hull-White parameters"),
         r0,
         event_times: vec![t],
-        config: RateExoticMcConfig {
+        config: Hw1fMcConfig {
             num_paths: 100_000,
             seed: 1,
             ..Default::default()

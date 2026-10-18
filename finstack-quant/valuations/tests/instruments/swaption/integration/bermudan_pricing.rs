@@ -10,7 +10,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
-use finstack_quant_valuations::instruments::rates::hw1f::RateExoticMcConfig;
+use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaptionTreeValuator;
 use finstack_quant_valuations::instruments::rates::swaption::{
     BermudanSchedule, BermudanSwaption, PreparedHullWhiteModel,
@@ -421,7 +421,7 @@ fn test_lsmc_vs_tree_sanity() {
 
     // Price with LSMC (fewer paths for speed in tests)
     let lsmc_pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-        mc: RateExoticMcConfig {
+        mc: Hw1fMcConfig {
             num_paths: 5000,
             seed: 42,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
@@ -507,7 +507,7 @@ fn test_lsmc_determinism() {
 
     // Price twice with same seed
     let pricer1 = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-        mc: RateExoticMcConfig {
+        mc: Hw1fMcConfig {
             num_paths: 2500,
             seed: 12345,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
@@ -519,7 +519,7 @@ fn test_lsmc_determinism() {
         .expect("Pricing should succeed");
 
     let pricer2 = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-        mc: RateExoticMcConfig {
+        mc: Hw1fMcConfig {
             num_paths: 2500,
             seed: 12345,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
@@ -554,7 +554,7 @@ fn test_lsmc_different_seeds() {
 
     // Price with different seeds
     let pricer1 = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-        mc: RateExoticMcConfig {
+        mc: Hw1fMcConfig {
             num_paths: 2500,
             seed: 111,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
@@ -566,7 +566,7 @@ fn test_lsmc_different_seeds() {
         .expect("Pricing should succeed");
 
     let pricer2 = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-        mc: RateExoticMcConfig {
+        mc: Hw1fMcConfig {
             num_paths: 2500,
             seed: 222,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
@@ -649,7 +649,7 @@ fn test_lsmc_rejects_partial_hw1f_parameters() {
         .hw1f_mean_reversion = Some(0.05);
 
     let pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-        mc: RateExoticMcConfig {
+        mc: Hw1fMcConfig {
             num_paths: 500,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
         },
@@ -680,7 +680,7 @@ fn test_lsmc_uses_prefitted_market_parameters() {
     let market = build_market_context();
 
     let pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-        mc: RateExoticMcConfig {
+        mc: Hw1fMcConfig {
             num_paths: 500,
             seed: 42,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
@@ -717,7 +717,7 @@ fn test_complete_explicit_hw1f_parameters_price_successfully() {
     let market = build_market_context();
 
     let pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-        mc: RateExoticMcConfig {
+        mc: Hw1fMcConfig {
             num_paths: 500,
             seed: 42,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
@@ -749,7 +749,7 @@ fn test_require_calibration_accepts_instrument_hw1f_overrides() {
 
     let market = build_market_context();
     let pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-        mc: RateExoticMcConfig {
+        mc: Hw1fMcConfig {
             num_paths: 500,
             seed: 42,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
@@ -837,7 +837,7 @@ fn lsmc_default_mc_pv_unchanged() {
         .price_dyn(&swaption, &market, as_of)
         .expect("default LSMC price");
     let explicit = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-        mc: RateExoticMcConfig {
+        mc: Hw1fMcConfig {
             num_paths: 50_000,
             seed: 42,
             antithetic: true,
@@ -902,7 +902,7 @@ fn test_bermudan_keeps_exercise_right_on_exercise_date() {
         (
             "lsmc",
             BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-                mc: RateExoticMcConfig {
+                mc: Hw1fMcConfig {
                     num_paths: 2000,
                     seed: 42,
                     ..BermudanSwaptionPricerConfig::DEFAULT_MC
@@ -982,7 +982,7 @@ fn bermudan_lsmc_grid_and_seed_acceptance() {
     for steps in [2, 4] {
         for seed in [17, 29] {
             let pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-                mc: RateExoticMcConfig {
+                mc: Hw1fMcConfig {
                     num_paths: 262_144,
                     seed,
                     min_steps_between_events: steps,

@@ -103,6 +103,8 @@ pub mod basis_swap;
 pub mod cap_floor;
 /// Reference-swap resolution shared by the CMS instruments.
 pub mod cms_common;
+/// Historical CMS (par swap rate) fixing lookups for seasoned CMS trades.
+pub(crate) mod cms_fixings;
 /// CMS option module - Constant maturity swap options.
 pub mod cms_option;
 /// CMS spread option module - Option on spread between two CMS rates.
@@ -111,10 +113,10 @@ pub mod cms_spread_option;
 pub mod cms_swap;
 /// Deposit module - Money market deposits.
 pub mod deposit;
+/// Forward swap rate and annuity helpers shared by the CMS instruments.
+pub mod forward_swap_rate;
 /// FRA module - Forward rate agreements.
 pub mod fra;
-/// Hull-White one-factor Monte Carlo / LSMC pricing infrastructure.
-pub mod hw1f;
 /// Inflation cap/floor module.
 pub mod inflation_cap_floor;
 /// Inflation swap module.

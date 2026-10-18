@@ -22,7 +22,7 @@
 //! ```
 //!
 //! Delta uses the resolved `rate_bump_bp` (default 1bp); the HW σ vega uses
-//! the absolute [`HW_SIGMA_BUMP`](crate::instruments::rates::hw1f::HW_SIGMA_BUMP)
+//! the absolute [`HW_SIGMA_BUMP`](crate::instruments::pricing::hw1f_params::HW_SIGMA_BUMP)
 //! step shared with cap/floor `HwSigmaVega`.
 
 use crate::instruments::rates::swaption::pricing::BermudanSwaptionTreeValuator;
@@ -72,7 +72,7 @@ pub(crate) struct HwGreekParams {
 
 impl HwGreekParams {
     fn resolve(swaption: &BermudanSwaption, context: &MetricContext) -> Result<Self> {
-        use crate::instruments::rates::hw1f::{resolve_hw1f_params, Hw1fParamFamily};
+        use crate::instruments::pricing::hw1f_params::{resolve_hw1f_params, Hw1fParamFamily};
         let params = resolve_hw1f_params(
             Hw1fParamFamily::Swaption,
             swaption.get_discount_curve_id().as_str(),
@@ -137,7 +137,7 @@ impl MetricCalculator for BermudanDeltaCalculator {
 /// Hull-White σ vega calculator for Bermudan swaptions.
 ///
 /// Shifts the short-rate σ by the absolute
-/// [`HW_SIGMA_BUMP`](crate::instruments::rates::hw1f::HW_SIGMA_BUMP) and
+/// [`HW_SIGMA_BUMP`](crate::instruments::pricing::hw1f_params::HW_SIGMA_BUMP) and
 /// reports the PV change per 0.01 absolute σ. A forward step replaces the
 /// central difference when σ does not exceed the bump.
 #[derive(Debug, Clone)]
@@ -145,7 +145,7 @@ pub(crate) struct BermudanVegaCalculator;
 
 impl MetricCalculator for BermudanVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        use crate::instruments::rates::hw1f::HW_SIGMA_BUMP;
+        use crate::instruments::pricing::hw1f_params::HW_SIGMA_BUMP;
 
         let swaption = context.instrument_as::<BermudanSwaption>()?;
         let hw = HwGreekParams::resolve(swaption, context)?;

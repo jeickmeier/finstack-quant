@@ -15,7 +15,7 @@
 //!   with an optional issuer call ([`CallableRangeAccrual`])
 //! - **Structured Rate Notes**: TARNs and snowball / inverse floater notes
 //!   priced under Hull-White one-factor Monte Carlo
-//!   ([`crate::instruments::rates::hw1f`])
+//!   ([`finstack_quant_models::rates::hw1f`])
 //!
 //! # Pricing Models
 //!

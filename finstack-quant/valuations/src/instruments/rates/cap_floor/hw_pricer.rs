@@ -25,12 +25,12 @@
 //!   dynamics underpinning the closed-form caplet normal volatility). `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
 
 use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::pricing::hw1f_params::{resolve_hw1f_params, Hw1fParamFamily};
 use crate::instruments::rates::cap_floor::pricing::payoff::CapletFloorletInputs;
 use crate::instruments::rates::cap_floor::pricing::projection::{
     resolve_optioned_caplet_inputs, OptionedCouponProjection,
 };
 use crate::instruments::rates::cap_floor::types::{CapFloor, RateOptionType};
-use crate::instruments::rates::hw1f::{resolve_hw1f_params, Hw1fParamFamily};
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -486,7 +486,6 @@ mod tests {
     use crate::instruments::rates::cap_floor::{
         OvernightCouponConvention, OvernightSpreadCompounding,
     };
-    use crate::instruments::rates::hw1f::{RateExoticHw1fMcPricer, RateExoticMcConfig};
     use crate::instruments::rates::irs::FloatingLegCompounding;
     use date_support::date;
     use discount_forward_curve_support::{flat_discount_with_tenor, flat_forward_with_tenor};
@@ -497,6 +496,7 @@ mod tests {
     use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
     use finstack_quant_models::monte_carlo::results::MoneyEstimate;
     use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
+    use finstack_quant_models::rates::hw1f::{Hw1fMcConfig, Hw1fMcPricer};
     use std::collections::BTreeMap;
 
     /// Test-only affine reconstruction of one contractual overnight factor.
@@ -603,7 +603,7 @@ mod tests {
         kappa: f64,
         sigma: f64,
         short_rate: f64,
-        config: RateExoticMcConfig,
+        config: Hw1fMcConfig,
     ) -> MoneyEstimate {
         let context = DayCountContext::default();
         let mut events = BTreeMap::<finstack_quant_core::dates::Date, CompoundedSofrMcEvent>::new();
@@ -658,7 +658,7 @@ mod tests {
             caplet.rate_option_type,
             RateOptionType::Cap | RateOptionType::Caplet
         );
-        let pricer = RateExoticHw1fMcPricer {
+        let pricer = Hw1fMcPricer {
             // A flat θ = r₀ keeps the centered short-rate state exactly
             // zero-mean, so the independently reconstructed affine factors are
             // normalized to the resolver's deterministic projections.
@@ -1434,7 +1434,7 @@ mod tests {
         let mut values = Vec::new();
         for steps in [2, 4, 8] {
             for seed in [0x5EED_50F5, 0xC0FF_EE17] {
-                let config = RateExoticMcConfig {
+                let config = Hw1fMcConfig {
                     num_paths: 65_536,
                     seed,
                     antithetic: true,
@@ -1500,7 +1500,7 @@ mod tests {
             kappa,
             0.0,
             short_rate,
-            RateExoticMcConfig {
+            Hw1fMcConfig {
                 num_paths: 2,
                 seed: 17,
                 min_steps_between_events: 4,

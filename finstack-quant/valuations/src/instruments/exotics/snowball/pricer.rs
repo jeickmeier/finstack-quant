@@ -3,13 +3,7 @@
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::snowball::{Snowball, SnowballVariant};
-use crate::instruments::rates::hw1f::cumulative_coupon::CouponEvent;
-use crate::instruments::rates::hw1f::hw1f_curve::{
-    initial_short_rate_from_curve, prepare_hw1f_params, Hw1fTermForward, PeriodForwardCoeffs,
-};
-use crate::instruments::rates::hw1f::hw1f_mc::RateExoticHw1fMcPricer;
-use crate::instruments::rates::hw1f::mc_config::RateExoticMcConfig;
-use crate::instruments::rates::hw1f::{resolve_hw1f_params, Hw1fParamFamily};
+use crate::instruments::pricing::hw1f_params::{resolve_hw1f_params, Hw1fParamFamily};
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -22,6 +16,12 @@ use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
 use finstack_quant_models::rates::clock::model_time;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
+use finstack_quant_models::rates::hw1f::config::Hw1fMcConfig;
+use finstack_quant_models::rates::hw1f::cumulative_coupon::CouponEvent;
+use finstack_quant_models::rates::hw1f::curve::{
+    initial_short_rate_from_curve, prepare_hw1f_params, Hw1fTermForward, PeriodForwardCoeffs,
+};
+use finstack_quant_models::rates::hw1f::mc::Hw1fMcPricer;
 
 /// Path-local snowball coupon accumulator.
 #[derive(Debug, Clone)]
@@ -262,11 +262,10 @@ impl SnowballDiscountingPricer {
             }
 
             let projection_start = start.max(as_of);
-            let floating_rate =
-                crate::instruments::rates::hw1f::forward_swap_rate::term_fixing_on_date(
-                    forward_curve.as_ref(),
-                    projection_start,
-                )?;
+            let floating_rate = crate::instruments::rates::forward_swap_rate::term_fixing_on_date(
+                forward_curve.as_ref(),
+                projection_start,
+            )?;
             let coupon_rate = inst.compute_coupon(floating_rate, prev_coupon);
             let event = &events[event_idx];
             pv += coupon_rate
@@ -336,7 +335,7 @@ impl Pricer for SnowballDiscountingPricer {
 #[derive(Debug, Clone)]
 pub struct SnowballHw1fMcPricer {
     hw_params: Option<HullWhiteCalibrationParams>,
-    config: RateExoticMcConfig,
+    config: Hw1fMcConfig,
 }
 
 impl SnowballHw1fMcPricer {
@@ -344,7 +343,7 @@ impl SnowballHw1fMcPricer {
     pub fn new() -> Self {
         Self {
             hw_params: None,
-            config: RateExoticMcConfig::default(),
+            config: Hw1fMcConfig::default(),
         }
     }
 
@@ -352,7 +351,7 @@ impl SnowballHw1fMcPricer {
     pub fn with_hw_params(hw_params: HullWhiteCalibrationParams) -> Self {
         Self {
             hw_params: Some(hw_params),
-            config: RateExoticMcConfig::default(),
+            config: Hw1fMcConfig::default(),
         }
     }
 
@@ -362,7 +361,7 @@ impl SnowballHw1fMcPricer {
     /// # Arguments
     ///
     /// * `config` - Base Hull-White Monte Carlo configuration.
-    pub fn with_config(mut self, config: RateExoticMcConfig) -> Self {
+    pub fn with_config(mut self, config: Hw1fMcConfig) -> Self {
         self.config = config;
         self
     }
@@ -382,7 +381,7 @@ impl SnowballHw1fMcPricer {
         )
     }
 
-    fn effective_config(&self, inst: &Snowball) -> RateExoticMcConfig {
+    fn effective_config(&self, inst: &Snowball) -> Hw1fMcConfig {
         self.config.with_instrument_overrides(
             &inst.id,
             inst.instrument_pricing_overrides.model_config.mc_paths,
@@ -501,7 +500,7 @@ impl SnowballHw1fMcPricer {
         let horizon = event_times.last().copied().unwrap_or(0.0);
         let process_params =
             prepare_hw1f_params(hw_params, discount_curve.as_ref(), as_of, horizon)?;
-        let mc = RateExoticHw1fMcPricer {
+        let mc = Hw1fMcPricer {
             process_params,
             r0,
             event_times,
@@ -615,7 +614,7 @@ fn coupon_events(
 ) -> Result<Vec<CouponEvent>> {
     let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
     let forward_curve = market.get_forward(inst.forward_curve_id.as_ref())?;
-    crate::instruments::rates::hw1f::forward_swap_rate::validate_term_curve_tenor(
+    crate::instruments::rates::forward_swap_rate::validate_term_curve_tenor(
         forward_curve.as_ref(),
         inst.index_tenor,
         inst.id.as_str(),
@@ -648,7 +647,7 @@ fn coupon_events(
             let tenor = inst.index_tenor.to_years();
             let coeffs = term_forward.period_coeffs(fixing_time, tenor);
             let discount_forward = term_forward.curve_forward(fixing_time, tenor);
-            let basis = crate::instruments::rates::hw1f::forward_swap_rate::term_fixing_on_date(
+            let basis = crate::instruments::rates::forward_swap_rate::term_fixing_on_date(
                 forward_curve.as_ref(),
                 start,
             )? - discount_forward;
@@ -657,11 +656,10 @@ fn coupon_events(
             // At inception the first fixing is projected from the explicit
             // projection curve. Do not substitute the discount-curve short
             // rate, which would remove the index/discount basis.
-            let seasoned_rate =
-                crate::instruments::rates::hw1f::forward_swap_rate::term_fixing_on_date(
-                    forward_curve.as_ref(),
-                    start,
-                )?;
+            let seasoned_rate = crate::instruments::rates::forward_swap_rate::term_fixing_on_date(
+                forward_curve.as_ref(),
+                start,
+            )?;
             (
                 PeriodForwardCoeffs::from_flat_rate(seasoned_rate, accrual_fraction),
                 false,
@@ -707,7 +705,7 @@ fn deterministic_estimate(
     spec: SnowballCouponSpec,
     notional: Money,
     events: &[CouponEvent],
-    config: &RateExoticMcConfig,
+    config: &Hw1fMcConfig,
 ) -> finstack_quant_core::Result<MoneyEstimate> {
     let mut payoff = SnowballPayoff::new(spec, notional.amount(), events.to_vec(), false);
     payoff.settle_seasoned_prefix();
@@ -730,7 +728,7 @@ fn deterministic_estimate(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::rates::hw1f::bermudan_call::BermudanCallProvision;
+    use crate::instruments::BermudanCallProvision;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -870,7 +868,7 @@ mod tests {
         SnowballHw1fMcPricer::with_hw_params(
             HullWhiteCalibrationParams::new(0.05, 1e-12).expect("hw params"),
         )
-        .with_config(RateExoticMcConfig {
+        .with_config(Hw1fMcConfig {
             num_paths: paths,
             antithetic: false,
             min_steps_between_events: 1,
@@ -892,7 +890,7 @@ mod tests {
             .price_estimate(&instrument, &market, as_of)
             .expect("default price");
         let explicit = pricer
-            .with_config(RateExoticMcConfig {
+            .with_config(Hw1fMcConfig {
                 num_paths: 10_000,
                 seed: 42,
                 antithetic: true,
@@ -1145,7 +1143,7 @@ mod tests {
         let low = SnowballHw1fMcPricer::with_hw_params(
             HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw"),
         )
-        .with_config(RateExoticMcConfig {
+        .with_config(Hw1fMcConfig {
             num_paths: 100,
             antithetic: true,
             min_steps_between_events: 1,
@@ -1157,7 +1155,7 @@ mod tests {
         let high = SnowballHw1fMcPricer::with_hw_params(
             HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw"),
         )
-        .with_config(RateExoticMcConfig {
+        .with_config(Hw1fMcConfig {
             num_paths: 1000,
             antithetic: true,
             min_steps_between_events: 1,

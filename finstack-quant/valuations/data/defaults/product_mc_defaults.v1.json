@@ -2,13 +2,6 @@
   "schema": "finstack_quant.valuations.product_mc_defaults/1",
   "version": 1,
   "defaults": {
-    "rate_exotics": {
-      "num_paths": 10000,
-      "seed": 42,
-      "antithetic": true,
-      "min_steps_between_events": 4,
-      "basis_degree": 2
-    },
     "lmm_bermudan": {
       "num_paths": 25000,
       "seed": 42,

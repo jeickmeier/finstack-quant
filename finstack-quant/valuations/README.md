@@ -58,7 +58,7 @@ instrument (types, pricer, optional cashflows, and a `metrics/` module):
 | Group | Instruments |
 |-------|-------------|
 | `fixed_income/` | `asset_backed_facility`, `bond`, `bond_future`, `cmo`, `convertible`, `dollar_roll`, `fi_trs`, `inflation_linked_bond`, `mbs_passthrough`, `revolving_credit`, `structured_credit`, `tba`, `term_loan` |
-| `rates/` | `basis_swap`, `cap_floor`, `cms_option`, `cms_spread_option`, `cms_swap`, `deposit`, `fra`, `hw1f`, `inflation_cap_floor`, `inflation_swap`, `ir_future`, `irs`, `repo`, `swaption`, `xccy_swap` |
+| `rates/` | `basis_swap`, `cap_floor`, `cms_option`, `cms_spread_option`, `cms_swap`, `deposit`, `fra`, `inflation_cap_floor`, `inflation_swap`, `ir_future`, `irs`, `repo`, `swaption`, `xccy_swap` |
 | `credit_derivatives/` | `cds`, `cds_index`, `cds_option`, `cds_tranche` |
 | `equity/` | `autocallable`, `cliquet_option`, `dcf_equity`, `equity_future`, `equity_option`, `equity_total_return_future`, `equity_trs`, `pe_fund`, `real_estate`, `spot`, `variance_swap`, `vol_index_future` |
 | `fx/` | `fx_barrier_option`, `fx_digital_option`, `fx_forward`, `fx_future`, `fx_option`, `fx_spot`, `fx_swap`, `fx_touch_option`, `fx_variance_swap`, `ndf`, `quanto_option` |

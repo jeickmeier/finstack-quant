@@ -11,8 +11,6 @@ static DEFAULTS: EmbeddedJsonRegistry<ProductMcDefaults, DefaultsFile> =
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ProductMcDefaults {
-    /// Shared rate-exotic Monte Carlo defaults.
-    pub(crate) rate_exotics: RateExoticDefaults,
     /// LMM Bermudan swaption defaults.
     pub(crate) lmm_bermudan: LmmBermudanDefaults,
     /// Merton PIK-bond Monte Carlo defaults.
@@ -20,22 +18,6 @@ pub(crate) struct ProductMcDefaults {
     /// Stochastic revolving-credit Monte Carlo defaults.
     pub(crate) revolving_credit: RevolvingCreditDefaults,
 }
-/// Shared rate-exotic Monte Carlo defaults.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct RateExoticDefaults {
-    /// Number of Monte Carlo paths.
-    pub(crate) num_paths: usize,
-    /// Root RNG seed.
-    pub(crate) seed: u64,
-    /// Whether antithetic variance reduction is enabled by default.
-    pub(crate) antithetic: bool,
-    /// Minimum number of simulation sub-steps between events.
-    pub(crate) min_steps_between_events: usize,
-    /// Polynomial basis degree for LSMC regression.
-    pub(crate) basis_degree: usize,
-}
-
 /// LMM Bermudan swaption defaults.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -93,7 +75,6 @@ pub(crate) fn embedded_defaults() -> Result<&'static ProductMcDefaults> {
         CONTRACT
             .resolve(Some(file.version))
             .map_err(|e| Error::Validation(e.to_string()))?;
-        validate_rate_exotics("rate_exotics", &file.defaults.rate_exotics)?;
         validate_lmm_bermudan("lmm_bermudan", &file.defaults.lmm_bermudan)?;
         validate_merton_pik_bond("merton_pik_bond", &file.defaults.merton_pik_bond)?;
         validate_revolving_credit("revolving_credit", &file.defaults.revolving_credit)?;
@@ -105,18 +86,6 @@ pub(crate) fn embedded_defaults() -> Result<&'static ProductMcDefaults> {
 pub(crate) fn embedded_defaults_or_panic() -> &'static ProductMcDefaults {
     embedded_defaults().expect("embedded product Monte Carlo defaults are compile-time assets")
 }
-fn validate_rate_exotics(label: &str, defaults: &RateExoticDefaults) -> Result<()> {
-    validate_positive_usize(&format!("{label}.num_paths"), defaults.num_paths)?;
-    validate_positive_usize(
-        &format!("{label}.min_steps_between_events"),
-        defaults.min_steps_between_events,
-    )?;
-    validate_positive_usize(&format!("{label}.basis_degree"), defaults.basis_degree)?;
-    let _seed = defaults.seed;
-    let _antithetic = defaults.antithetic;
-    Ok(())
-}
-
 fn validate_lmm_bermudan(label: &str, defaults: &LmmBermudanDefaults) -> Result<()> {
     validate_positive_usize(&format!("{label}.num_paths"), defaults.num_paths)?;
     validate_positive_usize(&format!("{label}.basis_degree"), defaults.basis_degree)?;

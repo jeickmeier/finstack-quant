@@ -7,7 +7,6 @@
 use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::common_impl::parameters::SettlementType;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::rates::hw1f::RateExoticMcConfig;
 use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::instruments::rates::swaption::bermudan::apply_exercise_today;
 use crate::instruments::rates::swaption::pricing::lmm_bermudan::price_bermudan_lmm;
@@ -22,6 +21,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::process::lmm::LmmParams;
+use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 
 /// Bermudan swaption pricer using LMM/BGM Monte Carlo with LSMC exercise.
 ///
@@ -42,12 +42,28 @@ use finstack_quant_models::monte_carlo::process::lmm::LmmParams;
 /// `model_config.lmm_base_vol` input. Calibration is an explicit upstream
 /// operation; this pricer never queries a volatility surface.
 pub struct BermudanSwaptionLmmPricer {
-    config: RateExoticMcConfig,
+    config: Hw1fMcConfig,
 }
 
 impl Default for BermudanSwaptionLmmPricer {
     fn default() -> Self {
-        Self::with_config(RateExoticMcConfig::lmm_bermudan())
+        Self::with_config(lmm_bermudan_mc_config())
+    }
+}
+
+/// Monte Carlo settings for the LMM Bermudan pricer from the embedded
+/// `lmm_bermudan` product defaults (paths, seed, antithetic pairing, minimum
+/// steps between exercises, regression degree; in-sample LSMC).
+#[must_use]
+pub fn lmm_bermudan_mc_config() -> Hw1fMcConfig {
+    let defaults = &crate::pricer::defaults::embedded_defaults_or_panic().lmm_bermudan;
+    Hw1fMcConfig {
+        num_paths: defaults.num_paths,
+        seed: defaults.seed,
+        antithetic: defaults.antithetic,
+        min_steps_between_events: defaults.min_steps_between_exercises,
+        basis_degree: defaults.basis_degree,
+        oos_lsmc: false,
     }
 }
 
@@ -57,9 +73,9 @@ impl BermudanSwaptionLmmPricer {
     /// # Arguments
     ///
     /// * `config` - Monte Carlo settings; see `price_bermudan_lmm` for the
-    ///   path-count constraints. [`RateExoticMcConfig::lmm_bermudan`] gives
+    ///   path-count constraints. [`lmm_bermudan_mc_config`] gives
     ///   the registry defaults.
-    pub fn with_config(config: RateExoticMcConfig) -> Self {
+    pub fn with_config(config: Hw1fMcConfig) -> Self {
         Self { config }
     }
 
@@ -457,7 +473,7 @@ mod tests {
             .df_between_dates(as_of, option.get_underlying_maturity())
             .expect("end DF");
         assert!((forward_bond - p_end / p_start).abs() < 1e-14);
-        let pricer = BermudanSwaptionLmmPricer::with_config(RateExoticMcConfig {
+        let pricer = BermudanSwaptionLmmPricer::with_config(Hw1fMcConfig {
             num_paths: 4,
             antithetic: true,
             oos_lsmc: false,
@@ -507,7 +523,7 @@ mod tests {
         let periods = option
             .fixed_schedule_periods()
             .expect("contractual periods");
-        let pricer = BermudanSwaptionLmmPricer::with_config(RateExoticMcConfig {
+        let pricer = BermudanSwaptionLmmPricer::with_config(Hw1fMcConfig {
             num_paths: 4,
             min_steps_between_events: 1,
             antithetic: true,

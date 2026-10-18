@@ -37,6 +37,8 @@ pub struct RustDefaults {
     pub path_dependent_pricer: PathDependentPricerDefaults,
     /// LSMC configuration defaults.
     pub lsmc: LsmcRuntimeDefaults,
+    /// Hull-White one-factor Monte Carlo / LSMC engine defaults.
+    pub hw1f: Hw1fRuntimeDefaults,
 }
 
 /// Defaults shared by the host bindings and the Rust convenience pricers.
@@ -111,6 +113,23 @@ pub struct LsmcRuntimeDefaults {
     pub use_parallel: bool,
     /// Whether antithetic variance reduction is enabled by default.
     pub antithetic: bool,
+}
+
+/// Hull-White one-factor Monte Carlo and LSMC engine defaults
+/// ([`crate::rates::hw1f::Hw1fMcConfig`]).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Hw1fRuntimeDefaults {
+    /// Number of independent Monte Carlo estimators (RNG streams).
+    pub num_paths: usize,
+    /// Root RNG seed.
+    pub seed: u64,
+    /// Whether antithetic variance reduction is enabled by default.
+    pub antithetic: bool,
+    /// Minimum number of simulation sub-steps between consecutive events.
+    pub min_steps_between_events: usize,
+    /// Polynomial basis degree for the LSMC continuation regression.
+    pub basis_degree: usize,
 }
 
 /// Pricer defaults with default time-grid step count.
@@ -241,6 +260,12 @@ fn validate_file(file: &DefaultsFile) -> Result<()> {
         "rust.path_dependent_pricer.min_steps",
         file.rust.path_dependent_pricer.min_steps,
     )?;
+    validate_positive_usize("rust.hw1f.num_paths", file.rust.hw1f.num_paths)?;
+    validate_positive_usize(
+        "rust.hw1f.min_steps_between_events",
+        file.rust.hw1f.min_steps_between_events,
+    )?;
+    validate_positive_usize("rust.hw1f.basis_degree", file.rust.hw1f.basis_degree)?;
     validate_convenience_pricer(
         "convenience.european_pricer",
         &file.convenience.european_pricer,
