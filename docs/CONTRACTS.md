@@ -145,8 +145,8 @@ content hash, and an owning test:
 - [market context state](../finstack-quant/core/tests/data/canonical/market_context_state.json)
 - [financial model](../finstack-quant/statements/tests/data/canonical/financial_model.json)
 - [scenario](../finstack-quant/scenarios/tests/data/canonical/scenario.json)
-- [factor-model configuration](../finstack-quant/models/tests/data/canonical/factor_model_config.json)
-- [credit factor model](../finstack-quant/models/tests/data/canonical/credit_factor_model.json)
+- [factor-model configuration](../finstack-quant/factor/tests/data/canonical/factor_model_config.json)
+- [credit factor model](../finstack-quant/factor/tests/data/canonical/credit_factor_model.json)
 - [portfolio materialization](../finstack-quant/portfolio/tests/data/canonical/portfolio_materialization.json)
 
 The adjacent `.sha256` files contain the domain-separated identity, not a raw

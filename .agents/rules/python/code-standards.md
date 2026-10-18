@@ -29,10 +29,10 @@ Two documented deviations from strict crate-mirroring, both recorded in
 
 - Correlation is split by ownership in Rust but bound in one place. The
   matrix/statistical helpers (`validate_correlation_matrix`,
-  `nearest_correlation`) live in `finstack_quant_analytics::correlation`;
+  `nearest_correlation`) live in `finstack_quant_core::math::linalg`;
   copulas, recovery and portfolio-loss models live in
-  `finstack_quant_models::correlation`. Both are bound under
-  `finstack_quant.models.correlation` (the analytics helpers as
+  `finstack_quant_models::correlation`, which re-exports the core helpers. Both
+  are bound under `finstack_quant.models.correlation` (the core helpers as
   `validate_correlation_matrix` and `nearest_correlation`); `finstack_quant.analytics`
   exposes only `Performance`, its result types and the scalar free functions.
   There is no `valuations.correlation` namespace.

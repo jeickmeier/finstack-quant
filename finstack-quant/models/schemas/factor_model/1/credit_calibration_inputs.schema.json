@@ -226,7 +226,7 @@
         "type": "number"
       },
       "default": {},
-      "description": "Option-adjusted spread duration in **years** (`> 0`) per issuer.\n\nRequired when\n[`CreditCalibrationConfig::bucket_weighting`][super::config::CreditCalibrationConfig::bucket_weighting]\nis [`BucketWeighting::Dts`][super::config::BucketWeighting::Dts].\nThe historical peel weights each date by contemporaneous DTS\n(`SD × panel spread_bp` at that date); the anchor uses as-of DTS.\nPersisted on each\n[`IssuerBetaRow`][crate::factor::credit::hierarchy::IssuerBetaRow] so\ndecompose can rebuild DTS from the current spread. The duration is a\nsingle value across the calibration window (no per-date duration\nseries).",
+      "description": "Option-adjusted spread duration in **years** (`> 0`) per issuer.\n\nRequired when\n[`CreditCalibrationConfig::bucket_weighting`][super::config::CreditCalibrationConfig::bucket_weighting]\nis [`BucketWeighting::Dts`][super::config::BucketWeighting::Dts].\nThe historical peel weights each date by contemporaneous DTS\n(`SD × panel spread_bp` at that date); the anchor uses as-of DTS.\nPersisted on each\n[`IssuerBetaRow`][crate::credit::hierarchy::IssuerBetaRow] so\ndecompose can rebuild DTS from the current spread. The duration is a\nsingle value across the calibration window (no per-date duration\nseries).",
       "type": "object"
     }
   },

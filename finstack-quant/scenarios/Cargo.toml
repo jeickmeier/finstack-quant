@@ -46,6 +46,7 @@ jsonschema = { version = "0.28", default-features = false }
 name = "gen_scenario_schemas"
 path = "src/bin/gen_schemas.rs"
 required-features = ["json-schema"]
+test = false
 
 [[bench]]
 name = "scenarios"

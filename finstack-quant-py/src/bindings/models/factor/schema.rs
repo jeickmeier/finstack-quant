@@ -1,4 +1,4 @@
-//! Python bindings for `finstack_quant_models::factor::schema`.
+//! Python bindings for `finstack_quant_factor::schema`.
 
 use crate::bindings::schema_registry::schema_registry_functions;
 use pyo3::prelude::*;
@@ -14,7 +14,7 @@ Examples
 'CreditFactorModel'
 "#;
 
-schema_registry_functions!(finstack_quant_models::factor::schema::ARTIFACTS);
+schema_registry_functions!(finstack_quant_factor::schema::ARTIFACTS);
 
 /// Register the `finstack_quant.models.factor.schema` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -290,7 +290,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_result.schema.json",
-      "bytes": 100641,
+      "bytes": 100633,
       "kind": "output",
       "path": "schemas/portfolio/1/replay_result.schema.json",
       "summary": "Full output of a replay run.",

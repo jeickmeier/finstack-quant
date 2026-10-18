@@ -1,6 +1,6 @@
 //! Credit-factor attribution detail configuration and model traceability.
 
-use finstack_quant_models::factor::credit::hierarchy::CreditFactorModel;
+use finstack_quant_factor::credit::hierarchy::CreditFactorModel;
 use serde::{Deserialize, Serialize};
 
 /// Options controlling the credit-factor detail emitted by attribution.

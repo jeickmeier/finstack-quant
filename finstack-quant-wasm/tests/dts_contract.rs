@@ -1188,7 +1188,7 @@ fn models_factor_dts_exposes_credit_namespace() {
     assert!(dts.contains("export interface FactorModelCreditNamespace"));
     assert!(dts.contains("credit: FactorModelCreditNamespace;"));
     assert!(models.contains("factor: FactorNamespace;"));
-    // Crate-root exports of `finstack_quant_models::factor` live on the factor
+    // Crate-root exports of `finstack_quant_factor` live on the factor
     // namespace itself; the credit hierarchy stays in its sub-namespace.
     let credit = interface_block(&dts, "FactorModelCreditNamespace");
     for name in [

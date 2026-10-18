@@ -45,8 +45,7 @@
           "version": 1
         },
         "fx_policy_applied": null,
-        "timestamp": "+002026-10-08T03:38:52.005000000Z",
-        "version": "0.10.0"
+        "version": "0.11.0"
       },
       "covenants": null,
       "provenance": {
@@ -453,7 +452,7 @@
         "bucketed": true
       }
     ],
-    "facadeWasmSha256": "b0b70e53b47dc8094bd02c79d0df40084310eb99fb2210626fd9ca16adbdb7f6"
+    "facadeWasmSha256": "9f6642684550e0e60a005259e3f4be0d492febc0460241bcb01fa8cb51bbc552"
   },
   "market": {
     "source": "finstack-quant/calibration/examples/market_bootstrap/05_cdx_base_correlation.json",
@@ -1867,10 +1866,10 @@
           "tenors": [2, 5, 10],
           "params": [
             {
-              "alpha": 0.0067231399046543665,
+              "alpha": 0.006723139967310844,
               "beta": 0,
-              "rho": 0.4793626929513042,
-              "nu": 1.092819199647211
+              "rho": 0.4793626551753536,
+              "nu": 1.0928190711751329
             },
             {
               "alpha": 0.0066107798139045295,
@@ -1885,10 +1884,10 @@
               "nu": 0.034512472936540285
             },
             {
-              "alpha": 0.006990422769287483,
+              "alpha": 0.0069904243735239265,
               "beta": 0,
-              "rho": 0.39496186155784146,
-              "nu": 0.6770963977375238
+              "rho": 0.39496148667319836,
+              "nu": 0.6770947953045241
             },
             {
               "alpha": 0.006793413854226229,
@@ -1903,10 +1902,10 @@
               "nu": 0.034724632751183426
             },
             {
-              "alpha": 0.007756567369121743,
+              "alpha": 0.007756567398446069,
               "beta": 0,
-              "rho": 0.2955214864489562,
-              "nu": 0.2940783089963684
+              "rho": 0.2955215329100774,
+              "nu": 0.29407829807191527
             },
             {
               "alpha": 0.007300463942612639,
@@ -12309,7 +12308,7 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "fad6faf385e2175618c9e566b2f3ceb31601e426db20be649f1dc7f682f4b3ba"
+        "sha256": "253c8f4bdf7a38f8225123623eaefc829c89ef15aaac474c56bf13dfec2b88e4"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_option.json",
@@ -12414,7 +12413,7 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "fad6faf385e2175618c9e566b2f3ceb31601e426db20be649f1dc7f682f4b3ba"
+        "sha256": "253c8f4bdf7a38f8225123623eaefc829c89ef15aaac474c56bf13dfec2b88e4"
       },
       {
         "path": "finstack-quant-wasm/tests/facade/covenants.test.mjs",
@@ -12426,7 +12425,7 @@
       },
       {
         "path": "finstack-quant-wasm/src/utils/mod.rs",
-        "sha256": "acaeb3fa720f32fc9a86c3f6add66666b128988daac32f5ad7293c668e98cfd9"
+        "sha256": "8098ebb869381018c0c37faa295a3eaab06e02df6ef780904174bfefc13f1108"
       },
       {
         "path": "finstack-quant/core/src/explain.rs",

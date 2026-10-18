@@ -450,19 +450,18 @@ fn decompose_factor_risk(
     let covariance_json =
         crate::bindings::extract::extract_records_json(py, covariance_json, "covariance")?;
     let covariance_json: &str = &covariance_json;
-    let measure: finstack_quant_models::factor::RiskMeasure = match risk_measure {
+    let measure: finstack_quant_factor::RiskMeasure = match risk_measure {
         Some(obj) => py_to_serde(py, obj, "risk_measure")?,
-        None => finstack_quant_models::factor::RiskMeasure::default(),
+        None => finstack_quant_factor::RiskMeasure::default(),
     };
 
     let matrix = sensitivities.inner.clone();
     let covariance_json = covariance_json.to_owned();
     py.detach(move || {
-        let covariance: finstack_quant_models::factor::FactorCovarianceMatrix =
+        let covariance: finstack_quant_factor::FactorCovarianceMatrix =
             serde_json::from_str(&covariance_json).map_err(display_to_py)?;
-        let result =
-            finstack_quant_models::factor::risk::decompose_factors(&matrix, &covariance, &measure)
-                .map_err(core_to_py)?;
+        let result = finstack_quant_factor::risk::decompose_factors(&matrix, &covariance, &measure)
+            .map_err(core_to_py)?;
         Ok(PyRiskDecomposition::from_inner(result))
     })
 }

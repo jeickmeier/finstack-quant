@@ -34,7 +34,7 @@ const metadataFor = (measures: Record<string, number>) =>
     }
   });
 afterEach(cleanup);
-it("matches the retained fixture against the real Node facade apart from wall-clock timestamp", () => {
+it("matches the retained fixture against the real Node facade", () => {
   const request = fixture.request;
   const current = native.priceInstrument(
     request.instrumentJson,
@@ -43,9 +43,7 @@ it("matches the retained fixture against the real Node facade apart from wall-cl
     request.model,
     request.metrics,
   );
-  const { timestamp: _, ...meta } = current.meta;
-  const { timestamp: _stored, ...stored } = fixture.result.meta;
-  expect({ ...current, meta }).toEqual({ ...fixture.result, meta: stored });
+  expect(current).toEqual(fixture.result);
   expect(native.listStandardMetricsGrouped()).toEqual(fixture.groups);
 });
 it("keeps every supplied key and raw value when metadata is unavailable", () => {
@@ -59,7 +57,6 @@ it("keeps every supplied key and raw value when metadata is unavailable", () => 
     fixture.result.meta.numeric_mode,
     fixture.result.meta.rounding.mode,
     fixture.result.meta.version,
-    fixture.result.meta.timestamp,
   ])
     expect(screen.getAllByText(text).length).toBeGreaterThan(0);
   const rows = screen

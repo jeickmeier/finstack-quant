@@ -9,7 +9,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_models::factor::{BumpSizeConfig, FactorDefinition, FactorId};
+use finstack_quant_factor::{BumpSizeConfig, FactorDefinition, FactorId};
 use serde::{Deserialize, Serialize};
 
 /// Default scenario count for symmetric P&L profile grids.
@@ -209,7 +209,7 @@ impl TryFrom<SensitivityMatrixJson> for SensitivityMatrix {
 mod tests {
     use super::*;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
-    use finstack_quant_models::factor::{FactorId, FactorType, MarketMapping};
+    use finstack_quant_factor::{FactorId, FactorType, MarketMapping};
     use finstack_quant_valuations::instruments::{Equity, InstrumentEnvelope, InstrumentJson};
     use std::sync::Arc;
 

@@ -11,10 +11,6 @@ mod cashflow_export_schema;
 mod cashflows;
 #[path = "core.rs"]
 mod core_framework;
-#[path = "credit_calibration.rs"]
-mod credit_calibration;
-#[path = "credit_decomposition.rs"]
-mod credit_decomposition;
 #[path = "cross_factor_metrics_tests.rs"]
 mod cross_factor_metrics_tests;
 #[path = "default_attribute_consistency.rs"]

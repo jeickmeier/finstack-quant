@@ -6,7 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-description = "Risk metrics and portfolio analytics for Finstack Quant: Sharpe, drawdown, correlation matrices, and nearest-correlation repair"
+description = "Risk metrics and portfolio analytics for Finstack Quant: Sharpe, drawdown, correlation matrices, and regression"
 autobenches = false
 autotests = false
 
@@ -30,6 +30,7 @@ serde_json = { workspace = true }
 name = "gen_analytics_schemas"
 path = "src/bin/gen_schemas.rs"
 required-features = ["json-schema"]
+test = false
 
 [[bench]]
 name = "analytics_hot_paths"

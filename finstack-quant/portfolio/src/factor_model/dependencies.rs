@@ -1,7 +1,7 @@
 //! Portfolio adapter from instrument dependencies to factor-model dependencies.
 
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_models::factor::{CurveType, MarketDependency};
+use finstack_quant_factor::{CurveType, MarketDependency};
 use finstack_quant_valuations::instruments::MarketDependencies;
 
 pub(super) fn flatten(

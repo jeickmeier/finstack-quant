@@ -99,7 +99,7 @@ fn minimal_inputs_json() -> String {
 #[wasm_bindgen_test]
 fn credit_factor_model_round_trips_through_json() {
     let json =
-        include_str!("../../finstack-quant/models/tests/data/canonical/credit_factor_model.json");
+        include_str!("../../finstack-quant/factor/tests/data/canonical/credit_factor_model.json");
     let model = JsCreditFactorModel::from_json(JsValue::from(json))
         .expect("from_json must succeed on golden artifact");
     let out = model.to_json().expect("to_json must succeed");

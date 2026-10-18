@@ -2,9 +2,11 @@
 //!
 //! Every root serde contract the bindings exchange with a host is registered
 //! here; the types it embeds are emitted as `$defs` of those roots. The
-//! `gen_models_schemas` binary writes one JSON Schema per
-//! entry, and the WASM package generates its TypeScript declarations from
-//! them. Render an entry with
+//! umbrella crate's `gen_models_schemas` binary writes one JSON Schema per
+//! entry into this crate's `schemas/` directory, together with the
+//! factor-owned contracts of the same family
+//! (`finstack_quant_factor::schema::MODELS_ARTIFACTS`), and the WASM package
+//! generates its TypeScript declarations from them. Render an entry with
 //! [`SchemaArtifact::generate`](finstack_quant_core::schema::SchemaArtifact::generate).
 
 use finstack_quant_core::schema::SchemaArtifact;
@@ -28,10 +30,6 @@ use crate::{
     credit::scoring::ScoringResult, credit::scoring::ZmijewskiInput, credit::CreditState,
     credit::DynamicRecoverySpec, credit::EndogenousHazardSpec, credit::MertonModel,
     credit::RatingFactorTable, credit::SimulatedPaths, credit::ToggleExerciseModel,
-    factor::credit::decomposition::LevelsAtDate,
-    factor::credit::decomposition::PeriodDecomposition, factor::risk::PositionRiskDecomposition,
-    factor::risk::RiskBudgetResult, factor::risk::RiskDecomposition,
-    factor::risk::StressAttribution, factor::MarketDependency,
     fourier::characteristic_function::BlackScholesCf,
     fourier::characteristic_function::MertonJumpCf,
     fourier::characteristic_function::VarianceGammaCf, fourier::CosConfig,
@@ -327,13 +325,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Factor model specification for configuration and serialization."
     ),
     finstack_quant_core::schema_artifact!(
-        LevelsAtDate,
-        "models",
-        "levels_at_date",
-        Component,
-        "Snapshot of all hierarchy-level factor values at a single date, produced from observed issuer spreads."
-    ),
-    finstack_quant_core::schema_artifact!(
         LiquidityTier,
         "models",
         "liquidity_tier",
@@ -381,13 +372,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "lvar_bangia_scalar",
         Component,
         "Scalar Bangia LVaR outputs for an isolated position where relative spread statistics are already known."
-    ),
-    finstack_quant_core::schema_artifact!(
-        MarketDependency,
-        "models",
-        "market_dependency",
-        Component,
-        "A single market dependency extracted from an instrument."
     ),
     finstack_quant_core::schema_artifact!(
         MasterScale,
@@ -474,13 +458,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Parameters for the Merton-Vasicek single-factor PiT/TtC conversion."
     ),
     finstack_quant_core::schema_artifact!(
-        PeriodDecomposition,
-        "models",
-        "period_decomposition",
-        Output,
-        "Difference between two `LevelsAtDate` snapshots."
-    ),
-    finstack_quant_core::schema_artifact!(
         PoolGranularity,
         "models",
         "pool_granularity",
@@ -500,13 +477,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "portfolio_loss_result",
         Output,
         "Portfolio credit-loss distribution and tail statistics."
-    ),
-    finstack_quant_core::schema_artifact!(
-        PositionRiskDecomposition,
-        "models",
-        "position_risk_decomposition",
-        Output,
-        "Complete position-level risk decomposition of a portfolio."
     ),
     finstack_quant_core::schema_artifact!(
         ProcessSpec,
@@ -549,20 +519,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "recovery_waterfall_result",
         Output,
         "Result of allocating a distributable estate across claims."
-    ),
-    finstack_quant_core::schema_artifact!(
-        RiskBudgetResult,
-        "models",
-        "risk_budget_result",
-        Output,
-        "Result of comparing actual risk decomposition against a risk budget."
-    ),
-    finstack_quant_core::schema_artifact!(
-        RiskDecomposition,
-        "models",
-        "risk_decomposition",
-        Output,
-        "Portfolio-level decomposition of total risk across common factors and residuals."
     ),
     finstack_quant_core::schema_artifact!(
         RoughBergomiParams,
@@ -640,13 +596,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "stochastic_prepay_spec",
         Input,
         "Stochastic prepayment model specification."
-    ),
-    finstack_quant_core::schema_artifact!(
-        StressAttribution,
-        "models",
-        "stress_attribution",
-        Output,
-        "Per-position attribution of portfolio losses in tail scenarios."
     ),
     finstack_quant_core::schema_artifact!(
         SviParams,

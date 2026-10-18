@@ -316,7 +316,7 @@ test('factor handles and helpers follow the Rust accessors', () => {
   assert.throws(() => factorCredit.VolHorizon.nSteps(1.5), invalidType);
 
   const model = factorCredit.CreditFactorModel.fromJson(
-    repoFile('finstack-quant/models/tests/data/canonical/credit_factor_model.json')
+    repoFile('finstack-quant/factor/tests/data/canonical/credit_factor_model.json')
   );
   assert.equal(model.factorIds().length, model.nFactors);
   assert.equal(model.issuerIds().length, model.nIssuers);
