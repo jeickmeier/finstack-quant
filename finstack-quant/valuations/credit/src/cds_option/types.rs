@@ -603,12 +603,35 @@ impl CdsOption {
         calendar_by_id_strict(calendar_id)
     }
 
-    /// CDS option Δ, branched by strike kind: closed-form Black-76 N(d₁)
-    /// on the displayed ATM forward spread for spread strikes (DOCS
-    /// 2055833 §2.5), and the curve-reprice hedge ratio
-    /// `option_CS01 / underlying_spread_DV01` for clean-price strikes.
+    /// CDS option Δ for spread strikes: closed-form Black-76 N(d₁) on the
+    /// displayed ATM forward spread (DOCS 2055833 §2.5).
+    ///
     /// Returned as a unit-less ratio (multiply by 100 for the displayed
-    /// percentage). Calls Δ ≥ 0, puts Δ ≤ 0.
+    /// percentage). Calls Δ ≥ 0, puts Δ ≤ 0; zero at or after expiry.
+    ///
+    /// Clean-price strikes use the curve-reprice hedge ratio
+    /// `option_CS01 / underlying_spread_DV01`, which re-bootstraps the hazard
+    /// curve through a [`RecalibrationProvider`]. This method has no provider,
+    /// so request [`MetricId::Delta`] through the pricing registry with
+    /// `PricingOptions` carrying a recalibration provider instead.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market holding the discount curve, the hazard curve named
+    ///   by `credit_curve_id`, and the vol surface (unless an implied
+    ///   volatility override is quoted on the instrument).
+    /// * `as_of` - Valuation date; Δ is zero when it is on or after expiry.
+    ///
+    /// # Errors
+    ///
+    /// - `Error::Calibration` with category `recalibration_provider_missing`
+    ///   for a [`CdsOptionStrikeKind::CleanPricePct`] strike before expiry.
+    /// - Validation errors for unsupported option configurations, and
+    ///   not-found errors when a required curve or surface is missing.
+    ///
+    /// [`RecalibrationProvider`]: finstack_quant_valuations_core::recalibration::RecalibrationProvider
+    /// [`MetricId::Delta`]: finstack_quant_valuations_core::metrics::MetricId::Delta
+    /// [`CdsOptionStrikeKind::CleanPricePct`]: crate::cds_option::CdsOptionStrikeKind::CleanPricePct
     pub fn delta(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -618,12 +641,34 @@ impl CdsOption {
         super::metrics::delta::delta(self, market, as_of)
     }
 
-    /// CDS option Γ, branched by strike kind: central difference of the
-    /// Black-76 N(d₁) delta across a ±5 bp move in the displayed ATM
-    /// forward for spread strikes (DOCS 2055833 §2.5), and the change in
-    /// the curve-reprice hedge-ratio delta under the same ±5 bp par-quote
-    /// spread bump for clean-price strikes. Returned as a unit-less
-    /// number.
+    /// CDS option Γ for spread strikes: central difference of the Black-76
+    /// N(d₁) delta across a ±5 bp move in the displayed ATM forward
+    /// (DOCS 2055833 §2.5). Returned as a unit-less number; zero at or
+    /// after expiry.
+    ///
+    /// Clean-price strikes use the change in the curve-reprice hedge-ratio
+    /// delta under a ±5 bp par-quote spread bump, which re-bootstraps the
+    /// hazard curve through a [`RecalibrationProvider`]. This method has no
+    /// provider, so request [`MetricId::Gamma`] through the pricing registry
+    /// with `PricingOptions` carrying a recalibration provider instead.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market holding the discount curve, the hazard curve named
+    ///   by `credit_curve_id`, and the vol surface (unless an implied
+    ///   volatility override is quoted on the instrument).
+    /// * `as_of` - Valuation date; Γ is zero when it is on or after expiry.
+    ///
+    /// # Errors
+    ///
+    /// - `Error::Calibration` with category `recalibration_provider_missing`
+    ///   for a [`CdsOptionStrikeKind::CleanPricePct`] strike before expiry.
+    /// - Validation errors for unsupported option configurations, and
+    ///   not-found errors when a required curve or surface is missing.
+    ///
+    /// [`RecalibrationProvider`]: finstack_quant_valuations_core::recalibration::RecalibrationProvider
+    /// [`MetricId::Gamma`]: finstack_quant_valuations_core::metrics::MetricId::Gamma
+    /// [`CdsOptionStrikeKind::CleanPricePct`]: crate::cds_option::CdsOptionStrikeKind::CleanPricePct
     pub fn gamma(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -841,5 +886,44 @@ mod tests {
         option.exercise_settlement_date = Some(option.expiry - time::Duration::days(1));
         let error = option.validate().expect_err("cannot pay before exercise");
         assert!(error.to_string().contains("on or after legal expiry"));
+    }
+
+    /// Clean-price strikes need a recalibration provider, which only the
+    /// metric path supplies; the inherent `delta`/`gamma` fail closed with
+    /// the documented `recalibration_provider_missing` error.
+    #[test]
+    fn inherent_delta_gamma_reject_clean_price_strikes_without_provider() {
+        use finstack_quant_core::market_data::context::MarketContext;
+
+        let as_of = date!(2025 - 01 - 02);
+        let params = CdsOptionParams::new(
+            CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
+            date!(2026 - 01 - 02),
+            date!(2030 - 01 - 02),
+            Money::from((10_000_000_i64, Currency::USD)),
+            OptionType::Call,
+        )
+        .expect("valid params")
+        .as_index(1.0)
+        .expect("valid factor")
+        .with_strike_index_factor(1.0)
+        .expect("valid strike factor")
+        .with_coupon_bp(Decimal::new(500, 0));
+        let credit = CreditParams::corporate_standard("HY", "HZ-SN");
+        let option = CdsOption::new("CDSO-PRICE-STRIKE", &params, &credit, "USD-OIS", "CDSO-VOL")
+            .expect("valid option");
+        let market = MarketContext::new();
+
+        for (name, result) in [
+            ("delta", option.delta(&market, as_of)),
+            ("gamma", option.gamma(&market, as_of)),
+        ] {
+            match result {
+                Err(finstack_quant_core::Error::Calibration { category, .. }) => {
+                    assert_eq!(category, "recalibration_provider_missing", "{name}");
+                }
+                other => panic!("{name}: expected recalibration_provider_missing, got {other:?}"),
+            }
+        }
     }
 }
