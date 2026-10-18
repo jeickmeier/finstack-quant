@@ -99,7 +99,7 @@ from it.
 - [`../pricer/`](../pricer/) — `FAMILIES`, `STANDARD` and the JSON pricing entry points (rustdoc only)
 - Per-instrument READMEs:
   [bond](fixed_income/bond/README.md),
-  [structured_credit](fixed_income/structured_credit/README.md),
+  [structured_credit](../../structured-credit/src/structured_credit/README.md),
   [revolving_credit](fixed_income/revolving_credit/README.md),
   [term_loan](fixed_income/term_loan/README.md),
   [irs](rates/irs/README.md),

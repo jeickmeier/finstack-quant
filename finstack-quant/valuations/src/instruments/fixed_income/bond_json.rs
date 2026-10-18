@@ -5,7 +5,7 @@
 
 /// Construct tagged bond instrument JSON from a cashflow schedule JSON payload.
 ///
-/// Parses and validates a canonical cashflow schedule, constructs a [`Bond`](crate::Bond),
+/// Parses and validates a canonical cashflow schedule, constructs a [`Bond`](crate::instruments::Bond),
 /// wraps it in [`crate::instruments::InstrumentJson::Bond`], and serializes the
 /// tagged instrument.
 ///

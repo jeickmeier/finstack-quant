@@ -67,9 +67,9 @@
 //! # See Also
 //!
 //! - [`Bond`] for standard fixed/floating rate bonds
-//! - `StructuredCredit` for ABS, CLO, and securitized products (umbrella crate,
-//!   `instruments::fixed_income::structured_credit`, until the structured-credit
-//!   crate exists)
+//! - `StructuredCredit` for ABS, CLO, and securitized products (the
+//!   `finstack-quant-valuations-structured-credit` crate, re-exported by the
+//!   umbrella as `instruments::fixed_income::structured_credit`)
 //! - [`AgencyMbsPassthrough`] for mortgage pass-throughs
 //! - [`finstack_quant_cashflows`] for cashflow generation
 

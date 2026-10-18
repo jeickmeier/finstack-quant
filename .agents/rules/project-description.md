@@ -45,9 +45,11 @@ Workspace (umbrella crate: finstack-quant)
  │   fixed-income,          finstack-quant-valuations-<family>), each with its Family static;  │
  │   credit, equity,        depend on valuations/core only, never on each other                │
  │   fx, exotics}                                                                              │
+ │  valuations/structured-credit ← second tier (structured credit, CMO, asset-backed facility); │
+ │                         depends on fixed-income and rates                                   │
  │  valuations           ← umbrella: re-exports core + the family crates under unchanged     │
- │                         paths; structured credit, CMO, ABF, basket, real estate, composite, │
- │                         json_loader, STANDARD registries, schemas (the closed world)        │
+ │                         paths; basket, real estate, composite, json_loader, STANDARD        │
+ │                         registries, schemas (the closed world)                              │
  │  calibration          ← curve/hazard/vol bootstraps and global calibration on valuations   │
  │  attribution          ← multi-period P&L attribution (waterfall, Taylor, metrics-based)     │
  │  statements           ← model graph (Value > Forecast > Formula), evaluation                │
@@ -69,7 +71,8 @@ Dependency direction (read off the manifests):
   core + analytics + cashflows → models
   core + cashflows + covenants + margin + models → valuations/core
   valuations/core → valuations/{rates, fixed-income, credit, equity, fx, exotics} (in parallel)
-  valuations/core + the six family crates → valuations
+  valuations/fixed-income + valuations/rates → valuations/structured-credit
+  valuations/core + the six family crates + valuations/structured-credit → valuations
   valuations (+ core, cashflows, models) → calibration
   calibration + valuations → attribution
   valuations (+ core, cashflows) → statements → statements-analytics (+ covenants, models)
@@ -83,8 +86,9 @@ Dependency direction (read off the manifests):
   valuations; the umbrella `finstack-quant-valuations` re-exports all of them under
   the same paths and adds the closed world, so downstream crates and bindings depend
   on the umbrella only. Instruments that hold other families' legs (composite,
-  basket, levered real estate) and the structured-credit tier (structured credit,
-  CMO, asset-backed facility; depends on fixed-income and rates) stay in the umbrella.
+  basket, levered real estate) stay in the umbrella; the structured-credit tier
+  (`finstack-quant-valuations-structured-credit`: structured credit, CMO, asset-backed
+  facility) depends on fixed-income and rates and is re-exported under its old paths.
   `margin` depends only on `core`; exposure generation is out of its scope. The
   `Marginable` trait is the seam and `valuations` implements it.
   `models` depends on `analytics`, `cashflows` and `core` only; Monte Carlo and

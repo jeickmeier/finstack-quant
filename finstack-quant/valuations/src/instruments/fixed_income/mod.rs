@@ -52,23 +52,17 @@
 //! - [`finstack_quant_cashflows`] for cashflow generation
 //!
 //! The family lives in `finstack-quant-valuations-fixed-income` and is
-//! re-exported here unchanged. Three modules stay in this crate until the
-//! structured-credit crate exists (plan Phase 3): [`structured_credit`],
-//! [`cmo`] and [`asset_backed_facility`] register with
-//! [`STRUCTURED_CREDIT`](structured_credit::STRUCTURED_CREDIT), not with
-//! [`FIXED_INCOME`](finstack_quant_valuations_fixed_income::FIXED_INCOME).
+//! re-exported here unchanged; the structured-credit tier
+//! (`structured_credit`, `cmo`, `asset_backed_facility`, registering
+//! with `structured_credit::STRUCTURED_CREDIT`) lives in
+//! `finstack-quant-valuations-structured-credit` and is re-exported under the
+//! same paths.
 
 pub use finstack_quant_valuations_fixed_income::*;
+pub use finstack_quant_valuations_structured_credit::{
+    asset_backed_facility, cmo, structured_credit, AgencyCmo, AssetBackedFacility, CmoTranche,
+    CmoTrancheType, CmoWaterfall, StructuredCredit,
+};
 
-/// Asset-backed facility module - warehouse lines against collateral pools.
-pub mod asset_backed_facility;
 mod bond_json;
-/// CMO module - Collateralized Mortgage Obligations.
-pub mod cmo;
-/// Structured credit module - ABS, RMBS, CMBS, CLO.
-pub mod structured_credit;
-
-pub use asset_backed_facility::AssetBackedFacility;
 pub use bond_json::bond_from_cashflows_json;
-pub use cmo::{AgencyCmo, CmoTranche, CmoTrancheType, CmoWaterfall};
-pub use structured_credit::StructuredCredit;

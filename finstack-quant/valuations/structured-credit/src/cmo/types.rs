@@ -1,0 +1,1055 @@
+//! Agency CMO types.
+//!
+//! Collateralized Mortgage Obligations (CMOs) are structured products that
+//! redistribute the cashflows from underlying MBS pools into tranches with
+//! different risk/return profiles.
+
+use super::tranches::pac_support::PacSchedule;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, DealId, InstrumentId};
+use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_fixed_income::mbs_passthrough::{
+    AgencyMbsPassthrough, AgencyProgram,
+};
+
+/// CMO tranche type enumeration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum CmoTrancheType {
+    /// Sequential pay - receives principal in order
+    Sequential,
+    /// PAC (Planned Amortization Class) - protected by support
+    Pac,
+    /// Support/Companion - absorbs prepayment variability
+    Support,
+    /// Interest-Only strip
+    InterestOnly,
+    /// Principal-Only strip
+    PrincipalOnly,
+    /// Accrual (Z) bond - capitalizes interest while senior tranches
+    /// are outstanding; the accrual is redirected as accretion-directed
+    /// principal to the current-pay tranches
+    Accrual,
+}
+
+/// Displays the serde wire value (`sequential`, `pac`, ...).
+impl std::fmt::Display for CmoTrancheType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CmoTrancheType::Sequential => write!(f, "sequential"),
+            CmoTrancheType::Pac => write!(f, "pac"),
+            CmoTrancheType::Support => write!(f, "support"),
+            CmoTrancheType::InterestOnly => write!(f, "interest_only"),
+            CmoTrancheType::PrincipalOnly => write!(f, "principal_only"),
+            CmoTrancheType::Accrual => write!(f, "accrual"),
+        }
+    }
+}
+
+/// PAC collar boundaries.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PacCollar {
+    /// Lower collar speed as a multiple of the standard PSA curve (`1.0` =
+    /// 100% PSA).
+    pub lower_speed_multiplier: f64,
+    /// Upper collar speed as a multiple of the standard PSA curve (`3.0` =
+    /// 300% PSA).
+    pub upper_speed_multiplier: f64,
+}
+
+impl PacCollar {
+    /// Create a PAC collar from its two PSA speed multiples.
+    ///
+    /// # Arguments
+    ///
+    /// * `lower_speed_multiplier` - Lower collar speed as a multiple of the
+    ///   standard PSA curve (`1.0` = 100% PSA).
+    /// * `upper_speed_multiplier` - Upper collar speed as a multiple of the
+    ///   standard PSA curve; at least `lower_speed_multiplier`.
+    pub fn new(lower_speed_multiplier: f64, upper_speed_multiplier: f64) -> Self {
+        Self {
+            lower_speed_multiplier,
+            upper_speed_multiplier,
+        }
+    }
+
+    /// Standard 100-300 PSA collar.
+    pub fn standard() -> Self {
+        Self::new(1.0, 3.0)
+    }
+}
+
+/// CMO tranche definition.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CmoTranche {
+    /// Tranche identifier (e.g., "A", "B", "IO")
+    pub id: String,
+    /// Tranche type
+    pub tranche_type: CmoTrancheType,
+    /// Original face amount
+    pub original_face: Money,
+    /// Current face amount
+    pub current_face: Money,
+    /// Coupon rate (0.0 for PO)
+    pub coupon: f64,
+    /// Payment priority (1 = highest for sequential)
+    pub priority: u32,
+    /// Original dated PAC principal targets and collar; required only for PAC tranches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pac_schedule: Option<PacSchedule>,
+}
+
+impl CmoTranche {
+    /// Create a sequential tranche.
+    pub fn sequential(id: &str, face: Money, coupon: f64, priority: u32) -> Self {
+        Self {
+            id: id.to_string(),
+            tranche_type: CmoTrancheType::Sequential,
+            original_face: face,
+            current_face: face,
+            coupon,
+            priority,
+            pac_schedule: None,
+        }
+    }
+
+    /// Create a PAC tranche with its persistent contractual principal plan.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Deal-unique tranche identifier.
+    /// * `face` - Original and opening current principal in the tranche currency.
+    /// * `coupon` - Annual cash coupon as a decimal rate, such as 0.04 for 4%.
+    /// * `priority` - Principal priority, with 1 paid before larger values.
+    /// * `schedule` - Dated original principal targets generated at construction
+    ///   or supplied from the deal terms; retained unchanged when seasoning.
+    pub fn pac(id: &str, face: Money, coupon: f64, priority: u32, schedule: PacSchedule) -> Self {
+        Self {
+            id: id.to_string(),
+            tranche_type: CmoTrancheType::Pac,
+            original_face: face,
+            current_face: face,
+            coupon,
+            priority,
+            pac_schedule: Some(schedule),
+        }
+    }
+
+    /// Create a support tranche.
+    pub fn support(id: &str, face: Money, coupon: f64, priority: u32) -> Self {
+        Self {
+            id: id.to_string(),
+            tranche_type: CmoTrancheType::Support,
+            original_face: face,
+            current_face: face,
+            coupon,
+            priority,
+            pac_schedule: None,
+        }
+    }
+
+    /// Create an accrual (Z) tranche.
+    ///
+    /// While any other principal-receiving tranche is outstanding, the Z
+    /// receives no cash: its coupon accrual is capitalized into its balance
+    /// and an equal amount of interest collections is redirected as
+    /// accretion-directed principal to the current-pay tranches. Once all
+    /// current-pay tranches retire, the Z pays cash interest on its accreted
+    /// balance plus principal until retired.
+    ///
+    /// See Fabozzi, *The Handbook of Mortgage-Backed Securities* (7th ed.),
+    /// Ch. 21 "Accrual Bonds" (Z bonds in sequential-pay CMO structures).
+    pub fn accrual(id: &str, face: Money, coupon: f64, priority: u32) -> Self {
+        Self {
+            id: id.to_string(),
+            tranche_type: CmoTrancheType::Accrual,
+            original_face: face,
+            current_face: face,
+            coupon,
+            priority,
+            pac_schedule: None,
+        }
+    }
+
+    /// Create an IO strip.
+    pub fn io_strip(id: &str, notional: Money, coupon: f64) -> Self {
+        Self {
+            id: id.to_string(),
+            tranche_type: CmoTrancheType::InterestOnly,
+            original_face: notional,
+            current_face: notional,
+            coupon,
+            priority: 0, // IO gets interest before principal allocation
+            pac_schedule: None,
+        }
+    }
+
+    /// Create a PO strip.
+    pub fn po_strip(id: &str, face: Money) -> Self {
+        Self {
+            id: id.to_string(),
+            tranche_type: CmoTrancheType::PrincipalOnly,
+            original_face: face,
+            current_face: face,
+            coupon: 0.0,
+            priority: 0,
+            pac_schedule: None,
+        }
+    }
+
+    /// Get current factor.
+    ///
+    /// Returns `0.0` for a zero-original-face tranche (fully retired or
+    /// degenerate placeholder) rather than dividing by zero.
+    pub fn factor(&self) -> f64 {
+        let original = self.original_face.amount();
+        if original == 0.0 {
+            return 0.0;
+        }
+        self.current_face.amount() / original
+    }
+
+    /// Check if tranche is interest-bearing.
+    ///
+    /// An accrual (Z) tranche is interest-bearing: its coupon accrues every
+    /// period, although during the accretion phase the accrual is capitalized
+    /// into its balance rather than paid in cash.
+    pub fn is_interest_bearing(&self) -> bool {
+        self.coupon > 0.0 && self.tranche_type != CmoTrancheType::PrincipalOnly
+    }
+
+    /// Check if tranche receives principal.
+    ///
+    /// An accrual (Z) tranche receives principal, but only after every
+    /// current-pay (non-accrual) principal tranche has been retired.
+    pub fn receives_principal(&self) -> bool {
+        self.tranche_type != CmoTrancheType::InterestOnly
+    }
+}
+
+/// CMO waterfall configuration.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CmoWaterfall {
+    /// Tranches in the deal (ordered by priority for sequential)
+    pub tranches: Vec<CmoTranche>,
+    /// Whether to use pro-rata allocation within same priority
+    pub pro_rata_same_priority: bool,
+}
+
+impl CmoWaterfall {
+    /// Create a new waterfall with tranches.
+    pub fn new(tranches: Vec<CmoTranche>) -> Self {
+        Self {
+            tranches,
+            pro_rata_same_priority: false,
+        }
+    }
+
+    /// Get tranche by ID.
+    pub fn get_tranche(&self, id: &str) -> Option<&CmoTranche> {
+        self.tranches.iter().find(|t| t.id == id)
+    }
+
+    /// Get total current face across all tranches (excluding IO).
+    pub fn total_current_face(&self) -> finstack_quant_core::Result<Money> {
+        let total: f64 = self
+            .tranches
+            .iter()
+            .filter(|t| t.receives_principal())
+            .map(|t| t.current_face.amount())
+            .sum();
+
+        let currency = self
+            .tranches
+            .first()
+            .map(|t| t.current_face.currency())
+            .unwrap_or(Currency::USD);
+
+        Money::new(total, currency)
+    }
+}
+
+/// Agency CMO instrument.
+///
+/// Represents a CMO deal backed by agency MBS collateral with multiple
+/// tranches that receive cashflows according to waterfall rules.
+#[derive(
+    Clone,
+    Debug,
+    finstack_quant_valuations_macros::FinancialBuilder,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct AgencyCmo {
+    /// Unique instrument identifier.
+    pub id: InstrumentId,
+    /// Deal name (e.g., "FNR 2024-1")
+    pub deal_name: DealId,
+    /// Agency program
+    pub agency: AgencyProgram,
+    /// Issue date
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub issue_date: Date,
+    /// Waterfall configuration with tranches
+    pub waterfall: CmoWaterfall,
+    /// Reference tranche ID for pricing (which tranche to value)
+    pub reference_tranche_id: String,
+    /// Collateral pool (optional - for detailed cashflow projection)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collateral: Option<Box<AgencyMbsPassthrough>>,
+    /// Collateral WAC (if no explicit collateral)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collateral_wac: Option<f64>,
+    /// Remaining collateral WAM in months (if no explicit collateral).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collateral_wam_months: Option<u32>,
+    /// Discount curve identifier.
+    pub discount_curve_id: CurveId,
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides:
+        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+    /// Attributes for tagging and selection.
+    #[builder(default)]
+    #[serde(default)]
+    /// Attributes for scenario selection and tagging
+    pub attributes: Attributes,
+}
+
+impl AgencyCmo {
+    /// Validate the tranche waterfall, collateral, and interest conservation.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        let context = format!("Agency CMO '{}'", self.id.as_str());
+        if self.deal_name.as_str().trim().is_empty()
+            || self.reference_tranche_id.trim().is_empty()
+            || self.discount_curve_id.as_str().trim().is_empty()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} requires non-empty deal, reference-tranche, and discount-curve identifiers"
+            )));
+        }
+        if self.waterfall.tranches.is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} requires at least one tranche"
+            )));
+        }
+        let currency = self.waterfall.tranches[0].original_face.currency();
+        let mut ids = std::collections::HashSet::new();
+        for tranche in &self.waterfall.tranches {
+            if tranche.id.trim().is_empty() || !ids.insert(tranche.id.as_str()) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} tranche identifiers must be non-empty and unique"
+                )));
+            }
+            let original = tranche.original_face.amount();
+            let current = tranche.current_face.amount();
+            if tranche.original_face.currency() != currency
+                || tranche.current_face.currency() != currency
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} all tranche balances must use the same currency"
+                )));
+            }
+            if !original.is_finite()
+                || original <= 0.0
+                || !current.is_finite()
+                || current < 0.0
+                || (current > original && tranche.tranche_type != CmoTrancheType::Accrual)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} tranche '{}' requires nonnegative current_face and positive original_face; only accrual tranches may exceed original_face",
+                    tranche.id
+                )));
+            }
+            if !tranche.coupon.is_finite() || !(0.0..=1.0).contains(&tranche.coupon) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} tranche '{}' coupon must be a finite decimal rate in [0, 1]",
+                    tranche.id
+                )));
+            }
+            if matches!(
+                tranche.tranche_type,
+                CmoTrancheType::Sequential
+                    | CmoTrancheType::Pac
+                    | CmoTrancheType::Support
+                    | CmoTrancheType::Accrual
+            ) && tranche.priority == 0
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} waterfall tranche '{}' requires positive priority",
+                    tranche.id
+                )));
+            }
+            match (&tranche.tranche_type, &tranche.pac_schedule) {
+                (CmoTrancheType::Pac, Some(schedule)) => {
+                    schedule.validate()?;
+                    if schedule.get_total() > tranche.original_face.amount() + 1e-6 {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "{context} PAC tranche '{}' targets exceed original face",
+                            tranche.id
+                        )));
+                    }
+                }
+                (CmoTrancheType::Pac, None) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{context} PAC tranche '{}' requires its original dated principal schedule",
+                        tranche.id
+                    )))
+                }
+                (_, Some(_)) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{context} non-PAC tranche '{}' cannot define a PAC schedule",
+                        tranche.id
+                    )))
+                }
+                _ => {}
+            }
+            if tranche.tranche_type == CmoTrancheType::PrincipalOnly && tranche.coupon != 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} principal-only tranche '{}' must have zero coupon",
+                    tranche.id
+                )));
+            }
+        }
+        if self.reference_tranche().is_none() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} reference tranche '{}' is not present in the waterfall",
+                self.reference_tranche_id
+            )));
+        }
+        if self
+            .collateral_wac
+            .is_some_and(|wac| !wac.is_finite() || !(0.0..=1.0).contains(&wac))
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} collateral_wac must be a finite decimal rate in [0, 1]"
+            )));
+        }
+        if self.collateral_wam_months == Some(0) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} collateral_wam_months must be positive"
+            )));
+        }
+        if let Some(pool) = &self.collateral {
+            finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(
+                pool.as_ref(),
+            )?;
+            if pool.current_face.currency() != currency {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} collateral and tranche currencies must match"
+                )));
+            }
+            // The collateral backs exactly the principal tranches; IO
+            // notionals are scaled by collateral balance over this face.
+            let collateral_face = pool.current_face.amount();
+            let principal_face = self.waterfall.total_current_face()?.amount();
+            if (collateral_face - principal_face).abs() > 1e-6 * collateral_face.max(1.0) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} collateral current face {collateral_face:.2} must equal the sum \
+                     of principal-tranche current faces {principal_face:.2}"
+                )));
+            }
+        }
+        Self::validate_interest_coverage(self)
+    }
+
+    /// Create a canonical example CMO for testing.
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        use time::macros::date;
+        // Create sequential structure: A (front), B (middle), C (last).
+        // Every tranche coupon is at or below the 4.0% net pass-through
+        // (4.5% WAC less 50bp of fees), so the structure stays
+        // interest-covered for the life of the deal.
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+            CmoTranche::sequential("B", Money::from((30_000_000_i64, Currency::USD)), 0.04, 2),
+            CmoTranche::sequential("C", Money::from((30_000_000_i64, Currency::USD)), 0.04, 3),
+        ];
+
+        Self::builder()
+            .id(InstrumentId::new("FNR-2024-1-A"))
+            .deal_name("FNR 2024-1".into())
+            .agency(AgencyProgram::Fnma)
+            .issue_date(date!(2024 - 01 - 01))
+            .waterfall(CmoWaterfall::new(tranches))
+            .reference_tranche_id("A".to_string())
+            .collateral_wac(0.045)
+            .collateral_wam_months(360)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .attributes(
+                Attributes::new()
+                    .with_tag("cmo")
+                    .with_tag("agency")
+                    .with_meta("deal", "fnr-2024-1"),
+            )
+            .build()
+    }
+
+    /// Create an example sequential structure with an accrual (Z) tranche.
+    ///
+    /// A and B are current-pay sequentials; Z accretes at its coupon while
+    /// they are outstanding, redirecting the accrual as accretion-directed
+    /// principal that retires A and B faster than in `example()`.
+    pub fn example_accrual() -> finstack_quant_core::Result<Self> {
+        use time::macros::date;
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+            CmoTranche::sequential("B", Money::from((30_000_000_i64, Currency::USD)), 0.04, 2),
+            CmoTranche::accrual("Z", Money::from((30_000_000_i64, Currency::USD)), 0.04, 3),
+        ];
+
+        Self::builder()
+            .id(InstrumentId::new("FNR-2024-3-Z"))
+            .deal_name("FNR 2024-3".into())
+            .agency(AgencyProgram::Fnma)
+            .issue_date(date!(2024 - 01 - 01))
+            .waterfall(CmoWaterfall::new(tranches))
+            .reference_tranche_id("Z".to_string())
+            .collateral_wac(0.045)
+            .collateral_wam_months(360)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build()
+    }
+
+    /// Create an example PAC/Support structure.
+    pub fn example_pac_support() -> finstack_quant_core::Result<Self> {
+        let mut deal = Self::example()?;
+        deal.id = InstrumentId::new("FNR-2024-2-PAC");
+        deal.deal_name = "FNR 2024-2".into();
+        deal.collateral_wac = Some(0.045);
+        let pool = super::pricer::resolve_collateral(&deal, deal.issue_date)?;
+        let dates: Vec<_> =
+            finstack_quant_valuations_fixed_income::mbs_passthrough::pricer::generate_cashflows(
+                &pool,
+                deal.issue_date,
+                None,
+            )?
+            .iter()
+            .map(|flow| flow.payment_date)
+            .collect();
+        let schedule = PacSchedule::generate(
+            pool.current_face.amount(),
+            50_000_000.0,
+            &dates,
+            pool.wac,
+            pool.seasoning_months(deal.issue_date),
+            PacCollar::standard(),
+        )?;
+        deal.waterfall = CmoWaterfall::new(vec![
+            CmoTranche::pac(
+                "PAC",
+                Money::from((50_000_000_i64, Currency::USD)),
+                0.0375,
+                1,
+                schedule,
+            ),
+            CmoTranche::support("SUP", Money::from((50_000_000_i64, Currency::USD)), 0.04, 2),
+        ]);
+        deal.reference_tranche_id = "PAC".into();
+        deal.validate()?;
+        Ok(deal)
+    }
+
+    /// Create an example IO/PO strip structure.
+    pub fn example_io_po() -> finstack_quant_core::Result<Self> {
+        use time::macros::date;
+        // IO strips the full 3.5% pass-through (4.0% WAC less 50bp fees).
+        let tranches = vec![
+            CmoTranche::io_strip("IO", Money::from((100_000_000_i64, Currency::USD)), 0.035),
+            CmoTranche::po_strip("PO", Money::from((100_000_000_i64, Currency::USD))),
+        ];
+
+        Self::builder()
+            .id(InstrumentId::new("FNS-2024-1-IO"))
+            .deal_name("FNS 2024-1".into())
+            .agency(AgencyProgram::Fnma)
+            .issue_date(date!(2024 - 01 - 01))
+            .waterfall(CmoWaterfall::new(tranches))
+            .reference_tranche_id("IO".to_string())
+            .collateral_wac(0.04)
+            .collateral_wam_months(360)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build()
+    }
+
+    /// Get the reference tranche being valued.
+    pub fn reference_tranche(&self) -> Option<&CmoTranche> {
+        self.waterfall.get_tranche(&self.reference_tranche_id)
+    }
+
+    /// Validate that the deal's tranche coupon demand does not exceed the
+    /// collateral interest supply (interest conservation).
+    ///
+    /// Two checks run, both against the net pass-through coupon (collateral
+    /// WAC less servicing and guarantee fees):
+    ///
+    /// 1. **Structural (per tranche)**: every principal-bearing tranche with a
+    ///    fixed coupon (sequential, PAC, support) must have
+    ///    `coupon <= net pass-through`. The aggregate weighted-average test
+    ///    alone is insufficient: in a sequential structure the surviving
+    ///    pool's weighted coupon rises toward the maximum tranche coupon as
+    ///    front tranches retire, so a deal that is covered at t=0 can become
+    ///    interest-deficient later. IO strips are excluded (their notional
+    ///    references the pass-through and total demand is bounded by check 2);
+    ///    PO strips carry no coupon. Accrual (Z) tranches are included: during
+    ///    the accretion phase the Z's accrual is funded from interest
+    ///    collections (as accretion-directed principal), and after seniors
+    ///    retire it is paid cash interest — in both phases its funding demand
+    ///    is `coupon × balance`, exactly like a current-pay tranche, so the
+    ///    same `coupon <= net pass-through` bound applies.
+    /// 2. **Aggregate (t=0)**: total annual coupon demand across all
+    ///    interest-bearing tranches (including IO strips) must not exceed
+    ///    `coupon × collateral face`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when any principal-bearing tranche coupon
+    /// exceeds the net pass-through coupon, or when aggregate annual coupon
+    /// demand exceeds `coupon × collateral face`.
+    fn validate_interest_coverage(cmo: &AgencyCmo) -> finstack_quant_core::Result<()> {
+        let (pass_through, collateral_face) = match &cmo.collateral {
+            Some(pool) => (pool.coupon, pool.current_face.amount()),
+            None => {
+                // Mirror the assumed-collateral construction in the pricer.
+                let defaults = crate::structured_credit::assumptions::embedded_registry()?
+                    .cmo_collateral_defaults();
+                let wac = cmo.collateral_wac.unwrap_or(defaults.wac);
+                let pass_through = wac
+                    - defaults.servicing_fee_bp / 10_000.0
+                    - defaults.guarantee_fee_bp / 10_000.0;
+                (pass_through, cmo.waterfall.total_current_face()?.amount())
+            }
+        };
+
+        // Structural check: a fixed-coupon tranche owed interest on its
+        // principal balance can never demand more than the net pass-through,
+        // otherwise it goes interest-short once higher-priority tranches
+        // retire even if the deal is covered in aggregate at t=0.
+        for tranche in &cmo.waterfall.tranches {
+            if tranche.is_interest_bearing()
+                && tranche.receives_principal()
+                && tranche.coupon > pass_through * (1.0 + 1e-9)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Interest-deficient CMO {}: tranche '{}' coupon {:.4} exceeds the net \
+                     pass-through coupon {:.4}; a fixed-coupon principal tranche cannot be \
+                     covered once senior tranches retire",
+                    cmo.id.as_str(),
+                    tranche.id,
+                    tranche.coupon,
+                    pass_through
+                )));
+            }
+        }
+
+        let annual_supply = pass_through * collateral_face;
+        let annual_demand: f64 = cmo
+            .waterfall
+            .tranches
+            .iter()
+            .filter(|t| t.is_interest_bearing())
+            .map(|t| t.current_face.amount() * t.coupon)
+            .sum();
+
+        // Relative tolerance so a fully-stripped IO (demand == supply) passes.
+        if annual_demand > annual_supply * (1.0 + 1e-9) + 1e-6 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Interest-deficient CMO {}: annual tranche coupon demand {:.2} exceeds \
+                 collateral interest supply {:.2} (pass-through {:.4} on face {:.2})",
+                cmo.id.as_str(),
+                annual_demand,
+                annual_supply,
+                pass_through,
+                collateral_face
+            )));
+        }
+        Ok(())
+    }
+}
+
+impl finstack_quant_cashflows::CashflowScheduleSource for AgencyCmo {
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(self.reference_tranche().map(|tranche| tranche.current_face))
+    }
+
+    fn raw_cashflow_schedule(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+        let _ = curves;
+        let schedule = crate::cmo::pricer::build_reference_tranche_schedule(self, as_of, None)?;
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
+    }
+}
+
+impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for AgencyCmo {
+    impl_instrument_base!(
+        finstack_quant_valuations_core::pricer::InstrumentType::AgencyCmo,
+        crate::structured_credit::STRUCTURED_CREDIT
+    );
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        Ok(deps)
+    }
+
+    fn base_value(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        crate::cmo::pricer::price_cmo(self, market, as_of)
+    }
+
+    fn rate_risk_rebuild(
+        &self,
+        base: &finstack_quant_core::market_data::context::MarketContext,
+        bumped: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<
+        Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>,
+    > {
+        use finstack_quant_valuations_fixed_income::mbs_passthrough::metrics::duration::rate_risk_pool;
+        let collateral = crate::cmo::pricer::resolve_collateral(self, as_of)?;
+        let mut rebuilt = self.clone();
+        rebuilt.collateral = Some(Box::new(rate_risk_pool(&collateral, base, bumped, as_of)?));
+        Ok(Some(Box::new(rebuilt)))
+    }
+
+    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_matches_serde_wire_value() {
+        use crate::structured_credit::DealType;
+        for t in [
+            CmoTrancheType::Sequential,
+            CmoTrancheType::Pac,
+            CmoTrancheType::Support,
+            CmoTrancheType::InterestOnly,
+            CmoTrancheType::PrincipalOnly,
+            CmoTrancheType::Accrual,
+        ] {
+            assert_eq!(serde_json::to_value(t).expect("ser"), t.to_string());
+        }
+        for d in [
+            DealType::Clo,
+            DealType::Cbo,
+            DealType::Abs,
+            DealType::Rmbs,
+            DealType::Cmbs,
+            DealType::Auto,
+            DealType::Card,
+        ] {
+            assert_eq!(serde_json::to_value(d).expect("ser"), d.to_string());
+        }
+    }
+
+    #[test]
+    fn test_cmo_example() {
+        let cmo = AgencyCmo::example().expect("AgencyCmo example is valid");
+        assert_eq!(cmo.agency, AgencyProgram::Fnma);
+        assert_eq!(cmo.waterfall.tranches.len(), 3);
+    }
+
+    #[test]
+    fn test_tranche_types() {
+        let cmo = AgencyCmo::example().expect("AgencyCmo example is valid");
+
+        for tranche in &cmo.waterfall.tranches {
+            assert_eq!(tranche.tranche_type, CmoTrancheType::Sequential);
+        }
+    }
+
+    #[test]
+    fn test_pac_support_structure() {
+        let cmo = AgencyCmo::example_pac_support().expect("AgencyCmo PAC/support example is valid");
+
+        let pac = cmo.waterfall.get_tranche("PAC").expect("PAC exists");
+        assert_eq!(pac.tranche_type, CmoTrancheType::Pac);
+        assert!(pac.pac_schedule.is_some());
+
+        let sup = cmo.waterfall.get_tranche("SUP").expect("SUP exists");
+        assert_eq!(sup.tranche_type, CmoTrancheType::Support);
+    }
+
+    #[test]
+    fn test_io_po_structure() {
+        let cmo = AgencyCmo::example_io_po().expect("AgencyCmo IO/PO example is valid");
+
+        let io = cmo.waterfall.get_tranche("IO").expect("IO exists");
+        assert_eq!(io.tranche_type, CmoTrancheType::InterestOnly);
+        assert!(io.is_interest_bearing());
+        assert!(!io.receives_principal());
+
+        let po = cmo.waterfall.get_tranche("PO").expect("PO exists");
+        assert_eq!(po.tranche_type, CmoTrancheType::PrincipalOnly);
+        assert!(!po.is_interest_bearing());
+        assert!(po.receives_principal());
+    }
+
+    #[test]
+    fn test_total_face() {
+        let cmo = AgencyCmo::example().expect("AgencyCmo example is valid");
+        let total = cmo
+            .waterfall
+            .total_current_face()
+            .expect("valid total_current_face fixture");
+
+        // 40M + 30M + 30M = 100M
+        assert!((total.amount() - 100_000_000.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_reference_tranche() {
+        let cmo = AgencyCmo::example().expect("AgencyCmo example is valid");
+        let ref_tranche = cmo.reference_tranche().expect("ref exists");
+
+        assert_eq!(ref_tranche.id, "A");
+    }
+
+    /// Finding 17: deals whose tranche coupon demand exceeds the collateral
+    /// pass-through interest are interest-deficient and rejected at build
+    /// (here B/Z coupons exceed the 4% pass-through and aggregate demand
+    /// is 4.45% of face against a 4% supply).
+    #[test]
+    fn interest_deficient_deal_rejected_at_build() {
+        use time::macros::date;
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.04, 1),
+            CmoTranche::sequential("B", Money::from((30_000_000_i64, Currency::USD)), 0.045, 2),
+            CmoTranche::sequential("Z", Money::from((30_000_000_i64, Currency::USD)), 0.05, 3),
+        ];
+
+        let result = AgencyCmo::builder()
+            .id(InstrumentId::new("FNR-DEFICIENT"))
+            .deal_name("FNR DEFICIENT".into())
+            .agency(AgencyProgram::Fnma)
+            .issue_date(date!(2024 - 01 - 01))
+            .waterfall(CmoWaterfall::new(tranches))
+            .reference_tranche_id("A".to_string())
+            .collateral_wac(0.045) // pass-through 4.0% < 4.45% demand
+            .collateral_wam_months(360)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build();
+
+        let err = result.expect_err("interest-deficient deal must be rejected");
+        assert!(
+            err.to_string().contains("Interest-deficient"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// Structural per-tranche coverage: a deal can satisfy the aggregate t=0
+    /// weighted-average test yet still carry a tranche coupon above the net
+    /// pass-through. In sequential pay that tranche goes interest-short once
+    /// senior tranches retire, so validation must reject it.
+    ///
+    /// This is the pre-fix `example()` structure: A 3.5%/40M, B 4.0%/30M,
+    /// Z 4.5%/30M on a 4.0% net pass-through — aggregate demand $3.95M is
+    /// under the $4.0M supply, but the 4.5% tranche exceeds the pass-through.
+    #[test]
+    fn tranche_coupon_above_pass_through_rejected_even_if_aggregate_covered() {
+        use time::macros::date;
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+            CmoTranche::sequential("B", Money::from((30_000_000_i64, Currency::USD)), 0.04, 2),
+            CmoTranche::sequential("Z", Money::from((30_000_000_i64, Currency::USD)), 0.045, 3),
+        ];
+
+        let result = AgencyCmo::builder()
+            .id(InstrumentId::new("FNR-STRUCTURAL"))
+            .deal_name("FNR STRUCTURAL".into())
+            .agency(AgencyProgram::Fnma)
+            .issue_date(date!(2024 - 01 - 01))
+            .waterfall(CmoWaterfall::new(tranches))
+            .reference_tranche_id("A".to_string())
+            .collateral_wac(0.045) // net pass-through 4.0% < Z's 4.5% coupon
+            .collateral_wam_months(360)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build();
+
+        let err = result.expect_err("tranche coupon above pass-through must be rejected");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("tranche 'Z'") && msg.contains("pass-through"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn accreted_z_balance_survives_serialization() {
+        let mut cmo = AgencyCmo::example_accrual().expect("example");
+        let z = cmo
+            .waterfall
+            .tranches
+            .iter_mut()
+            .find(|t| t.id == "Z")
+            .expect("Z");
+        z.current_face = Money::new(z.original_face.amount() * 1.1, z.original_face.currency())
+            .expect("accreted face");
+        cmo.validate().expect("legitimate accretion");
+        let json = serde_json::to_string(&cmo).expect("serialize");
+        let restored: AgencyCmo = serde_json::from_str(&json).expect("deserialize");
+        restored.validate().expect("reconstructed accretion");
+        assert_eq!(
+            restored.waterfall.get_tranche("Z").expect("Z").current_face,
+            cmo.waterfall.get_tranche("Z").expect("Z").current_face
+        );
+    }
+
+    #[test]
+    fn test_accrual_example_structure() {
+        let cmo = AgencyCmo::example_accrual().expect("accrual example is valid");
+        let z = cmo.waterfall.get_tranche("Z").expect("Z exists");
+        assert_eq!(z.tranche_type, CmoTrancheType::Accrual);
+        assert!(z.is_interest_bearing());
+        assert!(z.receives_principal());
+        assert_eq!(cmo.reference_tranche_id, "Z");
+    }
+
+    /// An accrual (Z) tranche's coupon must not exceed the net pass-through:
+    /// its accrual is funded from interest collections (accretion-directed
+    /// principal during accretion, cash interest after seniors retire), so
+    /// the same structural bound as current-pay tranches applies.
+    #[test]
+    fn accrual_coupon_above_pass_through_rejected() {
+        use time::macros::date;
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+            CmoTranche::accrual("Z", Money::from((30_000_000_i64, Currency::USD)), 0.045, 2),
+        ];
+
+        let result = AgencyCmo::builder()
+            .id(InstrumentId::new("FNR-Z-DEFICIENT"))
+            .deal_name("FNR Z DEFICIENT".into())
+            .agency(AgencyProgram::Fnma)
+            .issue_date(date!(2024 - 01 - 01))
+            .waterfall(CmoWaterfall::new(tranches))
+            .reference_tranche_id("Z".to_string())
+            .collateral_wac(0.045) // net pass-through 4.0% < Z's 4.5% coupon
+            .collateral_wam_months(360)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build();
+
+        let err = result.expect_err("accrual coupon above pass-through must be rejected");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("tranche 'Z'") && msg.contains("pass-through"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// Accrual tranches participate in the waterfall principal order and so
+    /// require a positive priority, like other principal-paying classes.
+    #[test]
+    fn accrual_zero_priority_rejected() {
+        use time::macros::date;
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+            CmoTranche::accrual("Z", Money::from((30_000_000_i64, Currency::USD)), 0.04, 0),
+        ];
+
+        let result = AgencyCmo::builder()
+            .id(InstrumentId::new("FNR-Z-PRIORITY"))
+            .deal_name("FNR Z PRIORITY".into())
+            .agency(AgencyProgram::Fnma)
+            .issue_date(date!(2024 - 01 - 01))
+            .waterfall(CmoWaterfall::new(tranches))
+            .reference_tranche_id("Z".to_string())
+            .collateral_wac(0.045)
+            .collateral_wam_months(360)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build();
+
+        let err = result.expect_err("zero-priority accrual tranche must be rejected");
+        assert!(
+            err.to_string().contains("positive priority"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    // schema-rejection-test: collateral_wam (now collateral_wam_months)
+    fn rejects_retired_collateral_wam_key() {
+        let cmo = AgencyCmo::example().expect("AgencyCmo example is valid");
+        let mut value = serde_json::to_value(&cmo).expect("serialize");
+        value
+            .as_object_mut()
+            .expect("object")
+            .insert("collateral_wam".into(), serde_json::json!(360));
+        let err = serde_json::from_value::<AgencyCmo>(value)
+            .expect_err("retired collateral_wam key must be rejected");
+        assert!(err.to_string().contains("unknown field"), "{err}");
+    }
+
+    #[test]
+    // schema-rejection-test: lower_psa / upper_psa (now lower_/upper_speed_multiplier)
+    fn rejects_retired_pac_collar_psa_keys() {
+        let err = serde_json::from_value::<PacCollar>(serde_json::json!({
+            "lower_psa": 1.0,
+            "upper_psa": 3.0
+        }))
+        .expect_err("retired PacCollar keys must be rejected");
+        assert!(err.to_string().contains("unknown field"), "{err}");
+        let collar: PacCollar = serde_json::from_value(serde_json::json!({
+            "lower_speed_multiplier": 1.0,
+            "upper_speed_multiplier": 3.0
+        }))
+        .expect("canonical PacCollar keys");
+        assert_eq!(collar.lower_speed_multiplier, 1.0);
+        assert_eq!(collar.upper_speed_multiplier, 3.0);
+    }
+}

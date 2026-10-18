@@ -71,7 +71,7 @@
 //! - [`PrivateMarketsFund`] for PE/credit fund valuation
 //!
 //! The family lives in `finstack-quant-valuations-equity` and is re-exported
-//! here unchanged. [`real_estate`] stays in this crate: `RealEstateFinancing`
+//! here unchanged. `real_estate` stays in this crate: `RealEstateFinancing`
 //! holds `Bond`, `TermLoan`, `RevolvingCredit` and `Repo` legs from other
 //! families, so it registers with [`STANDARD`](crate::pricer::STANDARD) rather
 //! than with [`EQUITY`](finstack_quant_valuations_equity::EQUITY).

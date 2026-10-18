@@ -41,13 +41,14 @@ and the closed world around them.
 | [`core/src/results/`](core/src/results/README.md) | `ValuationResult`, `ResultsMeta`, `ValuationRow` export, the composite and structured-credit result DTOs |
 | `core/src/contract_specs.rs` | Embedded exchange contract specs (bond/equity-index/vol-index futures, repo defaults); hidden, surfaced through the instruments that use them |
 | `core/src/constants.rs`, `core/src/error.rs`, `core/src/recalibration.rs` | Constants, the crate `Error`/`Result` (re-exported at both crate roots), the recalibration contract |
-| [`fixed-income/`](fixed-income/README.md) | `finstack-quant-valuations-fixed-income`: the fixed-income family (bonds, bond futures, convertibles, inflation-linked bonds, term loans, revolving credit, FI-index TRS, agency MBS pass-throughs, TBAs, dollar rolls) with its `FIXED_INCOME` registration static; re-exported as `instruments::fixed_income`; `structured_credit`, `cmo` and `asset_backed_facility` stay here under that path until Phase 3 |
+| [`fixed-income/`](fixed-income/README.md) | `finstack-quant-valuations-fixed-income`: the fixed-income family (bonds, bond futures, convertibles, inflation-linked bonds, term loans, revolving credit, FI-index TRS, agency MBS pass-throughs, TBAs, dollar rolls) with its `FIXED_INCOME` registration static; re-exported as `instruments::fixed_income` |
+| [`structured-credit/`](structured-credit/README.md) | `finstack-quant-valuations-structured-credit`: the structured-credit tier (ABS/RMBS/CMBS/CLO deals, agency CMOs, asset-backed facilities) with its `STRUCTURED_CREDIT` registration static; depends on fixed-income and rates; re-exported as `instruments::fixed_income::{structured_credit, cmo, asset_backed_facility}` |
 | [`rates/`](rates/README.md) | `finstack-quant-valuations-rates`: the interest-rate and inflation family (deposits, FRAs, futures, IRS, basis and cross-currency swaps, caps/floors, swaptions, CMS, repos, inflation swaps and caps/floors) with its `RATES` registration static; re-exported as `instruments::rates` |
 | [`credit/`](credit/README.md) | `finstack-quant-valuations-credit`: the credit-derivatives family (CDS, CDS indices, tranches, CDS options, the CS01 fast path) with its `CREDIT` registration static; re-exported as `instruments::credit_derivatives` |
 | [`equity/`](equity/README.md) | `finstack-quant-valuations-equity`: the equity family (spot, options, futures and futures options, variance swaps, TRS, autocallables, cliquets, vol-index futures, DCF equity, private-markets funds) with its `EQUITY` registration static; re-exported as `instruments::equity`; `real_estate` stays here under `instruments::equity::real_estate` |
 | [`exotics/`](exotics/README.md) | `finstack-quant-valuations-exotics`: the exotics family (Asian, barrier, lookback options, range accruals, TARN, snowball) and the commodity family (forwards, futures, swaps, options), one `EXOTICS` registration static; re-exported as `instruments::exotics` and `instruments::commodity`; `Basket` stays here under `instruments::exotics::basket` |
 | [`fx/`](fx/README.md) | `finstack-quant-valuations-fx`: the FX family (spot, forwards, swaps, NDFs, listed futures, vanilla/barrier/digital/touch/variance/quanto options) with its `FX` registration static; re-exported as `instruments::fx` |
-| [`src/instruments/`](src/instruments/README.md) | The façade modules of the six family crates; the umbrella-resident instruments — `fixed_income::{structured_credit, cmo, asset_backed_facility}` (the `STRUCTURED_CREDIT` family, Phase 3), `exotics::basket` and `equity::real_estate` (both register with `STANDARD`); `composite`; `json_loader` (`InstrumentJson`, the closed world); the JSON cashflow-export entry points |
+| [`src/instruments/`](src/instruments/README.md) | The façade modules of the family crates; the umbrella-resident instruments — `exotics::basket` and `equity::real_estate` (both register with `STANDARD`); `composite`; `json_loader` (`InstrumentJson`, the closed world); the JSON cashflow-export entry points |
 | `src/pricer/` | `FAMILIES`, the `STANDARD` family and `standard_pricer_registry()`, and the JSON pricing entry points in `pricer::json` |
 | `src/metrics/mod.rs`, `src/results.rs` | Façades over the core modules; `metrics::standard_registry()` |
 | `src/schema.rs` | Accessors and validators for the checked-in JSON Schema artifacts |
@@ -59,10 +60,11 @@ built-in instruments), [`test-support/`](test-support/README.md) (the dev-only
 `finstack-quant-valuations-test-support` crate: market builders, fixtures,
 tolerances and parity assertions shared by every valuations test tree),
 [`benches/`](benches/README.md),
-[`schemas/`](schemas/README.md), `examples/`, `data/assumptions/`
-(structured-credit / TBA assumptions) and `core/data/` (conventions, contract
-specs, product defaults, listed-product catalog), all compiled in with
-`include_str!`.
+[`schemas/`](schemas/README.md) and `examples/`. The embedded data lives with
+its crate: `core/data/` (conventions, contract specs, product defaults,
+listed-product catalog), `fixed-income/data/assumptions/` (TBA) and
+`structured-credit/data/assumptions/` (structured credit), all compiled in
+with `include_str!`.
 
 P&L attribution and covenant evaluation live in the separate
 `finstack-quant-attribution` and `finstack-quant-covenants` crates.
@@ -92,7 +94,7 @@ split.
 `instruments/json_loader.rs` covers 70 loadable instrument types. Several
 instruments carry their own README — for example
 [`fixed_income/bond`](src/instruments/fixed_income/bond/README.md),
-[`fixed_income/structured_credit`](src/instruments/fixed_income/structured_credit/README.md),
+[`structured_credit`](structured-credit/src/structured_credit/README.md),
 and [`rates/irs`](src/instruments/rates/irs/README.md).
 
 ## Example

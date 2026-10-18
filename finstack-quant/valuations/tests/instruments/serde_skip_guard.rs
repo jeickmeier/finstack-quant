@@ -8,7 +8,7 @@ const ALLOWED: &[(&str, usize)] = &[
     // `Tranche::payment_priority` and `TrancheStructure::currency` are
     // derived when the structure is assembled, never read from the wire.
     (
-        "src/instruments/fixed_income/structured_credit/types/tranches.rs",
+        "structured-credit/src/structured_credit/types/tranches.rs",
         2,
     ),
 ];
@@ -31,6 +31,17 @@ fn serde_skip_is_limited_to_documented_derived_artifacts() {
     rust_sources(&manifest.join("src/instruments"), &mut files);
     rust_sources(&manifest.join("core/src/instruments"), &mut files);
     rust_sources(&manifest.join("core/src/results"), &mut files);
+    for family in [
+        "credit",
+        "equity",
+        "exotics",
+        "fixed-income",
+        "fx",
+        "rates",
+        "structured-credit",
+    ] {
+        rust_sources(&manifest.join(family).join("src"), &mut files);
+    }
 
     let mut unexpected = Vec::new();
     let mut allowed_hits = Vec::new();

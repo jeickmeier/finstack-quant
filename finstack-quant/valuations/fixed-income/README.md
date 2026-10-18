@@ -9,10 +9,12 @@ there is unchanged. Depends on `finstack-quant-core`, `finstack-quant-cashflows`
 `finstack-quant-covenants`, `finstack-quant-models`, `finstack-quant-margin`
 (the `Marginable` impl of `FiIndexTotalReturnSwap`) and valuations-core only;
 no other instrument family. Three leaves described below are **not** in this
-crate yet: `structured_credit/`, `cmo/` and `asset_backed_facility/` stay in
-the umbrella under `instruments::fixed_income::…` and register with the
-`STRUCTURED_CREDIT` family until the structured-credit crate exists (plan
-Phase 3); they reach this crate's `#[doc(hidden)] pub` engine entry points.
+crate: `structured_credit/`, `cmo/` and `asset_backed_facility/` are the
+second-tier crate [`finstack-quant-valuations-structured-credit`](../structured-credit/README.md),
+which depends on this crate and on rates, registers with the
+`STRUCTURED_CREDIT` family and is re-exported under
+`instruments::fixed_income::…`; it reaches this crate's `#[doc(hidden)] pub`
+engine entry points.
 
 Twelve instrument families: cash bonds and loans, the agency mortgage complex
 (pass-through, TBA, dollar roll, CMO), securitized credit, and two
@@ -28,17 +30,14 @@ worked examples. This file links to them and does not repeat them.
 
 | Directory | Prices | Market convention / model | Own README |
 |-----------|--------|---------------------------|------------|
-| `asset_backed_facility/` | Warehouse lines and asset-backed facilities against a collateral pool — advance rates, eligibility, concentration limits, borrowing-base test, unused fee, revolving period, early-amortization events and term-out | Synthesizes a two-class `structured_credit` deal (facility note + residual) and runs the pool/waterfall engine; `BorrowingBaseRules` also drive the `CoverageTestType::BorrowingBase` test in any deal | no |
 | `bond/` | Fixed, floating, step-up, amortizing, callable/putable and PIK bonds | ISDA/ICMA accrual and clean-vs-dirty quoting; discounting, hazard-rate, tree/OAS and Merton-MC paths | [yes](bond/README.md) |
 | `bond_future/` | Deliverable-basket bond futures | Marks the caller-supplied CTD only — refresh the selection when the basket can switch; `value()` will not search. Clean price per 100 face divided by the exchange conversion factor, marked against `terms.entry_price` with no further discounting because futures settle by daily variation margin. Carry uses `repo_curve_id` when present, else `discount_curve_id` | [yes](bond_future/README.md) |
-| `cmo/` | Agency CMO tranches | `CmoTrancheType` = `Sequential`, `Pac`, `Support`, `InterestOnly`, `PrincipalOnly`, `Accrual`. Z-tranche accrual is capitalized and redirected as accretion-directed principal (Fabozzi, *MBS Handbook* 7e, Ch. 21). Every fixed-coupon principal tranche must sit at or below the collateral net pass-through coupon | no |
 | `convertible/` | Convertible bonds with soft call, put and make-whole | Credit-adjusted tree (Tsiveriotis–Fernandes 1998; Ayache–Forsyth–Vetzal 2003); anti-dilution policies for splits and dividends | no |
 | `dollar_roll/` | MBS dollar rolls (sell front month, buy back month) | Drop converted to an implied ACT/360 financing rate for comparison against repo ("specialness"); carry inputs come from the MBS cashflow engine, not stylized amortization | no |
 | `fi_trs/` | Fixed-income index total-return swaps | Deterministic carry analytic: the return leg earns a supplied continuously compounded index yield against a curve-driven financing leg. Not a full index mark-to-market model | no |
 | `inflation_linked_bond/` | TIPS, index-linked gilts and other linkers | `IndexationMethod` = `Tips`, `Uk`, `Canadian`, `French`, `Japanese`; `DeflationProtection` = `None`, `MaturityOnly`, `AllPayments`. **Discounting is nominal** — the schedule already carries inflation-projected nominal cashflows, so `discount_curve_id` must name a nominal curve. Real yield solves against the unindexed real cashflows and the real dirty price | no |
 | `mbs_passthrough/` | Agency MBS pass-throughs (FNMA, FHLMC, GNMA I/II) | PSA / constant-CPR / CPR-vector prepayment (`PrepaymentModelSpec`), scaled by an exponential rate multiplier for MC-OAS and effective duration; stated payment delay 55d for UMBS (FNMA and FHLMC), 45d GNMA I, 50d GNMA II, overridable per pool; net coupon = WAC − servicing fee − guarantee fee | no |
 | `revolving_credit/` | Corporate revolvers with deterministic or stochastic utilization, tiered fees and optional hazard weighting | One cashflow engine drives both the deterministic and the Monte Carlo path | [yes](revolving_credit/README.md) |
-| `structured_credit/` | ABS, RMBS, CMBS and CLO deals — pool, tranche stack, waterfall, coverage tests | Period-by-period pool and waterfall simulation; stochastic mode runs the same engine over simulated prepayment/default paths | [yes](structured_credit/README.md) |
 | `tba/` | Agency TBA forwards | SIFMA good-delivery conventions: third-week settlement with a 48-hour notification deadline (`TbaTerm` = 15y/20y/30y). Without an explicit delivered pool it prices a generic on-the-run pool whose assumptions load from `data/assumptions/tba_assumptions.v1.json`; an explicit `assumed_pool` must carry the TBA coupon and a deliverable agency (FNMA/FHLMC UMBS are interchangeable). No specified-pool allocation or pay-up model | no |
 | `term_loan/` | Institutional term loans and DDTLs — PIK and split coupons, OID, covenant events, borrower call schedules | Commitment limit plus draw calendar (contrast `bond`'s single funded notional); discounting or rates-credit tree | [yes](term_loan/README.md) |
 
@@ -109,7 +108,7 @@ sites, which are *not* all named after the directory:
 
 | Step | Where, for this family |
 |------|------------------------|
-| Pricer | `register_pricers` in `src/family.rs` (`FIXED_INCOME`) for every leaf in this crate; `structured_credit`, `cmo` and `asset_backed_facility` register with `STRUCTURED_CREDIT` in the umbrella's `structured_credit/family.rs` (`STRUCTURED_CREDIT`) |
+| Pricer | `register_pricers` in `src/family.rs` (`FIXED_INCOME`) for every leaf in this crate; `structured_credit`, `cmo` and `asset_backed_facility` register with `STRUCTURED_CREDIT` in the structured-credit crate's `structured_credit/family.rs` |
 | Instrument key | `InstrumentType` variant in `../core/src/pricer/keys.rs` |
 | JSON tag | One line in `with_instrument_json_registry!` in `../src/instruments/json_loader.rs` (umbrella), category `"fixed_income"`. Current tags: `bond`, `convertible_bond`, `inflation_linked_bond`, `term_loan`, `revolving_credit`, `asset_backed_facility`, `agency_mbs_passthrough`, `agency_tba`, `agency_cmo`, `dollar_roll`, `trs_fixed_income_index`, `bond_future`, `structured_credit`. `bond_future`, `structured_credit` and `asset_backed_facility` are registered `boxed:` because of their size |
 | Metrics | `register_<name>_metrics(&mut MetricRegistry)` in the leaf's `metrics/`, called from `register_metrics` in `family.rs` |
@@ -128,8 +127,9 @@ price through the standard registries or round-trip `InstrumentJson` stay in
 the umbrella's `../tests/instruments/<leaf>/`: `convertible/`, the credit-risk
 metrics of `bond/` and `term_loan/`, `bond_future/integration.rs`,
 `revolving_credit/{basic,analyst_coverage}.rs`, `term_loan/term_loan_tests.rs`,
-the whole `trs/`, `structured_credit/` and `asset_backed_facility/` suites and
-the loan-facility wire-key tests. The agency mortgage leaves (`mbs_passthrough`,
+the whole `trs/` suite and the loan-facility wire-key tests. `tests/support/
+revolver_draws.rs` (the stochastic-revolver fixtures) is also `#[path]`-included
+by the structured-credit crate's loan-pool tests. The agency mortgage leaves (`mbs_passthrough`,
 `tba`, `dollar_roll`) have no test directory — they are covered by colocated
 `#[cfg(test)]` modules plus the umbrella's registry, serde and
 dependency-completeness contract tests.

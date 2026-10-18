@@ -1,5 +1,7 @@
 //! Integration tests for `finstack-quant-valuations-fixed-income`: one target so the crate links once.
 
+mod support;
+
 #[path = "bond/mod.rs"]
 mod bond;
 #[path = "bond_future/mod.rs"]

@@ -38,7 +38,7 @@ larger ones split into subdirectories:
 |-----------|----------------|
 | `bond`, `cap_floor`, `irs` | `metrics/`, `validation/`, `integration/` |
 | `swaption` | `core/`, `pricing/`, `market/`, `metrics/`, `edge_cases/`, `integration/` |
-| `structured_credit` | `unit/` (with `components/`, `metrics/`), `integration/` |
+| `structured_credit` | `unit/`, `integration/` (the JSON round-trip and `price_instrument` tests; the rest of the suite is in `../../structured-credit/tests/`) |
 | `term_loan`, `revolving_credit`, `fra` | `metrics/`, `validation/` |
 | `deposit`, `fx_spot`, `inflation_swap` | `metrics/`, `integration/` |
 | `equity` | `real_estate/` |

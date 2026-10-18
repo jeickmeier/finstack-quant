@@ -1,0 +1,95 @@
+//! Pricing and cashflow projection for structured credit instruments.
+//!
+//! This module contains pure functions for:
+//! - Deterministic cashflow simulation
+//! - Waterfall execution
+//! - Coverage test evaluation
+//! - Diversion rule processing
+//! - Stochastic pricing
+
+pub(crate) mod coverage_tests;
+pub(crate) mod resolve;
+pub(crate) mod simulation_engine;
+pub use simulation_engine::{
+    CoverageTestDiagnostic, PeriodDiagnostics, SimulationDiagnostics, SimulationRun,
+};
+pub(crate) mod stochastic;
+pub(crate) mod waterfall;
+
+pub use waterfall::execute_waterfall;
+
+use crate::structured_credit::pricing::simulation_engine::DeterministicPoolFlowSource;
+use crate::structured_credit::types::{StructuredCredit, TrancheCashflows};
+use finstack_quant_cashflows::DatedFlows;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::HashMap;
+use finstack_quant_core::Result;
+
+/// Run full deterministic cashflow simulation for a structured credit instrument.
+///
+/// # Arguments
+///
+/// * `instrument` - Validated structured-credit deal containing asset pool,
+///   tranche structure, waterfall, and deterministic credit/prepayment model.
+/// * `market` - Market context used for rate resets, discounting, and other
+///   projection dependencies.
+/// * `as_of` - Requested valuation date; lifecycle policy may resolve an
+///   effective date from the market context.
+pub fn run_simulation(
+    instrument: &StructuredCredit,
+    market: &MarketContext,
+    as_of: Date,
+) -> Result<HashMap<String, TrancheCashflows>> {
+    run_simulation_with_diagnostics(instrument, market, as_of).map(|run| run.tranches)
+}
+
+/// Run the deterministic cashflow simulation and return the tranche results
+/// together with the deal-level accounting (reserve balance path, reserve
+/// interest, draw funding).
+///
+/// # Arguments
+///
+/// * `instrument` - Validated structured-credit deal containing asset pool,
+///   tranche structure, waterfall, and deterministic credit/prepayment model.
+/// * `market` - Market context used for rate resets, discounting, and other
+///   projection dependencies.
+/// * `as_of` - Requested valuation date; lifecycle policy may resolve an
+///   effective date from the market context.
+///
+/// # Errors
+///
+/// Propagates validation, schedule and cash-conservation errors from the
+/// simulation engine.
+pub fn run_simulation_with_diagnostics(
+    instrument: &StructuredCredit,
+    market: &MarketContext,
+    as_of: Date,
+) -> Result<simulation_engine::SimulationRun> {
+    let lifecycle =
+        finstack_quant_valuations_core::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(instrument)?;
+    let effective_as_of = lifecycle.effective_as_of(market, as_of);
+    if instrument.pool.instruments.is_some() {
+        return simulation_engine::simulate_instrument_pool(instrument, market, effective_as_of);
+    }
+    let mut source = DeterministicPoolFlowSource;
+    simulation_engine::simulate_with_source(instrument, market, effective_as_of, &mut source)
+}
+
+/// Generate aggregated deterministic cashflows for all tranches.
+///
+/// # Arguments
+///
+/// * `instrument` - Validated structured-credit deal to project through its
+///   deterministic pool and waterfall model.
+/// * `market` - Market context used for rate resets and projection inputs.
+/// * `as_of` - Requested valuation date used to select known versus projected
+///   cashflows.
+pub fn generate_cashflows(
+    instrument: &StructuredCredit,
+    market: &MarketContext,
+    as_of: Date,
+) -> Result<DatedFlows> {
+    let full_results = run_simulation(instrument, market, as_of)?;
+    simulation_engine::aggregate_tranche_cashflows(&full_results)
+}

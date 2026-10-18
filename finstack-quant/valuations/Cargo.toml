@@ -19,6 +19,7 @@ finstack-quant-margin = { path = "../margin", version = "0.10.0", default-featur
 finstack-quant-models = { path = "../models", version = "0.10.0", default-features = false }
 finstack-quant-valuations-core = { path = "core", version = "0.10.0", default-features = false }
 finstack-quant-valuations-fixed-income = { path = "fixed-income", version = "0.10.0", default-features = false }
+finstack-quant-valuations-structured-credit = { path = "structured-credit", version = "0.10.0", default-features = false }
 finstack-quant-valuations-rates = { path = "rates", version = "0.10.0", default-features = false }
 finstack-quant-valuations-equity = { path = "equity", version = "0.10.0", default-features = false }
 finstack-quant-valuations-credit = { path = "credit", version = "0.10.0", default-features = false }
@@ -60,6 +61,7 @@ json-schema = [
     "dep:schemars",
     "finstack-quant-valuations-core/json-schema",
     "finstack-quant-valuations-fixed-income/json-schema",
+    "finstack-quant-valuations-structured-credit/json-schema",
     "finstack-quant-valuations-rates/json-schema",
     "finstack-quant-valuations-equity/json-schema",
     "finstack-quant-valuations-credit/json-schema",

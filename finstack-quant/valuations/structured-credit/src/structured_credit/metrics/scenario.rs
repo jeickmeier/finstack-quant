@@ -1,0 +1,262 @@
+//! Scenario / yield table for structured-credit tranches.
+//!
+//! Sweeps a grid of behavioral assumptions (CPR × CDR × severity) and reprices
+//! a single tranche in each cell, returning a structured table of price, WAL and
+//! principal writedown. This is the standard way structured-credit tranches are
+//! quoted and stress-analysed on a trading desk.
+
+use crate::structured_credit::StructuredCredit;
+use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::Result;
+use finstack_quant_valuations_core::instruments::Instrument;
+use serde::{Deserialize, Serialize};
+
+use super::calculate_tranche_wal;
+
+/// Grid of behavioral scenarios to evaluate.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioGrid {
+    /// Annual CPR values (decimal) to sweep.
+    pub cprs: Vec<f64>,
+    /// Annual CDR values (decimal) to sweep.
+    pub cdrs: Vec<f64>,
+    /// Loss severities (decimal); recovery = `1 - severity`.
+    pub severities: Vec<f64>,
+    /// Recovery lag (months) applied in every scenario. When `None`, the deal's
+    /// own recovery lag is used; set it to override (e.g. `Some(0)` for
+    /// immediate recoveries).
+    #[serde(default)]
+    pub recovery_lag: Option<u32>,
+}
+
+/// One evaluated cell of the scenario table.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioCell {
+    /// Annual CPR (decimal) for this cell.
+    pub cpr: f64,
+    /// Annual CDR (decimal) for this cell.
+    pub cdr: f64,
+    /// Loss severity (decimal) for this cell.
+    pub severity: f64,
+    /// Clean settlement price as a percentage of the tranche's CURRENT
+    /// balance (the factor-adjusted quote basis): the model dirty value at
+    /// buyer settlement less accrued, the same figure as
+    /// `TrancheMetrics::price_pct`.
+    pub price: f64,
+    /// Weighted-average life in years.
+    pub wal: f64,
+    /// Total principal writedown in currency units.
+    pub writedown: f64,
+}
+
+/// Scenario table for a single tranche.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioTable {
+    /// Identifier of the tranche evaluated.
+    pub tranche_id: String,
+    /// Evaluated cells, in CPR-major, then CDR, then severity order.
+    pub cells: Vec<ScenarioCell>,
+}
+
+/// Build a scenario table for one tranche across a CPR × CDR × severity grid.
+///
+/// Each cell clones the deal, overrides the deterministic prepayment, default
+/// and recovery assumptions, projects the tranche once, and records its clean
+/// settlement price (as a percentage of current balance), WAL and principal
+/// writedown.
+///
+/// # Arguments
+///
+/// * `deal` - The structured-credit deal owning the tranche.
+/// * `tranche_id` - Identifier of the tranche to evaluate.
+/// * `market` - Market context for cashflow projection and discounting.
+/// * `as_of` - Valuation date used for every projected/repriced CPR, CDR, and
+///   severity scenario cell.
+/// * `grid` - The scenario grid to sweep.
+///
+/// # Errors
+///
+/// Returns an error if the tranche is missing, a cell fails to reprice, or a
+/// cell field is non-finite.
+pub fn scenario_table(
+    deal: &StructuredCredit,
+    tranche_id: &str,
+    market: &MarketContext,
+    as_of: Date,
+    grid: &ScenarioGrid,
+) -> Result<ScenarioTable> {
+    deal.validate_for_pricing()?;
+    let deal = deal.resolved_for_pricing()?;
+    // Prices are per CURRENT face (the factor-adjusted quote basis).
+    let current_balance = deal
+        .tranches
+        .tranches
+        .iter()
+        .find(|t| t.id.as_str() == tranche_id)
+        .ok_or_else(|| {
+            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
+                id: format!("tranche:{tranche_id}"),
+            })
+        })?
+        .current_balance
+        .amount();
+
+    // Cap grid size before allocating: each cell clones and reprices the deal.
+    // Use checked mul so a huge product cannot wrap on wasm32 `usize`.
+    const MAX_SCENARIO_CELLS: usize = 10_000;
+    let cell_count = grid
+        .cprs
+        .len()
+        .checked_mul(grid.cdrs.len())
+        .and_then(|n| n.checked_mul(grid.severities.len()))
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation("scenario grid size overflows usize".to_string())
+        })?;
+    if cell_count > MAX_SCENARIO_CELLS {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "scenario grid requests {cell_count} cells ({} CPR x {} CDR x {} \
+             severity), exceeding the {MAX_SCENARIO_CELLS} cap; each cell \
+             reprices the entire deal",
+            grid.cprs.len(),
+            grid.cdrs.len(),
+            grid.severities.len()
+        )));
+    }
+
+    for (name, values) in [
+        ("CPR", &grid.cprs),
+        ("CDR", &grid.cdrs),
+        ("severity", &grid.severities),
+    ] {
+        for &value in values {
+            finstack_quant_core::validation::validate_f64_unit_interval(value, name)?;
+        }
+    }
+    let disc = market.get_discount(deal.discount_curve_id.as_str())?;
+    let mut cells = Vec::with_capacity(cell_count);
+    for &cpr in &grid.cprs {
+        for &cdr in &grid.cdrs {
+            for &severity in &grid.severities {
+                let mut scenario = deal.clone();
+                scenario.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);
+                scenario.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
+                // Inherit the deal's recovery lag unless the grid overrides it.
+                let lag = grid
+                    .recovery_lag
+                    .unwrap_or(deal.credit_model.recovery_spec.recovery_lag);
+                scenario.credit_model.recovery_spec =
+                    RecoveryModelSpec::with_lag(1.0 - severity, lag);
+
+                let cashflows = (scenario).tranche_cashflows(tranche_id, market, as_of)?;
+                let price = if current_balance > 0.0 {
+                    let quote = super::quote::SettlementQuote::for_tranche(
+                        &scenario,
+                        as_of,
+                        current_balance,
+                        &cashflows,
+                    )?;
+                    quote.clean_price(quote.model_dirty(&cashflows.cashflows, disc.as_ref())?)
+                } else {
+                    0.0
+                };
+                let wal = calculate_tranche_wal(&cashflows, as_of)?;
+
+                cells.push(ScenarioCell {
+                    cpr,
+                    cdr,
+                    severity,
+                    price,
+                    wal,
+                    writedown: cashflows.total_writedown.amount(),
+                });
+            }
+        }
+    }
+
+    let table = ScenarioTable {
+        tranche_id: tranche_id.to_string(),
+        cells,
+    };
+    super::finite::ensure_scenario_table_finite(&table)?;
+    Ok(table)
+}
+
+#[cfg(test)]
+mod scenario_guard_tests {
+    use super::*;
+
+    /// Oversized scenario grids are rejected before allocation / repricing.
+    #[test]
+    fn oversized_scenario_grid_is_rejected() {
+        let deal = StructuredCredit::example().expect("example");
+        let market = MarketContext::new();
+        let as_of = deal.closing_date;
+
+        let grid = ScenarioGrid {
+            cprs: vec![0.05; 100],
+            cdrs: vec![0.02; 100],
+            severities: vec![0.4; 100],
+            recovery_lag: None,
+        };
+        let err = scenario_table(&deal, "CLONOTES-A", &market, as_of, &grid)
+            .expect_err("a 1,000,000-cell grid must be rejected");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("1000000") && msg.contains("cap"),
+            "the error must state the requested cell count and the cap; got: {msg}"
+        );
+    }
+    /// `recovery_lag` is the only `#[serde(default)]` field on [`ScenarioGrid`],
+    /// which made it the one key whose misspelling changed recovery timing
+    /// without any error: the typo was ignored and the deal's own lag silently
+    /// applied. `deny_unknown_fields` converts that into a parse failure.
+    #[test]
+    fn typo_in_scenario_grid_recovery_lag_is_rejected() {
+        let json = r#"{
+            "cprs": [0.05],
+            "cdrs": [0.02],
+            "severities": [0.4],
+            "recovery_leg": 0
+        }"#;
+        let err = serde_json::from_str::<ScenarioGrid>(json)
+            .expect_err("a misspelled recovery_lag must not be silently ignored");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("recovery_leg"),
+            "the error must name the offending key so the typo is findable; got: {msg}"
+        );
+    }
+
+    /// The correctly spelled optional field must still be accepted, so the
+    /// strictness above has not made a legitimate override unreachable.
+    #[test]
+    fn correctly_spelled_scenario_grid_recovery_lag_is_accepted() {
+        let json = r#"{
+            "cprs": [0.05],
+            "cdrs": [0.02],
+            "severities": [0.4],
+            "recovery_lag": 3
+        }"#;
+        let grid: ScenarioGrid =
+            serde_json::from_str(json).expect("a well-formed grid must still parse");
+        assert_eq!(grid.recovery_lag, Some(3));
+    }
+
+    /// Omitting the optional field entirely remains valid and still means
+    /// "use the deal's own recovery lag".
+    #[test]
+    fn scenario_grid_recovery_lag_remains_optional() {
+        let json = r#"{"cprs": [0.05], "cdrs": [0.02], "severities": [0.4]}"#;
+        let grid: ScenarioGrid =
+            serde_json::from_str(json).expect("recovery_lag must stay optional");
+        assert_eq!(grid.recovery_lag, None);
+    }
+}

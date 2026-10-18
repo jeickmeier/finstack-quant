@@ -182,8 +182,8 @@ RUNTIME_RESULT_EXCEPTIONS = (
         "runtime-spec",
     ),
     *_runtime_exception(
-        "valuations",
-        "src/instruments/fixed_income/cmo/waterfall.rs",
+        "valuations-structured-credit",
+        "src/cmo/waterfall.rs",
         ("CmoWaterfallPeriodResult",),
     ),
     *_runtime_exception(
