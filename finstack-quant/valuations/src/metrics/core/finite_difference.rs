@@ -18,7 +18,7 @@
 /// It is both the central-difference half-width (shrunk near ±1 where the
 /// correlation bound binds) and the reporting unit: Correlation01 is the PV
 /// change per 0.01 of correlation.
-pub(crate) const CORRELATION_BUMP: f64 = 0.01;
+pub const CORRELATION_BUMP: f64 = 0.01;
 
 /// Number of vol points in one unit (1.00) of absolute implied volatility.
 ///
@@ -28,10 +28,10 @@ pub(crate) const CORRELATION_BUMP: f64 = 0.01;
 /// finite difference taken in absolute-vol units must be multiplied by
 /// `(1 vol point)² = (0.01)²` — equivalently divided by
 /// `(bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL)²`.
-pub(crate) const VOL_POINTS_PER_ABSOLUTE_VOL: f64 = 100.0;
+pub const VOL_POINTS_PER_ABSOLUTE_VOL: f64 = 100.0;
 
 /// Effective scalar implied volatility, when supplied by the instrument.
-pub(crate) fn volatility_override(instrument: &dyn crate::instruments::Instrument) -> Option<f64> {
+pub fn volatility_override(instrument: &dyn crate::instruments::Instrument) -> Option<f64> {
     instrument
         .get_instrument_pricing_overrides()?
         .market_quotes
@@ -39,7 +39,7 @@ pub(crate) fn volatility_override(instrument: &dyn crate::instruments::Instrumen
 }
 
 /// Clone and bump the active scalar quote; absent overrides leave surface risk active.
-pub(crate) fn bumped_volatility_override<I: crate::instruments::Instrument + Clone>(
+pub fn bumped_volatility_override<I: crate::instruments::Instrument + Clone>(
     instrument: &I,
     bump_abs: f64,
 ) -> finstack_quant_core::Result<Option<I>> {
@@ -66,7 +66,22 @@ pub(crate) fn bumped_volatility_override<I: crate::instruments::Instrument + Clo
 }
 
 /// Prepare one volatility scenario using the same quote source as pricing.
-pub(crate) fn bump_active_volatility<I: crate::instruments::Instrument + Clone>(
+///
+/// An instrument carrying an implied-volatility override is bumped on that
+/// quote and the market is returned unchanged; otherwise the instrument is
+/// returned unchanged with the named surface bumped in the market.
+///
+/// # Arguments
+///
+/// * `instrument` - Instrument whose active volatility quote is bumped when it
+///   carries one in its pricing overrides.
+/// * `market` - Market context whose surface is bumped when the instrument
+///   prices off the surface.
+/// * `surface_id` - Identifier of the volatility surface the instrument reads
+///   when it has no quote override.
+/// * `bump_abs` - Absolute volatility shift as a decimal (`0.01` for one
+///   volatility point), applied to the quote or to every surface node.
+pub fn bump_active_volatility<I: crate::instruments::Instrument + Clone>(
     instrument: &I,
     market: &finstack_quant_core::market_data::context::MarketContext,
     surface_id: &str,
@@ -91,7 +106,7 @@ pub(crate) fn bump_active_volatility<I: crate::instruments::Instrument + Clone>(
 /// minimum to detect the clamp and fall back to a one-sided difference.
 ///
 /// Returns `None` for an empty grid.
-pub(crate) fn min_grid_vol(
+pub fn min_grid_vol(
     surface: &finstack_quant_core::market_data::surfaces::VolSurface,
 ) -> Option<f64> {
     let mut min_vol: Option<f64> = None;
@@ -113,7 +128,7 @@ pub(crate) fn min_grid_vol(
 /// The returned tokens restore the scratch context in reverse application
 /// order. If any surface bump fails, already-applied bumps are reverted before
 /// the error is returned.
-pub(crate) fn apply_parallel_surface_bumps_in_place(
+pub fn apply_parallel_surface_bumps_in_place(
     context: &mut finstack_quant_core::market_data::context::MarketContext,
     vol_surface_ids: &[finstack_quant_core::types::CurveId],
     bump_abs: f64,
@@ -141,7 +156,7 @@ pub(crate) fn apply_parallel_surface_bumps_in_place(
 }
 
 /// Restore a sequence of scratch bumps in reverse application order.
-pub(crate) fn revert_scratch_bumps(
+pub fn revert_scratch_bumps(
     context: &mut finstack_quant_core::market_data::context::MarketContext,
     tokens: Vec<finstack_quant_core::market_data::context::ContextScratchBump>,
 ) -> finstack_quant_core::Result<()> {
@@ -151,12 +166,17 @@ pub(crate) fn revert_scratch_bumps(
     Ok(())
 }
 
-/// Minimum width tolerated when normalizing a finite difference.
-const MIN_FINITE_DIFF_WIDTH: f64 = 1e-12;
+/// Smallest bump width a central difference accepts when normalizing a
+/// finite difference; narrower widths are numerically degenerate.
+pub const MIN_FINITE_DIFF_WIDTH: f64 = 1e-12;
 
 /// Extract the numeric value from a scalar quote.
+///
+/// # Arguments
+///
+/// * `scalar` - Market scalar whose unitless value or price amount is read.
 #[inline]
-pub(crate) fn scalar_numeric_value(
+pub fn scalar_numeric_value(
     scalar: &finstack_quant_core::market_data::scalars::MarketScalar,
 ) -> f64 {
     match scalar {
@@ -167,7 +187,7 @@ pub(crate) fn scalar_numeric_value(
 
 /// Rebuild a scalar quote using the same variant and currency as `template`.
 #[inline]
-pub(crate) fn scalar_with_numeric_value(
+pub fn scalar_with_numeric_value(
     template: &finstack_quant_core::market_data::scalars::MarketScalar,
     value: f64,
 ) -> finstack_quant_core::Result<finstack_quant_core::market_data::scalars::MarketScalar> {
@@ -184,7 +204,15 @@ pub(crate) fn scalar_with_numeric_value(
 }
 
 /// Clone a market context and replace a scalar quote with a new numeric value.
-pub(crate) fn replace_scalar_value(
+///
+/// # Arguments
+///
+/// * `context` - Market context to copy; it is left untouched.
+/// * `scalar_id` - Identifier of the scalar quote replaced in the copy.
+/// * `template` - Existing scalar whose kind (unitless or price in its
+///   currency) the replacement keeps.
+/// * `value` - Numeric value the replacement carries.
+pub fn replace_scalar_value(
     context: &finstack_quant_core::market_data::context::MarketContext,
     scalar_id: &str,
     template: &finstack_quant_core::market_data::scalars::MarketScalar,
@@ -197,15 +225,22 @@ pub(crate) fn replace_scalar_value(
 
 /// Compute a central difference normalized by the full bump width.
 ///
+/// # Arguments
+///
+/// * `pv_up` - Present value at the up-bumped input.
+/// * `pv_down` - Present value at the down-bumped input.
+/// * `width` - Distance between the up and down inputs, in the input's own
+///   unit; the result is per unit of that input.
+///
 /// # Errors
 ///
 /// Returns [`InputError::NonPositiveValue`](finstack_quant_core::InputError::NonPositiveValue)
 /// if `width` is non-finite or its magnitude is at or below
-/// [`MIN_FINITE_DIFF_WIDTH`]. A degenerate bump width cannot yield a meaningful
+/// `MIN_FINITE_DIFF_WIDTH`. A degenerate bump width cannot yield a meaningful
 /// sensitivity; returning a silent `0.0` would be indistinguishable from a true
 /// zero Greek, so the degenerate case is surfaced as an error instead.
 #[inline]
-pub(crate) fn central_diff_by_width(
+pub fn central_diff_by_width(
     pv_up: f64,
     pv_down: f64,
     width: f64,
@@ -223,12 +258,19 @@ pub(crate) fn central_diff_by_width(
 
 /// Compute a central difference normalized by a symmetric half-bump.
 ///
+/// # Arguments
+///
+/// * `pv_up` - Present value at the up-bumped input.
+/// * `pv_down` - Present value at the down-bumped input.
+/// * `half_bump` - Size of each one-sided bump in the input's own unit; the
+///   full width is twice this value.
+///
 /// # Errors
 ///
 /// Propagates the degenerate-width error from [`central_diff_by_width`] when
 /// `2 * half_bump` is non-finite or negligibly small.
 #[inline]
-pub(crate) fn central_diff_by_half_bump(
+pub fn central_diff_by_half_bump(
     pv_up: f64,
     pv_down: f64,
     half_bump: f64,
@@ -238,12 +280,21 @@ pub(crate) fn central_diff_by_half_bump(
 
 /// Compute a scaled central difference using the actual bump width.
 ///
+/// # Arguments
+///
+/// * `pv_up` - Present value at the up-bumped input.
+/// * `pv_down` - Present value at the down-bumped input.
+/// * `width` - Distance between the up and down inputs, in the input's own
+///   unit.
+/// * `scale` - Factor applied to the per-unit difference (for example the
+///   reporting unit of the sensitivity).
+///
 /// # Errors
 ///
 /// Propagates the degenerate-width error from [`central_diff_by_width`] when
 /// `width` is non-finite or negligibly small.
 #[inline]
-pub(crate) fn scaled_central_diff_by_width(
+pub fn scaled_central_diff_by_width(
     pv_up: f64,
     pv_down: f64,
     width: f64,
@@ -273,7 +324,7 @@ pub(crate) fn scaled_central_diff_by_width(
 /// Returns an error if:
 /// - The price ID is not found in the market context
 /// - The price data is invalid or corrupted
-pub(crate) fn bump_scalar_price(
+pub fn bump_scalar_price(
     context: &finstack_quant_core::market_data::context::MarketContext,
     price_id: &str,
     bump_pct: f64,
@@ -292,13 +343,23 @@ pub(crate) fn bump_scalar_price(
 /// Used by FX/equity delta calculators that share the "look up scalar, bump
 /// up/down by relative %, central difference" pattern.
 ///
+/// # Arguments
+///
+/// * `inst` - Instrument repriced in each bumped market.
+/// * `market` - Base market context holding the scalar quote.
+/// * `as_of` - Valuation date of each reprice.
+/// * `scalar_id` - Identifier of the scalar quote (spot or price) bumped
+///   relatively up and down.
+/// * `bump_pct` - Relative bump as a decimal (`0.01` for 1%); the result is
+///   per unit of the scalar.
+///
 /// # Errors
 ///
 /// Returns [`InputError::NonPositiveValue`](finstack_quant_core::InputError::NonPositiveValue)
 /// if the implied bump width `s * h` is non-finite or non-positive (e.g. when
 /// the spot `s` is zero). A degenerate bump width cannot yield a meaningful
 /// sensitivity, so it is surfaced as an error rather than a silent `0.0`.
-pub(crate) fn central_diff_scalar_relative<I>(
+pub fn central_diff_scalar_relative<I>(
     inst: &I,
     market: &finstack_quant_core::market_data::context::MarketContext,
     as_of: finstack_quant_core::dates::Date,
@@ -350,7 +411,7 @@ where
 /// Returns an error if:
 /// - The curve ID is not found in the market context
 /// - The bump operation fails due to invalid curve data
-pub(crate) fn bump_discount_curve_parallel(
+pub fn bump_discount_curve_parallel(
     context: &finstack_quant_core::market_data::context::MarketContext,
     curve_id: &finstack_quant_core::types::CurveId,
     bump_bp: f64,
@@ -402,7 +463,7 @@ pub fn bump_surface_vol_absolute(
 }
 
 /// Apply the same absolute parallel volatility bump to several surfaces.
-pub(crate) fn bump_surfaces_vol_absolute(
+pub fn bump_surfaces_vol_absolute(
     context: &finstack_quant_core::market_data::context::MarketContext,
     vol_surface_ids: &[finstack_quant_core::types::CurveId],
     bump_abs: f64,
@@ -435,7 +496,7 @@ pub(crate) fn bump_surfaces_vol_absolute(
 /// variables with absolute bump sizes `h` (first variable) and `k` (second).
 ///
 /// Returns `[f(+h,+k) - f(+h,-k) - f(-h,+k) + f(-h,-k)] / (4 h k)`.
-pub(crate) fn central_mixed<EEpp, EEpm, EEmp, Eemm>(
+pub fn central_mixed<EEpp, EEpm, EEmp, Eemm>(
     eval_pp: EEpp,
     eval_pm: EEpm,
     eval_mp: EEmp,

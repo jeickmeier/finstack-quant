@@ -2,7 +2,7 @@
 ///
 /// These are the per-instrument Monte Carlo controls, resolved from the bond's
 /// `instrument_pricing_overrides.model_config` by [`MertonMcRun::resolve`]; the
-/// wire [`MertonMcConfig`] carries only the model and grid.
+/// wire [`MertonMcConfig`](super::MertonMcConfig) carries only the model and grid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MertonMcRun {
     /// Number of independent estimators; antithetic sampling simulates two

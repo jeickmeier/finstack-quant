@@ -9,7 +9,7 @@
 use finstack_quant_core::config::FinstackConfig;
 
 /// Extension section key for sensitivities defaults.
-pub(crate) const SENSITIVITIES_CONFIG_KEY_V1: &str = "valuations.sensitivities.v1";
+pub const SENSITIVITIES_CONFIG_KEY_V1: &str = "valuations.sensitivities.v1";
 
 /// Standard risk bucket grid in years used for IR DV01 and credit CS01.
 pub const STANDARD_BUCKETS_YEARS: [f64; 11] =
@@ -49,7 +49,7 @@ pub fn format_bucket_label(years: f64) -> String {
 /// Same as [`format_bucket_label`] but returns `Cow<'static, str>` to avoid
 /// allocation for the 11 standard buckets (the common case in DV01/CS01 loops).
 #[inline]
-pub(crate) fn format_bucket_label_cow(years: f64) -> std::borrow::Cow<'static, str> {
+pub fn format_bucket_label_cow(years: f64) -> std::borrow::Cow<'static, str> {
     for (i, &bucket_time) in STANDARD_BUCKETS_YEARS.iter().enumerate() {
         if (years - bucket_time).abs() < 0.01 {
             return std::borrow::Cow::Borrowed(STANDARD_BUCKET_LABELS[i]);
@@ -120,23 +120,23 @@ const DEFAULT_BUMP_BP: f64 = 1.0;
 
 /// Resolved (fully-populated) sensitivities configuration.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct SensitivitiesConfig {
+pub struct SensitivitiesConfig {
     /// Interest rate bump size in basis points (e.g., 1.0 = 1bp).
-    pub(crate) rate_bump_bp: f64,
+    pub rate_bump_bp: f64,
     /// Credit spread bump size in basis points (e.g., 1.0 = 1bp).
-    pub(crate) credit_spread_bump_bp: f64,
+    pub credit_spread_bump_bp: f64,
     /// Spot bump size as a decimal fraction of spot (e.g., 0.01 = 1%).
-    pub(crate) spot_bump_decimal: f64,
+    pub spot_bump_decimal: f64,
     /// Vol bump size (absolute) in decimal volatility (e.g., 0.01 = 1 vol point).
-    pub(crate) vol_bump_decimal: f64,
+    pub vol_bump_decimal: f64,
     /// Yield bump in basis points for numerical yield duration/convexity, when
     /// set by `metric_pricing_overrides.bump_config.ytm_bump_bp`. `None` lets
     /// each calculator keep its own default shock.
-    pub(crate) ytm_bump_bp: Option<f64>,
+    pub ytm_bump_bp: Option<f64>,
     /// Default DV01 key-rate buckets in years.
-    pub(crate) dv01_buckets_years: Vec<f64>,
+    pub dv01_buckets_years: Vec<f64>,
     /// Default CS01 key-rate buckets in years.
-    pub(crate) cs01_buckets_years: Vec<f64>,
+    pub cs01_buckets_years: Vec<f64>,
 }
 
 impl Default for SensitivitiesConfig {
@@ -166,7 +166,7 @@ impl From<&SensitivitiesConfig> for crate::instruments::GreekBumps {
 /// Resolve the sensitivities config of a metric request: the
 /// `valuations.sensitivities.v1` extension of its `FinstackConfig`, then the
 /// request's `metric_pricing_overrides.bump_config`.
-pub(crate) fn resolve(
+pub fn resolve(
     context: &crate::metrics::MetricContext,
 ) -> finstack_quant_core::Result<SensitivitiesConfig> {
     from_context_or_default(context.get_config(), context.get_metric_pricing_overrides())
@@ -178,19 +178,19 @@ pub(crate) fn resolve(
 /// [`from_finstack_config_or_default`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct SensitivitiesOverrides {
+pub struct SensitivitiesOverrides {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) rate_bump_bp: Option<f64>,
+    pub rate_bump_bp: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) credit_spread_bump_bp: Option<f64>,
+    pub credit_spread_bump_bp: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) spot_bump_decimal: Option<f64>,
+    pub spot_bump_decimal: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) vol_bump_decimal: Option<f64>,
+    pub vol_bump_decimal: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) dv01_buckets_years: Option<Vec<f64>>,
+    pub dv01_buckets_years: Option<Vec<f64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) cs01_buckets_years: Option<Vec<f64>>,
+    pub cs01_buckets_years: Option<Vec<f64>>,
 }
 
 fn ensure_finite_positive(name: &str, v: f64) -> finstack_quant_core::Result<()> {
@@ -226,7 +226,7 @@ fn ensure_bucket_grid(name: &str, buckets: &[f64]) -> finstack_quant_core::Resul
 ///
 /// If the extension section `valuations.sensitivities.v1` is present, its fields override
 /// the defaults; otherwise defaults are used.
-pub(crate) fn from_finstack_config_or_default(
+pub fn from_finstack_config_or_default(
     cfg: &FinstackConfig,
 ) -> finstack_quant_core::Result<SensitivitiesConfig> {
     let mut base = SensitivitiesConfig::default();
@@ -273,7 +273,7 @@ pub(crate) fn from_finstack_config_or_default(
 }
 
 /// Resolve sensitivities defaults and then layer instrument-level pricing overrides.
-pub(crate) fn from_context_or_default(
+pub fn from_context_or_default(
     cfg: &FinstackConfig,
     pricing_overrides: Option<&crate::instruments::MetricPricingOverrides>,
 ) -> finstack_quant_core::Result<SensitivitiesConfig> {
@@ -282,7 +282,7 @@ pub(crate) fn from_context_or_default(
 }
 
 /// Apply per-instrument pricing overrides to a resolved sensitivities config.
-pub(crate) fn apply_pricing_overrides(
+pub fn apply_pricing_overrides(
     mut base: SensitivitiesConfig,
     pricing_overrides: Option<&crate::instruments::MetricPricingOverrides>,
 ) -> finstack_quant_core::Result<SensitivitiesConfig> {

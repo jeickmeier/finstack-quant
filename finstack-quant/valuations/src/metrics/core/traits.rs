@@ -199,7 +199,7 @@ pub struct MetricContext {
     /// Bump-and-reprice paths (DV01/CS01) sidestep this safely because they
     /// call `reprice_raw(bumped_market, …)` which goes through
     /// `Instrument::value_raw` directly without consulting the cache.
-    pub(crate) internal_schedule: Option<Arc<CashFlowSchedule>>,
+    pub internal_schedule: Option<Arc<CashFlowSchedule>>,
 
     /// Family-owned caches keyed by type; see [`MetricContext::ext`].
     extensions: finstack_quant_core::HashMap<TypeId, Box<dyn Any + Send + Sync>>,
@@ -278,7 +278,7 @@ impl MetricContext {
     /// Take the reusable market scratch context, cloning the base market only
     /// the first time a finite-difference metric needs a mutable copy.
     #[inline]
-    pub(crate) fn take_market_scratch(&mut self) -> MarketContext {
+    pub fn take_market_scratch(&mut self) -> MarketContext {
         self.market_scratch
             .take()
             .unwrap_or_else(|| self.curves.as_ref().clone())
@@ -286,14 +286,14 @@ impl MetricContext {
 
     /// Return an unbumped scratch context for reuse by the next metric.
     #[inline]
-    pub(crate) fn put_market_scratch(&mut self, scratch: MarketContext) {
+    pub fn put_market_scratch(&mut self, scratch: MarketContext) {
         self.market_scratch = Some(scratch);
     }
 
     /// Run a finite-difference calculation against the reusable scratch market
     /// and return it to the context even when the calculation fails.
     #[inline]
-    pub(crate) fn with_market_scratch<T>(
+    pub fn with_market_scratch<T>(
         &mut self,
         f: impl FnOnce(&Self, &mut MarketContext) -> finstack_quant_core::Result<T>,
     ) -> finstack_quant_core::Result<T> {
@@ -323,7 +323,7 @@ impl MetricContext {
 
     /// Returns the metric-only overrides, if any.
     #[inline]
-    pub(crate) fn get_metric_pricing_overrides(
+    pub fn get_metric_pricing_overrides(
         &self,
     ) -> Option<&crate::instruments::MetricPricingOverrides> {
         self.metric_pricing_overrides.as_ref()
@@ -331,19 +331,19 @@ impl MetricContext {
 
     /// Returns a reference to the market history, if set.
     #[inline]
-    pub(crate) fn get_market_history(&self) -> Option<&MarketHistory> {
+    pub fn get_market_history(&self) -> Option<&MarketHistory> {
         self.market_history.as_deref()
     }
 
     /// Clone the injected provider for nested historical-risk calculations.
-    pub(crate) fn get_recalibration_provider(
+    pub fn get_recalibration_provider(
         &self,
     ) -> Option<Arc<dyn crate::recalibration::RecalibrationProvider>> {
         self.recalibration_provider.clone()
     }
 
     /// Attach the batch-local quote recalibration provider.
-    pub(crate) fn set_recalibration_provider(
+    pub fn set_recalibration_provider(
         &mut self,
         provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
     ) {
@@ -351,7 +351,7 @@ impl MetricContext {
     }
 
     /// Recalibrate linked discount and forward curves for a parallel quote bump.
-    pub(crate) fn bump_rate_market_cached(
+    pub fn bump_rate_market_cached(
         &self,
         discount_curve_id: &CurveId,
         forward_curve_id: &CurveId,
@@ -369,7 +369,7 @@ impl MetricContext {
     }
 
     /// Recalibrate a single OIS curve for a parallel quote bump.
-    pub(crate) fn bump_single_ois_rate_market_cached(
+    pub fn bump_single_ois_rate_market_cached(
         &self,
         curve_id: &CurveId,
         bump_bp: f64,
@@ -385,7 +385,7 @@ impl MetricContext {
     }
 
     /// Execute one rate-market replay through the injected provider.
-    pub(crate) fn rebuild_rate_market(
+    pub fn rebuild_rate_market(
         &self,
         request: crate::recalibration::RateMarketRecalibrationRequest,
         operation: &str,
@@ -395,7 +395,7 @@ impl MetricContext {
     }
 
     /// Execute one discount-curve replay through the injected provider.
-    pub(crate) fn rebuild_discount_curve(
+    pub fn rebuild_discount_curve(
         &self,
         request: crate::recalibration::DiscountCurveRecalibrationRequest,
         operation: &str,
@@ -407,7 +407,7 @@ impl MetricContext {
     }
 
     /// Return exact ordered quote bindings for bucketed spread risk.
-    pub(crate) fn hazard_spread_risk_buckets(
+    pub fn hazard_spread_risk_buckets(
         &self,
         hazard: &finstack_quant_core::market_data::term_structures::HazardCurve,
     ) -> finstack_quant_core::Result<Vec<crate::recalibration::HazardSpreadRiskBucket>> {
@@ -416,7 +416,7 @@ impl MetricContext {
     }
 
     /// Execute one hazard replay through the injected provider.
-    pub(crate) fn rebuild_hazard_curve(
+    pub fn rebuild_hazard_curve(
         &self,
         request: crate::recalibration::HazardRecalibrationRequest,
         operation: &str,
@@ -437,7 +437,7 @@ impl MetricContext {
     }
 
     /// Clone the injected provider for nested pricing operations.
-    pub(crate) fn recalibration_provider(
+    pub fn recalibration_provider(
         &self,
         operation: &str,
     ) -> finstack_quant_core::Result<Arc<dyn crate::recalibration::RecalibrationProvider>> {
@@ -449,14 +449,14 @@ impl MetricContext {
 
     /// Clone the pricing dispatch for use in sub-contexts.
     #[inline]
-    pub(crate) fn clone_pricer_dispatch(&self) -> PricingDispatch {
+    pub fn clone_pricer_dispatch(&self) -> PricingDispatch {
         self.pricing_dispatch.clone()
     }
 
     /// Return the explicitly selected pricing model, if this metric request
     /// was entered through the registered-pricer path.
     #[inline]
-    pub(crate) fn pricing_model(&self) -> Option<crate::pricer::ModelKey> {
+    pub fn pricing_model(&self) -> Option<crate::pricer::ModelKey> {
         self.pricing_dispatch.model()
     }
 
@@ -483,7 +483,12 @@ impl MetricContext {
     ///
     /// Every family cache stored with [`MetricContext::set_ext`] describes the
     /// previous instrument view, so all of them are dropped.
-    pub(crate) fn set_instrument(&mut self, instrument: Arc<dyn Instrument>) {
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument` - Instrument the context evaluates from now on; the
+    ///   caller restores the original view when the scoped calculation ends.
+    pub fn set_instrument(&mut self, instrument: Arc<dyn Instrument>) {
         self.inputs.instrument = instrument;
         self.extensions.clear();
     }
@@ -529,7 +534,7 @@ impl MetricContext {
 
     /// Replace the request's base value during test or nested metric setup.
     #[cfg(test)]
-    pub(crate) fn set_base_value(&mut self, base_value: Money) {
+    pub fn set_base_value(&mut self, base_value: Money) {
         self.inputs.base_value = base_value;
     }
 
@@ -591,9 +596,7 @@ impl MetricContext {
     }
 
     /// Return the instrument's canonical cashflow schedule flows with CFKind metadata.
-    pub(crate) fn tagged_cashflows_cached(
-        &mut self,
-    ) -> finstack_quant_core::Result<&Vec<CashFlow>> {
+    pub fn tagged_cashflows_cached(&mut self) -> finstack_quant_core::Result<&Vec<CashFlow>> {
         if self.tagged_cashflows.is_none() {
             let schedule = self
                 .instrument
@@ -624,10 +627,7 @@ impl MetricContext {
     /// Returns an error when the schedule cannot be built or a crossed
     /// fixing has no finite as-of projection (see
     /// `finstack_quant_cashflows::fixings::materialize_fixings`).
-    pub(crate) fn fixings_held_market(
-        &self,
-        horizon: Date,
-    ) -> finstack_quant_core::Result<MarketContext> {
+    pub fn fixings_held_market(&self, horizon: Date) -> finstack_quant_core::Result<MarketContext> {
         let schedule = self
             .instrument
             .cashflow_schedule(&self.curves, self.as_of)?;

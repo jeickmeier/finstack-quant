@@ -1,5 +1,6 @@
 //! Shared trait and pricing delegation for asset-owned futures options.
 
+#[macro_export]
 macro_rules! impl_future_option_instrument {
     ($ty:ty, $key:expr, $family:expr $(, require_rate_risk = $require_rate_risk:expr)?) => {
         impl $ty {
@@ -117,8 +118,8 @@ macro_rules! impl_future_option_instrument {
             }
         }
 
-        impl crate::instruments::Instrument for $ty {
-            crate::instruments::common_impl::traits::impl_instrument_base!($key, $family);
+        impl $crate::instruments::Instrument for $ty {
+            $crate::instruments::common_impl::traits::impl_instrument_base!($key, $family);
 
             fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
                 self.validate()
@@ -126,8 +127,8 @@ macro_rules! impl_future_option_instrument {
 
             fn market_dependencies(
                 &self,
-            ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
-                let mut dependencies = crate::instruments::MarketDependencies::new();
+            ) -> finstack_quant_core::Result<$crate::instruments::MarketDependencies> {
+                let mut dependencies = $crate::instruments::MarketDependencies::new();
                 dependencies.add_discount_curve(self.terms.discount_curve_id.clone());
                 Ok(dependencies)
             }
@@ -164,17 +165,17 @@ macro_rules! impl_future_option_instrument {
             }
 
 
-            crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+            $crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
         }
 
-        impl crate::instruments::OptionGreeksProvider for $ty {
+        impl $crate::instruments::OptionGreeksProvider for $ty {
             fn option_greeks(
                 &self,
                 market: &finstack_quant_core::market_data::context::MarketContext,
                 as_of: finstack_quant_core::dates::Date,
-                request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
-            ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
-                use crate::instruments::common_impl::traits::{OptionGreekKind, OptionGreeks};
+                request: &$crate::instruments::common_impl::traits::OptionGreeksRequest,
+            ) -> finstack_quant_core::Result<$crate::instruments::common_impl::traits::OptionGreeks> {
+                use $crate::instruments::common_impl::traits::{OptionGreekKind, OptionGreeks};
 
                 let mut greeks = OptionGreeks::default();
                 match request.greek {
@@ -221,4 +222,4 @@ macro_rules! impl_future_option_instrument {
     };
 }
 
-pub(crate) use impl_future_option_instrument;
+pub use crate::impl_future_option_instrument;

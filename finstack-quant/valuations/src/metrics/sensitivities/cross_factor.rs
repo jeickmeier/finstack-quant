@@ -67,7 +67,7 @@ impl CrossFactorPair {
     }
 }
 
-pub(crate) trait FactorBumper: Send + Sync {
+pub trait FactorBumper: Send + Sync {
     fn bump_market(
         &self,
         market: &MarketContext,
@@ -359,7 +359,7 @@ impl FactorBumper for FxBumper {
 }
 
 /// Create a rate bumper from runtime instrument dependencies.
-pub(crate) fn make_rates_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
+pub fn make_rates_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
     let deps = context.instrument.market_dependencies()?;
     let mut curve_ids = Vec::new();
     for curve_id in deps
@@ -387,7 +387,7 @@ pub(crate) fn make_rates_bumper(context: &MetricContext) -> Result<Option<Box<dy
 }
 
 /// Create a credit bumper from runtime instrument dependencies.
-pub(crate) fn make_credit_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
+pub fn make_credit_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
     let deps = context.instrument.market_dependencies()?;
     if deps.curves.credit_curves.is_empty() {
         return Ok(None);
@@ -412,7 +412,7 @@ pub(crate) fn make_credit_bumper(context: &MetricContext) -> Result<Option<Box<d
 }
 
 /// Create a volatility bumper from runtime instrument dependencies.
-pub(crate) fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
+pub fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
     let deps = context.instrument.market_dependencies()?;
     let override_volatility = volatility_override(context.instrument.as_ref());
     let vol_surface_ids = if override_volatility.is_some() {
@@ -472,7 +472,7 @@ pub(crate) fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn 
 }
 
 /// Create a spot bumper from runtime instrument dependencies.
-pub(crate) fn make_spot_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
+pub fn make_spot_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
     let deps = context.instrument.market_dependencies()?;
     let Some(price_id) = deps.market_scalar_ids.first() else {
         return Ok(None);
@@ -489,7 +489,7 @@ pub(crate) fn make_spot_bumper(context: &MetricContext) -> Result<Option<Box<dyn
 }
 
 /// Create an FX bumper from runtime instrument dependencies.
-pub(crate) fn make_fx_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
+pub fn make_fx_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
     let deps = context.instrument.market_dependencies()?;
     if deps.fx_pairs.is_empty() {
         return Ok(None);
@@ -513,7 +513,7 @@ pub struct CrossFactorCalculator {
 
 impl CrossFactorCalculator {
     /// Creates a reusable cross-factor calculator from two bumper factories.
-    pub(crate) fn new(factory_a: BumperFactoryFn, factory_b: BumperFactoryFn) -> Self {
+    pub fn new(factory_a: BumperFactoryFn, factory_b: BumperFactoryFn) -> Self {
         Self {
             factory_a,
             factory_b,

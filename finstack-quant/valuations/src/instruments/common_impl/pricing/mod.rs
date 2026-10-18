@@ -5,21 +5,21 @@
 //!
 //! ## Sub-modules
 //!
-//! - [`generic`]: Generic pricers for instruments implementing the Instrument trait
-//! - [`trs`]: Total Return Swap pricing engine
+//! - `generic`: Generic pricers for instruments implementing the Instrument trait
+//! - `trs`: Total Return Swap pricing engine
 //! - [`swap_legs`]: Shared floating/fixed leg pricing for swaps
 //! - [`hw1f_params`]: Hull-White 1F κ/σ resolution from pricing overrides or calibrated market scalars
 
-pub(crate) mod coupon_period;
-pub(crate) mod floating_reset_descriptors;
+pub mod coupon_period;
+pub mod floating_reset_descriptors;
 mod generic;
 pub mod hw1f_params;
-pub(crate) mod overnight;
+pub mod overnight;
 pub mod overnight_conventions;
-pub(crate) mod rates_credit;
+pub mod rates_credit;
 pub mod swap_legs;
 mod trs;
-pub(crate) mod variance_observations;
+pub mod variance_observations;
 
 #[doc(hidden)]
 pub use generic::GenericInstrumentPricer;

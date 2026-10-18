@@ -34,7 +34,7 @@ mod unit;
 pub use group::MetricGroup;
 pub use unit::MetricUnit;
 
-pub(crate) use suggest::{closest_metric_names, MAX_METRIC_SUGGESTIONS};
+pub use suggest::{closest_metric_names, MAX_METRIC_SUGGESTIONS};
 
 /// Strongly-typed metric identifier.
 ///

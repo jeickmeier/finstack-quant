@@ -41,7 +41,7 @@ pub struct PricingOptions {
     /// Disabled by default.
     pub explain: ExplainOpts,
     /// Whether a trusted parsed-instrument boundary already performed validation.
-    pub(crate) instrument_validated: bool,
+    pub instrument_validated: bool,
 }
 
 impl PricingOptions {
@@ -140,7 +140,7 @@ impl PricingOptions {
         self
     }
 
-    pub(crate) fn mark_instrument_validated(mut self) -> Self {
+    pub fn mark_instrument_validated(mut self) -> Self {
         self.instrument_validated = true;
         self
     }

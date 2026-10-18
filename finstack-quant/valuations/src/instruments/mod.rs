@@ -148,7 +148,8 @@
 
 // Common functionality (traits, macros, helpers)
 #[macro_use]
-pub(crate) mod common_impl;
+#[doc(hidden)]
+pub mod common_impl;
 
 mod marginable;
 

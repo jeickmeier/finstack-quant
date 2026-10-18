@@ -59,13 +59,13 @@ impl MetricCalculator for ComputedMetricLookup {
 /// so this calculator fails when the valuation ran under a model that does not
 /// publish the metric. Each family registers the entries for the instrument
 /// types whose pricers publish the metric.
-pub(crate) struct PricerPublishedMetric {
+pub struct PricerPublishedMetric {
     metric: MetricId,
 }
 
 impl PricerPublishedMetric {
     /// Owner entry for `metric`, read back from the pricing pass.
-    pub(crate) fn new(metric: MetricId) -> Self {
+    pub fn new(metric: MetricId) -> Self {
         Self { metric }
     }
 }
@@ -110,7 +110,7 @@ pub fn standard_registry() -> &'static MetricRegistry {
 /// * `registry` - Registry receiving the universal calculators (theta and
 ///   its decomposition, carry, breakeven, historical VaR and expected
 ///   shortfall).
-pub(crate) fn register_universal_metrics(
+pub fn register_universal_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), MetricRegistryError> {
     registry.register_metric(MetricId::Theta, Arc::new(GenericThetaAny), &[])?;

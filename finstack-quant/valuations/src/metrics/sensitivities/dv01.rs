@@ -59,7 +59,7 @@ fn reprice_rate_risk(
 
 /// DV01 calculation mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Dv01ComputationMode {
+pub enum Dv01ComputationMode {
     /// Single scalar from parallel bump of all curves together.
     ParallelCombined,
     /// Per-curve parallel bumps (stored as series).
@@ -70,7 +70,7 @@ pub(crate) enum Dv01ComputationMode {
 
 /// Rate-curve subset to include in a DV01-style bump.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RateCurveSelection {
+pub enum RateCurveSelection {
     /// Include all rate curves declared by the instrument.
     All,
     /// Include only forward/projection curves.
@@ -85,15 +85,15 @@ pub(crate) enum RateCurveSelection {
 
 /// Configuration for DV01 calculations.
 #[derive(Clone, Debug)]
-pub(crate) struct Dv01CalculatorConfig {
+pub struct Dv01CalculatorConfig {
     /// Computation mode (parallel vs bucketed, triangular vs par-rate).
-    pub(crate) mode: Dv01ComputationMode,
+    pub mode: Dv01ComputationMode,
     /// MetricId under which to store per-curve or per-bucket series.
     /// Defaults to `BucketedDv01`. Set to e.g. `Pv01` when using
     /// `ParallelPerCurve` mode for PV01 so keys read `pv01::USD-OIS`.
-    pub(crate) series_id: MetricId,
+    pub series_id: MetricId,
     /// Subset of rate curves included in the bump.
-    pub(crate) curve_selection: RateCurveSelection,
+    pub curve_selection: RateCurveSelection,
 }
 
 impl Default for Dv01CalculatorConfig {
@@ -108,7 +108,7 @@ impl Default for Dv01CalculatorConfig {
 
 impl Dv01CalculatorConfig {
     /// Create config for parallel DV01 (all curves together).
-    pub(crate) fn parallel_combined() -> Self {
+    pub fn parallel_combined() -> Self {
         Self {
             mode: Dv01ComputationMode::ParallelCombined,
             series_id: MetricId::BucketedDv01,
@@ -123,7 +123,7 @@ impl Dv01CalculatorConfig {
     /// forward swap rate (and hence the option's intrinsic value) unchanged.
     /// Contrast with `parallel_combined()` which bumps both discount and forward
     /// curves and conflates Rho with Delta.
-    pub(crate) fn parallel_discount_only() -> Self {
+    pub fn parallel_discount_only() -> Self {
         Self {
             mode: Dv01ComputationMode::ParallelCombined,
             series_id: MetricId::BucketedDv01,
@@ -132,7 +132,7 @@ impl Dv01CalculatorConfig {
     }
 
     /// Create config for parallel DV01 over forward/projection curves only.
-    pub(crate) fn parallel_forward_only() -> Self {
+    pub fn parallel_forward_only() -> Self {
         Self {
             mode: Dv01ComputationMode::ParallelCombined,
             series_id: MetricId::BucketedDv01,
@@ -141,7 +141,7 @@ impl Dv01CalculatorConfig {
     }
 
     /// Create config for parallel DV01 per curve.
-    pub(crate) fn parallel_per_curve() -> Self {
+    pub fn parallel_per_curve() -> Self {
         Self {
             mode: Dv01ComputationMode::ParallelPerCurve,
             series_id: MetricId::BucketedDv01,
@@ -153,7 +153,7 @@ impl Dv01CalculatorConfig {
     ///
     /// This is the default and recommended method for most use cases.
     /// Uses triangular weights on the bucket grid, ensuring sum ≈ parallel within ~0.1%.
-    pub(crate) fn triangular_key_rate() -> Self {
+    pub fn triangular_key_rate() -> Self {
         Self {
             mode: Dv01ComputationMode::KeyRateTriangular,
             ..Self::default()
@@ -161,7 +161,7 @@ impl Dv01CalculatorConfig {
     }
 
     /// Override the metric ID used for storing per-curve or per-bucket series.
-    pub(crate) fn with_series_id(mut self, id: MetricId) -> Self {
+    pub fn with_series_id(mut self, id: MetricId) -> Self {
         self.series_id = id;
         self
     }
@@ -189,13 +189,13 @@ impl Dv01CalculatorConfig {
 ///
 /// 2. **Par-Rate Bumping** (`KeyRateParRate`): Bumps par rates of calibration
 ///    instruments and re-bootstraps, ensuring exact sum = parallel.
-pub(crate) struct UnifiedDv01Calculator {
+pub struct UnifiedDv01Calculator {
     config: Dv01CalculatorConfig,
 }
 
 impl UnifiedDv01Calculator {
     /// Create a new calculator with the given configuration.
-    pub(crate) fn new(config: Dv01CalculatorConfig) -> Self {
+    pub fn new(config: Dv01CalculatorConfig) -> Self {
         Self { config }
     }
 }

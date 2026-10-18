@@ -306,7 +306,7 @@ impl TranchePricingResult {
 /// Monte Carlo is the only engine: each scenario path draws its monthly
 /// systematic factors from a seeded Philox substream and runs the full deal
 /// waterfall. The mode is echoed on
-/// [`StochasticPricingResult::pricing_mode`](super::StochasticPricingResult)
+/// [`StochasticPricingResult::pricing_mode`]
 /// so a result records the estimator count it was produced with.
 ///
 /// Test coverage:

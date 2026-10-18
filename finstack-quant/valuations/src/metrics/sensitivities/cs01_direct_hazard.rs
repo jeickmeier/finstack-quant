@@ -26,7 +26,7 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 
 /// Parallel hazard-rate bump CS01.
-pub(crate) struct DirectHazardParallelCs01<I> {
+pub struct DirectHazardParallelCs01<I> {
     _phantom: PhantomData<I>,
 }
 
@@ -39,7 +39,7 @@ impl<I> Default for DirectHazardParallelCs01<I> {
 }
 
 /// Bucketed hazard-rate bump CS01: one bucket per hazard-curve knot.
-pub(crate) struct DirectHazardBucketedCs01<I> {
+pub struct DirectHazardBucketedCs01<I> {
     _phantom: PhantomData<I>,
 }
 

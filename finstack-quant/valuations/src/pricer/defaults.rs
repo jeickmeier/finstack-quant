@@ -10,54 +10,54 @@ static DEFAULTS: EmbeddedJsonRegistry<ProductMcDefaults, DefaultsFile> =
     EmbeddedJsonRegistry::new(DATA, None, "product Monte Carlo defaults");
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct ProductMcDefaults {
+pub struct ProductMcDefaults {
     /// LMM Bermudan swaption defaults.
-    pub(crate) lmm_bermudan: LmmBermudanDefaults,
+    pub lmm_bermudan: LmmBermudanDefaults,
     /// Merton PIK-bond Monte Carlo defaults.
-    pub(crate) merton_pik_bond: MertonPikBondDefaults,
+    pub merton_pik_bond: MertonPikBondDefaults,
     /// Stochastic revolving-credit Monte Carlo defaults.
-    pub(crate) revolving_credit: RevolvingCreditDefaults,
+    pub revolving_credit: RevolvingCreditDefaults,
 }
 /// LMM Bermudan swaption defaults.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct LmmBermudanDefaults {
+pub struct LmmBermudanDefaults {
     /// Number of Monte Carlo paths.
-    pub(crate) num_paths: usize,
+    pub num_paths: usize,
     /// Root RNG seed.
-    pub(crate) seed: u64,
+    pub seed: u64,
     /// Polynomial basis degree for LSMC regression.
-    pub(crate) basis_degree: usize,
+    pub basis_degree: usize,
     /// Whether antithetic variance reduction is enabled by default.
-    pub(crate) antithetic: bool,
+    pub antithetic: bool,
     /// Minimum simulation steps between exercise dates.
-    pub(crate) min_steps_between_exercises: usize,
+    pub min_steps_between_exercises: usize,
 }
 
 /// Merton PIK-bond Monte Carlo defaults.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct MertonPikBondDefaults {
+pub struct MertonPikBondDefaults {
     /// Number of independent Monte Carlo estimators (antithetic sampling
     /// simulates two paths per estimator). The seed is derived per instrument
     /// from `model_config.mc_seed_scenario`.
-    pub(crate) num_paths: usize,
+    pub num_paths: usize,
     /// Whether antithetic variance reduction is enabled by default.
-    pub(crate) antithetic: bool,
+    pub antithetic: bool,
     /// Simulation time steps per year.
-    pub(crate) steps_per_year: usize,
+    pub steps_per_year: usize,
 }
 
 /// Stochastic revolving-credit Monte Carlo defaults.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct RevolvingCreditDefaults {
+pub struct RevolvingCreditDefaults {
     /// Number of independent Monte Carlo estimators (antithetic sampling
     /// simulates two paths per estimator). The seed is derived per facility
     /// from `model_config.mc_seed_scenario`.
-    pub(crate) num_paths: usize,
+    pub num_paths: usize,
     /// Whether paired antithetic Philox paths are enabled by default.
-    pub(crate) antithetic: bool,
+    pub antithetic: bool,
 }
 
 #[derive(Deserialize)]
@@ -67,7 +67,7 @@ struct DefaultsFile {
     version: u32,
     defaults: ProductMcDefaults,
 }
-pub(crate) fn embedded_defaults() -> Result<&'static ProductMcDefaults> {
+pub fn embedded_defaults() -> Result<&'static ProductMcDefaults> {
     DEFAULTS.load(|file| {
         CONTRACT
             .parse_schema(&file.schema)
@@ -83,7 +83,7 @@ pub(crate) fn embedded_defaults() -> Result<&'static ProductMcDefaults> {
     })
 }
 #[allow(clippy::expect_used)]
-pub(crate) fn embedded_defaults_or_panic() -> &'static ProductMcDefaults {
+pub fn embedded_defaults_or_panic() -> &'static ProductMcDefaults {
     embedded_defaults().expect("embedded product Monte Carlo defaults are compile-time assets")
 }
 fn validate_lmm_bermudan(label: &str, defaults: &LmmBermudanDefaults) -> Result<()> {

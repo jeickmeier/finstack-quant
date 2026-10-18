@@ -30,7 +30,7 @@ use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditCalibratio
 /// # Errors
 ///
 /// Returns [`Error::Validation`] for an invalid factor.
-pub(crate) fn continuous_frp_weight(discount: f64, survival: f64) -> Result<f64> {
+pub fn continuous_frp_weight(discount: f64, survival: f64) -> Result<f64> {
     if !discount.is_finite() || discount <= 0.0 {
         return Err(Error::Validation(format!(
             "FRP interval discount factor must be positive and finite, got {discount}"
@@ -78,7 +78,7 @@ pub(crate) fn continuous_frp_weight(discount: f64, survival: f64) -> Result<f64>
 /// Returns [`Error::Validation`] when the date range is empty, the requested
 /// step count is zero, the resulting grid overflows, or a curve target is not
 /// positive and finite.
-pub(crate) fn build_daily_bond_rates_credit_targets(
+pub fn build_daily_bond_rates_credit_targets(
     discount: &dyn Discounting,
     hazard: &HazardCurve,
     origin: Date,
@@ -130,7 +130,7 @@ pub(crate) fn build_daily_bond_rates_credit_targets(
 ///
 /// Returns [`Error::Validation`] when the grid is empty or reversed, or when
 /// either curve produces a non-positive or non-finite target.
-pub(crate) fn build_rates_credit_targets(
+pub fn build_rates_credit_targets(
     discount: &dyn Discounting,
     hazard: &HazardCurve,
     origin: Date,

@@ -18,7 +18,7 @@ use finstack_quant_core::{Error, Result};
 use finstack_quant_models::volatility::VolatilityConvention;
 
 /// Coordinates and pricing convention for one volatility resolution.
-pub(crate) struct VolatilityRequest {
+pub struct VolatilityRequest {
     pub expiry: f64,
     pub tenor: f64,
     pub strike: f64,
@@ -29,14 +29,14 @@ pub(crate) struct VolatilityRequest {
 
 /// One validated quote together with the convention needed by prices and Greeks.
 #[derive(Clone, Copy)]
-pub(crate) struct ResolvedVolatility {
+pub struct ResolvedVolatility {
     pub sigma: f64,
     pub convention: VolatilityConvention,
 }
 
 impl ResolvedVolatility {
     /// Validate and transform both model coordinates using the resolved shift.
-    pub(crate) fn model_rates(self, forward: f64, strike: f64) -> Result<(f64, f64)> {
+    pub fn model_rates(self, forward: f64, strike: f64) -> Result<(f64, f64)> {
         if !forward.is_finite() || !strike.is_finite() {
             return Err(Error::Validation(
                 "option forward and strike must be finite".to_owned(),
@@ -57,7 +57,7 @@ impl ResolvedVolatility {
     }
 }
 
-pub(crate) fn validate_sigma(sigma: f64) -> Result<f64> {
+pub fn validate_sigma(sigma: f64) -> Result<f64> {
     if sigma.is_finite() && sigma >= 0.0 {
         Ok(sigma)
     } else {
@@ -68,7 +68,7 @@ pub(crate) fn validate_sigma(sigma: f64) -> Result<f64> {
 }
 
 /// Resolve the active quote, retaining units and displacement throughout pricing.
-pub(crate) fn resolve_volatility(
+pub fn resolve_volatility(
     overrides: &MarketQuoteOverrides,
     curves: &MarketContext,
     vol_surface_id: &str,
@@ -131,7 +131,7 @@ pub(crate) fn resolve_volatility(
 
 /// Resolve unshifted Black volatility for equity/FX-style surface consumers.
 #[inline]
-pub(crate) fn resolve_sigma_at(
+pub fn resolve_sigma_at(
     overrides: &MarketQuoteOverrides,
     curves: &MarketContext,
     vol_surface_id: &str,

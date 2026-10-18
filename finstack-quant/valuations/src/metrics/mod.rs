@@ -282,16 +282,19 @@
 mod aggregation;
 mod core;
 pub mod risk;
-pub(crate) mod sensitivities;
+#[doc(hidden)]
+pub mod sensitivities;
 
 // Core surface (supported)
 pub use aggregation::is_additive_metric;
 pub use core::finite_difference::bump_surface_vol_absolute;
-pub(crate) use core::ids::closest_metric_names;
+#[doc(hidden)]
+pub use core::ids::closest_metric_names;
 pub use core::ids::{MetricGroup, MetricId, MetricUnit};
 pub use core::registry::{MetricRegistry, MetricRegistryError};
 pub use core::standard_registry::standard_registry;
-pub(crate) use core::standard_registry::{register_universal_metrics, PricerPublishedMetric};
+#[doc(hidden)]
+pub use core::standard_registry::{register_universal_metrics, PricerPublishedMetric};
 pub use core::traits::{MetricCalculator, MetricContext};
 /// Format a standard risk bucket (years) as a human-readable label.
 pub use sensitivities::config::{
@@ -302,33 +305,47 @@ pub(crate) use sensitivities::cross_factor::CrossFactorCalculator;
 pub use sensitivities::cross_factor::CrossFactorPair;
 pub use sensitivities::theta::{collect_cashflows_in_period, collect_period_cash, PeriodCash};
 
-// Crate-internal re-exports (NOT part of the public API)
+// Family-facing calculators and helpers.
+//
+// Instrument families register and compose these; they are not a supported
+// downstream API and stay out of the rendered documentation.
 //
 // These are used across `finstack-quant-valuations` (instrument metric registries, etc.) but are not
 // supported as a stable downstream API. Keep them `pub(crate)` so we can refactor module layout
 // without creating public breakage surface.
-pub(crate) use core::finite_difference::{
+#[doc(hidden)]
+pub use core::finite_difference::{
     bump_active_volatility, bump_discount_curve_parallel, bump_scalar_price,
     central_diff_by_half_bump, central_diff_by_width, central_diff_scalar_relative,
     replace_scalar_value, scalar_numeric_value, scaled_central_diff_by_width, CORRELATION_BUMP,
     VOL_POINTS_PER_ABSOLUTE_VOL,
 };
-pub(crate) use sensitivities::carry_decomposition::{CarryDecompositionCalculator, YieldClock};
-pub(crate) use sensitivities::cross_factor::{
+#[doc(hidden)]
+pub use sensitivities::carry_decomposition::{CarryDecompositionCalculator, YieldClock};
+#[doc(hidden)]
+pub use sensitivities::cross_factor::{
     make_credit_bumper, make_fx_bumper, make_rates_bumper, make_spot_bumper, make_vol_bumper,
 };
-pub(crate) use sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs01};
-pub(crate) use sensitivities::cs01_z_spread::{
+#[doc(hidden)]
+pub use sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs01};
+#[doc(hidden)]
+pub use sensitivities::cs01_z_spread::{
     quoted_z_spread, ZSpreadBucketedCs01, ZSpreadCs01, ZSpreadCs01Inputs, ZSpreadParallelCs01,
 };
-pub(crate) use sensitivities::dv01::{Dv01CalculatorConfig, UnifiedDv01Calculator};
-pub(crate) use sensitivities::fd_greeks::{
+#[doc(hidden)]
+pub use sensitivities::dv01::{Dv01CalculatorConfig, UnifiedDv01Calculator};
+#[doc(hidden)]
+pub use sensitivities::fd_greeks::{
     GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVega, GenericFdVolga,
 };
-pub(crate) use sensitivities::option_greeks::OptionGreekCalculator;
-pub(crate) use sensitivities::rf_component_dv01::{RfComponentDv01Calculator, RfComponentPriced};
-pub(crate) use sensitivities::theta::{calculate_theta_date, theta_period};
-pub(crate) use sensitivities::vega::KeyRateVega;
+#[doc(hidden)]
+pub use sensitivities::option_greeks::OptionGreekCalculator;
+#[doc(hidden)]
+pub use sensitivities::rf_component_dv01::{RfComponentDv01Calculator, RfComponentPriced};
+#[doc(hidden)]
+pub use sensitivities::theta::{calculate_theta_date, theta_period};
+#[doc(hidden)]
+pub use sensitivities::vega::KeyRateVega;
 
 // Error helper functions
 

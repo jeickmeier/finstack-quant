@@ -8,4 +8,4 @@ pub use types::{
     FutureOptionTerms,
 };
 
-pub(crate) use instrument_impl::impl_future_option_instrument;
+pub use instrument_impl::impl_future_option_instrument;

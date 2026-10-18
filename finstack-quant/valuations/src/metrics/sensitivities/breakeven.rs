@@ -16,7 +16,7 @@ use std::cell::RefCell;
 const SENSITIVITY_FLOOR: f64 = 1e-12;
 
 /// Computes breakeven parameter shift from carry and sensitivity.
-pub(crate) struct BreakevenCalculator;
+pub struct BreakevenCalculator;
 
 impl MetricCalculator for BreakevenCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {

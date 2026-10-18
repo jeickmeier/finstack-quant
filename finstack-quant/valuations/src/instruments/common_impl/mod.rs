@@ -7,14 +7,14 @@
 //! - Shared data structures and enums
 
 // Core instrument traits and metadata
-pub(crate) mod traits;
+pub mod traits;
 
 // Unified dependency representation
-pub(crate) mod dependencies;
+pub mod dependencies;
 
 /// Stable date constants for `example()` constructors. Defined once so all
 /// instrument examples can rotate forward together.
-pub(crate) mod example_constants {
+pub mod example_constants {
     use finstack_quant_core::dates::Date;
     use time::macros::date;
 
@@ -26,19 +26,19 @@ pub(crate) mod example_constants {
 }
 
 // Shared utilities and helper functions
-pub(crate) mod helpers;
-pub(crate) mod listed;
+pub mod helpers;
+pub mod listed;
 // Shared volatility override/surface resolution.
-pub(crate) mod vol_resolution;
+pub mod vol_resolution;
 
 // Common parameter types shared across instruments
-pub(crate) mod parameters;
+pub mod parameters;
 
 // Common pricing patterns and infrastructure
-pub(crate) mod pricing;
+pub mod pricing;
 
 // Enriched per-flow cashflow export with DF/SP/PV columns.
 pub mod cashflow_export;
 
 #[doc(hidden)]
-pub(crate) use pricing::GenericInstrumentPricer;
+pub use pricing::GenericInstrumentPricer;

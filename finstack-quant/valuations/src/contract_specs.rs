@@ -13,14 +13,14 @@ static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<ContractSpecRegistry> = EmbeddedJ
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct ContractSpecRegistry {
+pub struct ContractSpecRegistry {
     schema: String,
     bond_futures: Vec<BondFutureSpecRecord>,
     repo_defaults: Vec<RepoDefaultRecord>,
 }
 
 impl ContractSpecRegistry {
-    pub(crate) fn bond_future_specs(&self, id: &str) -> Result<BondFutureSpecs> {
+    pub fn bond_future_specs(&self, id: &str) -> Result<BondFutureSpecs> {
         let record = self
             .bond_futures
             .iter()
@@ -33,7 +33,7 @@ impl ContractSpecRegistry {
         })
     }
 
-    pub(crate) fn repo_defaults(&self, id: &str) -> Result<RepoDefaultSpecs> {
+    pub fn repo_defaults(&self, id: &str) -> Result<RepoDefaultSpecs> {
         let record = self
             .repo_defaults
             .iter()
@@ -72,12 +72,12 @@ impl ContractSpecRegistry {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct RepoDefaultSpecs {
-    pub(crate) haircut: f64,
-    pub(crate) calendar_id: String,
-    pub(crate) day_count: DayCount,
-    pub(crate) business_day_convention: BusinessDayConvention,
-    pub(crate) triparty: bool,
+pub struct RepoDefaultSpecs {
+    pub haircut: f64,
+    pub calendar_id: String,
+    pub day_count: DayCount,
+    pub business_day_convention: BusinessDayConvention,
+    pub triparty: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -168,7 +168,7 @@ impl RepoDefaultRecord {
     }
 }
 
-pub(crate) fn embedded_registry() -> Result<&'static ContractSpecRegistry> {
+pub fn embedded_registry() -> Result<&'static ContractSpecRegistry> {
     EMBEDDED_REGISTRY.load(validate_registry)
 }
 
@@ -285,9 +285,7 @@ fn default_repo_day_count() -> DayCount {
     DayCount::Act360
 }
 
-pub(crate) fn repo_annualization_denominator(
-    day_count: DayCount,
-) -> finstack_quant_core::Result<f64> {
+pub fn repo_annualization_denominator(day_count: DayCount) -> finstack_quant_core::Result<f64> {
     match day_count {
         DayCount::Act360 => Ok(360.0),
         DayCount::Act365F => Ok(365.0),

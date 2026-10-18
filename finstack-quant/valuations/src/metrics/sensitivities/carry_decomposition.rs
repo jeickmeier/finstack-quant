@@ -38,7 +38,7 @@ use std::sync::Arc;
 /// so each family that quotes a yield supplies its clock and registers the
 /// calculator with it; the universal registration accretes annually on the
 /// context's day count.
-pub(crate) trait YieldClock: Send + Sync {
+pub trait YieldClock: Send + Sync {
     /// Accretion factor `1 / DF_y(as_of, rolled_date)` of the dirty PV under
     /// the constant yield `ytm`.
     ///
@@ -99,7 +99,7 @@ impl YieldClock for AnnualYieldClock {
     }
 }
 
-pub(crate) struct CarryDecompositionCalculator {
+pub struct CarryDecompositionCalculator {
     clock: Arc<dyn YieldClock>,
 }
 
@@ -116,7 +116,7 @@ impl CarryDecompositionCalculator {
     ///
     /// * `clock` - Yield clock of the instrument family registering the
     ///   calculator.
-    pub(crate) fn with_clock(clock: impl YieldClock + 'static) -> Self {
+    pub fn with_clock(clock: impl YieldClock + 'static) -> Self {
         Self {
             clock: Arc::new(clock),
         }

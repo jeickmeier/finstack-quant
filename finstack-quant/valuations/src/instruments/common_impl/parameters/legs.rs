@@ -2,7 +2,7 @@
 
 /// Error for a swap float leg set to `simple_average`, which the swap
 /// projectors do not implement (they compound or take one term forward).
-pub(crate) fn simple_average_unsupported() -> finstack_quant_core::Error {
+pub fn simple_average_unsupported() -> finstack_quant_core::Error {
     finstack_quant_core::Error::Validation(
         "float_leg.compounding = simple_average is not supported on swap legs; \
          use simple or a compounded_* variant"
@@ -135,7 +135,7 @@ pub struct FixedLegSpec {
 }
 
 impl FixedLegSpec {
-    pub(crate) fn schedule_params(
+    pub fn schedule_params(
         &self,
         adjust_accrual_dates: bool,
     ) -> finstack_quant_cashflows::builder::BuildPeriodsParams<'_> {
@@ -497,7 +497,7 @@ impl FinancingLegSpec {
     /// # Arguments
     ///
     /// * `context` - Instrument name included in validation diagnostics.
-    pub(crate) fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
+    pub fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
         if self.discount_curve_id.as_str().trim().is_empty() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{context} requires a non-empty financing discount_curve_id"

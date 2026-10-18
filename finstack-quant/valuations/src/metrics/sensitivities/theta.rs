@@ -72,7 +72,7 @@ use finstack_quant_core::Result;
 
 /// Theta horizon for a metric context: `metric_pricing_overrides.theta_period`,
 /// else one day.
-pub(crate) fn theta_period(context: &crate::metrics::MetricContext) -> Tenor {
+pub fn theta_period(context: &crate::metrics::MetricContext) -> Tenor {
     context
         .get_metric_pricing_overrides()
         .and_then(|po| po.theta_period)
@@ -109,7 +109,7 @@ pub(crate) fn theta_period(context: &crate::metrics::MetricContext) -> Tenor {
 ///
 /// Returns an error when a month or year count cannot be represented for
 /// date arithmetic.
-pub(crate) fn calculate_theta_date(
+pub fn calculate_theta_date(
     base_date: Date,
     period: Tenor,
     expiry_date: Option<Date>,
@@ -239,7 +239,7 @@ pub fn collect_period_cash(
     )
 }
 
-pub(crate) fn collect_cashflows_in_period_cached(
+pub fn collect_cashflows_in_period_cached(
     context: &mut crate::metrics::MetricContext,
     start_date: Date,
     end_date: Date,
@@ -249,7 +249,7 @@ pub(crate) fn collect_cashflows_in_period_cached(
         .map(|cash| cash.total.amount())
 }
 
-pub(crate) fn collect_period_cash_cached(
+pub fn collect_period_cash_cached(
     context: &mut crate::metrics::MetricContext,
     start_date: Date,
     end_date: Date,
@@ -272,7 +272,7 @@ pub(crate) fn collect_period_cash_cached(
 
 /// Eligible economic payments by date, with the same filtering and FX basis
 /// as period-cash aggregation. Used to accumulate intermediate cash at yield.
-pub(crate) fn period_cash_by_date_cached(
+pub fn period_cash_by_date_cached(
     context: &mut crate::metrics::MetricContext,
     end_date: Date,
 ) -> Result<Vec<(Date, f64)>> {
@@ -376,9 +376,7 @@ fn collect_cashflows_from_flows(
 /// Last economic payment or contractual expiry, whichever is later.
 /// Cashflow dates retain business-day adjustment and payment lag; option
 /// exercise expiry remains unchanged on the instrument itself.
-pub(crate) fn theta_termination_date(
-    context: &mut crate::metrics::MetricContext,
-) -> Result<Option<Date>> {
+pub fn theta_termination_date(context: &mut crate::metrics::MetricContext) -> Result<Option<Date>> {
     context
         .instrument
         .last_payment_date(&context.curves, context.as_of)
@@ -480,7 +478,7 @@ fn store_theta_breakdown(context: &mut crate::metrics::MetricContext, breakdown:
 /// state implied by the as-of spot), or the unchanged instrument when it
 /// returns `None`. See the module docs, "Market Held Fixed".
 #[derive(Default)]
-pub(crate) struct GenericThetaAny;
+pub struct GenericThetaAny;
 
 impl crate::metrics::MetricCalculator for GenericThetaAny {
     fn calculate(&self, context: &mut crate::metrics::MetricContext) -> Result<f64> {

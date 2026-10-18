@@ -79,7 +79,7 @@ const MIN_BUMP_BP_THRESHOLD: f64 = 1e-10;
 /// indistinguishable from a true zero CS01); release builds fall back to 0.0
 /// rather than divide by ~0 and emit inf/NaN.
 #[inline]
-pub(crate) fn sensitivity_central_diff(pv_up: f64, pv_down: f64, bump_bp: f64) -> f64 {
+pub fn sensitivity_central_diff(pv_up: f64, pv_down: f64, bump_bp: f64) -> f64 {
     debug_assert!(
         bump_bp.abs() > MIN_BUMP_BP_THRESHOLD,
         "bump_bp must exceed {MIN_BUMP_BP_THRESHOLD} (got {bump_bp}); validate upstream"
@@ -96,9 +96,7 @@ pub(crate) fn sensitivity_central_diff(pv_up: f64, pv_down: f64, bump_bp: f64) -
 /// unsorted or duplicate tenors silently produce wrong per-bucket sensitivities
 /// (each duplicate tenor would be shocked twice and double-counted in the
 /// series), so reject them up front with a clear error.
-pub(crate) fn validate_buckets_strictly_increasing(
-    buckets: &[f64],
-) -> finstack_quant_core::Result<()> {
+pub fn validate_buckets_strictly_increasing(buckets: &[f64]) -> finstack_quant_core::Result<()> {
     for win in buckets.windows(2) {
         if win[1].partial_cmp(&win[0]) != Some(std::cmp::Ordering::Greater) {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -112,7 +110,7 @@ pub(crate) fn validate_buckets_strictly_increasing(
 }
 
 /// Require a lossless calibration recipe for quote-space spread risk.
-pub(crate) fn require_hazard_replay(
+pub fn require_hazard_replay(
     hazard: &HazardCurve,
     operation: &str,
 ) -> finstack_quant_core::Result<()> {
@@ -143,22 +141,22 @@ pub(crate) fn require_hazard_replay(
 /// recalibration fails, or `revalue_raw` cannot price a bumped hazard curve.
 /// Bump size and CDS bootstrap convention shared by the parallel and
 /// key-rate quote-space CS01 engines.
-pub(crate) struct Cs01Request {
+pub struct Cs01Request {
     /// Symmetric bump applied to each par-spread quote, in basis points.
-    pub(crate) bump_bp: f64,
+    pub bump_bp: f64,
     /// Discount curve used when re-bootstrapping the hazard curve.
-    pub(crate) discount_curve_id: CurveId,
+    pub discount_curve_id: CurveId,
     /// Deal doc clause, when the instrument specifies one.
-    pub(crate) doc_clause: Option<CdsDocClause>,
+    pub doc_clause: Option<CdsDocClause>,
     /// Deal valuation convention, when the instrument specifies one.
-    pub(crate) cds_valuation_convention: Option<CdsValuationConvention>,
+    pub cds_valuation_convention: Option<CdsValuationConvention>,
     /// Optional deal-level clean-spread override.
-    pub(crate) deal_quote_override: Option<DealCdsQuoteOverride>,
+    pub deal_quote_override: Option<DealCdsQuoteOverride>,
 }
 
 impl Cs01Request {
     /// Request with no deal-specific convention (generic calculators).
-    pub(crate) fn generic(bump_bp: f64, discount_curve_id: CurveId) -> Self {
+    pub fn generic(bump_bp: f64, discount_curve_id: CurveId) -> Self {
         Self {
             bump_bp,
             discount_curve_id,
@@ -170,7 +168,7 @@ impl Cs01Request {
 }
 
 /// Swap `bumped` into `scratch`, revalue, and restore `original`.
-pub(crate) fn reprice_with_hazard<B, F>(
+pub fn reprice_with_hazard<B, F>(
     scratch: &mut MarketContext,
     bumped: B,
     original: &Arc<HazardCurve>,
@@ -186,7 +184,7 @@ where
     pv
 }
 
-pub(crate) fn compute_parallel_cs01_with_provider_raw<RevalFn>(
+pub fn compute_parallel_cs01_with_provider_raw<RevalFn>(
     provider: &dyn crate::recalibration::RecalibrationProvider,
     hazard: Arc<HazardCurve>,
     source_market: Arc<MarketContext>,
@@ -259,7 +257,7 @@ where
 /// Returns an error if hazard curve re-calibration fails. This ensures that CS01
 /// is computed under a consistent definition (par spread bump + rebootstrap) rather
 /// than silently falling back to a different methodology.
-pub(crate) fn compute_parallel_cs01_with_context_raw<RevalFn>(
+pub fn compute_parallel_cs01_with_context_raw<RevalFn>(
     context: &mut MetricContext,
     hazard_id: &CurveId,
     request: &Cs01Request,
@@ -301,7 +299,7 @@ where
 /// is computed under a consistent definition rather than silently falling back.
 /// `series_id` names the bucketed series stored on the context; `request`
 /// carries the bump size and CDS bootstrap convention.
-pub(crate) fn compute_key_rate_cs01_series_with_context_raw<RevalFn>(
+pub fn compute_key_rate_cs01_series_with_context_raw<RevalFn>(
     context: &mut MetricContext,
     hazard_id: &CurveId,
     series_id: MetricId,
@@ -316,7 +314,7 @@ where
 }
 
 /// The same exact-quote bucketing for a hazard embedded in a credit index.
-pub(crate) fn compute_key_rate_cs01_series_for_hazard<RevalFn>(
+pub fn compute_key_rate_cs01_series_for_hazard<RevalFn>(
     context: &mut MetricContext,
     hazard: Arc<HazardCurve>,
     series_id: MetricId,
@@ -434,7 +432,7 @@ fn missing_credit_curve_error(
     ))
 }
 
-pub(crate) fn resolve_optional_cs01_curves(
+pub fn resolve_optional_cs01_curves(
     instrument: &dyn Instrument,
     empty_credit_curve_zero: bool,
     metric_name: &str,
@@ -449,13 +447,13 @@ pub(crate) fn resolve_optional_cs01_curves(
 /// Generic BucketedCs01 calculator for any instrument that declares a credit
 /// curve dependency.
 #[derive(Default)]
-pub(crate) struct GenericBucketedCs01;
+pub struct GenericBucketedCs01;
 
 /// Generic parallel CS01 calculator that returns a scalar (not bucketed).
 ///
 /// Computes CS01 by applying a parallel bump to the entire hazard curve.
 #[derive(Default)]
-pub(crate) struct GenericParallelCs01;
+pub struct GenericParallelCs01;
 
 impl MetricCalculator for GenericParallelCs01 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
@@ -531,7 +529,7 @@ impl MetricCalculator for GenericBucketedCs01 {
 }
 
 /// Build the reval closure used by CS01 calculators.
-pub(crate) fn cs01_reval(
+pub fn cs01_reval(
     context: &MetricContext,
 ) -> impl FnMut(&MarketContext) -> finstack_quant_core::Result<f64> {
     let inst_arc = Arc::clone(&context.instrument);

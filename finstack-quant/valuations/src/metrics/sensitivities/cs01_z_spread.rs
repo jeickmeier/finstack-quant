@@ -9,8 +9,8 @@
 //! as `0.0`.
 //!
 //! This module computes CS01 for those instruments using the **market-standard
-//! z-spread bump**, mirroring the bond z-spread fallback in
-//! [`bond::metrics::cs01`]:
+//! z-spread bump**, mirroring the bond z-spread fallback in the bond's
+//! `metrics::cs01`:
 //!
 //! ```text
 //! CS01 = (PV_z(z* + 1bp) - PV_z(z* - 1bp)) / 2
@@ -41,7 +41,6 @@
 //! same convention as every other CS01 calculator in the workspace.
 //!
 //! [canonical]: crate::metrics::sensitivities::cs01
-//! [`bond::metrics::cs01`]: crate::instruments::fixed_income::bond::metrics::cs01
 //! [`z_spread_discount_factor`]: finstack_quant_core::math::z_spread_discount_factor
 
 use std::marker::PhantomData;
@@ -72,7 +71,7 @@ use crate::metrics::{
 /// The flows are the **holder-view** cashflows the discounting pricer values
 /// (e.g. coupons, fees, amortization and redemptions, with PIK and pre-anchor
 /// flows already excluded), so `PV_z(0)` reproduces the model PV.
-pub(crate) struct ZSpreadCs01Inputs {
+pub struct ZSpreadCs01Inputs {
     /// Date the PV is anchored to (settlement date for term loans, valuation
     /// date for revolvers). Discount factors and z-spread year fractions are
     /// measured from here, matching the discounting pricer.
@@ -87,7 +86,7 @@ pub(crate) struct ZSpreadCs01Inputs {
 
 /// Instruments whose CS01 is computed via a z-spread (parallel discount-curve
 /// spread) bump because their pricer discounts on a single curve.
-pub(crate) trait ZSpreadCs01 {
+pub trait ZSpreadCs01 {
     /// Explicit quoted z-spread, in decimal units, used directly as the risk anchor.
     fn z_spread_cs01_quoted_spread(&self) -> Option<f64> {
         None
@@ -219,7 +218,7 @@ fn anchor_spread<I: ZSpreadCs01>(
 }
 
 /// Resolve the z-spread implied by an instrument's quoted price.
-pub(crate) fn quoted_z_spread<I>(
+pub fn quoted_z_spread<I>(
     instrument: &I,
     context: &MetricContext,
 ) -> finstack_quant_core::Result<Option<f64>>
@@ -293,14 +292,14 @@ fn has_credit_curve<I: Instrument>(instrument: &I) -> finstack_quant_core::Resul
 /// canonical hazard-rebootstrap CS01) — used by revolving credit, whose pricer
 /// consumes the hazard curve when one is present. Otherwise CS01 is the
 /// z-spread bump, keyed `cs01::<instrument_id>`.
-pub(crate) struct ZSpreadParallelCs01<I> {
+pub struct ZSpreadParallelCs01<I> {
     delegate_to_hazard_when_credit_curve: bool,
     _phantom: PhantomData<I>,
 }
 
 impl<I> ZSpreadParallelCs01<I> {
     /// Z-spread CS01 only; never delegates to a hazard-curve calculator.
-    pub(crate) fn z_spread_only() -> Self {
+    pub fn z_spread_only() -> Self {
         Self {
             delegate_to_hazard_when_credit_curve: false,
             _phantom: PhantomData,
@@ -309,7 +308,7 @@ impl<I> ZSpreadParallelCs01<I> {
 
     /// Delegate to the canonical hazard CS01 when a credit curve is present,
     /// falling back to the z-spread bump otherwise (e.g. revolving credit).
-    pub(crate) fn hazard_when_credit_curve() -> Self {
+    pub fn hazard_when_credit_curve() -> Self {
         Self {
             delegate_to_hazard_when_credit_curve: true,
             _phantom: PhantomData,
@@ -381,14 +380,14 @@ where
 /// `bucketed_cs01::<instrument_id>::<tenor>` whose sum reconciles to the
 /// parallel z-spread CS01. Delegates to [`GenericBucketedCs01`] when configured
 /// and a credit curve is present (revolving credit).
-pub(crate) struct ZSpreadBucketedCs01<I> {
+pub struct ZSpreadBucketedCs01<I> {
     delegate_to_hazard_when_credit_curve: bool,
     _phantom: PhantomData<I>,
 }
 
 impl<I> ZSpreadBucketedCs01<I> {
     /// Z-spread bucketed CS01 only; never delegates to a hazard-curve calculator.
-    pub(crate) fn z_spread_only() -> Self {
+    pub fn z_spread_only() -> Self {
         Self {
             delegate_to_hazard_when_credit_curve: false,
             _phantom: PhantomData,
@@ -397,7 +396,7 @@ impl<I> ZSpreadBucketedCs01<I> {
 
     /// Delegate to the canonical hazard bucketed CS01 when a credit curve is
     /// present, falling back to the z-spread bump otherwise (revolving credit).
-    pub(crate) fn hazard_when_credit_curve() -> Self {
+    pub fn hazard_when_credit_curve() -> Self {
         Self {
             delegate_to_hazard_when_credit_curve: true,
             _phantom: PhantomData,

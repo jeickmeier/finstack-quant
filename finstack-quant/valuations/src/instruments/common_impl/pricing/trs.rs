@@ -336,7 +336,7 @@ impl TrsEngine {
         Money::new(pv.total(), currency)
     }
 
-    pub(crate) fn cashflows_total_return_leg_with_model(
+    pub fn cashflows_total_return_leg_with_model(
         params: TotalReturnLegParams,
         market: &MarketContext,
         as_of: Date,
@@ -422,7 +422,7 @@ impl TrsEngine {
         Money::new(pv.total(), currency)
     }
 
-    pub(crate) fn cashflows_financing_leg(
+    pub fn cashflows_financing_leg(
         financing: &FinancingLegSpec,
         schedule: &TrsScheduleSpec,
         notional: Money,

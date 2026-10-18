@@ -93,7 +93,7 @@ impl EquityUnderlyingParams {
     /// # Arguments
     ///
     /// * `context` - Instrument name included in validation diagnostics.
-    pub(crate) fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
+    pub fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
         if self.ticker.trim().is_empty() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{context} requires a non-empty equity ticker"
@@ -159,7 +159,7 @@ impl CommodityUnderlyingParams {
     /// # Arguments
     ///
     /// * `context` - Instrument name included in validation diagnostics.
-    pub(crate) fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
+    pub fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
         for (field, value) in [
             ("commodity_type", self.commodity_type.as_str()),
             ("underlying_ticker", self.underlying_ticker.as_str()),
@@ -235,7 +235,7 @@ impl IndexUnderlyingParams {
     /// # Arguments
     ///
     /// * `context` - Instrument name included in validation diagnostics.
-    pub(crate) fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
+    pub fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
         if self.index_id.as_str().trim().is_empty() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{context} requires a non-empty index_id"

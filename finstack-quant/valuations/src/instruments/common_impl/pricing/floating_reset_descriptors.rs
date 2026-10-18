@@ -35,7 +35,7 @@ use rust_decimal::prelude::ToPrimitive;
 /// Convert a [`FloatingRateSpec`] into the f64 composition parameters the
 /// increment shares with the emission (same mapping the term-loan
 /// discounting pricer applies for realized fixings).
-pub(crate) fn params_from_spec(spec: &FloatingRateSpec) -> FloatingRateParams {
+pub fn params_from_spec(spec: &FloatingRateSpec) -> FloatingRateParams {
     FloatingRateParams {
         spread_bp: spec.spread_bp.to_f64().unwrap_or_default(),
         gearing: spec.gearing.to_f64().unwrap_or(1.0),
@@ -50,7 +50,7 @@ pub(crate) fn params_from_spec(spec: &FloatingRateSpec) -> FloatingRateParams {
 /// Whether period-level composition must drop index-level floor/cap
 /// because the leg applies them daily inside an overnight-compounded
 /// window (mirrors the emission's `period_rate_params_for_overnight`).
-pub(crate) fn strips_index_constraints(spec: &FloatingRateSpec) -> bool {
+pub fn strips_index_constraints(spec: &FloatingRateSpec) -> bool {
     spec.compounding.is_some()
         && spec.overnight_index_constraints == OvernightIndexConstraintApplication::Daily
 }
@@ -67,7 +67,7 @@ fn ceil_step(time_steps: &[f64], t: f64) -> usize {
 }
 
 /// Inputs for [`build_node_coupons`].
-pub(crate) struct NodeCouponBuildInputs<'a> {
+pub struct NodeCouponBuildInputs<'a> {
     /// Canonical emitted schedule (already projected off today's curves).
     pub schedule: &'a CashFlowSchedule,
     /// Instrument-level floating-rate composition parameters.
@@ -100,7 +100,7 @@ pub(crate) struct NodeCouponBuildInputs<'a> {
 /// Returns [`Error::Validation`] when a future floating coupon's reset and
 /// payment dates snap to the same tree slice (grid too coarse) or a
 /// year-fraction computation fails.
-pub(crate) fn build_node_coupons(
+pub fn build_node_coupons(
     inputs: &NodeCouponBuildInputs<'_>,
     notional_at_step: impl Fn(usize) -> f64,
 ) -> Result<Vec<NodeCoupon>> {
@@ -197,7 +197,7 @@ pub(crate) fn build_node_coupons(
 /// principal, making outstanding balance, recovery, and redemption
 /// path-dependent. The engines reject that combination in stochastic-rate
 /// mode rather than misstate principal.
-pub(crate) fn has_future_pik(schedule: &CashFlowSchedule, grid_origin: Date) -> bool {
+pub fn has_future_pik(schedule: &CashFlowSchedule, grid_origin: Date) -> bool {
     schedule
         .get_flows()
         .iter()

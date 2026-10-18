@@ -7,7 +7,7 @@
 //! `accrued_interest` → `accrued`).
 
 /// Maximum number of suggestions attached to an unknown-metric error.
-pub(crate) const MAX_METRIC_SUGGESTIONS: usize = 5;
+pub const MAX_METRIC_SUGGESTIONS: usize = 5;
 
 /// Rank `candidates` by similarity to `requested` and return the best `limit`.
 ///
@@ -22,7 +22,7 @@ pub(crate) const MAX_METRIC_SUGGESTIONS: usize = 5;
 /// * `requested` - The metric name the caller supplied (any case).
 /// * `candidates` - Known metric identifiers to rank; duplicates are kept.
 /// * `limit` - Maximum number of names returned; `0` yields an empty vector.
-pub(crate) fn closest_metric_names<'a>(
+pub fn closest_metric_names<'a>(
     requested: &str,
     candidates: impl IntoIterator<Item = &'a str>,
     limit: usize,

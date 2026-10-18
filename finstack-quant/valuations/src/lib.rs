@@ -94,7 +94,8 @@ extern crate self as finstack_quant_valuations;
 
 /// Shared numerical constants and basis point helpers.
 pub mod constants;
-pub(crate) mod contract_specs;
+#[doc(hidden)]
+pub mod contract_specs;
 /// Error types for pricing and valuation workflows.
 pub mod error;
 /// Market quotes and conventions
@@ -108,7 +109,8 @@ pub mod recalibration;
 pub mod results;
 /// JSON Schema generation for API contracts.
 pub mod schema;
-pub(crate) mod serde_defaults;
+#[doc(hidden)]
+pub mod serde_defaults;
 
 /// Hidden support paths for exported macros.
 #[doc(hidden)]

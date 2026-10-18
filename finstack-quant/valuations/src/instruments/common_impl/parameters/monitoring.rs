@@ -25,7 +25,7 @@ pub enum Monitoring {
 }
 
 impl Monitoring {
-    pub(crate) fn time_grid(
+    pub fn time_grid(
         &self,
         as_of: Date,
         day_count: DayCount,

@@ -15,7 +15,7 @@ use finstack_quant_core::Result;
 
 /// Curve source used to project future overnight fixings.
 #[derive(Clone, Copy)]
-pub(crate) enum OvernightProjectionCurve<'a> {
+pub enum OvernightProjectionCurve<'a> {
     /// Explicit overnight forward curve.
     Forward(&'a ForwardCurve),
     /// Single-curve OIS fallback projected from discount factors.
@@ -23,7 +23,7 @@ pub(crate) enum OvernightProjectionCurve<'a> {
 }
 
 /// Inputs for one compounded overnight coupon projection.
-pub(crate) struct OvernightCouponProjectionInput<'a> {
+pub struct OvernightCouponProjectionInput<'a> {
     /// Projection source for future observations.
     pub curve: OvernightProjectionCurve<'a>,
     /// Historical fixing series for observations before `as_of`.
@@ -59,7 +59,7 @@ pub(crate) struct OvernightCouponProjectionInput<'a> {
 
 /// First-order stochastic exposure of one overnight observation.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct OvernightObservationExposure {
+pub struct OvernightObservationExposure {
     /// Date on which the overnight rate is observed and fixed.
     pub observation_start: Date,
     /// End of the overnight rate interval.
@@ -80,7 +80,7 @@ pub(crate) struct OvernightObservationExposure {
 
 /// Projected economics of one compounded overnight coupon.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct OvernightCouponProjection {
+pub struct OvernightCouponProjection {
     /// Equivalent simple annualized coupon rate.
     pub rate: f64,
     /// Coupon accrual fraction recomputed from the adjusted accrual boundaries.
@@ -103,7 +103,7 @@ pub(crate) struct OvernightCouponProjection {
 /// SOFR and Federal Funds futures. Calendar-day weights are produced by
 /// advancing between fixing-calendar business days, so a Friday observation
 /// naturally carries through the weekend.
-pub(crate) struct OvernightArithmeticProjectionInput<'a> {
+pub struct OvernightArithmeticProjectionInput<'a> {
     /// Projection source for future observations.
     pub curve: OvernightProjectionCurve<'a>,
     /// Historical fixing series for observations before `as_of`.
@@ -124,7 +124,7 @@ pub(crate) struct OvernightArithmeticProjectionInput<'a> {
 
 /// Projected economics of an arithmetic-average overnight rate.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct OvernightArithmeticProjection {
+pub struct OvernightArithmeticProjection {
     /// Calendar-day-weighted annualized rate in decimal units.
     pub rate: f64,
     /// Derivative of `rate` to a parallel bump of every projected observation.
@@ -160,7 +160,7 @@ pub fn default_rate_calendar_id(currency: Currency) -> Option<&'static str> {
 }
 
 /// Resolve the explicit or currency-standard fixing calendar for an RFR coupon.
-pub(crate) fn resolve_overnight_fixing_calendar(
+pub fn resolve_overnight_fixing_calendar(
     calendar_id: Option<&str>,
     currency: Currency,
     instrument_label: &str,
@@ -178,7 +178,7 @@ pub(crate) fn resolve_overnight_fixing_calendar(
 ///
 /// The schedule builder may preserve unadjusted roll dates, while overnight observations
 /// must start and end on business days. IRS and cap/floor projection share this helper.
-pub(crate) fn adjust_overnight_accrual_boundaries(
+pub fn adjust_overnight_accrual_boundaries(
     accrual_start: Date,
     accrual_end: Date,
     business_day_convention: BusinessDayConvention,
@@ -248,7 +248,7 @@ fn last_overnight_observation(
     end.add_business_days(-1, calendar)
 }
 /// Last observation date that contractually determines an overnight coupon.
-pub(crate) fn final_overnight_fixing_date(
+pub fn final_overnight_fixing_date(
     start: Date,
     end: Date,
     compounding: &FloatingLegCompounding,
@@ -443,7 +443,7 @@ fn projected_rate(
 /// Observations strictly before `as_of` must be present in the historical fixing
 /// series. The same-day observation remains projected because valuation occurs at
 /// the start of day, before publication.
-pub(crate) fn project_arithmetic_overnight_rate(
+pub fn project_arithmetic_overnight_rate(
     input: OvernightArithmeticProjectionInput<'_>,
 ) -> Result<OvernightArithmeticProjection> {
     let day_count_context = DayCountContext {
@@ -556,7 +556,7 @@ pub(crate) fn project_arithmetic_overnight_rate(
 /// The sensitivity differentiates the complete product, not a simple endpoint
 /// forward. Realized fixing factors have zero forward sensitivity; every future
 /// factor contributes through the product rule.
-pub(crate) fn project_overnight_coupon(
+pub fn project_overnight_coupon(
     input: OvernightCouponProjectionInput<'_>,
 ) -> Result<OvernightCouponProjection> {
     let day_count_context = DayCountContext {
@@ -796,7 +796,7 @@ pub(crate) fn project_overnight_coupon(
 /// * `projection` - Compounded overnight coupon already projected on the
 ///   adjusted accrual window.
 /// * `spread` - Arithmetic spread in decimal rate units (not basis points).
-pub(crate) fn overnight_coupon_amount(
+pub fn overnight_coupon_amount(
     notional: f64,
     projection: &OvernightCouponProjection,
     spread: f64,

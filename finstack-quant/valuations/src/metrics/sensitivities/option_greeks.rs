@@ -20,7 +20,7 @@ use finstack_quant_core::Result;
 /// products bump the discount curve; multi-curve caps bump their projection
 /// curve while holding discounting fixed. Parameters are held or recalibrated
 /// exactly as in each selected pricer's normal market-input resolution.
-pub(crate) fn selected_rate_greek(
+pub fn selected_rate_greek(
     context: &MetricContext,
     curve_id: &finstack_quant_core::types::CurveId,
     second: bool,
@@ -46,7 +46,7 @@ pub(crate) fn selected_rate_greek(
     }
 }
 
-pub(crate) struct OptionGreekCalculator<I> {
+pub struct OptionGreekCalculator<I> {
     kind: OptionGreekKind,
     _phantom: PhantomData<I>,
 }
@@ -59,35 +59,35 @@ impl<I> OptionGreekCalculator<I> {
         }
     }
 
-    pub(crate) fn delta() -> Self {
+    pub fn delta() -> Self {
         Self::new(OptionGreekKind::Delta)
     }
 
-    pub(crate) fn gamma() -> Self {
+    pub fn gamma() -> Self {
         Self::new(OptionGreekKind::Gamma)
     }
 
-    pub(crate) fn vega() -> Self {
+    pub fn vega() -> Self {
         Self::new(OptionGreekKind::Vega)
     }
 
-    pub(crate) fn theta() -> Self {
+    pub fn theta() -> Self {
         Self::new(OptionGreekKind::Theta)
     }
 
-    pub(crate) fn rho() -> Self {
+    pub fn rho() -> Self {
         Self::new(OptionGreekKind::Rho)
     }
 
-    pub(crate) fn foreign_rho() -> Self {
+    pub fn foreign_rho() -> Self {
         Self::new(OptionGreekKind::ForeignRho)
     }
 
-    pub(crate) fn vanna() -> Self {
+    pub fn vanna() -> Self {
         Self::new(OptionGreekKind::Vanna)
     }
 
-    pub(crate) fn volga() -> Self {
+    pub fn volga() -> Self {
         Self::new(OptionGreekKind::Volga)
     }
 }

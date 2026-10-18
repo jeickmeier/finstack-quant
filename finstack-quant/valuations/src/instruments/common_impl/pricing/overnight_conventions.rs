@@ -69,7 +69,7 @@ pub fn compounding_from_conventions(
 ///
 /// Propagates registry initialization errors and overnight-convention
 /// validation failures.
-pub(crate) fn compounding_from_index_id(index_id: &str) -> Result<Option<FloatingLegCompounding>> {
+pub fn compounding_from_index_id(index_id: &str) -> Result<Option<FloatingLegCompounding>> {
     match rate_index_conventions(index_id)? {
         Some(conv) => Ok(Some(compounding_from_conventions(&conv)?)),
         None => Ok(None),
@@ -89,10 +89,7 @@ pub(crate) fn compounding_from_index_id(index_id: &str) -> Result<Option<Floatin
 ///
 /// Returns a validation error when a registered overnight RFR is paired with
 /// `FloatingLegCompounding::Simple`.
-pub(crate) fn reject_simple_overnight(
-    index_id: &str,
-    compounding: &FloatingLegCompounding,
-) -> Result<()> {
+pub fn reject_simple_overnight(index_id: &str, compounding: &FloatingLegCompounding) -> Result<()> {
     let Some(conv) = rate_index_conventions(index_id)? else {
         return Ok(());
     };
@@ -123,7 +120,7 @@ fn reject_simple_overnight_kind(
 /// # Arguments
 ///
 /// * `compounding` - Canonical floating-leg compounding of the leg.
-pub(crate) fn builder_overnight_method(
+pub fn builder_overnight_method(
     compounding: FloatingLegCompounding,
 ) -> Option<FloatingLegCompounding> {
     compounding.is_overnight().then_some(compounding)
@@ -145,7 +142,7 @@ pub(crate) fn builder_overnight_method(
 /// Returns a validation error for `simple_average` (the shared overnight
 /// projector compounds; it does not arithmetic-average) and propagates
 /// registry errors.
-pub(crate) fn resolved_overnight_compounding(
+pub fn resolved_overnight_compounding(
     index_id: &str,
     explicit: Option<&FloatingLegCompounding>,
 ) -> Result<Option<FloatingLegCompounding>> {

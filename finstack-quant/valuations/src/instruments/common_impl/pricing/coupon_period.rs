@@ -7,7 +7,7 @@ use finstack_quant_core::dates::Date;
 /// Returns the quasi-coupon period `(first_flow − frequency, first_flow)`
 /// surrounding the settlement date, where `first_flow` is the first cashflow
 /// date strictly after `as_of`. Supplying this period through
-/// [`DayCountContext::coupon_period`] lets ISMA year fractions resolve for
+/// [`DayCountContext::coupon_period`](finstack_quant_core::dates::DayCountContext::coupon_period) lets ISMA year fractions resolve for
 /// spans that are not whole multiples of the coupon frequency (mid-coupon
 /// settlement, stubs), which the frequency-only path rejects; the core
 /// reference-period traversal then walks the quasi-coupon grid anchored on
@@ -26,7 +26,7 @@ use finstack_quant_core::dates::Date;
 /// Returns `None` for non-ICMA day counts, week/day frequencies, or when no
 /// flow falls strictly after `as_of` (callers then keep the frequency-only
 /// context and its existing error behavior).
-pub(crate) fn icma_reference_period(
+pub fn icma_reference_period(
     day_count: finstack_quant_core::dates::DayCount,
     frequency: finstack_quant_core::dates::Tenor,
     dates: impl IntoIterator<Item = Date>,

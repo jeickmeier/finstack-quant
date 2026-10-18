@@ -31,7 +31,8 @@
 //! [`standard_pricer_registry`](crate::pricer::standard_pricer_registry) is its pricer registry.
 
 // Core submodules
-pub(crate) mod defaults;
+#[doc(hidden)]
+pub mod defaults;
 mod enrichment;
 mod errors;
 mod family;
@@ -77,6 +78,7 @@ use crate::metrics::{MetricRegistry, MetricRegistryError};
 ///   under the explicit model key.
 ///
 /// Both forms expand to a single `registry.register(...)` call.
+#[macro_export]
 macro_rules! register_generic {
     ($registry:expr, $inst:expr, $ty:ty $(,)?) => {
         $registry.register($crate::instruments::common_impl::GenericInstrumentPricer::<
@@ -90,7 +92,7 @@ macro_rules! register_generic {
     };
 }
 
-pub(crate) use register_generic;
+pub use register_generic;
 
 /// The built-in instrument families, each owning a disjoint set of
 /// instrument types.

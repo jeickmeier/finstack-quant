@@ -18,7 +18,7 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 
 /// Read a scalar price amount without discarding an attached currency.
-pub(crate) fn scalar_price_amount(
+pub fn scalar_price_amount(
     scalar: &MarketScalar,
     expected_currency: Currency,
 ) -> finstack_quant_core::Result<f64> {
@@ -32,7 +32,7 @@ pub(crate) fn scalar_price_amount(
     }
 }
 
-pub(crate) fn attach_mc_diagnostics(
+pub fn attach_mc_diagnostics(
     result: &mut crate::results::ValuationResult,
     estimate: &finstack_quant_models::monte_carlo::results::MoneyEstimate,
 ) {
@@ -56,7 +56,7 @@ pub(crate) fn attach_mc_diagnostics(
 /// Construction performs the only mandatory invariant/override validation
 /// step. Callers may then resolve the effective date, run their chosen model
 /// kernel, and apply the instrument-owned scenario adjustment exactly once.
-pub(crate) struct ValidatedPricingLifecycle<'a, I>
+pub struct ValidatedPricingLifecycle<'a, I>
 where
     I: crate::instruments::common_impl::traits::Instrument + ?Sized,
 {
@@ -68,28 +68,28 @@ where
     I: crate::instruments::common_impl::traits::Instrument + ?Sized,
 {
     /// Validate the complete instrument pricing boundary.
-    pub(crate) fn new(instrument: &'a I) -> finstack_quant_core::Result<Self> {
+    pub fn new(instrument: &'a I) -> finstack_quant_core::Result<Self> {
         instrument.validate_for_pricing()?;
         Ok(Self { instrument })
     }
 
     /// Enter the lifecycle after a trusted boundary already validated the instrument.
-    pub(crate) fn from_validated(instrument: &'a I) -> Self {
+    pub fn from_validated(instrument: &'a I) -> Self {
         Self { instrument }
     }
 
     /// Resolve the instrument's effective valuation date after validation.
-    pub(crate) fn effective_as_of(&self, market: &MarketContext, requested: Date) -> Date {
+    pub fn effective_as_of(&self, market: &MarketContext, requested: Date) -> Date {
         self.instrument.resolve_pricing_as_of(market, requested)
     }
 
     /// Apply the instrument scenario to a model `Money` result exactly once.
-    pub(crate) fn apply_value(&self, base_value: Money) -> finstack_quant_core::Result<Money> {
+    pub fn apply_value(&self, base_value: Money) -> finstack_quant_core::Result<Money> {
         apply_scenario_value(self.instrument, base_value)
     }
 
     /// Apply the instrument scenario to a raw model result exactly once.
-    pub(crate) fn apply_raw_value(&self, base_value: f64) -> f64 {
+    pub fn apply_raw_value(&self, base_value: f64) -> f64 {
         apply_scenario_raw_value(self.instrument, base_value)
     }
 }
@@ -99,7 +99,7 @@ where
 /// Registry, direct-value, and metric assembly paths all route through this
 /// helper so the adjustment remains an exactly-once lifecycle step.
 #[inline]
-pub(crate) fn apply_scenario_value<I>(
+pub fn apply_scenario_value<I>(
     instrument: &I,
     base_value: Money,
 ) -> finstack_quant_core::Result<Money>
@@ -119,7 +119,7 @@ where
 /// multiplier outside `Money` preserves the precision expected by finite-
 /// difference risk calculations.
 #[inline]
-pub(crate) fn apply_scenario_raw_value<I>(instrument: &I, base_value: f64) -> f64
+pub fn apply_scenario_raw_value<I>(instrument: &I, base_value: f64) -> f64
 where
     I: crate::instruments::common_impl::traits::Instrument + ?Sized,
 {
@@ -142,11 +142,7 @@ where
 /// `df <= 0` would yield `NaN` or `+inf` from `ln`, masking a corrupted curve
 /// or extreme rate environment.
 #[inline]
-pub(crate) fn zero_rate_from_df(
-    df: f64,
-    t: f64,
-    context: &str,
-) -> finstack_quant_core::Result<f64> {
+pub fn zero_rate_from_df(df: f64, t: f64, context: &str) -> finstack_quant_core::Result<f64> {
     if t <= 0.0 {
         return Ok(0.0);
     }
@@ -540,16 +536,16 @@ pub fn get_unitless_scalar_strict(
 /// after construction, so this is safe for concurrent reads.
 /// Crate-private bundle at the registry → metric boundary.
 #[derive(Default)]
-pub(crate) struct MetricBuildOptions {
-    pub(crate) pricing: PricingOptions,
-    pub(crate) pricing_dispatch: PricingDispatch,
+pub struct MetricBuildOptions {
+    pub pricing: PricingOptions,
+    pub pricing_dispatch: PricingDispatch,
     /// Measures the model pricer already published for this valuation, taken
     /// verbatim from its `ValuationResult`. Standard identifiers among them
     /// seed the metric context; see [`compute_metrics_dyn`].
-    pub(crate) pricer_measures: IndexMap<MetricId, f64>,
+    pub pricer_measures: IndexMap<MetricId, f64>,
 }
 
-pub(crate) fn compute_metrics_dyn(
+pub fn compute_metrics_dyn(
     instrument: Arc<dyn crate::instruments::common_impl::traits::Instrument>,
     curves: Arc<MarketContext>,
     as_of: Date,
@@ -672,7 +668,7 @@ pub(crate) fn compute_metrics_dyn(
 /// Production pricing enriches the model-produced result envelope in the
 /// registry and must not construct a parallel `ValuationResult` here.
 #[cfg(test)]
-pub(crate) fn build_with_metrics_dyn(
+pub fn build_with_metrics_dyn(
     instrument: Arc<dyn crate::instruments::common_impl::traits::Instrument>,
     curves: Arc<MarketContext>,
     as_of: Date,
@@ -1346,10 +1342,7 @@ use finstack_quant_core::market_data::scalars::InflationLag;
 ///
 /// Returns a validation error when the lag underflows the supported calendar
 /// or the lag convention is unsupported.
-pub(crate) fn apply_inflation_lag(
-    date: Date,
-    lag: InflationLag,
-) -> finstack_quant_core::Result<Date> {
+pub fn apply_inflation_lag(date: Date, lag: InflationLag) -> finstack_quant_core::Result<Date> {
     match lag {
         InflationLag::None => Ok(date),
         InflationLag::Months(m) => date.add_months(-i32::from(m)),
@@ -1372,7 +1365,7 @@ pub(crate) fn apply_inflation_lag(
 /// date minus that lag. Ignoring it would read the curve on an unlagged time
 /// axis while the curve itself is built on a lagged one, silently
 /// over-projecting the reference index at both ends of a swap.
-pub(crate) fn resolve_inflation_lag(
+pub fn resolve_inflation_lag(
     contract_lag: Option<InflationLag>,
     index_id: &str,
     curves: &MarketContext,
@@ -1402,7 +1395,7 @@ pub(crate) fn resolve_inflation_lag(
 ///
 /// The index is cloned with the instrument's effective lag so a contract-level
 /// lag override is honored without mutating shared market data.
-pub(crate) fn realized_inflation_index_value(
+pub fn realized_inflation_index_value(
     index: &InflationIndex,
     unlagged_date: Date,
     effective_date: Date,
@@ -1447,7 +1440,7 @@ pub(crate) fn realized_inflation_index_value(
 
 /// Resolved reference CPI together with the information needed to distinguish
 /// observed fixings from projections for option valuation.
-pub(crate) struct InflationReferenceValue {
+pub struct InflationReferenceValue {
     /// Reference CPI after observation lag and monthly interpolation.
     pub value: f64,
     /// Whether every required anchor has an available historical fixing.
@@ -1461,7 +1454,7 @@ pub(crate) struct InflationReferenceValue {
 /// Explicit monthly publication dates control availability independently of the
 /// observation lag. Without one, past reference anchors remain strictly required
 /// history; a stale feed cannot silently extend the forecast window.
-pub(crate) fn reference_inflation_value(
+pub fn reference_inflation_value(
     market: &MarketContext,
     index_id: &str,
     date: Date,
@@ -1473,7 +1466,7 @@ pub(crate) fn reference_inflation_value(
 }
 
 /// Resolve reference CPI and the availability of every interpolation anchor.
-pub(crate) fn resolve_reference_inflation(
+pub fn resolve_reference_inflation(
     market: &MarketContext,
     index_id: &str,
     date: Date,

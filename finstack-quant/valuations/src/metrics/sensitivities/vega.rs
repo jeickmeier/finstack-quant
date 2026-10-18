@@ -23,7 +23,7 @@ use std::marker::PhantomData;
 /// # Type Parameters
 ///
 /// * `I` - Instrument type that implements [`Instrument`] and has a volatility surface
-pub(crate) struct KeyRateVega<I> {
+pub struct KeyRateVega<I> {
     expiries: Vec<f64>,
     strikes: Vec<f64>,
     _phantom: PhantomData<I>,
@@ -36,7 +36,7 @@ impl<I> KeyRateVega<I> {
     ///
     /// * `expiries` - Strictly increasing actual source expiries in years; empty selects every source expiry.
     /// * `strikes` - Strictly increasing actual source strikes; empty selects every source strike.
-    pub(crate) fn new(expiries: Vec<f64>, strikes: Vec<f64>) -> Self {
+    pub fn new(expiries: Vec<f64>, strikes: Vec<f64>) -> Self {
         Self {
             expiries,
             strikes,

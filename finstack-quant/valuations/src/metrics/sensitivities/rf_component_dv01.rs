@@ -13,7 +13,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use std::marker::PhantomData;
 
 /// Instruments whose PV is discounted at an instrument-owned appraisal rate.
-pub(crate) trait RfComponentPriced: Instrument {
+pub trait RfComponentPriced: Instrument {
     /// Present value with the discount rate bumped by `bump_at(t)` (absolute,
     /// decimal) at each cashflow tenor `t` (in years). `bump_at = |_| 0.0`
     /// must reproduce the unbumped PV.
@@ -26,15 +26,22 @@ pub(crate) trait RfComponentPriced: Instrument {
 }
 
 /// Per-basis-point sensitivity to an instrument-owned appraisal discount rate.
-pub(crate) struct RfComponentDv01Calculator<I> {
+pub struct RfComponentDv01Calculator<I> {
     _phantom: PhantomData<I>,
 }
 
-impl<I> RfComponentDv01Calculator<I> {
-    pub(crate) fn new() -> Self {
+impl<I> Default for RfComponentDv01Calculator<I> {
+    fn default() -> Self {
         Self {
             _phantom: PhantomData,
         }
+    }
+}
+
+impl<I> RfComponentDv01Calculator<I> {
+    /// A calculator for the instrument type `I`.
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 

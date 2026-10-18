@@ -85,7 +85,7 @@ pub enum FutureOptionSettlement {
 }
 
 impl FutureOptionSettlement {
-    pub(crate) fn terminal_date(&self) -> Date {
+    pub fn terminal_date(&self) -> Date {
         match self {
             Self::Cash { payment_date } => *payment_date,
             Self::Future {

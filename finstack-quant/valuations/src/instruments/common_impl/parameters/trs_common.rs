@@ -71,7 +71,7 @@ impl TrsScheduleSpec {
     /// # Arguments
     ///
     /// * `context` - Instrument name included in validation diagnostics.
-    pub(crate) fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
+    pub fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
         if self.start >= self.end {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{context} schedule start must precede end"
