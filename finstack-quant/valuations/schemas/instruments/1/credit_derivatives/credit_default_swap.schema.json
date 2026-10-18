@@ -26,7 +26,7 @@
       ]
     },
     "CdsDocClause": {
-      "description": "CDS market standard documentation clauses.\n\nRepresents the ISDA documentation clause used for CDS contracts. Different clauses\ndefine different restructuring events and settlement procedures. Used as part of\n[`CdsConventionKey`] to look up CDS conventions.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::market::conventions::ids::CdsDocClause;\n\nlet clause = CdsDocClause::Cr14; // Cum-Restructuring 2014\n```",
+      "description": "CDS market standard documentation clauses.\n\nRepresents the ISDA documentation clause used for CDS contracts. Different clauses\ndefine different restructuring events and settlement procedures. Used as part of\n[`CdsConventionKey`] to look up CDS conventions.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;\n\nlet clause = CdsDocClause::Cr14; // Cum-Restructuring 2014\n```",
       "oneOf": [
         {
           "const": "cr14",

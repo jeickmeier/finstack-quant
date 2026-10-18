@@ -323,7 +323,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
         quote! { #validator(&__built)?; }
     } else {
         quote! {
-            finstack_quant_valuations::instruments::Instrument::validate_invariants(&__built)?;
+            finstack_quant_valuations_core::instruments::Instrument::validate_invariants(&__built)?;
         }
     };
     let expanded = quote! {

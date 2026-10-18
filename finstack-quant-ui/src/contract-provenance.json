@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "63fcfff357fba352bc4729f6eb0eec124bbdbf0171ae8213603d3be14b0f946f",
+          "sha256": "52ce5da625252f18a856b83d2d86ebd0b12dee8d27b97d442c318c61dd259fa3",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -96,7 +96,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/credit_default_swap.schema.json",
-          "sha256": "c524b7f3c377ba1848378876ee2e6111ee155b1eaebc10e066c0d4d015ab1001",
+          "sha256": "cdcd3fdc875ec660eac27d78ddb8262bca41bc4021fa027289ba747258872175",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -180,7 +180,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/trs_equity.schema.json",
-          "sha256": "5b43e3f9c29178eb05c54c2c381c11fcc2204ca6af713e5ad64de9055ba51ad5",
+          "sha256": "4fc5806e4ebf296a23fc615e99fc313781c2a168c6ac8842fdd4368b9791a3a1",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "25e4bde920a121f9bb58e45ddf1651263e3bce9adb531fbfc4d74f2704bc0618",
+          "sha256": "226b29a66c8cd1cdfe833999bd6d4d9d0b5477d7b11b3886be617a331ade68d0",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -299,14 +299,14 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/bond_future.schema.json",
-          "sha256": "3a0a5df562ba1f8578411fe3ac932d8d6d30dd0afc8048b613d3273a67dc6cdc",
+          "sha256": "4f255eecb813101f8fe0932e1d20d54f24504ed8f985eeab65cfaf03d20b1105",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/convertible_bond.schema.json",
-          "sha256": "3c56e242fd35bd73dcfe033b688f2abc593b09d99bf39bee4671d1e2ca5ab4cf",
+          "sha256": "e1bc9933f43bbe4d0d077cdf6e618b157eeb8dc38ae0d8fb5b8021e1d8fa7966",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -348,7 +348,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/trs_fixed_income_index.schema.json",
-          "sha256": "537eefba1d50c45f4bc7a18894a5a2e77d4327d7ada54c2a5ab857db5628a22b",
+          "sha256": "749ccb3d768def92c1ac2beaa1ec14f1604d8ecf1c741baa7ffc105615da7d7a",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -579,7 +579,7 @@
           "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "pointer": "#",
           "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
-          "sha256": "69b0301d5ad512ec51ab7b8efefeaa6acd2a5b299562d89cf6dd89f522a0d698",
+          "sha256": "a39ca0a713346f6ab632324f1568907e64eedd4f178d3520ac7be4d2e3741618",
           "description": "Canonical typed calibration request and result envelope."
         }
       ]
@@ -644,8 +644,8 @@
           "uri": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
           "pointer": "#/properties/value",
           "source": "finstack-quant/valuations/schemas/results/1/valuation_result.schema.json",
-          "sha256": "d5dd572e0dae798376032b14a8534e4202d5f0b62da8429cd38007de359295a5",
-          "description": "Present value in the instrument's native currency.\n\nThis is the primary pricing output and is **always available** regardless\nof which metrics are requested. The PV is **not** included in the `measures`\nmap - it is provided here as a `Money` type with full currency information.\n\nFor cross-currency instruments, this may be in a different currency than\nthe base calculation currency.\n\n# Example\n```rust\n# use finstack_quant_valuations::results::ValuationResult;\n# use finstack_quant_core::currency::Currency;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::dates::create_date;\n# use time::Month;\n# fn main() -> Result<(), Box<dyn std::error::Error>> {\n# let as_of = create_date(2025, Month::January, 15)?;\n# let pv = Money::from((1_000_000_i64, Currency::USD));\n# let result = ValuationResult::stamped(\"BOND-001\", as_of, pv);\n// PV is always in result.value, not in measures\nlet pv_money = result.value;  // Money type\nlet pv_amount = result.value.amount();  // f64 value\nlet currency = result.value.currency();  // Currency type\n# Ok(())\n# }\n```"
+          "sha256": "edc0e7e88651444d9b91f4e1a892e5f48ca667ea98d5265f3948c690b688f349",
+          "description": "Present value in the instrument's native currency.\n\nThis is the primary pricing output and is **always available** regardless\nof which metrics are requested. The PV is **not** included in the `measures`\nmap - it is provided here as a `Money` type with full currency information.\n\nFor cross-currency instruments, this may be in a different currency than\nthe base calculation currency.\n\n# Example\n```rust\n# use finstack_quant_valuations_core::results::ValuationResult;\n# use finstack_quant_core::currency::Currency;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::dates::create_date;\n# use time::Month;\n# fn main() -> Result<(), Box<dyn std::error::Error>> {\n# let as_of = create_date(2025, Month::January, 15)?;\n# let pv = Money::from((1_000_000_i64, Currency::USD));\n# let result = ValuationResult::stamped(\"BOND-001\", as_of, pv);\n// PV is always in result.value, not in measures\nlet pv_money = result.value;  // Money type\nlet pv_amount = result.value.amount();  // f64 value\nlet currency = result.value.currency();  // Currency type\n# Ok(())\n# }\n```"
         }
       ]
     },
@@ -1319,7 +1319,7 @@
   ],
   "hostContract": {
     "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
-    "sha256": "8b6e02e25c1b6fba0487c9ea1cabdf944052cb29f638ce15e854057103dd0db5"
+    "sha256": "4a611bde2be9acde938f74fb0cacef36ef955deb68e4d40a5be91ac322d9b7da"
   },
   "details": [
     {

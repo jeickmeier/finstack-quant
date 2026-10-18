@@ -339,9 +339,23 @@ def _inline_module_spans(text: str, base_module: str) -> tuple[_ModuleSpan, ...]
     return tuple(spans)
 
 
+def crate_directory(source_root: Path, crate: str) -> Path:
+    """Return the crate directory (relative to ``source_root``) for an audit crate key.
+
+    A nested crate such as ``valuations-core`` lives at
+    ``finstack-quant/valuations/core``; every other key is a direct child of
+    ``finstack-quant/``.
+    """
+    direct = Path("finstack-quant") / crate
+    if (source_root / direct).is_dir():
+        return direct
+    parent, _, child = crate.rpartition("-")
+    return Path("finstack-quant") / parent / child
+
+
 def _crate_relative(path: Path, source_root: Path, crate: str) -> tuple[Path, str]:
     relative_path = path.relative_to(source_root)
-    crate_prefix = Path("finstack-quant") / crate
+    crate_prefix = crate_directory(source_root, crate)
     try:
         crate_path = relative_path.relative_to(crate_prefix).as_posix()
     except ValueError:

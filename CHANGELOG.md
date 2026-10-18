@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Valuations split: the pricing framework is `finstack-quant-valuations-core`
+
+#### Changed
+
+- New crate `finstack-quant-valuations-core` (`finstack-quant/valuations/core`) holds the pricing framework: the `Instrument` trait and its hooks, `PricingOptions` and the pricing overrides, the shared parameter types and kernels (`instruments::common_impl`, hidden), the per-flow cashflow exporter engine (`instruments::cashflow_export::export_cashflows`), `pricer::{InstrumentType, ModelKey, PricerKey, Pricer, PricerRegistry, PricingDispatch, Family, parse_model_key}`, the metric framework and universal calculators, `results`, `market`, `recalibration`, `constants`, `error` and the embedded conventions, contract specs, product defaults and listed-product catalog. `finstack-quant-valuations` depends on it and re-exports every item under its previous path (`finstack_quant_valuations::instruments::Instrument`, `::metrics::MetricId`, `::results::ValuationResult`, the exported macros, …), so downstream crates and the bindings are unchanged. The umbrella keeps the instrument families, `instruments::{json_loader, composite}`, `pricer::{json, FAMILIES, STANDARD, standard_pricer_registry}`, `metrics::standard_registry`, the JSON cashflow-export entry points, `schema` and the benches and integration tests.
+- `metrics::standard_registry` is defined on the umbrella's `metrics` façade; the core's `metrics::core::universal` holds `register_universal_metrics`. `ShortRateTreeModel`, `StructuredCreditPricingMode`, `NdfQuoteConvention`, `ResettingSide` and `VolatilityModel` are no longer `#[non_exhaustive]`: the instrument families match them exhaustively from their own crate. The `FinancialBuilder` derive now emits `finstack_quant_valuations_core::instruments::Instrument::validate_invariants`.
+
 ### Instrument families own their registrations
 
 #### Added

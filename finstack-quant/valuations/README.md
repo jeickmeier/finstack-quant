@@ -27,25 +27,33 @@ No crate that valuations depends on may depend back on it.
 
 ## Crate map
 
+The crate is an umbrella over two layers. The pricing framework lives in
+[`core/`](core/README.md) (package `finstack-quant-valuations-core`) and is
+re-exported here under the same paths; this crate adds the instrument families
+and the closed world around them.
+
 | Path | Role |
 |------|------|
-| [`src/instruments/`](src/instruments/README.md) | Instrument types by asset class, the `Instrument` trait, JSON loading |
-| `src/pricer/` | `InstrumentType`/`ModelKey`/`PricerKey` dispatch, `PricerRegistry`, and JSON pricing entry points |
-| [`src/metrics/`](src/metrics/README.md) | `MetricId`, `MetricCalculator`, `MetricRegistry`, sensitivities, historical VaR |
-| [`src/calibration/`](src/calibration/README.md) | Plan-driven calibration engine, solvers, targets, validation, bumps |
-| [`src/market/`](src/market/README.md) | Market quotes, convention registries, quote-to-instrument builders |
-| [`src/results/`](src/results/README.md) | `ValuationResult`, `ResultsMeta`, `ValuationRow` export |
-| `src/contract_specs.rs` | Embedded exchange contract specs (bond/equity-index/vol-index futures, repo defaults); crate-private, surfaced through the instruments that use them |
-| `src/constants.rs` | Basis-point and percent conversion constants for hot paths |
+| [`core/src/instruments/`](core/src/instruments/README.md) | The `Instrument` trait and its hooks, `PricingOptions`, parameter and override types, the generic pricer, the shared pricing kernels (`common_impl`), the cashflow exporter engine |
+| [`core/src/pricer/`](core/src/pricer/README.md) | `InstrumentType`/`ModelKey`/`PricerKey` dispatch, `Pricer`, `PricerRegistry`, `PricingDispatch`, the `Family` registration unit, metric enrichment, product defaults |
+| [`core/src/metrics/`](core/src/metrics/README.md) | `MetricId`, `MetricCalculator`, `MetricRegistry`, the universal calculators, sensitivities, historical VaR |
+| [`core/src/market/`](core/src/market/README.md) | Market quotes, convention registries, listed-product catalog |
+| [`core/src/results/`](core/src/results/README.md) | `ValuationResult`, `ResultsMeta`, `ValuationRow` export, the composite and structured-credit result DTOs |
+| `core/src/contract_specs.rs` | Embedded exchange contract specs (bond/equity-index/vol-index futures, repo defaults); hidden, surfaced through the instruments that use them |
+| `core/src/constants.rs`, `core/src/error.rs`, `core/src/recalibration.rs` | Constants, the crate `Error`/`Result` (re-exported at both crate roots), the recalibration contract |
+| [`src/instruments/`](src/instruments/README.md) | The instrument families by asset class (`rates`, `fixed_income`, `credit_derivatives`, `equity`, `fx`, `commodity`, `exotics`), each with its `Family` registration static; `composite`; `json_loader` (`InstrumentJson`, the closed world); the JSON cashflow-export entry points |
+| `src/pricer/` | `FAMILIES`, the `STANDARD` family and `standard_pricer_registry()`, and the JSON pricing entry points in `pricer::json` |
+| `src/metrics/mod.rs`, `src/results.rs` | Façades over the core modules; `metrics::standard_registry()` |
 | `src/schema.rs` | Accessors and validators for the checked-in JSON Schema artifacts |
-| `src/error.rs` | Crate `Error`/`Result` (re-exported at the crate root) |
 | `src/bin/gen_schemas.rs` | `gen_schemas` binary that writes/checks [`schemas/`](schemas/README.md) |
 
-Supporting directories: [`tests/`](tests/README.md),
-[`benches/`](benches/README.md), [`schemas/`](schemas/README.md),
-[`examples/market_bootstrap/`](examples/market_bootstrap/README.md), and `data/`
-(embedded conventions, contract specs, calibration defaults, and structured-credit
-/ TBA assumptions compiled in with `include_str!`).
+Supporting directories: [`tests/`](tests/README.md) (integration tests,
+including the `core_framework` module that exercises the framework over
+built-in instruments), [`benches/`](benches/README.md),
+[`schemas/`](schemas/README.md), `examples/`, `data/assumptions/`
+(structured-credit / TBA assumptions) and `core/data/` (conventions, contract
+specs, product defaults, listed-product catalog), all compiled in with
+`include_str!`.
 
 P&L attribution and covenant evaluation live in the separate
 `finstack-quant-attribution` and `finstack-quant-covenants` crates.
@@ -65,9 +73,11 @@ instrument (types, pricer, optional cashflows, and a `metrics/` module):
 | `commodity/` | `commodity_asian_option`, `commodity_forward`, `commodity_spot_option`, `commodity_spread_option`, `commodity_swap`, `commodity_swaption`, `commodity_future` |
 | `exotics/` | `asian_option`, `barrier_option`, `basket`, `callable_range_accrual`, `lookback_option`, `range_accrual`, `snowball`, `tarn` |
 
-`common_impl/` is crate-private plumbing (the `Instrument` trait, shared
-parameter types, pricing helpers, cashflow export). Its public re-exports are at
-`instruments::*` and `instruments::pricing`.
+The `Instrument` trait, the shared parameter types and the pricing kernels the
+families build on are defined in [`core/src/instruments/`](core/src/instruments/README.md)
+(`common_impl/` is public but hidden from the rendered docs). Their re-exports
+are at `instruments::*` and `instruments::pricing`, the same paths as before the
+split.
 
 `pricer::InstrumentType` has 71 variants; the JSON registry in
 `instruments/json_loader.rs` covers 70 loadable instrument types. Several

@@ -321,7 +321,7 @@ export default [
   {
     "path": "#/$defs/d_10afa2c48803544dc415",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikSchedule",
-    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
+    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
   },
   {
     "path": "#/$defs/d_10afa2c48803544dc415/oneOf/0",
@@ -2978,7 +2978,7 @@ export default [
   {
     "path": "#/$defs/d_9f2015dceb8c80d6e4d1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/CdsDocClause",
-    "description": "CDS market standard documentation clauses.\n\nRepresents the ISDA documentation clause used for CDS contracts. Different clauses\ndefine different restructuring events and settlement procedures. Used as part of\n[`CdsConventionKey`] to look up CDS conventions.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::market::conventions::ids::CdsDocClause;\n\nlet clause = CdsDocClause::Cr14; // Cum-Restructuring 2014\n```"
+    "description": "CDS market standard documentation clauses.\n\nRepresents the ISDA documentation clause used for CDS contracts. Different clauses\ndefine different restructuring events and settlement procedures. Used as part of\n[`CdsConventionKey`] to look up CDS conventions.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;\n\nlet clause = CdsDocClause::Cr14; // Cum-Restructuring 2014\n```"
   },
   {
     "path": "#/$defs/d_9f2015dceb8c80d6e4d1/oneOf/0",

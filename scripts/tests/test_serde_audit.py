@@ -192,8 +192,8 @@ def test_portfolio_margin_manual_impl_resolves_across_files() -> None:
 def test_production_recursive_glob_discovers_cashflow_envelope() -> None:
     """The valuations glob bridge exposes the registered binding output."""
     declarations = _MODULE.scan_crate(
-        _REPOSITORY_ROOT / "finstack-quant" / "valuations",
-        crate="valuations",
+        _REPOSITORY_ROOT / "finstack-quant" / "valuations" / "core",
+        crate="valuations-core",
         source_root=_REPOSITORY_ROOT,
     )
     declaration = next(item for item in declarations if item.name == "InstrumentCashflowEnvelope")
@@ -201,7 +201,7 @@ def test_production_recursive_glob_discovers_cashflow_envelope() -> None:
     assert declaration.capabilities == frozenset({"Serialize", "Deserialize", "JsonSchema"})
     assert "instruments::cashflow_export::InstrumentCashflowEnvelope" in (declaration.export_paths)
     identity = (
-        "valuations",
+        "valuations-core",
         "src/instruments/cashflow_export.rs",
         "InstrumentCashflowEnvelope",
     )

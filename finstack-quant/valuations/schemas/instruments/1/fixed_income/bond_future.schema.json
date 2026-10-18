@@ -432,7 +432,7 @@
     },
     "BondFutureSpecs": {
       "additionalProperties": false,
-      "description": "Contract specifications for bond futures.\n\nDefines the notional bond parameters used for conversion factor\ncalculations and the implied-repo day count. Contract size lives on the\nfuture's `terms`: `terms.multiplier` is the currency value of one full\nprice point, i.e. one hundredth of the per-contract face (1,000 for a\n$100,000 UST 10Y contract).\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`terms.settlement_date`, so the spec holds no settlement lag or holiday\ncalendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.standard_coupon, 0.06);\n```",
+      "description": "Contract specifications for bond futures.\n\nDefines the notional bond parameters used for conversion factor\ncalculations and the implied-repo day count. Contract size lives on the\nfuture's `terms`: `terms.multiplier` is the currency value of one full\nprice point, i.e. one hundredth of the per-contract face (1,000 for a\n$100,000 UST 10Y contract).\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`terms.settlement_date`, so the spec holds no settlement lag or holiday\ncalendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::contract_specs::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.standard_coupon, 0.06);\n```",
       "properties": {
         "repo_day_count": {
           "$ref": "#/$defs/RepoDayCountWire",

@@ -1,0 +1,343 @@
+//! Wire configuration of the Merton Monte Carlo PIK bond model: the
+//! structural model, PIK schedule, calibration target, barrier-crossing
+//! policy and recovery assumptions.
+//!
+//! The engine that consumes [`MertonMcConfig`] lives with the bond; this
+//! module holds only the serializable vocabulary embedded in
+//! [`ModelConfig`](crate::instruments::ModelConfig).
+
+use finstack_quant_models::credit::{
+    DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel, ToggleExerciseModel,
+};
+
+/// Barrier-crossing detection policy for first-passage default simulation.
+///
+/// `Discrete` only checks the barrier at grid points (fast but biased for
+/// coarse time steps). `BrownianBridge` uses a Brownian-bridge crossing
+/// probability between grid points to approximate continuous monitoring.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum BarrierCrossing {
+    /// Discrete monitoring: default if `V(t_i) < B(t_i)` at time steps.
+    Discrete,
+    /// Brownian-bridge correction for continuous monitoring between steps.
+    BrownianBridge,
+}
+
+/// Which structural parameter to calibrate in the MC engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum CalibrationParameter {
+    /// Calibrate the debt barrier B.
+    DebtBarrier,
+    /// Calibrate the asset volatility sigma_V.
+    AssetVol,
+}
+
+/// Calibration settings for MC-to-market matching.
+///
+/// When set on [`MertonMcConfig::calibration`], the pricer runs a low-path
+/// bisection to solve for a structural parameter so that the cash base-case
+/// MC price matches the target market quote, then re-prices with full paths.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MertonMcCalibrationSpec {
+    /// Target market quote to match (interpreted at quote/settlement date).
+    pub target: super::bond_quote::BondQuoteInput,
+    /// Which structural parameter to solve for.
+    pub parameter: CalibrationParameter,
+    /// Number of independent MC estimators used during calibration iterations (low paths).
+    pub low_paths: usize,
+    /// Maximum bisection iterations.
+    pub max_iterations: usize,
+    /// Absolute tolerance on the **PV residual** (currency units at `as_of`).
+    pub tolerance_pv: f64,
+    /// Search bracket for the calibrated parameter (low, high).
+    /// When `None`, auto-brackets based on the calibration parameter type.
+    pub bracket: Option<(f64, f64)>,
+    /// Optional seed override used for the calibration run.
+    pub seed: Option<u64>,
+}
+
+impl Default for MertonMcCalibrationSpec {
+    fn default() -> Self {
+        Self {
+            target: super::bond_quote::BondQuoteInput::ZSpread(0.0),
+            parameter: CalibrationParameter::DebtBarrier,
+            low_paths: 2_000,
+            max_iterations: 40,
+            tolerance_pv: 1e-4,
+            bracket: None,
+            seed: None,
+        }
+    }
+}
+
+/// Per-coupon PIK behavior for the MC engine.
+///
+/// Determines how each coupon payment is handled: paid in cash, accreted
+/// to notional (PIK), split between cash and PIK, or decided dynamically
+/// by a [`ToggleExerciseModel`].
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum PikMode {
+    /// Coupon paid in cash.
+    Cash,
+    /// Coupon accreted to notional (payment-in-kind).
+    Pik,
+    /// Coupon split between cash and PIK.
+    Split {
+        /// Fraction paid in cash (e.g. 0.5 for 50%).
+        cash_fraction: f64,
+        /// Fraction accreted to notional.
+        pik_fraction: f64,
+    },
+    /// Deferred to the [`ToggleExerciseModel`] on the config.
+    /// Falls back to `Cash` if no toggle model is set.
+    Toggle,
+}
+
+/// Time-varying PIK schedule for the MC engine.
+///
+/// Controls per-coupon PIK behavior, either uniformly or as a step
+/// function over time.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};
+///
+/// // All coupons PIK
+/// let uniform = PikSchedule::Uniform(PikMode::Pik);
+///
+/// // PIK for first 2 years, then cash
+/// let stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);
+///
+/// // Toggle for 3 years, then mandatory cash
+/// let toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);
+/// ```
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum PikSchedule {
+    /// Same mode for all coupon dates.
+    Uniform(PikMode),
+    /// Step function: each `(t, mode)` entry means `mode` applies from
+    /// time `t` onward. Entries must be sorted by time ascending.
+    Stepped(Vec<(f64, PikMode)>),
+}
+
+impl Default for PikSchedule {
+    fn default() -> Self {
+        Self::Uniform(PikMode::Cash)
+    }
+}
+
+impl PikSchedule {
+    /// Look up the active [`PikMode`] at time `t`.
+    pub fn mode_at(&self, t: f64) -> PikMode {
+        match self {
+            Self::Uniform(mode) => *mode,
+            Self::Stepped(steps) => {
+                let mut active = PikMode::Cash;
+                for &(step_t, mode) in steps {
+                    if t >= step_t {
+                        active = mode;
+                    } else {
+                        break;
+                    }
+                }
+                active
+            }
+        }
+    }
+}
+
+/// Configuration for Monte Carlo PIK bond pricing.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MertonMcConfig {
+    /// Merton structural credit model.
+    pub merton: MertonModel,
+    /// PIK schedule controlling per-coupon cash/PIK/toggle behavior.
+    pub pik_schedule: PikSchedule,
+    /// Optional endogenous (leverage-dependent) hazard rate model.
+    pub endogenous_hazard: Option<EndogenousHazardSpec>,
+    /// Optional dynamic (notional-dependent) recovery rate model.
+    ///
+    /// Recovery on default is evaluated pathwise as
+    /// `DynamicRecoverySpec::recovery_at_notional(N(τ))`, which hard-clamps
+    /// the result to `[0, base_recovery]`. The clamp introduces a small kink
+    /// in recovery as a function of the accreted notional; paths far into
+    /// the clamped region all contribute the same (floored/capped) recovery.
+    /// No smoothed (e.g. logistic) recovery rule is applied.
+    pub dynamic_recovery: Option<DynamicRecoverySpec>,
+    /// Optional toggle exercise model for PIK/cash coupon decisions.
+    /// Active only for coupon dates where [`PikSchedule`] resolves to
+    /// [`PikMode::Toggle`].
+    pub toggle_model: Option<ToggleExerciseModel>,
+    /// Time steps per year for the simulation grid.
+    pub steps_per_year: usize,
+    /// Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
+    ///
+    /// Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
+    /// otherwise `Discrete`.
+    pub barrier_crossing: BarrierCrossing,
+    /// Recovery on default as a decimal fraction in `[0, 1]`.
+    ///
+    /// `dynamic_recovery`, when set, takes precedence over this flat rate.
+    pub recovery_rate: f64,
+    /// Optional market-calibration specification.
+    ///
+    /// When set, the pricer first calibrates a structural parameter
+    /// (barrier or asset vol) to match a market quote using low-path MC
+    /// with common random numbers, then re-prices with full paths.
+    pub calibration: Option<MertonMcCalibrationSpec>,
+    /// Pre-computed discount factors for term-structure cashflow discounting.
+    ///
+    /// Each entry is `(year_fraction, discount_factor)`, sorted by time.
+    /// When set, cashflows are discounted using log-linear interpolation of
+    /// these factors instead of the flat `discount_rate`. The flat rate is
+    /// still used for the Merton risk-neutral drift.
+    pub cashflow_dfs: Option<Vec<(f64, f64)>>,
+}
+
+impl MertonMcConfig {
+    /// Create a new configuration with default simulation parameters.
+    ///
+    /// The time-grid density is sourced from the embedded Monte Carlo
+    /// registry; recovery is always supplied explicitly by the caller. Path
+    /// count, antithetic sampling and the seed are resolved separately into a
+    /// `MertonMcRun`.
+    ///
+    /// # Arguments
+    ///
+    /// * `merton` - Structural credit model driving the simulated asset value
+    ///   and default boundary.
+    /// * `recovery_rate` - Recovery on default as a decimal fraction in the
+    ///   inclusive range `[0, 1]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `recovery_rate` is non-finite or lies
+    /// outside `[0, 1]`.
+    pub fn new(merton: MertonModel, recovery_rate: f64) -> finstack_quant_core::Result<Self> {
+        validate_recovery_rate(recovery_rate)?;
+        let defaults = &crate::pricer::defaults::embedded_defaults()?.merton_pik_bond;
+        let barrier_crossing = match merton.barrier_type() {
+            MertonBarrierType::FirstPassage { .. } => BarrierCrossing::BrownianBridge,
+            MertonBarrierType::Terminal => BarrierCrossing::Discrete,
+        };
+        Ok(Self {
+            merton,
+            pik_schedule: PikSchedule::default(),
+            endogenous_hazard: None,
+            dynamic_recovery: None,
+            toggle_model: None,
+            steps_per_year: defaults.steps_per_year,
+            barrier_crossing,
+            recovery_rate,
+            calibration: None,
+            cashflow_dfs: None,
+        })
+    }
+
+    /// Set the PIK schedule.
+    #[must_use]
+    pub fn pik_schedule(mut self, s: PikSchedule) -> Self {
+        self.pik_schedule = s;
+        self
+    }
+
+    /// Set the simulation time-grid density.
+    ///
+    /// # Arguments
+    ///
+    /// * `n` - Time steps per year; the grid is sized to end exactly at
+    ///   maturity.
+    #[must_use]
+    pub fn steps_per_year(mut self, n: usize) -> Self {
+        self.steps_per_year = n;
+        self
+    }
+
+    /// Set barrier-crossing policy for first-passage default monitoring.
+    #[must_use]
+    pub fn barrier_crossing(mut self, p: BarrierCrossing) -> Self {
+        self.barrier_crossing = p;
+        self
+    }
+
+    /// Set the market-calibration specification.
+    ///
+    /// # Arguments
+    ///
+    /// * `c` - Market-quote calibration that the MC engine uses to solve for barrier
+    ///   or asset vol before the full-path reprice.
+    #[must_use]
+    pub fn calibration(mut self, c: MertonMcCalibrationSpec) -> Self {
+        self.calibration = Some(c);
+        self
+    }
+
+    /// Set pre-computed discount factors for term-structure cashflow discounting.
+    #[must_use]
+    pub fn cashflow_dfs(mut self, dfs: Vec<(f64, f64)>) -> Self {
+        self.cashflow_dfs = Some(dfs);
+        self
+    }
+
+    /// Set the endogenous hazard model.
+    #[must_use]
+    pub fn endogenous_hazard(mut self, h: EndogenousHazardSpec) -> Self {
+        self.endogenous_hazard = Some(h);
+        self
+    }
+
+    /// Set the dynamic recovery model.
+    #[must_use]
+    pub fn dynamic_recovery(mut self, r: DynamicRecoverySpec) -> Self {
+        self.dynamic_recovery = Some(r);
+        self
+    }
+
+    /// Set the flat recovery used when no dynamic recovery model is configured.
+    ///
+    /// # Arguments
+    ///
+    /// * `recovery_rate` - Recovery on default as a decimal fraction in the
+    ///   inclusive range `[0, 1]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `recovery_rate` is non-finite or lies
+    /// outside `[0, 1]`.
+    pub fn recovery_rate(mut self, recovery_rate: f64) -> finstack_quant_core::Result<Self> {
+        validate_recovery_rate(recovery_rate)?;
+        self.recovery_rate = recovery_rate;
+        Ok(self)
+    }
+
+    /// Set the toggle exercise model.
+    #[must_use]
+    pub fn toggle_model(mut self, t: ToggleExerciseModel) -> Self {
+        self.toggle_model = Some(t);
+        self
+    }
+}
+
+fn validate_recovery_rate(recovery_rate: f64) -> finstack_quant_core::Result<()> {
+    finstack_quant_core::validation::require_with(
+        recovery_rate.is_finite() && (0.0..=1.0).contains(&recovery_rate),
+        || {
+            format!(
+                "MertonMcConfig recovery_rate must be finite and in [0, 1], got {recovery_rate}"
+            )
+        },
+    )
+}

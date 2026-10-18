@@ -1324,7 +1324,7 @@ export default [
   {
     "path": "#/$defs/d_149952dfbecf32b456eb",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsConventionKey",
-    "description": "Key to look up CDS conventions (Currency + DocClause).\n\nCDS conventions are identified by both currency and documentation clause, as different\nclauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::defs::CdsConventionSpec)\nfrom the convention registry.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};\nuse finstack_quant_core::currency::Currency;\n\nlet key = CdsConventionKey {\n    currency: Currency::USD,\n    doc_clause: CdsDocClause::Cr14,\n};\n```"
+    "description": "Key to look up CDS conventions (Currency + DocClause).\n\nCDS conventions are identified by both currency and documentation clause, as different\nclauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::defs::CdsConventionSpec)\nfrom the convention registry.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};\nuse finstack_quant_core::currency::Currency;\n\nlet key = CdsConventionKey {\n    currency: Currency::USD,\n    doc_clause: CdsDocClause::Cr14,\n};\n```"
   },
   {
     "path": "#/$defs/d_149952dfbecf32b456eb/properties/currency",
@@ -3940,7 +3940,7 @@ export default [
   {
     "path": "#/$defs/d_973d7a036900fe27e69d",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause",
-    "description": "CDS market standard documentation clauses.\n\nRepresents the ISDA documentation clause used for CDS contracts. Different clauses\ndefine different restructuring events and settlement procedures. Used as part of\n[`CdsConventionKey`] to look up CDS conventions.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::market::conventions::ids::CdsDocClause;\n\nlet clause = CdsDocClause::Cr14; // Cum-Restructuring 2014\n```"
+    "description": "CDS market standard documentation clauses.\n\nRepresents the ISDA documentation clause used for CDS contracts. Different clauses\ndefine different restructuring events and settlement procedures. Used as part of\n[`CdsConventionKey`] to look up CDS conventions.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;\n\nlet clause = CdsDocClause::Cr14; // Cum-Restructuring 2014\n```"
   },
   {
     "path": "#/$defs/d_973d7a036900fe27e69d/oneOf/0",

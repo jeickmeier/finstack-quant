@@ -17,6 +17,7 @@ finstack-quant-cashflows = { path = "../cashflows", version = "0.10.0", default-
 finstack-quant-covenants = { path = "../covenants", version = "0.10.0", default-features = false }
 finstack-quant-margin = { path = "../margin", version = "0.10.0", default-features = false }
 finstack-quant-models = { path = "../models", version = "0.10.0", default-features = false }
+finstack-quant-valuations-core = { path = "core", version = "0.10.0", default-features = false }
 finstack-quant-valuations-macros = { path = "macros", version = "0.10.0" }
 indexmap = { workspace = true, features = ["serde"] }
 smallvec = { version = "1.15", default-features = false, features = ["serde"] }
@@ -50,6 +51,7 @@ toml = "1.1.4"
 default = ["json-schema", "jsonschema-validate"]
 json-schema = [
     "dep:schemars",
+    "finstack-quant-valuations-core/json-schema",
     "finstack-quant-core/json-schema",
     "finstack-quant-cashflows/json-schema",
     "finstack-quant-covenants/json-schema",

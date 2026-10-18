@@ -39,7 +39,10 @@ Workspace (umbrella crate: finstack-quant)
  │  models               ← model kernels: closed-form, Monte Carlo (Philox RNG, processes,     │
  │                         payoffs, engine), PDE, trees, Fourier, vol, short-rate, credit,     │
  │                         factor models, copulas/correlation, liquidity                       │
- │  valuations           ← instruments, pricer registry, metrics, market conventions (hub)     │
+ │  valuations/core      ← pricing framework: Instrument trait, pricer/metric registries,     │
+ │                         Family, results, market conventions (no instrument types)           │
+ │  valuations           ← umbrella: the instrument families, closed world (JSON loading,     │
+ │                         standard registries, composite, schemas); re-exports valuations/core │
  │  calibration          ← curve/hazard/vol bootstraps and global calibration on valuations   │
  │  attribution          ← multi-period P&L attribution (waterfall, Taylor, metrics-based)     │
  │  statements           ← model graph (Value > Forecast > Formula), evaluation                │
@@ -58,15 +61,19 @@ Workspace (umbrella crate: finstack-quant)
 Dependency direction (read off the manifests):
   core → {analytics, cashflows, covenants, features, margin}
   core + analytics + cashflows → models
-  core + cashflows + covenants + margin + models → valuations
+  core + cashflows + covenants + margin + models → valuations/core → valuations
   valuations (+ core, cashflows, models) → calibration
   calibration + valuations → attribution
   valuations (+ core, cashflows) → statements → statements-analytics (+ covenants, models)
   {attribution, calibration, models, statements, valuations} → scenarios
   {attribution, calibration, cashflows, margin, models, scenarios, valuations} → portfolio
 
-  Short form: core → cashflows/models → valuations → calibration → attribution →
-  statements/scenarios → portfolio.
+  Short form: core → cashflows/models → valuations/core → valuations → calibration →
+  attribution → statements/scenarios → portfolio.
+  `finstack-quant-valuations-core` (`finstack-quant/valuations/core`) is the pricing
+  framework; the umbrella `finstack-quant-valuations` re-exports it under the same
+  paths and adds the instrument families, so downstream crates and bindings depend
+  on the umbrella only.
   `margin` depends only on `core`; exposure generation is out of its scope. The
   `Marginable` trait is the seam and `valuations` implements it.
   `models` depends on `analytics`, `cashflows` and `core` only; Monte Carlo and

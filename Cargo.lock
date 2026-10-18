@@ -1061,6 +1061,7 @@ dependencies = [
  "finstack-quant-margin",
  "finstack-quant-models",
  "finstack-quant-test-utils",
+ "finstack-quant-valuations-core",
  "finstack-quant-valuations-macros",
  "indexmap",
  "jsonschema",
@@ -1076,6 +1077,30 @@ dependencies = [
  "thiserror",
  "time",
  "toml",
+ "tracing",
+]
+
+[[package]]
+name = "finstack-quant-valuations-core"
+version = "0.10.0"
+dependencies = [
+ "finstack-quant-cashflows",
+ "finstack-quant-core",
+ "finstack-quant-covenants",
+ "finstack-quant-margin",
+ "finstack-quant-models",
+ "finstack-quant-valuations-macros",
+ "indexmap",
+ "rayon",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "schemars",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "strum",
+ "thiserror",
+ "time",
  "tracing",
 ]
 

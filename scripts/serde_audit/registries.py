@@ -125,7 +125,7 @@ RESULT_ALIAS_EXCEPTIONS = tuple(
         ("portfolio", "src/error.rs"),
         ("scenarios", "src/error.rs"),
         ("statements", "src/error.rs"),
-        ("valuations", "src/error.rs"),
+        ("valuations-core", "src/error.rs"),
     )
     for entry in _classification(
         crate,
@@ -220,7 +220,7 @@ MAINTAINED_CONTRACTS = frozenset({
     ("factor-model", "src/envelope.rs", "FactorModelConfigEnvelope"),
     ("factor-model", "src/credit/hierarchy.rs", "CreditFactorModel"),
     ("portfolio", "src/materialization/envelope.rs", "PortfolioMaterializationEnvelope"),
-    ("valuations", "src/results/valuation_result.rs", "ValuationResult"),
+    ("valuations-core", "src/results/valuation_result.rs", "ValuationResult"),
     ("statements", "src/evaluator/results.rs", "StatementResult"),
     ("portfolio", "src/results.rs", "PortfolioResult"),
     ("portfolio", "src/optimization/result.rs", "PortfolioOptimizationResult"),
@@ -232,7 +232,7 @@ MAINTAINED_CONTRACTS = frozenset({
 # fail-closed when module/re-export resolution changes.
 REQUIRED_PUBLIC_TYPES = {
     (
-        "valuations",
+        "valuations-core",
         "src/instruments/cashflow_export.rs",
         "InstrumentCashflowEnvelope",
     ): CAPABILITIES,

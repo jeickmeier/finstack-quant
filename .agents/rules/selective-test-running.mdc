@@ -46,7 +46,8 @@ Add `--all-features` to `rust-lint-crate` / `rust-fix-crate` when touching featu
 | `finstack-quant/margin/` | `finstack-quant-margin` |
 | `finstack-quant/statements/` | `finstack-quant-statements` |
 | `finstack-quant/statements-analytics/` | `finstack-quant-statements-analytics` |
-| `finstack-quant/valuations/` | `finstack-quant-valuations` |
+| `finstack-quant/valuations/` (except `core/`, `macros/`) | `finstack-quant-valuations` |
+| `finstack-quant/valuations/core/` | `finstack-quant-valuations-core` (framework: `Instrument`, registries, metrics, results, conventions; its instrument-dependent tests run in the umbrella's `core_framework` integration module) |
 | `finstack-quant/calibration/` | `finstack-quant-calibration` |
 | `finstack-quant/calibration/` | `finstack-quant-calibration` |
 | `finstack-quant/features/` | `finstack-quant-features` |

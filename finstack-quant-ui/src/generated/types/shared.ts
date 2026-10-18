@@ -4885,7 +4885,7 @@ export type Date84 = string;
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
+ * use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
  *
  * let clause = CdsDocClause::Cr14; // Cum-Restructuring 2014
  * ```
@@ -14278,7 +14278,7 @@ export type DigitalPayoutType = "cash_or_nothing" | "asset_or_nothing";
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::convertible::{
+ * use finstack_quant_valuations_core::instruments::common_impl::parameters::convertible::{
  *     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
  * };
  *
@@ -15528,7 +15528,7 @@ export type WeightingMethod =
  * # Examples
  *
  * ```
- * use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{PikMode, PikSchedule};
+ * use finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};
  *
  * // All coupons PIK
  * let uniform = PikSchedule::Uniform(PikMode::Pik);
@@ -56638,7 +56638,7 @@ export interface BermudanSchedule1 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;
+ * use finstack_quant_valuations_core::contract_specs::BondFutureSpecs;
  *
  * // UST 10-year contract specs
  * let specs = BondFutureSpecs::default(); // UST 10Y defaults
@@ -57991,7 +57991,7 @@ export interface TrancheStructure1 {
  * # Examples
  *
  * ```
- * use finstack_quant_valuations::instruments::TrsScheduleSpec;
+ * use finstack_quant_valuations_core::instruments::TrsScheduleSpec;
  * use finstack_quant_cashflows::builder::ScheduleParams;
  * use finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention, StubKind};
  *

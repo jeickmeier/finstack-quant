@@ -1,47 +1,20 @@
-//! Pricer infrastructure: type-safe pricing dispatch via registry pattern.
+//! Pricer infrastructure: the core dispatch and registry types plus the
+//! closed-world assembly.
 //!
-//! This module provides a registry-based pricing system that maps
-//! (instrument type, model) pairs to specific pricer implementations.
-//! The system uses enum-based dispatch for type safety rather than string
-//! comparisons.
-//!
-//! # Module structure
-//!
-//! Core types are split into focused submodules:
-//! - `keys`: [`crate::pricer::InstrumentType`], [`crate::pricer::ModelKey`],
-//!   [`crate::pricer::PricerKey`]
-//! - `errors`: [`crate::pricer::PricingError`],
-//!   [`crate::pricer::PricingErrorContext`]
-//! - `registry`: [`crate::pricer::Pricer`], [`crate::pricer::PricerRegistry`],
-//!   `expect_inst`
-//! - `family`: [`crate::pricer::Family`], the registration unit
-//!
-//! Registration lives with the instruments. Each instrument family declares a
-//! [`Family`](crate::pricer::Family) `static` beside its instruments, holding the pricer and metric
-//! tables for the types it owns:
-//! [`rates::RATES`](crate::instruments::rates::RATES),
-//! [`fixed_income::FIXED_INCOME`](crate::instruments::fixed_income::FIXED_INCOME),
-//! [`structured_credit::STRUCTURED_CREDIT`](crate::instruments::fixed_income::structured_credit::STRUCTURED_CREDIT),
-//! [`credit_derivatives::CREDIT`](crate::instruments::credit_derivatives::CREDIT),
-//! [`equity::EQUITY`](crate::instruments::equity::EQUITY),
-//! [`fx::FX`](crate::instruments::fx::FX) and
-//! [`exotics::EXOTICS`](crate::instruments::exotics::EXOTICS) (which also
-//! owns the commodity instruments). [`STANDARD`](crate::pricer::STANDARD) merges them all and adds the
-//! composite instruments (`Composite`, `Basket`) that can hold any leg;
-//! [`standard_pricer_registry`](crate::pricer::standard_pricer_registry) is its pricer registry.
+//! The dispatch types ([`InstrumentType`](finstack_quant_valuations_core::pricer::InstrumentType),
+//! [`ModelKey`](finstack_quant_valuations_core::pricer::ModelKey), [`PricerKey`](finstack_quant_valuations_core::pricer::PricerKey),
+//! [`Pricer`](finstack_quant_valuations_core::pricer::Pricer), [`PricerRegistry`](finstack_quant_valuations_core::pricer::PricerRegistry),
+//! [`PricingDispatch`](finstack_quant_valuations_core::pricer::PricingDispatch), [`Family`](finstack_quant_valuations_core::pricer::Family))
+//! are defined in `finstack_quant_valuations_core::pricer` and re-exported here.
+//! This module adds what needs every instrument family: the
+//! [`FAMILIES`](crate::pricer::FAMILIES) list, the [`STANDARD`](crate::pricer::STANDARD)
+//! umbrella family and its registries, and the JSON pricing entry points in
+//! [`json`](crate::pricer::json).
 
-// Core submodules
-#[doc(hidden)]
-pub mod defaults;
-mod enrichment;
-mod errors;
-mod family;
+pub use finstack_quant_valuations_core::pricer::*;
+
 pub mod json;
-mod keys;
-mod registry;
 
-pub use errors::{PricingError, PricingErrorContext};
-pub use family::{Family, RegisterMetrics, RegisterPricers};
 pub use json::{
     instrument_envelope_from_spec, instrument_from_spec, list_models, list_models_grouped,
     list_standard_metrics, list_standard_metrics_grouped, metric_metadata, metric_value,
@@ -50,10 +23,6 @@ pub use json::{
     validate_instrument_json, validate_typed_instrument_json, MetricMetadata, ParsedInstrument,
     STANDARD_OPTION_GREEKS,
 };
-pub use keys::{parse_model_key, InstrumentType, ModelKey, PricerKey};
-#[doc(hidden)]
-pub use registry::stamp_results_meta;
-pub use registry::{expect_inst, Pricer, PricerRegistry, PricingDispatch};
 
 use std::sync::Arc;
 
@@ -65,36 +34,6 @@ use crate::instruments::fixed_income::FIXED_INCOME;
 use crate::instruments::fx::FX;
 use crate::instruments::rates::RATES;
 use crate::metrics::{MetricRegistry, MetricRegistryError};
-
-/// Register a [`GenericInstrumentPricer`](crate::instruments::common_impl::GenericInstrumentPricer)
-/// for an instrument type, collapsing the repetitive registration boilerplate
-/// shared by every family table.
-///
-/// Two forms are supported:
-///
-/// - `register_generic!(registry, InstrumentType::Foo, crate::instruments::FooType);`
-///   registers the discounting pricer (`GenericInstrumentPricer::<T>::discounting`)
-///   under `ModelKey::Discounting`.
-/// - `register_generic!(registry, InstrumentType::Foo, crate::instruments::FooType, ModelKey::Bar);`
-///   registers `GenericInstrumentPricer::<T>::new(InstrumentType::Foo, ModelKey::Bar)`
-///   under the explicit model key.
-///
-/// Both forms expand to a single `registry.register(...)` call.
-#[macro_export]
-macro_rules! register_generic {
-    ($registry:expr, $inst:expr, $ty:ty $(,)?) => {
-        $registry.register($crate::instruments::common_impl::GenericInstrumentPricer::<
-            $ty,
-        >::discounting($inst))?
-    };
-    ($registry:expr, $inst:expr, $ty:ty, $model:expr $(,)?) => {
-        $registry.register($crate::instruments::common_impl::GenericInstrumentPricer::<
-            $ty,
-        >::new($inst, $model))?
-    };
-}
-
-pub use register_generic;
 
 /// The built-in instrument families, each owning a disjoint set of
 /// instrument types.

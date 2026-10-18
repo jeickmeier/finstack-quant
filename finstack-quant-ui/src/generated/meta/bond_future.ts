@@ -804,7 +804,7 @@ export default [
   {
     "path": "#/$defs/d_10afa2c48803544dc415",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikSchedule",
-    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
+    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
   },
   {
     "path": "#/$defs/d_10afa2c48803544dc415/oneOf/0",
@@ -1649,7 +1649,7 @@ export default [
   {
     "path": "#/$defs/d_5193595b8b998a0dc94c",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs",
-    "description": "Contract specifications for bond futures.\n\nDefines the notional bond parameters used for conversion factor\ncalculations and the implied-repo day count. Contract size lives on the\nfuture's `terms`: `terms.multiplier` is the currency value of one full\nprice point, i.e. one hundredth of the per-contract face (1,000 for a\n$100,000 UST 10Y contract).\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`terms.settlement_date`, so the spec holds no settlement lag or holiday\ncalendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.standard_coupon, 0.06);\n```"
+    "description": "Contract specifications for bond futures.\n\nDefines the notional bond parameters used for conversion factor\ncalculations and the implied-repo day count. Contract size lives on the\nfuture's `terms`: `terms.multiplier` is the currency value of one full\nprice point, i.e. one hundredth of the per-contract face (1,000 for a\n$100,000 UST 10Y contract).\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`terms.settlement_date`, so the spec holds no settlement lag or holiday\ncalendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::contract_specs::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.standard_coupon, 0.06);\n```"
   },
   {
     "path": "#/$defs/d_5193595b8b998a0dc94c/properties/repo_day_count",
