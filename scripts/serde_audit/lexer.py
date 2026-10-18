@@ -37,10 +37,39 @@ class _SourceUnit:
     default_features: frozenset[str]
 
 
-def _blank(chars: list[str], start: int, end: int) -> None:
-    for index in range(start, min(end, len(chars))):
-        if chars[index] != "\n":
-            chars[index] = " "
+# The next token that leaves ordinary code, tried in this order at each offset.
+# A raw string's `r`/`br` must not continue an identifier (`\w` is exactly
+# `str.isalnum()` plus `_`). A quote starts a character literal only when a
+# complete one-character literal follows; otherwise it is a lifetime and stays
+# code.
+_CODE_EXIT = re.compile(
+    r'(?<!\w)(?P<raw>(?:br|r)(?P<hashes>#{0,255})")'
+    r"|(?P<line>//)"
+    r"|(?P<block>/\*)"
+    r'|(?P<string>b?")'
+    r"|(?P<char>'(?:\\.|[^\\'\n])')"
+)
+_BLOCK_DELIMITER = re.compile(r"/\*|\*/")
+# A literal body runs to the first unescaped delimiter; an escape consumes the
+# next character, newline included.
+_LITERAL_BODY = {
+    '"': re.compile(r'(?:[^"\\]|\\[\s\S])*"'),
+    "'": re.compile(r"(?:[^'\\]|\\[\s\S])*'"),
+}
+_NOT_NEWLINE = re.compile(r"[^\n]")
+
+_CFG_ATTR = re.compile(r"\bcfg_attr\s*\((.*)\)\s*\]", flags=re.DOTALL)
+_CFG = re.compile(r"\bcfg\s*\((.*)\)\s*\]", flags=re.DOTALL)
+_CFG_SELECTOR = re.compile(r'(feature|target_arch|target_os)="([^"]+)"')
+_DERIVE = re.compile(r"\bderive\s*\((.*?)\)", flags=re.DOTALL)
+_DEFAULT_WORD = re.compile(r"\bdefault\b")
+_DECLARATION_BOUNDARY = re.compile(r"[{;]")
+_USE_ALIAS = re.compile(r"(?<!\s)\s+as\s+")
+_WHITESPACE = re.compile(r"\s+")
+
+
+def _blank(text: str) -> str:
+    return _NOT_NEWLINE.sub(" ", text)
 
 
 def _mask_non_code(source: str) -> str:
@@ -50,80 +79,52 @@ def _mask_non_code(source: str) -> str:
     nested block comments, byte/ordinary strings, arbitrary-hash raw strings,
     character literals, and lifetimes. Macro-expanded declarations are outside
     scope; known derives that generate serde/schema impls are listed explicitly.
+
+    Every masked character except a newline becomes a space. Raw strings are
+    masked whole; comments are masked with their delimiters; ordinary and byte
+    strings and character literals keep their quotes (a byte string's `b` is
+    masked). An unterminated comment or literal is masked to the end.
     """
-    chars = list(source)
+    pieces: list[str] = []
+    length = len(source)
     index = 0
-    block_depth = 0
-    state = "code"
-    delimiter = ""
-    while index < len(chars):
-        current = chars[index]
-        following = chars[index + 1] if index + 1 < len(chars) else ""
-        if state == "code":
-            raw_match = re.match(r'(?:br|r)(?P<hashes>#{0,255})"', source[index:])
-            if raw_match and (index == 0 or not (source[index - 1].isalnum() or source[index - 1] == "_")):
-                hashes = raw_match.group("hashes")
-                close = f'"{hashes}'
-                end = source.find(close, index + raw_match.end())
-                end = len(source) if end < 0 else end + len(close)
-                _blank(chars, index, end)
-                index = end
-                continue
-            if current == "/" and following == "/":
-                chars[index] = chars[index + 1] = " "
-                index += 2
-                state = "line-comment"
-                continue
-            if current == "/" and following == "*":
-                chars[index] = chars[index + 1] = " "
-                index += 2
-                block_depth = 1
-                state = "block-comment"
-                continue
-            if current == '"' or (current == "b" and following == '"'):
-                if current == "b":
-                    chars[index] = " "
-                    index += 1
-                delimiter = '"'
-                index += 1
-                state = "literal"
-                continue
-            if current == "'" and re.match(r"'(?:\\.|[^\\'\n])'", source[index : index + 4]):
-                delimiter = "'"
-                index += 1
-                state = "literal"
-                continue
-        elif state == "line-comment":
-            if current == "\n":
-                state = "code"
+    while (token := _CODE_EXIT.search(source, index)) is not None:
+        start = token.start()
+        pieces.append(source[index:start])
+        if token.group("raw") is not None:
+            close = f'"{token.group("hashes")}'
+            end = source.find(close, token.end())
+            end = length if end < 0 else end + len(close)
+            pieces.append(_blank(source[start:end]))
+        elif token.group("line") is not None:
+            end = source.find("\n", token.end())
+            end = length if end < 0 else end
+            pieces.append(_blank(source[start:end]))
+        elif token.group("block") is not None:
+            depth = 1
+            end = length
+            for delimiter in _BLOCK_DELIMITER.finditer(source, token.end()):
+                depth += 1 if delimiter.group() == "/*" else -1
+                if depth == 0:
+                    end = delimiter.end()
+                    break
+            pieces.append(_blank(source[start:end]))
+        else:
+            quote = start + 1 if token.group("char") is not None or source[start] == '"' else start + 2
+            if quote == start + 2:
+                pieces.append(" ")
+            pieces.append(source[quote - 1])
+            body = _LITERAL_BODY[source[quote - 1]].match(source, quote)
+            if body is None:
+                pieces.append(_blank(source[quote:]))
+                end = length
             else:
-                chars[index] = " "
-        elif state == "block-comment":
-            if current == "/" and following == "*":
-                chars[index] = chars[index + 1] = " "
-                index += 2
-                block_depth += 1
-                continue
-            if current == "*" and following == "/":
-                chars[index] = chars[index + 1] = " "
-                index += 2
-                block_depth -= 1
-                if block_depth == 0:
-                    state = "code"
-                continue
-            if current != "\n":
-                chars[index] = " "
-        elif state == "literal":
-            if current == "\\" and following:
-                _blank(chars, index, index + 2)
-                index += 2
-                continue
-            if current == delimiter:
-                state = "code"
-            elif current != "\n":
-                chars[index] = " "
-        index += 1
-    return "".join(chars)
+                pieces.append(_blank(source[quote : body.end() - 1]))
+                pieces.append(source[body.end() - 1])
+                end = body.end()
+        index = end
+    pieces.append(source[index:])
+    return "".join(pieces)
 
 
 def _matching_open(text: str, close_index: int, opener: str, closer: str) -> int | None:
@@ -185,7 +186,7 @@ def _derived_capabilities(
     capabilities: set[str] = set()
     for attribute in attributes:
         derive_source = attribute
-        cfg_attr = re.search(r"\bcfg_attr\s*\((.*)\)\s*\]", attribute, flags=re.DOTALL)
+        cfg_attr = _CFG_ATTR.search(attribute)
         if cfg_attr is not None:
             parts = _split_top_level(cfg_attr.group(1))
             if len(parts) < 2 or not _cfg_condition_enabled(
@@ -194,7 +195,7 @@ def _derived_capabilities(
             ):
                 continue
             derive_source = ",".join(parts[1:])
-        for derive in re.findall(r"\bderive\s*\((.*?)\)", derive_source, flags=re.DOTALL):
+        for derive in _DERIVE.findall(derive_source):
             for item in derive.split(","):
                 trait = item.strip().split("::")[-1]
                 if trait in CAPABILITIES:
@@ -231,7 +232,7 @@ def _cfg_condition_enabled(
     condition: str,
     default_features: frozenset[str] = frozenset(),
 ) -> bool:
-    condition = re.sub(r"\s+", "", condition)
+    condition = _WHITESPACE.sub("", condition)
     host_predicates = {
         "test": False,
         "unix": CURRENT_TARGET_IS_UNIX,
@@ -239,7 +240,7 @@ def _cfg_condition_enabled(
     }
     if condition in host_predicates:
         return host_predicates[condition]
-    selector = re.fullmatch(r'(feature|target_arch|target_os)="([^"]+)"', condition)
+    selector = _CFG_SELECTOR.fullmatch(condition)
     if selector is not None:
         name, value = selector.groups()
         selectors = {
@@ -267,7 +268,7 @@ def _item_enabled(
     default_features: frozenset[str] = frozenset(),
 ) -> bool:
     for attribute in attributes:
-        cfg = re.search(r"\bcfg\s*\((.*)\)\s*\]", attribute, flags=re.DOTALL)
+        cfg = _CFG.search(attribute)
         if cfg is not None and not _cfg_condition_enabled(
             cfg.group(1),
             default_features,
@@ -381,7 +382,7 @@ def _marker_metadata(body: str) -> tuple[frozenset[str], frozenset[str]]:
         marker_name = field.group("name").lower()
         names.add(marker_name)
         field_attributes = _preceding_attributes(body, field.start())
-        has_default = any("serde" in item and re.search(r"\bdefault\b", item) for item in field_attributes)
+        has_default = any("serde" in item and _DEFAULT_WORD.search(item) for item in field_attributes)
         if has_default:
             defaults.add(marker_name)
     return frozenset(names), frozenset(defaults)
@@ -427,9 +428,9 @@ def _parse_unit_declarations(
             if equals >= 0 and semicolon >= 0:
                 target_name = unit.text[equals + 1 : semicolon].strip()
         else:
-            boundary_match = re.search(r"[{;]", unit.text[match.end() :])
+            boundary_match = _DECLARATION_BOUNDARY.search(unit.text, match.end())
             if boundary_match is not None:
-                boundary = match.end() + boundary_match.start()
+                boundary = boundary_match.start()
                 if unit.text[boundary] == "{":
                     close_index = _matching_close(unit.text, boundary)
                     if close_index is not None:
@@ -478,8 +479,8 @@ def _split_top_level(value: str) -> list[str]:
 
 
 def _expand_use_tree(value: str) -> tuple[str, ...]:
-    value = re.sub(r"(?<!\s)\s+as\s+", "@AS@", value)
-    value = re.sub(r"\s+", "", value)
+    value = _USE_ALIAS.sub("@AS@", value)
+    value = _WHITESPACE.sub("", value)
     open_index = value.find("{")
     if open_index < 0:
         return (value,)

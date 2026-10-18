@@ -20,6 +20,11 @@ from .lexer import (
 )
 from .models import AuditConfigurationError, PublicType
 
+_TRAILING_GENERICS = re.compile(r"<.*>$")
+_PUBLIC_USE = re.compile(r"\bpub\s+use\s+(?P<body>[^;]+);", flags=re.DOTALL)
+_ANY_USE = re.compile(r"\b(?:pub\s+)?use\s+(?P<body>[^;]+);", flags=re.DOTALL)
+_MODULE_DECLARATION = re.compile(r"\b(?P<vis>pub\s+)?mod\s+(?P<name>[A-Za-z_]\w*)\s*;")
+
 
 def _reference_candidates(reference: str, module_path: str) -> tuple[str, ...]:
     reference = reference.strip().lstrip(":")
@@ -45,7 +50,7 @@ def _resolve_symbol(
     symbols: dict[str, PublicType],
     imports: dict[tuple[str, str], str],
 ) -> str | None:
-    reference = re.sub(r"<.*>$", "", reference.strip())
+    reference = _TRAILING_GENERICS.sub("", reference.strip())
     if "::" not in reference:
         imported = imports.get((module_path, reference))
         if imported is not None:
@@ -61,8 +66,7 @@ def _resolve_symbol(
 
 
 def _unit_uses(unit: _SourceUnit, *, public_only: bool) -> tuple[tuple[str, str, int], ...]:
-    prefix = r"\bpub\s+use" if public_only else r"\b(?:pub\s+)?use"
-    pattern = re.compile(rf"{prefix}\s+(?P<body>[^;]+);", flags=re.DOTALL)
+    pattern = _PUBLIC_USE if public_only else _ANY_USE
     uses = []
     for match in pattern.finditer(unit.text):
         attributes = _preceding_attributes(
@@ -80,10 +84,9 @@ def _unit_uses(unit: _SourceUnit, *, public_only: bool) -> tuple[tuple[str, str,
 
 def _module_edges(units: Sequence[_SourceUnit]) -> tuple[tuple[str, str, bool], ...]:
     edges: list[tuple[str, str, bool]] = []
-    pattern = re.compile(r"\b(?P<vis>pub\s+)?mod\s+(?P<name>[A-Za-z_]\w*)\s*;")
     for unit in units:
         edges.extend((span.parent, span.path, span.public) for span in unit.spans)
-        for match in pattern.finditer(unit.text):
+        for match in _MODULE_DECLARATION.finditer(unit.text):
             attributes = _preceding_attributes(
                 unit.text,
                 match.start(),
