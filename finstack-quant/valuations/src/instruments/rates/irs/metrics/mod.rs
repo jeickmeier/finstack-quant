@@ -68,7 +68,7 @@ pub(crate) fn register_irs_metrics(
             (Annuity, annuity::AnnuityCalculator),
             (ParRate, par_rate::ParRateCalculator),
 
-            // Theta is now registered universally in metrics::standard_registry()
+            // Theta is now registered universally in crate::instruments::rates::RATES.metrics()
 
             (Dv01, dv01::IrsDv01Calculator),
 

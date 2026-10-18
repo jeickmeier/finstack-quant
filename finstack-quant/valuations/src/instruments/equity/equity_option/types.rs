@@ -1168,7 +1168,7 @@ mod tests {
             pv,
             MetricContext::default_config(),
         );
-        let registry = crate::metrics::standard_registry();
+        let registry = crate::instruments::equity::EQUITY.metrics();
         let results = registry
             .compute(&[MetricId::Dividend01], &mut context)
             .expect("dividend risk");
@@ -1199,7 +1199,8 @@ mod tests {
             pv,
             MetricContext::default_config(),
         );
-        let values = crate::metrics::standard_registry()
+        let values = crate::instruments::equity::EQUITY
+            .metrics()
             .compute(&[MetricId::Dividend01], &mut context)
             .expect("risk with zero downside cash dividends");
         let risk = values[&MetricId::Dividend01];

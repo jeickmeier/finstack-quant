@@ -319,7 +319,7 @@ mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::PricingOptions;
-    use crate::pricer::{standard_pricer_registry, ModelKey};
+    use crate::pricer::ModelKey;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -362,7 +362,8 @@ mod tests {
     }
 
     fn price_amount(opt: &CmsSpreadOption, market: &MarketContext, as_of: Date) -> f64 {
-        standard_pricer_registry()
+        crate::instruments::rates::RATES
+            .pricers()
             .price_with_metrics(
                 opt,
                 ModelKey::StaticReplication,

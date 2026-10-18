@@ -1612,7 +1612,7 @@ mod tests {
         use crate::metrics::MetricId;
         use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
         let (as_of, cap, market) = example_cap_market();
-        let registry = crate::pricer::standard_pricer_registry();
+        let registry = crate::instruments::rates::RATES.pricers();
         let price = |bp: f64| {
             let shifted = market
                 .bump([MarketBump::Curve {

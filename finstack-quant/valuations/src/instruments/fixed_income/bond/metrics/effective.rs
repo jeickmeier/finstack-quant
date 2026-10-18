@@ -155,7 +155,7 @@ mod tests {
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule, CashflowSpec};
     use crate::instruments::{BondRiskBasis, InstrumentPricingOverrides, PricingOptions};
-    use crate::metrics::{standard_registry, MetricContext, MetricId};
+    use crate::metrics::{MetricContext, MetricId};
     use crate::pricer::{
         expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingDispatch,
         PricingError,
@@ -565,7 +565,7 @@ mod tests {
         let base_pv = bond.value(&market, as_of).expect("value");
         let instrument_arc: Arc<dyn Instrument> = Arc::new(bond);
         let curves_arc = Arc::new(market);
-        let registry = standard_registry();
+        let registry = crate::instruments::fixed_income::FIXED_INCOME.metrics();
         let mut ctx = MetricContext::new(
             instrument_arc,
             curves_arc,

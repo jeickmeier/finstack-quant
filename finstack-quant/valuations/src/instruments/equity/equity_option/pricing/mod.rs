@@ -234,7 +234,7 @@ mod tests {
         let as_of = date(2025, 1, 1);
         let option = option(date(2026, 1, 1), OptionType::Call, ExerciseStyle::European);
         let market = market(as_of, 100.0, 0.20, 0.03, 0.01);
-        let registry = crate::pricer::standard_pricer_registry();
+        let registry = crate::instruments::equity::EQUITY.pricers();
 
         let default = option
             .price_with_metrics(

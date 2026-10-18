@@ -49,7 +49,7 @@ pub(crate) fn register_ilb_metrics(
             (RealDuration, RealDurationCalculator),
             (BreakevenInflation, BreakevenInflationCalculator),
             (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            // Theta is now registered universally in metrics::standard_registry()
+            // Theta is now registered universally in crate::instruments::fixed_income::FIXED_INCOME.metrics()
             (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     };

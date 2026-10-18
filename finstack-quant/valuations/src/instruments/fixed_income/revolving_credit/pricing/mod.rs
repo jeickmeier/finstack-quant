@@ -144,7 +144,8 @@ mod tests {
         let pv_direct = facility
             .value(&market, start)
             .expect("direct instrument lifecycle");
-        let registry_value = crate::pricer::shared_standard_registry()
+        let registry_value = crate::instruments::fixed_income::FIXED_INCOME
+            .shared_pricers()
             .price_with_metrics(
                 &facility,
                 ModelKey::Discounting,

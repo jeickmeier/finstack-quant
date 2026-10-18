@@ -691,7 +691,6 @@ impl MetricCalculator for BucketedCs01Calculator {
 mod zspread_quote_tests {
     use super::*;
     use crate::instruments::MarketQuoteOverrides;
-    use crate::metrics::standard_registry;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use std::sync::Arc;
@@ -746,7 +745,8 @@ mod zspread_quote_tests {
             MetricId::SpreadDuration,
         ] {
             let mut context = context_without_quote();
-            let err = standard_registry()
+            let err = crate::instruments::fixed_income::structured_credit::STRUCTURED_CREDIT
+                .metrics()
                 .compute(std::slice::from_ref(&requested), &mut context)
                 .expect_err("quote-dependent spread metrics must require an external quote");
             let message = err.to_string();
@@ -765,7 +765,8 @@ mod zspread_quote_tests {
     #[test]
     fn spread_duration_normalizes_by_quote_reproducing_target() {
         let mut context = context_with_quote(90.0);
-        standard_registry()
+        crate::instruments::fixed_income::structured_credit::STRUCTURED_CREDIT
+            .metrics()
             .compute(&[MetricId::SpreadDuration], &mut context)
             .expect("quoted spread duration");
 

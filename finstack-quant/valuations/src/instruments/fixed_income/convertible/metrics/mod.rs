@@ -134,7 +134,7 @@ pub(crate) fn register_convertible_metrics(
             (Cs01, cs01::Cs01Calculator),
             (BucketedCs01, cs01::BucketedCs01Calculator),
             (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            // Theta is now registered universally in metrics::standard_registry()
+            // Theta is now registered universally in crate::instruments::fixed_income::FIXED_INCOME.metrics()
             (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }

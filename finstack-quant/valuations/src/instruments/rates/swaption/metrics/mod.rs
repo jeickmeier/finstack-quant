@@ -35,7 +35,7 @@ pub(crate) fn register_swaption_metrics(
             (Vega, VegaCalculator),
             (HwSigmaVega, vega::HwSigmaVegaCalculator),
             (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            // Theta is now registered universally in metrics::standard_registry()
+            // Theta is now registered universally in crate::instruments::rates::RATES.metrics()
             // Rho bumps ONLY the discount/funding curve (holding the forward swap
             // rate fixed) — this is the correct option rho definition.  Using
             // `parallel_combined()` would also move the forward curve, conflating
@@ -82,7 +82,7 @@ pub(crate) fn register_bermudan_swaption_metrics(
             // Note: UnifiedDv01Calculator and BucketedDv01 are NOT
             // registered here because BermudanSwaption::value() returns Err.
             // Use BermudanDeltaCalculator for rate sensitivity instead.
-            // Theta is registered universally in metrics::standard_registry()
+            // Theta is registered universally in crate::instruments::rates::RATES.metrics()
             // but will fail for BermudanSwaption for the same reason.
         ]
     }

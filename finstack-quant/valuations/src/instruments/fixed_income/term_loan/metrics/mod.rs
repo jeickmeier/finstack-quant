@@ -117,7 +117,7 @@ pub(crate) fn register_term_loan_metrics(
         metrics: [
             (Ytw, YtwCalculator),
 
-            // Theta is now registered universally in metrics::standard_registry()
+            // Theta is now registered universally in crate::instruments::fixed_income::FIXED_INCOME.metrics()
 
             (Dv01, risk_view::TermLoanParallelDv01Calculator),
             (BucketedDv01, risk_view::TermLoanBucketedDv01Calculator),

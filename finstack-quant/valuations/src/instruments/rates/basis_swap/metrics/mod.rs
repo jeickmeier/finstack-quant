@@ -54,7 +54,7 @@ pub(crate) fn register_basis_swap_metrics(
             (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_per_curve())),
             (BasisParSpread, ParSpreadCalculator),
             (IncrementalParSpread, IncrementalParSpreadCalculator),
-            // Theta is now registered universally in metrics::standard_registry()
+            // Theta is now registered universally in crate::instruments::rates::RATES.metrics()
             (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }

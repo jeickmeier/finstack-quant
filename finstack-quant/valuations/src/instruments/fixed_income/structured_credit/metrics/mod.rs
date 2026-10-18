@@ -189,7 +189,7 @@ pub(crate) fn register_structured_credit_metrics(
             (CDR, pool::CdrCalculator),
             (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
-            // Theta is now registered universally in metrics::standard_registry()
+            // Theta is now registered universally in crate::instruments::fixed_income::structured_credit::STRUCTURED_CREDIT.metrics()
         ]
     }
     Ok(())
@@ -197,7 +197,7 @@ pub(crate) fn register_structured_credit_metrics(
 
 #[cfg(test)]
 mod tests {
-    use crate::metrics::{standard_registry, MetricId};
+    use crate::metrics::MetricId;
     use crate::pricer::InstrumentType;
 
     /// Pool and deal-level metrics that compute purely from the deal model are
@@ -205,7 +205,8 @@ mod tests {
     /// `list_standard_metrics` surface them by id without extra wiring.
     #[test]
     fn data_complete_deal_metrics_are_registered_for_structured_credit() {
-        let registry = standard_registry();
+        let registry =
+            crate::instruments::fixed_income::structured_credit::STRUCTURED_CREDIT.metrics();
         for id in [
             MetricId::CloWas,
             MetricId::AbsChargeOff,

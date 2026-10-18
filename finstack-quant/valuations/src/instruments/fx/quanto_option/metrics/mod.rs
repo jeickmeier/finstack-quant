@@ -16,7 +16,7 @@ pub(crate) fn register_quanto_option_metrics(
 ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
     use crate::pricer::InstrumentType;
 
-    // Theta is registered universally in `metrics::standard_registry`.
+    // Theta is one of the universal metrics every family registry carries.
     crate::register_metrics! {
         registry: registry,
         instrument: InstrumentType::QuantoOption,

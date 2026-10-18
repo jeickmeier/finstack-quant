@@ -196,7 +196,7 @@ mod tests {
             0.03,
             10.0,
         ));
-        let registry = crate::pricer::standard_pricer_registry();
+        let registry = crate::instruments::rates::RATES.pricers();
 
         for (swaption, expected_model) in [
             (&black, ModelKey::Black76),
@@ -241,7 +241,7 @@ mod tests {
             0.03,
             10.0,
         ));
-        let registry = crate::pricer::standard_pricer_registry();
+        let registry = crate::instruments::rates::RATES.pricers();
 
         let baseline_result = baseline
             .price_with_metrics(

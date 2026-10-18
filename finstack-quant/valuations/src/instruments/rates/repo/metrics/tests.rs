@@ -99,7 +99,7 @@ fn test_effective_rate_calculator() {
 
 #[test]
 fn test_dv01_negative_when_rates_rise_price_falls() {
-    use crate::metrics::{standard_registry, MetricId};
+    use crate::metrics::MetricId;
 
     let as_of = test_date(2025, 1, 10);
     let disc = DiscountCurve::builder("USD-OIS")
@@ -110,7 +110,7 @@ fn test_dv01_negative_when_rates_rise_price_falls() {
     let repo = create_test_repo();
     let ctx = create_test_context().insert(disc);
     let pv = repo.value(&ctx, as_of).expect("should succeed");
-    let reg = standard_registry();
+    let reg = crate::instruments::rates::RATES.metrics();
     let mut mctx = crate::metrics::MetricContext::new(
         std::sync::Arc::new(repo),
         std::sync::Arc::new(ctx),
@@ -127,7 +127,7 @@ fn test_dv01_negative_when_rates_rise_price_falls() {
 
 #[test]
 fn test_repo_interest_metric_matches_direct_interest() {
-    use crate::metrics::{standard_registry, MetricId};
+    use crate::metrics::MetricId;
 
     let as_of = test_date(2025, 1, 10);
     let repo = create_test_repo();
@@ -140,7 +140,7 @@ fn test_repo_interest_metric_matches_direct_interest() {
         pv,
         MetricContext::default_config(),
     );
-    let reg = standard_registry();
+    let reg = crate::instruments::rates::RATES.metrics();
     let res = reg
         .compute(&[MetricId::RepoInterest], &mut mctx)
         .expect("should succeed");
@@ -151,7 +151,7 @@ fn test_repo_interest_metric_matches_direct_interest() {
 
 #[test]
 fn test_collateral_coverage_ratio_reasonable() {
-    use crate::metrics::{standard_registry, MetricId};
+    use crate::metrics::MetricId;
 
     let as_of = test_date(2025, 1, 10);
     let repo = create_test_repo();
@@ -164,7 +164,7 @@ fn test_collateral_coverage_ratio_reasonable() {
         pv,
         MetricContext::default_config(),
     );
-    let reg = standard_registry();
+    let reg = crate::instruments::rates::RATES.metrics();
     let res = reg
         .compute(&[MetricId::CollateralCoverage], &mut mctx)
         .expect("should succeed");
@@ -177,7 +177,7 @@ fn test_collateral_coverage_ratio_reasonable() {
 
 #[test]
 fn test_time_to_maturity_and_implied_collateral_return() {
-    use crate::metrics::{standard_registry, MetricId};
+    use crate::metrics::MetricId;
 
     let as_of = test_date(2025, 1, 10);
     let repo = create_test_repo();
@@ -190,7 +190,7 @@ fn test_time_to_maturity_and_implied_collateral_return() {
         pv,
         MetricContext::default_config(),
     );
-    let reg = standard_registry();
+    let reg = crate::instruments::rates::RATES.metrics();
     let res = reg
         .compute(
             &[
@@ -221,7 +221,7 @@ fn test_time_to_maturity_and_implied_collateral_return() {
 
 #[test]
 fn test_funding_risk_sign() {
-    use crate::metrics::{standard_registry, MetricId};
+    use crate::metrics::MetricId;
 
     let as_of = test_date(2025, 1, 10);
     let repo = create_test_repo();
@@ -234,7 +234,7 @@ fn test_funding_risk_sign() {
         pv,
         MetricContext::default_config(),
     );
-    let reg = standard_registry();
+    let reg = crate::instruments::rates::RATES.metrics();
     let res = reg
         .compute(&[MetricId::FundingRisk], &mut mctx)
         .expect("should succeed");

@@ -279,7 +279,7 @@ mod tests {
     use super::*;
     use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule, ReturnFloorSpec};
     use crate::instruments::PricingOptions;
-    use crate::pricer::{standard_pricer_registry, PricingError};
+    use crate::pricer::PricingError;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::StubKind;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -442,7 +442,8 @@ mod tests {
         // Accrued at 2025-04-14 under 30/360: 90/180 of a 2.5 coupon.
         let accrued = 1.25;
 
-        let pv = standard_pricer_registry()
+        let pv = crate::instruments::fixed_income::FIXED_INCOME
+            .pricers()
             .price_with_metrics(
                 &bond,
                 ModelKey::MertonMc,
@@ -496,7 +497,8 @@ mod tests {
             .with_mc_paths(8)
             .with_mc_antithetic(false);
 
-        let merton = standard_pricer_registry()
+        let merton = crate::instruments::fixed_income::FIXED_INCOME
+            .pricers()
             .price_with_metrics(
                 &gilt,
                 ModelKey::MertonMc,
@@ -508,7 +510,8 @@ mod tests {
             .expect("ICMA gilt must price under Merton MC")
             .value
             .amount();
-        let discount = standard_pricer_registry()
+        let discount = crate::instruments::fixed_income::FIXED_INCOME
+            .pricers()
             .price_with_metrics(
                 &gilt,
                 ModelKey::Discounting,
@@ -542,7 +545,8 @@ mod tests {
             .price_merton_mc(&config, 0.03, as_of)
             .expect("straight Merton pricing remains supported");
         assert!(direct.clean_price_pct.is_finite());
-        let registered_straight = standard_pricer_registry()
+        let registered_straight = crate::instruments::fixed_income::FIXED_INCOME
+            .pricers()
             .price_with_metrics(
                 &straight,
                 ModelKey::MertonMc,
@@ -569,7 +573,8 @@ mod tests {
             .expect_err("typed Merton pricing must reject callable bonds");
         assert_option_guidance(&direct_error.to_string());
 
-        let money_error = standard_pricer_registry()
+        let money_error = crate::instruments::fixed_income::FIXED_INCOME
+            .pricers()
             .price_with_metrics(
                 &callable,
                 ModelKey::MertonMc,
@@ -604,7 +609,8 @@ mod tests {
             .expect_err("typed Merton pricing must reject return floors");
         assert_option_guidance(&floor_error.to_string());
 
-        let raw_error = standard_pricer_registry()
+        let raw_error = crate::instruments::fixed_income::FIXED_INCOME
+            .pricers()
             .price_raw(&floored, ModelKey::MertonMc, &market, as_of)
             .expect_err("registered raw Merton pricing must reject return floors");
         assert!(matches!(raw_error, PricingError::InvalidInput { .. }));

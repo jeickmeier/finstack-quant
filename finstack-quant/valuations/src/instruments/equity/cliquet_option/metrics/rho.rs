@@ -57,7 +57,7 @@ mod tests {
     use crate::instruments::common_impl::traits::{Attributes, Instrument};
     use crate::instruments::equity::cliquet_option::CliquetOption;
     use crate::instruments::MetricPricingOverrides;
-    use crate::metrics::{standard_registry, MetricContext, MetricId};
+    use crate::metrics::{MetricContext, MetricId};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -143,7 +143,8 @@ mod tests {
             MetricContext::default_config(),
         );
         ctx.set_metric_pricing_overrides(Some(option.metric_pricing_overrides.clone()));
-        let res = standard_registry()
+        let res = crate::instruments::equity::EQUITY
+            .metrics()
             .compute(&[MetricId::Rho], &mut ctx)
             .expect("rho");
         (pv.amount(), res[&MetricId::Rho])

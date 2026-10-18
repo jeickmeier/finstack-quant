@@ -3,7 +3,7 @@ use crate::instruments::fixed_income::bond::{
     Bond, BondSettlementConvention, CallPut, CallPutSchedule,
 };
 use crate::instruments::{Instrument, PricingOptions};
-use crate::metrics::{standard_registry, MetricCalculator, MetricContext, MetricId};
+use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use crate::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
 };
@@ -35,7 +35,9 @@ fn b11_quote_set_propagates_applicable_metric_failure() {
             .build()
             .expect("curve"),
     );
-    let mut metrics = standard_registry().clone();
+    let mut metrics = crate::instruments::fixed_income::FIXED_INCOME
+        .metrics()
+        .clone();
     metrics
         .replace_metric(
             MetricId::Ytm,
@@ -504,7 +506,9 @@ fn compute_quotes_preserves_custom_tree_and_metric_registries_for_oas_roundtrip(
         })
         .expect("unique custom Tree pricer");
 
-    let mut metrics = standard_registry().clone();
+    let mut metrics = crate::instruments::fixed_income::FIXED_INCOME
+        .metrics()
+        .clone();
     metrics
         .replace_metric(
             MetricId::Ytm,

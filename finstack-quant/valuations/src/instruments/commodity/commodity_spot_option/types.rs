@@ -1360,7 +1360,7 @@ mod tests {
                     .build()
                     .expect("vol surface"),
             );
-        let registry = crate::pricer::standard_pricer_registry();
+        let registry = crate::instruments::exotics::EXOTICS.pricers();
 
         let default = option
             .price_with_metrics(

@@ -503,7 +503,7 @@ mod tests {
         let credit_market = MarketContext::new()
             .insert(build_flat_discount(issue))
             .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
-        let registry = crate::pricer::standard_pricer_registry();
+        let registry = crate::instruments::fixed_income::FIXED_INCOME.pricers();
         let options = crate::instruments::PricingOptions::default();
 
         let discounting = registry
@@ -624,7 +624,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(build_flat_discount(issue))
             .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
-        let registry = crate::pricer::standard_pricer_registry();
+        let registry = crate::instruments::fixed_income::FIXED_INCOME.pricers();
         let price = |bond: &Bond| {
             registry
                 .price_with_metrics(
@@ -685,7 +685,8 @@ mod tests {
             .insert(build_flat_discount(issue))
             .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
 
-        let result = crate::pricer::standard_pricer_registry()
+        let result = crate::instruments::fixed_income::FIXED_INCOME
+            .pricers()
             .price_with_metrics(
                 &bond,
                 ModelKey::RatesCredit,
@@ -738,7 +739,8 @@ mod tests {
             .insert(build_flat_discount(issue))
             .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
 
-        let result = crate::pricer::standard_pricer_registry()
+        let result = crate::instruments::fixed_income::FIXED_INCOME
+            .pricers()
             .price_with_metrics(
                 &bond,
                 ModelKey::RatesCredit,
@@ -783,7 +785,8 @@ mod tests {
             .instrument_pricing_overrides
             .market_quotes
             .quoted_clean_price_pct = Some(100.0);
-        let clean_result = crate::pricer::standard_pricer_registry()
+        let clean_result = crate::instruments::fixed_income::FIXED_INCOME
+            .pricers()
             .price_with_metrics(
                 &clean_price,
                 ModelKey::RatesCredit,
@@ -806,7 +809,7 @@ mod tests {
             .market_quotes
             .quoted_dirty_price_currency = Some(1_000_000.0);
         let market = MarketContext::new().insert(build_flat_discount(issue));
-        let registry = crate::pricer::standard_pricer_registry();
+        let registry = crate::instruments::fixed_income::FIXED_INCOME.pricers();
 
         let missing_curve = registry
             .price_with_metrics(

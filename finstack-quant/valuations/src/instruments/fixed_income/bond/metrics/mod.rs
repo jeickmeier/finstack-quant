@@ -251,7 +251,7 @@ pub(crate) fn register_bond_metrics(
 
             (WAL, BondWalCalculator),
 
-            // Theta is now registered universally in metrics::standard_registry()
+            // Theta is now registered universally in crate::instruments::fixed_income::FIXED_INCOME.metrics()
 
             (Dv01, BondDv01Calculator),
             (BucketedDv01, BondBucketedDv01Calculator),
