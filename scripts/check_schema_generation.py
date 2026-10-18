@@ -1,7 +1,20 @@
-"""Verify schema registry completeness and clean-room reproducibility."""
+"""Run the schema generators: verify the checked-in tree, or regenerate it.
+
+Without ``--write`` this checks that the registries own exactly the generated
+files on disk, that the schema ``$ref`` graph resolves, and that two clean-room
+generations are byte-identical to each other and to the checked-in files. With
+``--write`` it regenerates every registry in place.
+
+The generators are executed from ``--bin-dir`` (default: ``target/debug`` of the
+cargo target directory) instead of through ``cargo run``, which re-resolves
+features and rebuilds per package. Build them first with
+``mise run rust-build-schema-generators``.
+"""
 
 from __future__ import annotations
 
+import argparse
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import hashlib
 import json
@@ -15,10 +28,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @dataclass(frozen=True)
 class Generator:
-    """One registry-driven generator and its crate-relative output root."""
+    """One registry-driven generator binary and its crate-relative output root."""
 
     crate: Path
-    package: str
     binary: str
 
 
@@ -26,79 +38,114 @@ class Generator:
 SCHEMA_INDEX_RELATIVE_PATH = Path("schemas/index.json")
 
 GENERATORS = (
-    Generator(Path("finstack-quant/core"), "finstack-quant-core", "gen_core_schemas"),
-    Generator(Path("finstack-quant/analytics"), "finstack-quant-analytics", "gen_analytics_schemas"),
-    Generator(
-        Path("finstack-quant/statements-analytics"),
-        "finstack-quant-statements-analytics",
-        "gen_statements_analytics_schemas",
-    ),
-    Generator(Path("finstack-quant/covenants"), "finstack-quant-covenants", "gen_covenants_schemas"),
-    Generator(Path("finstack-quant/features"), "finstack-quant-features", "gen_features_schemas"),
-    Generator(Path("finstack-quant/attribution"), "finstack-quant-attribution", "gen_attribution_schemas"),
-    Generator(
-        Path("finstack-quant/calibration"),
-        "finstack-quant-calibration",
-        "gen_calibration_schemas",
-    ),
-    Generator(Path("finstack-quant/cashflows"), "finstack-quant-cashflows", "gen_cashflow_schemas"),
-    Generator(Path("finstack-quant/models"), "finstack-quant-models", "gen_models_schemas"),
-    Generator(Path("finstack-quant/margin"), "finstack-quant-margin", "gen_margin_schema"),
-    Generator(Path("finstack-quant/scenarios"), "finstack-quant-scenarios", "gen_scenario_schemas"),
-    Generator(Path("finstack-quant/statements"), "finstack-quant-statements", "gen_statement_schemas"),
-    Generator(Path("finstack-quant/valuations"), "finstack-quant-valuations", "gen_schemas"),
-    Generator(Path("finstack-quant/portfolio"), "finstack-quant-portfolio", "gen_materialization_schemas"),
+    Generator(Path("finstack-quant/core"), "gen_core_schemas"),
+    Generator(Path("finstack-quant/analytics"), "gen_analytics_schemas"),
+    Generator(Path("finstack-quant/statements-analytics"), "gen_statements_analytics_schemas"),
+    Generator(Path("finstack-quant/covenants"), "gen_covenants_schemas"),
+    Generator(Path("finstack-quant/features"), "gen_features_schemas"),
+    Generator(Path("finstack-quant/attribution"), "gen_attribution_schemas"),
+    Generator(Path("finstack-quant/calibration"), "gen_calibration_schemas"),
+    Generator(Path("finstack-quant/cashflows"), "gen_cashflow_schemas"),
+    Generator(Path("finstack-quant/models"), "gen_models_schemas"),
+    Generator(Path("finstack-quant/margin"), "gen_margin_schema"),
+    Generator(Path("finstack-quant/scenarios"), "gen_scenario_schemas"),
+    Generator(Path("finstack-quant/statements"), "gen_statement_schemas"),
+    Generator(Path("finstack-quant/valuations"), "gen_schemas"),
+    Generator(Path("finstack-quant/portfolio"), "gen_materialization_schemas"),
+)
+
+# Globs for generator-owned files. Every match must be a listed artifact: this
+# is how an orphaned schema or instrument fixture is caught. It mirrors the
+# generators' own `--check`, which reports `*.schema.json` extras below each
+# schema root and `*.json` extras below the valuations fixture root.
+OWNED_FILES = (
+    "finstack-quant/*/schemas/**/*.schema.json",
+    "finstack-quant/valuations/tests/instruments/json_examples/**/*.json",
 )
 
 
-def command(generator: Generator, *arguments: str) -> list[str]:
-    """Build one generator command without invoking a shell."""
-    return [
-        "cargo",
-        "run",
-        "--quiet",
-        "-p",
-        generator.package,
-        "--bin",
-        generator.binary,
-        "--",
-        *arguments,
-    ]
+def default_bin_dir() -> Path:
+    """Return ``debug/`` below the cargo target directory.
 
-
-def registry_paths(generator: Generator) -> tuple[Path, ...]:
-    """Read and validate the generator's deterministic path inventory."""
-    result = subprocess.run(  # noqa: S603
-        command(generator, "--list"),
+    Ask cargo: ``.cargo/config.toml`` can set ``build.target-dir`` (worktrees
+    here share one), which a ``CARGO_TARGET_DIR`` fallback does not see.
+    """
+    metadata = subprocess.run(
+        ["cargo", "metadata", "--format-version", "1", "--no-deps"],  # noqa: S607
         cwd=ROOT,
         check=True,
         capture_output=True,
         text=True,
     )
-    paths = tuple(Path(line) for line in result.stdout.splitlines() if line)
+    return Path(json.loads(metadata.stdout)["target_directory"]) / "debug"
+
+
+def command(generator: Generator, bin_dir: Path, *arguments: str) -> list[str]:
+    """Build one generator command without invoking a shell."""
+    binary = bin_dir / generator.binary
+    if not binary.is_file():
+        raise FileNotFoundError(
+            f"schema generator {binary} is not built; run `mise run rust-build-schema-generators` first"
+        )
+    return [str(binary), *arguments]
+
+
+def run(generator: Generator, bin_dir: Path, *arguments: str) -> str:
+    """Run one generator and return its standard output; its diagnostics go to stderr."""
+    return subprocess.run(  # noqa: S603
+        command(generator, bin_dir, *arguments),
+        cwd=ROOT,
+        check=True,
+        stdout=subprocess.PIPE,
+        text=True,
+    ).stdout
+
+
+def run_all(bin_dir: Path, *arguments: str) -> list[str]:
+    """Run every generator concurrently and return their outputs in table order.
+
+    Generators write disjoint crate trees, so running them in parallel cannot
+    change what any one of them produces.
+    """
+    with ThreadPoolExecutor() as pool:
+        return list(pool.map(lambda generator: run(generator, bin_dir, *arguments), GENERATORS))
+
+
+def parse_registry(generator: Generator, listing: str) -> tuple[Path, ...]:
+    """Validate one generator's deterministic ``--list`` path inventory."""
+    paths = tuple(Path(line) for line in listing.splitlines() if line)
     if not paths:
-        raise ValueError(f"{generator.package} returned an empty registry")
+        raise ValueError(f"{generator.binary} returned an empty registry")
     if len(paths) != len(set(paths)):
-        raise ValueError(f"{generator.package} returned duplicate registry paths")
+        raise ValueError(f"{generator.binary} returned duplicate registry paths")
     invalid = [path for path in paths if path.is_absolute() or ".." in path.parts]
     if invalid:
-        raise ValueError(f"{generator.package} returned unsafe paths: {invalid}")
+        raise ValueError(f"{generator.binary} returned unsafe paths: {invalid}")
     if tuple(sorted(paths, key=lambda path: path.as_posix())) != paths:
-        raise ValueError(f"{generator.package} registry paths are not sorted")
+        raise ValueError(f"{generator.binary} registry paths are not sorted")
     return paths
 
 
-def generate_tree(destination: Path) -> None:
+def generate_tree(destination: Path, bin_dir: Path) -> None:
     """Generate every registry into an isolated workspace-shaped tree."""
-    for generator in GENERATORS:
+
+    def generate(generator: Generator) -> None:
         output_root = destination / generator.crate
         output_root.mkdir(parents=True, exist_ok=True)
-        subprocess.run(  # noqa: S603
-            command(generator, "--write", "--output-root", str(output_root)),
-            cwd=ROOT,
-            check=True,
-            stdout=subprocess.DEVNULL,
-        )
+        run(generator, bin_dir, "--write", "--output-root", str(output_root))
+
+    with ThreadPoolExecutor() as pool:
+        list(pool.map(generate, GENERATORS))
+
+
+def ownership_mismatch(listed: set[Path], root: Path) -> str | None:
+    """Describe listed artifacts missing below ``root`` and owned files nobody lists."""
+    owned = {path.relative_to(root) for pattern in OWNED_FILES for path in root.glob(pattern) if path.is_file()}
+    missing = sorted(path for path in listed if not (root / path).is_file())
+    extra = sorted(owned - listed)
+    if not missing and not extra:
+        return None
+    return f"generated artifact registry mismatch: missing={missing or 'none'} extra={extra or 'none'}"
 
 
 def files_by_relative_path(directory: Path) -> dict[Path, bytes]:
@@ -181,11 +228,11 @@ def digest(files: dict[Path, bytes]) -> str:
     return result.hexdigest()
 
 
-def main() -> int:
+def check(bin_dir: Path) -> int:
     """Check registry ownership and two independent generated trees."""
     listed: set[Path] = set()
-    for generator in GENERATORS:
-        for relative_path in registry_paths(generator):
+    for generator, listing in zip(GENERATORS, run_all(bin_dir, "--list"), strict=True):
+        for relative_path in parse_registry(generator, listing):
             workspace_path = generator.crate / relative_path
             if workspace_path in listed:
                 raise ValueError(f"artifact has multiple registry entries: {workspace_path}")
@@ -195,14 +242,12 @@ def main() -> int:
         # per-crate file correctly against every crate's root directory name.
         listed.add(generator.crate / SCHEMA_INDEX_RELATIVE_PATH)
 
-    actual_schemas = {path.relative_to(ROOT) for path in ROOT.glob("finstack-quant/*/schemas/**/*.schema.json")}
-    registered_schemas = {path for path in listed if path.name.endswith(".schema.json")}
-    if actual_schemas != registered_schemas:
-        missing = sorted(registered_schemas - actual_schemas)
-        extra = sorted(actual_schemas - registered_schemas)
-        raise ValueError(f"schema registry mismatch: missing={missing or 'none'} extra={extra or 'none'}")
+    mismatch = ownership_mismatch(listed, ROOT)
+    if mismatch is not None:
+        raise ValueError(mismatch)
 
-    validate_schema_graph(actual_schemas)
+    schemas = {path for path in listed if path.name.endswith(".schema.json")}
+    validate_schema_graph(schemas)
 
     with (
         tempfile.TemporaryDirectory(prefix="finstack-schema-a-") as first_dir,
@@ -210,8 +255,8 @@ def main() -> int:
     ):
         first_root = Path(first_dir)
         second_root = Path(second_dir)
-        generate_tree(first_root)
-        generate_tree(second_root)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            list(pool.map(lambda root: generate_tree(root, bin_dir), (first_root, second_root)))
         first = files_by_relative_path(first_root)
         second = files_by_relative_path(second_root)
         if first != second:
@@ -225,10 +270,21 @@ def main() -> int:
             changed = sorted(path for path in listed if first.get(path) != workspace.get(path))
             raise ValueError(f"checked-in generated artifacts differ: {changed}")
 
-    print(
-        f"Schema registries are complete and byte-reproducible: {len(actual_schemas)} schemas, sha256:{digest(first)}"
-    )
+    print(f"Schema registries are complete and byte-reproducible: {len(schemas)} schemas, sha256:{digest(first)}")
     return 0
+
+
+def main(arguments: list[str] | None = None) -> int:
+    """Verify the generated tree, or regenerate it with ``--write``."""
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--bin-dir", type=Path, help="directory holding the built gen_* binaries")
+    parser.add_argument("--write", action="store_true", help="regenerate every registry in the workspace")
+    options = parser.parse_args(arguments)
+    bin_dir = options.bin_dir or default_bin_dir()
+    if options.write:
+        run_all(bin_dir, "--write")
+        return 0
+    return check(bin_dir)
 
 
 if __name__ == "__main__":

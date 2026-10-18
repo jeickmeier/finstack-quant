@@ -767,65 +767,50 @@ run = [
   "uv run --no-sync python -m scripts.serde_audit --check",
 ]
 
+[tasks.rust-build-schema-generators]
+description = "Build the 14 gen_* schema generator binaries into target/debug"
+# Locally this is `rust-test`'s exact test build with `--no-run`: cargo builds a
+# package's bins whenever it has integration tests, so that build already holds
+# every gen_* binary and is a no-op right after `rust-test`. Any other package
+# selection (`cargo build -p ...`, `cargo run -p X`) resolves a different feature
+# set and recompiles the third-party graph. CI's Lint job has no test build, and a
+# full test-profile build there costs ~14 min, so it builds just the bins with one
+# workspace resolution (the gen_* binaries are the workspace's only bins).
+run = """
+set -eu
+if [ -n "${CI:-}" ]; then
+  cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --bins
+else
+  cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' --no-run
+fi
+"""
+
 [tasks.rust-check-schemas]
 description = "Verify JSON schemas match Rust types"
 run = [
   "mise run rust-serde-audit",
   "uv run --no-sync pytest scripts/tests/test_check_schema_residue.py -q",
   "uv run --no-sync python scripts/check_schema_residue.py",
-  """
-  set -eu
-  cargo build \
-    -p finstack-quant-core --bin gen_core_schemas \
-    -p finstack-quant-analytics --bin gen_analytics_schemas \
-    -p finstack-quant-statements-analytics --bin gen_statements_analytics_schemas \
-    -p finstack-quant-covenants --bin gen_covenants_schemas \
-    -p finstack-quant-features --bin gen_features_schemas \
-    -p finstack-quant-attribution --bin gen_attribution_schemas \
-    -p finstack-quant-calibration --bin gen_calibration_schemas \
-    -p finstack-quant-cashflows --bin gen_cashflow_schemas \
-    -p finstack-quant-models --bin gen_models_schemas \
-    -p finstack-quant-margin --bin gen_margin_schema \
-    -p finstack-quant-scenarios --bin gen_scenario_schemas \
-    -p finstack-quant-statements --bin gen_statement_schemas \
-    -p finstack-quant-valuations --bin gen_schemas \
-    -p finstack-quant-portfolio --bin gen_materialization_schemas
-  # Ask cargo: `.cargo/config.toml` can set `build.target-dir` (worktrees here
-  # share one), which a `${CARGO_TARGET_DIR:-target}` fallback does not see.
-  target_dir="$(cargo metadata --format-version 1 --no-deps \
-    | uv run --no-sync python -c 'import json, sys; print(json.load(sys.stdin)["target_directory"])')"
-  for bin in \
-    gen_core_schemas \
-    gen_analytics_schemas \
-    gen_statements_analytics_schemas \
-    gen_covenants_schemas \
-    gen_features_schemas \
-    gen_attribution_schemas \
-    gen_calibration_schemas \
-    gen_cashflow_schemas \
-    gen_models_schemas \
-    gen_margin_schema \
-    gen_scenario_schemas \
-    gen_statement_schemas \
-    gen_schemas \
-    gen_materialization_schemas
-  do
-    "${target_dir}/debug/${bin}" --check
-  done
-  """,
+  "mise run rust-build-schema-generators",
+  "uv run --no-sync pytest scripts/tests/test_check_schema_generation.py -q",
+  # Runs the built gen_* binaries directly: registry inventory and stale files,
+  # the $ref graph, and two clean-room trees compared with each other and with
+  # the checked-in bytes.
   "uv run --no-sync python scripts/check_schema_generation.py",
   # The schema-contract nextest run below is skipped when `CI` is set: it compiles
   # the whole workspace in the test profile (14 min on a 4-core runner) to run
   # 141 tests in 30 s, and the Test Rust job already runs every one of them in
   # `rust-test-cov` (`--workspace --lib --test '*'`) in the same workflow.
-  # Locally it stays on so `mise run gen-check` is a complete schema gate.
+  # Locally it stays on so `mise run gen-check` is a complete schema gate. It uses
+  # `rust-test`'s package selection, so it reuses the build above.
   """
   set -eu
   if [ -n "${CI:-}" ]; then
     echo "CI: skipping schema-contract nextest run (covered by rust-test-cov in the Test Rust job)"
     exit 0
   fi
-  cargo nextest run --no-fail-fast -E '\
+  cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' \
+    --no-fail-fast -E '\
     (binary_id(finstack-quant-analytics::analytics) & test(/schema_contract::/)) | \
     (binary_id(finstack-quant-covenants::covenants) & test(/schema_contract::/)) | \
     (binary_id(finstack-quant-cashflows::cashflows) & test(/schema_roundtrip::/)) | \
@@ -847,46 +832,10 @@ run = [
 
 [tasks.rust-gen-schemas]
 description = "Regenerate typed JSON schemas from Rust types"
-run = '''
-set -eu
-cargo build \
-  -p finstack-quant-core --bin gen_core_schemas \
-  -p finstack-quant-analytics --bin gen_analytics_schemas \
-  -p finstack-quant-statements-analytics --bin gen_statements_analytics_schemas \
-  -p finstack-quant-covenants --bin gen_covenants_schemas \
-  -p finstack-quant-features --bin gen_features_schemas \
-  -p finstack-quant-attribution --bin gen_attribution_schemas \
-  -p finstack-quant-calibration --bin gen_calibration_schemas \
-  -p finstack-quant-cashflows --bin gen_cashflow_schemas \
-  -p finstack-quant-models --bin gen_models_schemas \
-  -p finstack-quant-margin --bin gen_margin_schema \
-  -p finstack-quant-scenarios --bin gen_scenario_schemas \
-  -p finstack-quant-statements --bin gen_statement_schemas \
-  -p finstack-quant-valuations --bin gen_schemas \
-  -p finstack-quant-portfolio --bin gen_materialization_schemas
-# Ask cargo: `.cargo/config.toml` can set `build.target-dir` (worktrees here
-# share one), which a `${CARGO_TARGET_DIR:-target}` fallback does not see.
-target_dir="$(cargo metadata --format-version 1 --no-deps \
-  | uv run --no-sync python -c 'import json, sys; print(json.load(sys.stdin)["target_directory"])')"
-for bin in \
-  gen_core_schemas \
-  gen_analytics_schemas \
-  gen_statements_analytics_schemas \
-  gen_covenants_schemas \
-  gen_features_schemas \
-  gen_attribution_schemas \
-  gen_calibration_schemas \
-  gen_cashflow_schemas \
-  gen_models_schemas \
-  gen_margin_schema \
-  gen_scenario_schemas \
-  gen_statement_schemas \
-  gen_schemas \
-  gen_materialization_schemas
-do
-  "${target_dir}/debug/${bin}" --write
-done
-'''
+run = [
+  "mise run rust-build-schema-generators",
+  "uv run --no-sync python scripts/check_schema_generation.py --write",
+]
 
 [tasks.core-gen-data]
 description = "Generate core currency and lunar reference tables from maintained CSV data"

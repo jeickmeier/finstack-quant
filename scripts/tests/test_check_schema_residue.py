@@ -93,3 +93,35 @@ def test_checked_in_artifacts_are_clean() -> None:
     assert _MODULE.positional_schema_name_findings(artifacts) == []
     assert _MODULE.undeclared_enum_spelling_findings(artifacts) == []
     assert _MODULE.conflicting_schema_definition_findings(artifacts) == []
+
+
+# One text per prefiltered pattern that the full expression must flag, kept in
+# a fixture so the residue check does not flag this test. Each prefilter must
+# match inside every such match, or it would skip a file that holds real residue.
+_PREFILTER_POSITIVES = _MODULE.json.loads(
+    (Path(__file__).parent / "fixtures/residue_prefilter_positives.json").read_text(encoding="utf-8")
+)
+
+
+def test_every_prefilter_is_contained_in_every_match() -> None:
+    """A prefilter that misses a real match would silently disable its check."""
+    prefiltered = [
+        forbidden
+        for group in (_MODULE.FORBIDDEN, _MODULE.DIRECT_CONSUMER_FORBIDDEN, _MODULE.BINDING_FORBIDDEN)
+        for forbidden in group
+        if forbidden.prefilter is not None
+    ]
+    assert {forbidden.label for forbidden in prefiltered} == set(_PREFILTER_POSITIVES)
+    for forbidden in prefiltered:
+        text = _PREFILTER_POSITIVES[forbidden.label]
+        matches = list(forbidden.expression.finditer(text))
+        assert matches, f"{forbidden.label}: positive example does not match"
+        for match in matches:
+            assert forbidden.prefilter.search(match.group(0)), f"{forbidden.label}: prefilter misses {match.group(0)!r}"
+        assert [match.span() for match in forbidden.finditer(text)] == [match.span() for match in matches]
+
+
+def test_prefilter_skips_files_it_rules_out() -> None:
+    """A file without the prefilter's piece is not scanned at all."""
+    forbidden = next(item for item in _MODULE.FORBIDDEN if item.label == "retired skipped-path field")
+    assert list(forbidden.finditer("fn unrelated() {}")) == []

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 import re
 
@@ -85,60 +87,95 @@ ENUM_NAMING_EXCEPTIONS = {
 
 @dataclass(frozen=True)
 class ForbiddenPattern:
-    """One forbidden production pattern and its diagnostic label."""
+    """One forbidden production pattern and its diagnostic label.
+
+    ``prefilter`` matches a piece that every match of ``expression`` contains,
+    so a file it does not match cannot match ``expression`` either. It exists
+    because a leading word boundary stops the regex engine from scanning ahead
+    for a literal prefix; the prefilter restores that scan, and the expression
+    then runs only over the few files that can match.
+    """
 
     label: str
     expression: re.Pattern[str]
+    prefilter: re.Pattern[str] | None = None
 
+    def finditer(self, contents: str) -> Iterator[re.Match[str]]:
+        """Yield every match of ``expression``, skipping files the prefilter rules out."""
+        if self.prefilter is not None and self.prefilter.search(contents) is None:
+            return iter(())
+        return self.expression.finditer(contents)
+
+
+# Alternations shared by an expression and its prefilter.
+_OBSOLETE_SCHEMA_HELPERS = (
+    r"postprocess_schema|assemble_schema|fallback_instrument_schema|"
+    r"PricingOverridesWire|rust_sync_schemas|sync_instrument_schema_overrides|"
+    r"NormalizedEnum|parse_normalized_enum|parse_day_count_override|"
+    r"value_portfolio_typed|parametric_var_decomposition_typed|"
+    r"historical_var_decomposition_typed|evaluate_risk_budget_typed|"
+    r"optimize_portfolio_typed"
+)
+_RETIRED_SCHEMA_SYMBOLS = (
+    r"LegacyPanelTransformResult|spot_ids|add_spot_id|equity_instruments|"
+    r"dual_values|cache_budget_mb|CacheStrategy|deprecated_ids|sp_empirical|"
+    r"moodys_empirical|sp_assumptions_v1|moodys_assumptions_v1|bilateral_cva"
+)
+_MALFORMED_NAME_FRAGMENTS = (
+    r"frequencyuenc|frequencys|currencyrenc|currencys|"
+    r"conventionention|business_day_conventionf|countount|day_countf|"
+    r"versionersion|surfaceface|spreads_preads|as_of_of|"
+    r"credit_curve_curve|hazard_curve_curve|vol_surface_surface|bp_bp|"
+    r"frequency_frequency|currency_currency|day_count_day_count|"
+    r"business_day_convention_business_day_convention"
+)
 
 FORBIDDEN = (
     ForbiddenPattern(
         "manual JsonSchema implementation",
         re.compile(r"\bimpl\s+(?:schemars::)?JsonSchema\s+for\b"),
+        re.compile(r"JsonSchema"),
     ),
     ForbiddenPattern(
         "handwritten json_schema macro",
         re.compile(r"\b(?:schemars::)?json_schema!\s*\("),
+        re.compile(r"json_schema!"),
     ),
-    ForbiddenPattern("schema_with override", re.compile(r"\bschema_with\b")),
+    ForbiddenPattern("schema_with override", re.compile(r"\bschema_with\b"), re.compile(r"schema_with")),
     ForbiddenPattern(
         "serde compatibility alias",
         re.compile(r"#\s*\[\s*serde\s*\([^\]]*\balias\s*="),
+        re.compile(r"alias"),
     ),
     ForbiddenPattern(
         "serde_json::Value schema projection",
         re.compile(r"#\s*\[\s*schemars\s*\(\s*with\s*=\s*\"serde_json::Value\""),
+        re.compile(r"serde_json::Value"),
     ),
     ForbiddenPattern(
         "schema-only single-instrument shadow enum",
         re.compile(r"\benum\s+SingleInstrumentJson\b"),
+        re.compile(r"SingleInstrumentJson"),
     ),
     ForbiddenPattern(
         "obsolete schema assembly helper",
-        re.compile(
-            r"\b(?:postprocess_schema|assemble_schema|fallback_instrument_schema|"
-            r"PricingOverridesWire|rust_sync_schemas|sync_instrument_schema_overrides|"
-            r"NormalizedEnum|parse_normalized_enum|parse_day_count_override|"
-            r"value_portfolio_typed|parametric_var_decomposition_typed|"
-            r"historical_var_decomposition_typed|evaluate_risk_budget_typed|"
-            r"optimize_portfolio_typed)\b"
-        ),
+        re.compile(rf"\b(?:{_OBSOLETE_SCHEMA_HELPERS})\b"),
+        re.compile(_OBSOLETE_SCHEMA_HELPERS),
     ),
     ForbiddenPattern(
         "retired skipped-path field",
         re.compile(r"\bnum_skipped\b"),
+        re.compile(r"num_skipped"),
     ),
     ForbiddenPattern(
         "retired scalar arbitrage-forward field",
         re.compile(r"\bforward\s*:\s*Option\s*<\s*f64\s*>"),
+        re.compile(r"forward"),
     ),
     ForbiddenPattern(
         "retired schema contract symbol",
-        re.compile(
-            r"\b(?:LegacyPanelTransformResult|spot_ids|add_spot_id|equity_instruments|"
-            r"dual_values|cache_budget_mb|CacheStrategy|deprecated_ids|sp_empirical|"
-            r"moodys_empirical|sp_assumptions_v1|moodys_assumptions_v1|bilateral_cva)\b"
-        ),
+        re.compile(rf"\b(?:{_RETIRED_SCHEMA_SYMBOLS})\b"),
+        re.compile(_RETIRED_SCHEMA_SYMBOLS),
     ),
     ForbiddenPattern(
         "retired abbreviated contract identifier",
@@ -146,6 +183,7 @@ FORBIDDEN = (
             r"\b(?:freq|dc|bdc|asof_spreads|surface_ids|"
             r"[A-Za-z][A-Za-z0-9_]*_(?:ccy|bps))\b"
         ),
+        re.compile(r"freq|dc|asof_spreads|surface_ids|_ccy|_bps"),
     ),
 )
 
@@ -201,15 +239,13 @@ DIRECT_CONSUMER_FORBIDDEN = (
     ),
     ForbiddenPattern(
         "retired schema contract symbol",
-        re.compile(
-            r"\b(?:LegacyPanelTransformResult|spot_ids|add_spot_id|equity_instruments|"
-            r"dual_values|cache_budget_mb|CacheStrategy|deprecated_ids|sp_empirical|"
-            r"moodys_empirical|sp_assumptions_v1|moodys_assumptions_v1|bilateral_cva)\b"
-        ),
+        re.compile(rf"\b(?:{_RETIRED_SCHEMA_SYMBOLS})\b"),
+        re.compile(_RETIRED_SCHEMA_SYMBOLS),
     ),
     ForbiddenPattern(
         "retired margin registry identifier",
         re.compile(r"\bvaluations\.margin_registry\.v1\b"),
+        re.compile(r"margin_registry"),
     ),
     ForbiddenPattern(
         "retired persisted day-count spelling",
@@ -235,6 +271,7 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r'(?:(?:"|\\")(?:policy|anti_dilution|dividend_adjustment)(?:"|\\")\s*:\s*)'
             r'(?:"|\\")(?:Voluntary|FullRatchet|WeightedAverage|AdjustPrice|AdjustRatio)(?:"|\\")'
         ),
+        re.compile(r"policy|anti_dilution|dividend_adjustment"),
     ),
     ForbiddenPattern(
         "retired PascalCase type discriminator",
@@ -246,6 +283,7 @@ DIRECT_CONSUMER_FORBIDDEN = (
     ForbiddenPattern(
         "retired tranche behavior_type field",
         re.compile(r'(?:"|\\")behavior_type(?:"|\\")\s*:'),
+        re.compile(r"behavior_type"),
     ),
     ForbiddenPattern(
         "retired PascalCase tranche seniority",
@@ -253,6 +291,7 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r'(?:(?:"|\\")seniority(?:"|\\")\s*:\s*)'
             r'(?:"|\\")(?:Senior|Mezzanine|Subordinated|Equity)(?:"|\\")'
         ),
+        re.compile(r"seniority"),
     ),
     ForbiddenPattern(
         "retired PascalCase typed result value",
@@ -262,27 +301,22 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r'(?:"|\\")\s*:\s*)'
             r'(?:"|\\")[A-Z][A-Za-z0-9_() ,-]*(?:"|\\")'
         ),
+        re.compile(r"instrument_type|model_key|pricing_mode|account_type"),
     ),
     ForbiddenPattern(
         "retired calibration marker",
         re.compile(r"(?:finstack_quant\.calibration|schemas/calibration)/(?:0|[2-9][0-9]*)\b"),
+        re.compile(r"calibration/"),
     ),
     ForbiddenPattern(
         "retired numeric schema version",
         re.compile(r'(?:"|\\")schema_version(?:"|\\")\s*:\s*(?:0|[2-9][0-9]*)\b'),
+        re.compile(r"schema_version"),
     ),
     ForbiddenPattern(
         "malformed repeated canonical name",
-        re.compile(
-            r"\b[A-Za-z][A-Za-z0-9_]*(?:"
-            r"frequencyuenc|frequencys|currencyrenc|currencys|"
-            r"conventionention|business_day_conventionf|countount|day_countf|"
-            r"versionersion|surfaceface|spreads_preads|as_of_of|"
-            r"credit_curve_curve|hazard_curve_curve|vol_surface_surface|bp_bp|"
-            r"frequency_frequency|currency_currency|day_count_day_count|"
-            r"business_day_convention_business_day_convention"
-            r")[A-Za-z0-9_]*\b"
-        ),
+        re.compile(rf"\b[A-Za-z][A-Za-z0-9_]*(?:{_MALFORMED_NAME_FRAGMENTS})[A-Za-z0-9_]*\b"),
+        re.compile(_MALFORMED_NAME_FRAGMENTS),
     ),
 )
 
@@ -310,38 +344,50 @@ RETIRED_PATHS = (
 )
 
 
+def _walk_files(
+    roots: tuple[Path, ...],
+    suffixes: set[str],
+    excluded_parts: set[str],
+) -> list[Path]:
+    """Return files below ``roots`` with a listed suffix, outside every exclusion.
+
+    A file is excluded when any component of its repository-relative path is in
+    ``excluded_parts`` or the path lies under ``EXCLUDED_PREFIXES``. Excluded
+    directories are pruned instead of walked, so ``target/`` and
+    ``node_modules/`` cost nothing.
+    """
+    excluded_prefixes = tuple(prefix.parts for prefix in EXCLUDED_PREFIXES)
+
+    def excluded(parts: tuple[str, ...]) -> bool:
+        return any(part in excluded_parts for part in parts) or any(
+            parts[: len(prefix)] == prefix for prefix in excluded_prefixes
+        )
+
+    files: set[Path] = set()
+    for root in roots:
+        if root.is_file():
+            if root.suffix in suffixes and not excluded(root.relative_to(ROOT).parts):
+                files.add(root)
+            continue
+        for directory, subdirectories, names in os.walk(root):
+            directory_path = Path(directory)
+            directory_parts = directory_path.relative_to(ROOT).parts
+            subdirectories[:] = [name for name in subdirectories if not excluded((*directory_parts, name))]
+            for name in names:
+                path = directory_path / name
+                if path.suffix in suffixes and not excluded((*directory_parts, name)) and path.is_file():
+                    files.add(path)
+    return sorted(files)
+
+
 def source_files() -> list[Path]:
     """Return deterministic production and direct-consumer source files."""
-    files: set[Path] = set()
-    for source_root in SOURCE_ROOTS:
-        candidates = [source_root] if source_root.is_file() else source_root.rglob("*")
-        for path in candidates:
-            if not path.is_file() or path.suffix not in SOURCE_SUFFIXES:
-                continue
-            relative = path.relative_to(ROOT)
-            if any(part in EXCLUDED_PARTS for part in relative.parts):
-                continue
-            if any(relative.is_relative_to(prefix) for prefix in EXCLUDED_PREFIXES):
-                continue
-            files.add(path)
-    return sorted(files)
+    return _walk_files(SOURCE_ROOTS, SOURCE_SUFFIXES, EXCLUDED_PARTS)
 
 
 def contract_files() -> list[Path]:
     """Return every text artifact that can carry or document a JSON contract."""
-    files: set[Path] = set()
-    for contract_root in CONTRACT_ROOTS:
-        candidates = [contract_root] if contract_root.is_file() else contract_root.rglob("*")
-        for path in candidates:
-            if not path.is_file() or path.suffix not in CONTRACT_SUFFIXES:
-                continue
-            relative = path.relative_to(ROOT)
-            if any(part in CONTRACT_EXCLUDED_PARTS for part in relative.parts):
-                continue
-            if any(relative.is_relative_to(prefix) for prefix in EXCLUDED_PREFIXES):
-                continue
-            files.add(path)
-    return sorted(files)
+    return _walk_files(CONTRACT_ROOTS, CONTRACT_SUFFIXES, CONTRACT_EXCLUDED_PARTS)
 
 
 def line_number(contents: str, offset: int) -> int:
@@ -644,7 +690,7 @@ def main() -> int:
     for path in sources:
         contents = path.read_text(encoding="utf-8")
         for forbidden in FORBIDDEN:
-            for match in forbidden.expression.finditer(contents):
+            for match in forbidden.finditer(contents):
                 line_start = contents.rfind("\n", 0, match.start()) + 1
                 line_end = contents.find("\n", match.end())
                 if line_end == -1:
@@ -659,7 +705,7 @@ def main() -> int:
 
         if path.is_relative_to(ROOT / "finstack-quant-py/src") or path.is_relative_to(ROOT / "finstack-quant-wasm/src"):
             for forbidden in BINDING_FORBIDDEN:
-                for match in forbidden.expression.finditer(contents):
+                for match in forbidden.finditer(contents):
                     relative = path.relative_to(ROOT)
                     findings.append(
                         f"{relative}:{line_number(contents, match.start())}: {forbidden.label}: {match.group(0)!r}"
@@ -672,7 +718,7 @@ def main() -> int:
     for path in contract_files():
         contents = path.read_text(encoding="utf-8")
         for forbidden in DIRECT_CONSUMER_FORBIDDEN:
-            for match in forbidden.expression.finditer(contents):
+            for match in forbidden.finditer(contents):
                 if is_explicit_rejection_test(contents, match):
                     continue
                 relative = path.relative_to(ROOT)
