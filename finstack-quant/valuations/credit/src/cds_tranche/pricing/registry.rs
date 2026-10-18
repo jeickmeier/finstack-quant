@@ -38,9 +38,12 @@ impl finstack_quant_valuations_core::pricer::Pricer for SimpleCdsTrancheHazardPr
         let pv = CdsTranchePricer::new()
             .price_tranche(cds_tranche, market, as_of)
             .map_err(|e| {
-                finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
-                    e.to_string(),
-                    finstack_quant_valuations_core::pricer::PricingErrorContext::default(),
+                finstack_quant_valuations_core::pricer::PricingError::from_core(
+                    e,
+                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
+                        cds_tranche,
+                    )
+                    .model(finstack_quant_valuations_core::pricer::ModelKey::HazardRate),
                 )
             })?;
 

@@ -904,9 +904,12 @@ impl finstack_quant_valuations_core::pricer::Pricer for SimpleCdsIndexHazardPric
         let pv = CdsIndexPricer::new()
             .npv(cds_index, market, as_of)
             .map_err(|e| {
-                finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
-                    e.to_string(),
-                    finstack_quant_valuations_core::pricer::PricingErrorContext::default(),
+                finstack_quant_valuations_core::pricer::PricingError::from_core(
+                    e,
+                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
+                        cds_index,
+                    )
+                    .model(finstack_quant_valuations_core::pricer::ModelKey::HazardRate),
                 )
             })?;
 
