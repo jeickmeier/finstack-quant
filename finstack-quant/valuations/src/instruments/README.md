@@ -1,10 +1,13 @@
 # Instruments
 
-Instrument definitions, the `Instrument` trait, per-instrument metric
-registration, and the JSON loading contract for `finstack-quant-valuations`.
+The instrument families, their `Family` registration statics, and the JSON
+loading contract for `finstack-quant-valuations`. The `Instrument` trait, the
+shared parameter types and the pricing kernels are defined in the framework
+crate [`finstack-quant-valuations-core`](../../core/src/instruments/README.md)
+and re-exported here unchanged.
 
 The canonical overview and quick-start example live in [`mod.rs`](mod.rs)
-rustdoc. This file covers layout, the trait contract, and extension points.
+rustdoc. This file covers layout, the family contract, and extension points.
 
 ## Layout
 
@@ -12,8 +15,6 @@ Instruments are grouped by asset class. Each leaf directory is one instrument.
 
 ```
 instruments/
-├── common_impl/          # crate-private: traits, shared listed terms/future-option mechanics,
-│                         # parameters and pricing helpers
 ├── commodity/            # asian option, forward, listed commodity future, option, swap
 ├── credit_derivatives/   # cds, cds_index, cds_option, cds_tranche
 ├── equity/               # spot, option, TRS, variance swap, autocallable, cliquet,
@@ -38,51 +39,25 @@ Files at this level:
 
 | File | Role |
 |------|------|
-| `mod.rs` | Asset-class module declarations and the flat public re-export list |
-| `json_loader.rs` | `InstrumentEnvelope`, `InstrumentJson`, and the registry macro |
-| `pricing_overrides.rs` | `InstrumentPricingOverrides`, `MetricPricingOverrides`, `ScenarioPricingOverrides`, `ModelConfig`, `BumpConfig` |
-| `model_params.rs` | `ModelParamsSnapshot` used by attribution |
-| `position.rs` | `Position` (long/short direction) |
-| `breakeven.rs` | `BreakevenConfig`, `BreakevenMode`, `BreakevenTarget` |
-| `cashflow_export.rs` | `instrument_cashflows_json`, `InstrumentCashflowEnvelope`, `CashflowRow`, and `CashflowExportTerms` — the per-flow DF / survival / PV export behind the bindings and the explain trace; it decomposes an instrument through `Instrument::cashflow_export_terms` and `Instrument::validate_cashflow_export` |
+| `mod.rs` | `pub use finstack_quant_valuations_core::instruments::*`, the asset-class module declarations and the flat public re-export list |
+| `json_loader.rs` | `InstrumentEnvelope`, `InstrumentJson`, and the registry macro (the closed world) |
+| `cashflow_export.rs` | `instrument_cashflows_json` and `instrument_cashflows(&ParsedInstrument, …)` over the core exporter (`export_cashflows`); re-exports the envelope and row types |
+| `composite/` | `CompositeInstrument` and its legs; it holds `InstrumentJson`, so it belongs to the closed world |
+| `<family>/family.rs` | The family's `Family` static: its pricer table and metric table |
 
-`common_impl` is `pub(crate)`. Its supported surface is re-exported flat from
-`instruments::*`, plus the public sub-namespace `instruments::pricing`
-(schedules, generic pricers, `TrsEngine`).
+The framework surface (`Instrument`, `PricingOptions`, parameter types, the
+`common_impl` kernels, `instruments::pricing`) is re-exported flat from
+`instruments::*` exactly as the core crate exports it.
 
 ## Core trait
 
-Every instrument implements `Instrument`, defined in
-[`common_impl/traits/instrument.rs`](common_impl/traits/instrument.rs) and
-re-exported as `finstack_quant_valuations::instruments::Instrument`. It requires
-`CashflowProvider` (from `finstack-quant-cashflows`) and `Send + Sync`.
-
-Main entry points:
-
-| Method | Returns |
-|--------|---------|
-| `id()`, `key()` | Instrument identifier and `InstrumentType` for pricer dispatch |
-| `value(market, as_of)` | `Money` PV only, in the instrument's native currency |
-| `price_with_metrics(market, as_of, metrics, options)` | `ValuationResult` — PV plus every requested `MetricId`; pass `&[]` for PV only |
-| `cashflow_schedule(market, as_of)` | Canonical signed, future-filtered `CashFlowSchedule` |
-| `dated_cashflows(market, as_of)` | Flattened `(Date, Money)` view of the same schedule |
-| `market_dependencies()` | Declared curve/surface/FX requirements |
-| `default_model()` | `ModelKey` used when `PricingOptions::model` is `None` |
-| `attributes()` / `attributes_mut()` | Tags for scenario selection and reporting |
-| `as_marginable()` | Optional `finstack_quant_margin::Marginable` view |
-
-`PricingOptions` carries the optional config, model override, pricer registry,
-market history, and quote-recalibration provider; `PricingOptions::default()`
-uses the shared standard registry and each instrument's `default_model()`.
-
-Cashflow policy is universal. Deterministic products emit contractual or
-projected schedules; contingent or exhausted products still return an explicit
-empty schedule tagged so `Placeholder` is distinguishable from `NoResidual`.
-
-`Instrument` is a stable compatibility surface used behind
-`Arc<dyn Instrument>` across portfolio and binding code. New optional
-capabilities belong in focused provider traits (follow `OptionGreeksProvider`),
-not as new required methods.
+Every instrument implements `Instrument`, defined in the framework crate
+([`core/src/instruments/README.md`](../../core/src/instruments/README.md) lists
+its entry points and hooks) and re-exported as
+`finstack_quant_valuations::instruments::Instrument`. A family instrument names
+its `Family` through `impl_instrument_base!(InstrumentType::X, FAMILY)`, so
+pricing with no explicit registry resolves the family's own pricers and
+metrics; `STANDARD` merges every family for the closed-world entry points.
 
 ## JSON contract
 
@@ -101,9 +76,9 @@ from it.
 
 1. Add the type under the appropriate asset-class directory, following an
    existing neighbour (for example `fixed_income/bond/` or `rates/irs/`).
-2. Implement `Instrument` and register a pricer in the matching
-   `src/pricer/<asset_class>.rs` shard.
-3. Add an `InstrumentType` variant in `src/pricer/keys.rs`.
+2. Implement `Instrument` (`impl_instrument_base!` supplies `id`, `key`,
+   `attributes` and `family`).
+3. Add an `InstrumentType` variant in `core/src/pricer/keys.rs`.
 4. Add one line to `with_instrument_json_registry!` in `json_loader.rs`. No
    per-site hand edits are needed — everything else is generated.
 5. Add a `metrics/` module with a `register_<name>_metrics(&mut MetricRegistry)`
@@ -116,11 +91,12 @@ from it.
 
 ## Related
 
-- [`../metrics/README.md`](../metrics/README.md) — `MetricId`, calculators, registry
-- [`../results/README.md`](../results/README.md) — `ValuationResult` envelope
-- [`../calibration/README.md`](../calibration/README.md) — building a `MarketContext`
-- [`../market/README.md`](../market/README.md) — quotes and conventions
-- [`../pricer/`](../pricer/) — dispatch keys and `PricerRegistry` (rustdoc only)
+- [`../../core/src/instruments/README.md`](../../core/src/instruments/README.md) — the framework: trait, hooks, parameters, kernels
+- [`../../core/src/metrics/README.md`](../../core/src/metrics/README.md) — `MetricId`, calculators, registry
+- [`../../core/src/results/README.md`](../../core/src/results/README.md) — `ValuationResult` envelope
+- [`../../core/src/market/README.md`](../../core/src/market/README.md) — quotes and conventions
+- [`../../core/src/pricer/README.md`](../../core/src/pricer/README.md) — dispatch keys, `PricerRegistry`, `Family`
+- [`../pricer/`](../pricer/) — `FAMILIES`, `STANDARD` and the JSON pricing entry points (rustdoc only)
 - Per-instrument READMEs:
   [bond](fixed_income/bond/README.md),
   [structured_credit](fixed_income/structured_credit/README.md),
@@ -130,6 +106,6 @@ from it.
   [cds_option](credit_derivatives/cds_option/README.md),
   [cds_tranche](credit_derivatives/cds_tranche/README.md),
   [bond_future](fixed_income/bond_future/README.md),
-  [listed instrument mechanics](common_impl/listed/README.md),
+  [listed instrument mechanics](../../core/src/instruments/common_impl/listed/README.md),
   [real_estate](equity/real_estate/README.md),
   [range_accrual](exotics/range_accrual/README.md)

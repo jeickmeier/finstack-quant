@@ -6,7 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Procedural macros for the finstack-quant-valuations crate (`FinancialBuilder` derive)"
+description = "Procedural macros for the finstack-quant-valuations crates (`FinancialBuilder` derive, emitting finstack-quant-valuations-core paths)"
 
 [lib]
 proc-macro = true
