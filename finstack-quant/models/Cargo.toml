@@ -12,7 +12,6 @@ autotests = false
 
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.11.0", default-features = false }
-finstack-quant-analytics = { path = "../analytics", version = "0.11.0", default-features = false }
 finstack-quant-cashflows = { path = "../cashflows", version = "0.11.0", default-features = false }
 smallvec = { version = "1.15", default-features = false, features = ["serde"] }
 serde = { workspace = true }
@@ -37,7 +36,6 @@ default = ["json-schema"]
 json-schema = [
     "dep:schemars",
     "finstack-quant-core/json-schema",
-    "finstack-quant-analytics/json-schema",
     "finstack-quant-cashflows/json-schema",
 ]
 
@@ -65,28 +63,8 @@ name = "migration_matrix"
 harness = false
 
 [[bench]]
-name = "factor_model"
-path = "benches/factor/factor_model.rs"
-harness = false
-
-[[bench]]
-name = "factor_model_scale"
-path = "benches/factor/factor_model_scale.rs"
-harness = false
-
-[[bench]]
-name = "credit_factor_calibration"
-path = "benches/factor/credit_factor_calibration.rs"
-harness = false
-
-[[bench]]
 name = "liquidity"
 harness = false
-
-[[bin]]
-name = "gen_models_schemas"
-path = "src/bin/gen_models_schemas.rs"
-required-features = ["json-schema"]
 
 [lints]
 workspace = true

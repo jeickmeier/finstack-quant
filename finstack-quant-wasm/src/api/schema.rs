@@ -127,7 +127,7 @@ schema_registry!(
     margin_schema_validate = "marginSchemaValidate"
 );
 schema_registry!(
-    finstack_quant_models::factor::schema::ARTIFACTS,
+    finstack_quant_factor::schema::ARTIFACTS,
     factor_schema_index = "factorSchemaIndex",
     factor_schema_get = "factorSchemaGet",
     factor_schema_validate = "factorSchemaValidate"

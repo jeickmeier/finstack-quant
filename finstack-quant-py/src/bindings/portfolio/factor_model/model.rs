@@ -6,7 +6,7 @@
 
 use pyo3::prelude::*;
 
-use finstack_quant_models::factor::{FactorId, FactorModelConfig};
+use finstack_quant_factor::{FactorId, FactorModelConfig};
 use finstack_quant_portfolio::factor_model::FactorModel;
 
 use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};

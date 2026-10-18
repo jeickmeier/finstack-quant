@@ -216,6 +216,7 @@ harness = false
 name = "gen_schemas"
 path = "src/bin/gen_schemas.rs"
 required-features = ["json-schema"]
+test = false
 
 [lints]
 workspace = true

@@ -2,7 +2,7 @@ use numpy::{PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use finstack_quant_models::factor::risk as model_risk;
+use finstack_quant_factor::risk as model_risk;
 
 use crate::errors::{core_to_py, value_error};
 

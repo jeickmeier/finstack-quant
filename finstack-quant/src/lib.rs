@@ -32,7 +32,7 @@
 //! | `covenants`        | [`finstack_quant_covenants`]            |
 //! | `features`         | [`finstack_quant_features`]             |
 //! | `margin`           | [`finstack_quant_margin`]               |
-//! | `models`           | [`finstack_quant_models`]                |
+//! | `models`           | [`finstack_quant_models`], plus `models::factor` = [`finstack_quant_factor`] |
 //! | `valuations`       | [`finstack_quant_valuations`]           |
 //! | `statements`       | [`finstack_quant_statements`]           |
 //! | `statements_analytics` | [`finstack_quant_statements_analytics`] |
@@ -68,7 +68,17 @@ pub use finstack_quant_core as core;
 pub use finstack_quant_covenants as covenants;
 pub use finstack_quant_features as features;
 pub use finstack_quant_margin as margin;
-pub use finstack_quant_models as models;
+/// Model kernels from [`finstack_quant_models`], plus the factor-model crate at
+/// its public path `models::factor`.
+///
+/// `finstack-quant-factor` is a separate crate so that `finstack-quant-models`
+/// (and with it every valuations crate) does not depend on it. It is mounted
+/// here so the public path, and the Python/WASM `models.factor` namespaces
+/// that mirror it, are unchanged.
+pub mod models {
+    pub use finstack_quant_factor as factor;
+    pub use finstack_quant_models::*;
+}
 pub use finstack_quant_portfolio as portfolio;
 pub use finstack_quant_scenarios as scenarios;
 pub use finstack_quant_statements as statements;

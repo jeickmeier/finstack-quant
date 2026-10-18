@@ -31,6 +31,7 @@ time = { workspace = true, features = ["macros"] }
 name = "gen_covenants_schemas"
 path = "src/bin/gen_schemas.rs"
 required-features = ["json-schema"]
+test = false
 
 [lints]
 workspace = true

@@ -11,7 +11,7 @@ use super::types::PnlAttribution;
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
-use finstack_quant_models::factor::credit::hierarchy::{dimension_key, CreditFactorModel};
+use finstack_quant_factor::credit::hierarchy::{dimension_key, CreditFactorModel};
 use finstack_quant_valuations::instruments::Instrument;
 
 impl AttributionInputs {
@@ -404,16 +404,14 @@ mod tests {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, IssuerId};
-    use finstack_quant_models::factor::credit::hierarchy::{
+    use finstack_quant_factor::credit::hierarchy::{
         AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditFactorModelSchema,
         CreditHierarchySpec, DateRange, FactorCorrelationMatrix, GenericFactorSpec,
         HierarchyDimension, IssuerBetaMode, IssuerBetaPolicy, IssuerBetaRow, IssuerBetas,
         IssuerTags, LevelsAtAnchor, VolState,
     };
-    use finstack_quant_models::factor::matching::ISSUER_ID_META_KEY;
-    use finstack_quant_models::factor::{
-        FactorCovarianceMatrix, FactorModelConfig, MatchingConfig,
-    };
+    use finstack_quant_factor::matching::ISSUER_ID_META_KEY;
+    use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
     use finstack_quant_valuations::instruments::{Attributes, Bond, Instrument, InstrumentJson};
     use std::sync::Arc;
     use time::Month;
@@ -452,12 +450,9 @@ mod tests {
             hierarchy: CreditHierarchySpec {
                 levels: vec![HierarchyDimension::Rating, HierarchyDimension::Region],
             },
-            panel_frequency:
-                finstack_quant_models::factor::credit::calibration::PanelFrequency::Monthly,
-            use_returns_or_levels:
-                finstack_quant_models::factor::credit::calibration::PanelSpace::Returns,
-            bucket_weighting:
-                finstack_quant_models::factor::credit::calibration::BucketWeighting::Equal,
+            panel_frequency: finstack_quant_factor::credit::calibration::PanelFrequency::Monthly,
+            use_returns_or_levels: finstack_quant_factor::credit::calibration::PanelSpace::Returns,
+            bucket_weighting: finstack_quant_factor::credit::calibration::BucketWeighting::Equal,
             config: empty_factor_config(),
             issuer_betas: vec![IssuerBetaRow {
                 issuer_id: IssuerId::new("ISSUER-B"),

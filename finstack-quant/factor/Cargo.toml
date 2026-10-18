@@ -1,0 +1,55 @@
+[package]
+name = "finstack-quant-factor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Multi-asset factor models for Finstack Quant: factor definitions, matching, covariance, sensitivity matrices, risk decomposition and hierarchical credit-factor calibration"
+autobenches = false
+autotests = false
+
+[dependencies]
+finstack-quant-core = { path = "../core", version = "0.11.0", default-features = false }
+finstack-quant-analytics = { path = "../analytics", version = "0.11.0", default-features = false }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+time = { workspace = true }
+schemars = { workspace = true, optional = true }
+thiserror = { workspace = true }
+
+[features]
+default = ["json-schema"]
+json-schema = [
+    "dep:schemars",
+    "finstack-quant-core/json-schema",
+    "finstack-quant-analytics/json-schema",
+]
+
+[dev-dependencies]
+criterion = { workspace = true }
+jsonschema = { version = "0.28", default-features = false }
+proptest = "1.11.0"
+time = { workspace = true, features = ["macros"] }
+
+[[bench]]
+name = "factor_model"
+harness = false
+
+[[bench]]
+name = "factor_model_scale"
+harness = false
+
+[[bench]]
+name = "credit_factor_calibration"
+harness = false
+
+[lints]
+workspace = true
+
+# Consolidated integration tests
+[[test]]
+name = "factor"
+path = "tests/main.rs"

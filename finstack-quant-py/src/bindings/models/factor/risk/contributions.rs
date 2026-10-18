@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use finstack_quant_models::factor::risk::{
+use finstack_quant_factor::risk::{
     FactorContribution, PositionEsContribution, PositionFactorContribution,
     PositionResidualContribution, PositionRiskDecomposition, PositionVarContribution,
     ResidualContributionSource, RiskDecomposition,

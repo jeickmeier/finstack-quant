@@ -26,6 +26,7 @@ finstack-quant-statements-analytics = { path = "../finstack-quant/statements-ana
 finstack-quant-valuations = { path = "../finstack-quant/valuations", version = "0.11.0", default-features = false }
 finstack-quant-calibration = { path = "../finstack-quant/calibration", version = "0.11.0", default-features = false }
 finstack-quant-models = { path = "../finstack-quant/models", version = "0.11.0", default-features = false }
+finstack-quant-factor = { path = "../finstack-quant/factor", version = "0.11.0", default-features = false }
 finstack-quant-scenarios = { path = "../finstack-quant/scenarios", version = "0.11.0", default-features = false }
 finstack-quant-portfolio = { path = "../finstack-quant/portfolio", version = "0.11.0", default-features = false }
 # The umbrella crate owns the whole-workspace schema registry and the JSON Schema

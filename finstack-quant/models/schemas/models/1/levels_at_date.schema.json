@@ -41,7 +41,7 @@
           "description": "Dimension identifier for this level, copied from the hierarchy spec."
         },
         "level_index": {
-          "description": "Zero-based index of this level inside [`crate::factor::credit::hierarchy::CreditHierarchySpec::levels`].",
+          "description": "Zero-based index of this level inside [`crate::credit::hierarchy::CreditHierarchySpec::levels`].",
           "format": "uint",
           "minimum": 0,
           "type": "integer"

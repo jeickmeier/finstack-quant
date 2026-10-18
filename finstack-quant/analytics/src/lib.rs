@@ -38,8 +38,6 @@
 //! - [`sharpe`], [`sortino`], [`volatility`], and [`max_drawdown`] operate on
 //!   a single return slice for callers that do not need a panel.
 //! - [`beta`] is kept public for cross-crate regression use.
-//! - [`correlation`] owns shared row-major correlation-matrix validation and
-//!   repair infrastructure used by valuations and factor-model crates.
 //! - [`regression`] owns [`regression::constrained_least_squares`], an
 //!   equality-constrained least-squares solver exposed through the bindings.
 //!   It fits the factor returns that `finstack-quant-portfolio`'s
@@ -85,7 +83,6 @@ pub(crate) type Result<T> = finstack_quant_core::Result<T>;
 
 pub(crate) mod aggregation;
 pub(crate) mod benchmark;
-pub mod correlation;
 pub(crate) mod defaults;
 pub(crate) mod drawdown;
 pub(crate) mod lookback;

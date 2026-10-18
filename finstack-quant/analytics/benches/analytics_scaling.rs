@@ -17,12 +17,12 @@ mod fixtures;
 use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use finstack_quant_analytics::correlation::{
-    nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts,
-};
 use finstack_quant_analytics::regression::constrained_least_squares;
 use finstack_quant_analytics::{Performance, ReturnKind};
 use finstack_quant_core::dates::PeriodKind;
+use finstack_quant_core::math::linalg::{
+    nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts,
+};
 use fixtures::{
     constrained_ls_inputs, near_correlation_needs_repair, perf_from_returns, perf_panel,
     synthetic_dates, synthetic_returns,

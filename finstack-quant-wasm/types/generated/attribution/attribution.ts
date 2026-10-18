@@ -9543,7 +9543,7 @@ export interface CreditFactorDetailOptions {
  * to byte-identical JSON. This relies on:
  * - [`issuer_betas`][Self::issuer_betas] sorted by `issuer_id`.
  * - All maps using `BTreeMap`.
- * - [`crate::factor::FactorModelConfig`] respecting its own factor ordering.
+ * - [`crate::FactorModelConfig`] respecting its own factor ordering.
  */
 export interface CreditFactorModel {
   /**
@@ -9757,7 +9757,7 @@ export interface BumpSizeConfig {
  *
  * Entries are **annualized (co)variances of factor moves expressed in each
  * factor's canonical bump unit** — the same unit the sensitivity engines use
- * for deltas (see [`crate::factor::BumpSizeConfig`] / [`crate::factor::FactorType::bump_units`]):
+ * for deltas (see [`crate::BumpSizeConfig`] / [`crate::FactorType::bump_units`]):
  * basis points for rates/credit/inflation, percent for equity/commodity/FX,
  * vol points for volatility. With sensitivities `s` in P&L-per-canonical-unit
  * and `Σ` in canonical-unit², `sᵀΣs` is directly an annual P&L variance.
@@ -10063,7 +10063,7 @@ export interface CreditCalibrationDiagnostics {
    * Log of all fold-up events triggered by insufficient bucket coverage.
    *
    * **Load-bearing, not purely diagnostic:**
-   * [`decompose_levels`][crate::factor::credit::decomposition::decompose_levels]
+   * [`decompose_levels`][crate::credit::decomposition::decompose_levels]
    * reads these records to reconstruct which `(issuer, level)` pairs were
    * folded during calibration. Stripping or editing them changes
    * decomposition results.
@@ -10110,7 +10110,7 @@ export interface CreditCalibrationDiagnostics {
  * bucket therefore share a common component that Σ represents as
  * *uncorrelated* idiosyncratic risk — holding several names from one folded
  * bucket overstates diversification for that component. Lower the level's
- * [`BucketSizeThresholds`][crate::factor::credit::calibration::BucketSizeThresholds]
+ * [`BucketSizeThresholds`][crate::credit::calibration::BucketSizeThresholds]
  * entry if that correlation materially matters for a thin bucket.
  */
 export interface FoldUpRecord {
@@ -10211,7 +10211,7 @@ export interface VolState {
   /**
    * EWMA or sample vol model for each systematic factor.
    *
-   * Keys are factor IDs from [`crate::factor::FactorModelConfig`].
+   * Keys are factor IDs from [`crate::FactorModelConfig`].
    * `BTreeMap` for deterministic serialization order.
    */
   factors: {
@@ -20970,7 +20970,7 @@ export interface CreditFactorAttribution {
    */
   generic_pnl: Money;
   /**
-   * One entry per [`finstack_quant_models::factor::credit::hierarchy::HierarchyDimension`]
+   * One entry per [`finstack_quant_factor::credit::hierarchy::HierarchyDimension`]
    * in the spec order recorded by the model's hierarchy.
    */
   levels: LevelPnl[];

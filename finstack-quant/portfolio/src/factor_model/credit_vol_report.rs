@@ -3,10 +3,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::types::PositionId;
-use finstack_quant_models::factor::credit::hierarchy::{dimension_key, CreditFactorModel};
-use finstack_quant_models::factor::matching::CREDIT_GENERIC_FACTOR_ID;
-use finstack_quant_models::factor::risk::RiskDecomposition;
-use finstack_quant_models::factor::RiskMeasure;
+use finstack_quant_factor::credit::hierarchy::{dimension_key, CreditFactorModel};
+use finstack_quant_factor::matching::CREDIT_GENERIC_FACTOR_ID;
+use finstack_quant_factor::risk::RiskDecomposition;
+use finstack_quant_factor::RiskMeasure;
 
 /// Aggregated credit risk grouped by hierarchy level.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

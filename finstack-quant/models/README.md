@@ -2,7 +2,7 @@
 
 Reusable product-independent model engines for quantitative finance. The crate
 owns closed-form and Fourier pricing formulas, volatility models, PDE and tree
-solvers, dynamic term-structure models, factor and factor-risk primitives,
+solvers, dynamic term-structure models,
 structural-credit and correlation models, and Monte Carlo simulation.
 It also owns reusable liquidity estimators, liquidity-adjusted risk, and
 market-impact engines.
@@ -18,13 +18,20 @@ modules; no wildcard prelude is provided.
 
 ## Position in the stack
 
-Depends on `finstack-quant-core`, `finstack-quant-analytics`, and
-`finstack-quant-cashflows`. It does not depend on `finstack-quant-valuations`, so
+Depends on `finstack-quant-core` and `finstack-quant-cashflows`. It does not depend on `finstack-quant-valuations`, so
 instrument pricing can build on it without a cycle.
 
 Consumed by `finstack-quant-valuations` (Monte Carlo pricers for exotics and rate
 products), re-exported from the umbrella crate as `finstack_quant::models`,
 and surfaced through both binding crates.
+
+Factor models are not part of this crate: they are `finstack-quant-factor`
+([`../factor`](../factor/README.md)), which the umbrella mounts at
+`finstack_quant::models::factor`. This crate must not depend on it, because every
+valuations crate depends on this one. The checked-in schemas under
+[`schemas/`](schemas) include factor-owned artifacts for the same reason, and are
+written by the umbrella's `gen_models_schemas` binary
+(`cargo run -p finstack-quant --bin gen_models_schemas -- --write`).
 
 The crate has **no cargo features**; `[features] default = []`. Rayon is an
 unconditional dependency. A few convenience entry points (`EuropeanPricer`,
@@ -40,7 +47,6 @@ unconditional dependency. A few convenience entry points (`EuropeanPricer`,
 | `fourier` | Characteristic-function models and the product-independent COS pricing engine |
 | `rates` | Interest-rate models: Hull-White parameters and pricing kernels, the HW1F Monte Carlo and LSMC engines (`rates::hw1f`), plus Diebold-Li and PCA dynamic term structures |
 | `volatility` | SABR parameters, smile, and calibration; FX ATM / risk-reversal / butterfly quote conversion (`FxVolSurfaceBuilder`, `get_fx_delta_vol`) |
-| `factor` | Factor definitions and matching, covariance matrices, sensitivity storage, and hierarchical credit-factor calibration and decomposition |
 | `liquidity` | Roll and Amihud estimators, days-to-liquidate tiering, Bangia LVaR, Almgren-Chriss execution impact, and Kyle lambda |
 | `pde` | One- and two-dimensional grids, steppers, and solvers |
 | `trees` | Equity, short-rate, and multi-factor tree engines |

@@ -90,27 +90,66 @@ def test_contract_string_lists_have_unique_entries() -> None:
 
 
 def _umbrella_reexports() -> list[tuple[str, str]]:
-    """Return ``(alias, rust_crate)`` pairs from the canonical umbrella crate."""
+    """Return ``(alias, rust_crate)`` pairs from the canonical umbrella crate.
+
+    A top-level ``pub use finstack_quant_x as alias;`` maps ``alias``. A
+    ``pub mod alias { pub use finstack_quant_x::*; pub use finstack_quant_y as sub; }``
+    block maps ``alias`` to ``finstack_quant_x`` and ``alias.sub`` to
+    ``finstack_quant_y`` (the umbrella mounts ``finstack-quant-factor`` at
+    ``models::factor`` this way).
+    """
     umbrella_path = CONTRACT_PATH.parents[1] / CONTRACT["meta"]["umbrella_lib"]
     source = umbrella_path.read_text()
-    return [
+    pairs = [
         (match.group("alias"), match.group("crate"))
         for match in re.finditer(
-            r"^\s*pub\s+use\s+(?P<crate>finstack_quant_[A-Za-z0-9_]+)"
+            r"^pub\s+use\s+(?P<crate>finstack_quant_[A-Za-z0-9_]+)"
             r"\s+as\s+(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\s*;",
             source,
             re.MULTILINE,
         )
     ]
+    for block in re.finditer(
+        r"^pub\s+mod\s+(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\s*\{(?P<body>[^}]*)\}",
+        source,
+        re.MULTILINE,
+    ):
+        alias = block.group("alias")
+        body = block.group("body")
+        pairs.extend(
+            (alias, match.group("crate"))
+            for match in re.finditer(r"pub\s+use\s+(?P<crate>finstack_quant_[A-Za-z0-9_]+)::\*\s*;", body)
+        )
+        pairs.extend(
+            (f"{alias}.{match.group('sub')}", match.group("crate"))
+            for match in re.finditer(
+                r"pub\s+use\s+(?P<crate>finstack_quant_[A-Za-z0-9_]+)"
+                r"\s+as\s+(?P<sub>[A-Za-z_][A-Za-z0-9_]*)\s*;",
+                body,
+            )
+        )
+    return pairs
 
 
 def _contract_umbrella_reexports() -> dict[str, str]:
-    """Return the public contract's expected umbrella alias-to-crate mapping."""
-    return {
-        alias: spec["rust_crate"].replace("-", "_")
-        for alias, spec in CONTRACT["crates"].items()
-        if spec.get("visibility") == "pub" and spec.get("rust_crate") and spec.get("rust_lib")
-    }
+    """Return the public contract's expected umbrella alias-to-crate mapping.
+
+    Nested crate tables (``[crates.models.factor]``) are keyed by their dotted
+    path, matching how the umbrella mounts them.
+    """
+    expected: dict[str, str] = {}
+
+    def visit(tables: dict, prefix: str) -> None:
+        for name, spec in tables.items():
+            if not isinstance(spec, dict):
+                continue
+            alias = f"{prefix}.{name}" if prefix else name
+            if spec.get("visibility") == "pub" and spec.get("rust_crate") and spec.get("rust_lib"):
+                expected[alias] = spec["rust_crate"].replace("-", "_")
+            visit(spec, alias)
+
+    visit(CONTRACT["crates"], "")
+    return expected
 
 
 def test_rust_umbrella_reexports_match_contract() -> None:
