@@ -16,6 +16,8 @@
 //! This ensures greeks are consistent with the Black-76 pricing model, regardless of
 //! how the forward price is specified in the market data.
 
+pub(crate) mod selected_model;
+
 use crate::metrics::{MetricId, MetricRegistry};
 use crate::pricer::InstrumentType;
 use std::sync::Arc;

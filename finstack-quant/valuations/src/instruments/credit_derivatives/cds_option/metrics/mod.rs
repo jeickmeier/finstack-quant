@@ -26,7 +26,7 @@ use crate::metrics::MetricRegistry;
 /// Per-deal CS01 conventions for `CdsOption`.
 ///
 /// Drives the generic credit CS01 calculator
-/// ([`crate::metrics::sensitivities::cs01::CreditParallelCs01`]). The CDS
+/// ([`crate::instruments::credit_derivatives::cs01::CreditParallelCs01`]). The CDS
 /// option does not carry its own doc clause / valuation convention; CS01 is a
 /// quote-spread risk measured against the *synthetic underlying CDS*, so the
 /// conventions are read off `synthetic_underlying_cds`.
@@ -37,7 +37,7 @@ use crate::metrics::MetricRegistry;
 /// re-bootstrap. Directly specified hazard curves are rejected rather than
 /// silently interpreted as quote-spread risk.
 ///
-impl crate::metrics::sensitivities::cs01::CdsCs01Conventions
+impl crate::instruments::credit_derivatives::cs01::CdsCs01Conventions
     for crate::instruments::credit_derivatives::cds_option::CdsOption
 {
     fn cs01_bootstrap_convention(
@@ -104,10 +104,10 @@ pub(crate) fn register_cds_option_metrics(
             (Delta, delta::DeltaCalculator),
             (Gamma, gamma::GammaCalculator),
             (Vega, vega::VegaCalculator),
-            (Cs01, crate::metrics::sensitivities::cs01::CreditParallelCs01::<
+            (Cs01, crate::instruments::credit_derivatives::cs01::CreditParallelCs01::<
                 crate::instruments::credit_derivatives::cds_option::CdsOption,
             >::default()),
-            (BucketedCs01, crate::metrics::sensitivities::cs01::CreditBucketedCs01::<
+            (BucketedCs01, crate::instruments::credit_derivatives::cs01::CreditBucketedCs01::<
                 crate::instruments::credit_derivatives::cds_option::CdsOption,
             >::default()),
             (SpreadDv01, spread_dv01::UnderlyingSpreadDv01Calculator),

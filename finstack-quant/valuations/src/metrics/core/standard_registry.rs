@@ -143,7 +143,7 @@ pub(crate) fn register_universal_metrics(
     )?;
     registry.register_metric(
         MetricId::CarryTotal,
-        Arc::new(CarryDecompositionCalculator),
+        Arc::new(CarryDecompositionCalculator::default()),
         &[],
     )?;
     registry.register_metric(

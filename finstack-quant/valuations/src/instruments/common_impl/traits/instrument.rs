@@ -929,6 +929,18 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         None
     }
 
+    /// Date of the opening notional draw, when the instrument's cashflows
+    /// carry one.
+    ///
+    /// A negative notional flow on this date is the trade-level purchase or
+    /// funding cash that starts the position (a bond's issue date, a
+    /// deposit's effective start): it is not in PV and not buy-and-hold
+    /// period income, so theta and carry exclude it. The default is `None`:
+    /// no opening draw to exclude.
+    fn notional_draw_date(&self) -> Option<Date> {
+        None
+    }
+
     /// Rebuild the instrument for a rate scenario when its projected
     /// cashflows respond to rates.
     ///

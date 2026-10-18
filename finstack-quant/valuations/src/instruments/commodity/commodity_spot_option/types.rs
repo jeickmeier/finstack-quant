@@ -839,6 +839,23 @@ impl Instrument for CommoditySpotOption {
 }
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for CommoditySpotOption {
+    fn selected_model_greek(
+        &self,
+        kind: crate::instruments::common_impl::traits::OptionGreekKind,
+        context: &mut crate::metrics::MetricContext,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        // Once exercise resolves the spot option, every pricing model owns the
+        // same remaining delivery claim and its contractual forward exposure.
+        if context.as_of >= self.expiry
+            || self
+                .exercise
+                .is_some_and(|event| event.date <= context.as_of)
+        {
+            return Ok(None);
+        }
+        super::metrics::selected_model::selected_commodity_greek(kind, context).map(Some)
+    }
+
     fn option_greeks(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,

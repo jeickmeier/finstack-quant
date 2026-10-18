@@ -173,6 +173,10 @@ impl crate::instruments::common_impl::traits::Instrument for Deposit {
         crate::instruments::rates::RATES
     );
 
+    fn notional_draw_date(&self) -> Option<finstack_quant_core::dates::Date> {
+        self.effective_start_date().ok()
+    }
+
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()
     }

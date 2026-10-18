@@ -65,7 +65,6 @@
 //! - **Positive theta**: Instrument gains value over time (e.g., short options, carry trades)
 //! - **Zero theta**: No time-dependent value change (rare)
 
-use crate::instruments::{Bond, Deposit};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
@@ -235,7 +234,7 @@ pub fn collect_period_cash(
         start_date,
         end_date,
         base_currency,
-        opening_notional_draw_date(instrument),
+        instrument.notional_draw_date(),
         instrument.includes_valuation_date_cashflows(),
     )
 }
@@ -257,7 +256,7 @@ pub(crate) fn collect_period_cash_cached(
     base_currency: Currency,
 ) -> Result<PeriodCash> {
     let curves = std::sync::Arc::clone(&context.curves);
-    let skip_issue_draw_on = opening_notional_draw_date(context.instrument.as_ref());
+    let skip_issue_draw_on = context.instrument.notional_draw_date();
     let include_same_day = context.instrument.includes_valuation_date_cashflows();
     let flows = context.tagged_cashflows_cached()?;
     collect_cashflows_from_flows(
@@ -280,7 +279,7 @@ pub(crate) fn period_cash_by_date_cached(
     let curves = std::sync::Arc::clone(&context.curves);
     let start_date = context.as_of;
     let currency = context.base_value.currency();
-    let skip = opening_notional_draw_date(context.instrument.as_ref());
+    let skip = context.instrument.notional_draw_date();
     let same_day = context.instrument.includes_valuation_date_cashflows();
     context
         .tagged_cashflows_cached()?
@@ -299,16 +298,6 @@ pub(crate) fn period_cash_by_date_cached(
         })
         .filter(|result| !matches!(result, Ok((_, amount)) if *amount == 0.0))
         .collect()
-}
-
-fn opening_notional_draw_date(instrument: &dyn crate::instruments::Instrument) -> Option<Date> {
-    if let Some(bond) = instrument.as_any().downcast_ref::<Bond>() {
-        return Some(bond.issue_date);
-    }
-    if let Some(deposit) = instrument.as_any().downcast_ref::<Deposit>() {
-        return deposit.effective_start_date().ok();
-    }
-    None
 }
 
 /// Interest and fee cash; principal settlement is economic cash but not income.
@@ -506,6 +495,7 @@ impl crate::metrics::MetricCalculator for GenericThetaAny {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::Deposit;
     use finstack_quant_core::currency::Currency;
     use time::macros::date;
     use time::Month;
@@ -741,7 +731,10 @@ mod tests {
         deposit.calendar_id = Some("nyse".into());
         let expected = deposit.effective_start_date().expect("effective start");
         assert_eq!(expected, date!(2024 - 01 - 08));
-        assert_eq!(opening_notional_draw_date(&deposit), Some(expected));
+        assert_eq!(
+            crate::instruments::Instrument::notional_draw_date(&deposit),
+            Some(expected)
+        );
     }
 
     #[test]

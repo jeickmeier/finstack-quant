@@ -52,6 +52,7 @@ use finstack_quant_core::money::Money;
 
 /// Accrued interest calculator
 pub(crate) mod accrued;
+pub(crate) mod carry;
 /// Convexity calculator
 pub(crate) mod convexity;
 /// CS01 calculators with z-spread fallback for bonds without credit curves
@@ -254,6 +255,7 @@ pub(crate) fn register_bond_metrics(
             (ASWMarket, AssetSwapMarketCalculator),
 
             (WAL, BondWalCalculator),
+            (CarryTotal, crate::metrics::CarryDecompositionCalculator::with_clock(carry::BondYieldClock)),
 
             // Theta is now registered universally in crate::instruments::fixed_income::FIXED_INCOME.metrics()
 

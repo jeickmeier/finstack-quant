@@ -10,6 +10,7 @@
 //! - [`swap_legs`]: Shared floating/fixed leg pricing for swaps
 //! - [`hw1f_params`]: Hull-White 1F κ/σ resolution from pricing overrides or calibrated market scalars
 
+pub(crate) mod coupon_period;
 pub(crate) mod floating_reset_descriptors;
 mod generic;
 pub mod hw1f_params;

@@ -1,5 +1,5 @@
-//! Df implementation used by the shared subsystem.
-//!
+//! Discount factors at the deposit's effective start and end dates.
+
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::dates::Date;
 
@@ -34,11 +34,11 @@ impl DfDateSelector {
 }
 
 /// Generic discount factor at an instrument's start or end date.
-pub(crate) struct GenericDfCalculator {
+pub(crate) struct DfCalculator {
     selector: DfDateSelector,
 }
 
-impl GenericDfCalculator {
+impl DfCalculator {
     /// Discount factor at the effective start/value date.
     pub(crate) const START: Self = Self {
         selector: DfDateSelector::Start,
@@ -49,7 +49,7 @@ impl GenericDfCalculator {
     };
 }
 
-impl MetricCalculator for GenericDfCalculator {
+impl MetricCalculator for DfCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let deps = context.instrument.market_dependencies()?;
         let discount_id = deps
@@ -73,7 +73,7 @@ impl MetricCalculator for GenericDfCalculator {
 
 #[cfg(test)]
 mod tests {
-    use super::GenericDfCalculator;
+    use super::DfCalculator;
     use crate::instruments::{Bond, Deposit, Instrument};
     use crate::metrics::{MetricCalculator, MetricContext};
     use finstack_quant_core::config::FinstackConfig;
@@ -121,7 +121,7 @@ mod tests {
         let market = MarketContext::new().insert(curve);
 
         let mut context = context_for_instrument(Arc::new(deposit), market, as_of);
-        let calc = GenericDfCalculator::START;
+        let calc = DfCalculator::START;
         let actual = calc.calculate(&mut context).expect("df_start");
 
         assert!((actual - expected).abs() < 1e-10);
@@ -132,7 +132,7 @@ mod tests {
         let as_of = date!(2024 - 01 - 01);
         let deposit = Deposit::example().unwrap();
         let mut context = context_for_instrument(Arc::new(deposit), MarketContext::new(), as_of);
-        let calc = GenericDfCalculator::START;
+        let calc = DfCalculator::START;
         let err = calc
             .calculate(&mut context)
             .expect_err("missing curve should fail");
@@ -151,7 +151,7 @@ mod tests {
         let market = MarketContext::new().insert(curve);
 
         let mut context = context_for_instrument(Arc::new(bond), market, as_of);
-        let calc = GenericDfCalculator::END;
+        let calc = DfCalculator::END;
         let actual = calc.calculate(&mut context).expect("df_end");
 
         assert!((actual - expected).abs() < 1e-10);
@@ -167,7 +167,7 @@ mod tests {
         let market = MarketContext::new().insert(curve);
 
         let mut context = context_for_instrument(Arc::new(deposit), market, as_of);
-        let calc = GenericDfCalculator::END;
+        let calc = DfCalculator::END;
         let actual = calc.calculate(&mut context).expect("df_end");
 
         assert!((actual - expected).abs() < 1e-10);

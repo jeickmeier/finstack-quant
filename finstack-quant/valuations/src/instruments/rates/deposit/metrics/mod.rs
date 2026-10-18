@@ -10,6 +10,8 @@
 //!
 //! See unit tests and `examples/` for usage.
 
+mod df;
+
 mod df_end_from_quote;
 mod par_rate;
 mod quote_rate;
@@ -35,8 +37,8 @@ pub(crate) fn register_deposit_metrics(
         instrument: InstrumentType::Deposit,
         metrics: [
             (Yf, YearFractionCalculator),
-            (DfStart, crate::metrics::GenericDfCalculator::START),
-            (DfEnd, crate::metrics::GenericDfCalculator::END),
+            (DfStart, df::DfCalculator::START),
+            (DfEnd, df::DfCalculator::END),
             (DepositParRate, DepositParRateCalculator),
             (DfEndFromQuote, DfEndFromQuoteCalculator),
             (QuoteRate, QuoteRateCalculator),

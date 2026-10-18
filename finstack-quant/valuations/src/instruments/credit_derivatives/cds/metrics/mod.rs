@@ -66,12 +66,12 @@ pub(crate) fn deal_quote_override(
 /// Per-deal CS01 conventions for `CreditDefaultSwap`.
 ///
 /// Drives the generic credit CS01 calculators
-/// ([`crate::metrics::sensitivities::cs01::CreditParallelCs01`] /
-/// [`CreditBucketedCs01`](crate::metrics::sensitivities::cs01::CreditBucketedCs01))
+/// ([`crate::instruments::credit_derivatives::cs01::CreditParallelCs01`] /
+/// [`CreditBucketedCs01`](crate::instruments::credit_derivatives::cs01::CreditBucketedCs01))
 /// so the hazard curve is re-bootstrapped under this CDS's doc clause and
 /// valuation convention. The optional curve override reproduces the legacy
 /// deal-quote hazard substitution.
-impl crate::metrics::sensitivities::cs01::CdsCs01Conventions
+impl crate::instruments::credit_derivatives::cs01::CdsCs01Conventions
     for crate::instruments::credit_derivatives::cds::CreditDefaultSwap
 {
     fn cs01_bootstrap_convention(
@@ -124,10 +124,10 @@ pub(crate) fn register_cds_metrics(
         metrics: [
             (ParSpread, par_spread::ParSpreadCalculator),
             (RiskyAnnuity, risky_annuity::RiskyAnnuityCalculator),
-            (Cs01, crate::metrics::sensitivities::cs01::CreditParallelCs01::<
+            (Cs01, crate::instruments::credit_derivatives::cs01::CreditParallelCs01::<
                 crate::instruments::credit_derivatives::cds::CreditDefaultSwap,
             >::default()),
-            (BucketedCs01, crate::metrics::sensitivities::cs01::CreditBucketedCs01::<
+            (BucketedCs01, crate::instruments::credit_derivatives::cs01::CreditBucketedCs01::<
                 crate::instruments::credit_derivatives::cds::CreditDefaultSwap,
             >::default()),
             (CsGamma, cs_gamma::CsGammaCalculator),

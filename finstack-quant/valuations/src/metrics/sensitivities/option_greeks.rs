@@ -7,6 +7,7 @@
 //! explicitly selected alternate models use the context's repricing dispatch.
 
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use crate::instruments::common_impl::traits::{
     GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
@@ -14,125 +15,6 @@ use crate::instruments::common_impl::traits::{
 };
 use crate::metrics::{metric_not_found, MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::Result;
-
-/// Equity's native provider evaluates Black-Scholes. Other registered models
-/// must differentiate their selected valuation function, holding their explicit
-/// model parameters fixed. In particular, a surface bump is not a Heston
-/// parameter bump or an implicit recalibration.
-fn selected_equity_greek(kind: OptionGreekKind, context: &mut MetricContext) -> Result<f64> {
-    use super::fd_greeks::{
-        GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVega, GenericFdVolga,
-    };
-    use crate::instruments::EquityOption;
-
-    let option: &EquityOption = context.instrument_as()?;
-    if option
-        .exercise
-        .as_ref()
-        .is_some_and(|exercise| exercise.date <= context.as_of)
-    {
-        let g = option.greeks(&context.curves, context.as_of)?;
-        return Ok(match kind {
-            OptionGreekKind::Delta => g.delta,
-            OptionGreekKind::Gamma => g.gamma,
-            OptionGreekKind::Vega => g.vega,
-            OptionGreekKind::Theta => g.theta,
-            OptionGreekKind::Rho => g.rho,
-            _ => 0.0,
-        });
-    }
-    match kind {
-        OptionGreekKind::Delta => GenericFdDelta::<EquityOption>::default().calculate(context),
-        OptionGreekKind::Gamma => GenericFdGamma::<EquityOption>::default().calculate(context),
-        OptionGreekKind::Vega => GenericFdVega::<EquityOption>::default().calculate(context),
-        OptionGreekKind::Vanna => GenericFdVanna::<EquityOption>::default().calculate(context),
-        OptionGreekKind::Volga => GenericFdVolga::<EquityOption>::default().calculate(context),
-        OptionGreekKind::Theta => selected_equity_theta(context),
-        OptionGreekKind::Rho => super::dv01::UnifiedDv01Calculator::new(
-            super::dv01::Dv01CalculatorConfig::parallel_discount_only(),
-        )
-        .calculate(context),
-        OptionGreekKind::ForeignRho => Err(finstack_quant_core::Error::Validation(
-            "Foreign rho is not defined for an equity option".into(),
-        )),
-    }
-}
-
-fn selected_equity_theta(context: &MetricContext) -> Result<f64> {
-    use std::sync::Arc;
-    let option: &crate::instruments::EquityOption = context.instrument_as()?;
-    if context.as_of >= option.expiry
-        || option
-            .exercise
-            .as_ref()
-            .is_some_and(|exercise| exercise.date <= context.as_of)
-    {
-        return Ok(0.0);
-    }
-    // Equity theta is per reporting day, rather than period-total carry.
-    // Estimate one calendar day's selected-model roll in an isolated context
-    // and normalize to the same 365/252 reporting basis as the native provider.
-    // A separate context also prevents the period-carry component metrics from
-    // being cached with the units of this per-day sensitivity.
-    let mut overrides = context
-        .get_metric_pricing_overrides()
-        .cloned()
-        .unwrap_or_else(|| option.metric_pricing_overrides.clone());
-    let days_per_year = overrides.theta_days_per_year();
-    if (option.expiry - context.as_of).whole_days() == 1 {
-        // A forward stencil would cross into the observed-expiry state and
-        // require an exercise observation that does not yet exist. Use a
-        // backward calendar roll while both valuation points remain live.
-        let previous_date = context
-            .as_of
-            .checked_sub(time::Duration::days(1))
-            .ok_or_else(|| finstack_quant_core::Error::Validation("theta date underflow".into()))?;
-        let previous_market = context.curves.roll_forward(-1)?;
-        let current = context.reprice_raw(&context.curves, context.as_of)?;
-        let previous = context.reprice_raw(&previous_market, previous_date)?;
-        return Ok((current - previous) * 365.0 / days_per_year);
-    }
-    overrides.theta_period = Some(finstack_quant_core::dates::Tenor::daily());
-    let mut daily = MetricContext::new(
-        Arc::clone(&context.instrument),
-        Arc::clone(&context.curves),
-        context.as_of,
-        context.base_value,
-        context.config_arc(),
-    );
-    daily.set_pricer_dispatch(context.clone_pricer_dispatch());
-    daily.set_metric_pricing_overrides(Some(overrides));
-    Ok(super::theta::GenericThetaAny.calculate(&mut daily)? * 365.0 / days_per_year)
-}
-
-/// Commodity delta/gamma retain their published forward-price coordinate.
-/// MC parameters and random numbers remain owned by the selected registry.
-fn selected_commodity_greek(kind: OptionGreekKind, context: &MetricContext) -> Result<f64> {
-    use crate::instruments::CommoditySpotOption;
-    if !matches!(kind, OptionGreekKind::Delta | OptionGreekKind::Gamma) {
-        return Err(finstack_quant_core::Error::Validation(
-            "Schwartz-Smith volatility risk requires explicit sigma_x/sigma_y parameter bumps in the registered model; Black surface vega, vanna and volga are not supported".into(),
-        ));
-    }
-    let option: &CommoditySpotOption = context.instrument_as()?;
-    let forward = option.forward_price(&context.curves, context.as_of)?;
-    let config = super::config::resolve(context)?;
-    let h = (forward * config.spot_bump_decimal)
-        .max(1e-6)
-        .min(forward * 0.5);
-    let evaluate = |shift: f64| {
-        let mut bumped = option.clone();
-        bumped.quoted_forward = Some(forward + shift);
-        context.reprice_instrument_raw(&bumped, &context.curves, context.as_of)
-    };
-    let up = evaluate(h)?;
-    let down = evaluate(-h)?;
-    if kind == OptionGreekKind::Delta {
-        Ok((up - down) / (2.0 * h))
-    } else {
-        Ok((up - 2.0 * evaluate(0.0)? + down) / (h * h))
-    }
-}
 
 /// Selected-model derivative to parallel decimal curve rates. HW single-curve
 /// products bump the discount curve; multi-curve caps bump their projection
@@ -177,19 +59,6 @@ impl<I> OptionGreekCalculator<I> {
         }
     }
 
-    fn metric_id(&self) -> MetricId {
-        match self.kind {
-            OptionGreekKind::Delta => MetricId::Delta,
-            OptionGreekKind::Gamma => MetricId::Gamma,
-            OptionGreekKind::Vega => MetricId::Vega,
-            OptionGreekKind::Theta => MetricId::Theta,
-            OptionGreekKind::Rho => MetricId::Rho,
-            OptionGreekKind::ForeignRho => MetricId::ForeignRho,
-            OptionGreekKind::Vanna => MetricId::Vanna,
-            OptionGreekKind::Volga => MetricId::Volga,
-        }
-    }
-
     pub(crate) fn delta() -> Self {
         Self::new(OptionGreekKind::Delta)
     }
@@ -228,51 +97,24 @@ where
     I: Instrument + OptionGreeksProvider + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let metric_id = self.metric_id();
+        let metric_id = self.kind.metric_id();
         if let Some(value) = context.computed.get(&metric_id) {
             return Ok(*value);
         }
 
         let native_model = context.instrument.default_model();
-        // Once exercise resolves the spot option, every pricing model owns the
-        // same remaining delivery claim and its contractual forward exposure.
-        let resolved_commodity = context
-            .instrument
-            .as_any()
-            .downcast_ref::<crate::instruments::CommoditySpotOption>()
-            .is_some_and(|option| {
-                context.as_of >= option.expiry
-                    || option
-                        .exercise
-                        .is_some_and(|event| event.date <= context.as_of)
-            });
         if context
             .pricing_model()
             .is_some_and(|model| model != native_model)
-            && !resolved_commodity
         {
-            let value = if context
-                .instrument
-                .as_any()
-                .is::<crate::instruments::EquityOption>()
-            {
-                selected_equity_greek(self.kind, context)?
-            } else if context
-                .instrument
-                .as_any()
-                .is::<crate::instruments::CommoditySpotOption>()
-            {
-                selected_commodity_greek(self.kind, context)?
-            } else {
-                // A provider implements its canonical model only. New registered
-                // models must supply an explicit repricing coordinate convention.
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Native {} is unavailable for selected model {:?} on {}; use a selected-model market sensitivity",
-                    metric_id, context.pricing_model(), context.instrument.id()
-                )));
-            };
-            context.computed.insert(metric_id, value);
-            return Ok(value);
+            context.instrument_as::<I>()?;
+            let instrument = Arc::clone(&context.instrument);
+            if let Some(inst) = instrument.as_any().downcast_ref::<I>() {
+                if let Some(value) = inst.selected_model_greek(self.kind, context)? {
+                    context.computed.insert(metric_id, value);
+                    return Ok(value);
+                }
+            }
         }
 
         let base_pv =

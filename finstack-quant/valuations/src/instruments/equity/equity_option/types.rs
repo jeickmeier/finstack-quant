@@ -611,6 +611,14 @@ impl EquityOption {
 }
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOption {
+    fn selected_model_greek(
+        &self,
+        kind: crate::instruments::common_impl::traits::OptionGreekKind,
+        context: &mut crate::metrics::MetricContext,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        super::metrics::selected_model::selected_equity_greek(kind, context).map(Some)
+    }
+
     fn option_greeks(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,

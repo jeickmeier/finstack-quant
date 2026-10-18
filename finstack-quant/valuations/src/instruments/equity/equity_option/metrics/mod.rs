@@ -8,6 +8,7 @@ mod charm;
 mod color;
 mod dividend_risk;
 mod implied_vol;
+pub(crate) mod selected_model;
 mod speed;
 
 use crate::instruments::equity::equity_option::EquityOption;

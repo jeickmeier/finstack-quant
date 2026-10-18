@@ -52,8 +52,8 @@
 //! use the same overridden quote set as standard CS01.
 
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
+use crate::instruments::credit_derivatives::cs01::with_prepared_cds_risk_context;
 use crate::metrics::sensitivities::config as sens_config;
-use crate::metrics::sensitivities::cs01::with_prepared_cds_risk_context;
 use crate::metrics::{MetricCalculator, MetricContext};
 use crate::recalibration::{HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump};
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;

@@ -2,6 +2,7 @@
 //!
 // Option risk metric providers
 
+use crate::metrics::{MetricContext, MetricId};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 
@@ -24,6 +25,23 @@ pub enum OptionGreekKind {
     Vanna,
     /// Volga in instrument bump convention.
     Volga,
+}
+
+impl OptionGreekKind {
+    /// The metric identifier this greek is reported under.
+    #[must_use]
+    pub fn metric_id(self) -> MetricId {
+        match self {
+            Self::Delta => MetricId::Delta,
+            Self::Gamma => MetricId::Gamma,
+            Self::Vega => MetricId::Vega,
+            Self::Theta => MetricId::Theta,
+            Self::Rho => MetricId::Rho,
+            Self::ForeignRho => MetricId::ForeignRho,
+            Self::Vanna => MetricId::Vanna,
+            Self::Volga => MetricId::Volga,
+        }
+    }
 }
 
 /// Finite-difference bump sizes passed to every [`OptionGreeksProvider`] method.
@@ -129,6 +147,44 @@ pub trait OptionGreeksProvider: Send + Sync {
         as_of: Date,
         request: &OptionGreeksRequest,
     ) -> finstack_quant_core::Result<OptionGreeks>;
+
+    /// Price `kind` under a pricing model other than the instrument's native
+    /// one.
+    ///
+    /// The generic option-greek calculator calls this when the metric context
+    /// selected a model that differs from the instrument's default model;
+    /// [`OptionGreeksProvider::option_greeks`] answers only for the native
+    /// model. Providers that can differentiate a selected valuation function
+    /// (holding its explicit model parameters fixed) override it.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - The greek requested.
+    /// * `context` - Metric context carrying the selected model dispatch, the
+    ///   market, the valuation date and the bump configuration.
+    ///
+    /// # Returns
+    ///
+    /// `Some(value)` when the provider priced the greek under the selected
+    /// model; `None` when the native greeks apply after all (for example once
+    /// an exercise resolved the option's remaining claim).
+    ///
+    /// # Errors
+    ///
+    /// The default rejects every selected model: the provider implements its
+    /// native model only.
+    fn selected_model_greek(
+        &self,
+        kind: OptionGreekKind,
+        context: &mut MetricContext,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        Err(finstack_quant_core::Error::Validation(format!(
+            "Native {} is unavailable for selected model {:?} on {}; use a selected-model market sensitivity",
+            kind.metric_id(),
+            context.pricing_model(),
+            context.instrument.id()
+        )))
+    }
 }
 
 #[cfg(test)]

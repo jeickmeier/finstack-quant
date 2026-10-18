@@ -283,7 +283,6 @@ mod aggregation;
 mod core;
 pub mod risk;
 pub(crate) mod sensitivities;
-mod shared;
 
 // Core surface (supported)
 pub use aggregation::is_additive_metric;
@@ -314,6 +313,7 @@ pub(crate) use core::finite_difference::{
     replace_scalar_value, scalar_numeric_value, scaled_central_diff_by_width, CORRELATION_BUMP,
     VOL_POINTS_PER_ABSOLUTE_VOL,
 };
+pub(crate) use sensitivities::carry_decomposition::{CarryDecompositionCalculator, YieldClock};
 pub(crate) use sensitivities::cross_factor::{
     make_credit_bumper, make_fx_bumper, make_rates_bumper, make_spot_bumper, make_vol_bumper,
 };
@@ -329,7 +329,6 @@ pub(crate) use sensitivities::option_greeks::OptionGreekCalculator;
 pub(crate) use sensitivities::rf_component_dv01::{RfComponentDv01Calculator, RfComponentPriced};
 pub(crate) use sensitivities::theta::{calculate_theta_date, theta_period};
 pub(crate) use sensitivities::vega::KeyRateVega;
-pub(crate) use shared::df::GenericDfCalculator;
 
 // Error helper functions
 

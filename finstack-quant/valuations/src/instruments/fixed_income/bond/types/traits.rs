@@ -13,6 +13,10 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         crate::instruments::fixed_income::FIXED_INCOME
     );
 
+    fn notional_draw_date(&self) -> Option<finstack_quant_core::dates::Date> {
+        Some(self.issue_date)
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         self.default_pricing_model()
     }

@@ -21,24 +21,107 @@
 //! Floating-rate bonds and OIS/term swaps whose horizon crosses a fixing
 //! therefore reprice instead of failing on the unpublished fixing.
 
-use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
-    df_from_yield, YieldCompounding,
-};
-use crate::instruments::fixed_income::bond::pricing::time_basis::{
-    act365l_year_fraction, bond_coupon_periods,
-};
-use crate::instruments::Bond;
+use crate::instruments::common_impl::pricing::coupon_period::icma_reference_period;
 use crate::metrics::sensitivities::theta::{
     calculate_theta_date, collect_period_cash_cached, theta_termination_date,
 };
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
-use finstack_quant_core::math::Compounding;
 use finstack_quant_core::Result;
+use std::sync::Arc;
 
-/// Computes carry decomposition and stores all components in `context.computed`.
-#[derive(Default)]
-pub(crate) struct CarryDecompositionCalculator;
+/// The yield clock a carry decomposition accretes along.
+///
+/// Pull-to-par is the constant-yield accretion of the dirty PV over the carry
+/// horizon. How a yield turns into an accretion factor depends on the
+/// instrument's quoting convention (compounding, coupon frequency, day count),
+/// so each family that quotes a yield supplies its clock and registers the
+/// calculator with it; the universal registration accretes annually on the
+/// context's day count.
+pub(crate) trait YieldClock: Send + Sync {
+    /// Accretion factor `1 / DF_y(as_of, rolled_date)` of the dirty PV under
+    /// the constant yield `ytm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Metric context of the instrument under evaluation.
+    /// * `ytm` - Yield to maturity as a decimal rate in the instrument's
+    ///   quoting convention.
+    /// * `rolled_date` - End of the carry horizon.
+    fn accretion_factor(&self, context: &MetricContext, ytm: f64, rolled_date: Date)
+        -> Result<f64>;
+}
+
+/// Annual compounding on the context's day count (ACT/365F when none was
+/// stamped); the quasi-coupon period is resolved from the cached cashflow
+/// dates for ACT/ACT (ICMA).
+struct AnnualYieldClock;
+
+impl YieldClock for AnnualYieldClock {
+    fn accretion_factor(
+        &self,
+        context: &MetricContext,
+        ytm: f64,
+        rolled_date: Date,
+    ) -> Result<f64> {
+        let frequency = Tenor::annual();
+        let day_count = context.day_count.unwrap_or(DayCount::Act365F);
+        let dc_ctx = DayCountContext {
+            frequency: Some(frequency),
+            coupon_period: context.cashflows.as_deref().and_then(|flows| {
+                icma_reference_period(
+                    day_count,
+                    frequency,
+                    flows.iter().map(|(d, _)| *d),
+                    context.as_of,
+                )
+            }),
+            ..DayCountContext::default()
+        };
+        let tau = day_count.year_fraction(context.as_of, rolled_date, dc_ctx)?;
+        if tau <= 0.0 {
+            return Ok(1.0);
+        }
+        if ytm < -0.5 {
+            tracing::warn!(
+                ytm = ytm,
+                "Extreme negative yield detected (< -50%). This may indicate a data error."
+            );
+        }
+        let base = 1.0 + ytm;
+        if base <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Annual compounding base (1 + y) = {} is non-positive for ytm={}",
+                base, ytm
+            )));
+        }
+        Ok(base.powf(tau))
+    }
+}
+
+pub(crate) struct CarryDecompositionCalculator {
+    clock: Arc<dyn YieldClock>,
+}
+
+impl Default for CarryDecompositionCalculator {
+    fn default() -> Self {
+        Self::with_clock(AnnualYieldClock)
+    }
+}
+
+impl CarryDecompositionCalculator {
+    /// A carry decomposition accreting along `clock`.
+    ///
+    /// # Arguments
+    ///
+    /// * `clock` - Yield clock of the instrument family registering the
+    ///   calculator.
+    pub(crate) fn with_clock(clock: impl YieldClock + 'static) -> Self {
+        Self {
+            clock: Arc::new(clock),
+        }
+    }
+}
 
 impl MetricCalculator for CarryDecompositionCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
@@ -86,11 +169,11 @@ impl MetricCalculator for CarryDecompositionCalculator {
             // it is not double counted against `coupon_income`. For a par
             // bond over a full coupon period this is ~0; for a zero-coupon
             // bond it is the full accretion.
-            let accretion = ytm_accretion_factor(context, ytm, rolled_date)?;
+            let accretion = self.clock.accretion_factor(context, ytm, rolled_date)?;
             let payments = super::theta::period_cash_by_date_cached(context, rolled_date)?;
             let mut intermediate_accretion = 0.0;
             for (payment_date, amount) in payments {
-                let at_payment = ytm_accretion_factor(context, ytm, payment_date)?;
+                let at_payment = self.clock.accretion_factor(context, ytm, payment_date)?;
                 intermediate_accretion += amount * (accretion / at_payment - 1.0);
             }
             (
@@ -140,63 +223,6 @@ impl MetricCalculator for CarryDecompositionCalculator {
     }
 }
 
-/// Accretion factor `1 / DF_y(tau)` over `[as_of, rolled_date]` under the same
-/// discounting convention the instrument's `Ytm` metric was solved with.
-///
-/// Bond YTMs are Street-compounded at the bond's coupon frequency and day
-/// count (see `YtmCalculator` / `solve_ytm`), so the accretion must invert
-/// `(1 + y/f)^(-f*tau)` measured with those conventions. Non-bond instruments
-/// that expose a `Ytm` metric (term loans via XIRR, structured credit by
-/// default) solve annually compounded yields, so those fall back to
-/// `(1 + y)^tau` using the context day count when one was stamped.
-fn ytm_accretion_factor(context: &MetricContext, ytm: f64, rolled_date: Date) -> Result<f64> {
-    let bond = context.instrument.as_any().downcast_ref::<Bond>();
-    let (compounding, frequency, day_count) = if let Some(bond) = bond {
-        (
-            YieldCompounding::Street,
-            bond.cashflow_spec.frequency(),
-            bond.cashflow_spec.day_count(),
-        )
-    } else {
-        (
-            YieldCompounding::Rate(Compounding::Annual),
-            Tenor::annual(),
-            context.day_count.unwrap_or(DayCount::Act365F),
-        )
-    };
-
-    // ACT/ACT (ICMA) requires the coupon frequency in the day-count context
-    // (mirrors `price_from_ytm_compounded_params`). The schedule-derived
-    // reference coupon period lets ISMA resolve the mid-coupon carry horizon,
-    // which is never a whole number of coupons.
-    let dc_ctx = DayCountContext {
-        frequency: Some(frequency),
-        coupon_period: context.cashflows.as_deref().and_then(|flows| {
-            crate::instruments::fixed_income::bond::pricing::quote_conversions::icma_reference_period(
-                day_count,
-                frequency,
-                flows.iter().map(|(d, _)| *d),
-                context.as_of,
-            )
-        }),
-        ..DayCountContext::default()
-    };
-    // ACT/365L must retain each enclosing coupon's denominator when the
-    // carry horizon crosses a coupon boundary, just as the bond yield clock does.
-    let tau = if let Some(bond) = bond.filter(|_| day_count == DayCount::Act365L) {
-        act365l_year_fraction(
-            frequency,
-            &bond_coupon_periods(bond)?,
-            context.as_of,
-            rolled_date,
-        )?
-    } else {
-        day_count.year_fraction(context.as_of, rolled_date, dc_ctx)?
-    };
-    let df = df_from_yield(ytm, tau, compounding, frequency)?;
-    Ok(1.0 / df)
-}
-
 fn compute_funding_cost(context: &MetricContext, rolled_date: Date) -> Result<f64> {
     let Some(repo_curve_id) = context.instrument.repo_curve_id() else {
         return Ok(0.0);
@@ -211,6 +237,7 @@ fn compute_funding_cost(context: &MetricContext, rolled_date: Date) -> Result<f6
 mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::Instrument;
+    use crate::instruments::fixed_income::bond::metrics::carry::BondYieldClock;
     use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
         df_from_yield, YieldCompounding,
     };
@@ -325,7 +352,7 @@ mod tests {
         let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
         let mut context = context_for(bond, market, as_of, Tenor::daily(), Some(0.05));
 
-        let total = CarryDecompositionCalculator
+        let total = CarryDecompositionCalculator::with_clock(BondYieldClock)
             .calculate(&mut context)
             .expect("carry decomposition should calculate");
 
@@ -362,10 +389,14 @@ mod tests {
         let tau = 30.0 / 366.0 + 61.0 / 365.0;
         let accretion = (1.0 + ytm / 2.0).powf(2.0 * tau);
         assert!(
-            (ytm_accretion_factor(&context, ytm, rolled).expect("accretion") - accretion).abs()
+            (BondYieldClock
+                .accretion_factor(&context, ytm, rolled)
+                .expect("accretion")
+                - accretion)
+                .abs()
                 < 1e-12
         );
-        let total = CarryDecompositionCalculator
+        let total = CarryDecompositionCalculator::with_clock(BondYieldClock)
             .calculate(&mut context)
             .expect("ACT/365L carry");
         let coupon_income = 100.0 * 0.05 * 183.0 / 366.0;
@@ -407,7 +438,7 @@ mod tests {
             Tenor::daily(),
             Some(street_equivalent_yield(0.05)),
         );
-        let total = CarryDecompositionCalculator
+        let total = CarryDecompositionCalculator::with_clock(BondYieldClock)
             .calculate(&mut context)
             .expect("carry");
         assert_eq!(context.computed[&MetricId::CouponIncome], 0.0);
@@ -434,7 +465,7 @@ mod tests {
         let mut context = context_for(bond, market, as_of, Tenor::monthly(), Some(ytm));
         let base_pv = context.base_value.amount();
 
-        let total = CarryDecompositionCalculator
+        let total = CarryDecompositionCalculator::with_clock(BondYieldClock)
             .calculate(&mut context)
             .expect("carry decomposition should calculate");
 
@@ -491,7 +522,7 @@ mod tests {
         let ytm = street_equivalent_yield(0.05);
         let mut context = context_for(bond, market, as_of, Tenor::semi_annual(), Some(ytm));
 
-        let total = CarryDecompositionCalculator
+        let total = CarryDecompositionCalculator::with_clock(BondYieldClock)
             .calculate(&mut context)
             .expect("carry decomposition should calculate");
 
@@ -536,7 +567,7 @@ mod tests {
         let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
         let mut context = context_for(bond, market, as_of, Tenor::monthly(), None);
 
-        CarryDecompositionCalculator
+        CarryDecompositionCalculator::with_clock(BondYieldClock)
             .calculate(&mut context)
             .expect("carry decomposition should calculate without YTM");
 
@@ -554,7 +585,7 @@ mod tests {
         let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
         let mut context = context_for(bond, market, as_of, Tenor::monthly(), None);
 
-        CarryDecompositionCalculator
+        CarryDecompositionCalculator::with_clock(BondYieldClock)
             .calculate(&mut context)
             .expect("carry decomposition should calculate without YTM");
 
@@ -586,7 +617,7 @@ mod tests {
         let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
         let mut context = context_for(bond, market, as_of, Tenor::monthly(), Some(0.05));
 
-        CarryDecompositionCalculator
+        CarryDecompositionCalculator::with_clock(BondYieldClock)
             .calculate(&mut context)
             .expect("carry decomposition should calculate with YTM");
 
@@ -610,7 +641,7 @@ mod tests {
         let mut context = context_for(bond, market, as_of, Tenor::monthly(), Some(0.05));
         context.day_count = Some(DayCount::Thirty360);
 
-        CarryDecompositionCalculator
+        CarryDecompositionCalculator::with_clock(BondYieldClock)
             .calculate(&mut context)
             .expect("carry decomposition should calculate");
 
@@ -675,7 +706,7 @@ mod tests {
         // A full carry calculation still uses the bond's day count for its
         // separate constant-yield accretion component.
         context.day_count = Some(DayCount::Thirty360);
-        CarryDecompositionCalculator
+        CarryDecompositionCalculator::with_clock(BondYieldClock)
             .calculate(&mut context)
             .expect("carry decomposition");
         assert!((context.computed[&MetricId::FundingCost] - funding_cost).abs() < 1e-8);
