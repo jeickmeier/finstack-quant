@@ -48,6 +48,7 @@ json-schema = [
 name = "gen_materialization_schemas"
 path = "src/bin/gen_materialization_schemas.rs"
 required-features = ["json-schema"]
+test = false
 
 [dev-dependencies]
 criterion = { workspace = true }

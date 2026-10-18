@@ -48,6 +48,7 @@ time = { workspace = true, features = ["macros"] }
 name = "gen_attribution_schemas"
 path = "src/bin/gen_schemas.rs"
 required-features = ["json-schema"]
+test = false
 
 [[bench]]
 name = "attribution"
