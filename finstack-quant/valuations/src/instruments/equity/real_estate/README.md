@@ -42,9 +42,12 @@ real_estate/
     └── sensitivities.rs # cap-rate and discount-rate finite differences
 ```
 
-Both instruments are registered with `register_generic!` under
-`InstrumentType::RealEstateAsset` and `InstrumentType::LeveredRealEstateEquity`
-in [`../family.rs`](../family.rs) (`EQUITY`). Pricing runs through
+Both instruments stay in the umbrella crate rather than in
+`finstack-quant-valuations-equity`: their financing stack holds `InstrumentJson`
+legs, which is the closed world. They are registered with `register_generic!`
+under `InstrumentType::RealEstateAsset` and
+`InstrumentType::LeveredRealEstateEquity` by the umbrella's `STANDARD` family in
+[`src/pricer/mod.rs`](../../../pricer/mod.rs), not by `EQUITY`. Pricing runs through
 `Instrument::base_value`; `levered_pricer.rs` contains the shared PV and
 cashflow helpers used by `LeveredRealEstateEquity`.
 

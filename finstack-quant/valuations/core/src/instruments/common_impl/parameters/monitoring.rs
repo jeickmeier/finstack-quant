@@ -25,6 +25,43 @@ pub enum Monitoring {
 }
 
 impl Monitoring {
+    /// Build the simulation time grid for a barrier payoff and the step map
+    /// the Monte Carlo barrier monitor reads from it.
+    ///
+    /// Every contractual observation (the monitoring start for `Continuous`,
+    /// each remaining observation date for `Discrete`) is converted to a year
+    /// fraction from `as_of` and inserted into the pricer's grid, so the
+    /// monitor can observe the barrier on an exact grid step.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date; time `0.0` of the grid. Observation dates
+    ///   before it are already in the past and are dropped.
+    /// * `day_count` - Day-count convention that turns an observation date
+    ///   into its year fraction from `as_of`; it must be the convention the
+    ///   caller used to compute `time_to_maturity`, so observation times and
+    ///   the horizon share one clock.
+    /// * `monitoring_start_date` - `Continuous` only: the date monitoring
+    ///   begins. `None`, or a date on or before `as_of`, means monitoring is
+    ///   already active at time `0.0`; a later date defers it to that step.
+    ///   Ignored for `Discrete`, whose observation dates are the contract's.
+    /// * `time_to_maturity` - Horizon of the grid, in years from `as_of` on
+    ///   the `day_count` clock. Every observation time must lie within it.
+    /// * `config` - Path-dependent pricer configuration whose step count and
+    ///   grid policy the required observation times are inserted into.
+    ///
+    /// # Returns
+    ///
+    /// The time grid to simulate on and the barrier monitoring expressed in
+    /// grid steps: `Continuous { start_step }` or
+    /// `Discrete { observation_steps }`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the day-count error for an observation date that cannot be
+    /// placed on the clock, the grid builder's error when a required time is
+    /// outside `[0, time_to_maturity]`, and an internal error if a required
+    /// time is missing from the built grid.
     pub fn time_grid(
         &self,
         as_of: Date,

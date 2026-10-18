@@ -140,6 +140,16 @@ impl PricingOptions {
         self
     }
 
+    /// Record that the instrument these options price has already passed
+    /// `Instrument::validate_invariants`, so the registry skips that check.
+    ///
+    /// The flag is a promise, not a check: the registry prices the instrument
+    /// without re-validating it. Call this only when the same, unmodified
+    /// instrument was validated earlier in the current lifecycle (the
+    /// cashflow exporter does so after pricing it once); marking options for
+    /// an instrument that was never validated lets malformed inputs reach the
+    /// pricer. Options built any other way, including `Default`, leave the
+    /// flag unset.
     pub fn mark_instrument_validated(mut self) -> Self {
         self.instrument_validated = true;
         self
