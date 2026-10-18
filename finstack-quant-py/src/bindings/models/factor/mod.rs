@@ -1,4 +1,4 @@
-//! Python bindings for `finstack_quant_models::factor`.
+//! Python bindings for `finstack_quant_factor`.
 //!
 //! The module mirrors the Rust crate boundary: `FactorCovarianceMatrix` and
 //! `FactorModelConfig` sit on `finstack_quant.models.factor` like their Rust
@@ -86,7 +86,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     schema::register(py, &m)?;
 
-    // Exported at the Rust crate root (`finstack_quant_models::factor`), so
+    // Exported at the Rust crate root (`finstack_quant_factor`), so
     // they live on `finstack_quant.models.factor`, not under `credit`.
     m.add_class::<credit::PyFactorCovarianceMatrix>()?;
     m.add_class::<credit::PyFactorModelConfig>()?;

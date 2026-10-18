@@ -53,6 +53,7 @@ jsonschema-validate = ["json-schema", "dep:jsonschema"]
 name = "gen_core_schemas"
 path = "src/bin/gen_core_schemas.rs"
 required-features = ["json-schema"]
+test = false
 
 [build-dependencies]
 serde = { workspace = true, features = ["alloc"] }

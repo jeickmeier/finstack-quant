@@ -7,16 +7,6 @@
 mod credit;
 #[path = "dtsm_serde.rs"]
 mod dtsm_serde;
-#[path = "factor_canonical_contract.rs"]
-mod factor_canonical_contract;
-#[path = "factor_credit_peel_parity.rs"]
-mod factor_credit_peel_parity;
-#[path = "factor_multi_asset_config.rs"]
-mod factor_multi_asset_config;
-#[path = "factor_schema_contract.rs"]
-mod factor_schema_contract;
-#[path = "factor_strictness.rs"]
-mod factor_strictness;
 #[path = "fx_delta_vol_tests.rs"]
 mod fx_delta_vol_tests;
 #[path = "host_bridges.rs"]

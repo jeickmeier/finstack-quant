@@ -7,7 +7,7 @@ use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_models::factor::{FactorDefinition, MarketMapping, SensitivityMatrix};
+use finstack_quant_factor::{FactorDefinition, MarketMapping, SensitivityMatrix};
 use finstack_quant_valuations::instruments::{Instrument, RatesCurveKind};
 
 /// Resolve one factor definition to the exact dependency keys its market bump
@@ -269,7 +269,7 @@ mod tests {
     use super::*;
     use finstack_quant_core::market_data::bumps::BumpUnits;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_models::factor::{FactorId, FactorType};
+    use finstack_quant_factor::{FactorId, FactorType};
     use time::macros::date;
 
     #[test]

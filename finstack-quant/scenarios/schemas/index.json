@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/horizon_result.schema.json",
-      "bytes": 142763,
+      "bytes": 142755,
       "kind": "output",
       "path": "schemas/scenarios/1/horizon_result.schema.json",
       "summary": "Horizon total return: factor-decomposed P&L with scenario context.",

@@ -1,10 +1,10 @@
 //! Factor model serialization tests for portfolio.
 
 use finstack_quant_core::types::CurveId;
-use finstack_quant_models::factor::risk::{
+use finstack_quant_factor::risk::{
     FactorContribution, PositionFactorContribution, RiskDecomposition,
 };
-use finstack_quant_models::factor::{CurveType, FactorId, MarketDependency, RiskMeasure};
+use finstack_quant_factor::{CurveType, FactorId, MarketDependency, RiskMeasure};
 use finstack_quant_portfolio::factor_model::{
     FactorAssignmentReport, FactorContributionDelta, PositionAssignment, StressPnl, StressResult,
     UnmatchedEntry, WhatIfResult,

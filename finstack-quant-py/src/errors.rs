@@ -190,7 +190,7 @@ pub fn scenarios_to_py(e: finstack_quant_scenarios::Error) -> PyErr {
 /// Rust-owned kind (unknown issuer → `KeyError`, inconsistent model →
 /// `RuntimeError`, otherwise `ValueError`).
 pub fn decomposition_error_to_py(
-    e: finstack_quant_models::factor::credit::decomposition::DecompositionError,
+    e: finstack_quant_factor::credit::decomposition::DecompositionError,
 ) -> PyErr {
     kind_to_py(e.kind(), format_chain(&e))
 }

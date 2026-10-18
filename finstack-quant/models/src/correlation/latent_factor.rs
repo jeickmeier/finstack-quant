@@ -1,7 +1,7 @@
 //! Factor models for correlated behavior in credit portfolios.
 //!
 //! **Naming note:** This module's [`LatentFactorKind`] enum is distinct from the
-//! portfolio-risk factor framework in `finstack_quant_models::factor`.
+//! portfolio-risk factor framework in the `finstack-quant-factor` crate.
 //! Here, "factor model" refers to *latent-variable models* used to generate
 //! correlated default/prepayment events in Monte Carlo simulations (the
 //! Gaussian copula family). The core/portfolio factor model instead provides
@@ -44,8 +44,10 @@
 //!
 
 use crate::correlation::{Error, Result};
-use finstack_quant_analytics::correlation::{validate_correlation_matrix, Error as MatrixError};
-use finstack_quant_core::math::linalg::{cholesky_correlation, CorrelationFactor};
+use finstack_quant_core::math::linalg::{
+    cholesky_correlation, validate_correlation_matrix, CorrelationError as MatrixError,
+    CorrelationFactor,
+};
 
 /// Perform Cholesky decomposition of a correlation matrix using diagonal pivoting.
 /// Returns a [`CorrelationFactor`] that holds the lower triangular factor in the
@@ -329,7 +331,7 @@ impl LatentFactorSpec {
                     });
                 }
                 if !correlation.is_finite() || !(-1.0..=1.0).contains(correlation) {
-                    return Err(finstack_quant_analytics::correlation::Error::OutOfBounds {
+                    return Err(MatrixError::OutOfBounds {
                         i: 0,
                         j: 1,
                         value: *correlation,

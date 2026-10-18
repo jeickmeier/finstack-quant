@@ -1,12 +1,11 @@
 //! Models-owned correlation errors.
 //!
 //! Matrix validation and nearest-correlation failures come from
-//! [`finstack_quant_analytics::correlation::Error`]. This enum adds the
-//! credit-domain variants that analytics never constructs: factor volatilities,
+//! [`finstack_quant_core::math::linalg::CorrelationError`]. This enum adds the
+//! credit-domain variants that core never constructs: factor volatilities,
 //! recovery inputs, and Student-t degrees of freedom.
 
-use finstack_quant_analytics::correlation::Error as MatrixError;
-use finstack_quant_core::math::linalg::CholeskyError;
+use finstack_quant_core::math::linalg::{CholeskyError, CorrelationError as MatrixError};
 
 /// Convenience result type for models correlation constructors.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -20,7 +19,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Error {
-    /// Matrix validation or nearest-correlation failure from analytics.
+    /// Matrix validation or nearest-correlation failure from core.
     #[error(transparent)]
     Matrix(
         /// Analytics matrix-validation or nearest-correlation failure.

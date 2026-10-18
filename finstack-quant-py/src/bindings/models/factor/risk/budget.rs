@@ -3,9 +3,7 @@ use crate::bindings::pandas_utils::dict_to_dataframe;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use finstack_quant_models::factor::risk::{
-    self as model_risk, PositionBudgetEntry, RiskBudgetResult,
-};
+use finstack_quant_factor::risk::{self as model_risk, PositionBudgetEntry, RiskBudgetResult};
 
 use crate::bindings::json_bridge::{deserialize_json, serialize_json};
 
@@ -265,7 +263,7 @@ impl_repr_html_via_dataframe!(PyRiskBudgetResult);
 ///         non-empty target shares do not sum to one, or a non-zero component
 ///         is paired with a zero ``portfolio_var``.
 #[pyfunction]
-#[pyo3(signature = (position_ids, actual_var, target_var_pct, portfolio_var, utilization_threshold = finstack_quant_models::factor::risk::DEFAULT_UTILIZATION_THRESHOLD))]
+#[pyo3(signature = (position_ids, actual_var, target_var_pct, portfolio_var, utilization_threshold = finstack_quant_factor::risk::DEFAULT_UTILIZATION_THRESHOLD))]
 pub(super) fn evaluate_risk_budget(
     py: Python<'_>,
     position_ids: Vec<String>,

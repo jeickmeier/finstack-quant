@@ -25,6 +25,7 @@ finstack_quant_valuations = { package = "finstack-quant-valuations", path = "val
 finstack_quant_portfolio = { package = "finstack-quant-portfolio", path = "portfolio", version = "0.11.0", default-features = false }
 finstack_quant_scenarios = { package = "finstack-quant-scenarios", path = "scenarios", version = "0.11.0", default-features = false }
 finstack_quant_models = { package = "finstack-quant-models", path = "models", version = "0.11.0", default-features = false }
+finstack_quant_factor = { package = "finstack-quant-factor", path = "factor", version = "0.11.0", default-features = false }
 serde_json = { workspace = true }
 jsonschema = { version = "0.28", default-features = false, optional = true }
 
@@ -45,6 +46,7 @@ json-schema = [
     "finstack_quant_portfolio/json-schema",
     "finstack_quant_scenarios/json-schema",
     "finstack_quant_models/json-schema",
+    "finstack_quant_factor/json-schema",
 ]
 jsonschema-validate = [
     "finstack_quant_core/jsonschema-validate",
@@ -56,6 +58,12 @@ jsonschema-validate = [
 
 [lints]
 workspace = true
+
+[[bin]]
+name = "gen_models_schemas"
+path = "src/bin/gen_models_schemas.rs"
+required-features = ["json-schema"]
+test = false
 
 # Consolidated integration tests
 [[test]]

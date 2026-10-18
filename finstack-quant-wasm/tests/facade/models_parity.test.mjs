@@ -22,7 +22,7 @@ await init({
 const repoFile = (path) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8');
 const GOLDEN = JSON.parse(repoFile('finstack-quant-py/tests/data/models_parity_golden.json'));
 const CANONICAL_MODEL = repoFile(
-  'finstack-quant/models/tests/data/canonical/credit_factor_model.json'
+  'finstack-quant/factor/tests/data/canonical/credit_factor_model.json'
 );
 
 // Monte Carlo and iterative results go through libm on each target; everything

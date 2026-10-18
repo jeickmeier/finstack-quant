@@ -14,15 +14,15 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple, PyType};
 
 use finstack_quant_core::types::IssuerId;
-use finstack_quant_models::factor::credit::calibration::{
+use finstack_quant_factor::credit::calibration::{
     CreditCalibrationConfig, CreditCalibrationInputs, GenericFactorSeries, HistoryPanel,
     IssuerTagPanel,
 };
-use finstack_quant_models::factor::credit::hierarchy::{
+use finstack_quant_factor::credit::hierarchy::{
     dimension_key, CreditFactorModel, GenericFactorSpec, IssuerTags,
 };
-use finstack_quant_models::factor::credit::VolHorizon;
-use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
+use finstack_quant_factor::credit::VolHorizon;
+use finstack_quant_factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
 
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::module_utils::py_to_json_value;
@@ -338,7 +338,7 @@ impl PyCreditFactorModel {
 )]
 #[derive(Clone)]
 pub(crate) struct PyCreditCalibrator {
-    inner: finstack_quant_models::factor::credit::calibration::CreditCalibrator,
+    inner: finstack_quant_factor::credit::calibration::CreditCalibrator,
 }
 
 /// Parse an optional calibration config from a dict / JSON string.
@@ -446,9 +446,7 @@ impl PyCreditCalibrator {
     fn new(py: Python<'_>, config: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
         let config = extract_calibration_config(py, config)?;
         Ok(Self {
-            inner: finstack_quant_models::factor::credit::calibration::CreditCalibrator::new(
-                config,
-            ),
+            inner: finstack_quant_factor::credit::calibration::CreditCalibrator::new(config),
         })
     }
 
@@ -526,8 +524,7 @@ impl PyCreditCalibrator {
         let config = extract_calibration_config(py, config)?;
         let inputs =
             inputs_from_dataframe(py, spreads, tags, generic, generic_spec, spread_durations)?;
-        let calibrator =
-            finstack_quant_models::factor::credit::calibration::CreditCalibrator::new(config);
+        let calibrator = finstack_quant_factor::credit::calibration::CreditCalibrator::new(config);
         let model = py
             .detach(|| calibrator.calibrate(inputs))
             .map_err(core_to_py)?;
@@ -581,13 +578,11 @@ impl PyCreditCalibrator {
 )]
 #[derive(Clone)]
 pub(crate) struct PyLevelsAtDate {
-    inner: finstack_quant_models::factor::credit::decomposition::LevelsAtDate,
+    inner: finstack_quant_factor::credit::decomposition::LevelsAtDate,
 }
 
 impl PyLevelsAtDate {
-    fn from_inner(
-        inner: finstack_quant_models::factor::credit::decomposition::LevelsAtDate,
-    ) -> Self {
+    fn from_inner(inner: finstack_quant_factor::credit::decomposition::LevelsAtDate) -> Self {
         Self { inner }
     }
 }
@@ -600,7 +595,7 @@ impl PyLevelsAtDate {
     ///     ValueError: If the JSON is malformed or fails validation.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        finstack_quant_models::factor::credit::decomposition::LevelsAtDate::from_json(json)
+        finstack_quant_factor::credit::decomposition::LevelsAtDate::from_json(json)
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -747,12 +742,12 @@ impl PyLevelsAtDate {
 )]
 #[derive(Clone)]
 pub(crate) struct PyPeriodDecomposition {
-    inner: finstack_quant_models::factor::credit::decomposition::PeriodDecomposition,
+    inner: finstack_quant_factor::credit::decomposition::PeriodDecomposition,
 }
 
 impl PyPeriodDecomposition {
     fn from_inner(
-        inner: finstack_quant_models::factor::credit::decomposition::PeriodDecomposition,
+        inner: finstack_quant_factor::credit::decomposition::PeriodDecomposition,
     ) -> Self {
         Self { inner }
     }
@@ -766,7 +761,7 @@ impl PyPeriodDecomposition {
     ///     ValueError: If the JSON is malformed or fails validation.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        finstack_quant_models::factor::credit::decomposition::PeriodDecomposition::from_json(json)
+        finstack_quant_factor::credit::decomposition::PeriodDecomposition::from_json(json)
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -975,7 +970,7 @@ fn decompose_levels(
         _ => None,
     };
 
-    let result = finstack_quant_models::factor::credit::decomposition::decompose_levels(
+    let result = finstack_quant_factor::credit::decomposition::decompose_levels(
         &model.inner,
         &observed_spreads,
         observed_generic,
@@ -1025,7 +1020,7 @@ fn decompose_period(
     from_levels: &PyLevelsAtDate,
     to_levels: &PyLevelsAtDate,
 ) -> PyResult<PyPeriodDecomposition> {
-    let result = finstack_quant_models::factor::credit::decomposition::decompose_period(
+    let result = finstack_quant_factor::credit::decomposition::decompose_period(
         &from_levels.inner,
         &to_levels.inner,
     )
@@ -1498,9 +1493,8 @@ impl PyFactorCovarianceForecast {
         let h = extract_vol_horizon(horizon)?;
         let cov = py
             .detach(|| {
-                let forecast = finstack_quant_models::factor::credit::FactorCovarianceForecast::new(
-                    &self.model,
-                );
+                let forecast =
+                    finstack_quant_factor::credit::FactorCovarianceForecast::new(&self.model);
                 forecast.covariance_at(h)
             })
             .map_err(core_to_py)?;
@@ -1530,7 +1524,7 @@ impl PyFactorCovarianceForecast {
         let id = IssuerId::new(issuer_id);
         py.detach(|| {
             let forecast =
-                finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
+                finstack_quant_factor::credit::FactorCovarianceForecast::new(&self.model);
             forecast.idiosyncratic_vol(&id, h)
         })
         .map_err(core_to_py)
@@ -1560,19 +1554,18 @@ impl PyFactorCovarianceForecast {
         risk_measure: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyFactorModelConfig> {
         let h = extract_vol_horizon(horizon)?;
-        let measure: finstack_quant_models::factor::RiskMeasure = match risk_measure {
+        let measure: finstack_quant_factor::RiskMeasure = match risk_measure {
             Some(obj) if !obj.is_none() => {
                 let value = py_to_json_value(py, obj, "risk_measure")?;
                 serde_json::from_value(value)
                     .map_err(|e| serde_json_to_py(e, "invalid risk_measure"))?
             }
-            _ => finstack_quant_models::factor::RiskMeasure::default(),
+            _ => finstack_quant_factor::RiskMeasure::default(),
         };
         let config = py
             .detach(|| {
-                let forecast = finstack_quant_models::factor::credit::FactorCovarianceForecast::new(
-                    &self.model,
-                );
+                let forecast =
+                    finstack_quant_factor::credit::FactorCovarianceForecast::new(&self.model);
                 forecast.factor_model_at(h, measure)
             })
             .map_err(core_to_py)?;

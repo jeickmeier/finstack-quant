@@ -8,7 +8,7 @@ use crate::api::models::factor::credit::JsCreditFactorModel;
 use crate::utils::date::parse_iso_date;
 use crate::utils::input::{from_js_json, js_bool, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_models::factor::{FactorId, FactorModelConfig};
+use finstack_quant_factor::{FactorId, FactorModelConfig};
 use finstack_quant_portfolio::factor_model::{
     self as fm, FactorModel, PositionChange, WeightAllocationSpec,
 };
@@ -320,7 +320,7 @@ pub fn build_credit_vol_report(
     model: &JsCreditFactorModel,
     by_position: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let decomposition: finstack_quant_models::factor::risk::RiskDecomposition =
+    let decomposition: finstack_quant_factor::risk::RiskDecomposition =
         from_js_json(&decomposition, "decomposition")?;
     let by_position = js_bool(&by_position, "byPosition")?;
     let report = fm::build_credit_vol_report(&decomposition, &model.inner, by_position);

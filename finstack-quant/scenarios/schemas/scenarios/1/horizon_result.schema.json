@@ -530,7 +530,7 @@
           "description": "P&L attributed to the generic (PC) credit factor:\n`Σ_i CS01_i × β_i^PC × ΔF_PC` (canonical signed CS01 = ∂PV/∂s,\nnegative for long credit — no extra negation)."
         },
         "levels": {
-          "description": "One entry per [`finstack_quant_models::factor::credit::hierarchy::HierarchyDimension`]\nin the spec order recorded by the model's hierarchy.",
+          "description": "One entry per [`finstack_quant_factor::credit::hierarchy::HierarchyDimension`]\nin the spec order recorded by the model's hierarchy.",
           "items": {
             "$ref": "#/$defs/LevelPnl"
           },

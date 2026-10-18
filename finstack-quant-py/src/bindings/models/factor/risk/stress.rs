@@ -2,7 +2,7 @@ use crate::bindings::macros::impl_repr_html_via_dataframe;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-use finstack_quant_models::factor::risk::{
+use finstack_quant_factor::risk::{
     self as model_risk, StressAttribution, StressPositionEntry, TailScenarioBreakdown,
 };
 

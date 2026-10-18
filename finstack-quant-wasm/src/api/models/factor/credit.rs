@@ -19,8 +19,8 @@
 use crate::utils::input::{from_js_json, js_f64, js_string, js_uint, json_text, opt_json_text};
 use crate::utils::{to_js_err, to_js_value};
 
-use finstack_quant_models::factor::credit::VolHorizon;
-use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
+use finstack_quant_factor::credit::VolHorizon;
+use finstack_quant_factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
 use wasm_bindgen::prelude::*;
 
 /// Calibrated credit factor hierarchy artifact.
@@ -30,7 +30,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen(js_name = CreditFactorModel)]
 pub struct JsCreditFactorModel {
     /// Underlying Rust value (not exposed to JS).
-    pub(crate) inner: finstack_quant_models::factor::credit::hierarchy::CreditFactorModel,
+    pub(crate) inner: finstack_quant_factor::credit::hierarchy::CreditFactorModel,
 }
 
 #[wasm_bindgen(js_class = CreditFactorModel)]
@@ -46,9 +46,8 @@ impl JsCreditFactorModel {
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsCreditFactorModel, JsValue> {
         let json: &str = &json_text(&json, "json")?;
-        let inner =
-            finstack_quant_models::factor::credit::hierarchy::CreditFactorModel::from_json(json)
-                .map_err(to_js_err)?;
+        let inner = finstack_quant_factor::credit::hierarchy::CreditFactorModel::from_json(json)
+            .map_err(to_js_err)?;
         Ok(Self { inner })
     }
 
@@ -76,7 +75,7 @@ impl JsCreditFactorModel {
 /// Configuration and inputs are passed as JSON strings or plain objects.
 #[wasm_bindgen(js_name = CreditCalibrator)]
 pub struct JsCreditCalibrator {
-    inner: finstack_quant_models::factor::credit::calibration::CreditCalibrator,
+    inner: finstack_quant_factor::credit::calibration::CreditCalibrator,
 }
 
 #[wasm_bindgen(js_class = CreditCalibrator)]
@@ -89,15 +88,13 @@ impl JsCreditCalibrator {
     #[wasm_bindgen(constructor)]
     pub fn new(config_json: Option<JsValue>) -> Result<JsCreditCalibrator, JsValue> {
         let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
-        let config: finstack_quant_models::factor::credit::calibration::CreditCalibrationConfig =
+        let config: finstack_quant_factor::credit::calibration::CreditCalibrationConfig =
             match config_json.as_deref() {
                 Some(json) => serde_json::from_str(json).map_err(to_js_err)?,
                 None => Default::default(),
             };
         Ok(Self {
-            inner: finstack_quant_models::factor::credit::calibration::CreditCalibrator::new(
-                config,
-            ),
+            inner: finstack_quant_factor::credit::calibration::CreditCalibrator::new(config),
         })
     }
 
@@ -110,7 +107,7 @@ impl JsCreditCalibrator {
     /// @param inputs_json - Credit-factor calibration input JSON containing issuers, spreads, and observations.
     pub fn calibrate(&self, inputs_json: JsValue) -> Result<JsCreditFactorModel, JsValue> {
         let inputs_json: &str = &json_text(&inputs_json, "inputsJson")?;
-        let inputs: finstack_quant_models::factor::credit::calibration::CreditCalibrationInputs =
+        let inputs: finstack_quant_factor::credit::calibration::CreditCalibrationInputs =
             serde_json::from_str(inputs_json).map_err(to_js_err)?;
         let model = self.inner.calibrate(inputs).map_err(to_js_err)?;
         Ok(JsCreditFactorModel { inner: model })
@@ -126,7 +123,7 @@ impl JsCreditCalibrator {
 #[wasm_bindgen(js_name = LevelsAtDate)]
 pub struct JsLevelsAtDate {
     /// Underlying Rust value (not exposed to JS).
-    pub(crate) inner: finstack_quant_models::factor::credit::decomposition::LevelsAtDate,
+    pub(crate) inner: finstack_quant_factor::credit::decomposition::LevelsAtDate,
 }
 
 #[wasm_bindgen(js_class = LevelsAtDate)]
@@ -145,9 +142,8 @@ impl JsLevelsAtDate {
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsLevelsAtDate, JsValue> {
         let json: &str = &json_text(&json, "json")?;
-        let inner =
-            finstack_quant_models::factor::credit::decomposition::LevelsAtDate::from_json(json)
-                .map_err(to_js_err)?;
+        let inner = finstack_quant_factor::credit::decomposition::LevelsAtDate::from_json(json)
+            .map_err(to_js_err)?;
         Ok(Self { inner })
     }
 
@@ -217,7 +213,7 @@ impl JsLevelsAtDate {
 #[wasm_bindgen(js_name = PeriodDecomposition)]
 pub struct JsPeriodDecomposition {
     /// Underlying Rust value (not exposed to JS).
-    pub(crate) inner: finstack_quant_models::factor::credit::decomposition::PeriodDecomposition,
+    pub(crate) inner: finstack_quant_factor::credit::decomposition::PeriodDecomposition,
 }
 
 #[wasm_bindgen(js_class = PeriodDecomposition)]
@@ -237,10 +233,8 @@ impl JsPeriodDecomposition {
     pub fn from_json(json: JsValue) -> Result<JsPeriodDecomposition, JsValue> {
         let json: &str = &json_text(&json, "json")?;
         let inner =
-            finstack_quant_models::factor::credit::decomposition::PeriodDecomposition::from_json(
-                json,
-            )
-            .map_err(to_js_err)?;
+            finstack_quant_factor::credit::decomposition::PeriodDecomposition::from_json(json)
+                .map_err(to_js_err)?;
         Ok(Self { inner })
     }
 
@@ -354,14 +348,14 @@ pub fn decompose_levels(
     let runtime_tags: Option<
         std::collections::BTreeMap<
             finstack_quant_core::types::IssuerId,
-            finstack_quant_models::factor::credit::hierarchy::IssuerTags,
+            finstack_quant_factor::credit::hierarchy::IssuerTags,
         >,
     > = match runtime_tags_json.as_deref() {
         Some(json) => Some(serde_json::from_str(json).map_err(to_js_err)?),
         None => None,
     };
 
-    let inner = finstack_quant_models::factor::credit::decomposition::decompose_levels(
+    let inner = finstack_quant_factor::credit::decomposition::decompose_levels(
         &model.inner,
         &observed_spreads,
         observed_generic,
@@ -390,7 +384,7 @@ pub fn decompose_period(
     from_levels: &JsLevelsAtDate,
     to_levels: &JsLevelsAtDate,
 ) -> Result<JsPeriodDecomposition, JsValue> {
-    let inner = finstack_quant_models::factor::credit::decomposition::decompose_period(
+    let inner = finstack_quant_factor::credit::decomposition::decompose_period(
         &from_levels.inner,
         &to_levels.inner,
     )
@@ -405,7 +399,7 @@ pub fn decompose_period(
 pub struct JsFactorCovarianceForecast {
     /// Store the model by value so `FactorCovarianceForecast<'a>` lifetime
     /// requirements don't escape the WASM boundary.
-    model: finstack_quant_models::factor::credit::hierarchy::CreditFactorModel,
+    model: finstack_quant_factor::credit::hierarchy::CreditFactorModel,
 }
 
 fn parse_vol_horizon(value: &JsValue, label: &str) -> Result<VolHorizon, JsValue> {
@@ -462,8 +456,7 @@ impl JsFactorCovarianceForecast {
     #[wasm_bindgen(js_name = covarianceAt)]
     pub fn covariance_at(&self, horizon_json: JsValue) -> Result<JsValue, JsValue> {
         let h = parse_vol_horizon(&horizon_json, "horizonJson")?;
-        let forecast =
-            finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
+        let forecast = finstack_quant_factor::credit::FactorCovarianceForecast::new(&self.model);
         let cov = forecast.covariance_at(h).map_err(to_js_err)?;
         crate::utils::to_js_value(&cov)
     }
@@ -486,8 +479,7 @@ impl JsFactorCovarianceForecast {
         let issuer_id: &str = &js_string(&issuer_id, "issuerId")?;
         let h = parse_vol_horizon(&horizon_json, "horizonJson")?;
         let id = finstack_quant_core::types::IssuerId::new(issuer_id);
-        let forecast =
-            finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
+        let forecast = finstack_quant_factor::credit::FactorCovarianceForecast::new(&self.model);
         forecast.idiosyncratic_vol(&id, h).map_err(to_js_err)
     }
 
@@ -509,11 +501,10 @@ impl JsFactorCovarianceForecast {
         let h = parse_vol_horizon(&horizon_json, "horizonJson")?;
         // `js_opt_wire`: the unit variants are bare wire strings (`"variance"`),
         // which are not JSON text.
-        let measure: finstack_quant_models::factor::RiskMeasure =
+        let measure: finstack_quant_factor::RiskMeasure =
             crate::utils::wire::js_opt_wire(risk_measure_json.as_ref(), "riskMeasureJson")?
                 .unwrap_or_default();
-        let forecast =
-            finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
+        let forecast = finstack_quant_factor::credit::FactorCovarianceForecast::new(&self.model);
         let config = forecast.factor_model_at(h, measure).map_err(to_js_err)?;
         crate::utils::to_js_value(&config)
     }
@@ -818,12 +809,12 @@ pub fn validate_factor_model_config(config: JsValue) -> Result<(), JsValue> {
 mod tests {
     use finstack_quant_core::dates::create_date;
     use finstack_quant_core::types::IssuerId;
-    use finstack_quant_models::factor::credit::calibration::{
+    use finstack_quant_factor::credit::calibration::{
         BucketSizeThresholds, CovarianceStrategy, CreditCalibrationConfig, CreditCalibrationInputs,
         CreditCalibrator, GenericFactorSeries, HistoryPanel, IssuerTagPanel, PanelSpace,
         VolModelChoice,
     };
-    use finstack_quant_models::factor::credit::hierarchy::{
+    use finstack_quant_factor::credit::hierarchy::{
         CreditFactorModel, CreditFactorModelSchema, CreditHierarchySpec, GenericFactorSpec,
         HierarchyDimension, IssuerTags,
     };
@@ -869,10 +860,8 @@ mod tests {
             vol_model: VolModelChoice::Sample,
             covariance_strategy: CovarianceStrategy::Diagonal,
             use_returns_or_levels: PanelSpace::Returns,
-            panel_frequency:
-                finstack_quant_models::factor::credit::calibration::PanelFrequency::Monthly,
-            bucket_weighting:
-                finstack_quant_models::factor::credit::calibration::BucketWeighting::Equal,
+            panel_frequency: finstack_quant_factor::credit::calibration::PanelFrequency::Monthly,
+            bucket_weighting: finstack_quant_factor::credit::calibration::BucketWeighting::Equal,
             ..Default::default()
         }
     }
@@ -984,7 +973,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let levels_t0 = finstack_quant_models::factor::credit::decomposition::decompose_levels(
+        let levels_t0 = finstack_quant_factor::credit::decomposition::decompose_levels(
             &model,
             &spreads_t0,
             0.0100,
@@ -993,7 +982,7 @@ mod tests {
         )
         .expect("decompose_levels t0");
 
-        let levels_t1 = finstack_quant_models::factor::credit::decomposition::decompose_levels(
+        let levels_t1 = finstack_quant_factor::credit::decomposition::decompose_levels(
             &model,
             &spreads_t1,
             0.01005,
@@ -1008,10 +997,9 @@ mod tests {
         assert_eq!(l0_val["date"].as_str().unwrap(), "2024-03-28");
 
         // decompose_period.
-        let period = finstack_quant_models::factor::credit::decomposition::decompose_period(
-            &levels_t0, &levels_t1,
-        )
-        .expect("decompose_period");
+        let period =
+            finstack_quant_factor::credit::decomposition::decompose_period(&levels_t0, &levels_t1)
+                .expect("decompose_period");
         let p_val = serde_json::to_value(&period).expect("PeriodDecomposition serializes");
         assert!(p_val.is_object());
         assert!(p_val["d_generic"].as_f64().is_some());
@@ -1022,9 +1010,9 @@ mod tests {
         let cal = CreditCalibrator::new(fixture_config());
         let model = cal.calibrate(fixture_inputs()).expect("calibrate");
 
-        let forecast = finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&model);
+        let forecast = finstack_quant_factor::credit::FactorCovarianceForecast::new(&model);
         let cov = forecast
-            .covariance_at(finstack_quant_models::factor::credit::VolHorizon::OneStep)
+            .covariance_at(finstack_quant_factor::credit::VolHorizon::OneStep)
             .expect("covariance_at");
         let cov_json = serde_json::to_string_pretty(&cov).expect("serialize");
         let cov_val: serde_json::Value = serde_json::from_str(&cov_json).expect("valid json");
@@ -1035,7 +1023,7 @@ mod tests {
     /// JSON convention.
     #[test]
     fn levels_at_date_dimension_matches_serde_convention() {
-        use finstack_quant_models::factor::credit::hierarchy::HierarchyDimension;
+        use finstack_quant_factor::credit::hierarchy::HierarchyDimension;
         use serde_json::json;
 
         // Unit-level checks against serde round-trip.
@@ -1072,7 +1060,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let levels = finstack_quant_models::factor::credit::decomposition::decompose_levels(
+        let levels = finstack_quant_factor::credit::decomposition::decompose_levels(
             &model,
             &spreads,
             0.0100,

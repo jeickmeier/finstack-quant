@@ -401,7 +401,7 @@ pub type DealId = Id<DealTag>;
 /// Type-safe identifier for a credit issuer.
 ///
 /// This is the canonical key used throughout the credit factor model hierarchy
-/// in `finstack-quant-models::factor`, in `VolState::idiosyncratic`, and anywhere
+/// in `finstack-quant-factor`, in `VolState::idiosyncratic`, and anywhere
 /// a per-issuer lookup is required.
 pub type IssuerId = Id<IssuerTag>;
 

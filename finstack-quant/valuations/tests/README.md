@@ -30,8 +30,6 @@ Single-file targets:
 |--------|--------|
 | `canonical_contracts` | Canonical byte encoding, content hashes, and key-insertion-order invariance for the instrument and calibration envelopes |
 | `cashflow_export_schema` | JSON Schema coverage of `InstrumentCashflowEnvelope` and its row fields |
-| `credit_calibration` | `finstack_quant_models::factor::credit::calibration` end-to-end |
-| `credit_decomposition` | `finstack_quant_models::factor::credit::decomposition` levels and period decomposition |
 | `cross_factor_metrics_tests` | Cross-factor gamma against manual four-corner repricing |
 | `default_attribute_consistency` | Static source audit over every instrument `types.rs`: builder defaults carry a matching `#[serde(default)]`, and no type stores the legacy full-override bag |
 | `phase2_strictness` | Persisted calibration steps reject unknown flattened fields |

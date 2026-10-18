@@ -4,6 +4,18 @@
 
 Workspace version 0.11.0: the valuations split below removes and moves public Rust items (see the section that follows), so the crates, the Python wheel and the WASM package take a breaking-change version bump.
 
+### Factor models are the `finstack-quant-factor` crate
+
+#### Changed
+
+- New crate `finstack-quant-factor` (`finstack-quant/factor`) holds what was `finstack_quant_models::factor`: factor definitions and matching, covariance, sensitivity matrices, risk decomposition and the hierarchical credit-factor calibrator. It depends on `finstack-quant-core` and `finstack-quant-analytics` (`beta`). `finstack-quant-models` no longer has a `factor` module and no longer depends on `finstack-quant-analytics`, so a factor or analytics edit no longer rebuilds valuations, calibration or statements. Rust callers that used `finstack_quant_models::factor::X` use `finstack_quant_factor::X`; the umbrella path `finstack_quant::models::factor::X` and the Python/WASM `models.factor` namespaces are unchanged.
+- `gen_models_schemas` is a binary of the umbrella package (`cargo run -p finstack-quant --bin gen_models_schemas`); it still writes `finstack-quant/models/schemas`, whose paths and `$id`s are unchanged. The factor-owned models-family artifacts are `finstack_quant_factor::schema::MODELS_ARTIFACTS`. `description` text changes where rustdoc links named the old module path.
+- The canonical factor fixtures moved from `finstack-quant/models/tests/data/canonical/` to `finstack-quant/factor/tests/data/canonical/`.
+
+#### Removed
+
+- `finstack_quant_analytics::correlation`. `nearest_correlation` and `NearestCorrelationOpts` moved to `finstack_quant_core::math::linalg`, beside `validate_correlation_matrix` and `CorrelationError` (which the analytics module only re-exported). `finstack_quant_models::correlation` re-exports all four, so the Python/WASM `models.correlation` namespace is unchanged.
+
 ### Valuations split: the pricing framework is `finstack-quant-valuations-core`
 
 #### Added

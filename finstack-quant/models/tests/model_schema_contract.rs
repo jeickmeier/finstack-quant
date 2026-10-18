@@ -26,11 +26,8 @@ use serde_json::{json, Value};
 /// Schema for `type_name`: its root artifact, or a `$defs` entry of any
 /// registered artifact, wrapped so its local references still resolve.
 fn schema_for(type_name: &str) -> Value {
-    let artifacts = finstack_quant_models::factor::schema::ARTIFACTS
-        .iter()
-        .chain(finstack_quant_models::schema::ARTIFACTS);
     let mut nested = None;
-    for artifact in artifacts {
+    for artifact in finstack_quant_models::schema::ARTIFACTS {
         let schema = artifact.generate().expect("schema renders");
         if artifact.type_name() == type_name {
             return schema;

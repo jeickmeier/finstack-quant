@@ -31,6 +31,7 @@ criterion = { workspace = true }
 name = "gen_features_schemas"
 path = "src/bin/gen_schemas.rs"
 required-features = ["json-schema"]
+test = false
 
 [[bench]]
 name = "features_hot_paths"
