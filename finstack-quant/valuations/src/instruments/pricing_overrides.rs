@@ -92,7 +92,7 @@ fn validate_oas_quote_compounding(compounding: Compounding) -> finstack_quant_co
 ///
 /// Each entry is `(value, must_be_nonneg)`: an unset `value` is skipped. A
 /// `must_be_nonneg = false` field need only be finite (failing with
-/// `InputError::Invalid`); a `must_be_nonneg = true` field must be both finite
+/// `Error::Validation`); a `must_be_nonneg = true` field must be both finite
 /// and `>= 0` (failing with `InputError::NegativeValue`). Shared by the numeric
 /// `validate()` impls below so the per-field `if let Some` bodies are not repeated.
 fn check_finite_fields(fields: &[(Option<f64>, bool)]) -> finstack_quant_core::Result<()> {
@@ -104,7 +104,9 @@ fn check_finite_fields(fields: &[(Option<f64>, bool)]) -> finstack_quant_core::R
                     return Err(InputError::NegativeValue.into());
                 }
             } else if !v.is_finite() {
-                return Err(InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "pricing override values must be finite".to_string(),
+                ));
             }
         }
     }
@@ -292,8 +294,6 @@ impl MarketQuoteOverrides {
     /// Validate market quote values for finiteness, non-negativity, and
     /// mutual exclusivity among price-driving fields.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        use finstack_quant_core::InputError;
-
         // Yields, spreads, and clean prices may be negative but all fields
         // must be finite. Dirty bond prices are additionally positive below;
         // implied volatility and CDS spreads are non-negative.
@@ -324,7 +324,9 @@ impl MarketQuoteOverrides {
 
         // Mutual exclusivity: at most one price-driving field set at a time.
         if self.price_driver_count() > 1 {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "at most one price-driving override may be set".to_string(),
+            ));
         }
 
         Ok(())
@@ -669,15 +671,18 @@ impl ModelConfig {
 
     /// Validate model config (tree steps > 0, non-negative vol/friction).
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        use finstack_quant_core::InputError;
         if let Some(steps) = self.tree_steps {
             if steps == 0 {
-                return Err(InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "tree_steps must be greater than zero".to_string(),
+                ));
             }
         }
         if let Some(paths) = self.mc_paths {
             if paths == 0 {
-                return Err(InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "mc_paths must be greater than zero".to_string(),
+                ));
             }
         }
         if let Some(target) = self.mc_target_ci_half_width {

@@ -77,7 +77,7 @@ def test_shifted_surface_constructor_keeps_metadata_and_validates_shape() -> Non
 def test_dynamic_recovery_json_cannot_bypass_validation(recovery: float) -> None:
     payload = json.loads(DynamicRecoverySpec.constant(0.4).to_json())
     payload["base_recovery"] = recovery
-    with pytest.raises(ValueError, match="Invalid input data"):
+    with pytest.raises(ValueError, match=r"base_recovery must lie in \[0, 1\]"):
         DynamicRecoverySpec.from_json(json.dumps(payload))
 
 

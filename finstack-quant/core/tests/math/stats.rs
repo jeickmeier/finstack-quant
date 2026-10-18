@@ -37,8 +37,7 @@ fn log_returns_and_realized_variance_close_to_close() {
     let returns = log_returns(&prices);
     assert_eq!(returns.len(), prices.len() - 1);
 
-    let rv = realized_variance(&prices, Some(RealizedVarMethod::CloseToClose), Some(252.0))
-        .expect("CloseToClose should succeed");
+    let rv = realized_variance(&prices, Some(252.0)).expect("CloseToClose should succeed");
     assert!(rv.is_finite() && rv >= 0.0);
     let expected = returns.iter().map(|r| r * r).sum::<f64>() / returns.len() as f64 * 252.0;
     assert!(
@@ -47,30 +46,12 @@ fn log_returns_and_realized_variance_close_to_close() {
     );
 
     // OHLC-only methods must be rejected on the close-only API
-    for method in [
-        RealizedVarMethod::Parkinson,
-        RealizedVarMethod::GarmanKlass,
-        RealizedVarMethod::RogersSatchell,
-        RealizedVarMethod::YangZhang,
-    ] {
-        let result = realized_variance(&prices, Some(method), Some(252.0));
-        assert!(
-            result.is_err(),
-            "realized_variance with {} must return Err for close-only input",
-            method.label()
-        );
-        let msg = result.unwrap_err().to_string();
-        assert!(
-            msg.contains("OHLC"),
-            "error message should mention OHLC: {msg}"
-        );
-    }
 }
 
 #[test]
 fn realized_variance_close_to_close_rejects_invalid_prices() {
     for prices in [[100.0, 0.0], [100.0, -5.0], [100.0, f64::NAN]] {
-        let err = realized_variance(&prices, Some(RealizedVarMethod::CloseToClose), Some(252.0))
+        let err = realized_variance(&prices, Some(252.0))
             .expect_err("invalid close prices should be rejected");
         assert!(
             err.to_string()
@@ -82,7 +63,7 @@ fn realized_variance_close_to_close_rejects_invalid_prices() {
 
 #[test]
 fn realized_variance_close_to_close_single_price_is_zero() {
-    let result = realized_variance(&[100.0], Some(RealizedVarMethod::CloseToClose), Some(252.0))
+    let result = realized_variance(&[100.0], Some(252.0))
         .expect("single close price should use early zero return");
     assert_eq!(result, 0.0);
 }

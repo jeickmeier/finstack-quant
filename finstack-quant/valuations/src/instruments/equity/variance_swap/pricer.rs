@@ -52,11 +52,7 @@ pub(crate) fn compute_pv(
             if prices.is_empty() {
                 return Ok(Money::from((0_i64, inst.notional.currency())));
             }
-            realized_variance(
-                &prices,
-                Some(inst.realized_var_method),
-                Some(annualization_factor(inst)),
-            )?
+            realized_variance(&prices, Some(annualization_factor(inst)))?
         };
         let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
             disc.as_ref(),
@@ -284,11 +280,7 @@ fn realized_variance_with_factor(
     if prices.len() < 2 {
         return Ok(0.0);
     }
-    realized_variance(
-        &prices,
-        Some(inst.realized_var_method),
-        Some(annualization_factor),
-    )
+    realized_variance(&prices, Some(annualization_factor))
 }
 
 pub(crate) fn partial_realized_variance(

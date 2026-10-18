@@ -68,7 +68,10 @@ fn credit_index_builder_validates_bad_input() {
         .base_correlation_curve(base_corr)
         .build()
         .expect_err("invalid recovery should fail");
-    assert!(matches!(err, finstack_quant_core::Error::Input(_)));
+    assert!(
+        matches!(err, finstack_quant_core::Error::Validation(_)),
+        "{err}"
+    );
 }
 
 // Additional credit index behavior
@@ -141,7 +144,10 @@ fn test_credit_index_zero_constituents_fails() {
         .build()
         .expect_err("num_constituents = 0 should fail");
 
-    assert!(matches!(err, finstack_quant_core::Error::Input(_)));
+    assert!(
+        matches!(err, finstack_quant_core::Error::Validation(_)),
+        "{err}"
+    );
 }
 
 #[test]
@@ -157,7 +163,10 @@ fn test_credit_index_missing_index_curve_fails() {
         .build()
         .expect_err("missing index_credit_curve should fail");
 
-    assert!(matches!(err, finstack_quant_core::Error::Input(_)));
+    assert!(
+        matches!(err, finstack_quant_core::Error::Validation(_)),
+        "{err}"
+    );
 }
 
 #[test]
@@ -173,7 +182,10 @@ fn test_credit_index_missing_base_correlation_fails() {
         .build()
         .expect_err("missing base_correlation_curve should fail");
 
-    assert!(matches!(err, finstack_quant_core::Error::Input(_)));
+    assert!(
+        matches!(err, finstack_quant_core::Error::Validation(_)),
+        "{err}"
+    );
 }
 
 #[test]
@@ -190,7 +202,10 @@ fn test_credit_index_missing_num_constituents_fails() {
         .build()
         .expect_err("missing num_constituents should fail");
 
-    assert!(matches!(err, finstack_quant_core::Error::Input(_)));
+    assert!(
+        matches!(err, finstack_quant_core::Error::Validation(_)),
+        "{err}"
+    );
 }
 #[test]
 fn test_credit_index_issuer_recovery_rates() {

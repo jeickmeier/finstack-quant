@@ -619,7 +619,7 @@ impl CashflowSpec {
     ///
     /// # Errors
     ///
-    /// Returns `InputError::Invalid` for an amortizing spec nested inside
+    /// Returns `Error::Validation` for an amortizing spec nested inside
     /// another amortizing spec.
     pub(crate) fn add_to_builder(
         &self,
@@ -637,7 +637,9 @@ impl CashflowSpec {
             }
             Self::Amortizing { base, schedule } => {
                 if matches!(**base, Self::Amortizing { .. }) {
-                    return Err(finstack_quant_core::InputError::Invalid.into());
+                    return Err(finstack_quant_core::Error::Validation(
+                        "amortizing cashflow spec cannot nest another amortizing spec".to_string(),
+                    ));
                 }
                 let _ = builder.amortization(schedule.clone());
                 base.add_to_builder(builder)?;

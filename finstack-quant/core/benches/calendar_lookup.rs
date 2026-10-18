@@ -7,7 +7,7 @@
 //! the business-day-adjustment shape that consumes it.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_core::dates::calendar_by_id;
+use finstack_quant_core::dates::calendar_by_id_strict;
 use std::hint::black_box;
 use time::{Date, Month};
 
@@ -38,7 +38,7 @@ fn bench_is_holiday_by_rule_count(c: &mut Criterion) {
     let dates = sample_dates();
     let mut group = c.benchmark_group("calendar_is_holiday_by_rule_count");
     for (id, rules) in CALENDARS {
-        let Some(cal) = calendar_by_id(id) else {
+        let Ok(cal) = calendar_by_id_strict(id) else {
             continue;
         };
         group.bench_with_input(BenchmarkId::new(*id, rules), rules, |b, _| {
@@ -61,7 +61,7 @@ fn bench_is_business_day(c: &mut Criterion) {
     let dates = sample_dates();
     let mut group = c.benchmark_group("calendar_is_business_day");
     for (id, rules) in CALENDARS {
-        let Some(cal) = calendar_by_id(id) else {
+        let Ok(cal) = calendar_by_id_strict(id) else {
             continue;
         };
         group.bench_with_input(BenchmarkId::new(*id, rules), rules, |b, _| {

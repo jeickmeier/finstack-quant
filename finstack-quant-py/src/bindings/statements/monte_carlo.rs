@@ -3,8 +3,9 @@
 //! The simulation itself is started from ``Evaluator.evaluate_monte_carlo``
 //! (see `evaluator.rs`), mirroring Rust's `Evaluator::evaluate_monte_carlo`.
 
+use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::{dict_to_dataframe, table_to_dataframe};
+use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements::evaluator::{
     MonteCarloConfig as RustMonteCarloConfig, MonteCarloResults as RustMonteCarloResults,
@@ -277,7 +278,7 @@ impl PyMonteCarloResults {
             .ok_or_else(|| {
                 PyKeyError::new_err(format!("unknown Monte Carlo metric: {metric:?}"))
             })?;
-        table_to_dataframe(py, &table)?.call_method1("set_index", ("period",))
+        envelope_to_pandas(py, &table)?.call_method1("set_index", ("period",))
     }
 
     /// Export the retained per-path values as a long-format pandas
@@ -294,7 +295,7 @@ impl PyMonteCarloResults {
     #[pyo3(text_signature = "($self)")]
     fn to_paths_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match &self.inner.path_data {
-            Some(table) => table_to_dataframe(py, table),
+            Some(table) => envelope_to_pandas(py, table),
             None => {
                 let columns = PyDict::new(py);
                 columns.set_item("path_id", Vec::<u32>::new())?;

@@ -39,11 +39,10 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
+    calendar_by_id_strict, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 
 use super::spec::{
@@ -255,11 +254,7 @@ impl TermLoan {
             )));
         }
         if let Some(calendar_id) = self.calendar_id.as_deref() {
-            calendar_by_id(calendar_id).ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "{context} unknown calendar_id '{calendar_id}'"
-                ))
-            })?;
+            calendar_by_id_strict(calendar_id)?;
         }
         if let RateSpec::Floating(rate) = &self.rate {
             rate.validate()?;
@@ -812,11 +807,7 @@ impl TermLoan {
         })?;
 
         if let Some(calendar_id) = &self.calendar_id {
-            let calendar = calendar_by_id(calendar_id).ok_or_else(|| {
-                finstack_quant_core::Error::Input(InputError::NotFound {
-                    id: format!("calendar:{}", calendar_id),
-                })
-            })?;
+            let calendar = calendar_by_id_strict(calendar_id)?;
             return as_of.add_business_days(settlement_days, calendar);
         }
 

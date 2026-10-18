@@ -212,10 +212,11 @@ mod tests {
 
     #[test]
     fn require_or_preserves_caller_supplied_error() {
-        assert!(require_or(true, InputError::Invalid).is_ok());
+        assert!(require_or(true, InputError::NegativeValue).is_ok());
 
-        let err = require_or(false, InputError::Invalid).expect_err("false condition should fail");
-        assert!(matches!(err, Error::Input(InputError::Invalid)));
+        let err =
+            require_or(false, InputError::NegativeValue).expect_err("false condition should fail");
+        assert!(matches!(err, Error::Input(InputError::NegativeValue)));
     }
 
     #[test]

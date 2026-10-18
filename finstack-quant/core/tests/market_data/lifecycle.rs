@@ -2,12 +2,33 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{
     InflationCurve, PriceCurve, PriceCurveKind,
 };
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider, FxQuery};
 use std::sync::Arc;
+
+/// Parallel price shock in native price units.
+fn par(value: f64) -> BumpSpec {
+    BumpSpec {
+        mode: BumpMode::Additive,
+        units: BumpUnits::Fraction,
+        value,
+        bump_type: BumpType::Parallel,
+    }
+}
+
+/// Parallel relative shock; `fraction = 0.1` scales every level by 1.1.
+fn pct(fraction: f64) -> BumpSpec {
+    BumpSpec {
+        mode: BumpMode::Additive,
+        units: BumpUnits::Percent,
+        value: fraction * 100.0,
+        bump_type: BumpType::Parallel,
+    }
+}
 
 fn base() -> Date {
     Date::from_ordinal_date(2025, 1).unwrap()
@@ -21,24 +42,19 @@ fn signed_price_shocks_preserve_zero_identity_and_native_units() {
         .build()
         .unwrap();
     for t in [0.0, 0.25, 1.0, 1.5, 2.0] {
-        for bumped in [
-            curve.with_parallel_bump(0.0),
-            curve.with_percentage_bump(0.0),
-        ] {
+        for bumped in [curve.apply_bump(par(0.0)), curve.apply_bump(pct(0.0))] {
             assert_eq!(bumped.unwrap().price(t), curve.price(t));
         }
         assert!(
-            (curve.with_parallel_bump(-2.0).unwrap().price(t) - (curve.price(t) - 2.0)).abs()
-                < 1e-12
+            (curve.apply_bump(par(-2.0)).unwrap().price(t) - (curve.price(t) - 2.0)).abs() < 1e-12
         );
         assert!(
-            (curve.with_percentage_bump(0.1).unwrap().price(t) - curve.price(t) * 1.1).abs()
-                < 1e-12
+            (curve.apply_bump(pct(0.1)).unwrap().price(t) - curve.price(t) * 1.1).abs() < 1e-12
         );
     }
     for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        assert!(curve.with_parallel_bump(invalid).is_err());
-        assert!(curve.with_percentage_bump(invalid).is_err());
+        assert!(curve.apply_bump(par(invalid)).is_err());
+        assert!(curve.apply_bump(pct(invalid)).is_err());
     }
     let vol_index = PriceCurve::builder("VIX")
         .kind(PriceCurveKind::VolIndex)
@@ -46,8 +62,8 @@ fn signed_price_shocks_preserve_zero_identity_and_native_units() {
         .knots([(0.0, 10.0), (1.0, 15.0)])
         .build()
         .unwrap();
-    assert!(vol_index.with_parallel_bump(-11.0).is_err());
-    assert!(vol_index.with_percentage_bump(-2.0).is_err());
+    assert!(vol_index.apply_bump(par(-11.0)).is_err());
+    assert!(vol_index.apply_bump(pct(-2.0)).is_err());
 }
 
 #[test]

@@ -609,7 +609,9 @@ impl JsMarketContext {
         let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
         self.inner
             .convert_money(amount.inner, target_currency.inner, as_of)
-            .map(|inner| JsMoney { inner })
+            .map(|converted| JsMoney {
+                inner: converted.amount,
+            })
             .map_err(to_js_err)
     }
 

@@ -595,6 +595,7 @@ fn envelope_for_priced(
                 row_reporting_currency,
                 as_of_date,
             )?
+            .amount
             .amount();
         let fx_rate = if row_reporting_currency == ccy {
             None

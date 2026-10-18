@@ -1052,7 +1052,9 @@ pub(crate) fn multi_factor_greeks(
             reason = "invalid_annualization_factor",
             "multi-factor greeks rejected input"
         );
-        return Err(crate::error::InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "annualization factor must be finite and positive".to_string(),
+        ));
     }
 
     let adjusted_y;
@@ -1061,7 +1063,9 @@ pub(crate) fn multi_factor_greeks(
         ReturnKind::Total { risk_free_rate } => {
             let rf_period = crate::returns::periodic_risk_free_rate(risk_free_rate, ann_factor);
             if !rf_period.is_finite() {
-                return Err(crate::error::InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "periodic risk-free rate must be finite".to_string(),
+                ));
             }
             adjusted_y = returns.iter().map(|r| r - rf_period).collect::<Vec<_>>();
             adjusted_y.as_slice()
@@ -1080,7 +1084,10 @@ pub(crate) fn multi_factor_greeks(
             reason = "insufficient_observations",
             "multi-factor greeks rejected input"
         );
-        return Err(crate::error::InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "multi-factor greeks need at least {} observations, got {n}",
+            p + 1
+        )));
     }
     if returns.iter().any(|r| !r.is_finite()) {
         tracing::debug!(
@@ -1088,7 +1095,9 @@ pub(crate) fn multi_factor_greeks(
             reason = "non_finite_returns",
             "multi-factor greeks rejected input"
         );
-        return Err(crate::error::InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "returns must be finite".to_string(),
+        ));
     }
     if factors
         .iter()
@@ -1100,7 +1109,9 @@ pub(crate) fn multi_factor_greeks(
             reason = "non_finite_factors",
             "multi-factor greeks rejected input"
         );
-        return Err(crate::error::InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "factor returns must be finite".to_string(),
+        ));
     }
     if factors.iter().any(|factor| factor.len() != n) {
         tracing::debug!(

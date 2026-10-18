@@ -151,7 +151,9 @@ impl ForwardCurve {
     #[must_use = "computed forward rate should not be discarded"]
     pub fn rate_between(&self, t1: f64, t2: f64) -> crate::Result<f64> {
         if !(t1.is_finite() && t2.is_finite()) {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "rate_between interval endpoints must be finite".to_string(),
+            ));
         }
         if t2 <= t1 {
             return Err(crate::Error::Validation(format!(
@@ -344,7 +346,9 @@ impl ForwardCurve {
     /// Logarithm of the implied projection discount factor from zero to `t`.
     fn projection_log_df(&self, t: f64) -> crate::Result<f64> {
         if !t.is_finite() {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "projection time must be finite".to_string(),
+            ));
         }
         if t < 0.0 {
             return Err(crate::Error::Validation(format!(
@@ -357,7 +361,9 @@ impl ForwardCurve {
 
         let tau = self.tenor;
         if !tau.is_finite() || tau <= 0.0 {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "forward curve tenor must be finite and positive".to_string(),
+            ));
         }
 
         let mut log_df = 0.0_f64;

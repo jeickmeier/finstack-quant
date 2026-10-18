@@ -157,7 +157,9 @@ pub fn constrained_least_squares(
 ) -> crate::Result<Vec<f64>> {
     let n_assets = returns.len();
     if n_assets == 0 || n_factors == 0 {
-        return Err(InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "constrained least squares needs at least one asset and one factor".to_string(),
+        ));
     }
     let expected_exposures = n_assets
         .checked_mul(n_factors)
@@ -265,7 +267,9 @@ pub(crate) fn normalized_svd_least_squares(
     for column in design.column_iter() {
         let max_value = column.iter().map(|value| value.abs()).fold(0.0, f64::max);
         if !max_value.is_finite() || max_value <= 0.0 {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "design matrix has an all-zero or non-finite column".to_string(),
+            ));
         }
         // Exact binary scaling avoids squared overflow/underflow without
         // changing the rounding of ordinary column norms. Preserve a single
@@ -302,12 +306,16 @@ pub(crate) fn normalized_svd_least_squares(
         .filter(|&&value| value > tolerance)
         .count();
     if rank < p {
-        return Err(InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "design matrix is rank deficient (rank {rank} < {p})"
+        )));
     }
 
-    let beta_scaled = svd
-        .solve(targets, tolerance)
-        .map_err(|_| InputError::Invalid)?;
+    let beta_scaled = svd.solve(targets, tolerance).map_err(|_| {
+        finstack_quant_core::Error::Validation(
+            "SVD solve failed for the normalized least-squares system".to_string(),
+        )
+    })?;
 
     let mut beta = beta_scaled;
     for (row_idx, &(scale, norm)) in scales.iter().enumerate() {
@@ -501,17 +509,24 @@ mod tests {
     fn empty_assets_fails_closed() {
         // n_assets = returns.len() = 0 with n_factors = 2: exposures.len()
         // (0) and weights.len() (0) both match n_assets * n_factors / n_assets
-        // trivially, so this trips the dedicated `n_assets == 0` guard (which
-        // renders as `InputError::Invalid`, "Invalid input data"), not a
+        // trivially, so this trips the dedicated `n_assets == 0` guard, not a
         // dimension-mismatch check.
         let err = constrained_least_squares(&[], 2, &[], &[]).unwrap_err();
-        assert!(err.to_string().to_lowercase().contains("invalid"), "{err}");
+        assert!(
+            err.to_string()
+                .contains("at least one asset and one factor"),
+            "{err}"
+        );
     }
 
     #[test]
     fn zero_factors_fail_closed() {
         let err = constrained_least_squares(&[], 0, &[0.02], &[1.0]).unwrap_err();
-        assert!(err.to_string().to_lowercase().contains("invalid"), "{err}");
+        assert!(
+            err.to_string()
+                .contains("at least one asset and one factor"),
+            "{err}"
+        );
     }
 
     /// Two factor columns in an exact `2x` proportion (perfectly collinear)
@@ -527,7 +542,7 @@ mod tests {
         let r = [0.05, 0.02, 0.01];
         let w = [0.6, 0.3, 0.1];
         let err = constrained_least_squares(&x, 2, &r, &w).unwrap_err();
-        assert!(err.to_string().to_lowercase().contains("invalid"), "{err}");
+        assert!(err.to_string().contains("rank deficient"), "{err}");
     }
 
     #[test]

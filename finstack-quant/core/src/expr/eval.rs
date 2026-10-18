@@ -1,17 +1,14 @@
-//! Scalar expression evaluation with DAG optimization.
+//! Scalar expression evaluation with DAG planning.
 //!
-//! Provides the `CompiledExpr` type that evaluates expression trees using
-//! optimized scalar algorithms. Supports DAG planning for shared sub-expression
-//! elimination: structurally identical sub-trees are deduplicated and each DAG
-//! node is evaluated exactly once per `eval()` call.
+//! [`CompiledExpr`] evaluates an elementwise expression tree over `&[f64]`
+//! columns. Structurally identical sub-trees are deduplicated into one
+//! execution plan at construction, and each plan node is evaluated exactly
+//! once per [`CompiledExpr::eval`] call.
 //!
-//! # Evaluation Strategy
-//!
-//! - **Planning**: Every evaluation runs a DAG plan, built eagerly by
-//!   `with_planning` or lazily (and cached) on the first `eval()`
-//! - **Execution**: Topological order with sub-expression dedup
-//! - **Scratch buffers**: Reused to minimize allocations
-//! - **Deterministic**: Identical results across runs
+//! Windowed, cumulative, positional and reducing functions (`lag`,
+//! `rolling_*`, `cumsum`, `std`, `rank`, ...) share the [`Function`] AST but
+//! are evaluated only by the `statements` crate's period-aware evaluator;
+//! [`CompiledExpr::new`] rejects them (see [`Function::is_scalar_evaluable`]).
 
 use super::{
     ast::*,
@@ -19,124 +16,32 @@ use super::{
     dag::{DagBuilder, ExecutionPlan},
 };
 use smallvec::SmallVec;
-use std::sync::{Mutex, OnceLock};
-use std::vec::Vec;
 
-/// Options controlling expression evaluation strategy.
+/// Compiled expression with a deduplicated execution plan.
 ///
-/// Limits scratch arena allocation while the compiled expression owns its plan.
-/// Deserialization rejects unknown fields, including execution-plan overrides.
+/// # Thread Safety
+///
+/// Immutable after construction: `Send + Sync`, and concurrent [`Self::eval`]
+/// calls share one instance without serializing.
 ///
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::expr::{CompiledExpr, Expr, SimpleContext, EvalOpts};
+/// use finstack_quant_core::expr::{CompiledExpr, Expr, SimpleContext};
 ///
 /// let ctx = SimpleContext::new(["x"]).expect("unique columns");
 /// let x = vec![1.0, 2.0, 3.0];
 /// let cols: [&[f64]; 1] = [&x];
-/// let expr = CompiledExpr::new(Expr::column("x"));
+/// let expr = CompiledExpr::new(Expr::column("x"))?;
 ///
-/// let out = expr.eval(&ctx, &cols, EvalOpts::default()).expect("column lookup should succeed");
+/// let out = expr.eval(&ctx, &cols)?;
 /// assert_eq!(out.values, vec![1.0, 2.0, 3.0]);
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EvalOpts {
-    /// Maximum arena allocation in bytes. Defaults to 1 GB.
-    /// Set to 0 to disable the check.
-    #[serde(default = "default_max_arena_bytes")]
-    pub max_arena_bytes: usize,
-}
-
-fn default_max_arena_bytes() -> usize {
-    1_073_741_824
-}
-
-impl Default for EvalOpts {
-    fn default() -> Self {
-        Self {
-            max_arena_bytes: default_max_arena_bytes(),
-        }
-    }
-}
-
-/// Compiled expression with optimized evaluation.
-///
-/// Wraps an expression AST with a DAG execution plan that evaluates each
-/// structurally distinct sub-expression once per `eval()` call.
-///
-/// # Components
-///
-/// - **AST**: Expression tree to evaluate
-/// - **Plan**: Execution plan in topological order, supplied by
-///   [`Self::with_planning`] or built and cached on the first [`Self::eval`]
-/// - **Scratch buffers**: Reused temporary storage to minimize allocations
-///
-/// # Thread Safety
-///
-/// `CompiledExpr` is both `Send` and `Sync`. Internal scratch buffers are
-/// protected by `Mutex`. For parallel evaluation, either share a
-/// single instance (concurrent `eval()` calls will serialize on the scratch
-/// `Mutex`) or clone for independent scratch buffers per thread.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CompiledExpr {
-    /// Immutable expression AST from which every execution plan is derived.
-    ast: Expr,
-    /// Optional explicit result metadata supplied via [`Self::with_planning`].
-    meta: Option<crate::config::ResultsMeta>,
-    /// Small scratch arena to reuse temporary buffers within hot paths.
-    pub(super) scratch: Mutex<ScratchArena>,
-    /// Execution plan (built eagerly by [`Self::with_planning`] or lazily on first [`Self::eval`]).
-    plan: OnceLock<ExecutionPlan>,
-}
-
-impl serde::Serialize for CompiledExpr {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("CompiledExpr", 2)?;
-        state.serialize_field("ast", &self.ast)?;
-        state.serialize_field("meta", &self.meta)?;
-        state.end()
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CompiledExpr {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(serde::Deserialize)]
-        #[serde(deny_unknown_fields)]
-        struct Input {
-            ast: Expr,
-            meta: Option<crate::config::ResultsMeta>,
-        }
-        let input = <Input as serde::Deserialize>::deserialize(deserializer)?;
-        match input.meta {
-            Some(meta) => Self::with_planning(input.ast, meta).map_err(serde::de::Error::custom),
-            None => Ok(Self::new(input.ast)),
-        }
-    }
-}
-
-/// Tiny reusable scratch buffers for hot evaluation paths.
-#[derive(Default, Debug)]
-pub(super) struct ScratchArena {
-    /// Generic temporary buffer for algorithms (e.g., median, sorts).
-    pub(super) tmp: Vec<f64>,
-    /// Window buffer for rolling operations that need a writable copy.
-    pub(super) window: Vec<f64>,
-    /// Node-result arena reused across `eval()` calls to avoid reallocating
-    /// `len * node_count` f64s every evaluation.
-    pub(super) arena: Vec<f64>,
-    /// Per-node result offsets indexed by DAG node id, reused across `eval()`
-    /// calls. Replaces a per-call `HashMap<u64, (usize, usize)>`; node ids are
-    /// dense, so direct indexing avoids hashing on every dependency lookup.
-    pub(super) offsets: Vec<Option<(usize, usize)>>,
+    /// Execution plan in topological order, built at construction.
+    plan: ExecutionPlan,
 }
 
 struct EvalNodeContext<'a> {
@@ -154,100 +59,72 @@ impl<'a> EvalNodeContext<'a> {
     }
 }
 
-impl Clone for CompiledExpr {
-    fn clone(&self) -> Self {
-        Self {
-            ast: self.ast.clone(),
-            meta: self.meta.clone(),
-            // Fresh scratch for clones; per-instance reuse only.
-            scratch: Mutex::new(ScratchArena::default()),
-            plan: self.plan.clone(),
+/// Reject expressions the scalar evaluator cannot execute.
+///
+/// The single source of truth for which functions belong in the statements
+/// layer is [`Function::is_scalar_evaluable`]; capital-structure references
+/// (`CsRef`) are statements-only as well.
+fn ensure_scalar_evaluable(ast: &Expr) -> crate::Result<()> {
+    match &ast.node {
+        ExprNode::Column(_) | ExprNode::Literal(_) => Ok(()),
+        ExprNode::CsRef { .. } => Err(crate::Error::Validation(
+            "capital-structure references require the statements evaluator".to_string(),
+        )),
+        ExprNode::Call(func, args) => {
+            if !func.is_scalar_evaluable() {
+                return Err(crate::Error::Validation(format!(
+                    "Expression function '{func}' is a statements-layer function; \
+                     compile it via the statements crate instead of core::expr::CompiledExpr::new"
+                )));
+            }
+            for arg in args {
+                ensure_scalar_evaluable(arg)?;
+            }
+            Ok(())
+        }
+        ExprNode::BinOp { left, right, .. } => {
+            ensure_scalar_evaluable(left)?;
+            ensure_scalar_evaluable(right)
+        }
+        ExprNode::UnaryOp { operand, .. } => ensure_scalar_evaluable(operand),
+        ExprNode::IfThenElse {
+            condition,
+            then_expr,
+            else_expr,
+        } => {
+            ensure_scalar_evaluable(condition)?;
+            ensure_scalar_evaluable(then_expr)?;
+            ensure_scalar_evaluable(else_expr)
         }
     }
 }
 
 impl CompiledExpr {
-    /// Construct a new compiled expression from an AST.
+    /// Compile an expression for the scalar evaluator.
     ///
-    /// Accepts any [`Expr`], including statements-layer functions (`Ttm`,
-    /// `Ytd`, etc.); those will fail at `eval()` time with a typed validation
-    /// error. Callers that know they are operating on a scalar evaluator may
-    /// prefer [`Self::try_new_scalar`] to fail fast at compile time.
-    ///
-    /// # Arguments
-    ///
-    /// * `ast` - Expression tree to compile. Statements-layer functions such as
-    ///   `Ttm` are accepted here and fail at [`Self::eval`].
-    pub fn new(ast: Expr) -> Self {
-        Self {
-            ast,
-            meta: None,
-            scratch: Mutex::new(ScratchArena::default()),
-            plan: OnceLock::new(),
-        }
-    }
-
-    /// Construct a compiled expression and reject statements-layer functions
-    /// up front.
-    ///
-    /// Use this when you know the expression must be evaluable by the core
-    /// scalar evaluator (i.e., not under the `statements` crate). Period-aware
-    /// functions like `Ttm`/`Ytd`/`GrowthRate` etc. return a typed validation
-    /// error instead of being silently accepted and rejected at eval time.
+    /// Builds the deduplicated execution plan up front; every evaluation
+    /// reuses it.
     ///
     /// # Errors
     ///
-    /// Returns an error when `ast` contains a statements-layer or other
-    /// period-aware operation that the scalar evaluator cannot execute. It
-    /// does not validate column names or data shapes; those are checked by
+    /// Returns [`crate::Error::Validation`] when `ast` calls a function that
+    /// only the statements evaluator supports (every non-elementwise
+    /// [`Function`]), references the capital structure (`CsRef`), or nests
+    /// deeper than the plan limit. Column names and data shapes are checked by
     /// [`Self::eval`].
     ///
     /// # Arguments
     ///
-    /// * `ast` - Expression tree that must be evaluable by the scalar engine;
-    ///   period-aware functions are rejected immediately.
-    pub fn try_new_scalar(ast: Expr) -> crate::Result<Self> {
-        super::ast_walk::ensure_scalar_evaluable(&ast)?;
-        Ok(Self::new(ast))
+    /// * `ast` - Expression tree to compile: column references, literals,
+    ///   operators, conditionals and elementwise functions only.
+    pub fn new(ast: Expr) -> crate::Result<Self> {
+        ensure_scalar_evaluable(&ast)?;
+        let meta = crate::config::results_meta(&crate::config::FinstackConfig::default());
+        let plan = DagBuilder::default().build_plan(ast, meta)?;
+        Ok(Self { plan })
     }
 
-    /// Construct with DAG planning enabled.
-    ///
-    /// The provided `meta` is stored on the execution plan and stamped into
-    /// each [`EvaluationResult`] produced by [`Self::eval`].
-    ///
-    /// The plan deduplicates structurally identical subexpressions and
-    /// evaluates each planned node once per call. Use [`Self::new`] when this
-    /// up-front planning cost is not appropriate; it builds and caches the
-    /// equivalent plan lazily on the first evaluation.
-    ///
-    /// # Arguments
-    ///
-    /// * `ast` - Owned expression tree to plan, deduplicating structurally
-    ///   identical subexpressions before evaluation.
-    /// * `meta` - Result metadata stored in the execution plan and copied into
-    ///   each evaluation result.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the expression graph cannot be converted into a
-    /// valid execution plan, for example because planning detects an invalid
-    /// dependency structure or more than 512 nested expression levels.
-    pub fn with_planning(ast: Expr, meta: crate::config::ResultsMeta) -> crate::Result<Self> {
-        let plan = DagBuilder::default().build_plan(vec![ast.clone()], meta.clone())?;
-
-        Ok(Self {
-            ast,
-            meta: Some(meta),
-            scratch: Mutex::new(ScratchArena::default()),
-            plan: OnceLock::from(plan),
-        })
-    }
-
-    /// Unified evaluation entrypoint returning values with execution metadata.
-    ///
-    /// Uses scalar implementations for all functions, with optional DAG planning
-    /// for complex expressions.
+    /// Evaluate the expression over `cols`.
     ///
     /// # Column length handling
     ///
@@ -256,159 +133,79 @@ impl CompiledExpr {
     /// than that are truncated. Missing tail values therefore propagate as
     /// NaN rather than being silently zero-filled.
     ///
-    /// The context maps column names to positions in `cols`. A plan attached
-    /// via [`Self::with_planning`] is reused; otherwise a plan is built once
-    /// and cached. Auto-built plans carry a default-config metadata snapshot.
-    /// Evaluation does not add timing or parallelism data. Every call
-    /// recomputes values from the supplied columns.
+    /// The context maps column names to positions in `cols`. The result
+    /// carries a default-config metadata snapshot; evaluation adds no timing
+    /// or parallelism data, and every call recomputes values from the
+    /// supplied columns.
     ///
     /// # Errors
     ///
-    /// Returns an error when planning fails, a referenced column is absent
-    /// from `ctx` or `cols`, an expression operation is invalid for scalar
-    /// evaluation, a planned dependency is unavailable, or the scratch arena
-    /// would overflow or exceed `opts.max_arena_bytes`. A zero arena limit
-    /// disables only the configured size limit, not arithmetic-overflow
-    /// protection.
+    /// Returns an error when a referenced column is absent from `ctx` or
+    /// `cols`, or a planned dependency is unavailable.
     ///
     /// # Arguments
     ///
     /// * `ctx` - Column-name to index map used to resolve `Expr` column references.
     /// * `cols` - Column arrays aligned with `ctx`; output length is the first
     ///   column's length.
-    /// * `opts` - Arena size limit; `max_arena_bytes = 0` disables the configured cap.
-    pub fn eval(
-        &self,
-        ctx: &SimpleContext,
-        cols: &[&[f64]],
-        opts: EvalOpts,
-    ) -> crate::Result<EvaluationResult> {
-        let owned_plan;
-        let plan_to_use: &ExecutionPlan = if let Some(plan) = self.plan.get() {
-            plan
-        } else {
-            let meta = self.meta.clone().unwrap_or_else(|| {
-                crate::config::results_meta(&crate::config::FinstackConfig::default())
-            });
-            let plan = DagBuilder::default().build_plan(vec![self.ast.clone()], meta)?;
-            // Try to cache for future calls; if a racing thread beat us, use theirs.
-            match self.plan.set(plan) {
-                Ok(()) => self.plan.get().ok_or_else(|| {
-                    crate::Error::Internal(
-                        "expression lazy plan missing immediately after OnceLock::set".to_string(),
-                    )
-                })?,
-                Err(plan) => {
-                    owned_plan = plan;
-                    self.plan.get().unwrap_or(&owned_plan)
-                }
-            }
-        };
-
+    pub fn eval(&self, ctx: &SimpleContext, cols: &[&[f64]]) -> crate::Result<EvaluationResult> {
+        let plan = &self.plan;
         tracing::debug!(
             row_count = cols.first().map(|c| c.len()).unwrap_or(0),
-            plan_nodes = plan_to_use.nodes.len(),
+            plan_nodes = plan.nodes.len(),
             "evaluating compiled expression"
         );
 
-        let values: Vec<f64> = {
-            let len = cols.first().map(|c| c.len()).unwrap_or(0);
-            let node_count = plan_to_use.nodes.len();
-            let arena_elements = len.checked_mul(node_count).ok_or_else(|| {
-                crate::Error::from(crate::InputError::TooLarge {
-                    what: "expression arena".into(),
-                    requested_bytes: usize::MAX,
-                    limit_bytes: opts.max_arena_bytes,
-                })
-            })?;
-            let arena_bytes = arena_elements.saturating_mul(std::mem::size_of::<f64>());
-            if opts.max_arena_bytes > 0 && arena_bytes > opts.max_arena_bytes {
-                return Err(crate::InputError::TooLarge {
-                    what: "expression arena".into(),
-                    requested_bytes: arena_bytes,
-                    limit_bytes: opts.max_arena_bytes,
-                }
-                .into());
-            }
+        let len = cols.first().map(|c| c.len()).unwrap_or(0);
+        let arena_elements = len.checked_mul(plan.nodes.len()).ok_or_else(|| {
+            crate::Error::Validation("expression arena size overflows usize".to_string())
+        })?;
+        // DAG node ids are dense (assigned 0..next_id during plan build), so
+        // index offsets by id directly instead of hashing.
+        let id_capacity = plan
+            .nodes
+            .iter()
+            .map(|n| n.id as usize)
+            .max()
+            .map_or(0, |m| m + 1);
+        let mut arena = vec![0.0; arena_elements];
+        let mut offsets: Vec<Option<(usize, usize)>> = vec![None; id_capacity];
 
-            // DAG node ids are dense (assigned 0..next_id during plan build), so
-            // index offsets by id directly instead of hashing.
-            let id_capacity = plan_to_use
-                .nodes
-                .iter()
-                .map(|n| n.id as usize)
-                .max()
-                .map_or(0, |m| m + 1);
+        let mut cursor = 0;
+        for node in &plan.nodes {
+            let start = cursor;
+            let end = cursor + len;
 
-            // Borrow the pooled arena/offsets buffers (retaining capacity across
-            // calls) and release the scratch lock immediately so nested
-            // median/rolling ops can re-lock the same scratch without deadlock.
-            let (mut arena, mut offsets) = {
-                let mut guard = crate::recover_lock(self.scratch.lock());
-                (
-                    std::mem::take(&mut guard.arena),
-                    std::mem::take(&mut guard.offsets),
-                )
+            // Split the arena to avoid borrow conflicts
+            let (arena_deps, arena_out) = arena.split_at_mut(start);
+            let out_slice = &mut arena_out[..len];
+            let env = EvalNodeContext {
+                ctx,
+                cols,
+                arena: arena_deps,
+                offsets: &offsets,
             };
-            // Every node overwrites its slice, so retain a larger arena and
-            // avoid clearing and re-zeroing it on each call.
-            if arena.len() < arena_elements {
-                arena.resize(arena_elements, 0.0);
-            }
-            // Reset offsets so a failed prior evaluation cannot leak stale data.
-            offsets.clear();
-            offsets.resize(id_capacity, None);
+            Self::eval_node_into(&env, node, out_slice)?;
 
-            let mut cursor = 0;
-            let eval_result: crate::Result<Vec<f64>> = (|| {
-                for node in &plan_to_use.nodes {
-                    let start = cursor;
-                    let end = cursor + len;
+            offsets[node.id as usize] = Some((start, end));
+            cursor = end;
+        }
 
-                    // Split the arena to avoid borrow conflicts
-                    let (arena_deps, arena_out) = arena.split_at_mut(start);
-                    let out_slice = &mut arena_out[..len];
-                    let env = EvalNodeContext {
-                        ctx,
-                        cols,
-                        arena: arena_deps,
-                        offsets: &offsets,
-                    };
-                    self.eval_node_into(&env, node, out_slice)?;
-
-                    offsets[node.id as usize] = Some((start, end));
-                    cursor = end;
-                }
-
-                Ok(plan_to_use
-                    .roots
-                    .first()
-                    .and_then(|&root_id| offsets.get(root_id as usize).copied().flatten())
-                    .map(|(start, end)| arena[start..end].to_vec())
-                    .unwrap_or_default())
-            })();
-
-            // Return the buffers to the pool for reuse, even on error.
-            {
-                let mut guard = crate::recover_lock(self.scratch.lock());
-                guard.arena = arena;
-                guard.offsets = offsets;
-            }
-
-            eval_result?
-        };
-
-        let meta = plan_to_use.meta.clone();
+        let values = offsets
+            .get(plan.root as usize)
+            .copied()
+            .flatten()
+            .map(|(start, end)| arena[start..end].to_vec())
+            .unwrap_or_default();
 
         Ok(EvaluationResult {
             values,
-            metadata: meta,
+            metadata: plan.meta.clone(),
         })
     }
 
     /// Evaluate a single DAG node directly into a provided output slice (arena-based).
     fn eval_node_into(
-        &self,
         env: &EvalNodeContext<'_>,
         node: &super::dag::DagNode,
         out: &mut [f64],
@@ -453,7 +250,7 @@ impl CompiledExpr {
                         node.dependencies.len() - arg_slices.len()
                     )));
                 }
-                self.eval_function_into(*func, &arg_slices, out)?;
+                Self::eval_function_into(*func, &arg_slices, out)?;
             }
             ExprNode::BinOp { op, .. } => {
                 // Binary operations should have exactly 2 dependencies
@@ -659,40 +456,14 @@ impl CompiledExpr {
 
     /// Evaluate a function directly into `out`.
     ///
-    /// Every arm writes the output slice. Scalar reducers broadcast one value
-    /// across `out`. Elementwise functions NaN-fill a short result.
+    /// Every elementwise arm writes the whole output slice, NaN-filling a
+    /// short result. Any other function was rejected by [`Self::new`].
     fn eval_function_into(
-        &self,
         fun: Function,
         arg_slices: &[&[f64]],
         out: &mut [f64],
     ) -> crate::Result<()> {
         match fun {
-            Function::Lag => Self::eval_lag_into(arg_slices, out)?,
-            Function::Lead => Self::eval_lead_into(arg_slices, out)?,
-            Function::Diff => Self::eval_diff_into(arg_slices, out)?,
-            Function::PctChange => Self::eval_pct_change_into(arg_slices, out)?,
-            Function::RollingMean => Self::eval_rolling_mean_into(arg_slices, out)?,
-            Function::RollingSum => Self::eval_rolling_sum_into(arg_slices, out)?,
-            Function::RollingStd => Self::eval_rolling_std_into(arg_slices, out)?,
-            Function::RollingVar => Self::eval_rolling_var_into(arg_slices, out)?,
-            Function::RollingMedian => self.eval_rolling_median_into(arg_slices, out)?,
-            Function::Shift => Self::eval_shift_into(arg_slices, out)?,
-            Function::RollingMin => Self::eval_rolling_min_into(arg_slices, out)?,
-            Function::RollingMax => Self::eval_rolling_max_into(arg_slices, out)?,
-            Function::RollingCount => Self::eval_rolling_count_into(arg_slices, out)?,
-            Function::EwmMean => Self::eval_ewm_mean_into(arg_slices, out)?,
-            Function::Std => Self::eval_population_var_into(arg_slices, out, true),
-            Function::Var => Self::eval_population_var_into(arg_slices, out, false),
-            Function::Median => self.eval_median_into(arg_slices, out),
-            Function::CumSum => Self::eval_cum_sum_into(arg_slices, out),
-            Function::CumProd => Self::eval_cum_prod_into(arg_slices, out),
-            Function::CumMin => Self::eval_cum_min_into(arg_slices, out),
-            Function::CumMax => Self::eval_cum_max_into(arg_slices, out),
-            Function::Rank => Self::eval_rank_into(arg_slices, out),
-            Function::Quantile => self.eval_quantile_into(arg_slices, out)?,
-            Function::EwmStd => Self::eval_ewm_variance_into(arg_slices, out, true)?,
-            Function::EwmVar => Self::eval_ewm_variance_into(arg_slices, out, false)?,
             Function::Abs => Self::eval_unary_into(arg_slices, out, f64::abs),
             Function::Sign => Self::eval_sign_into(arg_slices, out),
             Function::Pow => Self::eval_pow_into(arg_slices, out),
@@ -717,18 +488,7 @@ impl CompiledExpr {
                     },
                 );
             }
-            Function::Sum
-            | Function::Mean
-            | Function::Ttm
-            | Function::Ytd
-            | Function::Qtd
-            | Function::FiscalYtd
-            | Function::Annualize
-            | Function::AnnualizeRate
-            | Function::Coalesce
-            | Function::GrowthRate
-            | Function::Min
-            | Function::Max => {
+            _ => {
                 debug_assert!(
                     !fun.is_scalar_evaluable(),
                     "Function::is_scalar_evaluable disagrees with eval dispatch for {fun:?}"
@@ -741,6 +501,7 @@ impl CompiledExpr {
         Ok(())
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -754,7 +515,7 @@ mod tests {
     }
 
     #[test]
-    fn eval_auto_builds_plan_for_if_binop_and_unary_nodes() {
+    fn eval_plans_if_binop_and_unary_nodes() {
         let (ctx, data) = sample_context();
         let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
 
@@ -763,11 +524,8 @@ mod tests {
         let else_branch = Expr::unary_op(UnaryOp::Neg, Expr::column("y"));
         let expr = Expr::if_then_else(condition, then_branch, else_branch);
 
-        let compiled = CompiledExpr::new(expr);
-        let result = compiled
-            .eval(&ctx, &cols, EvalOpts::default())
-            .unwrap()
-            .values;
+        let compiled = CompiledExpr::new(expr).expect("elementwise expression compiles");
+        let result = compiled.eval(&ctx, &cols).unwrap().values;
 
         assert_eq!(result.len(), 4);
         assert!((result[0] + 0.5).abs() < 1e-12);
@@ -777,47 +535,30 @@ mod tests {
     }
 
     #[test]
-    fn arena_rejects_oversized_allocation() {
-        let ast = Expr::bin_op(BinOp::Add, Expr::column("x"), Expr::column("y"));
-        let expr = CompiledExpr::new(ast);
+    fn new_rejects_statements_layer_functions_and_capital_structure_references() {
+        let elementwise = Expr::call(Function::Abs, vec![Expr::column("x")]);
+        assert!(CompiledExpr::new(elementwise).is_ok());
 
-        let col: Vec<f64> = vec![1.0; 1000];
-        let cols: Vec<&[f64]> = vec![&col, &col];
-        let ctx = SimpleContext::new(["x", "y"]).expect("unique columns");
+        for fun in [
+            Function::RollingMean,
+            Function::Lag,
+            Function::CumSum,
+            Function::Std,
+            Function::Rank,
+            Function::Ttm,
+            Function::Sum,
+        ] {
+            let expr = Expr::call(fun, vec![Expr::column("x"), Expr::literal(2.0)]);
+            let err = CompiledExpr::new(expr).expect_err("statements-layer function is rejected");
+            assert!(matches!(err, crate::Error::Validation(_)), "{err}");
+        }
 
-        let opts = EvalOpts {
-            max_arena_bytes: 100,
-        };
-        let result = expr.eval(&ctx, &cols, opts);
-        assert!(result.is_err());
-        let err_str = result.unwrap_err().to_string();
-        assert!(
-            err_str.contains("too large") || err_str.contains("TooLarge"),
-            "Expected TooLarge error, got: {err_str}"
+        let nested = Expr::bin_op(
+            BinOp::Add,
+            Expr::column("x"),
+            Expr::call(Function::Median, vec![Expr::column("x")]),
         );
-    }
-
-    #[test]
-    fn arena_accepts_normal_allocation() {
-        let ast = Expr::column("x");
-        let expr = CompiledExpr::new(ast);
-        let col = vec![1.0, 2.0, 3.0];
-        let cols: Vec<&[f64]> = vec![&col];
-        let ctx = SimpleContext::new(["x"]).expect("unique columns");
-        let opts = EvalOpts::default();
-        let result = expr.eval(&ctx, &cols, opts);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn arena_check_disabled_when_zero() {
-        let ast = Expr::column("x");
-        let expr = CompiledExpr::new(ast);
-        let col = vec![1.0, 2.0, 3.0];
-        let cols: Vec<&[f64]> = vec![&col];
-        let ctx = SimpleContext::new(["x"]).expect("unique columns");
-        let opts = EvalOpts { max_arena_bytes: 0 };
-        let result = expr.eval(&ctx, &cols, opts);
-        assert!(result.is_ok());
+        assert!(CompiledExpr::new(nested).is_err());
+        assert!(CompiledExpr::new(Expr::cs_ref("debt", "total")).is_err());
     }
 }

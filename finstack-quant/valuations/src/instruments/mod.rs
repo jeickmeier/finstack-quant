@@ -170,10 +170,8 @@ pub mod cashflow_export {
     pub use super::common_impl::cashflow_export::*;
 }
 
-pub use common_impl::fx_dates::{
-    add_joint_business_days, adjust_joint_calendar, fx_spot_date_for_pair, ResolvedCalendarPair,
-};
-pub use finstack_quant_core::dates::resolve_calendar;
+pub use common_impl::fx_dates::fx_spot_date_for_pair;
+pub use finstack_quant_core::dates::{resolve_calendar, resolve_joint_calendar};
 
 /// Model parameter snapshots used by attribution.
 pub mod model_params;

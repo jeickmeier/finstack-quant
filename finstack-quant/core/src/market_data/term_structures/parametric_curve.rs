@@ -504,7 +504,9 @@ impl ParametricCurve {
         )?;
         let time_offset = self.time_offset + years;
         if !time_offset.is_finite() {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "rolled time offset must be finite".to_string(),
+            ));
         }
         let normalization = source_discount_factor(&self.model, time_offset);
         if !normalization.is_finite() || normalization <= 0.0 {
@@ -589,7 +591,9 @@ impl ParametricCurveBuilder {
             .ok_or(crate::Error::Validation("model is required".into()))?;
         model.validate()?;
         if !self.time_offset.is_finite() {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "time_offset must be finite".to_string(),
+            ));
         }
         let normalization = source_discount_factor(&model, self.time_offset);
         if !normalization.is_finite() || normalization <= 0.0 {

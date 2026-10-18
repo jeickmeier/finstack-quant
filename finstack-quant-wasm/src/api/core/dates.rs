@@ -239,36 +239,13 @@ impl JsDayCount {
     ///
     /// @returns The matching `DayCount`.
     /// @throws `TypeError` if `name` is not a string; `FinstackError` (kind
-    /// `validation`) if it is not a canonical convention name. Use
-    /// `DayCount.parse` for term-sheet spellings.
+    /// `validation`) if no convention matches. Case, spaces, `/` and `-` are
+    /// normalised, so term-sheet spellings such as `"ACT/360"` or
+    /// `"Act/Act ICMA"` are accepted.
     #[wasm_bindgen(js_name = fromName)]
     pub fn from_name(name: JsValue) -> Result<JsDayCount, JsValue> {
         let name: &str = &js_string(&name, "name")?;
         name.parse::<RustDayCount>()
-            .map(|inner| JsDayCount { inner })
-            .map_err(to_js_err)
-    }
-
-    /// Parse a convention leniently (Rust `DayCount::parse`): case, spaces,
-    /// `/` and `-` are normalised, so term-sheet spellings such as
-    /// `"ACT/360"`, `"Act/Act ICMA"` or `"30E/360 ISDA"` are accepted.
-    ///
-    /// # Arguments
-    ///
-    /// * `s` - Convention text in canonical or term-sheet spelling.
-    ///
-    /// @returns The matching `DayCount`.
-    /// @throws `TypeError` if `s` is not a string; `FinstackError` (kind
-    /// `validation`) if no convention matches.
-    ///
-    /// @example
-    /// ```javascript
-    /// core.DayCount.parse("Act/Act ICMA").toString();  // "act_act_isma"
-    /// ```
-    #[wasm_bindgen(js_name = parse)]
-    pub fn parse(s: JsValue) -> Result<JsDayCount, JsValue> {
-        let s: &str = &js_string(&s, "s")?;
-        RustDayCount::parse(s)
             .map(|inner| JsDayCount { inner })
             .map_err(to_js_err)
     }
@@ -464,26 +441,6 @@ impl JsDayCount {
         self.inner
             .signed_year_fraction(start, end, ctx.to_rust_ctx()?)
             .map_err(to_js_err)
-    }
-
-    /// Count the calendar days between two dates (epoch days), independent of
-    /// the convention (Rust associated fn `DayCount::calendar_days`).
-    /// @param start_epoch_days - Start date as days since 1970-01-01.
-    /// @param end_epoch_days - End date as days since 1970-01-01.
-    /// @returns Signed calendar-day count from start to end.
-    ///
-    /// # Errors
-    ///
-    /// Throws a JavaScript exception if either epoch-day value is non-finite, fractional, or outside the
-    /// representable date range.
-    #[wasm_bindgen(js_name = calendarDays)]
-    pub fn calendar_days(
-        start_epoch_days: JsValue,
-        end_epoch_days: JsValue,
-    ) -> Result<i64, JsValue> {
-        let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
-        let end = js_epoch_days(&end_epoch_days, "endEpochDays")?;
-        Ok(RustDayCount::calendar_days(start, end))
     }
 
     /// Convention name.
@@ -971,10 +928,14 @@ mod tests {
     fn daycount_nl365_factory_and_lenient_parse() {
         assert_eq!(JsDayCount::nl365().to_string(), "nl_365");
         assert_eq!(
-            RustDayCount::parse("Act/Act ICMA").expect("lenient"),
+            "Act/Act ICMA".parse::<RustDayCount>().expect("lenient"),
             RustDayCount::ActActIsma
         );
-        assert!("ACT/360".parse::<RustDayCount>().is_err());
+        assert_eq!(
+            "ACT/360".parse::<RustDayCount>().expect("lenient"),
+            RustDayCount::Act360
+        );
+        assert!("act360".parse::<RustDayCount>().is_err());
     }
 
     #[test]

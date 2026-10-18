@@ -17,7 +17,7 @@ impl HazardCurve {
             day_count: DayCount::Act365F,
             par_points: Vec::new(),
             par_interp: ParInterp::Linear,
-            max_hazard_rate: 10.0,
+            max_hazard_rate: DEFAULT_MAX_HAZARD_RATE,
             hazard_calibration: None,
             fx_policy: None,
         }
@@ -278,6 +278,12 @@ impl HazardCurve {
     pub fn id(&self) -> &CurveId {
         &self.id
     }
+    /// Largest hazard rate the builder accepted for this curve; carried by
+    /// rebuilds and the wire form.
+    pub fn max_hazard_rate(&self) -> f64 {
+        self.max_hazard_rate
+    }
+
     /// Curve valuation **base date**.
     pub fn base_date(&self) -> Date {
         self.base

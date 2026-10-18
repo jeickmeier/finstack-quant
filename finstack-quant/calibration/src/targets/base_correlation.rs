@@ -147,20 +147,20 @@ impl BaseCorrelationTarget {
 
     fn validate_monotone_and_bounds(knots: &[(f64, f64)]) -> Result<()> {
         if knots.windows(2).any(|w| w[1].0 <= w[0].0) {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid,
+            return Err(finstack_quant_core::Error::Validation(
+                "base correlation knots must have strictly increasing detachments".to_string(),
             ));
         }
 
         for (detachment, corr) in knots {
             if !detachment.is_finite() || *detachment <= 0.0 || *detachment > 100.0 {
-                return Err(finstack_quant_core::Error::Input(
-                    finstack_quant_core::InputError::Invalid,
+                return Err(finstack_quant_core::Error::Validation(
+                    "base correlation detachment must be finite and in (0, 100]".to_string(),
                 ));
             }
             if !corr.is_finite() || *corr < 0.0 || *corr > 1.0 {
-                return Err(finstack_quant_core::Error::Input(
-                    finstack_quant_core::InputError::Invalid,
+                return Err(finstack_quant_core::Error::Validation(
+                    "base correlation must be finite and in [0, 1]".to_string(),
                 ));
             }
         }
@@ -365,8 +365,8 @@ impl BootstrapTarget for BaseCorrelationTarget {
     fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
         let mut sorted_knots = knots.to_vec();
         if sorted_knots.iter().any(|(d, _)| !d.is_finite()) {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid,
+            return Err(finstack_quant_core::Error::Validation(
+                "base correlation knot detachments must be finite".to_string(),
             ));
         }
 

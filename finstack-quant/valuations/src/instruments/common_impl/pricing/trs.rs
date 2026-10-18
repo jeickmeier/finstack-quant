@@ -1412,7 +1412,7 @@ mod tests {
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
         use crate::instruments::rates::irs::FloatingLegCompounding;
-        use finstack_quant_core::dates::calendar_by_id;
+        use finstack_quant_core::dates::calendar_by_id_strict;
 
         let start = date(2025, 1, 2);
         let end = date(2025, 4, 2);
@@ -1445,7 +1445,7 @@ mod tests {
             Currency::USD,
         )
         .expect("trs overnight");
-        let calendar = calendar_by_id("usny").expect("usny");
+        let calendar = calendar_by_id_strict("usny").expect("usny");
         let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
         let expected = project_overnight_coupon(OvernightCouponProjectionInput {
             curve: OvernightProjectionCurve::Forward(&fwd),

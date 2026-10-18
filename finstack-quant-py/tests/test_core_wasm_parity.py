@@ -41,6 +41,7 @@ from finstack_quant.core.market_data import (
 )
 from finstack_quant.core.math import linalg, special_functions, stats
 from finstack_quant.core.money import Money
+from finstack_quant.models import volatility
 
 GOLDEN = Path(__file__).parent / "data" / "core_wasm_parity.json"
 
@@ -339,7 +340,7 @@ CASES: dict[str, Callable[[], Any]] = {
     "base_correlation": lambda: _base_correlation().correlation(5.0),
     "vol_surface": lambda: json.loads(_surface().to_json()),
     "vol_surface_queries": lambda: [
-        _surface().vol(0.75, 100.0),
+        volatility.get_surface_vol(_surface(), 0.75, 100.0),
         list(_surface().grid_shape),
         _surface().secondary_axis,
         _surface().quote_type,
@@ -411,7 +412,7 @@ CASES: dict[str, Callable[[], Any]] = {
         "contains": [_market().contains("USD-OIS"), _market().contains("missing")],
         "is_empty": [_market().is_empty(), MarketContext().is_empty()],
         "df": _market().get_discount("USD-OIS").df(1.0),
-        "vol": _market().get_surface("SPX-VOL").vol(0.75, 100.0),
+        "vol": volatility.get_surface_vol(_market().get_surface("SPX-VOL"), 0.75, 100.0),
         "series": _market().get_series("SOFR-FIXINGS").value_on("2025-01-06"),
         "index_lag": _market().get_inflation_index("US-CPI-U").lag,
         "credit_index": _market().get_credit_index("CDX-IG-43").num_constituents,

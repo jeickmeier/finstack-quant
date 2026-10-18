@@ -15,7 +15,7 @@ use crate::instruments::rates::hw1f::forward_swap_rate::{
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    calendar_by_id, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
+    calendar_by_id_strict, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::{CurveId, IndexId};
@@ -170,12 +170,7 @@ impl CmsReferenceSwap<'_> {
     pub fn reference_swap_start(&self, fixing_date: Date) -> Result<Date> {
         let convention = self.market_convention()?;
         let calendar_id = &convention.market_calendar_id;
-        let calendar = calendar_by_id(calendar_id).ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "{} reference calendar '{}' is not registered",
-                self.label, calendar_id
-            ))
-        })?;
+        let calendar = calendar_by_id_strict(calendar_id)?;
         fixing_date.add_business_days(convention.market_settlement_days, calendar)
     }
 

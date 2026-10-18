@@ -497,7 +497,9 @@ fn cube_params(cube: &VolCube, expiry: f64, tenor: f64) -> (SabrParameters, f64,
 
 fn cube_vol(cube: &VolCube, expiry: f64, tenor: f64, strike: f64, normal: bool) -> Result<f64> {
     if !strike.is_finite() {
-        return Err(InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "strike must be finite".to_string(),
+        ));
     }
     let (params, forward, model_expiry) = cube_params(cube, expiry, tenor);
     if normal {
@@ -659,7 +661,9 @@ fn materialize_cube_tenor_slice_with_convention(
     normal: bool,
 ) -> Result<VolSurface> {
     if strikes.is_empty() || !tenor.is_finite() || strikes.iter().any(|value| !value.is_finite()) {
-        return Err(InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "tenor slice needs a finite tenor and a non-empty, finite strike grid".to_string(),
+        ));
     }
     let mut values = Vec::with_capacity(cube.expiries().len() * strikes.len());
     for &expiry in cube.expiries() {
@@ -741,7 +745,9 @@ fn materialize_cube_expiry_slice_with_convention(
     normal: bool,
 ) -> Result<VolCubeExpirySlice> {
     if strikes.is_empty() || !expiry.is_finite() || strikes.iter().any(|value| !value.is_finite()) {
-        return Err(InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "expiry slice needs a finite expiry and a non-empty, finite strike grid".to_string(),
+        ));
     }
     let expiry = expiry.clamp(
         cube.expiries()[0],

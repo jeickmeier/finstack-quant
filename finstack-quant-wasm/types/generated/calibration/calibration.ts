@@ -1953,6 +1953,11 @@ export type PriorMarketObject =
        */
       knot_points: [unknown, unknown][];
       /**
+       * Hazard-rate cap the curve was built with, when it differs from the
+       * default of 10; absent for curves built with the default.
+       */
+      max_hazard_rate?: number | null;
+      /**
        * Par interpolation method
        */
       par_interp?: ParInterp;
@@ -2650,6 +2655,11 @@ export type CurveState =
        * Time/value pairs used to construct the curve
        */
       knot_points: [unknown, unknown][];
+      /**
+       * Hazard-rate cap the curve was built with, when it differs from the
+       * default of 10; absent for curves built with the default.
+       */
+      max_hazard_rate?: number | null;
       /**
        * Par interpolation method
        */
@@ -5340,10 +5350,16 @@ export interface HazardCalibrationInput {
   };
 }
 /**
- * Serialized source grid and time origin for a rolled interpolation.
+ * Serialized source grid and time origin of a rolled curve.
  */
 export interface InterpRollState {
+  /**
+   * Current origin in the source interpolation's year-fraction coordinates.
+   */
   offset: number;
+  /**
+   * Source pillars `(time, value)` in the source curve's own coordinates.
+   */
   source_points: [unknown, unknown][];
 }
 /**

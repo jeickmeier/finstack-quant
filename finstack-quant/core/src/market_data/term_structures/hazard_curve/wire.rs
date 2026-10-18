@@ -36,6 +36,10 @@ pub(super) struct RawHazardCurve {
     /// Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].
     #[serde(default)]
     pub fx_policy: Option<String>,
+    /// Hazard-rate cap the curve was built with, when it differs from the
+    /// default of 10; absent for curves built with the default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_hazard_rate: Option<f64>,
 }
 
 impl From<HazardCurve> for RawHazardCurve {
@@ -67,6 +71,8 @@ impl From<HazardCurve> for RawHazardCurve {
 
             hazard_calibration: curve.hazard_calibration,
             fx_policy: curve.fx_policy,
+            max_hazard_rate: (curve.max_hazard_rate != DEFAULT_MAX_HAZARD_RATE)
+                .then_some(curve.max_hazard_rate),
         }
     }
 }
@@ -83,6 +89,7 @@ impl TryFrom<RawHazardCurve> for HazardCurve {
             .par_spreads(state.par_points)
             .par_interp(state.par_interp)
             .hazard_calibration_opt(state.hazard_calibration)
+            .max_hazard_rate(state.max_hazard_rate.unwrap_or(DEFAULT_MAX_HAZARD_RATE))
             .issuer_opt(state.issuer)
             .seniority_opt(state.seniority)
             .currency_opt(state.currency)

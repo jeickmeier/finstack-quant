@@ -7,7 +7,9 @@
 
 use crate::builder::schedule::CashFlowSchedule;
 use crate::primitives::CFKind;
-use finstack_quant_core::dates::{calendar_by_id, Date, DateExt, DayCount, DayCountContext, Tenor};
+use finstack_quant_core::dates::{
+    calendar_by_id_strict, Date, DateExt, DayCount, DayCountContext, Tenor,
+};
 use finstack_quant_core::money::Money;
 
 /// Generic accrual method usable across instruments.
@@ -118,11 +120,7 @@ impl ExCouponRule {
             ))
         })?;
         if let Some(cal_id) = &self.calendar_id {
-            let cal = calendar_by_id(cal_id).ok_or_else(|| {
-                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-                    id: cal_id.to_string(),
-                })
-            })?;
+            let cal = calendar_by_id_strict(cal_id)?;
             Ok(payment_date.add_business_days(-days, cal)?)
         } else {
             payment_date

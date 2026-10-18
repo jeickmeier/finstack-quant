@@ -377,19 +377,21 @@ fn calendar_metadata_override_is_respected() {
 // Joint business days T+0 behavior
 
 #[test]
-fn add_joint_business_days_t0_returns_start_unadjusted() {
-    use finstack_quant_core::dates::add_joint_business_days;
+fn joint_business_days_t0_returns_start_unadjusted() {
+    use finstack_quant_core::dates::{resolve_joint_calendar, DateExt};
 
     // Saturday Jan 4, 2025 is not a business day on either calendar, but
     // n_days = 0 pins the documented behavior: return start unadjusted.
     let saturday = make_date(2025, 1, 4);
-    let result = add_joint_business_days(saturday, 0, Some("nyse"), Some("gblo"), None)
+    let result = resolve_joint_calendar(Some("nyse"), Some("gblo"))
+        .and_then(|cal| saturday.add_business_days(0, cal))
         .expect("calendars resolve");
     assert_eq!(result, saturday, "T+0 returns start unadjusted");
 
     // Holiday (Jan 1, 2025, Wednesday) also returned unadjusted at T+0.
     let new_year = make_date(2025, 1, 1);
-    let result = add_joint_business_days(new_year, 0, Some("nyse"), Some("gblo"), None)
+    let result = resolve_joint_calendar(Some("nyse"), Some("gblo"))
+        .and_then(|cal| new_year.add_business_days(0, cal))
         .expect("calendars resolve");
     assert_eq!(result, new_year);
 }

@@ -793,10 +793,10 @@ mod tests {
         }
 
         let fallback_input =
-            PricingError::from_core(finstack_quant_core::InputError::Invalid.into(), ctx);
+            PricingError::from_core(finstack_quant_core::InputError::NegativeValue.into(), ctx);
         match fallback_input {
             PricingError::InvalidInput { message, .. } => {
-                assert!(message.contains("Invalid input data"));
+                assert!(message.contains("Values must be non-negative"));
             }
             other => panic!("expected InvalidInput, got {other:?}"),
         }
@@ -831,7 +831,7 @@ mod tests {
                 ErrorKind::Validation,
             ),
             (
-                finstack_quant_core::InputError::Invalid.into(),
+                finstack_quant_core::InputError::NegativeValue.into(),
                 ErrorKind::Validation,
             ),
             (

@@ -5,7 +5,7 @@
 //! commitment, usage, and facility fees) and both fixed and floating rate bases.
 
 use finstack_quant_core::dates::{
-    calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
+    calendar_by_id_strict, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -692,8 +692,6 @@ impl McConfig {
     /// `Ok(())` if all parameters are valid, otherwise returns an error
     /// describing the validation failure.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        use finstack_quant_core::InputError;
-
         // Validate correlation matrix if provided
         if let Some(corr) = self.correlation_matrix {
             // Check positive semi-definiteness
@@ -705,7 +703,12 @@ impl McConfig {
 
         // Validate util_credit_corr if provided
         if let Some(rho) = self.util_credit_corr {
-            validation::require_or(rho.abs() <= 1.0, InputError::Invalid)?;
+            validation::require_or(
+                rho.abs() <= 1.0,
+                finstack_quant_core::Error::Validation(
+                    "util_credit_corr must lie in [-1, 1]".to_string(),
+                ),
+            )?;
         }
 
         // Validate credit spread process parameters
@@ -719,11 +722,16 @@ impl McConfig {
                 // All parameters must be non-negative
                 validation::require_or(
                     *kappa > 0.0 && *theta >= 0.0 && *sigma >= 0.0 && *initial >= 0.0,
-                    InputError::Invalid,
+                    finstack_quant_core::Error::Validation("CIR credit spread process needs kappa > 0 and non-negative theta, sigma and initial".to_string()),
                 )?;
             }
             CreditSpreadProcessSpec::Constant(spread) => {
-                validation::require_or(*spread >= 0.0, InputError::Invalid)?;
+                validation::require_or(
+                    *spread >= 0.0,
+                    finstack_quant_core::Error::Validation(
+                        "constant credit spread must be non-negative".to_string(),
+                    ),
+                )?;
             }
             CreditSpreadProcessSpec::MarketAnchored {
                 kappa,
@@ -731,9 +739,14 @@ impl McConfig {
                 tenor_years,
                 ..
             } => {
-                validation::require_or(*kappa > 0.0 && *implied_vol >= 0.0, InputError::Invalid)?;
+                validation::require_or(*kappa > 0.0 && *implied_vol >= 0.0, finstack_quant_core::Error::Validation("market-anchored credit spread process needs kappa > 0 and non-negative implied_vol".to_string()))?;
                 if let Some(tenor) = tenor_years {
-                    validation::require_or(*tenor > 0.0, InputError::Invalid)?;
+                    validation::require_or(
+                        *tenor > 0.0,
+                        finstack_quant_core::Error::Validation(
+                            "market-anchored tenor_years must be positive".to_string(),
+                        ),
+                    )?;
                 }
             }
         }
@@ -745,7 +758,13 @@ impl McConfig {
             ..
         }) = &self.interest_rate_process
         {
-            validation::require_or(*kappa > 0.0 && *sigma >= 0.0, InputError::Invalid)?;
+            validation::require_or(
+                *kappa > 0.0 && *sigma >= 0.0,
+                finstack_quant_core::Error::Validation(
+                    "Hull-White process needs positive mean reversion and non-negative sigma"
+                        .to_string(),
+                ),
+            )?;
         }
         if let Some(InterestRateProcessSpec::HullWhite1F { initial, theta, .. }) =
             &self.interest_rate_process
@@ -915,11 +934,7 @@ impl RevolvingCredit {
         })?;
         match self.calendar_id.as_deref() {
             Some(calendar_id) => {
-                let calendar = calendar_by_id(calendar_id).ok_or_else(|| {
-                    finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-                        id: format!("calendar:{calendar_id}"),
-                    })
-                })?;
+                let calendar = calendar_by_id_strict(calendar_id)?;
                 as_of.add_business_days(settlement_days, calendar)
             }
             None => as_of.add_weekdays(settlement_days),

@@ -188,8 +188,6 @@ class TestMathAdditions:
         assert stats.finite_count([1.0, float("nan")]) == 1
         assert len(stats.log_returns([1.0, 2.0, 4.0])) == 2
         assert stats.realized_variance([100.0, 101.0, 100.0], annualization_factor=1.0) > 0.0
-        with pytest.raises(ValueError, match=r"requires OHLC data"):
-            stats.realized_variance([100.0, 101.0], method="parkinson")
 
     def test_linalg_and_special(self) -> None:
         from finstack_quant.core.math import linalg, special_functions

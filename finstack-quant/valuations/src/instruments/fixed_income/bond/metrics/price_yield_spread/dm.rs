@@ -102,8 +102,8 @@ impl MetricCalculator for DiscountMarginCalculator {
         // amortizing floaters). For fixed-rate bonds, return an error; callers
         // should use YTM, Z-spread, or asset-swap spreads instead.
         if !bond.has_floating_coupons() {
-            return Err(finstack_quant_core::Error::from(
-                finstack_quant_core::InputError::Invalid,
+            return Err(finstack_quant_core::Error::Validation(
+                "discount margin is only defined for bonds with floating coupons".to_string(),
             ));
         }
 

@@ -54,7 +54,7 @@ fn hazard_recipe_invalidation_covers_synthetic_transformations() {
 
     let mut in_place = source;
     in_place
-        .bump_in_place(&BumpSpec::parallel_bp(1.0))
+        .bump_in_place(&BumpSpec::parallel_bp(1.0), HazardBumpTarget::ParSpread)
         .expect("in-place bump");
     assert!(in_place.hazard_calibration().is_none());
 }
@@ -79,6 +79,34 @@ fn survival_at_dates_is_one_on_or_before_the_base_date() {
     assert_eq!(survival[0], 1.0);
     assert_eq!(survival[1], 1.0);
     assert!(survival[2] < 1.0);
+}
+
+#[test]
+fn hazard_cap_round_trips_through_json_and_rebuilds() {
+    let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let capped = HazardCurve::builder("CAPPED")
+        .base_date(base)
+        .recovery_rate(0.4)
+        .knots([(1.0, 12.0), (5.0, 15.0)])
+        .max_hazard_rate(40.0)
+        .build()
+        .expect("cap admits lambda above 10");
+    let json = serde_json::to_string(&capped).expect("serialize");
+    assert!(json.contains("\"max_hazard_rate\":40.0"));
+    let restored: HazardCurve = serde_json::from_str(&json).expect("deserialize with cap");
+    assert_eq!(restored.max_hazard_rate(), 40.0);
+    assert!(capped.with_parallel_hazard_rate_bump_bp(10.0).is_ok());
+    assert!(capped.to_builder_with_id("AGAIN").build().is_ok());
+
+    let default_cap = HazardCurve::builder("DEFAULT")
+        .base_date(base)
+        .recovery_rate(0.4)
+        .knots([(1.0, 0.02)])
+        .build()
+        .expect("default cap");
+    assert!(!serde_json::to_string(&default_cap)
+        .expect("serialize")
+        .contains("max_hazard_rate"));
 }
 
 #[test]
@@ -277,7 +305,7 @@ fn zero_size_bump_in_place_is_noop_for_zero_anchored_curve() {
 
     let mut bumped = curve.clone();
     bumped
-        .bump_in_place(&BumpSpec::parallel_bp(0.0))
+        .bump_in_place(&BumpSpec::parallel_bp(0.0), HazardBumpTarget::ParSpread)
         .expect("zero bump succeeds");
 
     for t in [0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0] {
@@ -312,7 +340,10 @@ fn small_bump_in_place_shifts_average_hazard_uniformly() {
 
     let mut bumped = curve.clone();
     bumped
-        .bump_in_place(&BumpSpec::parallel_bp(spread_bp))
+        .bump_in_place(
+            &BumpSpec::parallel_bp(spread_bp),
+            HazardBumpTarget::ParSpread,
+        )
         .expect("small bump succeeds");
 
     for t in [0.5, 1.0, 2.0, 3.0, 5.0] {
@@ -346,7 +377,7 @@ fn bump_in_place_clears_stale_par_spread_quotes() {
         .expect("quoted hazard curve builds");
 
     curve
-        .bump_in_place(&BumpSpec::parallel_bp(10.0))
+        .bump_in_place(&BumpSpec::parallel_bp(10.0), HazardBumpTarget::ParSpread)
         .expect("bump succeeds");
 
     assert_eq!(
@@ -474,7 +505,7 @@ fn failed_bump_in_place_is_atomic() {
     let mut attempted = original.clone();
 
     attempted
-        .bump_in_place(&BumpSpec::parallel_bp(-30.0))
+        .bump_in_place(&BumpSpec::parallel_bp(-30.0), HazardBumpTarget::ParSpread)
         .expect_err("second hazard node would become negative");
 
     assert_eq!(

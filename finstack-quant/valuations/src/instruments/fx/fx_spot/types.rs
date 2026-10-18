@@ -305,9 +305,8 @@ impl FxSpot {
     ///   applied from this date; an explicit `settlement_date` is only
     ///   business-day-adjusted and ignores `as_of`.
     pub fn effective_settlement_date(&self, as_of: Date) -> Result<Date> {
-        use crate::instruments::common_impl::fx_dates::{
-            adjust_joint_calendar, fx_spot_date_for_pair,
-        };
+        use crate::instruments::common_impl::fx_dates::fx_spot_date_for_pair;
+        use finstack_quant_core::dates::{adjust, resolve_joint_calendar};
 
         // Check if we should use joint calendar logic
         let use_joint_calendar =
@@ -316,12 +315,11 @@ impl FxSpot {
         if let Some(date) = self.settlement_date {
             // Explicit settlement date provided - adjust for business days
             if use_joint_calendar {
-                adjust_joint_calendar(
-                    date,
-                    self.business_day_convention,
+                let calendar = resolve_joint_calendar(
                     self.base_calendar_id.as_deref(),
                     self.quote_calendar_id.as_deref(),
-                )
+                )?;
+                adjust(date, self.business_day_convention, calendar)
             } else {
                 Ok(date)
             }

@@ -687,14 +687,9 @@ fn valuation_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
         1_012_345.67,
         finstack_quant_core::currency::Currency::USD,
     )?;
-    // `stamped` records a wall-clock timestamp, which would make the checked-in
-    // artifact differ on every regeneration; the example carries a fixed meta.
-    let meta = finstack_quant_core::config::ResultsMeta {
-        timestamp: None,
-        ..finstack_quant_core::config::results_meta_now(
-            &finstack_quant_core::config::FinstackConfig::default(),
-        )
-    };
+    let meta = finstack_quant_core::config::results_meta(
+        &finstack_quant_core::config::FinstackConfig::default(),
+    );
     let result =
         crate::results::ValuationResult::stamped_with_meta("US912828XG33", as_of, value, meta);
     let value = serde_json::to_value(&result).map_err(|error| {

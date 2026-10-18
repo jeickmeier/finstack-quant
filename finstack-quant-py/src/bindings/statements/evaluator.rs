@@ -4,12 +4,11 @@ use super::capital_structure::PyCapitalStructureCashflows;
 use super::monte_carlo::{extract_config, PyMonteCarloResults};
 use super::parse_period_id;
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::{envelope_to_pandas, selected_envelope_to_pandas};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::{extract_market_ref, extract_model_ref};
 use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::{
-    selected_table_to_dataframe, table_to_dataframe, values_to_series,
-};
+use crate::bindings::pandas_utils::values_to_series;
 use crate::errors::statements_to_py;
 use finstack_quant_statements::evaluator::PeriodDateConvention;
 use pyo3::exceptions::PyKeyError;
@@ -418,7 +417,7 @@ impl PyStatementResult {
         match orient {
             "long" => {
                 let table = self.inner.to_table_long().map_err(statements_to_py)?;
-                selected_table_to_dataframe(
+                selected_envelope_to_pandas(
                     py,
                     &table,
                     &[
@@ -434,7 +433,7 @@ impl PyStatementResult {
             }
             "wide" => {
                 let table = self.inner.to_table_wide().map_err(statements_to_py)?;
-                let df = table_to_dataframe(py, &table)?;
+                let df = envelope_to_pandas(py, &table)?;
                 df.call_method1("set_index", ("period_id",))?.getattr("T")
             }
             other => Err(pyo3::exceptions::PyValueError::new_err(format!(

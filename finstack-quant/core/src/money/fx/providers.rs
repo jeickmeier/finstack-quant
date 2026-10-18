@@ -276,7 +276,7 @@ impl FxProvider for SimpleFxProvider {
 /// bump is **term-structure preserving**: for the bumped pair the provider
 /// returns `original.rate(query) * (1 + bump_pct)`, so a date-aware
 /// provider keeps its date/policy structure under the bump.
-pub struct BumpedFxProvider {
+pub(crate) struct BumpedFxProvider {
     /// Original provider to delegate to
     original: Arc<dyn FxProvider>,
     /// Bumped pair base currency
@@ -302,7 +302,7 @@ impl BumpedFxProvider {
     /// Returns an error when `from == to`, the bump multiplier is invalid, or
     /// any statically known shocked snapshot quote (including another date or
     /// policy scope) is outside the finite, positive FX range.
-    pub fn new(
+    pub(crate) fn new(
         original: Arc<dyn FxProvider>,
         from: Currency,
         to: Currency,
@@ -438,6 +438,39 @@ mod tests {
     use super::*;
     use crate::currency::Currency;
     use time::Month;
+
+    #[test]
+    fn bumped_provider_snapshot_normalizes_the_shocked_orientation() {
+        let on = Date::from_ordinal_date(2025, 1).expect("date");
+        let provider = SimpleFxProvider::new();
+        provider
+            .set_quotes(&[
+                (Currency::EUR, Currency::USD, 1.1),
+                (Currency::USD, Currency::EUR, 0.9),
+                (Currency::GBP, Currency::USD, 1.3),
+            ])
+            .expect("positive direction-sensitive quotes");
+        let bumped = BumpedFxProvider::new(Arc::new(provider), Currency::EUR, Currency::USD, 0.1)
+            .expect("bump");
+        let restored = SimpleFxProvider::new();
+        restored
+            .set_quotes(&bumped.snapshot_quotes())
+            .expect("snapshot quotes");
+        for (from, to) in [
+            (Currency::EUR, Currency::USD),
+            (Currency::USD, Currency::EUR),
+            (Currency::GBP, Currency::USD),
+        ] {
+            assert_eq!(
+                restored
+                    .rate(from, to, on, FxConversionPolicy::CashflowDate)
+                    .expect("snapshot rate"),
+                bumped
+                    .rate(from, to, on, FxConversionPolicy::CashflowDate)
+                    .expect("live rate")
+            );
+        }
+    }
 
     fn test_date() -> Date {
         Date::from_calendar_date(2024, Month::January, 2).expect("Valid test date")

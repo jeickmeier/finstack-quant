@@ -1,7 +1,7 @@
 //! Shared observation schedule generation for realized-variance instruments.
 
 use finstack_quant_core::dates::{
-    adjust, BusinessDayConvention, Date, DateExt, HolidayCalendar, ResolvedCalendarPair,
+    adjust, resolve_joint_calendar, BusinessDayConvention, Date, DateExt, HolidayCalendar,
     ScheduleBuilder, StubKind, Tenor, TenorUnit,
 };
 
@@ -13,20 +13,17 @@ pub(crate) enum VarianceCalendar<'a> {
     Joint { base: &'a str, quote: &'a str },
 }
 
-enum ResolvedVarianceCalendar {
-    Single(&'static dyn HolidayCalendar),
-    Joint(ResolvedCalendarPair),
-}
+struct ResolvedVarianceCalendar(&'static dyn HolidayCalendar);
 
 impl ResolvedVarianceCalendar {
     fn resolve(spec: VarianceCalendar<'_>) -> finstack_quant_core::Result<Self> {
         match spec {
-            VarianceCalendar::Single(id) => Ok(Self::Single(
-                finstack_quant_core::dates::calendar_by_id_strict(id)?,
-            )),
-            VarianceCalendar::Joint { base, quote } => Ok(Self::Joint(
-                ResolvedCalendarPair::resolve(Some(base), Some(quote))?,
-            )),
+            VarianceCalendar::Single(id) => {
+                Ok(Self(finstack_quant_core::dates::calendar_by_id_strict(id)?))
+            }
+            VarianceCalendar::Joint { base, quote } => {
+                Ok(Self(resolve_joint_calendar(Some(base), Some(quote))?))
+            }
         }
     }
 
@@ -35,27 +32,17 @@ impl ResolvedVarianceCalendar {
         date: Date,
         business_day_convention: BusinessDayConvention,
     ) -> finstack_quant_core::Result<Date> {
-        match self {
-            Self::Single(calendar) => adjust(date, business_day_convention, *calendar),
-            Self::Joint(calendars) => {
-                calendars.adjust_joint_calendar(date, business_day_convention)
-            }
-        }
+        adjust(date, business_day_convention, self.0)
     }
 
     fn add_business_days(&self, date: Date, count: u32) -> finstack_quant_core::Result<Date> {
-        match self {
-            Self::Single(calendar) => date.add_business_days(
-                i32::try_from(count).map_err(|_| {
-                    finstack_quant_core::InputError::InvalidTenor {
-                        tenor: format!("{count}D"),
-                        reason: "day count exceeds supported range".to_string(),
-                    }
-                })?,
-                *calendar,
-            ),
-            Self::Joint(calendars) => calendars.add_joint_business_days(date, count),
-        }
+        date.add_business_days(
+            i32::try_from(count).map_err(|_| finstack_quant_core::InputError::InvalidTenor {
+                tenor: format!("{count}D"),
+                reason: "day count exceeds supported range".to_string(),
+            })?,
+            self.0,
+        )
     }
 }
 

@@ -1379,41 +1379,6 @@ fn snapshot_only_scoped_crosses_do_not_pin_the_live_bumped_provider() {
 }
 
 #[test]
-fn public_bumped_provider_snapshot_normalizes_the_shocked_orientation() {
-    use finstack_quant_core::money::fx::BumpedFxProvider;
-
-    let on = Date::from_ordinal_date(2025, 1).expect("date");
-    let provider = SimpleFxProvider::new();
-    provider
-        .set_quotes(&[
-            (Currency::EUR, Currency::USD, 1.1),
-            (Currency::USD, Currency::EUR, 0.9),
-            (Currency::GBP, Currency::USD, 1.3),
-        ])
-        .expect("positive direction-sensitive quotes");
-    let bumped =
-        BumpedFxProvider::new(Arc::new(provider), Currency::EUR, Currency::USD, 0.1).expect("bump");
-    let restored = SimpleFxProvider::new();
-    restored
-        .set_quotes(&bumped.snapshot_quotes())
-        .expect("snapshot quotes");
-    for (from, to) in [
-        (Currency::EUR, Currency::USD),
-        (Currency::USD, Currency::EUR),
-        (Currency::GBP, Currency::USD),
-    ] {
-        assert_eq!(
-            restored
-                .rate(from, to, on, FxConversionPolicy::CashflowDate)
-                .expect("snapshot rate"),
-            bumped
-                .rate(from, to, on, FxConversionPolicy::CashflowDate)
-                .expect("live rate")
-        );
-    }
-}
-
-#[test]
 fn fx_bumps_reject_overflowing_static_scopes_outside_the_reference_date() {
     let reference = Date::from_ordinal_date(2025, 1).expect("reference date");
     let later = Date::from_ordinal_date(2025, 182).expect("later scope");

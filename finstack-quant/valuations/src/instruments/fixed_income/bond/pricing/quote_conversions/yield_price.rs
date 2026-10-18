@@ -643,8 +643,8 @@ fn japanese_simple_yield_terms(
 ) -> finstack_quant_core::Result<(f64, f64)> {
     let crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) = &bond.cashflow_spec
     else {
-        return Err(finstack_quant_core::Error::from(
-            finstack_quant_core::InputError::Invalid,
+        return Err(finstack_quant_core::Error::Validation(
+            "Japanese simple yield requires a fixed-coupon bond".to_string(),
         ));
     };
     let coupon = spec.rate.to_f64().ok_or_else(|| {
@@ -726,8 +726,8 @@ pub(crate) fn clean_price_from_japanese_simple_yield(
     }
     let clean_pct = 100.0 * (1.0 + coupon * n) / denom;
     if clean_pct <= 0.0 {
-        return Err(finstack_quant_core::Error::from(
-            finstack_quant_core::InputError::Invalid,
+        return Err(finstack_quant_core::Error::Validation(
+            "Japanese simple yield implies a non-positive clean price".to_string(),
         ));
     }
     Ok(clean_pct)

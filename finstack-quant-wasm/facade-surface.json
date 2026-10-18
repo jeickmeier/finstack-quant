@@ -1156,11 +1156,9 @@
       "actActAfb",
       "actActIsma",
       "bus252",
-      "calendarDays",
       "fromName",
       "nl365",
       "oneOne",
-      "parse",
       "thirty360",
       "thirty360It",
       "thirtyE360",
@@ -1517,7 +1515,7 @@
   "core.VolSurface": {
     "kind": "class",
     "statics": ["fromJson"],
-    "methods": ["free", "toJson", "vol", "withDisplacements"],
+    "methods": ["free", "toJson", "withDisplacements"],
     "getters": [
       "displacements",
       "expiries",

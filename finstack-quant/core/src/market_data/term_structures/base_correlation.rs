@@ -320,7 +320,7 @@ impl BaseCorrelationCurve {
     ///
     /// # Errors
     ///
-    /// Returns [`InputError::Invalid`] for non-finite inputs or an invalid reconstructed curve.
+    /// Returns [`Error::Validation`](crate::Error::Validation) for non-finite inputs or an invalid reconstructed curve.
     /// The resulting correlation shape may be nonmonotonic.
     pub fn apply_bucket_bump(
         &self,
@@ -330,7 +330,9 @@ impl BaseCorrelationCurve {
         if !points.is_finite()
             || detachment_filter.is_some_and(|values| values.iter().any(|v| !v.is_finite()))
         {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "base correlation bump and detachment filter must be finite".to_string(),
+            ));
         }
         let new_points: Vec<(f64, f64)> = self
             .detachment_points
@@ -472,10 +474,14 @@ impl BaseCorrelationCurveBuilder {
 
         for (detachment, corr) in &sorted_points {
             if !detachment.is_finite() || !(0.0..=100.0).contains(detachment) {
-                return Err(InputError::Invalid.into());
+                return Err(crate::Error::Validation(
+                    "base correlation detachment must be finite and in [0, 100]".to_string(),
+                ));
             }
             if !corr.is_finite() || *corr < 0.0 || *corr > 1.0 {
-                return Err(InputError::Invalid.into());
+                return Err(crate::Error::Validation(
+                    "base correlation must be finite and in [0, 1]".to_string(),
+                ));
             }
         }
 

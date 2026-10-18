@@ -9,7 +9,7 @@ use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use crate::instruments::PayReceive;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
 use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
-use finstack_quant_core::dates::{calendar_by_id, Date, DateExt, HolidayCalendar};
+use finstack_quant_core::dates::{calendar_by_id_strict, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
@@ -475,7 +475,8 @@ impl CdsTranchePricer {
         let calendar: Option<&dyn HolidayCalendar> = tranche
             .calendar_id
             .as_deref()
-            .and_then(|id| calendar_by_id(id));
+            .map(calendar_by_id_strict)
+            .transpose()?;
 
         if let Some(cal) = calendar {
             as_of.add_business_days(settlement_lag, cal)

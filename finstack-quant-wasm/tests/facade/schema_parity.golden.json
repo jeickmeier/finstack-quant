@@ -32,7 +32,7 @@
             "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
             "type_name": "MarketContextState",
             "kind": "input",
-            "bytes": 130557
+            "bytes": 131074
           },
           {
             "path": "schemas/market_data/1/vol_cube_expiry_slice.schema.json",
@@ -112,14 +112,14 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1256007
+            "bytes": 1256524
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 231842
+            "bytes": 232359
           },
           {
             "path": "schemas/attribution/1/attribution_result.schema.json",
@@ -823,14 +823,14 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 216517
+            "bytes": 217034
           },
           {
             "path": "schemas/calibration/1/calibration_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
             "type_name": "CalibrationResultEnvelope",
             "kind": "output",
-            "bytes": 132475
+            "bytes": 132992
           },
           {
             "path": "schemas/calibration/1/calibration_validation_report.schema.json",
@@ -3579,7 +3579,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1256007
+            "bytes": 1256524
           },
           {
             "domain": "attribution",
@@ -3587,7 +3587,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 231842
+            "bytes": 232359
           },
           {
             "domain": "attribution",
@@ -3603,7 +3603,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 216517
+            "bytes": 217034
           },
           {
             "domain": "calibration",
@@ -3611,7 +3611,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
             "type_name": "CalibrationResultEnvelope",
             "kind": "output",
-            "bytes": 132475
+            "bytes": 132992
           },
           {
             "domain": "calibration",
@@ -3859,7 +3859,7 @@
             "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
             "type_name": "MarketContextState",
             "kind": "input",
-            "bytes": 130557
+            "bytes": 131074
           },
           {
             "domain": "core",

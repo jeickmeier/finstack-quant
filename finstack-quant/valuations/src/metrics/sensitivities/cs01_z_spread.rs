@@ -323,10 +323,11 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let inst_arc = Arc::clone(&context.instrument);
-        let instrument = inst_arc
-            .as_any()
-            .downcast_ref::<I>()
-            .ok_or(finstack_quant_core::InputError::Invalid)?;
+        let instrument = inst_arc.as_any().downcast_ref::<I>().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "metric context instrument has an unexpected type".to_string(),
+            )
+        })?;
 
         if self.delegate_to_hazard_when_credit_curve && has_credit_curve(instrument)? {
             return if hazard_is_replayable(instrument, context)? {
@@ -410,10 +411,11 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let inst_arc = Arc::clone(&context.instrument);
-        let instrument = inst_arc
-            .as_any()
-            .downcast_ref::<I>()
-            .ok_or(finstack_quant_core::InputError::Invalid)?;
+        let instrument = inst_arc.as_any().downcast_ref::<I>().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "metric context instrument has an unexpected type".to_string(),
+            )
+        })?;
 
         if self.delegate_to_hazard_when_credit_curve && has_credit_curve(instrument)? {
             return if hazard_is_replayable(instrument, context)? {

@@ -80,10 +80,6 @@ name = "curve_operations"
 harness = false
 
 [[bench]]
-name = "rolling"
-harness = false
-
-[[bench]]
 name = "solver_operations"
 harness = false
 

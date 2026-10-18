@@ -25,11 +25,9 @@ CLOSE = [101.0, 99.5, 100.2, 100.6]
 
 def test_realized_variance_defaults_are_rust_owned() -> None:
     assert realized_variance(PRICES) == 0.04341008921510013
-    assert realized_variance(PRICES, "close_to_close", 52.0) == 0.008957637457084153
+    assert realized_variance(PRICES, 52.0) == 0.008957637457084153
     assert realized_variance_ohlc(OPEN, HIGH, LOW, CLOSE) == 0.04489594471070698
     assert realized_variance_ohlc(OPEN, HIGH, LOW, CLOSE, "parkinson") == 0.04439216444474536
-    with pytest.raises(ValueError, match="requires OHLC data"):
-        realized_variance(PRICES, "parkinson")
 
 
 def test_rate_family_values_match_wasm() -> None:
@@ -41,15 +39,17 @@ def test_rate_family_values_match_wasm() -> None:
 
 
 def test_day_count_and_tenor_values_match_wasm() -> None:
-    assert str(DayCount.parse("Act/Act ICMA")) == "act_act_isma"
+    assert str(DayCount.from_name("Act/Act ICMA")) == "act_act_isma"
     assert str(DayCount.NL_365) == "nl_365"
     tenor = Tenor.parse("3M")
     assert str(tenor.unit) == "M"
     assert tenor.to_days_approx() == 91
-    assert Tenor("1M").add_to_date(dt.date(2025, 1, 31)) == dt.date(2025, 2, 28)
+    assert Tenor.parse("1M").add_to_date(dt.date(2025, 1, 31)) == dt.date(2025, 2, 28)
     # No convention: the Rust default (modified following) applies with a calendar.
-    assert Tenor("1M").add_to_date(dt.date(2025, 5, 31), "nyse") == dt.date(2025, 6, 30)
-    assert Tenor("6M").to_years_with_context(dt.date(2025, 1, 15), day_count=DayCount.ACT_360) == 0.5027777777777778
+    assert Tenor.parse("1M").add_to_date(dt.date(2025, 5, 31), "nyse") == dt.date(2025, 6, 30)
+    assert (
+        Tenor.parse("6M").to_years_with_context(dt.date(2025, 1, 15), day_count=DayCount.ACT_360) == 0.5027777777777778
+    )
 
 
 def test_day_count_context_round_trips_like_wasm() -> None:

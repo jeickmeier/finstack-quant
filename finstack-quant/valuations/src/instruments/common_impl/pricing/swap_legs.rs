@@ -11,7 +11,7 @@
 //! - Neumaier compensated summation for long-dated swaps
 //! - Holiday-aware payment delay handling
 
-use finstack_quant_core::dates::calendar_by_id;
+use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::Result;
 
@@ -71,20 +71,13 @@ pub fn add_payment_delay(date: Date, delay_days: i32, calendar_id: Option<&str>)
 
     if let Some(id) = calendar_id {
         // Calendar explicitly specified: require successful resolution and application
-        match calendar_by_id(id) {
-            Some(cal) => date.add_business_days(delay_days, cal).map_err(|e| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Failed to add {} business days to {} using calendar '{}': {}",
-                    delay_days, date, id, e
-                ))
-            }),
-            None => Err(finstack_quant_core::Error::Validation(format!(
-                "Payment-delay calendar '{}' not found in registry; \
-                 cannot apply {} business day delay to {}. \
-                 Either register the calendar or use None for weekday-only stepping.",
-                id, delay_days, date
-            ))),
-        }
+        let cal = calendar_by_id_strict(id)?;
+        date.add_business_days(delay_days, cal).map_err(|e| {
+            finstack_quant_core::Error::Validation(format!(
+                "Failed to add {} business days to {} using calendar '{}': {}",
+                delay_days, date, id, e
+            ))
+        })
     } else {
         // No calendar specified: weekday-only (Mon-Fri) is intentional
         date.add_weekdays(delay_days)

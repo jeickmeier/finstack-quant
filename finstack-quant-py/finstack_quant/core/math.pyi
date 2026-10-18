@@ -611,7 +611,6 @@ class stats:
     @staticmethod
     def realized_variance(
         prices: Sequence[float] | npt.NDArray[np.float64],
-        method: str | None = None,
         annualization_factor: float | None = None,
     ) -> float:
         """
@@ -624,10 +623,6 @@ class stats:
         ----------
         prices : Sequence[float] or numpy.ndarray
             Finite, strictly positive close prices in time order.
-        method : str or None
-            Must be ``"close_to_close"``; OHLC estimators require
-            :func:`realized_variance_ohlc`. ``None`` selects the Rust default
-            (``RealizedVarMethod::default()``, close-to-close).
         annualization_factor : float or None
             Positive observations-per-year scaling factor. ``None`` selects
             the Rust daily convention (``PeriodKind::Daily``, 252).
@@ -640,8 +635,8 @@ class stats:
         Raises
         ------
         ValueError
-            If *method* is unknown or needs OHLC data, a price is non-positive
-            or non-finite, or *annualization_factor* is not positive.
+            If a price is non-positive or non-finite, or *annualization_factor*
+            is not positive.
         TypeError
             If a series is not one-dimensional or contains values that cannot
             be converted to float.

@@ -2,8 +2,7 @@
 
 use finstack_quant_core::dates::calendar::{GBLO, NYSE, TARGET2};
 use finstack_quant_core::dates::{
-    available_calendars, calendar_by_id, calendar_by_id_strict, CompositeCalendar, Date,
-    HolidayCalendar,
+    available_calendars, calendar_by_id_strict, CompositeCalendar, Date, HolidayCalendar,
 };
 use finstack_quant_core::types::CalendarId;
 use time::Month;
@@ -18,7 +17,7 @@ fn resolves_all_built_in_calendars() {
     assert!(!ids.is_empty());
     for &id in ids {
         assert!(
-            calendar_by_id(id).is_some(),
+            calendar_by_id_strict(id).is_ok(),
             "Calendar '{id}' should resolve"
         );
     }
@@ -26,15 +25,15 @@ fn resolves_all_built_in_calendars() {
 
 #[test]
 fn resolution_is_case_insensitive_and_unknown_is_none() {
-    assert!(calendar_by_id("gblo").is_some());
-    assert!(calendar_by_id("GBLO").is_some());
-    assert!(calendar_by_id("nonexistent_calendar").is_none());
+    assert!(calendar_by_id_strict("gblo").is_ok());
+    assert!(calendar_by_id_strict("GBLO").is_ok());
+    assert!(calendar_by_id_strict("nonexistent_calendar").is_err());
 }
 
 #[test]
 fn typed_id_resolves() {
     let id = CalendarId::from(TARGET2.id);
-    let cal = calendar_by_id(id.as_str()).expect("TARGET2 resolves");
+    let cal = calendar_by_id_strict(id.as_str()).expect("TARGET2 resolves");
     assert!(cal.is_holiday(make_date(2025, 1, 1)));
 }
 

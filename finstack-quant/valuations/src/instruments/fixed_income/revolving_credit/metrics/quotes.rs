@@ -37,7 +37,11 @@ fn cached_schedule(context: &mut MetricContext) -> Result<Arc<CashFlowSchedule>>
         let facility = inst
             .as_any()
             .downcast_ref::<RevolvingCredit>()
-            .ok_or(finstack_quant_core::InputError::Invalid)?;
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "metric context instrument is not a RevolvingCredit".to_string(),
+                )
+            })?;
         let schedule = facility.raw_cashflow_schedule(&context.curves, context.as_of)?;
         context.internal_schedule = Some(Arc::new(schedule));
     }
@@ -45,7 +49,11 @@ fn cached_schedule(context: &mut MetricContext) -> Result<Arc<CashFlowSchedule>>
         .internal_schedule
         .as_ref()
         .map(Arc::clone)
-        .ok_or_else(|| finstack_quant_core::InputError::Invalid.into())
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "revolving credit schedule was not cached".to_string(),
+            )
+        })
 }
 
 /// Drawn balance on `date`: the deterministic replay after the anchor, or
@@ -146,11 +154,11 @@ fn target_price(
 /// floating-only guard.
 fn contractual_margin(facility: &RevolvingCredit, as_of: Date) -> Result<f64> {
     match &facility.rate {
-        RateSpec::Floating(spec) => Ok(spec
-            .spread_bp
-            .to_f64()
-            .ok_or(finstack_quant_core::InputError::Invalid)?
-            * 1e-4
+        RateSpec::Floating(spec) => Ok(spec.spread_bp.to_f64().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "floating spread_bp is not representable as f64".to_string(),
+            )
+        })? * 1e-4
             + facility.margin_delta_bp_at(as_of) * 1e-4),
         RateSpec::Fixed { .. } => Err(finstack_quant_core::Error::Validation(format!(
             "RevolvingCredit {}: discount margin is defined for floating-rate facilities only",

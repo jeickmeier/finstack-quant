@@ -67,7 +67,9 @@ pub(super) fn validate_axis(axis: &[f64]) -> crate::Result<()> {
         return Err(crate::error::InputError::TooFewPoints.into());
     }
     if axis.iter().any(|x| !x.is_finite()) {
-        return Err(crate::error::InputError::Invalid.into());
+        return Err(crate::Error::Validation(
+            "surface axis values must be finite".to_string(),
+        ));
     }
     if axis.len() > 1 {
         crate::math::interp::utils::validate_knots(axis)?;

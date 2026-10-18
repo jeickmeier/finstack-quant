@@ -434,8 +434,8 @@ mod tests {
 
     #[test]
     fn test_display() {
-        let err: Error = InputError::Invalid.into();
-        assert_eq!(format!("{}", err), "Invalid input data");
+        let err: Error = InputError::NegativeValue.into();
+        assert_eq!(format!("{}", err), "Values must be non-negative");
 
         let not_found_err: Error = InputError::NotFound {
             id: "test_curve".to_string(),

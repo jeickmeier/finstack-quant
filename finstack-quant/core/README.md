@@ -41,7 +41,7 @@ Full item documentation is in the rustdoc (`cargo doc -p finstack-quant-core
 | `money::Money` | Decimal-backed, currency-tagged amount. `checked_add`/`checked_sub` refuse to mix currencies. |
 | `money::FormatOpts` | Formatting options behind `Money::format` / `format_with`. |
 | `money::fx::FxProvider` | Conversion interface. |
-| `money::fx::{FxMatrix, SimpleFxProvider, BumpedFxProvider}` | Concrete providers; `FxMatrix` also carries `FxMatrixState` for serialization. |
+| `money::fx::{FxMatrix, SimpleFxProvider}` | Concrete providers; `FxMatrix` also carries `FxMatrixState` for serialization. |
 | `money::fx::{FxConfig, FxConversionPolicy, FxPolicyMeta, FxQuery, FxRateResult}` | Policy selection and the stamped result of a conversion. |
 | `decimal::{f64_to_decimal, decimal_to_f64}` | The only sanctioned `f64 ↔ Decimal` bridge; both return `Result` instead of collapsing non-finite input to zero. |
 
@@ -117,14 +117,15 @@ live in `finstack-quant-models::credit`.
 
 ### Expression engine
 
-`expr` is a scalar DAG engine over `&[f64]` columns. `statements` shares its AST
-(`Expr`, `Function`) but evaluates formulas with its own per-period evaluator;
-the in-workspace caller of `CompiledExpr::eval` is the valuations composite
-instrument. `Expr`/`ExprNode` build the AST, `Function` enumerates the
-supported operators (lags, diffs, cumulatives, rolling windows, EWM, reducers),
-`SimpleContext` maps column names to positions, `CompiledExpr::eval` plans and
-runs it, and `EvaluationResult` carries values plus metadata. Windows are
-row-count windows, not calendar-time windows.
+`expr` holds the expression AST shared with `statements` and a scalar DAG
+evaluator over `&[f64]` columns. `Expr`/`ExprNode` build the AST and
+`Function` enumerates every operator; `CompiledExpr::new` compiles the
+elementwise subset (`abs`, `pow`, `round`, `clamp`, operators, conditionals)
+and rejects the windowed, cumulative, reducing and period-aware functions,
+which only the `statements` per-period evaluator runs. `SimpleContext` maps
+column names to positions and `EvaluationResult` carries values plus
+metadata. The in-workspace caller of `CompiledExpr::eval` is the valuations
+composite instrument.
 
 ### Serialization, schema, and contracts
 

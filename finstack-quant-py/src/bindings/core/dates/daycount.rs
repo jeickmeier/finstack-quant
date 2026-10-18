@@ -1,6 +1,5 @@
 //! Python bindings for day-count conventions from [`finstack_quant_core::dates`].
 
-use crate::bindings::core::dates::calendar::extract_calendar;
 use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
@@ -53,34 +52,18 @@ pub(crate) fn extract_day_count(obj: &Bound<'_, PyAny>) -> PyResult<DayCount> {
         return Ok(day_count.inner);
     }
     if let Ok(s) = obj.extract::<String>() {
-        return DayCount::parse(&s).map_err(core_to_py);
+        return s.parse::<DayCount>().map_err(core_to_py);
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
         "expected DayCount or str",
     ))
 }
 
-/// Build a [`DayCountContext`] for a year-fraction call from the optional
-/// ``ctx`` object or the ``frequency``/``calendar`` keywords.
-fn context_from_args(
-    ctx: Option<&PyDayCountContext>,
-    frequency: Option<&Bound<'_, PyAny>>,
-    calendar: Option<&Bound<'_, PyAny>>,
-) -> PyResult<DayCountContext<'static>> {
+/// Resolve the optional ``ctx`` argument of a year-fraction call.
+fn resolve_context(ctx: Option<&PyDayCountContext>) -> PyResult<DayCountContext<'static>> {
     match ctx {
-        Some(c) => {
-            if frequency.is_some() || calendar.is_some() {
-                return Err(crate::errors::value_error(
-                    "pass either ctx or the frequency/calendar keywords, not both",
-                ));
-            }
-            c.to_rust_ctx()
-        }
-        None => Ok(DayCountContext {
-            calendar: calendar.map(extract_calendar).transpose()?,
-            frequency: frequency.map(extract_tenor).transpose()?,
-            ..DayCountContext::default()
-        }),
+        Some(c) => c.to_rust_ctx(),
+        None => Ok(DayCountContext::default()),
     }
 }
 
@@ -177,36 +160,15 @@ impl PyDayCount {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``name`` is not one of the canonical names; the message lists
-    ///     them. Use ``DayCount.parse`` for term-sheet spellings.
+    ///     If no spelling matches; the message lists the canonical names.
+    ///     Case, spaces, ``/`` and ``-`` are normalised, so term-sheet
+    ///     spellings such as ``"ACT/360"`` or ``"Act/Act ICMA"`` are accepted.
     #[classmethod]
     #[pyo3(text_signature = "(cls, name)")]
     fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
         name.parse::<DayCount>()
             .map(Self::from_inner)
             .map_err(core_to_py)
-    }
-
-    /// Leniently parse a day-count label as written on term sheets.
-    ///
-    /// Case-insensitive; ``/``, ``-`` and spaces are treated as ``_``, and
-    /// the market spellings ``"ACT/ACT ICMA"``, ``"ACT/ACT ISDA"``,
-    /// ``"ACT/365"``, ``"30/360"``, ``"30E/360 ISDA"`` are recognised.
-    ///
-    /// Parameters
-    /// ----------
-    /// s : str
-    ///     Day-count label (``"ACT/360"``, ``"Act/Act ICMA"``, or any
-    ///     canonical name).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If no spelling matches; the message lists the canonical names.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, s)")]
-    fn parse(_cls: &Bound<'_, PyType>, s: &str) -> PyResult<Self> {
-        DayCount::parse(s).map(Self::from_inner).map_err(core_to_py)
     }
 
     /// Compute the year fraction between two dates under this convention.
@@ -218,14 +180,10 @@ impl PyDayCount {
     /// end : datetime.date | str
     ///     Accrual end (exclusive); must not precede ``start``.
     /// ctx : DayCountContext | None
-    ///     Full context object (calendar, frequency, coupon period, …).
-    ///     ``ACT_365L`` requires ``frequency`` and the enclosing contractual
-    ///     ``coupon_period``; partial accrual retains that coupon's denominator.
-    ///     Mutually exclusive with the keywords below.
-    /// frequency : Tenor | str | None
-    ///     Coupon frequency for ``ACT_ACT_ISMA``/``ACT_365L`` (e.g. ``"6M"``).
-    /// calendar : HolidayCalendar | str | None
-    ///     Holiday calendar required by ``BUS_252``.
+    ///     Context for conventions that need one: ``ACT_ACT_ISMA`` and
+    ///     ``ACT_365L`` read ``frequency``, ``ACT_365L`` also the enclosing
+    ///     contractual ``coupon_period`` (partial accrual retains that coupon's
+    ///     denominator), ``BUS_252`` reads ``calendar_id``.
     ///
     /// Returns
     /// -------
@@ -235,63 +193,43 @@ impl PyDayCount {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``start > end``, both ``ctx`` and keywords are given, or the
-    ///     convention needs context that was not supplied (ISMA without a
-    ///     frequency, ACT/365L without frequency/enclosing coupon dates,
-    ///     Bus/252 without a calendar), ACT/365L dates lie outside the coupon,
-    ///     or ICMA reference endpoints do not share an unadjusted nominal month grid.
+    ///     If ``start > end`` or the convention needs context that was not
+    ///     supplied (ISMA without a frequency, ACT/365L without
+    ///     frequency/enclosing coupon dates, Bus/252 without a calendar),
+    ///     ACT/365L dates lie outside the coupon, or ICMA reference endpoints
+    ///     do not share an unadjusted nominal month grid.
     /// KeyError
-    ///     If ``calendar`` names an unknown calendar.
-    #[pyo3(
-        signature = (start, end, ctx=None, *, frequency=None, calendar=None),
-        text_signature = "(self, start, end, ctx=None, *, frequency=None, calendar=None)"
-    )]
+    ///     If ``ctx`` names an unknown calendar.
+    #[pyo3(signature = (start, end, ctx=None), text_signature = "(self, start, end, ctx=None)")]
     fn year_fraction(
         &self,
         start: &Bound<'_, PyAny>,
         end: &Bound<'_, PyAny>,
         ctx: Option<&PyDayCountContext>,
-        frequency: Option<&Bound<'_, PyAny>>,
-        calendar: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<f64> {
         let s = py_to_date(start)?;
         let e = py_to_date(end)?;
-        let context = context_from_args(ctx, frequency, calendar)?;
+        let context = resolve_context(ctx)?;
         self.inner.year_fraction(s, e, context).map_err(core_to_py)
     }
 
     /// Compute the signed year fraction (negative when ``start > end``).
     ///
-    /// Accepts the same ``ctx`` / ``frequency`` / ``calendar`` inputs as
-    /// ``year_fraction`` and raises the same exceptions, except that an
-    /// inverted range is allowed.
-    #[pyo3(
-        signature = (start, end, ctx=None, *, frequency=None, calendar=None),
-        text_signature = "(self, start, end, ctx=None, *, frequency=None, calendar=None)"
-    )]
+    /// Accepts the same ``ctx`` as ``year_fraction`` and raises the same
+    /// exceptions, except that an inverted range is allowed.
+    #[pyo3(signature = (start, end, ctx=None), text_signature = "(self, start, end, ctx=None)")]
     fn signed_year_fraction(
         &self,
         start: &Bound<'_, PyAny>,
         end: &Bound<'_, PyAny>,
         ctx: Option<&PyDayCountContext>,
-        frequency: Option<&Bound<'_, PyAny>>,
-        calendar: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<f64> {
         let s = py_to_date(start)?;
         let e = py_to_date(end)?;
-        let context = context_from_args(ctx, frequency, calendar)?;
+        let context = resolve_context(ctx)?;
         self.inner
             .signed_year_fraction(s, e, context)
             .map_err(core_to_py)
-    }
-
-    /// Count the calendar days between two dates (``end - start``, signed).
-    #[staticmethod]
-    #[pyo3(text_signature = "(start, end)")]
-    fn calendar_days(start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<i64> {
-        let s = py_to_date(start)?;
-        let e = py_to_date(end)?;
-        Ok(DayCount::calendar_days(s, e))
     }
 
     /// Support ``pickle`` by reconstructing through ``from_name``.

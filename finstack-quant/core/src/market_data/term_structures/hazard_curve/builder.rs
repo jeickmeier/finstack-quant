@@ -31,7 +31,7 @@ pub struct HazardCurveBuilder {
     pub(super) day_count: DayCount,
     pub(super) par_points: Vec<(f64, f64)>, // (t, spread_bp)
     pub(super) par_interp: ParInterp,
-    /// Maximum allowed hazard rate (default 10.0).
+    /// Maximum allowed hazard rate (default [`DEFAULT_MAX_HAZARD_RATE`]).
     /// Rates above this trigger an error in `build()`.
     pub(super) max_hazard_rate: f64,
     pub(super) hazard_calibration:
@@ -187,7 +187,9 @@ impl HazardCurveBuilder {
     /// Input points are sorted by time before the curve is
     /// constructed; callers need not pre-sort them.
     pub fn build(self) -> crate::Result<HazardCurve> {
-        let base = self.base.ok_or(InputError::Invalid)?;
+        let base = self.base.ok_or_else(|| {
+            crate::Error::Validation("HazardCurve requires base_date".to_string())
+        })?;
         if self.points.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
@@ -238,14 +240,19 @@ impl HazardCurveBuilder {
         if kvec.len() > 1 {
             for i in 1..kvec.len() {
                 if kvec[i] <= kvec[i - 1] {
-                    return Err(InputError::Invalid.into());
+                    return Err(crate::Error::Validation(
+                        "hazard curve knot times must be strictly increasing".to_string(),
+                    ));
                 }
             }
         }
         let mut par_pts = self.par_points;
         for &(t, spread) in &par_pts {
             if !t.is_finite() || t < 0.0 || !spread.is_finite() {
-                return Err(InputError::Invalid.into());
+                return Err(crate::Error::Validation(
+                    "hazard curve par spread pillars must be finite with non-negative tenors"
+                        .to_string(),
+                ));
             }
         }
         par_pts.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -280,6 +287,7 @@ impl HazardCurveBuilder {
             par_spreads_bp: p_spd.into_boxed_slice(),
             par_interp: self.par_interp,
             hazard_calibration: self.hazard_calibration,
+            max_hazard_rate: self.max_hazard_rate,
             interp,
             fx_policy: self.fx_policy,
         })

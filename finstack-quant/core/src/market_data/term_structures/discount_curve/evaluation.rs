@@ -1,6 +1,6 @@
 //! Exact, non-recursive evaluation of rolled and continuously shocked curves.
 
-use super::super::common::{PiecewiseLinearAdjustment, RateShock};
+use super::super::common::{validate_pillars, PiecewiseLinearAdjustment, RateShock};
 use super::DiscountCurve;
 use crate::market_data::bumps::BumpType;
 use crate::math::interp::types::Interp;
@@ -62,7 +62,9 @@ impl CurveTransform {
     fn refresh_normalization(&mut self, interp: &Interp) -> crate::Result<()> {
         self.adjustment.validate()?;
         if !self.offset.is_finite() {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "discount curve roll offset must be finite".to_string(),
+            ));
         }
         self.normalization = interp.interp(self.offset);
         if !self.normalization.is_finite() || self.normalization <= 0.0 {
@@ -87,17 +89,12 @@ impl DiscountCurve {
             })
             .build()?;
         transform.refresh_normalization(&source.interp)?;
-        for (&time, &df) in self.knots.iter().zip(self.dfs.iter()) {
-            let actual = transform.df(&source.interp, time);
-            if !actual.is_finite()
-                || actual <= 0.0
-                || (actual - df).abs() > 1e-12 * actual.abs().max(df.abs()).max(1.0)
-            {
-                return Err(crate::Error::Validation(
-                    "discount-curve transformation disagrees with its pillar samples".into(),
-                ));
-            }
-        }
+        validate_pillars(
+            self.knots.iter().copied().zip(self.dfs.iter().copied()),
+            true,
+            "discount-curve transformation",
+            |time| transform.df(&source.interp, time),
+        )?;
         self.interp = source.interp;
         self.transform = Some(transform);
         Ok(())

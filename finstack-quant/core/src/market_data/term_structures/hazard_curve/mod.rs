@@ -130,11 +130,26 @@ pub struct HazardCurve {
     par_interp: ParInterp,
     /// Exact typed recipe used to replay calibration after quote shocks.
     hazard_calibration: Option<crate::market_data::term_structures::HazardCalibrationRecipe>,
+    /// Largest hazard rate the builder accepts; rebuilds and the wire form keep it.
+    max_hazard_rate: f64,
     /// Interpolator for survival probabilities
     interp: Interp,
     /// Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].
     fx_policy: Option<String>,
 }
+
+/// What a hazard-curve bump shifts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HazardBumpTarget {
+    /// The CDS par spread: the hazard shift is `s / (1 - R)` (credit triangle).
+    ParSpread,
+    /// The hazard intensity itself, in the bump's rate units.
+    HazardRate,
+}
+
+/// Default cap on hazard rates accepted by [`HazardCurveBuilder::max_hazard_rate`]:
+/// a rate above 10 implies more than 99.995% one-year default probability.
+pub const DEFAULT_MAX_HAZARD_RATE: f64 = 10.0;
 
 /// Seniority level for credit exposures.
 ///

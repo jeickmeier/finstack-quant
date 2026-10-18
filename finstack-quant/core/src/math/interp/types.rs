@@ -196,19 +196,6 @@ pub(crate) enum Interp {
     MonotoneConvex(Interpolator<MonotoneConvexStrategy>),
     CubicHermite(Interpolator<CubicHermiteStrategy>),
     PiecewiseQuadraticForward(Interpolator<PiecewiseQuadraticForwardStrategy>),
-    Rolled {
-        source: Box<Interp>,
-        state: InterpRollState,
-    },
-}
-
-/// Serialized source grid and time origin for a rolled interpolation.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub(crate) struct InterpRollState {
-    pub(crate) source_points: Vec<(f64, f64)>,
-    pub(crate) offset: f64,
 }
 
 impl Interp {
@@ -220,132 +207,7 @@ impl Interp {
             Interp::MonotoneConvex(i) => i.interp(x),
             Interp::CubicHermite(i) => i.interp(x),
             Interp::PiecewiseQuadraticForward(i) => i.interp(x),
-            Interp::Rolled { source, state } => source.interp(x + state.offset),
         }
-    }
-
-    /// Return the serialized source function and accumulated time offset.
-    pub(crate) fn roll_state(&self) -> Option<InterpRollState> {
-        match self {
-            Interp::Rolled { state, .. } => Some(state.clone()),
-            _ => None,
-        }
-    }
-
-    /// Build the next roll state without refitting the source interpolation.
-    ///
-    /// Returns `None` when the new origin precedes the source's own origin (a
-    /// net backward roll): the source holds no market shape before its base
-    /// date, so the caller rebuilds the curve from its rolled pillars instead.
-    pub(crate) fn next_roll_state(
-        &self,
-        years: f64,
-        current_points: impl IntoIterator<Item = (f64, f64)>,
-    ) -> crate::Result<Option<InterpRollState>> {
-        let mut state = self.roll_state().unwrap_or_else(|| InterpRollState {
-            source_points: current_points.into_iter().collect(),
-            offset: 0.0,
-        });
-        state.offset += years;
-        if !state.offset.is_finite() {
-            return Err(crate::error::InputError::Invalid.into());
-        }
-        Ok((state.offset >= 0.0).then_some(state))
-    }
-
-    /// Shock a rolled interpolation in level space while keeping its shape.
-    ///
-    /// Every source pillar is mapped with `map(current_time, value)`, where
-    /// `current_time` is the pillar's time on the rolled curve (negative for
-    /// pillars before the origin). When the shocked source would not carry the
-    /// current origin to `map(0, origin_level)`, the origin is added as a
-    /// source pillar first, which leaves linear and log-linear interpolants
-    /// unchanged. The shocked curve's values at `current_times` are read back
-    /// from the shocked source. Returns `None` for an unrolled interpolation.
-    pub(crate) fn bump_rolled(
-        &self,
-        validation: ValidationPolicy,
-        current_times: &[f64],
-        map: impl Fn(f64, f64) -> f64,
-    ) -> crate::Result<Option<(InterpRollState, Vec<f64>)>> {
-        let Interp::Rolled { source, state } = self else {
-            return Ok(None);
-        };
-        let origin = state.offset;
-        let origin_level = map(0.0, source.interp(origin));
-        let shock = |points: &[(f64, f64)]| -> crate::Result<(InterpRollState, Self)> {
-            let state = InterpRollState {
-                source_points: points
-                    .iter()
-                    .map(|&(time, value)| (time, map(time - origin, value)))
-                    .collect(),
-                offset: origin,
-            };
-            let shocked = Self::restore_rolled(
-                self.style(),
-                self.extrapolation(),
-                validation,
-                state.clone(),
-            )?;
-            Ok((state, shocked))
-        };
-        let (mut shocked_state, mut shocked) = shock(&state.source_points)?;
-        let level = shocked.interp(0.0);
-        if (level - origin_level).abs() > 1e-12 * level.abs().max(origin_level.abs()).max(1.0) {
-            let mut points = state.source_points.clone();
-            let at = points.partition_point(|&(time, _)| time < origin);
-            points.insert(at, (origin, source.interp(origin)));
-            (shocked_state, shocked) = shock(&points)?;
-        }
-        let values: Vec<f64> = current_times.iter().map(|&t| shocked.interp(t)).collect();
-        if values.iter().any(|value| !value.is_finite()) {
-            return Err(crate::error::InputError::Invalid.into());
-        }
-        Ok(Some((shocked_state, values)))
-    }
-
-    /// Restore a rolled source interpolation from its source knots.
-    ///
-    /// `validation` is the value policy of the owning curve, applied to every
-    /// source pillar (including pillars before the origin).
-    pub(crate) fn restore_rolled(
-        style: InterpStyle,
-        extrapolation: ExtrapolationPolicy,
-        validation: ValidationPolicy,
-        state: InterpRollState,
-    ) -> crate::Result<Self> {
-        if !state.offset.is_finite() {
-            return Err(crate::error::InputError::Invalid.into());
-        }
-        let (knots, values): (Vec<_>, Vec<_>) = state.source_points.iter().copied().unzip();
-        let source = style.build_enum(
-            knots.into_boxed_slice(),
-            values.into_boxed_slice(),
-            extrapolation,
-            validation,
-        )?;
-        Ok(Self::Rolled {
-            source: Box::new(source),
-            state,
-        })
-    }
-
-    /// Reject serialized rolled state whose current pillars disagree with its
-    /// source interpolation and origin.
-    pub(crate) fn validate_roll_samples(
-        &self,
-        points: impl IntoIterator<Item = (f64, f64)>,
-    ) -> crate::Result<()> {
-        for (time, value) in points {
-            let actual = self.interp(time);
-            let tolerance = 1e-12 * actual.abs().max(value.abs()).max(1.0);
-            if !actual.is_finite() || (actual - value).abs() > tolerance {
-                return Err(crate::Error::Validation(
-                    "rolled interpolation disagrees with its current pillars".into(),
-                ));
-            }
-        }
-        Ok(())
     }
 
     /// Get the interpolation style of this Interp
@@ -356,7 +218,6 @@ impl Interp {
             Interp::MonotoneConvex(_) => InterpStyle::MonotoneConvex,
             Interp::CubicHermite(_) => InterpStyle::CubicHermite,
             Interp::PiecewiseQuadraticForward(_) => InterpStyle::PiecewiseQuadraticForward,
-            Interp::Rolled { source, .. } => source.style(),
         }
     }
 
@@ -368,7 +229,6 @@ impl Interp {
             Interp::MonotoneConvex(i) => i.extrapolation(),
             Interp::CubicHermite(i) => i.extrapolation(),
             Interp::PiecewiseQuadraticForward(i) => i.extrapolation(),
-            Interp::Rolled { source, .. } => source.extrapolation(),
         }
     }
 }

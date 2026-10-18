@@ -7,8 +7,8 @@ use crate::types::CurveId;
 use crate::Result;
 
 use super::super::term_structures::{
-    BaseCorrelationCurve, BasisSpreadCurve, DiscountCurve, ForwardCurve, HazardCurve,
-    InflationCurve, ParametricCurve, PriceCurve,
+    BaseCorrelationCurve, BasisSpreadCurve, DiscountCurve, ForwardCurve, HazardBumpTarget,
+    HazardCurve, InflationCurve, ParametricCurve, PriceCurve,
 };
 use crate::market_data::bumps::BumpSpec;
 
@@ -217,7 +217,7 @@ impl CurveStorage {
                 Ok(())
             }
             Self::Hazard(arc) => {
-                Arc::make_mut(arc).bump_in_place(&spec)?;
+                Arc::make_mut(arc).bump_in_place(&spec, HazardBumpTarget::ParSpread)?;
                 Ok(())
             }
             Self::Inflation(original) => {

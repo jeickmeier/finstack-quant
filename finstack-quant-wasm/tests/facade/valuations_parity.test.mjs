@@ -99,7 +99,7 @@ function sameAsSpec(value, expected, label) {
     const designator = { days: 'D', weeks: 'W', months: 'M', years: 'Y' }[expected.unit];
     assert.equal(`${value.count}${value.unit}`, `${expected.count}${designator}`, label);
   } else if (value instanceof core.DayCount) {
-    assert.equal(value.toString(), core.DayCount.parse(expected).toString(), label);
+    assert.equal(value.toString(), core.DayCount.fromName(expected).toString(), label);
   } else if (value instanceof core.Currency) {
     assert.equal(value.code, expected, label);
   } else if (typeof value === 'number' && typeof expected === 'string') {

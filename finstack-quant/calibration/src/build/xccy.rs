@@ -4,13 +4,14 @@ use crate::build::BuildCtx;
 use crate::quotes::ids::Pillar;
 use crate::quotes::xccy::XccyQuote;
 use finstack_quant_core::dates::BusinessDayConvention;
+use finstack_quant_core::dates::{adjust, resolve_joint_calendar};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
+use finstack_quant_valuations::instruments::fx_spot_date_for_pair;
 use finstack_quant_valuations::instruments::rates::xccy_swap::{XccySwap, XccySwapLeg};
 use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::{adjust_joint_calendar, fx_spot_date_for_pair};
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use rust_decimal::Decimal;
 
@@ -173,22 +174,13 @@ fn resolve_far_date(
     base_calendar_id: &str,
     quote_calendar_id: &str,
 ) -> Result<finstack_quant_core::dates::Date> {
+    let calendar = resolve_joint_calendar(Some(base_calendar_id), Some(quote_calendar_id))?;
     match pillar {
         Pillar::Tenor(tenor) => {
             let raw = tenor.add_to_date(spot, None, BusinessDayConvention::Unadjusted)?;
-            adjust_joint_calendar(
-                raw,
-                business_day_convention,
-                Some(base_calendar_id),
-                Some(quote_calendar_id),
-            )
+            adjust(raw, business_day_convention, calendar)
         }
-        Pillar::Date(date) => adjust_joint_calendar(
-            *date,
-            business_day_convention,
-            Some(base_calendar_id),
-            Some(quote_calendar_id),
-        ),
+        Pillar::Date(date) => adjust(*date, business_day_convention, calendar),
     }
 }
 

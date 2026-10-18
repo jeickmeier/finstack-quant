@@ -103,12 +103,13 @@ impl VolSurfaceTarget {
         // Need spot and dividend yield
         let spot = resolve_equity_spot(params.spot_override, &params.underlying_ticker, context)?;
 
-        let disc_id = params
-            .discount_curve_id
-            .clone()
-            .ok_or(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid, // Should specify discount curve
-            ))?;
+        let disc_id =
+            params
+                .discount_curve_id
+                .clone()
+                .ok_or(finstack_quant_core::Error::Validation(
+                    "vol calibration requires discount_curve_id".to_string(),
+                ))?;
         let discount = context.get_discount(&disc_id)?;
 
         let forward_inputs = resolve_equity_forward_inputs(

@@ -283,7 +283,9 @@ pub(crate) fn pv_total_return_leg(
     };
 
     if !initial.is_finite() || initial <= 0.0 {
-        return Err(finstack_quant_core::InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "initial equity price must be finite and positive".to_string(),
+        ));
     }
 
     let params = TotalReturnLegParams {

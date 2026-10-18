@@ -605,7 +605,7 @@ impl SabrParameters {
     ///   `f·k ≤ 0` (after any configured shift) with `beta > 0`: the CEV
     ///   backbone is not shift-invariant, so cross-zero quotes require an
     ///   explicit shift via [`new_with_shift`](Self::new_with_shift).
-    /// - Returns [`InputError::Invalid`](finstack_quant_core::error::InputError::Invalid)
+    /// - Returns [`Error::Validation`](finstack_quant_core::Error::Validation)
     ///   when the underlying expansion yields a non-finite volatility.
     ///
     /// # Arguments
@@ -631,7 +631,9 @@ impl SabrParameters {
         if v.is_finite() && v >= 0.0 {
             Ok(v)
         } else {
-            Err(finstack_quant_core::error::InputError::Invalid.into())
+            Err(finstack_quant_core::Error::Validation(
+                "normal SABR expansion produced a non-finite or negative volatility".to_string(),
+            ))
         }
     }
 

@@ -144,7 +144,9 @@ impl CollateralPiece {
             return Err(InputError::NegativeValue.into());
         }
         if !(0.0..=1.0).contains(&haircut) {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "collateral haircut must lie in [0, 1]".to_string(),
+            ));
         }
         Ok(Self {
             collateral_type,

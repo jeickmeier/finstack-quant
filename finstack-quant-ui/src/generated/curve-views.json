@@ -65,6 +65,7 @@
       "id",
       "issuer",
       "knot_points",
+      "max_hazard_rate",
       "par_interp",
       "par_points",
       "recovery_rate",
@@ -75,7 +76,7 @@
       "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
       "pointer": "#/$defs/CurveState/oneOf/2",
       "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "d0092d7d91ceae95df8aa6a72596bbd1f3ec85317cc3c6b9e46195dc34fd76a6",
+      "sha256": "6cf78eb41509139acb9fe1ab3f05225c615aad09de9610495e7ee3fad0b4dfea",
       "description": "Hazard curve state"
     }
   },

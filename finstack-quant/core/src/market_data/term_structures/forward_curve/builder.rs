@@ -156,9 +156,13 @@ impl ForwardCurveBuilder {
     /// the requested interpolation style cannot be built from the knots and
     /// forward values.
     pub fn build(self) -> crate::Result<ForwardCurve> {
-        let base = self.base.ok_or(InputError::Invalid)?;
+        let base = self.base.ok_or_else(|| {
+            crate::Error::Validation("ForwardCurve requires base_date".to_string())
+        })?;
         if !self.tenor.is_finite() || self.tenor <= 0.0 {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "forward curve tenor must be finite and positive".to_string(),
+            ));
         }
         if self.reset_lag < 0 {
             return Err(crate::Error::Validation(format!(

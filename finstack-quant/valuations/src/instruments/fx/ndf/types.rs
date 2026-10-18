@@ -654,9 +654,9 @@ impl Ndf {
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
         use crate::instruments::common_impl::fx_dates::{
-            add_fx_standard_tenor, adjust_joint_calendar, fx_spot_date_for_pair,
-            ResolvedCalendarPair,
+            add_fx_standard_tenor, fx_spot_date_for_pair,
         };
+        use finstack_quant_core::dates::{adjust, resolve_joint_calendar, DateExt};
 
         // CLS-consistent spot roll: a US holiday on an intermediate day does not
         // delay a USD pair's spot date (FX spot convention
@@ -680,7 +680,7 @@ impl Ndf {
         )?;
 
         // Fixing date is typically T-2 before maturity using joint-business-day stepping.
-        let joint_cal = ResolvedCalendarPair::resolve(
+        let joint_cal = resolve_joint_calendar(
             base_calendar_id.as_deref(),
             settlement_calendar_id.as_deref(),
         )?;
@@ -689,24 +689,23 @@ impl Ndf {
             let mut remaining = fixing_offset_days as u32;
             while remaining > 0 {
                 fixing_unadjusted -= time::Duration::days(1);
-                if joint_cal.is_joint_business_day(fixing_unadjusted) {
+                if joint_cal.is_business_day(fixing_unadjusted) {
                     remaining -= 1;
                 }
             }
         } else {
-            let n_days = u32::try_from(fixing_offset_days.unsigned_abs()).map_err(|_| {
+            let n_days = i32::try_from(fixing_offset_days.unsigned_abs()).map_err(|_| {
                 finstack_quant_core::Error::Validation(format!(
                     "NDF fixing_offset_days magnitude too large: {}",
                     fixing_offset_days
                 ))
             })?;
-            fixing_unadjusted = joint_cal.add_joint_business_days(fixing_unadjusted, n_days)?;
+            fixing_unadjusted = fixing_unadjusted.add_business_days(n_days, joint_cal)?;
         }
-        let fixing_date = adjust_joint_calendar(
+        let fixing_date = adjust(
             fixing_unadjusted,
             finstack_quant_core::dates::BusinessDayConvention::Preceding,
-            base_calendar_id.as_deref(),
-            settlement_calendar_id.as_deref(),
+            joint_cal,
         )?;
 
         Self::builder()

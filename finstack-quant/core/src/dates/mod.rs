@@ -65,11 +65,9 @@ pub use daycount::{
 };
 
 pub use calendar::business_days::{
-    add_joint_business_days, adjust, adjust_joint_calendar, available_calendars,
-    calendar_by_id_strict, canonical_calendar_id, resolve_calendar, BusinessDayConvention,
-    CalendarMetadata, HolidayCalendar, ResolvedCalendarPair,
+    adjust, available_calendars, calendar_by_id_strict, canonical_calendar_id, resolve_calendar,
+    resolve_joint_calendar, BusinessDayConvention, CalendarMetadata, HolidayCalendar,
 };
-pub use calendar::calendars_generated::registry::calendar_by_id;
 pub use calendar::WEEKENDS_ONLY;
 
 mod schedule;

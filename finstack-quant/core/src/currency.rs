@@ -321,8 +321,8 @@ mod tests {
     #[test]
     fn test_currency_error_display() {
         use crate::error::{Error, InputError};
-        let error: Error = InputError::Invalid.into();
-        assert_eq!(format!("{}", error), "Invalid input data");
+        let error: Error = InputError::NegativeValue.into();
+        assert_eq!(format!("{}", error), "Values must be non-negative");
     }
 
     #[test]

@@ -163,7 +163,9 @@ impl VolCube {
             return Err(InputError::DimensionMismatch.into());
         }
         if forwards.iter().any(|f| !f.is_finite()) {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "vol cube forwards must be finite".to_string(),
+            ));
         }
         Ok(Self {
             id: CurveId::new(id.as_ref()),
@@ -244,6 +246,23 @@ impl VolCube {
     /// Return the row-major forward nodes.
     pub fn forwards(&self) -> &[f64] {
         &self.forwards
+    }
+
+    /// Every node as `(expiry, tenor, parameters, forward)` in row-major order.
+    pub fn nodes(&self) -> impl Iterator<Item = (f64, f64, &SabrParameterData, f64)> + '_ {
+        let n_tenors = self.tenors.len();
+        self.params
+            .iter()
+            .zip(self.forwards.iter())
+            .enumerate()
+            .map(move |(index, (params, &forward))| {
+                (
+                    self.expiries[index / n_tenors],
+                    self.tenors[index % n_tenors],
+                    params,
+                    forward,
+                )
+            })
     }
 
     /// Interpolation contract used between expiry pillars.

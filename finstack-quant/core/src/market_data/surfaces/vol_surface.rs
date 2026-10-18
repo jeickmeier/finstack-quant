@@ -271,6 +271,18 @@ impl VolSurface {
         &self.vols
     }
 
+    /// Every grid node as `(expiry, strike, vol)` in expiry-major row order.
+    pub fn grid_points(&self) -> impl Iterator<Item = (f64, f64, f64)> + '_ {
+        let n_strikes = self.strikes.len();
+        self.vols.iter().enumerate().map(move |(index, &vol)| {
+            (
+                self.expiries[index / n_strikes],
+                self.strikes[index % n_strikes],
+                vol,
+            )
+        })
+    }
+
     /// Semantic meaning of the secondary axis.
     pub fn secondary_axis(&self) -> VolSurfaceAxis {
         self.secondary_axis
@@ -430,7 +442,9 @@ impl VolSurface {
         let original = self.vols[idx];
         let bumped = original + bump_abs;
         if !bumped.is_finite() {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "bumped volatility is not finite".to_string(),
+            ));
         }
         self.vols[idx] = bumped.max(0.0);
         Ok(original)
@@ -448,7 +462,7 @@ impl VolSurface {
             || !original_vol.is_finite()
             || original_vol < 0.0
         {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation("expiry, strike and original volatility must be finite and the volatility non-negative".to_string()));
         }
         let idx = self.nearest_grid_index(expiry, strike)?;
         self.vols[idx] = original_vol;
@@ -490,7 +504,9 @@ impl VolSurface {
     /// Rejects a negative/non-finite multiplier or non-finite scaled values.
     pub fn scaled(&self, scale: f64) -> crate::Result<Self> {
         if !scale.is_finite() || scale < 0.0 {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "volatility scale must be finite and non-negative".to_string(),
+            ));
         }
         // Fast path: return an identical copy when scale == 1.0
         if scale.total_cmp(&1.0).is_eq() {
@@ -500,7 +516,9 @@ impl VolSurface {
         // Scale all vols
         let scaled_vols = self.vols.iter().map(|&v| v * scale).collect::<Box<[f64]>>();
         if scaled_vols.iter().any(|v| !v.is_finite()) {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "scaled volatilities must be finite".to_string(),
+            ));
         }
 
         let mut scaled = self.clone();
@@ -535,7 +553,9 @@ impl Bumpable for VolSurface {
         }
         let bumped_vols: Box<[f64]> = self.vols.iter().map(|&v| (v + raw_val).max(0.0)).collect();
         if bumped_vols.iter().any(|v| !v.is_finite()) {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "bumped volatilities must be finite".to_string(),
+            ));
         }
 
         let mut bumped = self.clone();
@@ -576,7 +596,7 @@ impl VolSurface {
     ///
     /// # Errors
     ///
-    /// Returns [`InputError::Invalid`] when `pct` or any filter entry is non-finite or when a
+    /// Returns [`Error::Validation`](crate::Error::Validation) when `pct` or any filter entry is non-finite or when a
     /// scaled volatility overflows.
     pub fn apply_bucket_bump(
         &self,
@@ -588,7 +608,9 @@ impl VolSurface {
             || expiries_filter.is_some_and(|values| values.iter().any(|v| !v.is_finite()))
             || strikes_filter.is_some_and(|values| values.iter().any(|v| !v.is_finite()))
         {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "bucket bump percentage and filters must be finite".to_string(),
+            ));
         }
         let factor = 1.0 + pct / 100.0;
         let (n_expiries, n_strikes) = self.grid_shape();
@@ -605,7 +627,9 @@ impl VolSurface {
                     let index = ei * n_strikes + si;
                     bumped.vols[index] = (self.vols[index] * factor).max(0.0);
                     if !bumped.vols[index].is_finite() {
-                        return Err(InputError::Invalid.into());
+                        return Err(crate::Error::Validation(
+                            "bucket-bumped volatility is not finite".to_string(),
+                        ));
                     }
                 }
             }
@@ -885,7 +909,9 @@ pub(super) fn validate_grid(
     }
     for &v in vols_row_major {
         if !v.is_finite() {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "surface volatilities must be finite".to_string(),
+            ));
         }
         if v < 0.0 {
             return Err(InputError::NegativeValue.into());

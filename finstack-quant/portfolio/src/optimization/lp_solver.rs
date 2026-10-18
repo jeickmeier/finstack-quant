@@ -672,7 +672,7 @@ fn reconstruct_result(
 
     let status = OptimizationStatus::Optimal;
 
-    let meta = finstack_quant_core::config::results_meta_now(config);
+    let meta = finstack_quant_core::config::results_meta(config);
 
     PortfolioOptimizationResult {
         problem: problem.clone(),
@@ -776,7 +776,7 @@ pub fn optimize(
     )? {
         Ok(model) => model,
         Err(status) => {
-            let meta = finstack_quant_core::config::results_meta_now(config);
+            let meta = finstack_quant_core::config::results_meta(config);
             return Ok(PortfolioOptimizationResult {
                 problem: problem.clone(),
                 current_weights,

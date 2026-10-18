@@ -10,7 +10,7 @@ use crate::{HashMap, HashSet};
 use std::vec::Vec;
 
 /// A node in the execution DAG.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct DagNode {
     /// Unique identifier for this node.
     pub id: u64,
@@ -22,13 +22,13 @@ pub(crate) struct DagNode {
 
 const MAX_DAG_RECURSION_DEPTH: usize = 512;
 
-/// Execution plan for a DAG of expressions.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+/// Execution plan for one expression.
+#[derive(Debug, Clone)]
 pub(crate) struct ExecutionPlan {
     /// All nodes in topological order.
     pub nodes: Vec<DagNode>,
-    /// Root node IDs (final outputs).
-    pub roots: Vec<u64>,
+    /// Root node id (the final output).
+    pub root: u64,
     /// Execution metadata.
     pub meta: crate::config::ResultsMeta,
 }
@@ -45,29 +45,20 @@ pub(crate) struct DagBuilder {
 }
 
 impl DagBuilder {
-    /// Build an execution plan from a list of root expressions.
+    /// Build an execution plan for one root expression.
     pub(crate) fn build_plan(
         &mut self,
-        exprs: Vec<Expr>,
+        expr: Expr,
         meta: crate::config::ResultsMeta,
     ) -> crate::Result<ExecutionPlan> {
         self.expr_cache.clear();
         self.nodes.clear();
         self.next_id = 0;
 
-        let mut root_ids = Vec::new();
-        for expr in exprs {
-            let id = self.process_expression(expr, 0)?;
-            root_ids.push(id);
-        }
+        let root = self.process_expression(expr, 0)?;
+        let nodes = self.topological_sort(root)?;
 
-        let ordered_nodes = self.topological_sort(&root_ids)?;
-
-        Ok(ExecutionPlan {
-            nodes: ordered_nodes,
-            roots: root_ids,
-            meta,
-        })
+        Ok(ExecutionPlan { nodes, root, meta })
     }
 
     /// Process an expression tree, deduplicating shared sub-expressions.
@@ -134,7 +125,7 @@ impl DagBuilder {
     }
 
     /// Build topological ordering of nodes.
-    fn topological_sort(&self, root_ids: &[u64]) -> crate::Result<Vec<DagNode>> {
+    fn topological_sort(&self, root: u64) -> crate::Result<Vec<DagNode>> {
         let mut visited = HashSet::default();
         let mut result = Vec::new();
         let mut visiting = HashSet::default();
@@ -179,16 +170,14 @@ impl DagBuilder {
             Ok(())
         }
 
-        for &root_id in root_ids {
-            visit(
-                root_id,
-                &self.nodes,
-                &mut visited,
-                &mut visiting,
-                &mut result,
-                0,
-            )?;
-        }
+        visit(
+            root,
+            &self.nodes,
+            &mut visited,
+            &mut visiting,
+            &mut result,
+            0,
+        )?;
 
         Ok(result)
     }
@@ -217,21 +206,14 @@ mod tests {
     #[test]
     fn dag_builder_deduplicates_structurally_identical_nodes() {
         let mut builder = DagBuilder::default();
-        let a = Expr::call(
-            Function::RollingMean,
-            vec![Expr::column("x"), Expr::literal(3.0)],
-        );
-        let b = Expr::call(
-            Function::RollingMean,
-            vec![Expr::column("x"), Expr::literal(3.0)],
-        );
+        let a = Expr::call(Function::Pow, vec![Expr::column("x"), Expr::literal(3.0)]);
+        let b = Expr::call(Function::Pow, vec![Expr::column("x"), Expr::literal(3.0)]);
 
         let plan = builder
-            .build_plan(vec![a, b], meta())
+            .build_plan(Expr::bin_op(BinOp::Add, a, b), meta())
             .expect("valid expressions should build a DAG plan");
-        assert_eq!(plan.nodes.len(), 3, "column, literal, rolling mean");
-        assert_eq!(plan.roots.len(), 2);
-        assert_eq!(plan.roots[0], plan.roots[1]);
+        assert_eq!(plan.nodes.len(), 4, "column, literal, pow, add");
+        assert_eq!(plan.nodes.last().map(|node| node.id), Some(plan.root));
     }
 
     #[test]
@@ -239,13 +221,13 @@ mod tests {
         let mut builder = DagBuilder::default();
         let col = Expr::column("x");
         let lit = Expr::literal(2.0);
-        let sum = Expr::call(Function::RollingSum, vec![col.clone(), lit.clone()]);
-        let mean = Expr::call(Function::RollingMean, vec![col, lit]);
+        let pow = Expr::call(Function::Pow, vec![col.clone(), lit.clone()]);
+        let round = Expr::call(Function::Round, vec![col, lit]);
 
         let plan = builder
-            .build_plan(vec![sum, mean], meta())
+            .build_plan(Expr::bin_op(BinOp::Mul, pow, round), meta())
             .expect("valid expressions should build a DAG plan");
-        assert_eq!(plan.nodes.len(), 4);
+        assert_eq!(plan.nodes.len(), 5);
 
         // Ensure dependencies come before dependents in node order.
         for node in &plan.nodes {
@@ -283,7 +265,7 @@ mod tests {
         }
 
         let err = builder
-            .topological_sort(&[prev])
+            .topological_sort(prev)
             .expect_err("deep recursion should fail with a guard");
         assert!(
             err.to_string().contains("maximum DAG recursion depth"),
@@ -303,7 +285,7 @@ mod tests {
 
         let mut builder = DagBuilder::default();
         let err = builder
-            .build_plan(vec![expr], meta())
+            .build_plan(expr, meta())
             .expect_err("deeply nested AST should fail with a depth guard");
         assert!(
             err.to_string().contains("maximum DAG recursion depth"),
@@ -320,7 +302,7 @@ mod tests {
 
         let mut builder = DagBuilder::default();
         let plan = builder
-            .build_plan(vec![expr], meta())
+            .build_plan(expr, meta())
             .expect("AST below the depth limit should build a plan");
         assert_eq!(plan.nodes.len(), MAX_DAG_RECURSION_DEPTH - 1);
     }
@@ -329,41 +311,30 @@ mod tests {
     fn dag_builder_keeps_dependency_chain_in_topological_order() {
         let mut builder = DagBuilder::default();
         let col_x = Expr::column("x");
-        let lag_x = Expr::call(Function::Lag, vec![col_x, Expr::literal(1.0)]);
-        let diff_lag = Expr::call(Function::Diff, vec![lag_x, Expr::literal(1.0)]);
+        let abs_x = Expr::call(Function::Abs, vec![col_x]);
+        let sqrt_abs = Expr::call(Function::Sqrt, vec![abs_x]);
 
         let plan = builder
-            .build_plan(vec![diff_lag], explicit_meta())
+            .build_plan(sqrt_abs, explicit_meta())
             .expect("valid expressions should build a DAG plan");
 
         let mut found_column = false;
-        let mut found_lag = false;
+        let mut found_abs = false;
         for node in &plan.nodes {
             match &node.expr.node {
                 ExprNode::Column(_) => {
-                    assert!(!found_column && !found_lag);
+                    assert!(!found_column && !found_abs);
                     found_column = true;
                 }
-                ExprNode::Call(Function::Lag, _) => {
-                    assert!(found_column && !found_lag);
-                    found_lag = true;
+                ExprNode::Call(Function::Abs, _) => {
+                    assert!(found_column && !found_abs);
+                    found_abs = true;
                 }
-                ExprNode::Call(Function::Diff, _) => {
-                    assert!(found_column && found_lag);
+                ExprNode::Call(Function::Sqrt, _) => {
+                    assert!(found_column && found_abs);
                 }
                 _ => {}
             }
         }
-    }
-
-    #[test]
-    fn dag_builder_allows_empty_plans() {
-        let mut builder = DagBuilder::default();
-        let plan = builder
-            .build_plan(vec![], explicit_meta())
-            .expect("empty root list should still produce a valid plan");
-
-        assert!(plan.nodes.is_empty());
-        assert!(plan.roots.is_empty());
     }
 }

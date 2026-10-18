@@ -298,15 +298,22 @@ impl DiscountCurve {
     #[must_use = "computed forward rate should not be discarded"]
     pub fn forward(&self, t1: f64, t2: f64) -> crate::Result<f64> {
         if !t1.is_finite() || !t2.is_finite() || t2 <= t1 {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(crate::Error::Validation(format!(
+                "forward interval must be finite with t2 > t1, got [{t1}, {t2}]"
+            )));
         }
         if (t2 - t1) < self.min_forward_tenor {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(crate::Error::Validation(format!(
+                "forward interval [{t1}, {t2}] is shorter than min_forward_tenor {}",
+                self.min_forward_tenor
+            )));
         }
         let df1 = self.df(t1);
         let df2 = self.df(t2);
         if !(df1.is_finite() && df1 > 0.0 && df2.is_finite() && df2 > 0.0) {
-            return Err(crate::error::InputError::Invalid.into());
+            return Err(crate::Error::Validation(format!(
+                "discount factors over [{t1}, {t2}] must be finite and positive"
+            )));
         }
         Ok(-(df2 / df1).ln() / (t2 - t1))
     }

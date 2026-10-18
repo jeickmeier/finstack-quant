@@ -469,7 +469,7 @@ mod tests {
                 Error::Validation("curve 'not found quotes' rejected".to_string()),
                 "validation",
             ),
-            (Error::Input(InputError::Invalid), "validation"),
+            (Error::Input(InputError::NegativeValue), "validation"),
             (
                 Error::Input(InputError::VolatilityConversionFailed {
                     tolerance: 1e-8,

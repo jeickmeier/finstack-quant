@@ -372,7 +372,9 @@ fn collect_cashflows_from_flows(
             {
                 continue;
             }
-            let payment = curves.convert_money(cf.amount, base_currency, cf.date)?;
+            let payment = curves
+                .convert_money(cf.amount, base_currency, cf.date)?
+                .amount;
             cash.total = cash.total.checked_add(payment)?;
             if is_period_income(cf.kind) {
                 cash.income = cash.income.checked_add(payment)?;

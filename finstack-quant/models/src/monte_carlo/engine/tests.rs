@@ -69,9 +69,9 @@ impl TestEngineBuilder {
     }
 
     fn build(self) -> finstack_quant_core::Result<McEngine> {
-        let time_grid = self
-            .time_grid?
-            .ok_or(finstack_quant_core::InputError::Invalid)?;
+        let time_grid = self.time_grid?.ok_or_else(|| {
+            finstack_quant_core::Error::Validation("time grid is required".to_string())
+        })?;
         let mut config = McEngineConfig::new(self.num_paths, time_grid)
             .parallel(self.parallel)
             .antithetic(self.antithetic)

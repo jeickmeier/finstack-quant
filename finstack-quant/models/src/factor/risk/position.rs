@@ -463,7 +463,7 @@ pub fn build_stress_attribution(
 
 const VARIANCE_TOLERANCE: f64 = 1e-12;
 
-use super::math::{normal_pdf, normal_quantile};
+use finstack_quant_core::math::{norm_pdf, standard_normal_inv_cdf};
 
 // Validation helpers
 
@@ -553,7 +553,7 @@ fn compute_incremental_var(
     confidence: f64,
     n: usize,
 ) -> Vec<f64> {
-    let z_alpha = normal_quantile(confidence);
+    let z_alpha = standard_normal_inv_cdf(confidence);
 
     (0..n)
         .map(|k| {
@@ -639,8 +639,8 @@ pub fn parametric_var_decomposition(
         });
     }
 
-    let z_alpha = normal_quantile(confidence);
-    let phi_z = normal_pdf(z_alpha);
+    let z_alpha = standard_normal_inv_cdf(confidence);
+    let phi_z = norm_pdf(z_alpha);
     let es_multiplier = phi_z / (1.0 - confidence);
 
     // Sigma * w (matrix-vector product).
@@ -1755,7 +1755,7 @@ mod tests {
         // Diversification: the portfolio loses less than the sum of
         // standalone losses, so the signed portfolio VaR sits above the
         // (negative) sum of standalone VaRs.
-        let z = normal_quantile(0.95);
+        let z = standard_normal_inv_cdf(0.95);
         let standalone_var_a = -(0.5 * 0.2 * z);
         let standalone_var_b = -(0.5 * 0.2 * z);
         let sum_standalone = standalone_var_a + standalone_var_b;

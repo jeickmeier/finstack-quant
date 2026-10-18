@@ -381,7 +381,7 @@ impl JsFxDeltaVolSurface {
 ///
 /// @example
 /// ```typescript
-/// import init, { core } from "finstack-quant-wasm";
+/// import init, { core, models } from "finstack-quant-wasm";
 /// await init();
 /// const surface = new core.VolSurface(
 ///   "SPX-VOL",
@@ -389,7 +389,7 @@ impl JsFxDeltaVolSurface {
 ///   [90, 100, 110],
 ///   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
 /// );
-/// surface.vol(0.75, 100); // 0.205
+/// models.volatility.getSurfaceVol(surface.toJson(), 0.75, 100); // 0.205
 /// surface.gridShape; // [2, 3]
 /// ```
 #[wasm_bindgen(js_name = VolSurface)]
@@ -401,6 +401,16 @@ impl JsVolSurface {
     pub(crate) fn from_inner(inner: Arc<RustVolSurface>) -> Self {
         Self { inner }
     }
+}
+
+/// Optional keys of the `VolSurface` constructor's options bag.
+#[derive(Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct VolSurfaceOptions {
+    secondary_axis: Option<String>,
+    interpolation_mode: Option<String>,
+    quote_type: Option<String>,
+    displacements: Option<Vec<f64>>,
 }
 
 #[wasm_bindgen(js_class = VolSurface)]
@@ -417,15 +427,13 @@ impl JsVolSurface {
     /// * `vols` - Decimal volatilities, either as a flat row-major grid of
     ///   `expiries.length * strikes.length` entries or as `expiries.length`
     ///   rows of `strikes.length` values. Entries must be finite and non-negative.
-    /// * `secondary_axis` - What `strikes` holds: `"strike"` or `"tenor"`;
-    ///   omitted uses the Rust default (`"strike"`).
-    /// * `interpolation_mode` - `"vol"` or `"total_variance"`; omitted uses the
-    ///   Rust default (`"vol"`).
-    /// * `quote_type` - `"black_lognormal"`, `"shifted_black_lognormal"` or
-    ///   `"normal"`; omitted uses the Rust default (`"black_lognormal"`).
-    /// * `displacements` - Shifted-Black displacements in strike/rate units,
-    ///   one per expiry; required for `"shifted_black_lognormal"` quotes and
-    ///   omitted for the other conventions.
+    /// * `options` - Optional `{ secondaryAxis, interpolationMode, quoteType,
+    ///   displacements }`: `secondaryAxis` is `"strike"` or `"tenor"`,
+    ///   `interpolationMode` is `"vol"` or `"total_variance"`, `quoteType` is
+    ///   `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`, and
+    ///   `displacements` holds one shifted-Black displacement per expiry
+    ///   (required for `"shifted_black_lognormal"` quotes). Every omitted key
+    ///   takes the Rust default.
     ///
     /// @returns The validated `VolSurface`.
     /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
@@ -434,31 +442,34 @@ impl JsVolSurface {
     /// unknown axis, mode or quote-type name, or displacements that do not
     /// match the quote convention and the expiry count.
     #[wasm_bindgen(constructor)]
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: JsValue,
         expiries: JsValue,
         strikes: JsValue,
         vols: JsValue,
-        secondary_axis: Option<JsValue>,
-        interpolation_mode: Option<JsValue>,
-        quote_type: Option<JsValue>,
-        displacements: Option<JsValue>,
+        options: Option<JsValue>,
     ) -> Result<JsVolSurface, JsValue> {
         let id = js_string(&id, "id")?;
         let expiries = js_f64_seq(&expiries, "expiries")?;
         let strikes = js_f64_seq(&strikes, "strikes")?;
+        let options = match options
+            .as_ref()
+            .filter(|value| !value.is_undefined() && !value.is_null())
+        {
+            Some(value) => from_js_json::<VolSurfaceOptions>(value, "options")?,
+            None => VolSurfaceOptions::default(),
+        };
         let mut opts = VolGridOpts::default();
-        if let Some(axis) = js_opt_string(secondary_axis.as_ref(), "secondaryAxis")? {
-            opts.secondary_axis = serde_parse(&axis).map_err(to_js_err)?;
+        if let Some(axis) = options.secondary_axis.as_deref() {
+            opts.secondary_axis = serde_parse(axis).map_err(to_js_err)?;
         }
-        if let Some(mode) = js_opt_string(interpolation_mode.as_ref(), "interpolationMode")? {
-            opts.interpolation_mode = serde_parse(&mode).map_err(to_js_err)?;
+        if let Some(mode) = options.interpolation_mode.as_deref() {
+            opts.interpolation_mode = serde_parse(mode).map_err(to_js_err)?;
         }
-        if let Some(quote) = js_opt_string(quote_type.as_ref(), "quoteType")? {
+        if let Some(quote) = options.quote_type.as_deref() {
             opts.quote_type = quote.parse().map_err(to_js_err)?;
         }
-        let displacements = js_opt_f64_seq(displacements.as_ref(), "displacements")?;
+        let displacements = options.displacements;
         let is_rows = vols.dyn_ref::<js_sys::Array>().is_some_and(|arr| {
             arr.length() > 0 && {
                 let first = arr.get(0);
@@ -522,28 +533,6 @@ impl JsVolSurface {
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
         serde_json::to_string(&*self.inner).map_err(to_js_err)
-    }
-
-    /// Implied volatility at an expiry and strike inside the grid (Rust
-    /// `models::volatility::get_surface_vol`).
-    ///
-    /// # Arguments
-    ///
-    /// * `expiry` - Option expiry in years, within the expiry axis.
-    /// * `strike` - Secondary-axis coordinate, within the strike (or tenor) axis.
-    ///
-    /// @returns The interpolated volatility as a decimal.
-    /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-    /// `validation`) for a non-finite or out-of-grid coordinate, or when
-    /// total-variance interpolation is invalid.
-    #[wasm_bindgen(js_name = vol)]
-    pub fn vol(&self, expiry: JsValue, strike: JsValue) -> Result<f64, JsValue> {
-        finstack_quant_models::volatility::get_surface_vol(
-            &self.inner,
-            js_f64(&expiry, "expiry")?,
-            js_f64(&strike, "strike")?,
-        )
-        .map_err(to_js_err)
     }
 
     /// Surface identifier (the `MarketContext` lookup key).

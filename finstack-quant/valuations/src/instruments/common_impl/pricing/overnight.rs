@@ -6,7 +6,7 @@
 use crate::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    adjust, calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, DayCountContext,
+    adjust, calendar_by_id_strict, BusinessDayConvention, Date, DateExt, DayCount, DayCountContext,
     HolidayCalendar, Tenor,
 };
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -171,11 +171,7 @@ pub(crate) fn resolve_overnight_fixing_calendar(
             "{instrument_label} requires an explicit overnight fixing calendar for {currency}"
         ))
     })?;
-    calendar_by_id(id).ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "Overnight fixing calendar '{id}' is not registered for {instrument_label}"
-        ))
-    })
+    calendar_by_id_strict(id)
 }
 
 /// Adjust an overnight coupon's contractual accrual boundaries before daily compounding.
@@ -819,7 +815,8 @@ mod tests {
     fn overnight_projection_preserves_index_rates_across_curve_clocks() {
         let start = date!(2025 - 01 - 02);
         let end = date!(2025 - 04 - 02);
-        let calendar = finstack_quant_core::dates::calendar_by_id("usny").expect("USD calendar");
+        let calendar =
+            finstack_quant_core::dates::calendar_by_id_strict("usny").expect("USD calendar");
         let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
         let mut factors = Vec::new();
         for (curve_day_count, curve_rate) in [

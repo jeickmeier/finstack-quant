@@ -65,7 +65,9 @@ pub fn act_act_isma_year_fraction_with_reference_period(
     let reference_days = (reference_end - reference_start).whole_days() as f64;
     let period_months = (12.0 * reference_days / 365.0).round() as u32;
     if period_months == 0 {
-        return Err(InputError::Invalid.into());
+        return Err(crate::Error::Validation(
+            "ACT/ACT ISMA reference period must span at least one month".to_string(),
+        ));
     }
     let coupon_length_years = period_months as f64 / 12.0;
     let preserve_eom = reference_start == reference_start.end_of_month()
@@ -78,7 +80,11 @@ pub fn act_act_isma_year_fraction_with_reference_period(
     } else {
         (reference_end, 1)
     };
-    let period_months = i32::try_from(period_months).map_err(|_| InputError::Invalid)?;
+    let period_months = i32::try_from(period_months).map_err(|_| {
+        crate::Error::Validation(
+            "ACT/ACT ISMA reference period length in months overflows i32".to_string(),
+        )
+    })?;
     let boundary = |index: i32| -> crate::Result<Date> {
         if index.unsigned_abs() as usize >= MAX_ACT_ACT_ISMA_PERIODS {
             return Err(crate::Error::Validation(
@@ -87,7 +93,11 @@ pub fn act_act_isma_year_fraction_with_reference_period(
         }
         let months = (index - anchor_index)
             .checked_mul(period_months)
-            .ok_or(InputError::Invalid)?;
+            .ok_or_else(|| {
+                crate::Error::Validation(
+                    "ACT/ACT ISMA reference-period month offset overflows".to_string(),
+                )
+            })?;
         let shifted = anchor.add_months(months)?;
         Ok(if preserve_eom {
             shifted.end_of_month()

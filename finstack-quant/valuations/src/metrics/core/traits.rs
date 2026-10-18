@@ -555,9 +555,9 @@ impl MetricContext {
             let flows = self.instrument.dated_cashflows(&self.curves, self.as_of)?;
             self.cashflows = Some(flows);
         }
-        self.cashflows
-            .as_ref()
-            .ok_or_else(|| finstack_quant_core::InputError::Invalid.into())
+        self.cashflows.as_ref().ok_or_else(|| {
+            finstack_quant_core::Error::Validation("cashflows were not cached".to_string())
+        })
     }
 
     /// Return the instrument's canonical cashflow schedule flows with CFKind metadata.
@@ -570,9 +570,9 @@ impl MetricContext {
                 .cashflow_schedule(&self.curves, self.as_of)?;
             self.tagged_cashflows = Some(schedule.into_flows());
         }
-        self.tagged_cashflows
-            .as_ref()
-            .ok_or_else(|| finstack_quant_core::InputError::Invalid.into())
+        self.tagged_cashflows.as_ref().ok_or_else(|| {
+            finstack_quant_core::Error::Validation("tagged cashflows were not cached".to_string())
+        })
     }
 
     /// The context market with every coupon fixing the canonical schedule

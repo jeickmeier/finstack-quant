@@ -230,7 +230,9 @@ impl DiscountCurveBuilder {
     /// interpolation constraints are violated, the calendar id is unknown, or a
     /// Bus/252 curve has no calendar.
     pub fn build(mut self) -> crate::Result<DiscountCurve> {
-        let base = self.base.ok_or(crate::error::InputError::Invalid)?;
+        let base = self.base.ok_or_else(|| {
+            crate::Error::Validation("DiscountCurve requires base_date".to_string())
+        })?;
         if !self.points.is_empty() {
             self.points.sort_by(|a, b| a.0.total_cmp(&b.0));
             let first_t = self.points[0].0;

@@ -2,7 +2,9 @@
 
 use super::{ForwardCurve, InputError};
 use crate::market_data::bumps::BumpType;
-use crate::market_data::term_structures::common::{PiecewiseLinearAdjustment, RateShock};
+use crate::market_data::term_structures::common::{
+    validate_pillars, PiecewiseLinearAdjustment, RateShock,
+};
 use crate::math::interp::types::Interp;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -68,7 +70,9 @@ impl CurveTransform {
 
     pub(super) fn validate(&self) -> crate::Result<()> {
         if !self.offset.is_finite() || !self.scale.is_finite() {
-            return Err(InputError::Invalid.into());
+            return Err(crate::Error::Validation(
+                "forward curve transform offset and scale must be finite".to_string(),
+            ));
         }
         self.adjustment.validate()
     }
@@ -77,16 +81,15 @@ impl CurveTransform {
 impl ForwardCurve {
     pub(super) fn restore_transform(&mut self, transform: CurveTransform) -> crate::Result<()> {
         transform.validate()?;
-        for (&time, &rate) in self.knots.iter().zip(self.forwards.iter()) {
-            let actual = transform.rate(&self.interp, time);
-            if !actual.is_finite()
-                || (actual - rate).abs() > 1e-12 * actual.abs().max(rate.abs()).max(1.0)
-            {
-                return Err(crate::Error::Validation(
-                    "forward-curve transformation disagrees with its pillar samples".into(),
-                ));
-            }
-        }
+        validate_pillars(
+            self.knots
+                .iter()
+                .copied()
+                .zip(self.forwards.iter().copied()),
+            false,
+            "forward-curve transformation",
+            |time| transform.rate(&self.interp, time),
+        )?;
         self.transform = Some(transform);
         Ok(())
     }

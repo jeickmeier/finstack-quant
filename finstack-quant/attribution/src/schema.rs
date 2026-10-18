@@ -76,12 +76,9 @@ fn attribution_result_examples() -> finstack_quant_core::Result<Vec<serde_json::
         },
         result_invalid: false,
     };
-    let results_meta = finstack_quant_core::config::ResultsMeta {
-        timestamp: None,
-        ..finstack_quant_core::config::results_meta_now(
-            &finstack_quant_core::config::FinstackConfig::default(),
-        )
-    };
+    let results_meta = finstack_quant_core::config::results_meta(
+        &finstack_quant_core::config::FinstackConfig::default(),
+    );
     let result = crate::spec::AttributionResult {
         attribution,
         results_meta,

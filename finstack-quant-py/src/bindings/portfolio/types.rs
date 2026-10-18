@@ -16,10 +16,11 @@ use pyo3::types::{PyDict, PyModule};
 
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_instrument_json;
 use crate::bindings::module_utils::{py_to_json_value, py_to_serde};
-use crate::bindings::pandas_utils::{dict_to_dataframe, serde_to_py, table_to_dataframe};
+use crate::bindings::pandas_utils::{dict_to_dataframe, serde_to_py};
 use crate::errors::{core_to_py, display_to_py, portfolio_to_py, value_error};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::CurveId;
@@ -808,7 +809,7 @@ impl PyPortfolioValuation {
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let table =
             finstack_quant_portfolio::positions_to_table(&self.inner).map_err(core_to_py)?;
-        let frame = table_to_dataframe(py, &table)?;
+        let frame = envelope_to_pandas(py, &table)?;
         let complete: Vec<bool> = self
             .inner
             .position_values
@@ -1221,7 +1222,7 @@ impl PyPortfolioMetrics {
     fn to_aggregated_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let table = finstack_quant_portfolio::aggregated_metrics_to_table(&self.inner)
             .map_err(core_to_py)?;
-        table_to_dataframe(py, &table)
+        envelope_to_pandas(py, &table)
     }
 
     /// Export the raw per-position metric values as a long-format pandas
@@ -1239,7 +1240,7 @@ impl PyPortfolioMetrics {
     #[pyo3(text_signature = "(self)")]
     fn to_position_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let table = finstack_quant_portfolio::metrics_to_table(&self.inner).map_err(core_to_py)?;
-        table_to_dataframe(py, &table)
+        envelope_to_pandas(py, &table)
     }
 
     fn __repr__(&self) -> String {

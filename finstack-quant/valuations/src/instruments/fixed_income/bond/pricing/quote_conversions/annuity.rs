@@ -61,13 +61,17 @@ pub fn periods_per_year(
     match frequency.unit() {
         finstack_quant_core::dates::TenorUnit::Months => {
             if frequency.count() == 0 {
-                return Err(finstack_quant_core::InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "coupon frequency count must be greater than zero".to_string(),
+                ));
             }
             Ok(12.0 / (frequency.count() as f64))
         }
         finstack_quant_core::dates::TenorUnit::Days => {
             if frequency.count() == 0 {
-                return Err(finstack_quant_core::InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "coupon frequency count must be greater than zero".to_string(),
+                ));
             }
             // Use 365 as approximate annual basis for frequency calculations
             // Note: This is NOT a day count convention - actual day count is handled
@@ -76,13 +80,17 @@ pub fn periods_per_year(
         }
         finstack_quant_core::dates::TenorUnit::Years => {
             if frequency.count() == 0 {
-                return Err(finstack_quant_core::InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "coupon frequency count must be greater than zero".to_string(),
+                ));
             }
             Ok(1.0 / (frequency.count() as f64))
         }
         finstack_quant_core::dates::TenorUnit::Weeks => {
             if frequency.count() == 0 {
-                return Err(finstack_quant_core::InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "coupon frequency count must be greater than zero".to_string(),
+                ));
             }
             Ok(52.0 / (frequency.count() as f64))
         }

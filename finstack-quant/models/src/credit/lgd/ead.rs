@@ -32,7 +32,9 @@ impl CreditConversionFactor {
     /// Returns an error if `ccf` is not in \[0, 1\].
     pub fn new(ccf: f64) -> Result<Self> {
         if !(0.0..=1.0).contains(&ccf) {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "credit conversion factor must lie in [0, 1]".to_string(),
+            ));
         }
         Ok(Self { ccf })
     }
@@ -84,7 +86,9 @@ impl EadCalculator {
     /// Returns an error if `drawn < 0` or `undrawn < 0`.
     pub fn new(drawn: f64, undrawn: f64, ccf: CreditConversionFactor) -> Result<Self> {
         if !drawn.is_finite() || !undrawn.is_finite() {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "drawn and undrawn exposures must be finite".to_string(),
+            ));
         }
         if drawn < 0.0 || undrawn < 0.0 {
             return Err(InputError::NegativeValue.into());

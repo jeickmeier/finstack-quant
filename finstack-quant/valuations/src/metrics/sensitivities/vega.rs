@@ -66,7 +66,9 @@ where
         let dependencies = instrument.market_dependencies()?;
         let vol_surface_ids = dependencies.present_vol_surface_ids(&context.curves);
         if vol_surface_ids.is_empty() && volatility_override(instrument).is_none() {
-            return Err(finstack_quant_core::InputError::Invalid.into());
+            return Err(finstack_quant_core::Error::Validation(
+                "vega requires a vol surface dependency or a volatility override".to_string(),
+            ));
         }
 
         let curves = std::sync::Arc::clone(&context.curves);

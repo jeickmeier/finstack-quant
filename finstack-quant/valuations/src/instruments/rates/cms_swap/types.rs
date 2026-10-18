@@ -367,8 +367,8 @@ impl CmsSwap {
         })?;
 
         if cms_periods.is_empty() {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid,
+            return Err(finstack_quant_core::Error::Validation(
+                "CMS swap schedule produced no periods".to_string(),
             ));
         }
 

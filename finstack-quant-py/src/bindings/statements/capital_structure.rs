@@ -6,8 +6,8 @@
 //! All classes support JSON round-trip via `from_json`/`to_json`.
 
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::table_to_dataframe;
 use crate::errors::statements_to_py;
 use finstack_quant_statements::capital_structure::{
     CapitalStructureCashflows, EcfSweepSpec, PaymentClassSpec, PaymentPriority, PikToggleSpec,
@@ -1075,7 +1075,7 @@ impl PyCapitalStructureCashflows {
     /// period start and ``debt_balance`` the balance at period end.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        table_to_dataframe(py, &self.inner.to_table().map_err(statements_to_py)?)
+        envelope_to_pandas(py, &self.inner.to_table().map_err(statements_to_py)?)
     }
 
     /// Export the cross-instrument totals as a long pandas ``DataFrame``.
@@ -1085,7 +1085,7 @@ impl PyCapitalStructureCashflows {
     /// when no reporting currency is configured.
     #[pyo3(text_signature = "($self)")]
     fn to_totals_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        table_to_dataframe(py, &self.inner.to_totals_table().map_err(statements_to_py)?)
+        envelope_to_pandas(py, &self.inner.to_totals_table().map_err(statements_to_py)?)
     }
 
     /// Return ``CapitalStructureCashflows(instruments=2, periods=4)``.

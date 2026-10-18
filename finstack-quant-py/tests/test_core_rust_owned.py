@@ -115,8 +115,9 @@ def test_year_fractions_with_and_without_context_match_wasm() -> None:
         DayCount.ACT_365L.year_fraction(start, end)
     with _raises_exactly("Validation error: ACT/365L requires coupon frequency in DayCountContext"):
         DayCount.ACT_365L.signed_year_fraction(end, start)
-    assert DayCount.BUS_252.year_fraction(start, end, calendar="nyse") == 0.503968253968254
-    assert DayCount.BUS_252.signed_year_fraction(end, start, calendar="nyse") == -0.503968253968254
+    nyse = DayCountContext(calendar_id="nyse")
+    assert DayCount.BUS_252.year_fraction(start, end, nyse) == 0.503968253968254
+    assert DayCount.BUS_252.signed_year_fraction(end, start, nyse) == -0.503968253968254
 
 
 def test_day_count_context_rejects_a_zero_bus_basis_in_rust() -> None:
@@ -182,7 +183,7 @@ def test_fx_matrix_from_dict_uses_the_rust_currency_pair_parser() -> None:
 
 def test_realized_variance_defaults_are_rust_owned() -> None:
     prices = [100.0, 101.0, 100.5, 102.0]
-    assert stats.realized_variance(prices) == stats.realized_variance(prices, "close_to_close", 252.0)
+    assert stats.realized_variance(prices) == stats.realized_variance(prices, 252.0)
     o = [100.0, 101.5, 100.8, 102.0]
     h = [102.0, 103.0, 102.5, 103.5]
     lo = [99.0, 100.2, 99.9, 101.0]

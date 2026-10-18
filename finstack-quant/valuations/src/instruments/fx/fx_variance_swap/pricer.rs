@@ -274,11 +274,7 @@ fn realized_variance_with_factor(
     if prices.len() < 2 {
         return Ok(0.0);
     }
-    realized_variance(
-        &prices,
-        Some(inst.realized_var_method),
-        Some(annualization_factor),
-    )
+    realized_variance(&prices, Some(annualization_factor))
 }
 
 /// Expected contractual annualized variance, shared by PV and its metric.
@@ -313,7 +309,7 @@ fn expected_variance_with_dates(
     }
     let prices = get_historical_prices_with_dates(inst, context, as_of, obs_dates)?;
     // Calling the canonical estimator also validates historical prices.
-    let realized = realized_variance(&prices, Some(inst.realized_var_method), Some(1.0))?;
+    let realized = realized_variance(&prices, Some(1.0))?;
     let known_sum = realized * prices.len().saturating_sub(1) as f64;
     let (future_sum, _) = remaining_squared_returns(inst, context, as_of, obs_dates, &prices)?;
     Ok(annualization_factor(inst) * (known_sum + future_sum) / total_returns as f64)

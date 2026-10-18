@@ -1,7 +1,7 @@
 //! Inflation reference observations and market-convention production regressions.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{calendar_by_id, DayCount};
+use finstack_quant_core::dates::{calendar_by_id_strict, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationLag, SeriesInterpolation,
@@ -206,7 +206,7 @@ fn m21_uk_inflation_uses_a_registered_london_calendar() {
         .require_inflation_swap(&InflationSwapConventionId::new("UK-RPI"))
         .expect("RPI");
     assert!(
-        calendar_by_id(&convention.calendar_id).is_some(),
+        calendar_by_id_strict(&convention.calendar_id).is_ok(),
         "{}",
         convention.calendar_id
     );

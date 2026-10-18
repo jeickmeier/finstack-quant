@@ -2487,8 +2487,8 @@ export interface BpsConstructor {
  * - `30_360_it` (Italian) → `DayCount.thirty360It`
  * - `bus_252` → `DayCount.bus252`
  *
- * Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` go through the
- * lenient `DayCount.parse`.
+ * Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` are
+ * accepted by `fromName`.
  *
  * @example
  * ```javascript
@@ -2567,8 +2567,8 @@ export interface DayCount extends WasmOwned {
  * - `30_360_it` (Italian) → `DayCount.thirty360It`
  * - `bus_252` → `DayCount.bus252`
  *
- * Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` go through the
- * lenient `DayCount.parse`.
+ * Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` are
+ * accepted by `fromName`.
  *
  * @example
  * ```javascript
@@ -2583,7 +2583,7 @@ export interface DayCount extends WasmOwned {
  */
 export interface DayCountConstructor {
   /**
-   * JavaScript prototype of `DayCount`; instances come from `fromName`, `parse` and the named factories, not `new`.
+   * JavaScript prototype of `DayCount`; instances come from `fromName` and the named factories, not `new`.
    */
   readonly prototype: DayCount;
   /**
@@ -2592,37 +2592,14 @@ export interface DayCountConstructor {
    *
    * @param name - Canonical snake_case convention name, for example `"act_360"`, `"30_360"` or `"act_act"` (see the class list).
    * @returns The matching `DayCount`.
-   * @throws `TypeError` if `name` is not a string; `FinstackError` (kind `validation`) if it is not a canonical convention name. Use `DayCount.parse` for term-sheet spellings.
+   * @throws `TypeError` if `name` is not a string; `FinstackError` (kind `validation`) if no convention matches. Case, spaces, `/` and `-` are normalised, so term-sheet spellings such as `"ACT/360"` or `"Act/Act ICMA"` are accepted.
    */
   fromName(name: string): DayCount;
-  /**
-   * Parse a convention leniently (Rust `DayCount::parse`): case, spaces,
-   * `/` and `-` are normalised, so term-sheet spellings such as
-   * `"ACT/360"`, `"Act/Act ICMA"` or `"30E/360 ISDA"` are accepted.
-   *
-   * @example
-   * ```javascript
-   * core.DayCount.parse("Act/Act ICMA").toString();  // "act_act_isma"
-   * ```
-   * @param s - Convention text in canonical or term-sheet spelling.
-   * @returns The matching `DayCount`.
-   * @throws `TypeError` if `s` is not a string; `FinstackError` (kind `validation`) if no convention matches.
-   */
-  parse(s: string): DayCount;
   /**
    * No-Leap/365: actual days excluding February 29, over 365.
    * @returns A `DayCount` handle for this convention.
    */
   nl365(): DayCount;
-  /**
-   * Count the calendar days between two dates (epoch days), independent of the
-   * convention (Rust associated fn `DayCount::calendar_days`).
-   * @param startEpochDays - Start date as days since 1970-01-01.
-   * @param endEpochDays - End date as days since 1970-01-01.
-   * @returns Signed calendar-day count from start to end.
-   * @throws Error - Throws a JavaScript exception if either epoch-day value is non-finite, fractional, or outside the representable date range.
-   */
-  calendarDays(startEpochDays: number, endEpochDays: number): bigint;
   /**
    * Act/360 day-count convention.
    * @returns A `DayCount` handle for this convention.
@@ -7017,7 +6994,7 @@ export interface CreditIndexDataConstructor {
  *
  * @example
  * ```typescript
- * import init, { core } from "finstack-quant-wasm";
+ * import init, { core, models } from "finstack-quant-wasm";
  * await init();
  * const surface = new core.VolSurface(
  *   "SPX-VOL",
@@ -7025,7 +7002,7 @@ export interface CreditIndexDataConstructor {
  *   [90, 100, 110],
  *   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
  * );
- * surface.vol(0.75, 100); // 0.205
+ * models.volatility.getSurfaceVol(surface.toJson(), 0.75, 100); // 0.205
  * surface.gridShape; // [2, 3]
  * ```
  */
@@ -7083,16 +7060,28 @@ export interface VolSurface extends WasmOwned {
    * @throws If serialization fails (not expected for a valid surface).
    */
   toJson(): string;
+}
+
+/**
+ * Optional keys of the `VolSurface` constructor; every omitted key takes the Rust default.
+ */
+export interface VolSurfaceOptions {
   /**
-   * Implied volatility at an expiry and strike inside the grid (Rust
-   * `models::volatility::get_surface_vol`).
-   *
-   * @param expiry - Option expiry in years, within the expiry axis.
-   * @param strike - Secondary-axis coordinate, within the strike (or tenor) axis.
-   * @returns The interpolated volatility as a decimal.
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a non-finite or out-of-grid coordinate, or when total-variance interpolation is invalid.
+   * What `strikes` holds: `"strike"` (default) or `"tenor"`.
    */
-  vol(expiry: number, strike: number): number;
+  secondaryAxis?: string | null;
+  /**
+   * `"vol"` (default) or `"total_variance"`.
+   */
+  interpolationMode?: string | null;
+  /**
+   * `"black_lognormal"` (default), `"shifted_black_lognormal"` or `"normal"`.
+   */
+  quoteType?: string | null;
+  /**
+   * One shifted-Black displacement per expiry; required for `"shifted_black_lognormal"` quotes.
+   */
+  displacements?: NumericArray | null;
 }
 
 /**
@@ -7104,7 +7093,7 @@ export interface VolSurface extends WasmOwned {
  *
  * @example
  * ```typescript
- * import init, { core } from "finstack-quant-wasm";
+ * import init, { core, models } from "finstack-quant-wasm";
  * await init();
  * const surface = new core.VolSurface(
  *   "SPX-VOL",
@@ -7112,7 +7101,7 @@ export interface VolSurface extends WasmOwned {
  *   [90, 100, 110],
  *   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
  * );
- * surface.vol(0.75, 100); // 0.205
+ * models.volatility.getSurfaceVol(surface.toJson(), 0.75, 100); // 0.205
  * surface.gridShape; // [2, 3]
  * ```
  */
@@ -7125,10 +7114,7 @@ export interface VolSurfaceConstructor {
    * @param expiries - Option expiries in years, strictly increasing.
    * @param strikes - Secondary-axis coordinates (strikes, or swap tenors in years), strictly increasing.
    * @param vols - Decimal volatilities, either as a flat row-major grid of `expiries.length * strikes.length` entries or as `expiries.length` rows of `strikes.length` values. Entries must be finite and non-negative.
-   * @param secondaryAxis - What `strikes` holds: `"strike"` or `"tenor"`; omitted uses the Rust default (`"strike"`).
-   * @param interpolationMode - `"vol"` or `"total_variance"`; omitted uses the Rust default (`"vol"`).
-   * @param quoteType - `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`; omitted uses the Rust default (`"black_lognormal"`).
-   * @param displacements - Shifted-Black displacements in strike/rate units, one per expiry; required for `"shifted_black_lognormal"` quotes and omitted for the other conventions.
+   * @param options - Optional `{ secondaryAxis, interpolationMode, quoteType, displacements }`: `secondaryAxis` is `"strike"` or `"tenor"`, `interpolationMode` is `"vol"` or `"total_variance"`, `quoteType` is `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`, and `displacements` holds one shifted-Black displacement per expiry (required for `"shifted_black_lognormal"` quotes). Every omitted key takes the Rust default.
    * @returns The validated `VolSurface`.
    * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an empty or unsorted axis, a grid of the wrong length, a negative or non-finite volatility, an unknown axis, mode or quote-type name, or displacements that do not match the quote convention and the expiry count.
    */
@@ -7137,10 +7123,7 @@ export interface VolSurfaceConstructor {
     expiries: NumericArray,
     strikes: NumericArray,
     vols: NumericArray,
-    secondaryAxis?: string | null,
-    interpolationMode?: string | null,
-    quoteType?: string | null,
-    displacements?: NumericArray | null
+    options?: VolSurfaceOptions | null
   ): VolSurface;
   /**
    * Deserialize from the canonical JSON wire form shared with Python `VolSurface.to_json`.
@@ -8181,16 +8164,11 @@ export interface CoreNamespace {
    * core.realizedVariance([100, 101, 99.5, 100.2]);  // close-to-close, 252/yr
    * ```
    * @param prices - Close prices in time order; each must be finite and positive.
-   * @param method - Estimator name; only `"close_to_close"` applies to closes (the OHLC estimators need `realizedVarianceOhlc`). Omitted selects the Rust default (`"close_to_close"`).
    * @param annualizationFactor - Observations per year (for example `252` for daily closes); omitted selects the Rust daily default (252).
    * @returns Annualized realized variance (decimal, not volatility).
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an unknown or OHLC-only method, a non-positive or non-finite price, or a non-positive annualization factor.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a non-positive or non-finite price or a non-positive annualization factor.
    */
-  realizedVariance(
-    prices: NumericArray,
-    method?: string | null,
-    annualizationFactor?: number | null
-  ): number;
+  realizedVariance(prices: NumericArray, annualizationFactor?: number | null): number;
   /**
    * Annualized realized variance from OHLC bars (Rust `stats::realized_variance_ohlc`).
    *
@@ -8624,7 +8602,7 @@ export interface CoreNamespace {
    * @param month - Settlement month number, `1` through `12`.
    * @param year - Settlement year.
    * @returns The published date as epoch days, or `undefined` when the month is outside the embedded SIFMA calendar (dates are never approximated).
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
    */
   sifmaSettlementDate(month: number, year: number): number | undefined;
   /**
@@ -8635,7 +8613,7 @@ export interface CoreNamespace {
    * @param year - Settlement year.
    * @param settlementClass - Agency-MBS settlement class whose date is requested.
    * @returns The published date as epoch days, or `undefined` when that month and class are outside the embedded SIFMA calendar.
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
    */
   sifmaSettlementDateForClass(
     month: number,

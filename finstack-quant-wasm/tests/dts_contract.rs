@@ -919,11 +919,8 @@ fn core_daycount_dts_exposes_context_for_context_dependent_conventions() {
         day_count_ctor,
         "thirty360It(): DayCount;"
     ));
-    // `calendarDays` is static, like Rust `DayCount::calendar_days`.
-    assert!(contains_signature(
-        day_count_ctor,
-        "calendarDays(startEpochDays: number, endEpochDays: number): bigint;"
-    ));
+    // `calendarDays` was a host-only static; hosts subtract dates natively.
+    assert!(!day_count_ctor.contains("calendarDays("));
     assert!(!day_count.contains("calendarDays("));
     assert!(contains_ignoring_ws(
         &dts,
@@ -1553,11 +1550,7 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
         day_count_constructor,
         "act365l(): DayCount;"
     ));
-    for sig in [
-        "fromName(name: string): DayCount;",
-        "parse(s: string): DayCount;",
-        "nl365(): DayCount;",
-    ] {
+    for sig in ["fromName(name: string): DayCount;", "nl365(): DayCount;"] {
         assert!(
             contains_signature(day_count_constructor, sig),
             "DayCountConstructor: {sig}"

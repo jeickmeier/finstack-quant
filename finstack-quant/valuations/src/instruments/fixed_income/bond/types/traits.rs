@@ -286,7 +286,9 @@ impl Bond {
         let (coupon_rate, coupon_type) = match &self.cashflow_spec {
             CashflowSpec::Fixed(spec) => (spec.rate.to_f64().unwrap_or(0.0), spec.coupon_type),
             CashflowSpec::Floating(_) => {
-                return Err(finstack_quant_core::InputError::Invalid.into());
+                return Err(finstack_quant_core::Error::Validation(
+                    "Merton MC pricing requires a fixed-coupon bond".to_string(),
+                ));
             }
             // Step-up bonds are simulated at their initial rate.
             CashflowSpec::StepUp(spec) => {

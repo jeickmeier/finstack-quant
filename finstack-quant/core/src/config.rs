@@ -738,23 +738,6 @@ pub fn results_meta(cfg: &FinstackConfig) -> ResultsMeta {
     }
 }
 
-/// Construct a [`ResultsMeta`] snapshot and stamp a timestamp of "now".
-///
-/// Use this at user-facing IO boundaries and audit trails. For deterministic outputs
-/// (golden tests, reproducible snapshots), prefer [`results_meta`].
-///
-/// # Arguments
-///
-/// * `cfg` - Library configuration used to derive the result's rounding
-///   snapshot before the current UTC timestamp is added.
-pub fn results_meta_now(cfg: &FinstackConfig) -> ResultsMeta {
-    // On wasm32, core enables time's `wasm-bindgen` feature so `now_utc()` works.
-    ResultsMeta {
-        timestamp: Some(time::OffsetDateTime::now_utc()),
-        ..results_meta(cfg)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{ConfigExtensions, RoundingMode, ToleranceConfig};

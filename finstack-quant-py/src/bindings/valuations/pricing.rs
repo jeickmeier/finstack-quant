@@ -382,7 +382,7 @@ impl PyMarketHistory {
     /// where the factor type has no such coordinate) and ``shift``.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::table_to_dataframe(
+        crate::bindings::core::table::envelope_to_pandas(
             py,
             &self.inner.to_table().map_err(crate::errors::core_to_py)?,
         )

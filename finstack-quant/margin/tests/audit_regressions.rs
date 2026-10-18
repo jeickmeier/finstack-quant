@@ -297,7 +297,7 @@ fn repo_margin_call_settles_after_weekend_and_preserves_call_date() {
     let settlement = time::Date::from_calendar_date(2025, time::Month::January, 13).expect("date");
     let mut spec = RepoMarginSpec::mark_to_market(1.02, 0.0).expect("terms");
     spec.settlement_lag = 1;
-    let calendar = finstack_quant_core::dates::calendar_by_id("usny").expect("calendar");
+    let calendar = finstack_quant_core::dates::calendar_by_id_strict("usny").expect("calendar");
     let flows = generate_margin_cashflows(&spec, usd(1e6), &[(call_date, 900_000.0)], calendar)
         .expect("flows");
     assert_eq!(flows[0].date, settlement);

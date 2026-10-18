@@ -87,7 +87,7 @@ impl PrepaymentModelSpec {
     /// - the ABS `speed` is outside `[0, 1]`
     /// - the vector curve is empty or holds a value outside `[0, 1]`
     ///
-    /// Returns `InputError::NegativeValue`/`InputError::Invalid` if the
+    /// Returns `InputError::NegativeValue`/`Error::Validation` if the
     /// constant `cpr` is negative or non-finite.
     ///
     /// # References

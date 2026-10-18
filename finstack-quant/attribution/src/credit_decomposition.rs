@@ -206,28 +206,29 @@ impl AttributionInputs {
             5,
             finstack_quant_core::dates::TenorUnit::Years,
         )?;
-        let tenor_date = instrument.expiry().unwrap_or_else(|| {
-            let cal_code = instrument
-                .attributes()
-                .get_meta("calendar")
-                .or_else(|| instrument.attributes().get_meta("calendar_id"))
-                .unwrap_or("usny");
-            let calendar = finstack_quant_core::dates::calendar_by_id(cal_code)
-                .or_else(|| finstack_quant_core::dates::calendar_by_id("usny"));
-            let tenor = fallback_tenor;
-            tenor
-                .add_to_date(
-                    self.as_of_t0,
-                    calendar,
-                    finstack_quant_core::dates::BusinessDayConvention::Following,
-                )
-                .unwrap_or_else(|_| {
-                    let dur_days = (5.0 * 365.25) as i64;
-                    self.as_of_t0
-                        .checked_add(time::Duration::days(dur_days))
-                        .unwrap_or(self.as_of_t0)
-                })
-        });
+        let tenor_date = match instrument.expiry() {
+            Some(expiry) => expiry,
+            None => {
+                let cal_code = instrument
+                    .attributes()
+                    .get_meta("calendar")
+                    .or_else(|| instrument.attributes().get_meta("calendar_id"))
+                    .unwrap_or("usny");
+                let calendar = finstack_quant_core::dates::calendar_by_id_strict(cal_code)?;
+                fallback_tenor
+                    .add_to_date(
+                        self.as_of_t0,
+                        Some(calendar),
+                        finstack_quant_core::dates::BusinessDayConvention::Following,
+                    )
+                    .unwrap_or_else(|_| {
+                        let dur_days = (5.0 * 365.25) as i64;
+                        self.as_of_t0
+                            .checked_add(time::Duration::days(dur_days))
+                            .unwrap_or(self.as_of_t0)
+                    })
+            }
+        };
         let mut lookup_warnings: Vec<String> = Vec::new();
         let r = match disc.zero_rate_on_date(tenor_date, Compounding::Continuous) {
             Ok(v) => v,

@@ -24,7 +24,7 @@ use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::OptionType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    calendar_by_id, BusinessDayConvention, Date, DayCount, DayCountContext, Tenor,
+    calendar_by_id_strict, BusinessDayConvention, Date, DayCount, DayCountContext, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -319,7 +319,8 @@ impl CommoditySwaption {
         let calendar = self
             .calendar_id
             .as_deref()
-            .and_then(|id| calendar_by_id(id));
+            .map(calendar_by_id_strict)
+            .transpose()?;
         let is_business_day = |date: Date| -> bool {
             let wd = date.weekday();
             if wd == time::Weekday::Saturday || wd == time::Weekday::Sunday {

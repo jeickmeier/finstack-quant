@@ -11,7 +11,9 @@ use crate::instruments::common_impl::validation;
 use crate::market::conventions::ConventionRegistry;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{adjust, calendar_by_id, BusinessDayConvention, Date, DayCount};
+use finstack_quant_core::dates::{
+    adjust, calendar_by_id_strict, BusinessDayConvention, Date, DayCount,
+};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
@@ -250,7 +252,7 @@ impl ForwardRateAgreement {
 
                 // Compute base fixing date by subtracting reset_lag_days business days
                 let base_fixing_date = if let Some(cal_id) = resolved_cal_id.as_deref() {
-                    if let Some(cal) = calendar_by_id(cal_id) {
+                    if let Ok(cal) = calendar_by_id_strict(cal_id) {
                         // Use calendar-aware business day subtraction
                         self.start_date
                             .add_business_days(-(self.reset_lag_days), cal)?
@@ -269,7 +271,7 @@ impl ForwardRateAgreement {
 
                 // Apply business day convention adjustment to the resulting date
                 if let Some(cal_id) = resolved_cal_id.as_deref() {
-                    if let Some(cal) = calendar_by_id(cal_id) {
+                    if let Ok(cal) = calendar_by_id_strict(cal_id) {
                         adjust(base_fixing_date, business_day_convention, cal)?
                     } else {
                         base_fixing_date

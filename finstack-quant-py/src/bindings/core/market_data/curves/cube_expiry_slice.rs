@@ -129,21 +129,18 @@ impl PyVolCubeExpirySlice {
 
     /// Export ``expiry``, ``tenor``, ``strike``, and ``vol`` columns.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut tenors = Vec::with_capacity(self.inner.vols().len());
-        let mut strikes = Vec::with_capacity(self.inner.vols().len());
-        for &tenor in self.inner.tenors() {
-            for &strike in self.inner.strikes() {
-                tenors.push(tenor);
-                strikes.push(strike);
-            }
-        }
+        let (tenor, (strike, vol)): (Vec<f64>, (Vec<f64>, Vec<f64>)) = self
+            .inner
+            .grid_points()
+            .map(|(tenor, strike, vol)| (tenor, (strike, vol)))
+            .unzip();
         columns_to_dataframe(
             py,
             &[
-                ("expiry", vec![self.inner.expiry(); self.inner.vols().len()]),
-                ("tenor", tenors),
-                ("strike", strikes),
-                ("vol", self.inner.vols().to_vec()),
+                ("expiry", vec![self.inner.expiry(); vol.len()]),
+                ("tenor", tenor),
+                ("strike", strike),
+                ("vol", vol),
             ],
         )
     }

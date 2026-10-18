@@ -194,6 +194,11 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       knot_points: [number, number][];
       /**
+       * Hazard-rate cap the curve was built with, when it differs from the
+       * default of 10; absent for curves built with the default.
+       */
+      max_hazard_rate?: number | null;
+      /**
        * Par interpolation method
        */
       par_interp?: "linear" | "log_linear";
@@ -1377,10 +1382,16 @@ export interface D_268127561C9D65277399 {
   };
 }
 /**
- * Serialized source grid and time origin for a rolled interpolation.
+ * Serialized source grid and time origin of a rolled curve.
  */
 export interface D_13Ceef63597B70Bc1A71 {
+  /**
+   * Current origin in the source interpolation's year-fraction coordinates.
+   */
   offset: number;
+  /**
+   * Source pillars `(time, value)` in the source curve's own coordinates.
+   */
   source_points: [number, number][];
 }
 /**

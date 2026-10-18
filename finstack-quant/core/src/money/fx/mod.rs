@@ -43,7 +43,7 @@ pub use conventions::{
 pub use matrix::FxMatrix;
 pub use provider::FxProvider;
 pub(crate) use provider::{reciprocal_rate_or_err, validate_fx_rate};
-pub use providers::{BumpedFxProvider, SimpleFxProvider};
+pub use providers::SimpleFxProvider;
 pub use types::{
     CurrencyPair, FxConfig, FxConversionPolicy, FxMatrixState, FxPolicyMeta, FxQuery, FxRateResult,
 };

@@ -49,7 +49,11 @@ pub fn cash_equivalent_bond(bond: &Bond) -> Result<Bond> {
                 f.coupon_type = CouponType::Cash;
                 CashflowSpec::Fixed(f)
             }
-            CashflowSpec::Floating(_) => return Err(InputError::Invalid.into()),
+            CashflowSpec::Floating(_) => {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Merton MC calibration supports fixed and step-up coupons only".to_string(),
+                ))
+            }
             CashflowSpec::StepUp(s) => {
                 let mut s = s.clone();
                 s.coupon_type = CouponType::Cash;
@@ -122,7 +126,11 @@ fn target_pv_from_quote(
         BondQuoteInput::DiscountMargin(_)
         | BondQuoteInput::Oas(_)
         | BondQuoteInput::AswMarket(_)
-        | BondQuoteInput::ISpread(_) => return Err(InputError::Invalid.into()),
+        | BondQuoteInput::ISpread(_) => {
+            return Err(finstack_quant_core::Error::Validation(
+                "Merton MC calibration accepts price, yield and z-spread quotes only".to_string(),
+            ))
+        }
     };
 
     let disc = market.get_discount(&bond.discount_curve_id)?;
@@ -194,7 +202,9 @@ pub fn calibrate_parameter_to_market(
         CalibrationParameter::AssetVol => (0.01, 2.0),
     });
     if !(lo.is_finite() && hi.is_finite() && lo > 0.0 && hi > lo) {
-        return Err(InputError::Invalid.into());
+        return Err(finstack_quant_core::Error::Validation(
+            "calibration bracket must be finite with 0 < lo < hi".to_string(),
+        ));
     }
 
     // Low-path run: the bond's resolved antithetic flag and seed, with the

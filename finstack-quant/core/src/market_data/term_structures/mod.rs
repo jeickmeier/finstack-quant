@@ -150,7 +150,7 @@ pub use discount_curve::{
 pub use forward_curve::{ForwardCurve, ForwardCurveBuilder};
 pub use forward_variance::ForwardVarianceCurve;
 pub use hazard_calibration::{HazardCalibrationInput, HazardCalibrationRecipe};
-pub use hazard_curve::{HazardCurve, HazardCurveBuilder, ParInterp, Seniority};
+pub use hazard_curve::{HazardBumpTarget, HazardCurve, HazardCurveBuilder, ParInterp, Seniority};
 pub use inflation::{InflationCurve, InflationCurveBuilder};
 pub use parametric_curve::{NelsonSiegelModel, NsVariant, ParametricCurve, ParametricCurveBuilder};
 pub use price_curve::{PriceCurve, PriceCurveBuilder, PriceCurveKind};

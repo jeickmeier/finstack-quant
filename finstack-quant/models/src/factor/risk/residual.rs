@@ -1,9 +1,9 @@
 //! Residual-risk overlays for additive factor decompositions.
 
-use super::math::{normal_pdf, normal_quantile};
 use super::parametric::scale_for_measure;
 use super::types::{PositionResidualContribution, RiskDecomposition};
 use crate::factor::RiskMeasure;
+use finstack_quant_core::math::{norm_pdf, standard_normal_inv_cdf};
 
 /// Add one residual-risk overlay to a factor-only decomposition.
 ///
@@ -118,7 +118,7 @@ fn variance_from_measure(
         RiskMeasure::Variance => total_risk.max(0.0),
         RiskMeasure::Volatility => total_risk * total_risk,
         RiskMeasure::VaR { confidence } => {
-            let z = normal_quantile(confidence);
+            let z = standard_normal_inv_cdf(confidence);
             if z > 0.0 {
                 (total_risk / -z).powi(2)
             } else {
@@ -126,8 +126,8 @@ fn variance_from_measure(
             }
         }
         RiskMeasure::ExpectedShortfall { confidence } => {
-            let z = normal_quantile(confidence);
-            let es_multiplier = normal_pdf(z) / (1.0 - confidence);
+            let z = standard_normal_inv_cdf(confidence);
+            let es_multiplier = norm_pdf(z) / (1.0 - confidence);
             if es_multiplier > 0.0 {
                 (total_risk / -es_multiplier).powi(2)
             } else {

@@ -278,20 +278,26 @@ impl FxDeltaVolSurface {
         // RR and BF: finite
         for &v in rr_25d.iter().chain(bf_25d.iter()) {
             if !v.is_finite() {
-                return Err(InputError::Invalid.into());
+                return Err(crate::Error::Validation(
+                    "25-delta risk reversal and butterfly quotes must be finite".to_string(),
+                ));
             }
         }
         if let Some(rr) = rr_10d {
             for &v in rr {
                 if !v.is_finite() {
-                    return Err(InputError::Invalid.into());
+                    return Err(crate::Error::Validation(
+                        "10-delta risk reversal quotes must be finite".to_string(),
+                    ));
                 }
             }
         }
         if let Some(bf) = bf_10d {
             for &v in bf {
                 if !v.is_finite() {
-                    return Err(InputError::Invalid.into());
+                    return Err(crate::Error::Validation(
+                        "10-delta butterfly quotes must be finite".to_string(),
+                    ));
                 }
             }
         }
