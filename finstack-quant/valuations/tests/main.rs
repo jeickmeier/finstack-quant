@@ -9,6 +9,8 @@ mod canonical_contracts;
 mod cashflow_export_schema;
 #[path = "cashflows.rs"]
 mod cashflows;
+#[path = "core.rs"]
+mod core_framework;
 #[path = "credit_calibration.rs"]
 mod credit_calibration;
 #[path = "credit_decomposition.rs"]

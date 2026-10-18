@@ -51,6 +51,8 @@ pub use json::{
     ParsedInstrument, STANDARD_OPTION_GREEKS,
 };
 pub use keys::{InstrumentType, ModelKey, PricerKey};
+#[doc(hidden)]
+pub use registry::stamp_results_meta;
 pub use registry::{expect_inst, Pricer, PricerRegistry, PricingDispatch};
 
 use std::sync::Arc;
