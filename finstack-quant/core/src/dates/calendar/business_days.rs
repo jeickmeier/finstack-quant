@@ -441,7 +441,7 @@ pub const fn available_calendars() -> &'static [&'static str] {
 /// Resolve a calendar ID strictly, naming close matches on a miss.
 ///
 /// This is the one resolver behind every optional-calendar API in the
-/// workspace; use it instead of pairing [`super::calendars_generated::registry::calendar_by_id`] with
+/// workspace; use it instead of pairing the generated registry's `calendar_by_id` with
 /// `Error::calendar_not_found_with_suggestions` by hand.
 ///
 /// # Arguments

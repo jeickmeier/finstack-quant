@@ -373,10 +373,10 @@ impl Portfolio {
     /// Export a runtime portfolio as a deduplicated materialization bundle.
     ///
     /// Instrument artifacts are emitted in first-position order and
-    /// deduplicated by canonical envelope content hash. Instruments that do
-    /// not implement
-    /// [`finstack_quant_valuations::instruments::Instrument::to_instrument_json`]
-    /// cause an error instead of producing a lossy `null` payload.
+    /// deduplicated by canonical envelope content hash. Instruments that
+    /// [`instrument_json_of`] does not recognize (custom or unregistered
+    /// runtime types) cause an error instead of producing a lossy `null`
+    /// payload.
     ///
     /// Use [`Self::to_spec`] for the portable per-position interchange format.
     ///
