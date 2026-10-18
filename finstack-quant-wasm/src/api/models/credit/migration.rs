@@ -7,11 +7,11 @@ use crate::utils::input::{
     js_f64, js_f64_matrix, js_f64_seq, js_string, js_string_seq, js_u64, js_uint,
 };
 use crate::utils::{to_js_err, to_js_value};
+use finstack_quant_factor::risk::flatten_square_matrix;
 use finstack_quant_models::credit::migration::{
     self, projection, GeneratorMatrix, MigrationSimulator, RatingPath, RatingScale,
     TransitionMatrix,
 };
-use finstack_quant_models::factor::risk::flatten_square_matrix;
 use wasm_bindgen::prelude::*;
 
 /// Square-matrix input for an `n`-state scale, as flat row-major numbers or as

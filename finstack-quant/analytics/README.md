@@ -17,7 +17,7 @@ regression and the constrained least-squares solver. Consumed by:
 
 | Consumer | What it uses |
 |----------|--------------|
-| `finstack-quant-models` | `beta` (OLS slope in the credit peel) |
+| `finstack-quant-factor` | `beta` (OLS slope in the credit peel) |
 | `finstack-quant` (umbrella) | re-exported as `finstack_quant::analytics` |
 | `finstack-quant-py`, `finstack-quant-wasm` | `Performance`, `regression::constrained_least_squares` |
 
@@ -78,7 +78,7 @@ returns them.
 | `BetaResult`, `GreeksResult`, `RollingGreeks`, `MultiFactorResult`, `ReturnKind` | `benchmark` | Returned / consumed by benchmark methods |
 | `CagrDayCount` | `risk_metrics` | Act/365.25 default or a wrapped core `DayCount` |
 | `DatedSeries` | `risk_metrics` | Returned by `Performance::rolling_*` |
-| `beta` | `benchmark` | Freestanding OLS slope; consumed by `finstack-quant-models::factor` |
+| `beta` | `benchmark` | Freestanding OLS slope; consumed by `finstack-quant-factor` |
 | `regression` | `regression` | Public module: `constrained_least_squares` |
 
 All other analytics building blocks are `pub(crate)`.

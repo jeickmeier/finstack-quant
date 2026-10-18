@@ -42,7 +42,8 @@ Add `--all-features` to `rust-lint-crate` / `rust-fix-crate` when touching featu
 | `finstack-quant/attribution/` | `finstack-quant-attribution` |
 | `finstack-quant/cashflows/` | `finstack-quant-cashflows` |
 | `finstack-quant/covenants/` | `finstack-quant-covenants` |
-| `finstack-quant/models/` | `finstack-quant-models` |
+| `finstack-quant/models/` | `finstack-quant-models` (owns `models/schemas/`, but their generator is the umbrella's `gen_models_schemas`: `-p finstack-quant`) |
+| `finstack-quant/factor/` | `finstack-quant-factor` (also rerun `finstack-quant-attribution` and `finstack-quant-portfolio`; its schemas live under `finstack-quant/models/schemas/`) |
 | `finstack-quant/margin/` | `finstack-quant-margin` |
 | `finstack-quant/statements/` | `finstack-quant-statements` |
 | `finstack-quant/statements-analytics/` | `finstack-quant-statements-analytics` |

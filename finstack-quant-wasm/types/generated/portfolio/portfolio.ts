@@ -2584,7 +2584,7 @@ export interface CreditFactorAttribution {
    */
   generic_pnl: Money;
   /**
-   * One entry per [`finstack_quant_models::factor::credit::hierarchy::HierarchyDimension`]
+   * One entry per [`finstack_quant_factor::credit::hierarchy::HierarchyDimension`]
    * in the spec order recorded by the model's hierarchy.
    */
   levels: LevelPnl[];

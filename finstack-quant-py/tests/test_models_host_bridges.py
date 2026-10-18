@@ -18,7 +18,7 @@ from finstack_quant.models.factor import credit as factor_credit, risk as factor
 from finstack_quant.models.rates import dtsm
 
 ROOT = Path(__file__).parents[2]
-CANONICAL_MODEL = ROOT / "finstack-quant/models/tests/data/canonical/credit_factor_model.json"
+CANONICAL_MODEL = ROOT / "finstack-quant/factor/tests/data/canonical/credit_factor_model.json"
 
 
 def _generator() -> migration.GeneratorMatrix:

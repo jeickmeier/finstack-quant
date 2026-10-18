@@ -11,8 +11,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::HashSet;
-use finstack_quant_models::factor::risk::{FactorContribution, RiskDecomposition};
-use finstack_quant_models::factor::FactorId;
+use finstack_quant_factor::risk::{FactorContribution, RiskDecomposition};
+use finstack_quant_factor::FactorId;
 
 /// Base/after delta for a single factor contribution.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -178,7 +178,7 @@ pub(super) fn position_what_if(
         }
     }
 
-    let mut after = finstack_quant_models::factor::risk::decompose_factors(
+    let mut after = finstack_quant_factor::risk::decompose_factors(
         &sensitivities,
         model.covariance(),
         model.risk_measure(),
@@ -349,8 +349,8 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{Attributes, CurveId};
-    use finstack_quant_models::factor::matching::{DependencyFilter, MappingRule, MatchingConfig};
-    use finstack_quant_models::factor::{
+    use finstack_quant_factor::matching::{DependencyFilter, MappingRule, MatchingConfig};
+    use finstack_quant_factor::{
         CurveType, DependencyType, FactorCovarianceMatrix, FactorDefinition, FactorId,
         FactorModelConfig, FactorType, MarketMapping, RiskMeasure, UnmatchedPolicy,
     };
@@ -724,13 +724,11 @@ mod tests {
 
     #[test]
     fn factor_stress_matches_manually_stressed_market_for_credit_hierarchy() {
-        use finstack_quant_models::factor::credit::hierarchy::{
+        use finstack_quant_factor::credit::hierarchy::{
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use finstack_quant_models::factor::matching::{
-            CreditHierarchicalConfig, ISSUER_ID_META_KEY,
-        };
+        use finstack_quant_factor::matching::{CreditHierarchicalConfig, ISSUER_ID_META_KEY};
         use std::collections::BTreeMap;
 
         let as_of = date!(2024 - 01 - 01);
@@ -951,7 +949,7 @@ mod tests {
                     curve_type: Some(CurveType::Discount),
                     id: None,
                 },
-                attribute_filter: finstack_quant_models::factor::AttributeFilter::default(),
+                attribute_filter: finstack_quant_factor::AttributeFilter::default(),
                 factor_id: FactorId::new("Rates"),
             }]),
 

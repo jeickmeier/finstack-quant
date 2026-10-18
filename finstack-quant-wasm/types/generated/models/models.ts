@@ -2424,7 +2424,7 @@ export interface CreditCalibrationDiagnostics {
    * Log of all fold-up events triggered by insufficient bucket coverage.
    *
    * **Load-bearing, not purely diagnostic:**
-   * [`decompose_levels`][crate::factor::credit::decomposition::decompose_levels]
+   * [`decompose_levels`][crate::credit::decomposition::decompose_levels]
    * reads these records to reconstruct which `(issuer, level)` pairs were
    * folded during calibration. Stripping or editing them changes
    * decomposition results.
@@ -2471,7 +2471,7 @@ export interface CreditCalibrationDiagnostics {
  * bucket therefore share a common component that Σ represents as
  * *uncorrelated* idiosyncratic risk — holding several names from one folded
  * bucket overstates diversification for that component. Lower the level's
- * [`BucketSizeThresholds`][crate::factor::credit::calibration::BucketSizeThresholds]
+ * [`BucketSizeThresholds`][crate::credit::calibration::BucketSizeThresholds]
  * entry if that correlation materially matters for a thin bucket.
  */
 export interface FoldUpRecord {
@@ -2545,7 +2545,7 @@ export interface CreditCalibrationInputs {
    * The historical peel weights each date by contemporaneous DTS
    * (`SD × panel spread_bp` at that date); the anchor uses as-of DTS.
    * Persisted on each
-   * [`IssuerBetaRow`][crate::factor::credit::hierarchy::IssuerBetaRow] so
+   * [`IssuerBetaRow`][crate::credit::hierarchy::IssuerBetaRow] so
    * decompose can rebuild DTS from the current spread. The duration is a
    * single value across the calibration window (no per-date duration
    * series).
@@ -2851,7 +2851,7 @@ export interface FactorModelConfig {
  *
  * Entries are **annualized (co)variances of factor moves expressed in each
  * factor's canonical bump unit** — the same unit the sensitivity engines use
- * for deltas (see [`crate::factor::BumpSizeConfig`] / [`crate::factor::FactorType::bump_units`]):
+ * for deltas (see [`crate::BumpSizeConfig`] / [`crate::FactorType::bump_units`]):
  * basis points for rates/credit/inflation, percent for equity/commodity/FX,
  * vol points for volatility. With sensitivities `s` in P&L-per-canonical-unit
  * and `Σ` in canonical-unit², `sᵀΣs` is directly an annual P&L variance.
@@ -3171,7 +3171,7 @@ export interface VolState {
   /**
    * EWMA or sample vol model for each systematic factor.
    *
-   * Keys are factor IDs from [`crate::factor::FactorModelConfig`].
+   * Keys are factor IDs from [`crate::FactorModelConfig`].
    * `BTreeMap` for deterministic serialization order.
    */
   factors: {
@@ -3744,7 +3744,7 @@ export interface LevelValuesAtDate {
    */
   dimension: HierarchyDimension;
   /**
-   * Zero-based index of this level inside [`crate::factor::credit::hierarchy::CreditHierarchySpec::levels`].
+   * Zero-based index of this level inside [`crate::credit::hierarchy::CreditHierarchySpec::levels`].
    */
   level_index: number;
   /**

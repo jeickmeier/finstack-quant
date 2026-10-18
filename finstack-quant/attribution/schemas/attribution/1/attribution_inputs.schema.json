@@ -541,7 +541,7 @@
           "type": "array"
         },
         "fold_ups": {
-          "description": "Log of all fold-up events triggered by insufficient bucket coverage.\n\n**Load-bearing, not purely diagnostic:**\n[`decompose_levels`][crate::factor::credit::decomposition::decompose_levels]\nreads these records to reconstruct which `(issuer, level)` pairs were\nfolded during calibration. Stripping or editing them changes\ndecomposition results.",
+          "description": "Log of all fold-up events triggered by insufficient bucket coverage.\n\n**Load-bearing, not purely diagnostic:**\n[`decompose_levels`][crate::credit::decomposition::decompose_levels]\nreads these records to reconstruct which `(issuer, level)` pairs were\nfolded during calibration. Stripping or editing them changes\ndecomposition results.",
           "items": {
             "$ref": "#/$defs/FoldUpRecord"
           },
@@ -607,7 +607,7 @@
     },
     "CreditFactorModel": {
       "additionalProperties": false,
-      "description": "Fully self-contained credit factor model artifact.\n\nProduced by offline monthly calibration and loaded at startup by attribution,\nrisk, and vol-forecast consumers. JSON serialization is deterministic:\n`serde_json::to_string` followed by `serde_json::from_str` must produce a\nbyte-identical round-trip.\n\n# Schema version\n\n[`schema`][Self::schema] is deserialized as an exact v1 marker.\n\n# Determinism\n\nTwo `CreditFactorModel` values constructed from identical inputs serialize\nto byte-identical JSON. This relies on:\n- [`issuer_betas`][Self::issuer_betas] sorted by `issuer_id`.\n- All maps using `BTreeMap`.\n- [`crate::factor::FactorModelConfig`] respecting its own factor ordering.",
+      "description": "Fully self-contained credit factor model artifact.\n\nProduced by offline monthly calibration and loaded at startup by attribution,\nrisk, and vol-forecast consumers. JSON serialization is deterministic:\n`serde_json::to_string` followed by `serde_json::from_str` must produce a\nbyte-identical round-trip.\n\n# Schema version\n\n[`schema`][Self::schema] is deserialized as an exact v1 marker.\n\n# Determinism\n\nTwo `CreditFactorModel` values constructed from identical inputs serialize\nto byte-identical JSON. This relies on:\n- [`issuer_betas`][Self::issuer_betas] sorted by `issuer_id`.\n- All maps using `BTreeMap`.\n- [`crate::FactorModelConfig`] respecting its own factor ordering.",
       "properties": {
         "anchor_state": {
           "$ref": "#/$defs/LevelsAtAnchor",
@@ -2942,7 +2942,7 @@
     },
     "FactorCovarianceMatrix": {
       "additionalProperties": false,
-      "description": "User-supplied factor covariance matrix with row-major storage.\n\nThe factor ID order is part of the contract: row `i`, column `j`\ncorresponds to `factor_ids[i]` and `factor_ids[j]`.\n\n# Units contract\n\nEntries are **annualized (co)variances of factor moves expressed in each\nfactor's canonical bump unit** — the same unit the sensitivity engines use\nfor deltas (see [`crate::factor::BumpSizeConfig`] / [`crate::factor::FactorType::bump_units`]):\nbasis points for rates/credit/inflation, percent for equity/commodity/FX,\nvol points for volatility. With sensitivities `s` in P&L-per-canonical-unit\nand `Σ` in canonical-unit², `sᵀΣs` is directly an annual P&L variance.\nMixing conventions — e.g. a covariance in decimal² (`0.0001²` per bp²)\nagainst per-bp sensitivities — mis-scales portfolio variance by `1e8`.\nThe credit calibrator produces matrices in this convention from the spread\npanel's native units; hand-built matrices must match it.",
+      "description": "User-supplied factor covariance matrix with row-major storage.\n\nThe factor ID order is part of the contract: row `i`, column `j`\ncorresponds to `factor_ids[i]` and `factor_ids[j]`.\n\n# Units contract\n\nEntries are **annualized (co)variances of factor moves expressed in each\nfactor's canonical bump unit** — the same unit the sensitivity engines use\nfor deltas (see [`crate::BumpSizeConfig`] / [`crate::FactorType::bump_units`]):\nbasis points for rates/credit/inflation, percent for equity/commodity/FX,\nvol points for volatility. With sensitivities `s` in P&L-per-canonical-unit\nand `Σ` in canonical-unit², `sᵀΣs` is directly an annual P&L variance.\nMixing conventions — e.g. a covariance in decimal² (`0.0001²` per bp²)\nagainst per-bp sensitivities — mis-scales portfolio variance by `1e8`.\nThe credit calibrator produces matrices in this convention from the spread\npanel's native units; hand-built matrices must match it.",
       "properties": {
         "data": {
           "description": "Annualized (co)variances in row-major order, `n * n` entries, each in\nits factors' canonical bump units squared. The matrix is symmetric, so\n`data[i * n + j]` equals `data[j * n + i]`.",
@@ -3260,7 +3260,7 @@
     },
     "FoldUpRecord": {
       "additionalProperties": false,
-      "description": "Record of a single fold-up event during calibration.\n\nFold-up means **omit the sparse child factor** and set `β_k = 0` at that\nlevel. The issuer already sits in the parent bucket, so its residual\ncontinues to contribute to the parent mean. This is not a re-tagging of\nthe issuer into a different leaf.\n\n# Where the folded risk lands\n\nNo factor is re-assigned: the variation the sparse bucket's factor would\nhave carried stays in each member's residual and flows into the\nper-issuer **adder** (idiosyncratic) vol. Members of the same folded\nbucket therefore share a common component that Σ represents as\n*uncorrelated* idiosyncratic risk — holding several names from one folded\nbucket overstates diversification for that component. Lower the level's\n[`BucketSizeThresholds`][crate::factor::credit::calibration::BucketSizeThresholds]\nentry if that correlation materially matters for a thin bucket.",
+      "description": "Record of a single fold-up event during calibration.\n\nFold-up means **omit the sparse child factor** and set `β_k = 0` at that\nlevel. The issuer already sits in the parent bucket, so its residual\ncontinues to contribute to the parent mean. This is not a re-tagging of\nthe issuer into a different leaf.\n\n# Where the folded risk lands\n\nNo factor is re-assigned: the variation the sparse bucket's factor would\nhave carried stays in each member's residual and flows into the\nper-issuer **adder** (idiosyncratic) vol. Members of the same folded\nbucket therefore share a common component that Σ represents as\n*uncorrelated* idiosyncratic risk — holding several names from one folded\nbucket overstates diversification for that component. Lower the level's\n[`BucketSizeThresholds`][crate::credit::calibration::BucketSizeThresholds]\nentry if that correlation materially matters for a thin bucket.",
       "properties": {
         "folded_to": {
           "description": "Deepest surviving ancestor bucket path (e.g. `\"IG.EU\"`), recorded for\ndiagnostics only. The member's risk is **not** re-assigned to this\nbucket's factor — the parent level was already peeled at `k − 1`; the\nsparse bucket's own variation moves into the issuer adder instead.",
@@ -4619,7 +4619,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Calibrated credit hierarchy matcher.\n\nEmits `(credit::generic, β_pc)` plus\n`(credit::level{idx}::{dim_path}::{val_path}, β_level{idx})` entries\nusing calibrated betas from\n[`crate::factor::credit::hierarchy::CreditFactorModel`].",
+          "description": "Calibrated credit hierarchy matcher.\n\nEmits `(credit::generic, β_pc)` plus\n`(credit::level{idx}::{dim_path}::{val_path}, β_level{idx})` entries\nusing calibrated betas from\n[`crate::credit::hierarchy::CreditFactorModel`].",
           "properties": {
             "credit_hierarchical": {
               "$ref": "#/$defs/CreditHierarchicalConfig"
@@ -5883,7 +5883,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/FactorVolModel"
           },
-          "description": "EWMA or sample vol model for each systematic factor.\n\nKeys are factor IDs from [`crate::factor::FactorModelConfig`].\n`BTreeMap` for deterministic serialization order.",
+          "description": "EWMA or sample vol model for each systematic factor.\n\nKeys are factor IDs from [`crate::FactorModelConfig`].\n`BTreeMap` for deterministic serialization order.",
           "type": "object"
         },
         "idiosyncratic": {

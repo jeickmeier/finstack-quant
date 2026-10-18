@@ -18,9 +18,7 @@
 //! work the threshold is supposed to optimise.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use finstack_quant_models::factor::risk::{
-    historical_var_decomposition, PositionRiskDecomposition,
-};
+use finstack_quant_factor::risk::{historical_var_decomposition, PositionRiskDecomposition};
 
 fn bench_historical_tail_threshold(c: &mut Criterion) {
     let mut group = c.benchmark_group("historical_decomp_tail");
