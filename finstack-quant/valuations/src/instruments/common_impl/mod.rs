@@ -28,6 +28,7 @@ pub mod example_constants {
 // Shared utilities and helper functions
 pub mod helpers;
 pub mod listed;
+pub mod margin;
 // Shared volatility override/surface resolution.
 pub mod vol_resolution;
 

@@ -45,12 +45,12 @@ pub use family::{Family, RegisterMetrics, RegisterPricers};
 pub use json::{
     instrument_envelope_from_spec, instrument_from_spec, list_models, list_models_grouped,
     list_standard_metrics, list_standard_metrics_grouped, metric_metadata, metric_value,
-    parse_boxed_instrument_from_json, parse_instrument_from_json, parse_model_key,
-    parse_typed_instrument_json, present_standard_option_greeks, pretty_instrument_json,
-    price_instrument, validate_instrument_json, validate_typed_instrument_json, MetricMetadata,
-    ParsedInstrument, STANDARD_OPTION_GREEKS,
+    parse_boxed_instrument_from_json, parse_instrument_from_json, parse_typed_instrument_json,
+    present_standard_option_greeks, pretty_instrument_json, price_instrument,
+    validate_instrument_json, validate_typed_instrument_json, MetricMetadata, ParsedInstrument,
+    STANDARD_OPTION_GREEKS,
 };
-pub use keys::{InstrumentType, ModelKey, PricerKey};
+pub use keys::{parse_model_key, InstrumentType, ModelKey, PricerKey};
 #[doc(hidden)]
 pub use registry::stamp_results_meta;
 pub use registry::{expect_inst, Pricer, PricerRegistry, PricingDispatch};

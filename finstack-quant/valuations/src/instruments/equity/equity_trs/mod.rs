@@ -14,6 +14,7 @@
 //! level basket decomposition, stochastic equity dynamics, early termination,
 //! and bespoke fees are outside this instrument.
 
+mod marginable;
 pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;

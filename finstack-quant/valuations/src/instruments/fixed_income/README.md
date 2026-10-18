@@ -99,7 +99,7 @@ sites, which are *not* all named after the directory:
 | Instrument key | `InstrumentType` variant in `src/pricer/keys.rs` |
 | JSON tag | One line in `with_instrument_json_registry!` in `../json_loader.rs`, category `"fixed_income"`. Current tags: `bond`, `convertible_bond`, `inflation_linked_bond`, `term_loan`, `revolving_credit`, `asset_backed_facility`, `agency_mbs_passthrough`, `agency_tba`, `agency_cmo`, `dollar_roll`, `trs_fixed_income_index`, `bond_future`, `structured_credit`. `bond_future`, `structured_credit` and `asset_backed_facility` are registered `boxed:` because of their size |
 | Metrics | `register_<name>_metrics(&mut MetricRegistry)` in the leaf's `metrics/`, called from `register_metrics` in `family.rs` |
-| Margin | Optional `finstack_quant_margin::Marginable` impl in `../marginable.rs`, reached only through `Instrument::as_marginable` |
+| Margin | Optional `finstack_quant_margin::Marginable` impl in the instrument's `marginable.rs` (`fi_trs/marginable.rs`), reached only through `Instrument::as_marginable` |
 | Schemas | `mise run rust-gen-schemas`, verified by `mise run rust-check-schemas` |
 
 ## Tests and benches

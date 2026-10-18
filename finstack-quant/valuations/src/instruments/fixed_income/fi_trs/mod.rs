@@ -5,6 +5,7 @@
 //! a carry analytic, not a full index mark-to-market model; see
 //! [`FiIndexTotalReturnSwap`] for its inputs and limitations.
 
+mod marginable;
 pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;

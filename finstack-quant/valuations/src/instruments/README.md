@@ -41,7 +41,6 @@ Files at this level:
 | `mod.rs` | Asset-class module declarations and the flat public re-export list |
 | `json_loader.rs` | `InstrumentEnvelope`, `InstrumentJson`, and the registry macro |
 | `pricing_overrides.rs` | `InstrumentPricingOverrides`, `MetricPricingOverrides`, `ScenarioPricingOverrides`, `ModelConfig`, `BumpConfig` |
-| `marginable.rs` | private `finstack_quant_margin::Marginable` impls, reached only through `Instrument::as_marginable` |
 | `model_params.rs` | `ModelParamsSnapshot` used by attribution |
 | `position.rs` | `Position` (long/short direction) |
 | `breakeven.rs` | `BreakevenConfig`, `BreakevenMode`, `BreakevenTarget` |

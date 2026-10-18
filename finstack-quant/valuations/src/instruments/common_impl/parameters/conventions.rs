@@ -120,7 +120,7 @@ impl BondConvention {
     ///
     /// Schedules are generated backward from maturity, so an off-cycle issue
     /// date produces a short first coupon. Callers with explicit long/front/
-    /// back terms override this through [`crate::instruments::Bond::with_stub`].
+    /// back terms override this through the bond's `with_stub`.
     pub fn stub_convention(&self) -> StubKind {
         StubKind::ShortFront
     }

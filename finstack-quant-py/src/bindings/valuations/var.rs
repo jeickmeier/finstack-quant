@@ -142,7 +142,10 @@ fn calculate_var(
             &history,
             as_of,
             &config,
-            PricingDispatch::from_model(&model)?,
+            PricingDispatch::from_model(
+                &model,
+                finstack_quant_valuations::pricer::STANDARD.shared_pricers(),
+            )?,
             finstack_quant_calibration::recalibration::pricing_options().recalibration_provider,
         )
     })

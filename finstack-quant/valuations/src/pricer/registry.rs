@@ -140,26 +140,30 @@ impl PricingDispatch {
     /// Select the dispatch for a host-supplied model key.
     ///
     /// This is the model argument of the host historical-VaR entry points
-    /// (Rust `metrics::risk::calculate_var`): `"default"` keeps each instrument's canonical default
-    /// path, any other key reprices every instrument through that model in the
-    /// shared standard pricer registry.
+    /// (Rust `metrics::risk::calculate_var`): `"default"` keeps each
+    /// instrument's canonical default path, any other key reprices every
+    /// instrument through that model in `registry`.
     ///
     /// # Arguments
     ///
     /// * `model` - `"default"`, or a canonical model key such as
-    ///   `"discounting"` or `"hazard_rate"` (see [`super::list_models`]).
+    ///   `"discounting"` or `"hazard_rate"` (the umbrella crate's `pricer::list_models`
+    ///   lists them).
+    /// * `registry` - Shared registry the explicit model is resolved in;
+    ///   unused for `"default"`. Host entry points pass the standard
+    ///   registry (`STANDARD.shared_pricers()`).
     ///
     /// # Errors
     ///
     /// Returns `Error::Validation` when `model` is not a recognised model key.
-    pub fn from_model(model: &str) -> finstack_quant_core::Result<Self> {
+    pub fn from_model(
+        model: &str,
+        registry: Arc<PricerRegistry>,
+    ) -> finstack_quant_core::Result<Self> {
         if model == "default" {
             Ok(Self::InstrumentDefault)
         } else {
-            Ok(Self::registered(
-                super::parse_model_key(model)?,
-                super::shared_standard_registry(),
-            ))
+            Ok(Self::registered(super::parse_model_key(model)?, registry))
         }
     }
 
@@ -221,8 +225,8 @@ impl PricingDispatch {
 impl PricerRegistry {
     /// Create a new empty pricer registry.
     ///
-    /// For pre-configured registries with all standard pricers, use
-    /// [`standard_pricer_registry()`](super::standard_pricer_registry).
+    /// For pre-configured registries with all standard pricers, use the
+    /// umbrella crate's `pricer::standard_pricer_registry()`.
     pub fn new() -> Self {
         Self::default()
     }

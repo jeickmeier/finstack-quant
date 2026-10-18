@@ -151,8 +151,6 @@
 #[doc(hidden)]
 pub mod common_impl;
 
-mod marginable;
-
 /// Shared pricing helpers used by this crate and `finstack-quant-calibration`.
 pub mod pricing {
     pub use super::common_impl::pricing::hw1f_params;

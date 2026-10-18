@@ -640,6 +640,27 @@ impl PricerKey {
     }
 }
 
+/// Parse a concrete model key named by host callers.
+///
+/// This function only accepts named [`ModelKey`] values. The special
+/// exact `"default"` selector is handled by the pricing entry
+/// points, where it resolves to the instrument's default model.
+///
+/// # Arguments
+///
+/// * `model` - Canonical textual model key, such as `"discounting"` or
+///   `"black76"`.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `model` is not a supported concrete model
+/// key.
+pub fn parse_model_key(model: &str) -> finstack_quant_core::Result<ModelKey> {
+    model.parse::<ModelKey>().map_err(|e| {
+        finstack_quant_core::Error::Validation(format!("Unknown model key: '{model}'. {e}"))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -720,5 +741,36 @@ mod tests {
         ] {
             assert!(value.parse::<ModelKey>().is_err(), "accepted {value:?}");
         }
+    }
+
+    #[test]
+    fn parse_model_key_recognizes_standard_keys() {
+        assert_eq!(
+            parse_model_key("discounting").expect("ok"),
+            ModelKey::Discounting
+        );
+        assert_eq!(parse_model_key("tree").expect("ok"), ModelKey::Tree);
+        assert_eq!(parse_model_key("black76").expect("ok"), ModelKey::Black76);
+        assert_eq!(
+            parse_model_key("hull_white_1f").expect("ok"),
+            ModelKey::HullWhite1F
+        );
+        assert_eq!(
+            parse_model_key("hazard_rate").expect("ok"),
+            ModelKey::HazardRate
+        );
+        assert_eq!(
+            parse_model_key("rates_credit").expect("ok"),
+            ModelKey::RatesCredit
+        );
+        assert_eq!(parse_model_key("normal").expect("ok"), ModelKey::Normal);
+        assert_eq!(
+            parse_model_key("monte_carlo_gbm").expect("ok"),
+            ModelKey::MonteCarloGBM
+        );
+        assert_eq!(
+            parse_model_key("bond_future_clean_price_proxy").expect("ok"),
+            ModelKey::BondFutureCleanPriceProxy
+        );
     }
 }

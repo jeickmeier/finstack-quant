@@ -11,7 +11,7 @@
 //! Pricing with no explicit registry resolves through the instrument's
 //! family, so a family is self-contained: its own registries price its own
 //! instruments and compute their metrics. The umbrella family
-//! [`STANDARD`](crate::pricer::STANDARD) merges every family for closed-world
+//! `STANDARD` (umbrella crate) merges every family for closed-world
 //! callers: the JSON entry points, registry introspection, and the composite
 //! instruments that can hold any leg.
 //!

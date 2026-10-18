@@ -818,12 +818,15 @@ mod tests {
 
     #[test]
     fn pricing_dispatch_from_model_maps_default_and_explicit_keys() -> Result<()> {
-        assert!(PricingDispatch::from_model("default")?.model().is_none());
+        let registry = || crate::pricer::Family::unregistered().shared_pricers();
+        assert!(PricingDispatch::from_model("default", registry())?
+            .model()
+            .is_none());
         assert_eq!(
-            PricingDispatch::from_model("discounting")?.model(),
+            PricingDispatch::from_model("discounting", registry())?.model(),
             Some(crate::pricer::ModelKey::Discounting)
         );
-        assert!(PricingDispatch::from_model("no_such_model").is_err());
+        assert!(PricingDispatch::from_model("no_such_model", registry()).is_err());
         Ok(())
     }
 

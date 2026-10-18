@@ -135,6 +135,7 @@
 //! - `ProtectionLegSpec` for protection leg configuration
 //! - CDS metrics module for CDS risk metrics (CS01, DV01, recovery sensitivity)
 
+mod marginable;
 pub(crate) mod metrics;
 pub(crate) mod pricing;
 mod types;

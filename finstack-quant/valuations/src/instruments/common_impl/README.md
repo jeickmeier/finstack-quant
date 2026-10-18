@@ -29,6 +29,7 @@ numeric-serde helpers that keep instrument invariants uniform.
 | `parameters/` | Shared parameter types (see table below) |
 | `pricing/` | Shared pricing kernels (see table below) |
 | `dependencies.rs` | `MarketDependencies`, `InstrumentCurves`, `RatesCurveKind`, `FxPair`, `VolatilityDependency` |
+| `margin.rs` | Helpers shared by the instruments' `Marginable` impls: repriced DV01 / CS01 lookups, SIMM tenor buckets, reference-entity parsing, credit-delta classification, netting-set ids |
 | `helpers.rs` | `ValidatedPricingLifecycle`, metric-context construction, `schedule_pv*`, GBM drift schedules, market-scalar lookups, Black-Scholes input collection, inflation-lag resolution |
 | `validation.rs` | Structural invariant checks (`validate_date_range_strict`, `validate_money_gt`, `validate_recovery_rate`, `validate_rate_magnitude`, …) |
 | `numeric.rs` | `decimal_to_f64` plus the serde adapters that reject non-finite / out-of-range `f64` on the wire |
@@ -143,7 +144,7 @@ Optional hooks with defaults worth knowing about:
 | `valuation_details()` | `None` | The result must carry typed details, e.g. the FX-triangulation flag |
 | `seed_metric_context()` | no-op | Cashflow generation is expensive and the metrics pipeline would redo it |
 | `metrics_equivalent()` / `has_custom_metrics_equivalent()` | `clone_box()` / `false` | Spread and yield metrics need a normalized cashflow basis (PIK → cash) |
-| `as_marginable()` | `None` | The type implements `finstack_quant_margin::Marginable` (impls live in `../marginable.rs`) |
+| `as_marginable()` | `None` | The type implements `finstack_quant_margin::Marginable` (the impl lives in the instrument's own `marginable.rs`; shared helpers in `margin.rs`) |
 | `model_params_snapshot()` / `with_model_params()` | `ModelParamsSnapshot::None` (the variant, not `Option::None`) / clone-or-error | Attribution must revalue the instrument with isolated model parameters |
 | `scenario_spread_shock_supported()` | `false` | The pricer consumes `scenario_spread_shock_bp` exactly, with no silent no-op |
 | `fx_exposure()`, `expiry()`, `repo_curve_id()`, `to_instrument_json()` | `None` | The instrument has the corresponding concept |

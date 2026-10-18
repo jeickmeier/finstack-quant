@@ -29,6 +29,7 @@
 //! reinvestment economics, and currency/funding basis beyond supplied market
 //! data are outside this model.
 
+mod marginable;
 pub(crate) mod metrics;
 mod types;
 

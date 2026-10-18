@@ -89,6 +89,7 @@
 //! - `IndexPricing` for intrinsic vs index-level pricing mode
 //! - index metrics module for index risk metrics
 
+mod marginable;
 pub(crate) mod metrics;
 pub(crate) mod parameters;
 pub(crate) mod pricer;

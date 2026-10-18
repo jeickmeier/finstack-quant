@@ -93,6 +93,7 @@
 //! - swap metrics module for swap-specific risk metrics
 
 pub(crate) mod cashflow;
+mod marginable;
 pub(crate) mod metrics;
 /// Interest rate swap pricer implementation
 pub(crate) mod pricer;
