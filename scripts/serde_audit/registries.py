@@ -119,7 +119,6 @@ NON_MAINTAINED_SERDE_EXCEPTIONS = (
 RESULT_ALIAS_EXCEPTIONS = tuple(
     entry
     for crate, path in (
-        ("analytics", "src/correlation/mod.rs"),
         ("core", "src/error/mod.rs"),
         ("models", "src/correlation/error.rs"),
         ("portfolio", "src/error.rs"),
@@ -164,7 +163,7 @@ RUNTIME_RESULT_EXCEPTIONS = (
         ("GbmEuropeanFdSpec",),
         "runtime-spec",
     ),
-    *_runtime_exception("core", "src/math/linalg.rs", ("LedoitWolfResult",)),
+    *_runtime_exception("core", "src/math/linalg/mod.rs", ("LedoitWolfResult",)),
     *_runtime_exception(
         "statements",
         "src/capital_structure/waterfall/mod.rs",

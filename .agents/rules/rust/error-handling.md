@@ -28,7 +28,7 @@ which wraps it). That reuse is the default, not drift.
 
 Module-scoped `thiserror` enums for a narrow failure domain are a separate,
 allowed thing and do not make a crate a root-`Error` crate — for example
-`analytics::correlation::Error`, `models::correlation::Error`,
+`core::math::linalg::CorrelationError`, `models::correlation::Error`,
 `models::factor::matching::FactorMatchError`, and
 `models::factor::credit::decomposition::DecompositionError`. (`test-utils` is a
 dev-only supporting crate, not one of the 14 domain crates; it has a small

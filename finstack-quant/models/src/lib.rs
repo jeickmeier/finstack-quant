@@ -29,8 +29,6 @@
 //! - `closed_form`: Closed-form and semi-analytical pricing formulas (Black-Scholes Greeks,
 //!   Asian, Barrier, Lookback, Quanto, Heston)
 //! - `fourier`: Characteristic functions and COS-method pricing engines
-//! - `factor`: Factor definitions, matching, covariance, sensitivity matrices,
-//!   and hierarchical credit-factor calibration
 //! - `rates`: Interest-rate models, the HW1F Monte Carlo / LSMC engines and dynamic
 //!   term-structure engines
 //! - `liquidity`: Liquidity risk estimators and market-impact models
@@ -38,14 +36,19 @@
 //! - `trees`: Tree-based methods (Binomial, Trinomial, Multi-factor, Short-rate)
 //! - `pde`: Finite difference PDE methods (1D Crank-Nicolson, 2D Craig-Sneyd ADI, Heston, American penalty)
 //!
-//! Credit copulas, recovery models, and factor models live in [`crate::correlation`].
+//! Credit copulas, recovery models, and latent-factor models live in [`crate::correlation`].
+//!
+//! Multi-asset factor models (definitions, matching, covariance, risk
+//! decomposition and credit-factor calibration) are the separate
+//! `finstack-quant-factor` crate. This crate must not depend on it: every
+//! valuations crate depends on this one, so the edge would make a factor edit
+//! rebuild the pricing stack.
 
 extern crate self as finstack_quant_models;
 
 pub mod closed_form;
 pub mod correlation;
 pub mod credit;
-pub mod factor;
 pub mod fourier;
 pub mod liquidity;
 pub mod monte_carlo;

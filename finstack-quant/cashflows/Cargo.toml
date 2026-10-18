@@ -31,6 +31,7 @@ jsonschema-validate = ["json-schema", "dep:jsonschema"]
 name = "gen_cashflow_schemas"
 path = "src/bin/gen_schemas.rs"
 required-features = ["json-schema"]
+test = false
 
 [dev-dependencies]
 criterion = { workspace = true }

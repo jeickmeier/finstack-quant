@@ -29,6 +29,7 @@ finstack-quant-cashflows = { path = "../finstack-quant/cashflows", version = "0.
 finstack-quant-covenants = { path = "../finstack-quant/covenants", version = "0.11.0" }
 finstack-quant-margin = { path = "../finstack-quant/margin", version = "0.11.0" }
 finstack-quant-models = { path = "../finstack-quant/models", version = "0.11.0" }
+finstack-quant-factor = { path = "../finstack-quant/factor", version = "0.11.0" }
 finstack-quant-valuations = { path = "../finstack-quant/valuations", version = "0.11.0" }
 finstack-quant-calibration = { path = "../finstack-quant/calibration", version = "0.11.0" }
 finstack_quant = { package = "finstack-quant", path = "../finstack-quant", version = "0.11.0", features = ["jsonschema-validate"] }

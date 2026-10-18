@@ -1,5 +1,4 @@
 //! Numerical and boundary regressions for analytics kernels.
-use finstack_quant_analytics::correlation::{nearest_correlation, NearestCorrelationOpts};
 use finstack_quant_analytics::{
     max_drawdown, sharpe, sortino, volatility, CagrDayCount, Performance, ReturnKind,
 };
@@ -365,17 +364,6 @@ fn neutral_periods_do_not_change_binary_kelly_fraction() {
     close(decisive.kelly_criterion, 0.5);
     close(neutral.kelly_criterion, decisive.kelly_criterion);
     close(neutral.win_rate, 0.5);
-}
-
-#[test]
-fn nearest_correlation_preserves_already_feasible_off_diagonal() {
-    let output = nearest_correlation(
-        &[1.0005, 0.5, 0.5, 1.0005],
-        2,
-        NearestCorrelationOpts::default(),
-    )
-    .unwrap();
-    assert_eq!(output, vec![1.0, 0.5, 0.5, 1.0]);
 }
 
 #[test]

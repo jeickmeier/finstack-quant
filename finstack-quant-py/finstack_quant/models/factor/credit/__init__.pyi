@@ -1,7 +1,7 @@
 """
 Credit factor hierarchy: calibration, decomposition, and covariance forecasts.
 
-Bindings for ``finstack-quant-models::factor`` credit hierarchy artifacts. Models
+Bindings for ``finstack-quant-factor`` credit hierarchy artifacts. Models
 are JSON-first: calibrate or load a :class:`CreditFactorModel`, decompose
 observed spreads into level/adder components, link period-to-period changes, and
 forecast factor covariance for risk reporting.

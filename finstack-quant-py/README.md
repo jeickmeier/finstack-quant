@@ -308,7 +308,7 @@ documented deviations from strict crate mirroring live there:
   mirrors `finstack_quant_models::correlation` (copulas, `CreditExposure`,
   portfolio-loss simulation); the shared correlation-matrix helpers
   (`validate_correlation_matrix`, `nearest_correlation`) are canonically owned
-  by `finstack_quant_analytics::correlation` and re-exported through
+  by `finstack_quant_core::math::linalg` and re-exported through
   `finstack_quant_models::correlation`. `nearest_correlation` uses the same
   canonical name in Rust and Python (WASM: `nearestCorrelation`).
 - `reporting` is pure Python with no Rust crate and no WASM parity.

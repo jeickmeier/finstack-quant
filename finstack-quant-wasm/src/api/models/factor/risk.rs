@@ -9,7 +9,7 @@ use crate::utils::input::{
 };
 use crate::utils::{to_js_err, to_js_value};
 
-use finstack_quant_models::factor::risk::PositionRiskDecomposition;
+use finstack_quant_factor::risk::PositionRiskDecomposition;
 use wasm_bindgen::prelude::*;
 
 // Position-level VaR / ES decomposition and risk budgeting
@@ -43,9 +43,7 @@ pub fn parametric_var_decomposition(
     compute_incremental: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
-    use finstack_quant_models::factor::risk::{
-        flatten_square_matrix, parametric_var_decomposition,
-    };
+    use finstack_quant_factor::risk::{flatten_square_matrix, parametric_var_decomposition};
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let weights = js_f64_seq(&weights, "weights")?;
     let covariance = js_f64_matrix(&covariance, "covariance")?;
@@ -90,7 +88,7 @@ pub fn parametric_es_decomposition(
     confidence: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
-    use finstack_quant_models::factor::risk::{flatten_square_matrix, parametric_es_decomposition};
+    use finstack_quant_factor::risk::{flatten_square_matrix, parametric_es_decomposition};
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let weights = js_f64_seq(&weights, "weights")?;
     let covariance = js_f64_matrix(&covariance, "covariance")?;
@@ -126,9 +124,7 @@ pub fn historical_var_decomposition(
     confidence: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
-    use finstack_quant_models::factor::risk::{
-        flatten_position_pnls, historical_var_decomposition,
-    };
+    use finstack_quant_factor::risk::{flatten_position_pnls, historical_var_decomposition};
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let position_pnls = js_f64_matrix(&position_pnls, "positionPnls")?;
 
@@ -171,7 +167,7 @@ pub fn evaluate_risk_budget(
 ) -> Result<JsValue, JsValue> {
     let portfolio_var = js_f64(&portfolio_var, "portfolioVar")?;
     let utilization_threshold = js_opt_f64(utilization_threshold.as_ref(), "utilizationThreshold")?;
-    use finstack_quant_models::factor::risk::{
+    use finstack_quant_factor::risk::{
         evaluate_risk_budget as eval_risk_budget, DEFAULT_UTILIZATION_THRESHOLD,
     };
     let ids = js_string_seq(&position_ids, "positionIds")?;
@@ -183,9 +179,9 @@ pub fn evaluate_risk_budget(
         .map_err(to_js_err)?;
     let js = crate::utils::to_js_value(&result)?;
     let positions = js_sys::Reflect::get(&js, &JsValue::from("positions"))?;
-    crate::utils::restore_non_finite_rows::<
-        finstack_quant_models::factor::risk::PositionBudgetEntry,
-    >(&positions)?;
+    crate::utils::restore_non_finite_rows::<finstack_quant_factor::risk::PositionBudgetEntry>(
+        &positions,
+    )?;
     Ok(js)
 }
 
@@ -196,7 +192,7 @@ pub fn evaluate_risk_budget(
 /// @returns The threshold as a fraction of the risk budget.
 #[wasm_bindgen(js_name = defaultUtilizationThreshold)]
 pub fn default_utilization_threshold() -> f64 {
-    finstack_quant_models::factor::risk::DEFAULT_UTILIZATION_THRESHOLD
+    finstack_quant_factor::risk::DEFAULT_UTILIZATION_THRESHOLD
 }
 
 /// Attribute the portfolio loss in tail scenarios to positions.
@@ -220,7 +216,7 @@ pub fn build_stress_attribution(
     position_pnls: JsValue,
     confidence: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    use finstack_quant_models::factor::risk::{build_stress_attribution, flatten_position_pnls};
+    use finstack_quant_factor::risk::{build_stress_attribution, flatten_position_pnls};
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let position_pnls = js_f64_matrix(&position_pnls, "positionPnls")?;
     let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;

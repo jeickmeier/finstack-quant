@@ -51,7 +51,8 @@ finstack-quant/
 │   ├── covenants/                # covenant specs, evaluation, forecasting
 │   ├── features/                 # vectorized panel feature transforms
 │   ├── margin/                   # CSA/VM/IM, SIMM, FRTB-SBA, SA-CCR, XVA
-│   ├── models/                   # analytical, numerical, factor, credit, correlation, stochastic models
+│   ├── models/                   # analytical, numerical, credit, correlation, stochastic models
+│   ├── factor/                   # multi-asset factor models (umbrella path models::factor)
 │   ├── valuations/               # instruments, pricing, recalibration port, metrics, results
 │   │   └── macros/               # `FinancialBuilder` derive used by valuations
 │   ├── statements/               # statement model graph and period evaluation
@@ -89,7 +90,8 @@ JSON Schema generation and validation; they do not change pricing behavior.
 | [`finstack-quant-covenants`](finstack-quant/covenants/README.md) | `finstack_quant::covenants` | Covenant specs, evaluation engine, threshold schedules, forecasting, standard packages |
 | [`finstack-quant-features`](finstack-quant/features/README.md) | `finstack_quant::features` | Time-series, cross-sectional, and panel feature transforms over `Option<f64>` columns |
 | [`finstack-quant-margin`](finstack-quant/margin/README.md) | `finstack_quant::margin` | CSA/repo terms, VM and IM engines (SIMM, schedule, haircut, CCP), collateral metrics, XVA config, regulatory capital |
-| [`finstack-quant-models`](finstack-quant/models/README.md) | `finstack_quant::models` | Closed-form/Fourier formulas, volatility, rates/DTSM, credit and structured-credit pool models, factor risk, liquidity, PDE/tree engines, and Monte Carlo |
+| [`finstack-quant-models`](finstack-quant/models/README.md) | `finstack_quant::models` | Closed-form/Fourier formulas, volatility, rates/DTSM, credit and structured-credit pool models, liquidity, PDE/tree engines, and Monte Carlo |
+| [`finstack-quant-factor`](finstack-quant/factor/README.md) | `finstack_quant::models::factor` | Factor definitions and matching, covariance, sensitivity matrices, risk decomposition, and hierarchical credit-factor calibration |
 | [`finstack-quant-valuations`](finstack-quant/valuations/README.md) | `finstack_quant::valuations` | Instruments, market resolution, pricing registries, recalibration provider contract, metrics, and result envelopes |
 | [`finstack-quant-statements`](finstack-quant/statements/README.md) | `finstack_quant::statements` | Statement model graph, DSL formulas, forecasting, corkscrews, deterministic period evaluation |
 | [`finstack-quant-statements-analytics`](finstack-quant/statements-analytics/README.md) | `finstack_quant::statements_analytics` | Sensitivity, scenario sets, variance, DCF, goal seek, covenant forecasting, backtesting, templates |

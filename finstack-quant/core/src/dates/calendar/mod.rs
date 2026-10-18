@@ -92,7 +92,7 @@
 //! # See Also
 //!
 //! - [`super::HolidayCalendar`] for the core trait
-//! - [`super::calendar_by_id`] for calendar lookup by code
+//! - [`super::calendar_by_id_strict`] for calendar lookup by code
 //! - [`super::available_calendars`] for discovery of supported calendar identifiers
 //! - [`super::BusinessDayConvention`] for adjustment conventions
 //! - [`super::CompositeCalendar`] for combining calendars

@@ -31,14 +31,17 @@ Workspace (umbrella crate: finstack-quant)
  │ Domain crates (14 bound in Python/WASM)                                                     │
  │                                                                                             │
  │  core                 ← primitives: money/fx, dates, market data, math, expr engine, config │
- │  analytics            ← performance/risk statistics, correlation-matrix helpers             │
+ │  analytics            ← performance/risk statistics, `beta`, regression                     │
  │  cashflows            ← schedule generation, accrual, currency-safe dated flows             │
  │  covenants            ← covenant definition, evaluation, breach forecasting                 │
  │  features             ← vectorized panel feature transforms (bindings-facing leaf)          │
  │  margin               ← CSA specs, VM/IM (SIMM, schedule, CCP), FRTB-SBA, SA-CCR, XVA       │
  │  models               ← model kernels: closed-form, Monte Carlo (Philox RNG, processes,     │
  │                         payoffs, engine), PDE, trees, Fourier, vol, short-rate, credit,     │
- │                         factor models, copulas/correlation, liquidity                       │
+ │                         copulas/correlation, liquidity                                      │
+ │  factor               ← multi-asset factor models: definitions, matching, covariance,       │
+ │                         risk decomposition, credit-factor calibration (umbrella path        │
+ │                         `models::factor`)                                                   │
  │  valuations/core      ← pricing framework: Instrument trait, pricer/metric registries,     │
  │                         Family, results, market conventions (no instrument types)           │
  │  valuations/{rates,   ← one crate per instrument family (packages                           │
@@ -69,7 +72,8 @@ Workspace (umbrella crate: finstack-quant)
 
 Dependency direction (read off the manifests):
   core → {analytics, cashflows, covenants, features, margin}
-  core + analytics + cashflows → models
+  core + cashflows → models
+  core + analytics → factor
   core + cashflows + covenants + margin + models → valuations/core
   valuations/core → valuations/{rates, fixed-income, credit, equity, fx, exotics} (in parallel)
   valuations/fixed-income + valuations/rates → valuations/structured-credit
@@ -77,8 +81,9 @@ Dependency direction (read off the manifests):
   valuations/{core, rates, credit} (+ core, cashflows, models) → calibration
   calibration + valuations → attribution
   valuations (+ core, cashflows) → statements → statements-analytics (+ covenants, models)
+  factor + calibration + valuations → attribution
   {attribution, calibration, models, statements, valuations} → scenarios
-  {attribution, calibration, cashflows, margin, models, scenarios, valuations} → portfolio
+  {attribution, calibration, cashflows, factor, margin, models, scenarios, valuations} → portfolio
 
   Short form: core → cashflows/models → valuations/core → the family crates → valuations →
   calibration → attribution → statements/scenarios → portfolio.
@@ -92,9 +97,16 @@ Dependency direction (read off the manifests):
   facility) depends on fixed-income and rates and is re-exported under its old paths.
   `margin` depends only on `core`; exposure generation is out of its scope. The
   `Marginable` trait is the seam and `valuations` implements it.
-  `models` depends on `analytics`, `cashflows` and `core` only; Monte Carlo and
-  factor models are modules of it (`models::monte_carlo`, `models::factor`),
-  not crates.
+  `models` depends on `cashflows` and `core` only; Monte Carlo is a module of it
+  (`models::monte_carlo`), not a crate. Factor models are the separate crate
+  `finstack-quant-factor` (`finstack-quant/factor`, on `core` + `analytics`):
+  `models` must never depend on or re-export it, because every valuations crate
+  depends on `models` and a factor edit would then rebuild the pricing stack.
+  Its consumers (attribution, portfolio, the bindings) depend on it directly;
+  the umbrella mounts it at `finstack_quant::models::factor` (a `pub mod models`
+  block), so the public path and the Python/WASM `models.factor` namespaces are
+  unchanged. Correlation-matrix validation and nearest-correlation repair live
+  in `core::math::linalg`.
   `calibration` depends on `valuations/{core, rates, credit}` (it calibrates against
   the rates and credit pricers) and dev-depends on the umbrella for its
   `InstrumentJson` tests; no valuations crate depends on `calibration`.
@@ -117,7 +129,8 @@ Dependency direction (read off the manifests):
 - **attribution**: Multi-period P&L attribution, including waterfall, Taylor and metrics-based methods.
 - **cashflows**: Schedule generation, accrual calculations and currency-safe dated flows.
 - **covenants**: Covenant definitions, evaluation and breach forecasting.
-- **models**: Model kernels shared by pricers and calibrators: closed-form (Black-Scholes, Black-76, Bachelier), Monte Carlo (processes, discretization, Philox RNG, payoffs, engine), PDE, lattice trees, Fourier/COS, volatility (SABR, surfaces), short-rate, credit (PD, migration), factor models (matching, credit calibration, covariance), copulas/correlation and liquidity.
+- **models**: Model kernels shared by pricers and calibrators: closed-form (Black-Scholes, Black-76, Bachelier), Monte Carlo (processes, discretization, Philox RNG, payoffs, engine), PDE, lattice trees, Fourier/COS, volatility (SABR, surfaces), short-rate, credit (PD, migration), copulas/correlation and liquidity.
+- **factor**: Multi-asset factor models: factor definitions and matching, covariance, sensitivity matrices, risk decomposition and hierarchical credit-factor calibration (umbrella path `models::factor`).
 - **calibration**: Discount/forward/hazard/inflation curve bootstraps, vol-surface and SABR fits, base correlation and global calibration with validation and reporting.
 - **features**: Vectorized panel feature transforms.
 - **valuations**: Instrument cashflows, pricer registry, metrics/risk; currency‑preserving period aggregation; explicit FX collapse with policy stamping; private‑credit and real‑estate readiness.

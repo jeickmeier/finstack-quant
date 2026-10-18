@@ -33,7 +33,7 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyStressAttribution>()?;
     m.add(
         "DEFAULT_UTILIZATION_THRESHOLD",
-        finstack_quant_models::factor::risk::DEFAULT_UTILIZATION_THRESHOLD,
+        finstack_quant_factor::risk::DEFAULT_UTILIZATION_THRESHOLD,
     )?;
 
     m.add_function(wrap_pyfunction!(parametric_var_decomposition, m)?)?;

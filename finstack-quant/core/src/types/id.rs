@@ -392,7 +392,7 @@ pub type UnderlyingId = Id<UnderlyingTag>;
 /// Type-safe identifier for holiday calendar lookups.
 ///
 /// This is the canonical calendar identity type used by instrument fields and
-/// by [`crate::dates::calendar_by_id`] and [`crate::dates::calendar_by_id_strict`].
+/// by [`crate::dates::calendar_by_id_strict`].
 pub type CalendarId = Id<CalendarTag>;
 /// Type-safe identifier for securitized pools
 pub type PoolId = Id<PoolTag>;
@@ -401,7 +401,7 @@ pub type DealId = Id<DealTag>;
 /// Type-safe identifier for a credit issuer.
 ///
 /// This is the canonical key used throughout the credit factor model hierarchy
-/// in `finstack-quant-models::factor`, in `VolState::idiosyncratic`, and anywhere
+/// in `finstack-quant-factor`, in `VolState::idiosyncratic`, and anywhere
 /// a per-issuer lookup is required.
 pub type IssuerId = Id<IssuerTag>;
 

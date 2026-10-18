@@ -340,7 +340,7 @@ impl GaussHermiteQuadrature {
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`](crate::Error::Validation) when:
+/// Returns [`Error::Validation`] when:
 /// - `n` is zero
 /// - `n` is not an even number
 ///
@@ -409,7 +409,7 @@ where
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`](crate::Error::Validation) for non-finite endpoints, or a negative or
+/// Returns [`Error::Validation`] for non-finite endpoints, or a negative or
 /// non-finite tolerance.
 ///
 /// Returns [`Error::Input`] wrapping [`InputError::SolverConvergenceFailed`] if the
@@ -640,7 +640,7 @@ fn gl_nodes_weights(order: usize) -> Result<(&'static [f64], &'static [f64]), Er
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`](crate::Error::Validation) when:
+/// Returns [`Error::Validation`] when:
 /// - `a` or `b` is not finite (NaN or infinity)
 /// - `order` is not one of the supported values (2, 4, 8, 16)
 ///
@@ -707,7 +707,7 @@ where
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`](crate::Error::Validation) when either bound is non-finite, the
+/// Returns [`Error::Validation`] when either bound is non-finite, the
 /// interval is empty or reversed, `panels` is zero, or `order` is unsupported.
 pub fn gauss_legendre_grid(
     a: f64,
@@ -756,7 +756,7 @@ pub fn gauss_legendre_grid(
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`](crate::Error::Validation) when:
+/// Returns [`Error::Validation`] when:
 /// - `panels` is zero
 /// - `order` is unsupported (see [`gauss_legendre_integrate`])
 ///
@@ -813,7 +813,7 @@ where
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`](crate::Error::Validation) for non-finite endpoints, a negative or
+/// Returns [`Error::Validation`] for non-finite endpoints, a negative or
 /// non-finite tolerance, or an unsupported quadrature order. Returns
 /// [`InputError::SolverConvergenceFailed`] when the summed error estimate
 /// exceeds `tol` at `max_depth`, or the value or error estimate is non-finite.

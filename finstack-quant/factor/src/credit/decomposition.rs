@@ -1,0 +1,745 @@
+//! Pure decomposition of issuer spreads into hierarchy-level factor values.
+//!
+//! Given a calibrated [`CreditFactorModel`][crate::credit::hierarchy::CreditFactorModel]
+//! and observed issuer spreads at a point in time,
+//! [`decompose_levels`][crate::credit::decomposition::decompose_levels] peels off
+//! the generic (PC) component and each hierarchy level in turn, producing a
+//! [`LevelsAtDate`][crate::credit::decomposition::LevelsAtDate] snapshot.
+//!
+//! [`decompose_period`][crate::credit::decomposition::decompose_period] then
+//! differences two [`LevelsAtDate`][crate::credit::decomposition::LevelsAtDate]
+//! snapshots into a
+//! [`PeriodDecomposition`][crate::credit::decomposition::PeriodDecomposition]
+//! that preserves the linear reconciliation
+//! invariant
+//!
+//! ```text
+//! ΔS_i ≡ β_i^PC · Δgeneric
+//!        + Σ_k β_i^level_k · ΔL_level_k(g_i^k)
+//!        + Δadder_i
+//! ```
+//!
+//! to absolute tolerance `1e-10` for every issuer present in both snapshots.
+//!
+//! # Determinism
+//!
+//! All keyed maps are [`std::collections::BTreeMap`] so the output is byte-stable for byte-stable
+//! input. The function performs no I/O and reads no global state.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+use crate::credit::hierarchy::{
+    CreditFactorModel, HierarchyDimension, IssuerBetaRow, IssuerBetas, IssuerTags,
+};
+use crate::credit::units::{decimal_to_bp, validate_decimal_spread};
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::types::IssuerId;
+
+/// Per-level bucket values produced by a single decomposition.
+///
+/// The `values` map is keyed by the dotted bucket path (e.g. `"IG.EU.FIN"`),
+/// matching the convention used elsewhere in the credit hierarchy artifact.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct LevelValuesAtDate {
+    /// Zero-based index of this level inside [`crate::credit::hierarchy::CreditHierarchySpec::levels`].
+    pub level_index: usize,
+    /// Dimension identifier for this level, copied from the hierarchy spec.
+    pub dimension: HierarchyDimension,
+    /// Bucket → mean residual at this level, computed across all issuers
+    /// in the input spread set whose tags placed them in that bucket.
+    pub values: BTreeMap<String, f64>,
+}
+
+/// Snapshot of all hierarchy-level factor values at a single date,
+/// produced from observed issuer spreads.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct LevelsAtDate {
+    /// Date the spreads were observed.
+    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    pub date: Date,
+    /// Generic (PC) factor value at `date`. Equal to the input
+    /// `observed_generic` and propagated unchanged.
+    pub generic: f64,
+    /// Per-level bucket values, in hierarchy spec order.
+    pub by_level: Vec<LevelValuesAtDate>,
+    /// Per-issuer residual after peeling generic + every level.
+    pub adder: BTreeMap<IssuerId, f64>,
+}
+
+/// Per-level bucket-value deltas produced by [`decompose_period`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct LevelValuesDelta {
+    /// Zero-based level index, mirroring [`LevelValuesAtDate::level_index`].
+    pub level_index: usize,
+    /// Dimension for this level.
+    pub dimension: HierarchyDimension,
+    /// Bucket → `(to.values[bucket] - from.values[bucket])`. Only buckets
+    /// present in **both** snapshots are included.
+    pub deltas: BTreeMap<String, f64>,
+}
+
+/// Difference between two [`LevelsAtDate`] snapshots.
+///
+/// Only issuers and buckets present in **both** snapshots are included so that
+/// the linear reconciliation invariant on `ΔS_i` holds for every entry.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct PeriodDecomposition {
+    /// Earlier snapshot date.
+    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    pub from: Date,
+    /// Later snapshot date.
+    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    pub to: Date,
+    /// `to.generic - from.generic`.
+    pub d_generic: f64,
+    /// Per-level bucket deltas. Same length and same `level_index` /
+    /// `dimension` ordering as [`LevelsAtDate::by_level`].
+    pub by_level: Vec<LevelValuesDelta>,
+    /// Per-issuer adder deltas (`to - from`), restricted to issuers present
+    /// in both snapshots.
+    pub d_adder: BTreeMap<IssuerId, f64>,
+}
+
+fn ensure_finite(label: &str, value: f64) -> finstack_quant_core::Result<()> {
+    if value.is_finite() {
+        Ok(())
+    } else {
+        Err(finstack_quant_core::Error::Validation(format!(
+            "{label} must be finite, got {value}"
+        )))
+    }
+}
+
+/// Deserialize `json` as `T`, naming `type_name` in the validation error.
+fn parse_json<T: serde::de::DeserializeOwned>(
+    json: &str,
+    type_name: &str,
+) -> finstack_quant_core::Result<T> {
+    serde_json::from_str(json).map_err(|error| {
+        finstack_quant_core::Error::Validation(format!("invalid {type_name} JSON: {error}"))
+    })
+}
+
+/// Serialize `value` to compact JSON, naming `type_name` in the error.
+fn to_json_text<T: serde::Serialize>(
+    value: &T,
+    type_name: &str,
+) -> finstack_quant_core::Result<String> {
+    serde_json::to_string(value).map_err(|error| {
+        finstack_quant_core::Error::Validation(format!("cannot serialize {type_name}: {error}"))
+    })
+}
+
+fn level_out_of_range(level_index: usize, n_levels: usize) -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Validation(format!(
+        "level_index {level_index} out of range (n_levels={n_levels})"
+    ))
+}
+
+impl LevelsAtDate {
+    /// Bucket values for one hierarchy level.
+    ///
+    /// # Arguments
+    ///
+    /// * `level_index` - Zero-based position in [`Self::by_level`], i.e. the
+    ///   hierarchy spec's level order; must be less than `by_level.len()`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `level_index`
+    /// is not a valid level position.
+    pub fn level(&self, level_index: usize) -> finstack_quant_core::Result<&LevelValuesAtDate> {
+        self.by_level
+            .get(level_index)
+            .ok_or_else(|| level_out_of_range(level_index, self.by_level.len()))
+    }
+
+    /// Load and validate a snapshot from its canonical JSON form.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - `LevelsAtDate` JSON as produced by [`Self::to_json`]:
+    ///   `date` (ISO-8601), `generic`, `by_level` and `adder`, all levels in
+    ///   basis points.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when the JSON is
+    /// malformed or does not match the snapshot shape, or when a numeric
+    /// field is non-finite (see [`Self::validate`]).
+    pub fn from_json(json: &str) -> finstack_quant_core::Result<Self> {
+        let levels: Self = parse_json(json, "LevelsAtDate")?;
+        levels.validate()?;
+        Ok(levels)
+    }
+
+    /// Serialize the snapshot to compact canonical JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when a numeric
+    /// field is non-finite, which JSON cannot represent.
+    pub fn to_json(&self) -> finstack_quant_core::Result<String> {
+        self.validate()?;
+        to_json_text(self, "LevelsAtDate")
+    }
+
+    /// Reject any non-finite generic, bucket, or adder value.
+    ///
+    /// `serde_json` encodes `NaN`/`±inf` as `null`, so [`Self::from_json`]
+    /// and [`Self::to_json`] call this on every round trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] naming the first
+    /// non-finite field.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        ensure_finite("generic", self.generic)?;
+        for level in &self.by_level {
+            for (bucket, value) in &level.values {
+                ensure_finite(
+                    &format!("by_level[{}].values[{bucket}]", level.level_index),
+                    *value,
+                )?;
+            }
+        }
+        for (issuer, value) in &self.adder {
+            ensure_finite(&format!("adder[{}]", issuer.as_str()), *value)?;
+        }
+        Ok(())
+    }
+}
+
+impl PeriodDecomposition {
+    /// Bucket deltas for one hierarchy level.
+    ///
+    /// # Arguments
+    ///
+    /// * `level_index` - Zero-based position in [`Self::by_level`], i.e. the
+    ///   hierarchy spec's level order; must be less than `by_level.len()`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `level_index`
+    /// is not a valid level position.
+    pub fn level(&self, level_index: usize) -> finstack_quant_core::Result<&LevelValuesDelta> {
+        self.by_level
+            .get(level_index)
+            .ok_or_else(|| level_out_of_range(level_index, self.by_level.len()))
+    }
+
+    /// Load and validate a period decomposition from its canonical JSON form.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - `PeriodDecomposition` JSON as produced by [`Self::to_json`]:
+    ///   `from` and `to` (ISO-8601), `d_generic`, `by_level` and `d_adder`,
+    ///   all deltas in basis points.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when the JSON is
+    /// malformed or does not match the decomposition shape, or when a numeric
+    /// field is non-finite (see [`Self::validate`]).
+    pub fn from_json(json: &str) -> finstack_quant_core::Result<Self> {
+        let period: Self = parse_json(json, "PeriodDecomposition")?;
+        period.validate()?;
+        Ok(period)
+    }
+
+    /// Serialize the decomposition to compact canonical JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when a numeric
+    /// field is non-finite, which JSON cannot represent.
+    pub fn to_json(&self) -> finstack_quant_core::Result<String> {
+        self.validate()?;
+        to_json_text(self, "PeriodDecomposition")
+    }
+
+    /// Reject any non-finite generic, bucket, or adder delta.
+    ///
+    /// See [`LevelsAtDate::validate`] for the rationale.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] naming the first
+    /// non-finite field.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        ensure_finite("d_generic", self.d_generic)?;
+        for level in &self.by_level {
+            for (bucket, value) in &level.deltas {
+                ensure_finite(
+                    &format!("by_level[{}].deltas[{bucket}]", level.level_index),
+                    *value,
+                )?;
+            }
+        }
+        for (issuer, value) in &self.d_adder {
+            ensure_finite(&format!("d_adder[{}]", issuer.as_str()), *value)?;
+        }
+        Ok(())
+    }
+}
+
+/// Failure modes for the decomposition routines.
+#[derive(Debug, Clone, PartialEq, thiserror::Error, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum DecompositionError {
+    /// An issuer appeared in `observed_spreads` but had no
+    /// [`IssuerBetaRow`] in the model and no entry in `runtime_tags`.
+    #[error(
+        "issuer {issuer_id} is not in CreditFactorModel.issuer_betas and no \
+         runtime_tags entry was supplied"
+    )]
+    UnknownIssuer {
+        /// The issuer that could not be resolved.
+        issuer_id: IssuerId,
+    },
+    /// An issuer (model-resident or runtime-supplied) was missing the tag for
+    /// a hierarchy dimension.
+    #[error("issuer {issuer_id} is missing the tag for dimension {dimension}")]
+    MissingTag {
+        /// The issuer with the missing tag.
+        issuer_id: IssuerId,
+        /// Canonical key (per [`crate::credit::hierarchy::dimension_key`]) of the missing dimension.
+        dimension: String,
+    },
+    /// The model is internally inconsistent — typically `IssuerBetas.levels`
+    /// or `LevelsAtAnchor.by_level` does not match `hierarchy.levels.len()`.
+    #[error("CreditFactorModel is inconsistent: {reason}")]
+    ModelInconsistent {
+        /// Free-form diagnostic explaining the mismatch.
+        reason: String,
+    },
+    /// The two snapshots passed to [`decompose_period`] disagree on the number
+    /// of hierarchy levels or on the dimension assigned to each level.
+    #[error("snapshot shape mismatch: {reason}")]
+    SnapshotShapeMismatch {
+        /// Free-form diagnostic explaining the mismatch.
+        reason: String,
+    },
+    /// The two snapshots passed to [`decompose_period`] are out of order
+    /// (`from.date > to.date`).
+    #[error("decompose_period requires from.date <= to.date, got from={from} to={to}")]
+    DateMismatchInPeriod {
+        /// Date supplied as `from` (the later of the two).
+        from: Date,
+        /// Date supplied as `to` (the earlier of the two).
+        to: Date,
+    },
+    /// An observed spread or the generic factor value was not a finite
+    /// decimal in `(-0.5, 2.0)`.
+    ///
+    /// Callers pass decimal spreads (`0.01` = 100 bp). Values such as
+    /// `100.0` are rejected as looking like basis points. A single NaN
+    /// would otherwise silently poison every bucket mean.
+    #[error("invalid decimal spread: {label} = {value}")]
+    InvalidDecimalSpread {
+        /// Which input was invalid (issuer id or "observed_generic").
+        label: String,
+        /// The offending value.
+        value: f64,
+    },
+    /// DTS bucket weighting could not be formed for an observed issuer.
+    ///
+    /// Typical causes: a [`BucketWeighting::Dts`][crate::credit::calibration::BucketWeighting::Dts]
+    /// artifact is missing a persisted spread duration, or
+    /// `spread_duration × current_spread_bp` is not `> 0`.
+    #[error("invalid DTS weight: {reason}")]
+    InvalidDtsWeight {
+        /// Why the DTS weight could not be formed.
+        reason: String,
+    },
+}
+
+impl DecompositionError {
+    /// Classify this error for host-language exception mapping: an issuer
+    /// with no model row or runtime tags is a not-found error, an internally
+    /// inconsistent model a computation error, and every other variant
+    /// rejects the input (validation).
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        use finstack_quant_core::error::ErrorKind;
+        match self {
+            Self::UnknownIssuer { .. } => ErrorKind::NotFound,
+            Self::ModelInconsistent { .. } => ErrorKind::Computation,
+            Self::MissingTag { .. }
+            | Self::SnapshotShapeMismatch { .. }
+            | Self::DateMismatchInPeriod { .. }
+            | Self::InvalidDecimalSpread { .. }
+            | Self::InvalidDtsWeight { .. } => ErrorKind::Validation,
+        }
+    }
+}
+
+/// Indexes every issuer beta row by `issuer_id` for O(log n) lookup.
+fn index_issuer_betas(model: &CreditFactorModel) -> BTreeMap<&IssuerId, &IssuerBetaRow> {
+    let mut idx = BTreeMap::new();
+    for row in &model.issuer_betas {
+        idx.insert(&row.issuer_id, row);
+    }
+    idx
+}
+
+// decompose_levels
+
+/// Decompose observed issuer spreads at `as_of` into per-level factor values
+/// and per-issuer residual adders.
+///
+/// # Algorithm
+///
+/// 1. Validate the model: every `IssuerBetas.levels` must have length equal to
+///    `hierarchy.levels.len()`.
+/// 2. **PC peel.** For each issuer `i` with observed spread `S_i`, compute
+///    `r_1_i = S_i - β_i^PC · observed_generic`.
+/// 3. **Level peel.** For each level `k` in `0..L`:
+///    - Group issuers by their bucket path at level `k`
+///      (e.g. `"IG.EU"` for level 1).
+///    - Compute `L_k(g)` as the **weighted** mean of residuals in `g`
+///      (equal or DTS per [`CreditFactorModel::bucket_weighting`]).
+///    - Update `r_(k+2)_i = r_(k+1)_i - β_i^level_k · L_k(g_i^k)`.
+///   4. The remaining residual `r_(L+1)_i` is the per-issuer adder.
+///
+/// # Universe-difference handling (design §5.4)
+///
+/// - An issuer in `observed_spreads` but absent from `model.issuer_betas` is
+///   accepted iff `runtime_tags` contains its tag map. Such an issuer is
+///   treated as `BucketOnly` (`β = 1`). For issuers that *do* have a model
+///   row, the row's tags are authoritative and any `runtime_tags` entry for
+///   them is ignored.
+/// - An issuer in `model.issuer_betas` but absent from `observed_spreads` is
+///   silently skipped.
+/// - A hierarchy bucket present in `model.anchor_state` but with no current
+///   issuers is omitted from the output (rather than emitting `0.0`),
+///   so that callers can distinguish "no data" from "data, value 0".
+///
+/// Note: `decompose_levels` only processes `observed_spreads`; an issuer in
+/// `observed_spreads` is always in some bucket of size ≥ 1 (its own residual).
+/// The §5.4 "β=0 fallback for empty bucket" applies at attribution time,
+/// not here.
+///
+/// # Arguments
+///
+/// * `model` - Calibrated credit-factor model that defines hierarchy buckets,
+///   factor loadings, issuer tags, and anchor state.
+/// * `observed_spreads` - Current issuer spread observations, keyed by issuer.
+///   Values are **decimal** (`0.01` = 100 bp) and must lie in `(-0.5, 2.0)`.
+///   They are converted to bp before peeling; returned factor levels and
+///   adders are in bp.
+/// * `observed_generic` - Current generic principal-component factor value in
+///   the same **decimal** units as `observed_spreads`.
+/// * `as_of` - Observation date attached to the resulting factor snapshot.
+/// * `runtime_tags` - Optional tags for issuers absent from `model`; supplied
+///   issuers use unit betas and model-resident issuer tags remain authoritative.
+///
+/// # Errors
+///
+/// - [`DecompositionError::ModelInconsistent`] when an issuer's `betas.levels`
+///   length disagrees with `hierarchy.levels.len()`.
+/// - [`DecompositionError::UnknownIssuer`] when an issuer is in
+///   `observed_spreads` but neither in the model nor in `runtime_tags`.
+/// - [`DecompositionError::MissingTag`] when an issuer's tags do not cover
+///   every hierarchy dimension.
+/// - [`DecompositionError::InvalidDecimalSpread`] when a spread or the generic
+///   level is non-finite, outside `(-0.5, 2.0)`, or looks like basis points.
+/// - [`DecompositionError::InvalidDtsWeight`] when the model uses DTS
+///   weighting and an observed issuer is missing a persisted duration or
+///   `SD × current_spread_bp` is not `> 0`.
+pub fn decompose_levels(
+    model: &CreditFactorModel,
+    observed_spreads: &BTreeMap<IssuerId, f64>,
+    observed_generic: f64,
+    as_of: Date,
+    runtime_tags: Option<&BTreeMap<IssuerId, IssuerTags>>,
+) -> Result<LevelsAtDate, DecompositionError> {
+    let num_levels = model.hierarchy.levels.len();
+    let beta_idx = index_issuer_betas(model);
+
+    // Reject non-decimal inputs up front, then convert to bp so the peel
+    // and every output (generic, bucket levels, adders) stay in bp.
+    if validate_decimal_spread("observed_generic", observed_generic).is_err() {
+        return Err(DecompositionError::InvalidDecimalSpread {
+            label: "observed_generic".to_owned(),
+            value: observed_generic,
+        });
+    }
+    let observed_generic = decimal_to_bp(observed_generic);
+    let mut observed_spreads_bp = BTreeMap::new();
+    for (issuer, spread) in observed_spreads {
+        if validate_decimal_spread(issuer.as_str(), *spread).is_err() {
+            return Err(DecompositionError::InvalidDecimalSpread {
+                label: issuer.as_str().to_owned(),
+                value: *spread,
+            });
+        }
+        observed_spreads_bp.insert(issuer.clone(), decimal_to_bp(*spread));
+    }
+    let observed_spreads = &observed_spreads_bp;
+
+    // Step 0 — defensive shape check on model.issuer_betas. Cheap: O(N).
+    for row in &model.issuer_betas {
+        if row.betas.levels.len() != num_levels {
+            return Err(DecompositionError::ModelInconsistent {
+                reason: format!(
+                    "issuer {:?}: betas.levels.len() = {}, expected {num_levels}",
+                    row.issuer_id.as_str(),
+                    row.betas.levels.len()
+                ),
+            });
+        }
+    }
+    let mut folded_pairs: BTreeSet<(IssuerId, usize)> = BTreeSet::new();
+    for record in &model.diagnostics.fold_ups {
+        if record.level_index >= num_levels {
+            return Err(DecompositionError::ModelInconsistent {
+                reason: format!(
+                    "fold-up record for issuer {:?} has level_index {}, expected < {num_levels}",
+                    record.issuer_id.as_str(),
+                    record.level_index
+                ),
+            });
+        }
+        folded_pairs.insert((record.issuer_id.clone(), record.level_index));
+    }
+
+    // Pre-resolve, for every issuer in the input spread map, the
+    // (betas, tags) pair we need. Either the model row supplies both, or
+    // runtime_tags supplies tags and we synthesize unit betas.
+    //
+    // We materialize the unit-beta vector once and share it via reference
+    // to avoid an allocation per runtime issuer.
+    let unit = IssuerBetas::unit(num_levels);
+
+    struct Resolved<'a> {
+        betas: &'a IssuerBetas,
+        tags: &'a IssuerTags,
+    }
+
+    let mut resolved: BTreeMap<&IssuerId, Resolved<'_>> = BTreeMap::new();
+    for issuer in observed_spreads.keys() {
+        if let Some(row) = beta_idx.get(issuer) {
+            resolved.insert(
+                issuer,
+                Resolved {
+                    betas: &row.betas,
+                    tags: &row.tags,
+                },
+            );
+        } else if let Some(tags) = runtime_tags.and_then(|m| m.get(issuer)) {
+            resolved.insert(issuer, Resolved { betas: &unit, tags });
+        } else {
+            return Err(DecompositionError::UnknownIssuer {
+                issuer_id: issuer.clone(),
+            });
+        }
+    }
+
+    // Pre-compute every issuer's bucket path at every level. A missing tag at
+    // any level is a hard error here; we surface the canonical dimension key.
+    //
+    // bucket_paths[issuer][k] = "IG.EU.FIN" or analogous.
+    let mut bucket_paths: BTreeMap<IssuerId, Vec<String>> = BTreeMap::new();
+    for (issuer, r) in &resolved {
+        let paths = model.hierarchy.bucket_paths(r.tags).map_err(|dimension| {
+            DecompositionError::MissingTag {
+                issuer_id: (*issuer).clone(),
+                dimension,
+            }
+        })?;
+        bucket_paths.insert((*issuer).clone(), paths);
+    }
+
+    let betas_ref: BTreeMap<&IssuerId, &IssuerBetas> = resolved
+        .iter()
+        .map(|(issuer, resolved)| (*issuer, resolved.betas))
+        .collect();
+    let mut folded_owned: BTreeMap<IssuerId, Vec<bool>> = BTreeMap::new();
+    for (issuer, level_index) in folded_pairs {
+        folded_owned
+            .entry(issuer)
+            .or_insert_with(|| vec![false; num_levels])[level_index] = true;
+    }
+    let mut durations = BTreeMap::new();
+    for issuer in observed_spreads.keys() {
+        if let Some(row) = beta_idx.get(issuer) {
+            durations.insert((*issuer).clone(), row.spread_duration);
+        }
+    }
+    let weighted_issuers: Vec<&IssuerId> = match model.bucket_weighting {
+        super::calibration::BucketWeighting::Equal => observed_spreads.keys().collect(),
+        super::calibration::BucketWeighting::Dts => durations.keys().collect(),
+    };
+    let weights = super::peel::issuer_bucket_weights(
+        model.bucket_weighting,
+        weighted_issuers.into_iter(),
+        &durations,
+        observed_spreads,
+    )
+    .map_err(|reason| DecompositionError::InvalidDtsWeight { reason })?;
+    let peel = super::peel::peel_single_observation(super::peel::PeelSingleObservation {
+        observed_spreads,
+        observed_generic,
+        betas: &betas_ref,
+        bucket_paths: &bucket_paths,
+        folded: &folded_owned,
+        num_levels,
+        weights: &weights,
+    });
+    let by_level: Vec<LevelValuesAtDate> = peel
+        .by_level
+        .into_iter()
+        .enumerate()
+        .map(|(k, values)| LevelValuesAtDate {
+            level_index: k,
+            dimension: model.hierarchy.levels[k].clone(),
+            values,
+        })
+        .collect();
+
+    Ok(LevelsAtDate {
+        date: as_of,
+        generic: observed_generic,
+        by_level,
+        adder: peel.adder,
+    })
+}
+
+// decompose_period
+
+/// Difference two [`LevelsAtDate`] snapshots component-wise.
+///
+/// Output buckets and issuers are restricted to those present in **both**
+/// snapshots — a one-sided entry would not satisfy the reconciliation
+/// invariant on `ΔS_i` and is therefore omitted rather than emitted with an
+/// implicit `0.0`.
+///
+/// # Reconciliation contract: same model, same tags
+///
+/// The per-issuer identity `ΔS_i = β_i^PC·Δgeneric + Σ_k β_i^k·ΔL_k + Δadder_i`
+/// holds only when both snapshots were produced by the **same model vintage**
+/// and the issuer's bucket paths are unchanged between them. If an issuer's
+/// tags migrate between snapshots (e.g. a rating change moves it from
+/// `IG.…` to `HY.…`), its deltas mix levels of different buckets and the
+/// identity does not hold for that issuer. Snapshots do not carry per-issuer
+/// bucket membership, so this function cannot detect migration itself;
+/// callers attributing across a re-tagging event must split the period at
+/// the migration date.
+///
+/// # Arguments
+///
+/// * `from` - Earlier levels snapshot produced by the applicable model vintage.
+/// * `to` - Later levels snapshot from the same model vintage and unchanged
+///   issuer tag assignments.
+///
+/// # Errors
+///
+/// - [`DecompositionError::DateMismatchInPeriod`] when `from.date > to.date`.
+/// - [`DecompositionError::SnapshotShapeMismatch`] when the two snapshots
+///   disagree on hierarchy depth or on the dimension at any level.
+pub fn decompose_period(
+    from: &LevelsAtDate,
+    to: &LevelsAtDate,
+) -> Result<PeriodDecomposition, DecompositionError> {
+    if from.date > to.date {
+        return Err(DecompositionError::DateMismatchInPeriod {
+            from: from.date,
+            to: to.date,
+        });
+    }
+    if from.by_level.len() != to.by_level.len() {
+        return Err(DecompositionError::SnapshotShapeMismatch {
+            reason: format!(
+                "from.by_level.len() = {}, to.by_level.len() = {}",
+                from.by_level.len(),
+                to.by_level.len()
+            ),
+        });
+    }
+    for (a, b) in from.by_level.iter().zip(to.by_level.iter()) {
+        if a.level_index != b.level_index || a.dimension != b.dimension {
+            return Err(DecompositionError::SnapshotShapeMismatch {
+                reason: format!(
+                    "level {}/{}: dimensions disagree (from={:?}, to={:?})",
+                    a.level_index, b.level_index, a.dimension, b.dimension
+                ),
+            });
+        }
+    }
+
+    let d_generic = to.generic - from.generic;
+
+    let mut by_level = Vec::with_capacity(from.by_level.len());
+    for (a, b) in from.by_level.iter().zip(to.by_level.iter()) {
+        let mut deltas: BTreeMap<String, f64> = BTreeMap::new();
+        for (bucket, v_from) in &a.values {
+            if let Some(v_to) = b.values.get(bucket) {
+                deltas.insert(bucket.clone(), v_to - v_from);
+            }
+        }
+        by_level.push(LevelValuesDelta {
+            level_index: a.level_index,
+            dimension: a.dimension.clone(),
+            deltas,
+        });
+    }
+
+    let mut d_adder: BTreeMap<IssuerId, f64> = BTreeMap::new();
+    for (issuer, v_from) in &from.adder {
+        if let Some(v_to) = to.adder.get(issuer) {
+            d_adder.insert(issuer.clone(), v_to - v_from);
+        }
+    }
+
+    Ok(PeriodDecomposition {
+        from: from.date,
+        to: to.date,
+        d_generic,
+        by_level,
+        d_adder,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use time::Month;
+
+    fn levels(day: u8, generic: f64) -> LevelsAtDate {
+        LevelsAtDate {
+            date: finstack_quant_core::dates::create_date(2024, Month::March, day).unwrap(),
+            generic,
+            by_level: vec![LevelValuesAtDate {
+                level_index: 0,
+                dimension: HierarchyDimension::Rating,
+                values: BTreeMap::from([("IG".to_owned(), 10.0)]),
+            }],
+            adder: BTreeMap::from([(IssuerId::new("A"), 1.5)]),
+        }
+    }
+
+    #[test]
+    fn json_round_trips_and_rejects_non_finite_values() {
+        let from = levels(28, 100.0);
+        let json = from.to_json().unwrap();
+        assert_eq!(LevelsAtDate::from_json(&json).unwrap(), from);
+
+        let period = decompose_period(&from, &levels(29, 101.0)).unwrap();
+        let json = period.to_json().unwrap();
+        assert_eq!(PeriodDecomposition::from_json(&json).unwrap(), period);
+
+        // NaN cannot be written, and the `null` serde_json would write for it
+        // cannot be read back.
+        assert!(levels(28, f64::NAN).to_json().is_err());
+        let null_generic = json.replace("\"d_generic\":1.0", "\"d_generic\":null");
+        assert_ne!(null_generic, json);
+        assert!(PeriodDecomposition::from_json(&null_generic).is_err());
+        assert!(LevelsAtDate::from_json("{").is_err());
+    }
+}

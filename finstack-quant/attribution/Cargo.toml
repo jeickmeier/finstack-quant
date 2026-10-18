@@ -15,6 +15,7 @@ finstack-quant-core = { path = "../core", version = "0.11.0", default-features =
 finstack-quant-cashflows = { path = "../cashflows", version = "0.11.0", default-features = false }
 finstack-quant-calibration = { path = "../calibration", version = "0.11.0", default-features = false }
 finstack-quant-models = { path = "../models", version = "0.11.0", default-features = false }
+finstack-quant-factor = { path = "../factor", version = "0.11.0", default-features = false }
 finstack-quant-valuations = { path = "../valuations", version = "0.11.0", default-features = false }
 indexmap = { workspace = true, features = ["serde"] }
 schemars = { workspace = true, optional = true }
@@ -31,6 +32,7 @@ json-schema = [
     "finstack-quant-cashflows/json-schema",
     "finstack-quant-calibration/json-schema",
     "finstack-quant-models/json-schema",
+    "finstack-quant-factor/json-schema",
     "finstack-quant-valuations/json-schema",
 ]
 
@@ -46,6 +48,7 @@ time = { workspace = true, features = ["macros"] }
 name = "gen_attribution_schemas"
 path = "src/bin/gen_schemas.rs"
 required-features = ["json-schema"]
+test = false
 
 [[bench]]
 name = "attribution"

@@ -55,7 +55,7 @@ from finstack_quant.models.rates import dtsm, hull_white
 
 ROOT = Path(__file__).parents[2]
 GOLDEN = Path(__file__).parent / "data" / "models_parity_golden.json"
-CANONICAL_MODEL = ROOT / "finstack-quant/models/tests/data/canonical/credit_factor_model.json"
+CANONICAL_MODEL = ROOT / "finstack-quant/factor/tests/data/canonical/credit_factor_model.json"
 
 # Monte Carlo and iterative results go through libm on each target; everything
 # else is closed form. See INVARIANTS.md section 2.1.

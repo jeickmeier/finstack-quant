@@ -3,13 +3,12 @@
 
 use super::{LookbackReturns, Performance};
 use crate::aggregation::{group_period_buckets, period_stats_inner, PeriodStats, PeriodicReturn};
-use crate::correlation::{
-    nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts,
-};
 use crate::dates::{Date, FiscalConfig, PeriodKind};
 use crate::drawdown::{drawdown_details, to_drawdown_series, DrawdownEpisode};
 use crate::lookback;
-use crate::math::linalg::unflatten_square;
+use crate::math::linalg::{
+    nearest_correlation, unflatten_square, validate_correlation_matrix, NearestCorrelationOpts,
+};
 use crate::math::stats::{correlation, mean_var};
 use crate::math::summation::NeumaierAccumulator;
 use crate::returns::{comp_sum, comp_total, excess_returns};
@@ -77,7 +76,7 @@ impl Performance {
     /// uses pairwise intersecting spans. Any non-finite off-diagonal or
     /// zero-variance pair is an error (no silent `NaN` display matrix).
     /// The flattened matrix is then checked with
-    /// [`crate::correlation::validate_correlation_matrix`]; on failure it
+    /// [`crate::math::linalg::validate_correlation_matrix`]; on failure it
     /// is repaired with Higham's nearest-correlation projection.
     ///
     /// # Errors
@@ -89,7 +88,7 @@ impl Performance {
     ///
     /// `(matrix, repaired)`. `matrix` is `n × n` in [`Self::ticker_names`]
     /// order with a unit diagonal and passes
-    /// [`crate::correlation::validate_correlation_matrix`]. `repaired` is
+    /// [`crate::math::linalg::validate_correlation_matrix`]. `repaired` is
     /// `true` when the raw pairwise matrix failed that validation and was
     /// projected to the nearest valid correlation matrix, so a reader can
     /// tell a clean estimate from a repaired one.
@@ -395,8 +394,8 @@ fn finalize_correlation_matrix(matrix: Vec<Vec<f64>>) -> crate::Result<(Vec<Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::correlation::validate_correlation_matrix;
     use crate::dates::{Month, PeriodKind};
+    use crate::math::linalg::validate_correlation_matrix;
     use crate::Performance;
 
     fn jan(day: u8) -> Date {
