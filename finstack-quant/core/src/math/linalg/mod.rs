@@ -15,7 +15,10 @@
 //!   is internalized; the returned [`CorrelationFactor`] applies shocks in original
 //!   variable order.
 //! - **Correlation application**: Transform independent normals to correlated via L
-//! - **Matrix validation**: Check positive-definiteness and correlation properties
+//! - **Matrix validation**: Check positive-definiteness and correlation properties via
+//!   [`validate_correlation_matrix`], with located [`CorrelationError`] diagnostics
+//! - **Nearest correlation repair**: Higham (2002) alternating projections via
+//!   [`nearest_correlation()`] for matrices with small PSD / unit-diagonal defects
 //! - **Ledoit-Wolf shrinkage**: Well-conditioned covariance estimation via [`ledoit_wolf_shrinkage`]
 //!   (Ledoit & Wolf 2004, identity-scaled target, analytic optimal intensity)
 //!
@@ -61,6 +64,10 @@
 
 use crate::{error, Result};
 use thiserror::Error;
+
+mod nearest_correlation;
+
+pub use nearest_correlation::{nearest_correlation, NearestCorrelationOpts};
 
 /// Relative singular threshold for Cholesky decomposition and substitution.
 ///

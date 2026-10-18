@@ -1,11 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use finstack_quant_analytics::correlation::{
-    nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts,
-};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::BumpUnits;
-use finstack_quant_core::math::linalg::unflatten_square;
+use finstack_quant_core::math::linalg::{
+    nearest_correlation, unflatten_square, validate_correlation_matrix, NearestCorrelationOpts,
+};
 use finstack_quant_core::types::IssuerId;
 use finstack_quant_core::Result;
 

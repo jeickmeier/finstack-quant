@@ -265,7 +265,7 @@ status = "exists"
 [crates.analytics.modules]
 aggregation  = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.period_stats; freestanding bindings removed in paredown" }
 benchmark    = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.beta / .greeks / .rolling_greeks; freestanding bindings removed" }
-correlation  = { python = "finstack_quant.models.correlation", status = "exists", note = "Matrix/statistical correlation remains analytics-owned; reusable copula and credit-correlation models are exposed through finstack_quant.models.correlation." }
+correlation  = { python = "finstack_quant.models.correlation", status = "exists", note = "Correlation-matrix validation and nearest-correlation repair are core-owned (core::math::linalg); reusable copula and credit-correlation models are exposed through finstack_quant.models.correlation." }
 drawdown     = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.max_drawdown / .mean_drawdown / .drawdown_series / .drawdown_details" }
 lookback     = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.lookback_returns. Rust, Python, and WASM always expose LookbackReturns.fytd as a non-null per-ticker vector; the serialized field name is fytd." }
 performance  = { python = "finstack_quant.analytics", status = "flattened", note = "Performance class is the sole entry point on finstack_quant.analytics. Canonical Rust Performance::periodic_returns is shared as Python Performance.periodic_returns and WASM Performance.periodicReturns. Rust returns PeriodicReturn {date, value} points: WASM emits them as plain `{date, value}` objects (TS `PeriodicReturn`), Python as `(date, value)` tuples. Rolling methods return Rust DatedSeries {values, dates, value_column} (value_column = Rust RollingMetric name): Python wraps it as the DatedSeries class (to_json is the same object), WASM returns it as a plain object with values as a Float64Array. Rust Performance::correlation_matrix returns (matrix, repaired): Python returns the same `(matrix, repaired)` tuple, WASM the plain object `{matrix, repaired}`. Omitted arguments on both hosts resolve to the Rust `finstack_quant_analytics::DEFAULT_*` constants (DEFAULT_FREQUENCY, DEFAULT_PERIODIC_FREQUENCY, DEFAULT_ROLLING_WINDOW, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_ANNUALIZE, DEFAULT_RISK_FREE_RATE, DEFAULT_MAR — also the omega threshold), ReturnKind::from_label(None, ..) (excess), CagrDayCount::default() (act365_25) and FiscalConfig::from_parts / FiscalConfig::default() (an omitted fiscal month is January, an omitted day the 1st, both omitted is the calendar year)." }
@@ -874,7 +874,7 @@ public = [
 # matching the package __all__ ordering). Python names mirror the canonical
 # Rust names in finstack_quant_models::correlation (LatentFactorKind, not
 # LatentFactor). `nearest_correlation` is canonically owned by
-# finstack_quant_analytics::correlation and re-exported through
+# finstack_quant_core::math::linalg and re-exported through
 # finstack_quant_models::correlation.
 # Errors: `finstack_quant_models::correlation::Error` folds into the core
 # taxonomy (`From<correlation::Error> for core::Error`); non-convergence /

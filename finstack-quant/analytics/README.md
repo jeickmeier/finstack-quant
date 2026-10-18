@@ -5,8 +5,9 @@ Portfolio performance and risk analytics over numeric return series and
 are `Vec<Vec<f64>>` panels and `Vec<Date>` grids, outputs are `Vec<f64>` or
 small serde-derived result structs.
 
-The crate also owns the shared correlation-matrix validation and PSD-repair
-helpers used by `finstack-quant-models` and `finstack-quant-valuations`.
+Correlation-matrix validation and nearest-correlation repair live in
+`finstack_quant_core::math::linalg`; `Performance::correlation_matrix` uses them
+from there.
 
 ## Position in the stack
 
@@ -16,8 +17,7 @@ regression and the constrained least-squares solver. Consumed by:
 
 | Consumer | What it uses |
 |----------|--------------|
-| `finstack-quant-models` | `beta` (OLS slope in the credit peel), `correlation::{nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts}` |
-| `finstack-quant-valuations` | `correlation::*`, re-exported verbatim through `finstack_quant_models::correlation` |
+| `finstack-quant-models` | `beta` (OLS slope in the credit peel) |
 | `finstack-quant` (umbrella) | re-exported as `finstack_quant::analytics` |
 | `finstack-quant-py`, `finstack-quant-wasm` | `Performance`, `regression::constrained_least_squares` |
 
@@ -79,31 +79,9 @@ returns them.
 | `CagrDayCount` | `risk_metrics` | Act/365.25 default or a wrapped core `DayCount` |
 | `DatedSeries` | `risk_metrics` | Returned by `Performance::rolling_*` |
 | `beta` | `benchmark` | Freestanding OLS slope; consumed by `finstack-quant-models::factor` |
-| `correlation` | `correlation` | Public module: shared row-major correlation validation and repair |
 | `regression` | `regression` | Public module: `constrained_least_squares` |
 
 All other analytics building blocks are `pub(crate)`.
-
-### `correlation`
-
-Canonical home for the shared correlation-matrix helpers. Exports:
-
-- `validate_correlation_matrix(matrix, n)` — square-shape, unit-diagonal,
-  symmetry, `[-1, 1]` bounds, and PSD (Cholesky) checks, classifying failures
-  as the canonical core `CorrelationError`, re-exported here as `Error`.
-- `nearest_correlation(matrix, n, opts)` with `NearestCorrelationOpts` —
-  Higham (2002) alternating-projection PSD repair.
-- `Error` — re-export of
-  `finstack_quant_core::math::linalg::CorrelationError`.
-- `Result<T>` — analytics-local convenience alias for
-  `std::result::Result<T, Error>`. The analytics crate does not define a
-  separate correlation error or depend on `thiserror`.
-
-`finstack_quant_models::correlation` re-exports the matrix helpers and opts
-unchanged, and owns a wider `Error` that wraps this crate's matrix failures
-plus credit-domain variants. That merged namespace is a documented deviation
-from strict crate-mirroring, recorded in
-[`finstack-quant-py/parity_contract.toml`](../../finstack-quant-py/parity_contract.toml).
 
 ### `regression`
 

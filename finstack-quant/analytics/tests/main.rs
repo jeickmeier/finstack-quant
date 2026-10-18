@@ -7,8 +7,6 @@
 mod audit_regressions;
 #[path = "correctness_regressions.rs"]
 mod correctness_regressions;
-#[path = "correlation_validator_agreement.rs"]
-mod correlation_validator_agreement;
 #[path = "performance_smoke.rs"]
 mod performance_smoke;
 #[cfg(feature = "json-schema")]

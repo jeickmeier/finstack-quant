@@ -40,7 +40,9 @@
 //! application rejects any silent modification — validate first and let the
 //! caller decide.
 
-use super::{Error, Result};
+use super::CorrelationError as Error;
+
+type Result<T> = std::result::Result<T, Error>;
 
 /// Convergence parameters for [`nearest_correlation()`].
 ///
@@ -149,7 +151,7 @@ pub fn nearest_correlation(
     for i in 0..n {
         unit_diagonal[i * n + i] = 1.0;
     }
-    if finstack_quant_core::math::linalg::cholesky_correlation(&unit_diagonal, n).is_ok() {
+    if super::cholesky_correlation(&unit_diagonal, n).is_ok() {
         return Ok(unit_diagonal);
     }
 
@@ -221,7 +223,7 @@ fn rescale_to_unit_diagonal(matrix: &mut [f64], n: usize) {
 /// eigenvalues (the Higham projection step).
 ///
 /// Spectral decomposition delegates to
-/// [`finstack_quant_core::math::linalg::symmetric_eigen`] (divide-and-conquer
+/// [`super::symmetric_eigen`] (divide-and-conquer
 /// tridiagonal QR, `O(n³)`), which scales to portfolio-size correlation
 /// matrices without the `O(n⁵)` worst case of a hand-rolled Jacobi
 /// sweep.
@@ -230,8 +232,8 @@ fn project_psd(matrix: &[f64], n: usize) -> Result<Vec<f64>> {
         return Ok(Vec::new());
     }
 
-    let (eigenvalues, eigenvectors) = finstack_quant_core::math::linalg::symmetric_eigen(matrix, n)
-        .map_err(|_| Error::EigenDecompositionFailed)?;
+    let (eigenvalues, eigenvectors) =
+        super::symmetric_eigen(matrix, n).map_err(|_| Error::EigenDecompositionFailed)?;
 
     // Reconstruct using only non-negative eigenvalues: X = V · diag(max(λ, 0)) · Vᵀ.
     // `eigenvectors[i * n + k]` is the `i`-th component of the `k`-th
@@ -277,7 +279,7 @@ fn frobenius_diff(a: &[f64], b: &[f64]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::correlation::validate_correlation_matrix;
+    use crate::math::linalg::validate_correlation_matrix;
 
     fn max_abs_diff(a: &[f64], b: &[f64]) -> f64 {
         a.iter()

@@ -18,8 +18,8 @@
 //!
 //! Matrix-validation helpers (`validate_correlation_matrix`,
 //! `nearest_correlation`, `NearestCorrelationOpts`) are re-exported from
-//! [`finstack_quant_analytics::correlation`]. [`Error`] / [`Result`] are
-//! models-owned: they wrap analytics matrix failures and add credit-domain
+//! [`finstack_quant_core::math::linalg`]. [`Error`] / [`Result`] are
+//! models-owned: they wrap core matrix failures and add credit-domain
 //! variants (volatilities, recovery, Student-t df).
 //!
 //! # Utilities
@@ -55,7 +55,7 @@ pub use copula::{
     RandomFactorLoadingCopula, StudentTCopula,
 };
 pub use error::{Error, Result};
-pub use finstack_quant_analytics::correlation::{
+pub use finstack_quant_core::math::linalg::{
     nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts,
 };
 pub use finstack_quant_core::math::probability::{

@@ -544,14 +544,14 @@ def test_documented_one_way_inventory_is_exact() -> None:
     assert reviewed_identities.isdisjoint(_MODULE.MAINTAINED_CONTRACTS)
     assert Counter(entry.category for entry in _MODULE.REVIEWED_EXCEPTIONS) == {
         "attribution-report": 5,
-        "generic-error-result-alias": 7,
+        "generic-error-result-alias": 6,
         "in-process-serde-spec": 2,
         "internal-registry-document": 1,
         "non-maintained-serde-output": 2,
         "runtime-result": 8,
         "runtime-spec": 3,
     }
-    assert len(_MODULE.REVIEWED_EXCEPTIONS) == 28
+    assert len(_MODULE.REVIEWED_EXCEPTIONS) == 27
 
 
 def test_maintained_contract_capability_matrix_is_complete() -> None:

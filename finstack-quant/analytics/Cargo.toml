@@ -6,7 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-description = "Risk metrics and portfolio analytics for Finstack Quant: Sharpe, drawdown, correlation matrices, and nearest-correlation repair"
+description = "Risk metrics and portfolio analytics for Finstack Quant: Sharpe, drawdown, correlation matrices, and regression"
 autobenches = false
 autotests = false
 
