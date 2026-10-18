@@ -116,7 +116,7 @@ public item from `finite_difference.rs` is `bump_surface_vol_absolute`.
 2. Implement `MetricCalculator`, usually under
    `../instruments/<asset_class>/<instrument>/metrics/`.
 3. Register it in that instrument's `register_<name>_metrics` function, which is
-   called from `core/standard_registry.rs`.
+   called from `register_metrics` in the family's `family.rs`.
 4. Add tests next to the calculator or under `../../tests/metrics/`.
 
 ## Verification

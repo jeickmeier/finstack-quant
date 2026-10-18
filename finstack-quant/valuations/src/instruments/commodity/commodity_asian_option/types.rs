@@ -357,7 +357,10 @@ impl CommodityAsianOption {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for CommodityAsianOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::CommodityAsianOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CommodityAsianOption,
+        crate::instruments::exotics::EXOTICS
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate_structure()

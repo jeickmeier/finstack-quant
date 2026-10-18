@@ -97,6 +97,10 @@ impl Instrument for StructuredCreditTranche {
         crate::pricer::InstrumentType::StructuredCredit
     }
 
+    fn family(&self) -> &'static crate::pricer::Family {
+        &crate::instruments::fixed_income::structured_credit::STRUCTURED_CREDIT
+    }
+
     /// The deal, not the view: the deal's metric calculators downcast the
     /// context instrument to `StructuredCredit`.
     fn as_any(&self) -> &dyn std::any::Any {

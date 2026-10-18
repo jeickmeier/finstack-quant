@@ -1,7 +1,7 @@
 //! Shared trait and pricing delegation for asset-owned futures options.
 
 macro_rules! impl_future_option_instrument {
-    ($ty:ty, $key:expr $(, require_rate_risk = $require_rate_risk:expr)?) => {
+    ($ty:ty, $key:expr, $family:expr $(, require_rate_risk = $require_rate_risk:expr)?) => {
         impl $ty {
             /// Validate the shared contract economics and lifecycle state.
             pub fn validate(&self) -> finstack_quant_core::Result<()> {
@@ -118,7 +118,7 @@ macro_rules! impl_future_option_instrument {
         }
 
         impl crate::instruments::Instrument for $ty {
-            crate::instruments::common_impl::traits::impl_instrument_base!($key);
+            crate::instruments::common_impl::traits::impl_instrument_base!($key, $family);
 
             fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
                 self.validate()

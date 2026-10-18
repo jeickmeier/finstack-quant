@@ -522,7 +522,10 @@ impl VarianceSwap {
 
 // Use the macro to implement Instrument with pricing
 impl crate::instruments::common_impl::traits::Instrument for VarianceSwap {
-    impl_instrument_base!(crate::pricer::InstrumentType::VarianceSwap);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::VarianceSwap,
+        crate::instruments::equity::EQUITY
+    );
 
     fn validate_invariants(&self) -> Result<()> {
         self.validate()

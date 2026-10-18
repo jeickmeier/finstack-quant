@@ -292,6 +292,7 @@ pub(crate) use core::ids::closest_metric_names;
 pub use core::ids::{MetricGroup, MetricId, MetricUnit};
 pub use core::registry::{MetricRegistry, MetricRegistryError};
 pub use core::standard_registry::standard_registry;
+pub(crate) use core::standard_registry::{register_universal_metrics, PricerPublishedMetric};
 pub use core::traits::{MetricCalculator, MetricContext};
 /// Format a standard risk bucket (years) as a human-readable label.
 pub use sensitivities::config::{

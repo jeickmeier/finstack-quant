@@ -232,7 +232,10 @@ impl CommoditySpreadOption {
 }
 
 impl Instrument for CommoditySpreadOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::CommoditySpreadOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CommoditySpreadOption,
+        crate::instruments::exotics::EXOTICS
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

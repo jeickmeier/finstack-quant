@@ -546,7 +546,10 @@ impl CdsIndex {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for CdsIndex {
-    impl_instrument_base!(crate::pricer::InstrumentType::CdsIndex);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CdsIndex,
+        crate::instruments::credit_derivatives::CREDIT
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         CdsIndex::validate(self)

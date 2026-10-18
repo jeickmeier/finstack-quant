@@ -821,7 +821,10 @@ impl EquityOption {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for EquityOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::EquityOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::EquityOption,
+        crate::instruments::equity::EQUITY
+    );
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::Black76

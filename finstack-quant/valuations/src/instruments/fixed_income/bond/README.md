@@ -68,7 +68,7 @@ bond/
 The shared `BondPricer` registry adapter downcasts the instrument, preserves
 the caller-selected model, calls the corresponding engine, and wraps the
 result in a `ValuationResult`. Registration happens once in
-`src/pricer/rates.rs`:
+[`../family.rs`](../family.rs) (`FIXED_INCOME`):
 
 | Explicit model | Rates | Credit | Embedded rights |
 |----------------|-------|--------|-----------------|

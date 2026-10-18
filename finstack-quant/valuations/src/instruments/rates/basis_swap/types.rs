@@ -791,7 +791,10 @@ impl BasisSwap {
 
 // Use the macro to implement Instrument with pricing
 impl crate::instruments::common_impl::traits::Instrument for BasisSwap {
-    impl_instrument_base!(crate::pricer::InstrumentType::BasisSwap);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::BasisSwap,
+        crate::instruments::rates::RATES
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         BasisSwap::validate(self)

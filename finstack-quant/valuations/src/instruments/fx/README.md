@@ -101,10 +101,10 @@ Landing sites for this family:
 
 | Step | Where |
 |------|-------|
-| Pricer | `src/pricer/fx.rs` for eleven leaves — this shard also registers `rates::xccy_swap`. `QuantoOption` registers in `src/pricer/exotics.rs` |
+| Pricer | `register_pricers` in `family.rs` (`FX`) for all twelve leaves, `quanto_option` included |
 | Instrument key | `InstrumentType` variant in `src/pricer/keys.rs` |
 | JSON tag | `with_instrument_json_registry!` in `../json_loader.rs`, category `"fx"`. Tags: `fx_spot`, `fx_swap`, `fx_forward`, `ndf`, `fx_option`, `fx_digital_option`, `fx_touch_option`, `fx_barrier_option`, `fx_variance_swap`, `fx_future`, `fx_future_option`, `quanto_option` |
-| Metrics | `register_<name>_metrics` in the leaf's `metrics/`, called from `register_fx_instrument_metrics` in `src/metrics/core/standard_registry.rs` — except `register_quanto_option_metrics`, which is called from `register_exotic_instrument_metrics` |
+| Metrics | `register_<name>_metrics` in the leaf's `metrics/`, called from `register_metrics` in `family.rs` |
 | Schemas | `mise run rust-gen-schemas`, verified by `mise run rust-check-schemas` |
 
 `FxOption` is registered under `ModelKey::Black76` even though the pricer is

@@ -85,6 +85,9 @@ pub mod ndf;
 pub mod quanto_option;
 pub(crate) mod shared;
 
+mod family;
+pub use family::FX;
+
 pub use fx_barrier_option::FxBarrierOption;
 pub use fx_digital_option::{DigitalPayoutType, FxDigitalOption};
 pub use fx_forward::FxForward;

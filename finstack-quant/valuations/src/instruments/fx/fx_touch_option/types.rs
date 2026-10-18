@@ -219,7 +219,10 @@ impl FxTouchOption {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for FxTouchOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::FxTouchOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::FxTouchOption,
+        crate::instruments::fx::FX
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

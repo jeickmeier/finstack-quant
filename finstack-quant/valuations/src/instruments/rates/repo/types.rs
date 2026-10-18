@@ -611,7 +611,10 @@ impl Repo {
 }
 
 impl Instrument for Repo {
-    impl_instrument_base!(crate::pricer::InstrumentType::Repo);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::Repo,
+        crate::instruments::rates::RATES
+    );
 
     fn validate_invariants(&self) -> Result<()> {
         Repo::validate(self)

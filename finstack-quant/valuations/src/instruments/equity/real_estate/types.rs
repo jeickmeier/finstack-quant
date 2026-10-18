@@ -581,7 +581,10 @@ impl RealEstateAsset {
 }
 
 impl Instrument for RealEstateAsset {
-    impl_instrument_base!(InstrumentType::RealEstateAsset);
+    impl_instrument_base!(
+        InstrumentType::RealEstateAsset,
+        crate::instruments::equity::EQUITY
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

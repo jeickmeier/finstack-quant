@@ -538,7 +538,10 @@ impl AgencyMbsPassthrough {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for AgencyMbsPassthrough {
-    impl_instrument_base!(crate::pricer::InstrumentType::AgencyMbsPassthrough);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::AgencyMbsPassthrough,
+        crate::instruments::fixed_income::FIXED_INCOME
+    );
 
     fn market_dependencies(
         &self,

@@ -202,7 +202,10 @@ impl CmsOption {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for CmsOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::CmsOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CmsOption,
+        crate::instruments::rates::RATES
+    );
     fn last_payment_date(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,

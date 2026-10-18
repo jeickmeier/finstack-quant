@@ -526,7 +526,10 @@ impl FxBarrierOption {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for FxBarrierOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::FxBarrierOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::FxBarrierOption,
+        crate::instruments::fx::FX
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

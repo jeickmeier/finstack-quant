@@ -372,7 +372,10 @@ impl DollarRoll {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for DollarRoll {
-    impl_instrument_base!(crate::pricer::InstrumentType::DollarRoll);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::DollarRoll,
+        crate::instruments::fixed_income::FIXED_INCOME
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

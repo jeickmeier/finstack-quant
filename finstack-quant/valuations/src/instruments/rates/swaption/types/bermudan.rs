@@ -566,7 +566,10 @@ impl BermudanSwaption {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for BermudanSwaption {
-    impl_instrument_base!(crate::pricer::InstrumentType::BermudanSwaption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::BermudanSwaption,
+        crate::instruments::rates::RATES
+    );
 
     fn validate_invariants(&self) -> Result<()> {
         self.validate()

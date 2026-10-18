@@ -48,24 +48,26 @@ in a different crate, reached by the MC instrument pricers.
 
 | Path | Contents | Visibility |
 |------|----------|------------|
-| [`mod.rs`](mod.rs) | `register_all_pricers`, `build_standard_registry`, the `standard_pricer_registry()` `OnceLock` singleton, the `register_generic!` macro, all re-exports | mixed |
+| [`mod.rs`](mod.rs) | `FAMILIES`, the `STANDARD` umbrella family, `standard_pricer_registry()`, the `register_generic!` macro, all re-exports | mixed |
 | [`keys.rs`](keys.rs) | `InstrumentType`, `ModelKey`, `PricerKey` — enums, `as_str`, `Display`, `FromStr`, serde | private mod, types re-exported |
 | [`registry.rs`](registry.rs) | `Pricer` trait, `PricerRegistry`, the pricing pipeline, `expect_inst`, FX-policy collection | private mod, items re-exported |
 | [`errors.rs`](errors.rs) | `PricingError`, `PricingErrorContext`, the two lossy conversions to/from `finstack_quant_core::Error` | private mod, types re-exported |
 | [`enrichment.rs`](enrichment.rs) | Metric enrichment applied after the base PV | `pub(super)`, fully internal |
 | [`json.rs`](json.rs) | Envelope parse/validate, model + metric discovery, the JSON pricing entry points | `pub mod` |
-| [`rates.rs`](rates.rs) | Registrations: Bond, Irs, Fra, BasisSwap, Deposit, InterestRateFuture, BondFuture, CapFloor, Swaption, Repo, Dcf | private mod |
-| [`credit.rs`](credit.rs) | Registrations: Cds, CdsIndex, CdsTranche, CdsOption, StructuredCredit | private mod |
-| [`equity.rs`](equity.rs) | Registrations: Equity, EquityFuture, EquityTotalReturnFuture, EquityOption, EquityTotalReturnSwap, VarianceSwap, VolatilityIndexFuture, RealEstateAsset, LeveredRealEstateEquity, PrivateMarketsFund | private mod |
-| [`fx.rs`](fx.rs) | Registrations: FxSpot, FxFuture, FxSwap, XccySwap, FxOption, FxVarianceSwap, FxForward, Ndf, FxBarrierOption, FxDigitalOption, FxTouchOption | private mod |
-| [`fixed_income.rs`](fixed_income.rs) | Registrations: FiIndexTotalReturnSwap, Convertible, InflationLinkedBond, RevolvingCredit, TermLoan, AgencyMbsPassthrough, AgencyTba, DollarRoll, AgencyCmo | private mod |
-| [`inflation.rs`](inflation.rs) | Registrations: InflationSwap, YoYInflationSwap, InflationCapFloor | private mod |
-| [`exotics.rs`](exotics.rs) | Registrations: Basket, AsianOption, BarrierOption, LookbackOption, QuantoOption, Autocallable, CmsOption/Swap/SpreadOption, CliquetOption, RangeAccrual, CallableRangeAccrual, Tarn, Snowball, BermudanSwaption | private mod |
-| [`commodity.rs`](commodity.rs) | Registrations: CommodityFuture, CommodityForward, CommoditySwap, CommoditySpotOption, CommodityAsianOption, CommoditySwaption, CommoditySpreadOption | private mod |
+| [`family.rs`](family.rs) | `Family`: the registration unit, its per-family pricer and metric registries built on first use, `Family::unregistered` | private mod, type re-exported |
 
-The asset-class shards contain no logic beyond registration, apart from the two
-hand-written `Pricer` implementations in `credit.rs`. They are private modules
-whose only public effect is what `register_all_pricers` assembles.
+Registration tables live with the instruments. Each family root declares a
+`static Family` with its pricer and metric tables: `instruments/rates/family.rs`
+(`RATES`), `instruments/fixed_income/family.rs` (`FIXED_INCOME`),
+`instruments/fixed_income/structured_credit/family.rs` (`STRUCTURED_CREDIT`),
+`instruments/credit_derivatives/family.rs` (`CREDIT`),
+`instruments/equity/family.rs` (`EQUITY`), `instruments/fx/family.rs` (`FX`) and
+`instruments/exotics/family.rs` (`EXOTICS`, which also owns the commodity
+leaves). The two hand-written registry adapters (`CdsHazardPricer`,
+`StructuredCreditStochasticPricer`) sit in their family files. `STANDARD` in
+`mod.rs` merges every family and adds `Composite` and `Basket`; an instrument
+priced without an explicit registry resolves its own family through
+`Instrument::family`.
 
 ## Public API vs internal plumbing
 
@@ -163,9 +165,9 @@ registry (`all_models`, `all_models_grouped`, `available_models_for_instrument`,
 `register` **rejects** a duplicate key with
 `PricingError::DuplicateRegistration` and leaves the first registration in
 place. `replace` is the explicit overwrite, intended for tests and controlled
-monkey-patching. `build_standard_registry` propagates registration errors to the
-`OnceLock` initializer, where a duplicate built-in registration is treated as an
-invariant violation.
+monkey-patching. `Family::build_pricers` and `Family::build_metrics` propagate
+registration errors; the family's lazily initialised registries treat a
+duplicate built-in registration as an invariant violation.
 
 `standard_pricer_registry()` returns a `&'static PricerRegistry` from a process-wide
 `OnceLock<Arc<PricerRegistry>>`. When metrics are requested, the pricing path
@@ -272,7 +274,7 @@ The steps that touch this directory, in order:
 
 The remaining steps live outside this directory:
 `with_instrument_json_registry!` in `../instruments/json_loader.rs`, the
-`register_<name>_metrics` hook in `../metrics/core/standard_registry.rs`, tests
+`register_<name>_metrics` hook called from the family's `family.rs`, tests
 under `../../tests/instruments/<name>/`, and
 `mise run rust-gen-schemas` when the public JSON shape changes. See
 [`../instruments/README.md`](../instruments/README.md).

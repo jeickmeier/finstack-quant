@@ -698,7 +698,10 @@ fn infer_single_period_frequency(start_date: Date, maturity: Date) -> Tenor {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for CapFloor {
-    impl_instrument_base!(crate::pricer::InstrumentType::CapFloor);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CapFloor,
+        crate::instruments::rates::RATES
+    );
     fn includes_valuation_date_cashflows(&self) -> bool {
         false
     }

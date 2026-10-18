@@ -105,5 +105,6 @@ impl VolatilityIndexFutureOption {
 
 crate::instruments::common_impl::listed::impl_future_option_instrument!(
     VolatilityIndexFutureOption,
-    crate::pricer::InstrumentType::VolatilityIndexFutureOption
+    crate::pricer::InstrumentType::VolatilityIndexFutureOption,
+    crate::instruments::equity::EQUITY
 );

@@ -121,15 +121,15 @@ items surface through each leaf's `pub use`. Genuinely public submodules are
 ## Registration
 
 The general checklist is in [`../README.md`](../README.md#adding-an-instrument).
-Landing sites for this family are spread across four pricer shards, which are
-*not* named after the directory:
+Every leaf registers in [`family.rs`](family.rs) (`RATES`), including
+`xccy_swap`, the CMS products, the Bermudan swaption and the inflation
+instruments:
 
-| Leaf | Pricer shard |
-|------|--------------|
-| `irs`, `basis_swap`, `deposit`, `fra`, `repo`, `ir_future`, `cap_floor`, `swaption` (European: Black-76, Discounting, HullWhite1F) | `src/pricer/rates.rs` |
-| `xccy_swap` | `src/pricer/fx.rs` |
-| `cms_swap`, `cms_option`, `cms_spread_option`, `swaption` (Bermudan) | `src/pricer/exotics.rs` |
-| `inflation_swap`, `inflation_cap_floor` | `src/pricer/inflation.rs` |
+| Leaf | Registered by |
+|------|---------------|
+| `irs`, `basis_swap`, `deposit`, `fra`, `repo`, `ir_future`, `ir_future_option`, `xccy_swap`, `cap_floor`, `swaption` (European: Black-76, Discounting, HullWhite1F) | `register_pricers`, mostly through `register_generic!` |
+| `cms_swap`, `cms_option`, `cms_spread_option`, `swaption` (Bermudan: LSMC, tree, LMM) | concrete pricers |
+| `inflation_swap`, `inflation_cap_floor` | `register_generic!` and `SimpleInflationCapFloorPricer` |
 
 Other steps:
 
@@ -142,8 +142,7 @@ Other steps:
   `cms_spread_option`, `deposit`, `repo`. Note `swaption/`
   and `inflation_swap/` each own two tags.
 - `register_<name>_metrics` in the leaf's `metrics/`, called from
-  `register_rates_instrument_metrics` in
-  `src/metrics/core/standard_registry.rs`. Bermudan swaption greeks are
+  `register_metrics` in `family.rs`. Bermudan swaption greeks are
   registered there with the documented default Hull-White parameters
   (`DEFAULT_KAPPA`, `DEFAULT_SIGMA`); production risk should re-register on a
   cloned registry with parameters calibrated to co-terminal Europeans.

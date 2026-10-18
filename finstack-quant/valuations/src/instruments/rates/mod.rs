@@ -135,6 +135,9 @@ pub mod swaption;
 /// Cross-currency swap module.
 pub mod xccy_swap;
 
+mod family;
+pub use family::RATES;
+
 pub use basis_swap::BasisSwap;
 pub use cap_floor::{CapFloor, RateOptionType};
 pub use cms_option::CmsOption;

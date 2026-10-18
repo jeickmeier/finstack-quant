@@ -146,7 +146,10 @@ impl CallableRangeAccrual {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for CallableRangeAccrual {
-    impl_instrument_base!(crate::pricer::InstrumentType::CallableRangeAccrual);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CallableRangeAccrual,
+        crate::instruments::exotics::EXOTICS
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         CallableRangeAccrual::validate(self)

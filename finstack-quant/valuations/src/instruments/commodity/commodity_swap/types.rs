@@ -368,7 +368,10 @@ impl CommoditySwap {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for CommoditySwap {
-    impl_instrument_base!(crate::pricer::InstrumentType::CommoditySwap);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CommoditySwap,
+        crate::instruments::exotics::EXOTICS
+    );
 
     fn validate_invariants(&self) -> Result<()> {
         self.validate()

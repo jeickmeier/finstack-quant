@@ -419,7 +419,10 @@ impl FxOption {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for FxOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::FxOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::FxOption,
+        crate::instruments::fx::FX
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

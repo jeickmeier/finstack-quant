@@ -197,7 +197,10 @@ impl BarrierOption {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::BarrierOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::BarrierOption,
+        crate::instruments::exotics::EXOTICS
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::validation;

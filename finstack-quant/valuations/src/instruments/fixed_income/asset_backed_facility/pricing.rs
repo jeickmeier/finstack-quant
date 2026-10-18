@@ -462,7 +462,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
 }
 
 impl Instrument for AssetBackedFacility {
-    impl_instrument_base!(crate::pricer::InstrumentType::AssetBackedFacility);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::AssetBackedFacility,
+        crate::instruments::fixed_income::FIXED_INCOME
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.synthesized_deal()?.validate_for_pricing()

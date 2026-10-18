@@ -1224,7 +1224,10 @@ impl RevolvingCredit {
 
 // Implement the Instrument trait
 impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
-    impl_instrument_base!(crate::pricer::InstrumentType::RevolvingCredit);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::RevolvingCredit,
+        crate::instruments::fixed_income::FIXED_INCOME
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()
@@ -1265,7 +1268,7 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         // Optional model override via attributes metadata (e.g., meta["pricing_model"] = "monte_carlo_three_factor")
         if let Some(model) = self.pricing_model_override()? {
-            let registry = crate::pricer::standard_pricer_registry();
+            let registry = crate::instruments::Instrument::family(self).pricers();
             let result = registry
                 .price_with_metrics(self, model, curves, as_of, &[], Default::default())
                 .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;

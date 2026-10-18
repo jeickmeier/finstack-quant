@@ -388,7 +388,10 @@ impl EquityFuture {
 }
 
 impl crate::instruments::Instrument for EquityFuture {
-    impl_instrument_base!(crate::pricer::InstrumentType::EquityFuture);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::EquityFuture,
+        crate::instruments::equity::EQUITY
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

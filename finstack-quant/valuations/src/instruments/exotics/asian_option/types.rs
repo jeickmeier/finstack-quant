@@ -322,7 +322,10 @@ impl AsianOption {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for AsianOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::AsianOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::AsianOption,
+        crate::instruments::exotics::EXOTICS
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate_structure()

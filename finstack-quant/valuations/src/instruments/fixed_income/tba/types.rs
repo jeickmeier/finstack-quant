@@ -384,7 +384,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AgencyTba {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for AgencyTba {
-    impl_instrument_base!(crate::pricer::InstrumentType::AgencyTba);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::AgencyTba,
+        crate::instruments::fixed_income::FIXED_INCOME
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

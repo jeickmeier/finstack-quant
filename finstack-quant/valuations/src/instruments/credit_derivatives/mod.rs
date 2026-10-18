@@ -62,6 +62,9 @@ pub mod cds_option;
 /// CDS tranche module - Synthetic CDO tranches.
 pub mod cds_tranche;
 
+mod family;
+pub use family::CREDIT;
+
 pub use cds::CreditDefaultSwap;
 pub use cds_index::CdsIndex;
 pub use cds_option::{CdsOption, CdsOptionStrike, CdsOptionStrikeKind};

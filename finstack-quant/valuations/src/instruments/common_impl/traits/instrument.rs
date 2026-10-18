@@ -3,7 +3,7 @@
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::model_params::ModelParamsSnapshot;
 use crate::metrics::MetricId;
-use crate::pricer::{shared_standard_registry, InstrumentType, ModelKey};
+use crate::pricer::{Family, InstrumentType, ModelKey};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::Attributes;
@@ -125,6 +125,20 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// # }
     /// ```
     fn key(&self) -> InstrumentType;
+
+    /// The registration family whose pricers and metrics serve this
+    /// instrument when the caller supplies no registry.
+    ///
+    /// Built-in instruments name the family that registers them
+    /// (`impl_instrument_base!` supplies it), so pricing with
+    /// [`PricingOptions::registry`] unset resolves that family's registries.
+    /// The default is [`Family::unregistered`]: no pricers and only the
+    /// universal metrics. An instrument defined outside the built-in families
+    /// is priced through its own [`Instrument::value`] or through a registry
+    /// passed in the pricing options.
+    fn family(&self) -> &'static Family {
+        Family::unregistered()
+    }
 
     /// Access to the concrete type for downcasting.
     ///
@@ -744,7 +758,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
             instrument_validated: _,
         } = options;
         let model = model.unwrap_or_else(|| self.default_model());
-        let registry = registry.unwrap_or_else(shared_standard_registry);
+        let registry = registry.unwrap_or_else(|| self.family().shared_pricers());
         let instrument = self.clone_box();
         let registry_options = PricingOptions {
             config,

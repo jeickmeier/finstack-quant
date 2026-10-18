@@ -53,7 +53,7 @@ use crate::instruments::fixed_income::mbs_passthrough::{
 use crate::instruments::fx::fx_swap::FxSwap;
 use crate::instruments::rates::xccy_swap::XccySwap;
 use crate::instruments::Instrument;
-use crate::pricer::{shared_standard_registry, ModelKey, ParsedInstrument, PricerKey};
+use crate::pricer::{ModelKey, ParsedInstrument, PricerKey};
 
 // Envelope schema
 
@@ -279,7 +279,7 @@ fn build_envelope(
         .map_err(|e| Error::Validation(format!("invalid as_of '{as_of}': {e}")))?;
 
     // --- Pricer registry gate: ensure the (type, model) pair is supported ---
-    let registry = shared_standard_registry();
+    let registry = instrument.family().pricers();
     let instrument_type = instrument.key();
     let pricer_key = PricerKey::new(instrument_type, model_key);
     if registry.get_pricer(pricer_key).is_none() {

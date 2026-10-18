@@ -44,7 +44,7 @@ real_estate/
 
 Both instruments are registered with `register_generic!` under
 `InstrumentType::RealEstateAsset` and `InstrumentType::LeveredRealEstateEquity`
-in [`src/pricer/equity.rs`](../../../pricer/equity.rs). Pricing runs through
+in [`../family.rs`](../family.rs) (`EQUITY`). Pricing runs through
 `Instrument::base_value`; `levered_pricer.rs` contains the shared PV and
 cashflow helpers used by `LeveredRealEstateEquity`.
 

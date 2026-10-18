@@ -230,7 +230,10 @@ impl LookbackOption {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for LookbackOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::LookbackOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::LookbackOption,
+        crate::instruments::exotics::EXOTICS
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::validation;

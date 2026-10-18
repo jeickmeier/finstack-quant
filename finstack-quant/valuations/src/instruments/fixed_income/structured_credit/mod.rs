@@ -27,6 +27,9 @@ pub(crate) mod metrics;
 pub(crate) mod pricing;
 pub(crate) mod types;
 pub(crate) mod utils;
+
+mod family;
+pub use family::STRUCTURED_CREDIT;
 pub use utils::{validate_tiers, ValidationError};
 
 pub use types::{

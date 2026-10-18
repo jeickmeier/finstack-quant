@@ -370,7 +370,10 @@ impl CliquetOption {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for CliquetOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::CliquetOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CliquetOption,
+        crate::instruments::equity::EQUITY
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

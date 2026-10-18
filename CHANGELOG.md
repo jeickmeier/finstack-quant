@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Instrument families own their registrations
+
+#### Added
+
+- `finstack_quant_valuations::pricer::Family`, the registration unit of the valuations stack. Each built-in family is a `static` beside its instruments — `instruments::rates::RATES`, `instruments::fixed_income::FIXED_INCOME`, `instruments::fixed_income::structured_credit::STRUCTURED_CREDIT`, `instruments::credit_derivatives::CREDIT`, `instruments::equity::EQUITY`, `instruments::fx::FX` and `instruments::exotics::EXOTICS` (which owns the commodity leaves) — whose `pricers()` and `metrics()` registries are built on first use. `pricer::FAMILIES` lists them; `pricer::STANDARD` merges them and adds `Composite` and `Basket`. `Instrument::family()` names an instrument's family (`impl_instrument_base!` now takes it as its second argument); the default, `Family::unregistered()`, registers no pricers and only the universal metrics.
+
+#### Changed
+
+- Pricing with `PricingOptions::registry` or `metric_registry` unset resolves the instrument's family registries instead of the merged standard ones. For every built-in instrument type the family registers the same models and metrics as the standard registry (`tests/registry_snapshot.rs` pins both), so results are unchanged. An `Instrument` implemented outside the crate now needs an explicit registry (or its own `value`) for registry pricing, where it previously failed the pricer's downcast.
+- `standard_pricer_registry()` and `metrics::standard_registry()` return the `STANDARD` family's registries; the asset-class registration modules under `src/pricer/` are replaced by the family files. `XccySwap` registers with the rates family and `QuantoOption` with FX; the `ExpectedLoss` owner entry is registered by the family whose pricers publish it (`Bond` by fixed income, `StructuredCredit` by structured credit).
+
 ### Model kernels moved from valuations to `finstack-quant-models` and `finstack-quant-cashflows`
 
 #### Changed

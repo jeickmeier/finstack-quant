@@ -78,5 +78,6 @@ impl CommodityFutureOption {
 
 crate::instruments::common_impl::listed::impl_future_option_instrument!(
     CommodityFutureOption,
-    crate::pricer::InstrumentType::CommodityFutureOption
+    crate::pricer::InstrumentType::CommodityFutureOption,
+    crate::instruments::exotics::EXOTICS
 );

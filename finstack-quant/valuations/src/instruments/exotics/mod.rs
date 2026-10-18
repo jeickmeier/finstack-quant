@@ -111,6 +111,9 @@ pub mod snowball;
 /// TARN (Target Redemption Note) module.
 pub mod tarn;
 
+mod family;
+pub use family::EXOTICS;
+
 pub use asian_option::{AsianOption, AveragingMethod};
 pub use barrier_option::BarrierOption;
 pub use basket::Basket;

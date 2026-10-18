@@ -574,7 +574,10 @@ impl InterestRateSwap {
 // Attributable implementation is provided by the impl_instrument! macro
 
 impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
-    impl_instrument_base!(crate::pricer::InstrumentType::Irs);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::Irs,
+        crate::instruments::rates::RATES
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

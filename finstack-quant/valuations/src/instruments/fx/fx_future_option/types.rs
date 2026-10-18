@@ -78,5 +78,6 @@ impl FxFutureOption {
 
 crate::instruments::common_impl::listed::impl_future_option_instrument!(
     FxFutureOption,
-    crate::pricer::InstrumentType::FxFutureOption
+    crate::pricer::InstrumentType::FxFutureOption,
+    crate::instruments::fx::FX
 );

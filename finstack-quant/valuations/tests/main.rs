@@ -47,6 +47,8 @@ mod production_structured_audit;
 mod production_structured_metrics_audit;
 #[path = "production_waterfall_audit.rs"]
 mod production_waterfall_audit;
+#[path = "registry_snapshot.rs"]
+mod registry_snapshot;
 #[path = "return_floor_example.rs"]
 mod return_floor_example;
 #[path = "sanity_invariants.rs"]

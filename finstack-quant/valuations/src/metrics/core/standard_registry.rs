@@ -1,6 +1,7 @@
-//! Standard metric registry bootstrap.
+//! Standard metric registry: the universal calculators every family shares
+//! and the umbrella view that merges every family's registrations.
 
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use super::{
     ids::MetricId,
@@ -11,9 +12,6 @@ use crate::metrics::risk::{GenericExpectedShortfall, GenericHVar};
 use crate::metrics::sensitivities::breakeven::BreakevenCalculator;
 use crate::metrics::sensitivities::carry_decomposition::CarryDecompositionCalculator;
 use crate::metrics::sensitivities::theta::GenericThetaAny;
-use crate::pricer::InstrumentType;
-
-static STANDARD_REGISTRY: OnceLock<MetricRegistry> = OnceLock::new();
 
 struct ComputedMetricLookup {
     metric: MetricId,
@@ -59,13 +57,15 @@ impl MetricCalculator for ComputedMetricLookup {
 /// it, and `metrics_for_instrument` would omit it. Applicability is recorded
 /// per instrument type, while publication depends on the model actually used,
 /// so this calculator fails when the valuation ran under a model that does not
-/// publish the metric.
-struct PricerPublishedMetric {
+/// publish the metric. Each family registers the entries for the instrument
+/// types whose pricers publish the metric.
+pub(crate) struct PricerPublishedMetric {
     metric: MetricId,
 }
 
 impl PricerPublishedMetric {
-    fn new(metric: MetricId) -> Self {
+    /// Owner entry for `metric`, read back from the pricing pass.
+    pub(crate) fn new(metric: MetricId) -> Self {
         Self { metric }
     }
 }
@@ -82,7 +82,7 @@ impl MetricCalculator for PricerPublishedMetric {
     }
 }
 
-/// Creates a standard metric registry with all built-in metrics.
+/// The shared metric registry merging every built-in family.
 ///
 /// This registry includes metrics for:
 /// - **Bonds**: YTM, duration, convexity, accrued interest, credit spreads
@@ -90,210 +90,29 @@ impl MetricCalculator for PricerPublishedMetric {
 /// - **Deposits**: Discount factors, par rates, year fractions
 /// - **Risk**: Bucketed DV01, time decay (theta)
 ///
+/// It is the metric registry of the umbrella family
+/// [`STANDARD`](crate::pricer::STANDARD). An instrument priced without an
+/// explicit registry resolves its own family's registry instead, which
+/// answers identically for the instrument types that family owns.
+///
 /// See unit tests and `examples/` for usage.
-#[allow(clippy::expect_used)]
 pub fn standard_registry() -> &'static MetricRegistry {
-    STANDARD_REGISTRY.get_or_init(|| {
-        build_standard_registry().expect("built-in metric registrations must be valid")
-    })
+    crate::pricer::STANDARD.metrics()
 }
 
-fn build_standard_registry() -> std::result::Result<MetricRegistry, MetricRegistryError> {
-    let mut registry = MetricRegistry::new();
-    register_universal_metrics(&mut registry)?;
-    register_equity_instrument_metrics(&mut registry)?;
-    register_fixed_income_instrument_metrics(&mut registry)?;
-    register_rates_instrument_metrics(&mut registry)?;
-    register_credit_derivative_instrument_metrics(&mut registry)?;
-    register_fx_instrument_metrics(&mut registry)?;
-    register_commodity_instrument_metrics(&mut registry)?;
-    register_exotic_instrument_metrics(&mut registry)?;
-    register_model_published_metrics(&mut registry)?;
-    Ok(registry)
-}
-
-/// Record ownership of standard metrics that model pricers publish themselves.
+/// Register the calculators that apply to every instrument type.
 ///
-/// These have no calculator of their own: the value arrives from the pricing
-/// pass, seeded into the metric context. Registering them keeps the
-/// applicability table truthful, so a caller asking for one on an instrument
-/// type whose pricers emit it is answered instead of rejected.
+/// Every family registry starts from these; a family table adds only its
+/// instrument-specific owners on top.
 ///
-/// Registered here rather than in each instrument's metric module because the
-/// entries describe a pricer contract, not a calculator, and are only
-/// auditable as a set.
-fn register_model_published_metrics(
+/// # Arguments
+///
+/// * `registry` - Registry receiving the universal calculators (theta and
+///   its decomposition, carry, breakeven, historical VaR and expected
+///   shortfall).
+pub(crate) fn register_universal_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), MetricRegistryError> {
-    // `expected_loss` is published by `StructuredCreditStochasticPricer` (deal
-    // Monte Carlo loss) and by the Merton-MC bond engine (path-simulated credit
-    // loss). CDS, CDS index, CDS tranche and revolving credit own it through
-    // real calculators and are deliberately absent here.
-    registry.register_metric(
-        MetricId::ExpectedLoss,
-        Arc::new(PricerPublishedMetric::new(MetricId::ExpectedLoss)),
-        &[InstrumentType::StructuredCredit, InstrumentType::Bond],
-    )?;
-    // `expected_shortfall` has a universal historical-simulation owner, so it
-    // needs an instrument-specific entry to point at the value structured
-    // credit's Monte Carlo pass publishes instead.
-    registry.register_metric(
-        MetricId::ExpectedShortfall,
-        Arc::new(PricerPublishedMetric::new(MetricId::ExpectedShortfall)),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    Ok(())
-}
-
-macro_rules! register_modules {
-    ($registry:expr, $($register:path),+ $(,)?) => {
-        $(
-            $register($registry)?;
-        )+
-    };
-}
-
-fn register_equity_instrument_metrics(
-    registry: &mut MetricRegistry,
-) -> std::result::Result<(), MetricRegistryError> {
-    register_modules!(
-        registry,
-        crate::instruments::equity::spot::metrics::register_equity_metrics,
-        crate::instruments::equity::equity_option::metrics::register_equity_option_metrics,
-        crate::instruments::equity::equity_future::metrics::register_equity_future_metrics,
-        crate::instruments::equity::equity_total_return_future::metrics::register_equity_total_return_future_metrics,
-        crate::instruments::equity::equity_future_option::metrics::register_equity_future_option_metrics,
-        crate::instruments::equity::vol_index_future_option::metrics::register_vol_index_future_option_metrics,
-        crate::instruments::equity::equity_trs::metrics::register_equity_trs_metrics,
-        crate::instruments::equity::variance_swap::metrics::register_variance_swap_metrics,
-        crate::instruments::equity::pe_fund::metrics::register_private_markets_fund_metrics,
-        crate::instruments::equity::dcf_equity::metrics::register_dcf_metrics,
-        crate::instruments::equity::vol_index_future::metrics::register_vol_index_future_metrics,
-        crate::instruments::equity::real_estate::metrics::register_real_estate_metrics,
-        crate::instruments::equity::real_estate::metrics::register_levered_real_estate_metrics,
-        crate::instruments::exotics::basket::metrics::register_basket_metrics,
-    );
-    Ok(())
-}
-
-fn register_fixed_income_instrument_metrics(
-    registry: &mut MetricRegistry,
-) -> std::result::Result<(), MetricRegistryError> {
-    register_modules!(
-        registry,
-        crate::instruments::fixed_income::bond::metrics::register_bond_metrics,
-        crate::instruments::fixed_income::bond_future::metrics::register_bond_future_metrics,
-        crate::instruments::fixed_income::convertible::metrics::register_convertible_metrics,
-        crate::instruments::fixed_income::mbs_passthrough::metrics::register_mbs_passthrough_metrics,
-        crate::instruments::fixed_income::tba::metrics::register_tba_metrics,
-        crate::instruments::fixed_income::dollar_roll::metrics::register_dollar_roll_metrics,
-        crate::instruments::fixed_income::cmo::metrics::register_cmo_metrics,
-        crate::instruments::fixed_income::inflation_linked_bond::metrics::register_ilb_metrics,
-        crate::instruments::fixed_income::structured_credit::metrics::register_structured_credit_metrics,
-        crate::instruments::fixed_income::term_loan::metrics::register_term_loan_metrics,
-        crate::instruments::fixed_income::revolving_credit::metrics::register_revolving_credit_metrics,
-        crate::instruments::fixed_income::asset_backed_facility::metrics::register_asset_backed_facility_metrics,
-        crate::instruments::fixed_income::fi_trs::metrics::register_fi_trs_metrics,
-    );
-    Ok(())
-}
-
-fn register_rates_instrument_metrics(
-    registry: &mut MetricRegistry,
-) -> std::result::Result<(), MetricRegistryError> {
-    register_modules!(
-        registry,
-        crate::instruments::rates::irs::metrics::register_irs_metrics,
-        crate::instruments::rates::deposit::metrics::register_deposit_metrics,
-        crate::instruments::rates::fra::metrics::register_fra_metrics,
-        crate::instruments::rates::ir_future::metrics::register_ir_future_metrics,
-        crate::instruments::rates::ir_future_option::metrics::register_interest_rate_future_option_metrics,
-        crate::instruments::rates::inflation_swap::metrics::register_inflation_swap_metrics,
-        crate::instruments::rates::inflation_cap_floor::metrics::register_inflation_cap_floor_metrics,
-        crate::instruments::rates::cap_floor::metrics::register_cap_floor_metrics,
-        crate::instruments::rates::swaption::metrics::register_swaption_metrics,
-        crate::instruments::rates::xccy_swap::metrics::register_xccy_swap_metrics,
-        crate::instruments::rates::repo::metrics::register_repo_metrics,
-        crate::instruments::rates::basis_swap::metrics::register_basis_swap_metrics,
-        crate::instruments::rates::cms_option::metrics::register_cms_option_metrics,
-        crate::instruments::rates::cms_swap::metrics::register_cms_swap_metrics,
-        crate::instruments::rates::cms_spread_option::metrics::register_cms_spread_option_metrics,
-    );
-    crate::instruments::rates::swaption::metrics::register_bermudan_swaption_metrics(registry)?;
-    Ok(())
-}
-
-fn register_credit_derivative_instrument_metrics(
-    registry: &mut MetricRegistry,
-) -> std::result::Result<(), MetricRegistryError> {
-    register_modules!(
-        registry,
-        crate::instruments::credit_derivatives::cds::metrics::register_cds_metrics,
-        crate::instruments::credit_derivatives::cds_index::metrics::register_cds_index_metrics,
-        crate::instruments::credit_derivatives::cds_tranche::metrics::register_cds_tranche_metrics,
-        crate::instruments::credit_derivatives::cds_option::metrics::register_cds_option_metrics,
-    );
-    Ok(())
-}
-
-fn register_fx_instrument_metrics(
-    registry: &mut MetricRegistry,
-) -> std::result::Result<(), MetricRegistryError> {
-    register_modules!(
-        registry,
-        crate::instruments::fx::fx_spot::metrics::register_fx_spot_metrics,
-        crate::instruments::fx::fx_swap::metrics::register_fx_swap_metrics,
-        crate::instruments::fx::fx_forward::metrics::register_fx_forward_metrics,
-        crate::instruments::fx::fx_future::metrics::register_fx_future_metrics,
-        crate::instruments::fx::fx_future_option::metrics::register_fx_future_option_metrics,
-        crate::instruments::fx::ndf::metrics::register_ndf_metrics,
-        crate::instruments::fx::fx_option::metrics::register_fx_option_metrics,
-        crate::instruments::fx::fx_variance_swap::metrics::register_fx_variance_swap_metrics,
-        crate::instruments::fx::fx_barrier_option::metrics::register_fx_barrier_option_metrics,
-        crate::instruments::fx::fx_digital_option::metrics::register_fx_digital_option_metrics,
-        crate::instruments::fx::fx_touch_option::metrics::register_fx_touch_option_metrics,
-    );
-    Ok(())
-}
-
-fn register_commodity_instrument_metrics(
-    registry: &mut MetricRegistry,
-) -> std::result::Result<(), MetricRegistryError> {
-    register_modules!(
-        registry,
-        crate::instruments::commodity::commodity_forward::metrics::register_commodity_forward_metrics,
-        crate::instruments::commodity::commodity_future::metrics::register_commodity_future_metrics,
-        crate::instruments::commodity::commodity_future_option::metrics::register_commodity_future_option_metrics,
-        crate::instruments::commodity::commodity_swap::metrics::register_commodity_swap_metrics,
-        crate::instruments::commodity::commodity_spot_option::metrics::register_commodity_spot_option_metrics,
-        crate::instruments::commodity::commodity_asian_option::metrics::register_commodity_asian_option_metrics,
-        crate::instruments::commodity::commodity_swaption::metrics::register_commodity_swaption_metrics,
-        crate::instruments::commodity::commodity_spread_option::metrics::register_commodity_spread_option_metrics,
-    );
-    Ok(())
-}
-
-fn register_exotic_instrument_metrics(
-    registry: &mut MetricRegistry,
-) -> std::result::Result<(), MetricRegistryError> {
-    register_modules!(
-        registry,
-        crate::instruments::exotics::lookback_option::metrics::register_lookback_option_metrics,
-        crate::instruments::exotics::asian_option::metrics::register_asian_option_metrics,
-        crate::instruments::equity::autocallable::metrics::register_autocallable_metrics,
-        crate::instruments::exotics::barrier_option::metrics::register_barrier_option_metrics,
-        crate::instruments::equity::cliquet_option::metrics::register_cliquet_option_metrics,
-        crate::instruments::fx::quanto_option::metrics::register_quanto_option_metrics,
-        crate::instruments::exotics::range_accrual::metrics::register_range_accrual_metrics,
-        crate::instruments::exotics::tarn::metrics::register_tarn_metrics,
-        crate::instruments::exotics::snowball::metrics::register_snowball_metrics,
-        crate::instruments::exotics::callable_range_accrual::metrics::register_callable_range_accrual_metrics,
-    );
-    Ok(())
-}
-fn register_universal_metrics(
-    registry: &mut MetricRegistry,
-) -> std::result::Result<(), super::registry::MetricRegistryError> {
     registry.register_metric(MetricId::Theta, Arc::new(GenericThetaAny), &[])?;
     registry.register_metric(
         MetricId::ThetaCarry,
@@ -367,12 +186,4 @@ fn register_universal_metrics(
         &[],
     )?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn built_in_metric_owners_are_unique() {
-        super::build_standard_registry().expect("each built-in metric slot must have one owner");
-    }
 }

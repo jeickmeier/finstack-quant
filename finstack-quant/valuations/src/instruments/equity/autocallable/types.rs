@@ -556,7 +556,10 @@ impl Autocallable {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for Autocallable {
-    impl_instrument_base!(crate::pricer::InstrumentType::Autocallable);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::Autocallable,
+        crate::instruments::equity::EQUITY
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

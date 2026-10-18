@@ -10,8 +10,8 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use crate::instruments::PricingOptions;
-use crate::metrics::{standard_registry, MetricContext, MetricId};
-use crate::pricer::{shared_standard_registry, ModelKey, PricingDispatch};
+use crate::metrics::{MetricContext, MetricId};
+use crate::pricer::{ModelKey, PricingDispatch};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
@@ -104,7 +104,7 @@ pub fn compute_quotes(
     let pricer_registry = options
         .registry
         .clone()
-        .unwrap_or_else(shared_standard_registry);
+        .unwrap_or_else(|| bond.family().shared_pricers());
     let pricing_dispatch = PricingDispatch::registered(model, Arc::clone(&pricer_registry));
 
     // Work on a local clone so we never mutate the caller's bond instance.
@@ -187,7 +187,7 @@ pub fn compute_quotes(
     )?;
     let metric_registry = match options.metric_registry.as_deref() {
         Some(registry) => registry,
-        None => standard_registry(),
+        None => bond_for_metrics.family().metrics(),
     };
 
     let instrument_arc: Arc<dyn Instrument> = Arc::new(bond_for_metrics.clone());

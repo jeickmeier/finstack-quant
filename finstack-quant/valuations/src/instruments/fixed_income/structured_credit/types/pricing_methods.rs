@@ -563,8 +563,10 @@ impl StructuredCredit {
             // No yield on a worthless note: the solver has no target.
             requested.retain(|id| *id != MetricId::Ytm);
         }
-        let computed_metrics =
-            crate::metrics::standard_registry().compute(&requested, &mut metric_context)?;
+        let computed_metrics = self
+            .family()
+            .metrics()
+            .compute(&requested, &mut metric_context)?;
         let accrued = Money::new(computed_metrics[&MetricId::Accrued], pv.currency())?;
         let dirty_price = computed_metrics[&MetricId::DirtyPrice];
         let clean_price = computed_metrics[&MetricId::CleanPrice];

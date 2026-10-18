@@ -558,7 +558,10 @@ impl FxSpot {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for FxSpot {
-    impl_instrument_base!(crate::pricer::InstrumentType::FxSpot);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::FxSpot,
+        crate::instruments::fx::FX
+    );
 
     fn validate_invariants(&self) -> Result<()> {
         self.validate_economics()

@@ -128,6 +128,7 @@ impl InterestRateFutureOption {
 crate::instruments::common_impl::listed::impl_future_option_instrument!(
     InterestRateFutureOption,
     crate::pricer::InstrumentType::InterestRateFutureOption,
+    crate::instruments::rates::RATES,
     require_rate_risk = true
 );
 

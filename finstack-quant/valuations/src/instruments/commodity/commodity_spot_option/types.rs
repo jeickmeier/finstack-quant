@@ -697,7 +697,10 @@ fn black76_unit_price(
 }
 
 impl Instrument for CommoditySpotOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::CommoditySpotOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CommoditySpotOption,
+        crate::instruments::exotics::EXOTICS
+    );
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::Black76

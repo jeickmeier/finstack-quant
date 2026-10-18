@@ -455,7 +455,10 @@ impl CdsTranche {
 // Attributable is provided via blanket impl for all Instrument types
 
 impl Instrument for CdsTranche {
-    impl_instrument_base!(crate::pricer::InstrumentType::CdsTranche);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CdsTranche,
+        crate::instruments::credit_derivatives::CREDIT
+    );
 
     fn market_dependencies(
         &self,

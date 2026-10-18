@@ -53,14 +53,15 @@ pub(crate) fn oas_decimal_from_quote_overrides(
         .model_config
         .mc_target_ci_half_width
         .take();
-    // The standard tree models calibrate once and reprice the prepared
-    // lattice per root trial. A custom registry stays authoritative and is
-    // repriced through its own dispatch.
+    // The fixed-income family's tree models calibrate once and reprice the
+    // prepared lattice per root trial. A custom registry stays authoritative
+    // and is repriced through its own dispatch.
     let standard_dispatch = match &pricing_dispatch {
         crate::pricer::PricingDispatch::InstrumentDefault => true,
-        crate::pricer::PricingDispatch::Registered { registry, .. } => {
-            std::sync::Arc::ptr_eq(registry, &crate::pricer::shared_standard_registry())
-        }
+        crate::pricer::PricingDispatch::Registered { registry, .. } => std::sync::Arc::ptr_eq(
+            registry,
+            &crate::instruments::fixed_income::FIXED_INCOME.shared_pricers(),
+        ),
     };
     let tree_pricer = if standard_dispatch
         && trial_template

@@ -389,7 +389,10 @@ impl FxVarianceSwap {
 }
 
 impl InstrumentTrait for FxVarianceSwap {
-    impl_instrument_base!(crate::pricer::InstrumentType::FxVarianceSwap);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::FxVarianceSwap,
+        crate::instruments::fx::FX
+    );
 
     fn validate_invariants(&self) -> Result<()> {
         self.validate()

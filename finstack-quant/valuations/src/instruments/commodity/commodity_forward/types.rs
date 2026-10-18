@@ -415,7 +415,10 @@ impl CommodityForward {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for CommodityForward {
-    impl_instrument_base!(crate::pricer::InstrumentType::CommodityForward);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CommodityForward,
+        crate::instruments::exotics::EXOTICS
+    );
 
     fn validate_invariants(&self) -> Result<()> {
         self.validate()

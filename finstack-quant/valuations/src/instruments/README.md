@@ -108,8 +108,9 @@ from it.
 4. Add one line to `with_instrument_json_registry!` in `json_loader.rs`. No
    per-site hand edits are needed — everything else is generated.
 5. Add a `metrics/` module with a `register_<name>_metrics(&mut MetricRegistry)`
-   function and call it from the matching
-   `register_*_instrument_metrics` in `src/metrics/core/standard_registry.rs`.
+   function and call it from `register_metrics` in the family's `family.rs`;
+   register the pricer in that file's `register_pricers` and name the family
+   as the second argument of `impl_instrument_base!`.
 6. Add tests under `../../tests/instruments/<name>/`, then regenerate schemas
    when the public JSON shape changes: `mise run rust-gen-schemas`
    (verify with `mise run rust-check-schemas`).

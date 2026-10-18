@@ -4,7 +4,7 @@
 //! context construction and deterministic measure assembly.
 
 use crate::instruments::PricingOptions;
-use crate::metrics::{standard_registry, MetricContext, MetricId};
+use crate::metrics::{MetricContext, MetricId};
 use crate::pricer::PricingDispatch;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
@@ -616,7 +616,7 @@ pub(crate) fn compute_metrics_dyn(
 
     let registry = match pricing.metric_registry.as_deref() {
         Some(registry) => registry,
-        None => standard_registry(),
+        None => instrument.family().metrics(),
     };
     // Every requested metric is forwarded to the registry unfiltered: the
     // registry rejects unknown identifiers and identifiers with no calculator

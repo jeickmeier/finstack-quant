@@ -1451,7 +1451,10 @@ mod tests {
 
 // Implement Instrument trait for BondFuture
 impl crate::instruments::common_impl::traits::Instrument for BondFuture {
-    impl_instrument_base!(crate::pricer::InstrumentType::BondFuture);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::BondFuture,
+        crate::instruments::fixed_income::FIXED_INCOME
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         BondFuture::validate(self)

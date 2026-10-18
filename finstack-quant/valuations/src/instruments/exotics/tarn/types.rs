@@ -199,7 +199,10 @@ impl Tarn {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for Tarn {
-    impl_instrument_base!(crate::pricer::InstrumentType::Tarn);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::Tarn,
+        crate::instruments::exotics::EXOTICS
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         Tarn::validate(self)

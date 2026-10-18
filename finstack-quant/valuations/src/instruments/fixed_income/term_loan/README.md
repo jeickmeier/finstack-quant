@@ -110,7 +110,7 @@ Notes that bite:
 
 ## Pricing
 
-Both pricers are registered in [`src/pricer/fixed_income.rs`](../../../pricer/fixed_income.rs):
+Both pricers are registered in [`../family.rs`](../family.rs) (`FIXED_INCOME`):
 
 | Pricer | `ModelKey` | Use |
 |--------|-----------|-----|

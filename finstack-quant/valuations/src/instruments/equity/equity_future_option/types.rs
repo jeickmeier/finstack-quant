@@ -78,5 +78,6 @@ impl EquityFutureOption {
 
 crate::instruments::common_impl::listed::impl_future_option_instrument!(
     EquityFutureOption,
-    crate::pricer::InstrumentType::EquityFutureOption
+    crate::pricer::InstrumentType::EquityFutureOption,
+    crate::instruments::equity::EQUITY
 );

@@ -48,7 +48,7 @@ Callers enter through `Instrument::value`, `CdsOption` analytics, or registered
 metrics so validation, volatility resolution, and lifecycle policy are applied.
 
 Registered as `(InstrumentType::CdsOption, ModelKey::BloombergCdso)` →
-`BloombergCdsoPricer` in [`src/pricer/credit.rs`](../../../pricer/credit.rs).
+`BloombergCdsoPricer` in [`../family.rs`](../family.rs) (`CREDIT`).
 
 ## Strike conventions
 

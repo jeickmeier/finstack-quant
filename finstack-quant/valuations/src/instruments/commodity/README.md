@@ -85,10 +85,10 @@ it:
 
 | Step | Where |
 |------|-------|
-| Pricer | `src/pricer/commodity.rs`. Five of the six leaves register through `register_generic!` over `Instrument::base_value`; `commodity_asian_option` and the Schwartz–Smith path on `commodity_spot_option` register concrete pricers |
+| Pricer | `register_pricers` in `../exotics/family.rs` (`EXOTICS`, which owns the commodity leaves). Five of the six leaves register through `register_generic!` over `Instrument::base_value`; `commodity_asian_option` and the Schwartz–Smith path on `commodity_spot_option` register concrete pricers |
 | Instrument key | `InstrumentType` variant in `src/pricer/keys.rs` |
 | JSON tag | `with_instrument_json_registry!` in `../json_loader.rs`, category `"commodity"`. Current tags: `commodity_forward`, `commodity_swap`, `commodity_spot_option`, `commodity_asian_option`, `commodity_swaption`, `commodity_spread_option` |
-| Metrics | `register_<name>_metrics` in the leaf's `metrics/`, called from `register_commodity_instrument_metrics` in `src/metrics/core/standard_registry.rs` |
+| Metrics | `register_<name>_metrics` in the leaf's `metrics/`, called from `register_metrics` in `../exotics/family.rs` |
 | Metric traits | Options that use the finite-difference greeks path implement `crate::metrics::HasExpiry` and `HasDayCount` — see `commodity_spot_option/traits.rs` |
 | Schemas | `mise run rust-gen-schemas`, verified by `mise run rust-check-schemas` |
 

@@ -1076,7 +1076,7 @@ impl DiscountedCashFlow {
 }
 
 impl Instrument for DiscountedCashFlow {
-    impl_instrument_base!(InstrumentType::Dcf);
+    impl_instrument_base!(InstrumentType::Dcf, crate::instruments::equity::EQUITY);
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

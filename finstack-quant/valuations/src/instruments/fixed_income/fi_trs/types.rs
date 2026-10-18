@@ -302,7 +302,10 @@ impl FiIndexTotalReturnSwap {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for FiIndexTotalReturnSwap {
-    impl_instrument_base!(crate::pricer::InstrumentType::FiIndexTotalReturnSwap);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::FiIndexTotalReturnSwap,
+        crate::instruments::fixed_income::FIXED_INCOME
+    );
 
     fn validate_invariants(&self) -> Result<()> {
         self.validate()

@@ -309,7 +309,10 @@ impl Snowball {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for Snowball {
-    impl_instrument_base!(crate::pricer::InstrumentType::Snowball);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::Snowball,
+        crate::instruments::exotics::EXOTICS
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         Snowball::validate(self)

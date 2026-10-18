@@ -191,7 +191,10 @@ impl FxFuture {
 }
 
 impl crate::instruments::Instrument for FxFuture {
-    impl_instrument_base!(crate::pricer::InstrumentType::FxFuture);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::FxFuture,
+        crate::instruments::fx::FX
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

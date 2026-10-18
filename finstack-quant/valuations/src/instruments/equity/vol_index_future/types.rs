@@ -235,7 +235,10 @@ impl VolatilityIndexFuture {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexFuture {
-    impl_instrument_base!(crate::pricer::InstrumentType::VolatilityIndexFuture);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::VolatilityIndexFuture,
+        crate::instruments::equity::EQUITY
+    );
 
     fn market_dependencies(
         &self,

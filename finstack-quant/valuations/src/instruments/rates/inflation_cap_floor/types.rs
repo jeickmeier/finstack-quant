@@ -518,7 +518,10 @@ impl InflationCapFloor {
 impl InflationCapFloorBuilder {}
 
 impl crate::instruments::common_impl::traits::Instrument for InflationCapFloor {
-    impl_instrument_base!(crate::pricer::InstrumentType::InflationCapFloor);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::InflationCapFloor,
+        crate::instruments::rates::RATES
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

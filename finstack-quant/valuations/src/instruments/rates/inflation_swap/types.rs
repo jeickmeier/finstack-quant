@@ -441,7 +441,10 @@ impl InflationSwap {
 impl InflationSwapBuilder {}
 
 impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
-    impl_instrument_base!(crate::pricer::InstrumentType::InflationSwap);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::InflationSwap,
+        crate::instruments::rates::RATES
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         InflationSwap::validate(self)
@@ -989,7 +992,10 @@ impl YoYInflationSwap {
 impl YoYInflationSwapBuilder {}
 
 impl crate::instruments::common_impl::traits::Instrument for YoYInflationSwap {
-    impl_instrument_base!(crate::pricer::InstrumentType::YoYInflationSwap);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::YoYInflationSwap,
+        crate::instruments::rates::RATES
+    );
 
     fn market_dependencies(
         &self,

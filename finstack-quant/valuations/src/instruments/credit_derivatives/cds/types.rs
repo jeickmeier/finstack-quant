@@ -749,7 +749,10 @@ impl CreditDefaultSwap {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
-    impl_instrument_base!(crate::pricer::InstrumentType::Cds);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::Cds,
+        crate::instruments::credit_derivatives::CREDIT
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         CreditDefaultSwap::validate(self)

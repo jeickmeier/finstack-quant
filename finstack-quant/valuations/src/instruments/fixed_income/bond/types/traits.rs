@@ -8,7 +8,10 @@ use super::CashflowSpec;
 
 // Explicit Instrument trait implementation (replaces macro for better IDE visibility)
 impl crate::instruments::common_impl::traits::Instrument for Bond {
-    impl_instrument_base!(crate::pricer::InstrumentType::Bond);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::Bond,
+        crate::instruments::fixed_income::FIXED_INCOME
+    );
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         self.default_pricing_model()

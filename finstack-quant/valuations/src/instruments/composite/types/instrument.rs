@@ -43,7 +43,7 @@ use std::collections::BTreeMap;
 /// * `metrics` - Metric identifiers requested for the composite as a whole, in
 ///   caller order; the returned subset preserves that order.
 /// * `options` - Pricing options whose `metric_registry`, when present, decides
-///   applicability; otherwise the shared standard registry is used.
+///   applicability; otherwise the leg's own family registry is used.
 fn metrics_supported_by_leg(
     instrument: &dyn Instrument,
     metrics: &[MetricId],
@@ -51,7 +51,7 @@ fn metrics_supported_by_leg(
 ) -> Vec<MetricId> {
     let registry = match options.metric_registry.as_deref() {
         Some(registry) => registry,
-        None => crate::metrics::standard_registry(),
+        None => instrument.family().metrics(),
     };
     instrument.applicable_metrics(metrics, registry)
 }
@@ -565,6 +565,10 @@ impl Instrument for CompositeInstrument {
 
     fn key(&self) -> crate::pricer::InstrumentType {
         crate::pricer::InstrumentType::Composite
+    }
+
+    fn family(&self) -> &'static crate::pricer::Family {
+        &crate::pricer::STANDARD
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

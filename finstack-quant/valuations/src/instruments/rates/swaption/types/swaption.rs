@@ -1044,7 +1044,10 @@ pub struct GreekInputs {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for Swaption {
-    impl_instrument_base!(crate::pricer::InstrumentType::Swaption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::Swaption,
+        crate::instruments::rates::RATES
+    );
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         match self.vol_model {

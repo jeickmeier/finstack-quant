@@ -3,10 +3,17 @@
 /// Implements the standard boilerplate methods for the [`Instrument`](super::Instrument) trait.
 ///
 /// Most instruments store their ID as `self.id` (an `InstrumentId`), attributes as
-/// `self.attributes`, and have a fixed [`InstrumentType`](crate::pricer::InstrumentType) key.
-/// This macro provides default implementations for the mechanical methods, leaving only the
+/// `self.attributes`, have a fixed [`InstrumentType`](crate::pricer::InstrumentType) key
+/// and belong to one registration [`Family`](crate::pricer::Family). This macro provides
+/// default implementations for the mechanical methods, leaving only the
 /// instrument-specific methods (`value`, `market_dependencies`, etc.) to be
 /// implemented manually.
+///
+/// # Arguments
+///
+/// * `$key` - The instrument's `InstrumentType`.
+/// * `$family` - Path to the `static Family` that registers the instrument's
+///   pricers and metrics (for example `crate::instruments::rates::RATES`).
 ///
 /// # Requirements
 ///
@@ -19,7 +26,7 @@
 ///
 /// ```text
 /// impl Instrument for MyInstrument {
-///     impl_instrument_base!(InstrumentType::MyInstrument);
+///     impl_instrument_base!(InstrumentType::MyInstrument, crate::instruments::rates::RATES);
 ///
 ///     fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
 ///         // instrument-specific pricing logic
@@ -27,13 +34,17 @@
 /// }
 /// ```
 macro_rules! impl_instrument_base {
-    ($key:expr) => {
+    ($key:expr, $family:expr) => {
         fn id(&self) -> &str {
             self.id.as_str()
         }
 
         fn key(&self) -> $crate::pricer::InstrumentType {
             $key
+        }
+
+        fn family(&self) -> &'static $crate::pricer::Family {
+            &$family
         }
 
         fn as_any(&self) -> &dyn ::std::any::Any {

@@ -742,7 +742,10 @@ impl InflationLinkedBond {
 
 // Explicit Instrument trait implementation (replaces macro for better IDE visibility)
 impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond {
-    impl_instrument_base!(crate::pricer::InstrumentType::InflationLinkedBond);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::InflationLinkedBond,
+        crate::instruments::fixed_income::FIXED_INCOME
+    );
 
     fn validate_invariants(&self) -> Result<()> {
         self.validate()

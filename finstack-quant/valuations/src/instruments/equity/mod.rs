@@ -114,6 +114,9 @@ pub mod vol_index_future;
 /// Exchange-listed options on volatility-index futures.
 pub mod vol_index_future_option;
 
+mod family;
+pub use family::EQUITY;
+
 pub use autocallable::{Autocallable, FinalPayoffType};
 pub use cliquet_option::CliquetOption;
 pub use dcf_equity::{DiscountedCashFlow, TerminalValueSpec};

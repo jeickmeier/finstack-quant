@@ -688,7 +688,10 @@ pub(crate) fn prior_cds_roll_on_or_before(date: Date) -> Date {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for CdsOption {
-    impl_instrument_base!(crate::pricer::InstrumentType::CdsOption);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CdsOption,
+        crate::instruments::credit_derivatives::CREDIT
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()?;

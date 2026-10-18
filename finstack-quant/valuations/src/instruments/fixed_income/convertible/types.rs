@@ -1068,7 +1068,10 @@ impl ConvertibleBond {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
-    impl_instrument_base!(crate::pricer::InstrumentType::Convertible);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::Convertible,
+        crate::instruments::fixed_income::FIXED_INCOME
+    );
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::Tree

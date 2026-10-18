@@ -95,10 +95,10 @@ sites, which are *not* all named after the directory:
 
 | Step | Where, for this family |
 |------|------------------------|
-| Pricer | `src/pricer/fixed_income.rs` for most leaves. `Bond` and `BondFuture` register in `src/pricer/rates.rs`; `StructuredCredit` in `src/pricer/credit.rs` |
+| Pricer | `register_pricers` in `family.rs` (`FIXED_INCOME`) for every leaf except `structured_credit`, which is its own family in `structured_credit/family.rs` (`STRUCTURED_CREDIT`) |
 | Instrument key | `InstrumentType` variant in `src/pricer/keys.rs` |
 | JSON tag | One line in `with_instrument_json_registry!` in `../json_loader.rs`, category `"fixed_income"`. Current tags: `bond`, `convertible_bond`, `inflation_linked_bond`, `term_loan`, `revolving_credit`, `asset_backed_facility`, `agency_mbs_passthrough`, `agency_tba`, `agency_cmo`, `dollar_roll`, `trs_fixed_income_index`, `bond_future`, `structured_credit`. `bond_future`, `structured_credit` and `asset_backed_facility` are registered `boxed:` because of their size |
-| Metrics | `register_<name>_metrics(&mut MetricRegistry)` in the leaf's `metrics/`, called from `register_fixed_income_instrument_metrics` in `src/metrics/core/standard_registry.rs` |
+| Metrics | `register_<name>_metrics(&mut MetricRegistry)` in the leaf's `metrics/`, called from `register_metrics` in `family.rs` |
 | Margin | Optional `finstack_quant_margin::Marginable` impl in `../marginable.rs`, reached only through `Instrument::as_marginable` |
 | Schemas | `mise run rust-gen-schemas`, verified by `mise run rust-check-schemas` |
 

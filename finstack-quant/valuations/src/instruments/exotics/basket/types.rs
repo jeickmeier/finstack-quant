@@ -317,7 +317,10 @@ impl Basket {
 
 // Implement traits manually to handle InstrumentId properly
 impl Instrument for Basket {
-    impl_instrument_base!(crate::pricer::InstrumentType::Basket);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::Basket,
+        crate::pricer::STANDARD
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

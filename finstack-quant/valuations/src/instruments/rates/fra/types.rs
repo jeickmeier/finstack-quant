@@ -387,7 +387,10 @@ impl ForwardRateAgreementBuilder {}
 
 // Explicit Instrument trait implementation (replaces macro for better IDE visibility)
 impl crate::instruments::common_impl::traits::Instrument for ForwardRateAgreement {
-    impl_instrument_base!(crate::pricer::InstrumentType::Fra);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::Fra,
+        crate::instruments::rates::RATES
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

@@ -81,6 +81,9 @@ pub mod tba;
 /// Term loan module.
 pub mod term_loan;
 
+mod family;
+pub use family::FIXED_INCOME;
+
 pub use asset_backed_facility::AssetBackedFacility;
 pub use bond::{Bond, BondSettlementConvention};
 pub use bond_future::{BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond};

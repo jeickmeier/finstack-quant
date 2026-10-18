@@ -338,7 +338,10 @@ impl CommodityFuture {
 }
 
 impl crate::instruments::Instrument for CommodityFuture {
-    impl_instrument_base!(crate::pricer::InstrumentType::CommodityFuture);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::CommodityFuture,
+        crate::instruments::exotics::EXOTICS
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

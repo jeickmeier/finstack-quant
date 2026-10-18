@@ -932,7 +932,10 @@ impl XccySwap {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for XccySwap {
-    impl_instrument_base!(crate::pricer::InstrumentType::XccySwap);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::XccySwap,
+        crate::instruments::rates::RATES
+    );
     fn last_payment_date(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,

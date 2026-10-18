@@ -44,7 +44,7 @@ range_accrual/
 
 ## Pricing
 
-Registered in [`src/pricer/exotics.rs`](../../../pricer/exotics.rs):
+Registered in [`../family.rs`](../family.rs) (`EXOTICS`):
 
 | `ModelKey` | Pricer |
 |-----------|--------|

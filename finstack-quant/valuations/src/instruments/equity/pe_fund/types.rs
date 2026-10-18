@@ -175,7 +175,10 @@ impl PrivateMarketsFund {
 // Attributable is provided via blanket impl for all Instrument types
 
 impl Instrument for PrivateMarketsFund {
-    impl_instrument_base!(crate::pricer::InstrumentType::PrivateMarketsFund);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::PrivateMarketsFund,
+        crate::instruments::equity::EQUITY
+    );
 
     fn market_dependencies(
         &self,
