@@ -326,11 +326,15 @@ macro_rules! for_all_functions {
         impl Function {
             /// Whether this function can be evaluated by the core scalar evaluator.
             ///
-            /// A small set of period-aware variants (`Ttm`, `Ytd`, `Qtd`, `FiscalYtd`,
-            /// `GrowthRate`, the n-ary reducers `Sum`/`Mean`/`Min`/`Max`/`Coalesce`,
-            /// and the annualization helpers) live in the AST so that the
-            /// `statements` crate can parse and evaluate them with knowledge of the
-            /// period grid; they are deliberately rejected by `core::expr::eval`.
+            /// Only the elementwise functions (`abs`, `sign`, `pow`, `round`,
+            /// `floor`, `ceil`, `ln`, `exp`, `log10`, `sqrt`, `clamp`,
+            /// `is_missing`) are. The windowed, cumulative, positional and
+            /// reducing functions (`lag`, `rolling_*`, `cumsum`, `std`, `rank`,
+            /// ...) and the period-aware variants (`Ttm`, `Ytd`, `GrowthRate`,
+            /// the n-ary reducers `Sum`/`Mean`/`Min`/`Max`/`Coalesce`, the
+            /// annualization helpers) live in the AST so that the `statements`
+            /// crate can parse and evaluate them with knowledge of the period
+            /// grid; `core::expr::CompiledExpr::new` rejects them.
             ///
             /// This is the single source of truth for that layering boundary.
             #[must_use]
@@ -357,80 +361,80 @@ macro_rules! for_all_functions {
 
 for_all_functions! {
     /// Previous N values (shift down).
-    Lag => ("lag", true),
+    Lag => ("lag", false),
     /// Next N values (shift up).
-    Lead => ("lead", true),
+    Lead => ("lead", false),
     /// First/lagged difference with step N (default 1).
-    Diff => ("diff", true),
+    Diff => ("diff", false),
     /// Percentage change over step N (default 1).
-    PctChange => ("pct_change", true),
+    PctChange => ("pct_change", false),
     /// Cumulative sum.
-    CumSum => ("cumsum", true),
+    CumSum => ("cumsum", false),
     /// Cumulative product.
-    CumProd => ("cumprod", true),
+    CumProd => ("cumprod", false),
     /// Cumulative minimum.
-    CumMin => ("cummin", true),
+    CumMin => ("cummin", false),
     /// Cumulative maximum.
-    CumMax => ("cummax", true),
+    CumMax => ("cummax", false),
     /// Rolling arithmetic mean over a fixed row window size.
-    RollingMean => ("rolling_mean", true),
+    RollingMean => ("rolling_mean", false),
     /// Rolling sum over a fixed row window size.
-    RollingSum => ("rolling_sum", true),
+    RollingSum => ("rolling_sum", false),
     /// `ewm_mean(series, alpha, adjust?)`, with `alpha` normalized to
     /// `[1e-12, 1]`. An omitted or nonzero `adjust` uses normalized weights;
     /// zero selects the recursive form. Leading and interior NaNs are preserved,
     /// and the recursion starts at the first non-NaN observation.
-    EwmMean => ("ewm_mean", true),
+    EwmMean => ("ewm_mean", false),
     /// Population standard deviation (denominator `n`, pandas `ddof=0`),
     /// broadcast over the input length. NaNs are excluded; fewer than two
     /// non-NaN observations produce NaN.
-    Std => ("std", true),
+    Std => ("std", false),
     /// Population variance (denominator `n`, pandas `ddof=0`), broadcast over
     /// the input length. NaNs are excluded; fewer than two non-NaN
     /// observations produce NaN.
-    Var => ("var", true),
+    Var => ("var", false),
     /// Median.
-    Median => ("median", true),
+    Median => ("median", false),
     /// Rolling population standard deviation (`ddof=0`) over a fixed row
     /// window size. Incomplete windows and windows containing NaN return NaN.
-    RollingStd => ("rolling_std", true),
+    RollingStd => ("rolling_std", false),
     /// Rolling population variance (`ddof=0`) over a fixed row window size.
     /// Incomplete windows and windows containing NaN return NaN.
-    RollingVar => ("rolling_var", true),
+    RollingVar => ("rolling_var", false),
     /// Rolling median over a fixed row window size.
-    RollingMedian => ("rolling_median", true),
+    RollingMedian => ("rolling_median", false),
     /// Shift values by N positions (positive = shift down, negative = shift up).
-    Shift => ("shift", true),
+    Shift => ("shift", false),
     /// Rank values (min ranking; ties share the minimum rank, pandas
     /// `method='min'`).
-    Rank => ("rank", true),
+    Rank => ("rank", false),
     /// Calculate quantile/percentile of values.
     ///
     /// Note: This function reduces the entire series to a single scalar value
     /// and broadcasts that scalar across the output length. It is not a
     /// rolling/windowed quantile. For windowed behavior, prefer `RollingMedian`
     /// or a domain-specific rolling estimator.
-    Quantile => ("quantile", true),
+    Quantile => ("quantile", false),
     /// Rolling minimum over a fixed row window size.
-    RollingMin => ("rolling_min", true),
+    RollingMin => ("rolling_min", false),
     /// Rolling maximum over a fixed row window size.
-    RollingMax => ("rolling_max", true),
+    RollingMax => ("rolling_max", false),
     /// Count non-null values in rolling window.
-    RollingCount => ("rolling_count", true),
+    RollingCount => ("rolling_count", false),
     /// `ewm_std(series, alpha, adjust?)`, with `alpha` normalized to
     /// `[1e-12, 1]`. An omitted or positive `adjust` uses adjusted weights;
     /// zero or a negative value selects the recursive form. Leading and interior
     /// NaNs are preserved, and the recursion starts at the first non-NaN value.
     /// Returns weighted population standard deviation without a sample-bias
     /// correction; the first non-NaN observation has standard deviation zero.
-    EwmStd => ("ewm_std", true),
+    EwmStd => ("ewm_std", false),
     /// `ewm_var(series, alpha, adjust?)`, with `alpha` normalized to
     /// `[1e-12, 1]`. An omitted or positive `adjust` uses adjusted weights;
     /// zero or a negative value selects the recursive form. Leading and interior
     /// NaNs are preserved, and the recursion starts at the first non-NaN value.
     /// Returns weighted population variance without a sample-bias correction;
     /// the first non-NaN observation has variance zero.
-    EwmVar => ("ewm_var", true),
+    EwmVar => ("ewm_var", false),
     /// Sum multiple values, skipping NaN values.
     Sum => ("sum", false),
     /// Average of multiple values, skipping NaN values.

@@ -12,7 +12,7 @@ use crate::instruments::{Attributes, InstrumentEnvelope, InstrumentJson, Pricing
 use crate::metrics::{is_additive_metric, MetricId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::expr::{CompiledExpr, EvalOpts, Expr, SimpleContext};
+use finstack_quant_core::expr::{CompiledExpr, Expr, SimpleContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
@@ -291,7 +291,7 @@ impl CompositeSpec {
                                 leg.instrument_id
                             ))
                         })?;
-                    let _ = CompiledExpr::try_new_scalar(expression.clone())?;
+                    let _ = CompiledExpr::new(expression.clone())?;
                 }
                 Ok(())
             }
@@ -739,8 +739,8 @@ impl CompositeSpec {
                         leg.instrument_id
                     ))
                 })?;
-            let compiled = CompiledExpr::try_new_scalar(expression.clone())?;
-            let evaluated = compiled.eval(&context, &refs, EvalOpts::default())?;
+            let compiled = CompiledExpr::new(expression.clone())?;
+            let evaluated = compiled.eval(&context, &refs)?;
             let quantity = evaluated.values.first().copied().ok_or_else(|| {
                 Error::Validation(format!(
                     "quantity expression for leg '{}' returned no value",

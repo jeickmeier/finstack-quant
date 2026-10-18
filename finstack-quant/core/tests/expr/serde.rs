@@ -3,13 +3,11 @@
 //! This module tests serde roundtrip for:
 //! - Expression AST nodes (Column, Literal, Call, BinOp, IfThenElse)
 //! - Function enum variants
-//! - Evaluation types (CompiledExpr, EvalOpts, EvaluationResult)
+//! - Evaluation result envelope (EvaluationResult)
 //! - Context types (SimpleContext)
 
 use finstack_quant_core::config::{ResultsMeta, RoundingContext, NUMERIC_MODE_F64};
-use finstack_quant_core::expr::{
-    CompiledExpr, EvalOpts, EvaluationResult, Expr, ExprNode, Function, SimpleContext,
-};
+use finstack_quant_core::expr::{EvaluationResult, Expr, ExprNode, Function, SimpleContext};
 
 #[test]
 fn test_expr_ast_serde_roundtrip() {
@@ -149,43 +147,6 @@ fn test_evaluation_result_serde() {
 }
 
 #[test]
-fn test_eval_opts_serde() {
-    let opts = EvalOpts {
-        max_arena_bytes: 1_073_741_824,
-    };
-
-    let json = serde_json::to_string(&opts).expect("Failed to serialize EvalOpts");
-
-    // Execution plans are not caller-supplied evaluation options.
-    assert!(
-        !json.contains("\"plan\""),
-        "EvalOpts.plan must not be serialized, got: {json}"
-    );
-
-    let deserialized: EvalOpts =
-        serde_json::from_str(&json).expect("Failed to deserialize EvalOpts");
-
-    assert_eq!(opts.max_arena_bytes, deserialized.max_arena_bytes);
-}
-
-#[test]
-fn test_eval_opts_rejects_inbound_plan_field() {
-    // EvalOpts is strict (deny_unknown_fields) and has no `plan` field:
-    // payloads carrying a `plan` field must be rejected rather than silently
-    // executing an injected plan.
-    let json = r#"{"plan":null,"max_arena_bytes":1024}"#;
-    let result: Result<EvalOpts, _> = serde_json::from_str(json);
-    assert!(result.is_err(), "inbound `plan` field must be rejected");
-}
-
-#[test]
-fn test_eval_opts_rejects_unknown_fields() {
-    let json = r#"{"max_arena_bytes":1024,"bogus":1}"#;
-    let result: Result<EvalOpts, _> = serde_json::from_str(json);
-    assert!(result.is_err(), "unknown fields must be rejected");
-}
-
-#[test]
 fn test_expr_rejects_unknown_fields() {
     let json = r#"{"id":null,"node":{"Column":"x"},"bogus":1}"#;
     let result: Result<Expr, _> = serde_json::from_str(json);
@@ -211,72 +172,6 @@ fn test_simple_context_rejects_unknown_fields() {
         result.is_err(),
         "unknown SimpleContext fields must be rejected"
     );
-}
-
-#[test]
-fn test_compiled_expr_serde() {
-    // Create a compiled expression with a plan
-    let meta = ResultsMeta {
-        numeric_mode: NUMERIC_MODE_F64.to_owned(),
-        rounding: RoundingContext::default(),
-        fx_policy_applied: None,
-        parallel: false,
-        timestamp: None,
-        version: None,
-    };
-
-    let expr = Expr::call(
-        Function::RollingSum,
-        vec![Expr::column("values"), Expr::literal(5.0)],
-    );
-
-    let compiled = CompiledExpr::with_planning(expr, meta).unwrap();
-
-    let json = serde_json::to_string(&compiled).expect("Failed to serialize CompiledExpr");
-    let deserialized: CompiledExpr =
-        serde_json::from_str(&json).expect("Failed to deserialize CompiledExpr");
-
-    // Verify round-trip serialization preserves the expression and metadata
-    let reserialized =
-        serde_json::to_string(&deserialized).expect("Failed to re-serialize CompiledExpr");
-    assert_eq!(json, reserialized);
-}
-
-#[test]
-fn compiled_expression_serialization_rebuilds_plans_from_the_tree() {
-    use finstack_quant_core::config::{results_meta, FinstackConfig};
-    let meta = results_meta(&FinstackConfig::default());
-    let context = SimpleContext::new(["x"]).expect("unique column");
-    let data = [0.0, 0.0];
-    let columns: &[&[f64]] = &[&data];
-    for eager in [false, true] {
-        let compiled = if eager {
-            CompiledExpr::with_planning(Expr::literal(1.0), meta.clone()).expect("plan")
-        } else {
-            CompiledExpr::new(Expr::literal(1.0))
-        };
-        assert_eq!(
-            compiled
-                .eval(&context, columns, EvalOpts::default())
-                .expect("eval")
-                .values,
-            [1.0, 1.0]
-        );
-        let mut serialized = serde_json::to_value(&compiled).expect("serialize");
-        assert!(serialized.get("plan").is_none());
-        serialized["ast"] = serde_json::to_value(Expr::literal(2.0)).expect("new tree");
-        let restored: CompiledExpr =
-            serde_json::from_value(serialized.clone()).expect("deserialize");
-        let result = restored
-            .eval(&context, columns, EvalOpts::default())
-            .expect("rebuilt eval");
-        assert_eq!(result.values, [2.0, 2.0]);
-        if eager {
-            assert_eq!(result.metadata, meta);
-        }
-        serialized["plan"] = serde_json::json!({});
-        assert!(serde_json::from_value::<CompiledExpr>(serialized).is_err());
-    }
 }
 
 #[test]

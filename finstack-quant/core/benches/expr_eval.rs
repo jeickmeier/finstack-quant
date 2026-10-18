@@ -6,7 +6,7 @@
 //! reuses the pooled arena and node-id-indexed offsets.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_core::expr::{BinOp, CompiledExpr, EvalOpts, Expr, SimpleContext};
+use finstack_quant_core::expr::{BinOp, CompiledExpr, Expr, SimpleContext};
 use std::hint::black_box;
 
 /// Build a moderately deep arithmetic expression over `n_cols` columns:
@@ -47,12 +47,8 @@ fn benchmark_eval(c: &mut Criterion) {
             .collect();
         let cols: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
 
-        let compiled = CompiledExpr::new(build_expr(n_cols));
-        // Warm the lazy plan so the benchmark measures steady-state eval, not
-        // one-time DAG construction.
-        let _ = compiled
-            .eval(&ctx, &cols, EvalOpts::default())
-            .expect("warmup eval");
+        let compiled =
+            CompiledExpr::new(build_expr(n_cols)).expect("elementwise expression compiles");
 
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{n_cols}cols_{n_rows}rows")),
@@ -60,7 +56,7 @@ fn benchmark_eval(c: &mut Criterion) {
             |b, _| {
                 b.iter(|| {
                     let res = compiled
-                        .eval(black_box(&ctx), black_box(&cols), EvalOpts::default())
+                        .eval(black_box(&ctx), black_box(&cols))
                         .expect("eval");
                     black_box(res.values.len())
                 });
