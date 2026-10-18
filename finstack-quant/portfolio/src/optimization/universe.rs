@@ -2,6 +2,7 @@
 //!
 use crate::position::PositionUnit;
 use crate::types::{AttributeTest, AttributeValue, EntityId, PositionId};
+use finstack_quant_valuations::instruments::instrument_json_of;
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -222,7 +223,7 @@ impl TryFrom<CandidatePositionSpec> for CandidatePosition {
 
 impl Serialize for CandidatePosition {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let instrument_spec = self.instrument.to_instrument_json().ok_or_else(|| {
+        let instrument_spec = instrument_json_of(self.instrument.as_ref()).ok_or_else(|| {
             serde::ser::Error::custom(format!(
                 "candidate '{}' holds an instrument with no JSON representation",
                 self.id

@@ -1,0 +1,52 @@
+[package]
+name = "finstack-quant-valuations-structured-credit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Structured credit of Finstack Quant valuations: ABS, RMBS, CMBS and CLO deals with pool, tranche and waterfall modelling, agency CMOs and asset-backed warehouse facilities"
+autotests = false
+
+[dependencies]
+finstack-quant-cashflows = { path = "../../cashflows", version = "0.11.0", default-features = false }
+finstack-quant-core = { path = "../../core", version = "0.11.0", default-features = false }
+finstack-quant-models = { path = "../../models", version = "0.11.0", default-features = false }
+finstack-quant-valuations-macros = { path = "../macros", version = "0.11.0" }
+finstack-quant-valuations-core = { path = "../core", version = "0.11.0", default-features = false }
+finstack-quant-valuations-fixed-income = { path = "../fixed-income", version = "0.11.0", default-features = false }
+finstack-quant-valuations-rates = { path = "../rates", version = "0.11.0", default-features = false }
+indexmap = { workspace = true, features = ["serde"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true }
+rust_decimal = { workspace = true }
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+thiserror = { workspace = true }
+schemars = { workspace = true, optional = true }
+
+[dev-dependencies]
+finstack-quant-valuations-test-support = { path = "../test-support", version = "0.11.0" }
+time = { workspace = true, features = ["macros"] }
+rust_decimal_macros = { workspace = true }
+rayon = "1.11"
+
+[features]
+default = ["json-schema"]
+json-schema = [
+    "dep:schemars",
+    "finstack-quant-valuations-core/json-schema",
+    "finstack-quant-valuations-fixed-income/json-schema",
+    "finstack-quant-valuations-rates/json-schema",
+    "finstack-quant-cashflows/json-schema",
+    "finstack-quant-core/json-schema",
+    "finstack-quant-models/json-schema",
+]
+
+[lints]
+workspace = true
+
+[[test]]
+name = "structured-credit"
+path = "tests/main.rs"

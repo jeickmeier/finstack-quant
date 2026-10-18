@@ -6,9 +6,6 @@
 //! 1. A PriceCurve (preferred)
 //! 2. Cost-of-carry model using spot price and discount curve (fallback)
 
-use crate::instruments::test_support::commodity_curves::flat_price_curve;
-use crate::instruments::test_support::discount_forward_curves::flat_discount_with_tenor;
-use crate::instruments::test_support::volatility::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -16,8 +13,12 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::market_dependencies_of;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::MarketDependencies;
+use finstack_quant_valuations_test_support::commodity_curves::flat_price_curve;
+use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
+use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 use time::macros::date;
 
 fn build_market_from_deps(
@@ -63,10 +64,8 @@ fn test_forward_curve_dependencies_complete() {
     let mut option = CommoditySpotOption::example().expect("example");
     option.spot_id = Some("WTI-SPOT".into());
 
-    let deps = MarketDependencies::from_instrument_json(&InstrumentJson::CommoditySpotOption(
-        option.clone(),
-    ))
-    .expect("from_instrument_json");
+    let deps = market_dependencies_of(&InstrumentJson::CommoditySpotOption(option.clone()))
+        .expect("from_instrument_json");
     let market = build_market_from_deps(&deps, as_of, option.underlying.currency);
 
     let result = option.value(&market, as_of);
@@ -84,10 +83,8 @@ fn test_spot_option_requires_calibrated_forward_curve() {
     let mut option = CommoditySpotOption::example().expect("example");
     option.spot_id = Some("WTI-SPOT".into());
 
-    let deps = MarketDependencies::from_instrument_json(&InstrumentJson::CommoditySpotOption(
-        option.clone(),
-    ))
-    .expect("from_instrument_json");
+    let deps = market_dependencies_of(&InstrumentJson::CommoditySpotOption(option.clone()))
+        .expect("from_instrument_json");
 
     let mut market = MarketContext::new();
     for curve_id in deps.curves.discount_curves.iter() {
@@ -126,10 +123,8 @@ fn test_missing_both_forward_and_spot_fails() {
     let mut option = CommoditySpotOption::example().expect("example");
     option.spot_id = None; // No spot fallback
 
-    let deps = MarketDependencies::from_instrument_json(&InstrumentJson::CommoditySpotOption(
-        option.clone(),
-    ))
-    .expect("from_instrument_json");
+    let deps = market_dependencies_of(&InstrumentJson::CommoditySpotOption(option.clone()))
+        .expect("from_instrument_json");
 
     let mut market = MarketContext::new();
     for curve_id in deps.curves.discount_curves.iter() {

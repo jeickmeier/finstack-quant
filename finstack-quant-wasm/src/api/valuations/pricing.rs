@@ -279,7 +279,7 @@ pub fn bond_from_cashflows_json(
     let instrument_id: &str = &js_string(&instrument_id, "instrumentId")?;
     let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
     let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
-    finstack_quant_valuations::instruments::fixed_income::bond::bond_from_cashflows_json(
+    finstack_quant_valuations::instruments::fixed_income::bond_from_cashflows_json(
         instrument_id,
         schedule_json,
         discount_curve_id,
@@ -821,7 +821,7 @@ pub(super) mod tests {
     }
 
     fn revolving_credit_json(invalid_gearing: bool, with_credit: bool) -> String {
-        use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
+        use finstack_quant_cashflows::builder::RateSpec;
         use finstack_quant_valuations::instruments::{InstrumentJson, RevolvingCredit};
 
         let mut facility = RevolvingCredit::example().expect("facility");
@@ -1011,7 +1011,7 @@ pub(super) mod tests {
         use finstack_quant_valuations::instruments::exotics::range_accrual::{
             BoundsType, RangeAccrualTerms,
         };
-        use finstack_quant_valuations::instruments::rates::hw1f::bermudan_call::BermudanCallProvision;
+        use finstack_quant_valuations::instruments::BermudanCallProvision;
         use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
         use time::Month;
 

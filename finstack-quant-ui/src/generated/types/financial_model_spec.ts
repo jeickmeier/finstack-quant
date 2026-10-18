@@ -670,7 +670,7 @@ export type D_085E3Ec82Eb8695Eaf89 =
  * # Examples
  *
  * ```text
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;
+ * use finstack_quant_valuations_fixed_income::term_loan::spec::OidPolicy;
  * use finstack_quant_core::money::Money;
  * use finstack_quant_core::currency::Currency;
  *
@@ -1056,7 +1056,7 @@ export interface D_880C3Cc8D0Fc2E09823E {
  * and custom cashflow schedule overrides. Uses a clean `CashflowSpec` that wraps
  * the canonical builder coupon specs for maximum flexibility and parity.
  *
- * [`crate::instruments::Instrument::value`] is the **dirty NPV at `as_of`**,
+ * [`finstack_quant_valuations_core::instruments::Instrument::value`] is the **dirty NPV at `as_of`**,
  * not the market dirty quote at settlement. Quoted YTM, z-spread, and DM
  * remain settlement-anchored.
  */
@@ -1306,7 +1306,7 @@ export interface D_87642A02554Ab08B56E3 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+ * use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
  * use finstack_quant_core::dates::Date;
  * use time::Month;
  *
@@ -1338,7 +1338,7 @@ export interface DFb11B05Db6Ea44C39740 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::CallPut;
+ * use finstack_quant_valuations_fixed_income::bond::CallPut;
  * use finstack_quant_core::dates::Date;
  * use time::Month;
  *
@@ -4021,7 +4021,7 @@ export interface D_0B91Bd9Cf7E8361C3A1F {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */
@@ -4762,8 +4762,8 @@ export interface DD5Bd42D8B6Ec6C31D7864 {
  *
  * **Call-protection only**: the floor applies to EARLY issuer redemptions
  * within the [`ProtectionWindow`] and never at maturity. The held-to-maturity
- * path is unfloored. Use [`crate::metrics::MetricId::MoicToWorst`] /
- * [`crate::metrics::MetricId::XirrToWorst`] to see the honest worst-case
+ * path is unfloored. Use [`finstack_quant_valuations_core::metrics::MetricId::MoicToWorst`] /
+ * [`finstack_quant_valuations_core::metrics::MetricId::XirrToWorst`] to see the honest worst-case
  * return across all paths including the unfloored maturity path.
  *
  * # Mathematical Foundation
@@ -4838,7 +4838,7 @@ export interface DD5Bd42D8B6Ec6C31D7864 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{
+ * use finstack_quant_valuations_fixed_income::bond::{
  *     ReturnFloorSpec, IssuePrice,
  * };
  * use finstack_quant_core::types::Rate;
@@ -4856,7 +4856,7 @@ export interface DD5Bd42D8B6Ec6C31D7864 {
  * Attach to a bond using the fluent builder:
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{
+ * use finstack_quant_valuations_fixed_income::bond::{
  *     Bond, ReturnFloorSpec, ProtectionWindow,
  * };
  * use finstack_quant_core::currency::Currency;
@@ -8796,7 +8796,7 @@ export interface DD5Bd42D8B6Ec6C31D78615 {
  * covenant and call schedules):
  *
  * ```
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
+ * use finstack_quant_valuations_fixed_income::term_loan::TermLoan;
  *
  * let loan = TermLoan::example()?;
  * loan.validate()?;
@@ -8811,7 +8811,7 @@ export interface DD5Bd42D8B6Ec6C31D78615 {
  *
  * # Pricing
  *
- * Implements [`Instrument::value()`](crate::instruments::common_impl::traits::Instrument::value)
+ * Implements [`Instrument::value()`](finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::value)
  * using deterministic cashflow discounting. PIK interest is capitalized and excluded from PV.
  *
  * # Invariants
@@ -9446,7 +9446,7 @@ export interface D_87642A02554Ab08B56E33 {
  * # Examples
  *
  * ```text
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::{LoanCallSchedule, LoanCall};
+ * use finstack_quant_valuations_fixed_income::term_loan::spec::{LoanCallSchedule, LoanCall};
  * use finstack_quant_core::dates::create_date;
  * use time::Month;
  *
@@ -9786,7 +9786,7 @@ export interface D_4A1A06Fac651C71Ef236 {
  * # Examples
  *
  * ```text
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;
+ * use finstack_quant_valuations_fixed_income::term_loan::spec::*;
  * use finstack_quant_core::money::Money;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::create_date;

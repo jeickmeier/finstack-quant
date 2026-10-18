@@ -41,7 +41,9 @@ fn build_discount_quotes(_base_date: Date) -> Vec<MarketQuote> {
 
 fn build_credit_quotes() -> Vec<MarketQuote> {
     use finstack_quant_calibration::quotes::cds::CdsQuote;
-    use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+    use finstack_quant_valuations_core::market::conventions::ids::{
+        CdsConventionKey, CdsDocClause,
+    };
     vec![
         MarketQuote::Cds(CdsQuote::CdsParSpread {
             id: QuoteId::new("CDS-1"),

@@ -1,0 +1,460 @@
+//! Unified market data dependency representation for instruments.
+
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::types::{CurveId, PriceId};
+use smallvec::SmallVec;
+
+/// Collection of curves used by an instrument, categorized by market role.
+#[derive(Default, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct InstrumentCurves {
+    /// Discount curves used by the instrument (including primary and foreign).
+    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<CurveId>"))]
+    pub discount_curves: SmallVec<[CurveId; 2]>,
+    /// Forward/projection curves used by the instrument.
+    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<CurveId>"))]
+    pub forward_curves: SmallVec<[CurveId; 2]>,
+    /// Credit/hazard curves used by the instrument.
+    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<CurveId>"))]
+    pub credit_curves: SmallVec<[CurveId; 2]>,
+    /// Inflation curves or published inflation indices used by the instrument.
+    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<CurveId>"))]
+    pub inflation_curves: SmallVec<[CurveId; 2]>,
+}
+
+impl InstrumentCurves {
+    /// Create an empty curve collection.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Iterate over every curve with its market role.
+    pub fn all_with_kind(&self) -> impl Iterator<Item = (CurveId, RatesCurveKind)> + '_ {
+        self.discount_curves
+            .iter()
+            .map(|curve| (curve.clone(), RatesCurveKind::Discount))
+            .chain(
+                self.forward_curves
+                    .iter()
+                    .map(|curve| (curve.clone(), RatesCurveKind::Forward)),
+            )
+            .chain(
+                self.credit_curves
+                    .iter()
+                    .map(|curve| (curve.clone(), RatesCurveKind::Credit)),
+            )
+            .chain(
+                self.inflation_curves
+                    .iter()
+                    .map(|curve| (curve.clone(), RatesCurveKind::Inflation)),
+            )
+    }
+
+    /// Return whether no curves are present.
+    pub fn is_empty(&self) -> bool {
+        self.discount_curves.is_empty()
+            && self.forward_curves.is_empty()
+            && self.credit_curves.is_empty()
+            && self.inflation_curves.is_empty()
+    }
+
+    /// Return the total number of curves.
+    pub fn len(&self) -> usize {
+        self.discount_curves.len()
+            + self.forward_curves.len()
+            + self.credit_curves.len()
+            + self.inflation_curves.len()
+    }
+}
+
+/// Identifies a rate curve's market role for risk calculations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum RatesCurveKind {
+    /// Discount curve used for present-value discounting.
+    Discount,
+    /// Forward curve used for floating-rate projection.
+    Forward,
+    /// Credit or hazard curve.
+    Credit,
+    /// Inflation curve or published inflation index.
+    Inflation,
+}
+
+impl core::fmt::Display for RatesCurveKind {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Discount => write!(formatter, "discount"),
+            Self::Forward => write!(formatter, "forward"),
+            Self::Credit => write!(formatter, "credit"),
+            Self::Inflation => write!(formatter, "inflation"),
+        }
+    }
+}
+
+impl core::str::FromStr for RatesCurveKind {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "discount" => Ok(Self::Discount),
+            "forward" => Ok(Self::Forward),
+            "credit" => Ok(Self::Credit),
+            "inflation" => Ok(Self::Inflation),
+            _ => Err(format!(
+                "Unknown curve kind: '{value}'. Valid: discount, forward, credit, inflation"
+            )),
+        }
+    }
+}
+
+/// FX pair identifier using base/quote currency ordering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FxPair {
+    /// Base currency (numerator).
+    pub base: Currency,
+    /// Quote currency (denominator).
+    pub quote: Currency,
+}
+
+impl FxPair {
+    /// Create a new FX pair identifier.
+    pub fn new(base: Currency, quote: Currency) -> Self {
+        Self { base, quote }
+    }
+}
+
+/// A volatility-surface dependency with the context needed for diagnostics.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct VolatilityDependency {
+    /// Volatility surface identifier.
+    pub vol_surface_id: CurveId,
+    /// Optional market-scalar id of the underlying spot paired with the surface.
+    pub spot_id: Option<PriceId>,
+    /// Optional contractual strike used by local volatility diagnostics.
+    pub reference_strike: Option<f64>,
+}
+
+impl VolatilityDependency {
+    /// Create a volatility dependency descriptor.
+    pub fn new(
+        vol_surface_id: impl Into<CurveId>,
+        spot_id: Option<PriceId>,
+        reference_strike: Option<f64>,
+    ) -> Self {
+        Self {
+            vol_surface_id: vol_surface_id.into(),
+            spot_id,
+            reference_strike,
+        }
+    }
+}
+
+impl PartialEq for VolatilityDependency {
+    fn eq(&self, other: &Self) -> bool {
+        self.vol_surface_id == other.vol_surface_id
+            && self.spot_id == other.spot_id
+            && self.reference_strike.map(f64::to_bits) == other.reference_strike.map(f64::to_bits)
+    }
+}
+
+impl Eq for VolatilityDependency {}
+
+/// Unified dependency container for instrument market data requirements.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MarketDependencies {
+    /// Curve dependencies grouped by type.
+    pub curves: InstrumentCurves,
+    /// Credit-index aggregates resolved through `MarketContext::get_credit_index`.
+    ///
+    /// These identifiers are distinct from direct hazard-curve IDs because a
+    /// credit index also carries base correlation and optional issuer curves.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub credit_index_ids: Vec<CurveId>,
+    /// Scalar market-value identifiers resolved through `MarketContext::get_price`.
+    ///
+    /// This includes tradable spots and non-price unitless scalars such as
+    /// continuous dividend yields. [`Self::series_ids`] is reserved for
+    /// `MarketContext::get_series` dependencies.
+    pub market_scalar_ids: Vec<String>,
+    /// Typed volatility dependencies in deterministic insertion order.
+    pub volatility_dependencies: Vec<VolatilityDependency>,
+    /// FX pairs required for pricing (spot matrices).
+    pub fx_pairs: Vec<FxPair>,
+    /// Scalar time series identifiers (e.g., OHLC price series for realized variance).
+    pub series_ids: Vec<String>,
+}
+
+impl MarketDependencies {
+    /// Create an empty dependency set.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Merge curve dependencies into this set.
+    pub fn add_curves(&mut self, curves: InstrumentCurves) {
+        for id in curves.discount_curves {
+            push_unique_curve(&mut self.curves.discount_curves, id);
+        }
+        for id in curves.forward_curves {
+            push_unique_curve(&mut self.curves.forward_curves, id);
+        }
+        for id in curves.credit_curves {
+            push_unique_curve(&mut self.curves.credit_curves, id);
+        }
+        for id in curves.inflation_curves {
+            push_unique_curve(&mut self.curves.inflation_curves, id);
+        }
+    }
+
+    /// Add a discount-curve dependency.
+    pub fn add_discount_curve(&mut self, id: impl Into<CurveId>) {
+        push_unique_curve(&mut self.curves.discount_curves, id.into());
+    }
+
+    /// Add a forward/projection-curve dependency.
+    pub fn add_forward_curve(&mut self, id: impl Into<CurveId>) {
+        push_unique_curve(&mut self.curves.forward_curves, id.into());
+    }
+
+    /// Add a credit/hazard-curve dependency.
+    pub fn add_credit_curve(&mut self, id: impl Into<CurveId>) {
+        push_unique_curve(&mut self.curves.credit_curves, id.into());
+    }
+
+    /// Add a composite credit-index dependency.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Identifier resolved through `MarketContext::get_credit_index`.
+    ///   Duplicate identifiers are ignored while preserving insertion order.
+    pub fn add_credit_index(&mut self, id: impl Into<CurveId>) {
+        push_unique_curve_vec(&mut self.credit_index_ids, id.into());
+    }
+
+    /// Add an inflation-curve or published-index dependency.
+    pub fn add_inflation_curve(&mut self, id: impl Into<CurveId>) {
+        push_unique_curve(&mut self.curves.inflation_curves, id.into());
+    }
+
+    /// Add an identifier resolved through `MarketContext::get_price`.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Market-scalar key (a `PriceId` or plain string); duplicates are
+    ///   ignored while preserving insertion order.
+    pub fn add_market_scalar_id(&mut self, id: impl AsRef<str>) {
+        push_unique_string(&mut self.market_scalar_ids, id.as_ref().to_string());
+    }
+
+    /// Add a typed volatility dependency.
+    pub fn add_volatility_dependency(&mut self, dependency: VolatilityDependency) {
+        if !self.volatility_dependencies.contains(&dependency) {
+            self.volatility_dependencies.push(dependency);
+        }
+    }
+
+    /// Return unique volatility surface IDs in first-descriptor order.
+    pub fn unique_vol_surface_ids(&self) -> Vec<CurveId> {
+        let mut ids = Vec::new();
+        for dependency in &self.volatility_dependencies {
+            if !ids.contains(&dependency.vol_surface_id) {
+                ids.push(dependency.vol_surface_id.clone());
+            }
+        }
+        ids
+    }
+
+    /// Declared volatility surfaces that are actually present in `market`.
+    ///
+    /// Instruments may declare ordered fallback candidates, so missing
+    /// candidates are not errors while another is present; callers decide
+    /// what an empty result means.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market context whose surfaces are probed by id.
+    pub fn present_vol_surface_ids(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+    ) -> Vec<CurveId> {
+        self.unique_vol_surface_ids()
+            .into_iter()
+            .filter(|vol_surface_id| market.get_surface(vol_surface_id.as_str()).is_ok())
+            .collect()
+    }
+
+    /// Add a scalar time series identifier.
+    pub fn add_series_id(&mut self, id: impl Into<String>) {
+        push_unique_string(&mut self.series_ids, id.into());
+    }
+
+    /// Add an FX pair dependency.
+    pub fn add_fx_pair(&mut self, base: Currency, quote: Currency) {
+        push_unique_fx_pair(&mut self.fx_pairs, FxPair::new(base, quote));
+    }
+
+    /// Merge another dependency set into this one.
+    pub fn merge(&mut self, other: MarketDependencies) {
+        self.add_curves(other.curves);
+        for id in other.credit_index_ids {
+            self.add_credit_index(id);
+        }
+        for id in other.market_scalar_ids {
+            self.add_market_scalar_id(id);
+        }
+        for dependency in other.volatility_dependencies {
+            self.add_volatility_dependency(dependency);
+        }
+        for pair in other.fx_pairs {
+            self.add_fx_pair(pair.base, pair.quote);
+        }
+        for id in other.series_ids {
+            self.add_series_id(id);
+        }
+    }
+}
+
+// Deduplicate while preserving insertion order for deterministic risk reports.
+
+fn push_unique_curve(target: &mut SmallVec<[CurveId; 2]>, id: CurveId) {
+    if target.contains(&id) {
+        return;
+    }
+    target.push(id);
+}
+
+fn push_unique_curve_vec(target: &mut Vec<CurveId>, id: CurveId) {
+    if target.contains(&id) {
+        return;
+    }
+    target.push(id);
+}
+
+fn push_unique_string(target: &mut Vec<String>, value: String) {
+    if target.contains(&value) {
+        return;
+    }
+    target.push(value);
+}
+
+fn push_unique_fx_pair(target: &mut Vec<FxPair>, pair: FxPair) {
+    if target.contains(&pair) {
+        return;
+    }
+    target.push(pair);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn typed_volatility_dependency_preserves_underlying_surface_and_strike() {
+        let mut dependencies = MarketDependencies::new();
+        dependencies.add_market_scalar_id("SPX-SPOT");
+        dependencies.add_volatility_dependency(VolatilityDependency::new(
+            CurveId::new("SPX-VOL"),
+            Some(PriceId::new("SPX-SPOT")),
+            Some(4_500.0),
+        ));
+
+        assert_eq!(
+            dependencies.volatility_dependencies,
+            vec![VolatilityDependency::new(
+                CurveId::new("SPX-VOL"),
+                Some(PriceId::new("SPX-SPOT")),
+                Some(4_500.0),
+            )]
+        );
+        assert_eq!(dependencies.market_scalar_ids, vec!["SPX-SPOT"]);
+    }
+
+    #[test]
+    fn exact_descriptors_deduplicate_in_insertion_order_but_surfaces_can_repeat() {
+        let first = VolatilityDependency::new(
+            CurveId::new("SPX-VOL"),
+            Some(PriceId::new("SPX-SPOT")),
+            Some(4_500.0),
+        );
+        let second = VolatilityDependency::new(
+            CurveId::new("SPX-VOL"),
+            Some(PriceId::new("SPX-SPOT")),
+            Some(4_600.0),
+        );
+        let mut dependencies = MarketDependencies::new();
+        dependencies.add_volatility_dependency(first.clone());
+        dependencies.add_volatility_dependency(first.clone());
+        dependencies.add_volatility_dependency(second.clone());
+
+        assert_eq!(dependencies.volatility_dependencies, vec![first, second]);
+        assert_eq!(
+            dependencies.unique_vol_surface_ids(),
+            vec![CurveId::new("SPX-VOL")]
+        );
+    }
+
+    #[test]
+    fn merge_preserves_descriptor_order() {
+        let mut left = MarketDependencies::new();
+        left.add_volatility_dependency(VolatilityDependency::new(
+            CurveId::new("LEFT-VOL"),
+            None,
+            None,
+        ));
+        let mut right = MarketDependencies::new();
+        right.add_volatility_dependency(VolatilityDependency::new(
+            CurveId::new("RIGHT-VOL"),
+            None,
+            None,
+        ));
+        right.add_volatility_dependency(VolatilityDependency::new(
+            CurveId::new("LEFT-VOL"),
+            None,
+            None,
+        ));
+
+        left.merge(right);
+        assert_eq!(
+            left.unique_vol_surface_ids(),
+            vec![CurveId::new("LEFT-VOL"), CurveId::new("RIGHT-VOL")]
+        );
+    }
+
+    #[test]
+    fn market_dependencies_roundtrip_with_schema_and_equality() {
+        let mut dependencies = MarketDependencies::new();
+        dependencies.add_discount_curve("USD-OIS");
+        dependencies.add_forward_curve("USD-SOFR-3M");
+        dependencies.add_credit_curve("ACME-HAZARD");
+        dependencies.add_inflation_curve("USD-CPI");
+        dependencies.add_market_scalar_id("SPX");
+        dependencies.add_volatility_dependency(VolatilityDependency::new(
+            CurveId::new("SPX-VOL"),
+            Some(PriceId::new("SPX")),
+            Some(5_000.0),
+        ));
+        dependencies.add_fx_pair(Currency::USD, Currency::EUR);
+        dependencies.add_series_id("SPX-CLOSE");
+
+        let json = serde_json::to_string(&dependencies).expect("dependencies serialize");
+        let roundtripped: MarketDependencies =
+            serde_json::from_str(&json).expect("dependencies deserialize");
+        assert_eq!(roundtripped, dependencies);
+
+        let schema = schemars::schema_for!(MarketDependencies);
+        let schema_json = serde_json::to_value(schema).expect("schema serializes");
+        assert_eq!(
+            schema_json["title"],
+            serde_json::Value::String("MarketDependencies".into())
+        );
+    }
+}

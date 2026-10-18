@@ -3,12 +3,12 @@ use std::path::{Path, PathBuf};
 
 const ALLOWED: &[(&str, usize)] = &[
     // `PrimitiveExposure::instrument` and `::metric_defaults` are runtime-only
-    // decomposition state (the leg definition and inherited metric defaults).
-    ("src/instruments/composite/types/reporting.rs", 2),
+    // decomposition state (the leg instrument and inherited metric defaults).
+    ("core/src/results/composite.rs", 2),
     // `Tranche::payment_priority` and `TrancheStructure::currency` are
     // derived when the structure is assembled, never read from the wire.
     (
-        "src/instruments/fixed_income/structured_credit/types/tranches.rs",
+        "structured-credit/src/structured_credit/types/tranches.rs",
         2,
     ),
 ];
@@ -29,6 +29,19 @@ fn serde_skip_is_limited_to_documented_derived_artifacts() {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut files = Vec::new();
     rust_sources(&manifest.join("src/instruments"), &mut files);
+    rust_sources(&manifest.join("core/src/instruments"), &mut files);
+    rust_sources(&manifest.join("core/src/results"), &mut files);
+    for family in [
+        "credit",
+        "equity",
+        "exotics",
+        "fixed-income",
+        "fx",
+        "rates",
+        "structured-credit",
+    ] {
+        rust_sources(&manifest.join(family).join("src"), &mut files);
+    }
 
     let mut unexpected = Vec::new();
     let mut allowed_hits = Vec::new();

@@ -13,6 +13,7 @@
 pub mod brownian;
 pub mod cheyette_rough;
 pub mod cir;
+pub mod credit_line;
 pub mod gbm;
 pub mod gbm_dividends;
 pub mod heston;
@@ -21,6 +22,7 @@ pub mod local_vol;
 pub mod metadata;
 pub mod multi_ou;
 pub mod ou;
+pub mod piecewise_gbm;
 pub mod rough_bergomi;
 pub mod rough_heston;
 pub mod schwartz_smith;

@@ -9,6 +9,8 @@ mod canonical_contracts;
 mod cashflow_export_schema;
 #[path = "cashflows.rs"]
 mod cashflows;
+#[path = "core.rs"]
+mod core_framework;
 #[path = "credit_calibration.rs"]
 mod credit_calibration;
 #[path = "credit_decomposition.rs"]
@@ -47,6 +49,8 @@ mod production_structured_audit;
 mod production_structured_metrics_audit;
 #[path = "production_waterfall_audit.rs"]
 mod production_waterfall_audit;
+#[path = "registry_snapshot.rs"]
+mod registry_snapshot;
 #[path = "return_floor_example.rs"]
 mod return_floor_example;
 #[path = "sanity_invariants.rs"]

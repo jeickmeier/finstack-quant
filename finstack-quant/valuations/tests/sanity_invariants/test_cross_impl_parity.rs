@@ -31,7 +31,7 @@
 //! * `tests/instruments/structured_credit/unit/per_name_copula_tests.rs`
 //!   (`large_granular_pool_per_name_matches_lhp`, …) — per-name Gaussian-copula
 //!   default-simulation MC vs the large-homogeneous-pool (LHP) limit (Task 17).
-//! * `finstack-quant/valuations/src/instruments/exotics/snowball/pricer.rs`
+//! * `finstack-quant/valuations/exotics/src/exotics/snowball/pricer.rs`
 //!   (`deterministic_mc_snowball_matches_discounted_coupon_formula`) — HW1F MC
 //!   in the σ→0 limit vs the discounted in-advance coupon formula (Task 21).
 

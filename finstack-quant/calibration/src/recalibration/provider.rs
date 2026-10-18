@@ -9,8 +9,8 @@ use super::rates::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
-use finstack_quant_valuations::instruments::PricingOptions;
-use finstack_quant_valuations::recalibration::{
+use finstack_quant_valuations_core::instruments::PricingOptions;
+use finstack_quant_valuations_core::recalibration::{
     DiscountCurveRecalibrationRequest, HazardRecalibrationAction, HazardRecalibrationRequest,
     HazardSpreadRiskBucket, RateMarketRecalibrationRequest, RecalibrationProvider,
 };

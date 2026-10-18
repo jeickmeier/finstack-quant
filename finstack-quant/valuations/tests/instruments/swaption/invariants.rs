@@ -18,10 +18,10 @@
 //! 4. **Time Decay**: Option value decreases as expiry approaches (all else equal).
 
 use super::common::*;
-use crate::instruments::common::test_helpers::tolerances;
 use finstack_quant_core::dates::DateExt;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_test_support::test_helpers::tolerances;
 use proptest::prelude::*;
 use time::macros::date;
 

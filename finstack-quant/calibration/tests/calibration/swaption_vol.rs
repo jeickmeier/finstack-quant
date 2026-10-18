@@ -14,6 +14,7 @@ use finstack_quant_calibration::api::schema::{
 use finstack_quant_calibration::quotes::ids::QuoteId;
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::CalibrationConfig;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
@@ -24,12 +25,10 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::instruments::rates::irs::{
-    FixedLegSpec, FloatLegSpec, FloatingLegCompounding,
-};
-use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
-use finstack_quant_valuations::instruments::{OptionType, SettlementType, VolatilityModel};
-use finstack_quant_valuations::market::conventions::ids::SwaptionConventionId;
+use finstack_quant_valuations_core::instruments::{OptionType, SettlementType, VolatilityModel};
+use finstack_quant_valuations_core::market::conventions::ids::SwaptionConventionId;
+use finstack_quant_valuations_rates::irs::{FixedLegSpec, FloatLegSpec};
+use finstack_quant_valuations_rates::swaption::{CashSettlementMethod, Swaption};
 use rust_decimal::Decimal;
 
 use crate::calibration::calibration_support as cal_utils;
@@ -228,7 +227,7 @@ fn swaption_vol_step_builds_and_inserts_surface() {
 
     // Calibration now produces a VolCube (SABR params on expiry x tenor grid).
     // Resolve the calibrated cube as a concrete VolSource.
-    let vol_provider = finstack_quant_valuations::market::resolve_vol_source(&ctx, "USD-SWPT")
+    let vol_provider = finstack_quant_valuations_core::market::resolve_vol_source(&ctx, "USD-SWPT")
         .expect("vol cube inserted");
 
     // ATM strikes for each bucket (approximate).
@@ -345,7 +344,7 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
 
     // Normal calibration preserves its quote convention on the expiry/tenor
     // cube. It cannot be read as a Black strike surface.
-    let vol_provider = finstack_quant_valuations::market::resolve_vol_source(
+    let vol_provider = finstack_quant_valuations_core::market::resolve_vol_source(
         &ctx,
         swaption.vol_surface_id.as_str(),
     )
@@ -562,8 +561,9 @@ fn swaption_vol_settlement_lag_uses_canonical_tenor_axis() {
     let result = execute_for_tenor(contractual_tenor)
         .expect("the cube must use the contractual 1Y tenor after T+2 settlement");
     let context = MarketContext::try_from(result.result.final_market).expect("restore context");
-    let cube = finstack_quant_valuations::market::resolve_vol_source(&context, "USD-SWPT-SETTLED")
-        .expect("contractual-coordinate cube");
+    let cube =
+        finstack_quant_valuations_core::market::resolve_vol_source(&context, "USD-SWPT-SETTLED")
+            .expect("contractual-coordinate cube");
     assert!(cube
         .get_normal_vol(expiry_time, contractual_tenor, 0.043)
         .expect("exact contractual cube node")

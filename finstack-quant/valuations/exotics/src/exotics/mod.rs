@@ -1,0 +1,118 @@
+//! Exotic and path-dependent options.
+//!
+//! This module provides exotic option instruments whose payoffs depend on
+//! the path of the underlying asset, not just its terminal value. These
+//! instruments require either analytical approximations or Monte Carlo
+//! simulation for pricing.
+//!
+//! # Features
+//!
+//! - **Asian Options**: Payoff based on average price over option life
+//! - **Barrier Options**: Knock-in/knock-out based on barrier crossing
+//! - **Lookback Options**: Payoff based on path extremum (max or min)
+//! - **Range Accruals**: Coupons accruing only while an index stays in a range,
+//!   with an optional issuer call ([`CallableRangeAccrual`])
+//! - **Structured Rate Notes**: TARNs and snowball / inverse floater notes
+//!   priced under Hull-White one-factor Monte Carlo
+//!   ([`finstack_quant_models::rates::hw1f`])
+//!
+//! # Pricing Models
+//!
+//! | Option Type | Analytical | Monte Carlo |
+//! |-------------|------------|-------------|
+//! | Asian (Geometric) | Kemna-Vorst (exact) | ✓ |
+//! | Asian (Arithmetic) | Turnbull-Wakeman (approx) | ✓ |
+//! | Barrier (Continuous) | Reiner-Rubinstein | ✓ |
+//! | Barrier (Discrete) | Broadie-Glasserman correction | ✓ |
+//! | Lookback | Conze-Viswanathan | ✓ |
+//!
+//! # Monte Carlo Requirements
+//!
+//! Path-dependent exotics use the workspace Monte Carlo infrastructure for simulation-based
+//! pricing. Analytical formulas are available for some exotic types when applicable.
+//!
+//! # Quick Example
+//!
+//! ```rust
+//! use finstack_quant_valuations_exotics::exotics::{AsianOption, AveragingMethod};
+//!
+//! // Use the example Asian option (arithmetic average call)
+//! let asian = AsianOption::example().unwrap();
+//! ```
+//!
+//! Or build a custom option:
+//!
+//! ```
+//! use finstack_quant_valuations_exotics::exotics::{AsianOption, AveragingMethod};
+//! use finstack_quant_valuations_core::instruments::OptionType;
+//! use finstack_quant_core::currency::Currency;
+//! use finstack_quant_core::dates::DayCount;
+//! use finstack_quant_core::types::{CurveId, InstrumentId};
+//! use time::macros::date;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let fixing_dates = vec![
+//!     date!(2025-01-31), date!(2025-02-28), date!(2025-03-31),
+//!     date!(2025-04-30), date!(2025-05-31), date!(2025-06-30),
+//! ];
+//!
+//! let asian = AsianOption::builder()
+//!     .id(InstrumentId::new("ASIAN-SPX"))
+//!     .underlying_ticker("SPX".to_string())
+//!     .strike(4500.0)
+//!     .option_type(OptionType::Call)
+//!     .averaging_method(AveragingMethod::Arithmetic)
+//!     .expiry(date!(2025-06-30))
+//!     .fixing_dates(fixing_dates)
+//!     .quantity(100_000.0)
+//!     .currency(Currency::USD)
+//!     .day_count(DayCount::Act365F)
+//!     .discount_curve_id(CurveId::new("USD-OIS"))
+//!     .spot_id("SPX-SPOT".to_string().into())
+//!     .vol_surface_id(CurveId::new("SPX-VOL"))
+//!     .build()?;
+//! # Ok(()) }
+//! ```
+//!
+//! # Academic References
+//!
+//! - Kemna, A. G. Z., & Vorst, A. C. F. (1990). "A Pricing Method for Options
+//!   Based on Average Asset Values." *Journal of Banking & Finance*. `docs/REFERENCES.md#kemna-vorst-1990`
+//! - Turnbull, S. M., & Wakeman, L. M. (1991). "A Quick Algorithm for Pricing
+//!   European Average Options." `docs/REFERENCES.md#turnbull-wakeman-1991`
+//! - Reiner, E., & Rubinstein, M. (1991). "Breaking Down the Barriers." `docs/REFERENCES.md#reiner-rubinstein-1991`
+//! - Conze, A., & Viswanathan (1991). "Path Dependent Options: The Case of
+//!   Lookback Options." `docs/REFERENCES.md#conze-viswanathan-1991`
+//!
+//! # See Also
+//!
+//! - [`AsianOption`] for average price options
+//! - [`BarrierOption`] for knock-in/knock-out options
+//! - [`LookbackOption`] for path extremum options
+//! - [`finstack_quant_models::closed_form`] for analytical formulas
+
+/// Asian option module - Average price/strike options.
+pub mod asian_option;
+/// Barrier option module - Knock-in/knock-out options.
+pub mod barrier_option;
+/// Callable range accrual module - Range accrual with Bermudan call.
+pub mod callable_range_accrual;
+/// Lookback option module - Path-dependent lookback options.
+pub mod lookback_option;
+/// Range accrual module.
+pub mod range_accrual;
+/// Snowball / Inverse Floater structured note module.
+pub mod snowball;
+/// TARN (Target Redemption Note) module.
+pub mod tarn;
+
+mod family;
+pub use family::EXOTICS;
+
+pub use asian_option::{AsianOption, AveragingMethod};
+pub use barrier_option::BarrierOption;
+pub use callable_range_accrual::CallableRangeAccrual;
+pub use lookback_option::{LookbackOption, LookbackType};
+pub use range_accrual::RangeAccrual;
+pub use snowball::{Snowball, SnowballVariant};
+pub use tarn::Tarn;

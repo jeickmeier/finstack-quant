@@ -10,9 +10,10 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations::instruments::market_dependencies_of;
+use finstack_quant_valuations::instruments::FxPair;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{FxDigitalOption, FxForward, InstrumentJson};
-use finstack_quant_valuations::instruments::{FxPair, MarketDependencies};
 use std::sync::Arc;
 use time::macros::date;
 
@@ -53,9 +54,8 @@ fn test_fx_forward_dependencies_complete() {
         .build()
         .expect("FX forward construction should succeed");
 
-    let deps =
-        MarketDependencies::from_instrument_json(&InstrumentJson::FxForward(forward.clone()))
-            .expect("from_instrument_json");
+    let deps = market_dependencies_of(&InstrumentJson::FxForward(forward.clone()))
+        .expect("from_instrument_json");
     assert!(
         deps.fx_pairs
             .contains(&FxPair::new(Currency::EUR, Currency::USD)),
@@ -92,9 +92,8 @@ fn test_missing_fx_matrix_fails() {
         .build()
         .expect("FX forward construction should succeed");
 
-    let deps =
-        MarketDependencies::from_instrument_json(&InstrumentJson::FxForward(forward.clone()))
-            .expect("from_instrument_json");
+    let deps = market_dependencies_of(&InstrumentJson::FxForward(forward.clone()))
+        .expect("from_instrument_json");
     let mut market = MarketContext::new();
     for id in deps.curves.discount_curves {
         market = market.insert(build_discount_curve(id.as_str(), 0.03));
@@ -111,9 +110,8 @@ fn test_missing_fx_matrix_fails() {
 fn test_fx_digital_direct_dependencies_match_json_dependencies() {
     let option = FxDigitalOption::example().expect("FX digital example");
 
-    let json_deps =
-        MarketDependencies::from_instrument_json(&InstrumentJson::FxDigitalOption(option.clone()))
-            .expect("from_instrument_json");
+    let json_deps = market_dependencies_of(&InstrumentJson::FxDigitalOption(option.clone()))
+        .expect("from_instrument_json");
     let direct_deps = option
         .market_dependencies()
         .expect("direct market_dependencies");

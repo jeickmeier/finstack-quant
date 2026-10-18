@@ -19,9 +19,9 @@ use finstack_quant_core::market_data::term_structures::Seniority;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
-use finstack_quant_valuations::recalibration::QuoteBump;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+use finstack_quant_valuations_core::recalibration::QuoteBump;
 use time::Month;
 
 use crate::test_support as cal_utils;

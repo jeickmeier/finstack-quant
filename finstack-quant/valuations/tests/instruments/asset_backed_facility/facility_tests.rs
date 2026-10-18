@@ -4,6 +4,7 @@
 //! undrawn commitment, the term-out amortizes the facility sequentially,
 //! and the instrument prices and reports its metrics through the registry.
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Tenor};
@@ -15,7 +16,7 @@ use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility:
     AdvanceRate, AmortizationEvent, AssetBackedFacility, BorrowingBaseRules, ConcentrationLimit,
     ConcentrationScope, EligibilityRule, TermOutSpec,
 };
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::{DrawEvent, RateSpec};
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::DrawEvent;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, LiquidationSpec, PoolAsset,
 };

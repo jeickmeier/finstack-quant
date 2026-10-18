@@ -1,0 +1,1633 @@
+//! Commodity option instrument definition and pricing logic.
+
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
+use finstack_quant_core::Result;
+use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithParams;
+use finstack_quant_models::trees::binomial_tree::BinomialTree;
+use finstack_quant_valuations_core::instruments::common_impl::parameters::{
+    CommodityConvention, CommodityUnderlyingParams, OptionMarketParams,
+};
+use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::common_impl::traits::{Attributes, Instrument};
+use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType, SettlementType};
+
+/// Monte Carlo configuration for commodity option pricing.
+///
+/// When provided, enables simulation-based pricing using the Schwartz-Smith
+/// two-factor model instead of the default Black-76 analytical formula.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CommodityMcParams {
+    /// Risk-neutral Schwartz-Smith two-factor process parameters.
+    pub params: SchwartzSmithParams,
+    /// Number of independent Monte Carlo paths (estimators).
+    pub num_paths: usize,
+    /// Number of time steps per path.
+    pub num_steps: usize,
+    /// Optional random seed for reproducibility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u64>,
+}
+
+/// Recorded exercise or expiry of a spot commodity option.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CommoditySpotOptionExercise {
+    /// Exercise date, or expiry observation date for an unexercised option.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub date: Date,
+    /// Positive observed commodity spot price in strike units.
+    pub spot: f64,
+    /// Actual cash-payment or physical-delivery date, on or after exercise.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub settlement_date: Date,
+    /// True for exercise/assignment; false records expiration without exercise.
+    pub exercised: bool,
+}
+
+/// Option on spot commodity. Options on a specified futures contract use
+/// [`crate::CommodityFutureOption`], including futures delivery.
+///
+/// # Pricing
+///
+/// - **European options**: Black-76 model using the forward price from the `PriceCurve`
+/// - **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from
+///   the forward/spot relationship
+///
+/// Analytical delta measures currency per unit change in the resolved forward,
+/// holding discount factors and volatility fixed. At zero volatility or expiry,
+/// the intrinsic-payoff derivative is used; delta is defined as zero exactly at
+/// the strike, where the mathematical derivative does not exist.
+///
+/// # American Option Assumptions
+///
+/// For American exercise, the model requires a spot price to build the binomial tree.
+/// `spot_id` must identify an observed spot for early exercise and Monte Carlo.
+/// The commodity forward is never substituted for the spot underlying.
+/// The convenience yield (cost-of-carry) is implied from the forward/spot ratio:
+/// `q = r - ln(F/S)/T`
+///
+/// Bermudan exercise uses the configured exercise schedule and a binomial
+/// tree. The schedule must contain at least one strictly future date when the
+/// option is priced before expiry.
+///
+/// # Forward Price Retrieval
+///
+/// Forward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).
+/// The curve must be added via `MarketContext::insert_price_curve()`.
+/// If `quoted_forward` is provided, it overrides the curve lookup.
+#[derive(
+    Clone,
+    Debug,
+    finstack_quant_valuations_macros::FinancialBuilder,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
+pub struct CommoditySpotOption {
+    /// Unique instrument identifier.
+    pub id: InstrumentId,
+    /// Commodity underlying parameters (commodity_type, underlying_ticker, unit, currency).
+    #[serde(flatten)]
+    pub underlying: CommodityUnderlyingParams,
+    /// Strike price per unit.
+    #[serde(
+        serialize_with = "finstack_quant_core::wire::serialize_positive_f64",
+        deserialize_with = "finstack_quant_core::wire::deserialize_positive_f64"
+    )]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::PositiveF64Wire")
+    )]
+    pub strike: f64,
+    /// Option type (call or put).
+    pub option_type: OptionType,
+    /// Exercise style (European or American).
+    #[serde(default)]
+    #[builder(default)]
+    pub exercise_style: ExerciseStyle,
+    /// Optional Bermudan exercise schedule.
+    ///
+    /// Required when `exercise_style == ExerciseStyle::Bermudan`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(with = "finstack_quant_core::wire::optional_dates")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<Vec<finstack_quant_core::wire::DateWire>>")
+    )]
+    pub exercise_dates: Option<Vec<Date>>,
+    /// Option expiry date.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub expiry: Date,
+    /// Contract quantity in units.
+    #[serde(
+        serialize_with = "finstack_quant_core::wire::serialize_positive_f64",
+        deserialize_with = "finstack_quant_core::wire::deserialize_positive_f64"
+    )]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::PositiveF64Wire")
+    )]
+    pub quantity: f64,
+    /// Contract multiplier (typically 1.0 for OTC options).
+    #[serde(
+        serialize_with = "finstack_quant_core::wire::serialize_positive_f64",
+        deserialize_with = "finstack_quant_core::wire::deserialize_positive_f64"
+    )]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::PositiveF64Wire")
+    )]
+    pub multiplier: f64,
+    /// Settlement type (physical or cash).
+    ///
+    /// Cash fixes the payoff on exercise; physical retains the marked delivery
+    /// claim until its recorded settlement date.
+    pub settlement: SettlementType,
+    /// Recorded exercise or expiry; required after expiry while settlement remains unpaid.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exercise: Option<CommoditySpotOptionExercise>,
+    /// Forward/futures curve ID for price interpolation.
+    pub forward_curve_id: CurveId,
+    /// Discount curve ID for present value.
+    pub discount_curve_id: CurveId,
+    /// Volatility surface ID for implied vol.
+    pub vol_surface_id: CurveId,
+    /// Optional spot price ID (for spot-based pricing and American options).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spot_id: Option<PriceId>,
+    /// Optional quoted forward price (overrides curve lookup).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quoted_forward: Option<f64>,
+    /// Day count convention for time to expiry.
+    #[serde(default = "finstack_quant_valuations_core::serde_defaults::day_count_act365f")]
+    #[builder(default = DayCount::Act365F)]
+    pub day_count: DayCount,
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides:
+        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+    /// Optional market convention for this commodity.
+    ///
+    /// When set, provides default premium settlement days and calendar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub convention: Option<CommodityConvention>,
+    /// Premium settlement lag in business days after trade date.
+    ///
+    /// Standard: T+1 for most exchange-traded options, T+2 for OTC.
+    /// If not set and `convention` is provided, uses convention default.
+    /// Otherwise defaults to 1 (T+1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub premium_settlement_days: Option<u32>,
+    /// Attributes for tagging and selection.
+    #[builder(default)]
+    #[serde(default)]
+    /// Attributes for scenario selection and tagging
+    pub attributes: Attributes,
+    /// Rejects unknown JSON fields (restores `deny_unknown_fields` despite the
+    /// `#[serde(flatten)]` on `underlying`).
+    #[serde(flatten)]
+    #[cfg_attr(feature = "json-schema", schemars(skip))]
+    #[builder(default)]
+    pub(crate) unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
+}
+
+impl CommoditySpotOption {
+    /// Validate the static economic inputs shared by builders and JSON loads.
+    pub fn validate(&self) -> Result<()> {
+        self.underlying.validate("CommoditySpotOption")?;
+        finstack_quant_core::validation::validate_f64_positive(
+            self.strike,
+            "CommoditySpotOption strike",
+        )?;
+        finstack_quant_core::validation::validate_f64_positive(
+            self.quantity,
+            "CommoditySpotOption quantity",
+        )?;
+        finstack_quant_core::validation::validate_f64_positive(
+            self.multiplier,
+            "CommoditySpotOption multiplier",
+        )?;
+        if !matches!(self.exercise_style, ExerciseStyle::European) && self.spot_id.is_none() {
+            return Err(finstack_quant_core::Error::Validation(
+                "Spot early exercise requires spot_id; futures options use CommodityFutureOption"
+                    .into(),
+            ));
+        }
+        if let Some(exercise) = &self.exercise {
+            finstack_quant_core::validation::validate_f64_positive(
+                exercise.spot,
+                "commodity exercise spot",
+            )?;
+            if exercise.date > self.expiry
+                || exercise.settlement_date < exercise.date
+                || (!exercise.exercised && exercise.date != self.expiry)
+                || (matches!(self.exercise_style, ExerciseStyle::European)
+                    && exercise.date != self.expiry)
+                || (matches!(self.exercise_style, ExerciseStyle::Bermudan)
+                    && exercise.date != self.expiry
+                    && !self
+                        .exercise_dates
+                        .as_ref()
+                        .is_some_and(|dates| dates.contains(&exercise.date)))
+            {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Commodity spot exercise and settlement dates conflict with the contract"
+                        .into(),
+                ));
+            }
+        }
+        if let Some(schedule) = &self.exercise_dates {
+            if schedule.windows(2).any(|w| w[0] >= w[1]) {
+                return Err(finstack_quant_core::Error::Validation(
+                    "CommoditySpotOption exercise_dates must be strictly increasing".to_string(),
+                ));
+            }
+            if schedule.iter().any(|date| *date > self.expiry) {
+                return Err(finstack_quant_core::Error::Validation(
+                    "CommoditySpotOption exercise_dates cannot extend beyond expiry".to_string(),
+                ));
+            }
+        }
+        if matches!(self.exercise_style, ExerciseStyle::Bermudan)
+            && self.exercise_dates.as_ref().is_none_or(Vec::is_empty)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "Commodity Bermudan option requires exercise_dates".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Create a canonical example commodity option for testing and documentation.
+    ///
+    /// Returns a WTI European call option.
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        Self::builder()
+            .id(InstrumentId::new("WTI-OPT-2025M06"))
+            .underlying(CommodityUnderlyingParams::new(
+                "Energy",
+                "CL",
+                "BBL",
+                Currency::USD,
+            ))
+            .strike(75.0)
+            .option_type(OptionType::Call)
+            .exercise_style(ExerciseStyle::European)
+            .expiry(time::macros::date!(2025 - 06 - 15))
+            .quantity(1000.0)
+            .multiplier(1.0)
+            .settlement(SettlementType::Cash)
+            .forward_curve_id(CurveId::new("WTI-FORWARD"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .vol_surface_id(CurveId::new("WTI-VOL"))
+            .day_count(DayCount::Act365F)
+            .attributes(Attributes::new())
+            .build()
+    }
+
+    fn required_spot(&self, market: &MarketContext) -> Result<f64> {
+        let spot = self.spot_price(market)?.ok_or_else(|| finstack_quant_core::Error::Validation(
+            "CommoditySpotOption requires observed spot_id for spot exercise or simulation; use CommodityFutureOption for futures".into()
+        ))?;
+        finstack_quant_core::validation::validate_f64_positive(spot, "commodity spot")?;
+        Ok(spot)
+    }
+
+    /// Value only the remaining exercise settlement claim, when resolved.
+    fn resolved_claim(&self, market: &MarketContext, as_of: Date) -> Result<Option<Money>> {
+        let Some(exercise) = self
+            .exercise
+            .filter(|observation| observation.date <= as_of)
+        else {
+            if as_of > self.expiry {
+                return Err(finstack_quant_core::Error::Validation(
+                    "CommoditySpotOption requires recorded expiry observation after expiry".into(),
+                ));
+            }
+            if as_of == self.expiry {
+                return Money::new(
+                    self.intrinsic_value(self.required_spot(market)?)
+                        * self.quantity
+                        * self.multiplier,
+                    self.underlying.currency,
+                )
+                .map(Some);
+            }
+            return Ok(None);
+        };
+        let unit = if !exercise.exercised || as_of > exercise.settlement_date {
+            0.0
+        } else {
+            let disc = market.get_discount(&self.discount_curve_id)?;
+            let df = disc.df_between_dates(as_of, exercise.settlement_date)?;
+            match self.settlement {
+                SettlementType::Cash => self.intrinsic_value(exercise.spot) * df,
+                SettlementType::Physical => {
+                    let curve = market.get_price_curve(&self.forward_curve_id)?;
+                    let t = curve.day_count().year_fraction(
+                        curve.base_date(),
+                        exercise.settlement_date,
+                        DayCountContext::default(),
+                    )?;
+                    let delivery_forward = curve.price(t);
+                    let sign = if self.option_type == OptionType::Call {
+                        1.0
+                    } else {
+                        -1.0
+                    };
+                    sign * (delivery_forward - self.strike) * df
+                }
+            }
+        };
+        Money::new(
+            unit * self.quantity * self.multiplier,
+            self.underlying.currency,
+        )
+        .map(Some)
+    }
+
+    fn intrinsic_value(&self, underlying: f64) -> f64 {
+        match self.option_type {
+            OptionType::Call => (underlying - self.strike).max(0.0),
+            OptionType::Put => (self.strike - underlying).max(0.0),
+        }
+    }
+
+    fn time_to_expiry(&self, as_of: Date) -> Result<f64> {
+        self.day_count
+            .year_fraction(as_of, self.expiry, DayCountContext::default())
+            .map(|t| t.max(0.0))
+    }
+
+    fn collect_inputs(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<CommoditySpotOptionInputs> {
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        let t = self.time_to_expiry(as_of)?;
+        let df = disc.df_between_dates(as_of, self.expiry)?;
+        let r =
+            finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+                df,
+                t,
+                "commodity-option model rate",
+            )?;
+
+        let sigma = finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
+            &self.instrument_pricing_overrides.market_quotes,
+            market,
+            self.vol_surface_id.as_str(),
+            t,
+            self.strike,
+        )?;
+
+        let forward = self.forward_price(market, as_of)?;
+        let spot = if matches!(self.exercise_style, ExerciseStyle::European) {
+            // European pricing uses the expiry forward directly; this local
+            // coordinate is unused by its payoff and does not define a spot.
+            forward
+        } else {
+            self.required_spot(market)?
+        };
+        let q = implied_carry(spot, forward, r, t);
+
+        Ok(CommoditySpotOptionInputs {
+            forward,
+            spot,
+            r,
+            q,
+            sigma,
+            t,
+            df,
+        })
+    }
+
+    fn spot_price(&self, market: &MarketContext) -> Result<Option<f64>> {
+        let Some(spot_id) = &self.spot_id else {
+            return Ok(None);
+        };
+        let scalar = market.get_price(spot_id)?;
+        let spot = match scalar {
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
+            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
+        };
+        Ok(Some(spot))
+    }
+
+    /// Get the forward price for this option.
+    ///
+    /// Uses `quoted_forward` when supplied, otherwise the price curve at expiry.
+    /// A missing curve is an error; spot alone cannot establish commodity carry.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market containing the dated commodity price curve unless overridden.
+    /// * `_as_of` - Valuation date; the curve retains its own base date and the contract's expiry.
+    pub fn forward_price(&self, market: &MarketContext, _as_of: Date) -> Result<f64> {
+        let validate = |price: f64| {
+            if price.is_finite() && price > 0.0 {
+                Ok(price)
+            } else {
+                Err(finstack_quant_core::Error::Validation(format!(
+                    "CommoditySpotOption '{}' requires a finite positive forward for its lognormal model, got {price}",
+                    self.id
+                )))
+            }
+        };
+        validate(match self.quoted_forward {
+            Some(forward) => forward,
+            None => market
+                .get_price_curve(&self.forward_curve_id)?
+                .price_on_date(self.expiry)?,
+        })
+    }
+
+    /// Get the effective premium settlement lag in business days.
+    ///
+    /// Resolution order:
+    /// 1. `premium_settlement_days` if explicitly set
+    /// 2. `convention.settlement_days()` if convention is set
+    /// 3. Default: 1 (T+1, standard for exchange-traded options)
+    pub fn effective_premium_settlement_days(&self) -> u32 {
+        self.premium_settlement_days
+            .or_else(|| self.convention.map(|c| c.settlement_days()))
+            .unwrap_or(1)
+    }
+
+    /// Price commodity option using Monte Carlo with Schwartz-Smith dynamics.
+    ///
+    /// Simulates paths under the Schwartz-Smith two-factor model and
+    /// computes discounted expected payoff.
+    ///
+    /// # Arguments
+    ///
+    /// * `mc_params` - Monte Carlo configuration (model, paths, steps, seed)
+    /// * `market` - Market data context for discount curves and forward prices
+    /// * `as_of` - Valuation date
+    ///
+    /// # Returns
+    ///
+    /// Present value as `Money` in the underlying currency.
+    pub fn npv_mc(
+        &self,
+        mc_params: &CommodityMcParams,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<Money> {
+        self.price_mc(mc_params, market, as_of)
+            .map(|(value, _)| value)
+    }
+
+    pub(crate) fn price_mc(
+        &self,
+        mc_params: &CommodityMcParams,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<(
+        Money,
+        Option<finstack_quant_valuations_core::results::MonteCarloValuationDetails>,
+    )> {
+        use finstack_quant_models::monte_carlo::discretization::ExactSchwartzSmith;
+        use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
+        use finstack_quant_models::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
+        use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithProcess;
+        use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
+        use finstack_quant_models::monte_carlo::TimeGrid;
+
+        self.validate()?;
+        if let Some(claim) = self.resolved_claim(market, as_of)? {
+            return Ok((claim, None));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommoditySpotOption Monte Carlo supports European exercise only".into(),
+            ));
+        }
+        let t = self.time_to_expiry(as_of)?;
+
+        let p = &mc_params.params;
+
+        // Build risk-neutral Schwartz-Smith process. Schwartz & Smith
+        // (2000) risk-neutralize the short-term factor with a
+        // CONSTANT drift shift at unchanged mean-reversion speed:
+        //   dX = (-kappa·X - lambda_x) dt + sigma_x dW*_X
+        // (inflating kappa by lambda_x would distort the futures
+        // volatility term structure e^{-kappa·tau}).
+        let ss_params = SchwartzSmithParams::new(p.kappa, p.sigma_x, p.mu_y, p.sigma_y, p.rho_xy)?
+            .with_lambda_x(p.lambda_x)?;
+
+        let initial_spot = self.required_spot(market)?;
+
+        let mut process = SchwartzSmithProcess::from_spot(ss_params, initial_spot, None)?;
+
+        // Pin the simulated forward to the market: the closed-form
+        // futures curve F_model(0,T) (Schwartz-Smith 2000, eq. 9) is
+        // calibrated to the market forward by shifting the long-term
+        // drift — A(T) is linear in mu_y with coefficient T, so
+        //   mu_y* = mu_y + ln(F_mkt / F_model) / T
+        // makes E^Q[S_T] equal the same forward the Black-76 branch
+        // discounts. Without this, the SS-MC price embeds an
+        // arbitrary carry inconsistent with the price curve.
+        let market_forward = self.forward_price(market, as_of)?;
+        if market_forward > 0.0 && t > 0.0 {
+            let model_forward = process.futures_price(t);
+            let mu_adjustment = (market_forward / model_forward).ln() / t;
+            let pinned_params = SchwartzSmithParams::new(
+                p.kappa,
+                p.sigma_x,
+                p.mu_y + mu_adjustment,
+                p.sigma_y,
+                p.rho_xy,
+            )?
+            .with_lambda_x(p.lambda_x)?;
+            process = SchwartzSmithProcess::from_spot(pinned_params, initial_spot, None)?;
+        }
+        let disc_scheme = ExactSchwartzSmith::new();
+
+        // Discount factor
+        let disc_curve = market.get_discount(self.discount_curve_id.as_str())?;
+        let df = disc_curve.df_between_dates(as_of, self.expiry)?;
+
+        let seed = mc_params.seed.unwrap_or(42);
+        let time_grid = TimeGrid::uniform(t, mc_params.num_steps)?;
+        let time_grid_values = time_grid.times().to_vec();
+        let engine_config = McEngineConfig::new(mc_params.num_paths, time_grid).parallel(true);
+        let engine = McEngine::new(engine_config);
+
+        let rng = PhiloxRng::new(seed);
+        let initial_state = process.initial_state().to_vec();
+        let maturity_step = mc_params.num_steps;
+
+        // Dispatch on option type (EuropeanCall / EuropeanPut are
+        // distinct concrete types, so we branch here).
+        let estimate = match self.option_type {
+            OptionType::Call => {
+                let payoff = EuropeanCall::new(self.strike, 1.0, maturity_step);
+                engine.price(
+                    &rng,
+                    &process,
+                    &disc_scheme,
+                    &initial_state,
+                    &payoff,
+                    self.underlying.currency,
+                    df,
+                )?
+            }
+            OptionType::Put => {
+                let payoff = EuropeanPut::new(self.strike, 1.0, maturity_step);
+                engine.price(
+                    &rng,
+                    &process,
+                    &disc_scheme,
+                    &initial_state,
+                    &payoff,
+                    self.underlying.currency,
+                    df,
+                )?
+            }
+        };
+
+        let scale = self.quantity * self.multiplier;
+        Ok((
+            Money::new(estimate.mean.amount() * scale, self.underlying.currency)?,
+            Some(
+                finstack_quant_valuations_core::results::MonteCarloValuationDetails {
+                    model_key:
+                        finstack_quant_valuations_core::pricer::ModelKey::MonteCarloSchwartzSmith,
+                    standard_error: estimate.stderr * scale.abs(),
+                    training_paths: 0,
+                    training_simulated_paths: 0,
+                    make_whole_training_paths: 0,
+                    make_whole_training_simulated_paths: 0,
+                    estimator_paths: estimate.num_paths,
+                    simulated_paths: estimate.num_simulated_paths,
+                    seed,
+                    time_grid: time_grid_values,
+                    antithetic: false,
+                    sobol: false,
+                    brownian_bridge: false,
+                },
+            ),
+        ))
+    }
+}
+
+struct CommoditySpotOptionInputs {
+    forward: f64,
+    spot: f64,
+    r: f64,
+    q: f64,
+    sigma: f64,
+    t: f64,
+    df: f64,
+}
+
+fn implied_carry(spot: f64, forward: f64, r: f64, t: f64) -> f64 {
+    // Guard against near-zero time: ln(F/S)/t amplifies noise when t is tiny.
+    // For t < 1e-5 (~5 seconds), the carry estimate is unreliable.
+    //
+    // Also guard against non-finite `forward` / `spot` (W-13): a NaN or
+    // infinite input passes the `<= 0.0` checks (NaN comparisons are false)
+    // and would otherwise feed `(forward/spot).ln()/t` — and hence `q` — a
+    // non-finite value straight into the binomial tree. Fall back to the
+    // risk-free rate (zero cost-of-carry) when any input is unusable.
+    if t < 1e-5
+        || !t.is_finite()
+        || !spot.is_finite()
+        || !forward.is_finite()
+        || spot <= 0.0
+        || forward <= 0.0
+    {
+        return r;
+    }
+    let carry = (forward / spot).ln() / t;
+    if carry.is_finite() {
+        r - carry
+    } else {
+        r
+    }
+}
+
+fn black76_unit_price(
+    forward: f64,
+    strike: f64,
+    sigma: f64,
+    t: f64,
+    df: f64,
+    option_type: OptionType,
+) -> f64 {
+    let undiscounted = match option_type {
+        OptionType::Call => {
+            finstack_quant_models::closed_form::black_call(forward, strike, sigma, t)
+        }
+        OptionType::Put => finstack_quant_models::closed_form::black_put(forward, strike, sigma, t),
+    };
+    undiscounted * df
+}
+
+impl Instrument for CommoditySpotOption {
+    impl_instrument_base!(
+        finstack_quant_valuations_core::pricer::InstrumentType::CommoditySpotOption,
+        crate::exotics::EXOTICS
+    );
+
+    fn default_model(&self) -> finstack_quant_valuations_core::pricer::ModelKey {
+        finstack_quant_valuations_core::pricer::ModelKey::Black76
+    }
+
+    fn validate_invariants(&self) -> Result<()> {
+        self.validate()
+    }
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_forward_curve(self.forward_curve_id.clone());
+        let underlying_id = self
+            .spot_id
+            .as_deref()
+            .map(finstack_quant_core::types::PriceId::new);
+        if let Some(spot_id) = self.spot_id.as_deref() {
+            deps.add_market_scalar_id(spot_id);
+        }
+        deps.add_volatility_dependency(
+            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                underlying_id,
+                Some(self.strike),
+            ),
+        );
+        Ok(deps)
+    }
+
+    fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
+        self.validate()?;
+        if let Some(claim) = self.resolved_claim(market, as_of)? {
+            return Ok(claim);
+        }
+
+        let inputs = self.collect_inputs(market, as_of)?;
+
+        let unit_price = match self.exercise_style {
+            ExerciseStyle::European => {
+                if !inputs.forward.is_finite() || inputs.forward <= 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "CommoditySpotOption '{}' Black-76 forward must be finite and positive, got {}",
+                        self.id, inputs.forward
+                    )));
+                }
+                black76_unit_price(
+                    inputs.forward,
+                    self.strike,
+                    inputs.sigma,
+                    inputs.t,
+                    inputs.df,
+                    self.option_type,
+                )
+            }
+            ExerciseStyle::American => {
+                let steps = self
+                    .instrument_pricing_overrides
+                    .model_config
+                    .tree_steps
+                    .unwrap_or(201);
+                let tree = BinomialTree::leisen_reimer(steps);
+                let params = OptionMarketParams {
+                    spot: inputs.spot,
+                    strike: self.strike,
+                    rate: inputs.r,
+                    dividend_yield: inputs.q,
+                    volatility: inputs.sigma,
+                    time_to_expiry: inputs.t,
+                    option_type: self.option_type,
+                };
+                params.validate()?;
+                tree.price_american(&params)?
+            }
+            ExerciseStyle::Bermudan => {
+                let schedule = self.exercise_dates.as_ref().ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "Commodity Bermudan option requires exercise_dates".to_string(),
+                    )
+                })?;
+                let steps = self
+                    .instrument_pricing_overrides
+                    .model_config
+                    .tree_steps
+                    .unwrap_or(201);
+                let tree = BinomialTree::leisen_reimer(steps);
+                let params = OptionMarketParams {
+                    spot: inputs.spot,
+                    strike: self.strike,
+                    rate: inputs.r,
+                    dividend_yield: inputs.q,
+                    volatility: inputs.sigma,
+                    time_to_expiry: inputs.t,
+                    option_type: self.option_type,
+                };
+                params.validate()?;
+                let exercise_times: Vec<f64> = schedule
+                    .iter()
+                    .filter_map(|date| {
+                        let yf = self
+                            .day_count
+                            .year_fraction(as_of, *date, DayCountContext::default())
+                            .ok()?;
+                        if yf > 0.0 && yf <= inputs.t {
+                            Some(yf)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if exercise_times.is_empty() {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "Commodity Bermudan option requires at least one future exercise date"
+                            .to_string(),
+                    ));
+                }
+                tree.price_bermudan(&params, &exercise_times)?
+            }
+        };
+
+        Money::new(
+            unit_price * self.quantity * self.multiplier,
+            self.underlying.currency,
+        )
+    }
+
+    fn expiry(&self) -> Option<Date> {
+        Some(self.expiry)
+    }
+
+    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+}
+
+impl finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksProvider
+    for CommoditySpotOption
+{
+    fn selected_model_greek(
+        &self,
+        kind: finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind,
+        context: &mut finstack_quant_valuations_core::metrics::MetricContext,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        // Once exercise resolves the spot option, every pricing model owns the
+        // same remaining delivery claim and its contractual forward exposure.
+        if context.as_of >= self.expiry
+            || self
+                .exercise
+                .is_some_and(|event| event.date <= context.as_of)
+        {
+            return Ok(None);
+        }
+        super::metrics::selected_model::selected_commodity_greek(kind, context).map(Some)
+    }
+
+    fn option_greeks(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        request: &finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksRequest,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeks,
+    > {
+        let mut greeks =
+            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeks::default(
+            );
+        if self.resolved_claim(market, as_of)?.is_some() {
+            let delta = if let Some(exercise) = self.exercise.filter(|event| event.date <= as_of) {
+                if exercise.exercised
+                    && as_of <= exercise.settlement_date
+                    && self.settlement == SettlementType::Physical
+                {
+                    let df = market
+                        .get_discount(&self.discount_curve_id)?
+                        .df_between_dates(as_of, exercise.settlement_date)?;
+                    (if self.option_type == OptionType::Call {
+                        1.0
+                    } else {
+                        -1.0
+                    }) * df
+                        * self.quantity
+                        * self.multiplier
+                } else {
+                    0.0
+                }
+            } else {
+                let spot = self.required_spot(market)?;
+                let sign = if self.option_type == OptionType::Call {
+                    1.0
+                } else {
+                    -1.0
+                };
+                if sign * (spot - self.strike) > 0.0 {
+                    sign * self.quantity * self.multiplier
+                } else {
+                    0.0
+                }
+            };
+            greeks.delta = Some(delta);
+            greeks.gamma = Some(0.0);
+            greeks.vega = Some(0.0);
+            greeks.vanna = Some(0.0);
+            greeks.volga = Some(0.0);
+            return Ok(greeks);
+        }
+        match request.greek {
+            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Delta => {
+                greeks.delta = self.option_delta(market, as_of, request.bumps)?
+            }
+            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Gamma => {
+                greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
+            }
+            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Vega => {
+                greeks.vega = self.option_vega(market, as_of, request.bumps)?
+            }
+            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Vanna => {
+                greeks.vanna = self.option_vanna(market, as_of, request.bumps)?
+            }
+            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Volga => {
+                greeks.volga =
+                    self.option_volga(market, as_of, request.require_base_pv()?, request.bumps)?
+            }
+            _ => {}
+        }
+        Ok(greeks)
+    }
+}
+impl CommoditySpotOption {
+    fn option_delta(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        _bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        use finstack_quant_core::math::special_functions::norm_cdf;
+
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommoditySpotOption analytical Greeks support European exercise only".to_string(),
+            ));
+        }
+
+        let t = self
+            .day_count
+            .year_fraction(as_of, self.expiry, DayCountContext::default())?
+            .max(0.0);
+        if t <= 0.0 {
+            let forward = self.forward_price(market, as_of)?;
+            let intrinsic = match self.option_type {
+                OptionType::Call => {
+                    if forward > self.strike {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                }
+                OptionType::Put => {
+                    if forward < self.strike {
+                        -1.0
+                    } else {
+                        0.0
+                    }
+                }
+            };
+            return Ok(Some(intrinsic * self.quantity * self.multiplier));
+        }
+
+        let sigma = finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
+            &self.instrument_pricing_overrides.market_quotes,
+            market,
+            self.vol_surface_id.as_str(),
+            t,
+            self.strike,
+        )?;
+        let forward = self.forward_price(market, as_of)?;
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        let df = disc.df_between_dates(as_of, self.expiry)?;
+        if sigma <= 0.0 {
+            let intrinsic_delta = match self.option_type {
+                OptionType::Call => f64::from(forward > self.strike),
+                OptionType::Put => -f64::from(forward < self.strike),
+            };
+            return Ok(Some(intrinsic_delta * df * self.quantity * self.multiplier));
+        }
+
+        let d1 = finstack_quant_models::d1_d2_black76(forward, self.strike, sigma, t).0;
+        let nd1 = norm_cdf(d1);
+
+        let delta_unit = match self.option_type {
+            OptionType::Call => df * nd1,
+            OptionType::Put => df * (nd1 - 1.0),
+        };
+        Ok(Some(delta_unit * self.quantity * self.multiplier))
+    }
+    fn option_gamma(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommoditySpotOption analytical Greeks support European exercise only".to_string(),
+            ));
+        }
+
+        #[derive(Debug)]
+        enum ForwardDriver {
+            QuotedForward(f64),
+            PriceCurve,
+            SpotScalar(PriceId),
+        }
+
+        let driver = if let Some(fwd) = self.quoted_forward {
+            ForwardDriver::QuotedForward(fwd)
+        } else if market
+            .get_price_curve(self.forward_curve_id.as_str())
+            .is_ok()
+        {
+            ForwardDriver::PriceCurve
+        } else if let Some(ref spot_id) = self.spot_id {
+            ForwardDriver::SpotScalar(spot_id.clone())
+        } else {
+            return Err(finstack_quant_core::Error::Validation(
+                "Cannot compute gamma: no quoted_forward, PriceCurve, or spot_id available"
+                    .to_string(),
+            ));
+        };
+
+        let bump_pct = bumps.spot_bump_decimal;
+        let forward_price = self.forward_price(market, as_of)?;
+        let bump_size = forward_price * bump_pct;
+        if bump_size <= 0.0 {
+            return Ok(Some(0.0));
+        }
+
+        let pv_base = self.value(market, as_of)?.amount();
+
+        let (pv_up, pv_down) = match driver {
+            ForwardDriver::QuotedForward(fwd) => {
+                let mut up = self.clone();
+                up.quoted_forward = Some(fwd * (1.0 + bump_pct));
+                let pv_up = up.value(market, as_of)?.amount();
+
+                let mut down = self.clone();
+                down.quoted_forward = Some(fwd * (1.0 - bump_pct));
+                let pv_down = down.value(market, as_of)?.amount();
+                (pv_up, pv_down)
+            }
+            ForwardDriver::PriceCurve => {
+                use finstack_quant_core::market_data::bumps::{
+                    BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
+                };
+                let curve_id = CurveId::new(self.forward_curve_id.as_str());
+                let up = market.bump([MarketBump::Curve {
+                    id: curve_id.clone(),
+                    spec: BumpSpec {
+                        bump_type: BumpType::Parallel,
+                        mode: BumpMode::Additive,
+                        units: BumpUnits::Percent,
+                        value: bump_pct * 100.0,
+                    },
+                }])?;
+                let pv_up = self.value(&up, as_of)?.amount();
+
+                let down = market.bump([MarketBump::Curve {
+                    id: curve_id,
+                    spec: BumpSpec {
+                        bump_type: BumpType::Parallel,
+                        mode: BumpMode::Additive,
+                        units: BumpUnits::Percent,
+                        value: -bump_pct * 100.0,
+                    },
+                }])?;
+                let pv_down = self.value(&down, as_of)?.amount();
+                (pv_up, pv_down)
+            }
+            ForwardDriver::SpotScalar(ref spot_id) => {
+                let up = finstack_quant_valuations_core::metrics::bump_scalar_price(
+                    market, spot_id, bump_pct,
+                )?;
+                let down = finstack_quant_valuations_core::metrics::bump_scalar_price(
+                    market, spot_id, -bump_pct,
+                )?;
+                let pv_up = self.value(&up, as_of)?.amount();
+                let pv_down = self.value(&down, as_of)?.amount();
+                (pv_up, pv_down)
+            }
+        };
+
+        Ok(Some(
+            (pv_up - 2.0 * pv_base + pv_down) / (bump_size * bump_size),
+        ))
+    }
+    fn option_vega(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        _bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        use finstack_quant_core::math::special_functions::norm_pdf;
+
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommoditySpotOption analytical Greeks support European exercise only".to_string(),
+            ));
+        }
+
+        let t = self
+            .day_count
+            .year_fraction(as_of, self.expiry, DayCountContext::default())?
+            .max(0.0);
+        if t <= 0.0 {
+            return Ok(Some(0.0));
+        }
+
+        let sigma = finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
+            &self.instrument_pricing_overrides.market_quotes,
+            market,
+            self.vol_surface_id.as_str(),
+            t,
+            self.strike,
+        )?;
+        if sigma <= 0.0 {
+            return Ok(Some(0.0));
+        }
+
+        let forward = self.forward_price(market, as_of)?;
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        let df = disc.df_between_dates(as_of, self.expiry)?;
+        let d1 = finstack_quant_models::d1_d2_black76(forward, self.strike, sigma, t).0;
+        let vega_abs = df * forward * norm_pdf(d1) * t.sqrt();
+        Ok(Some(vega_abs * 0.01 * self.quantity * self.multiplier))
+    }
+    fn option_vanna(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommoditySpotOption analytical Greeks support European exercise only".to_string(),
+            ));
+        }
+        #[derive(Debug)]
+        enum ForwardDriver {
+            QuotedForward(f64),
+            PriceCurve,
+            SpotScalar(PriceId),
+        }
+
+        let driver = if let Some(fwd) = self.quoted_forward {
+            ForwardDriver::QuotedForward(fwd)
+        } else if market
+            .get_price_curve(self.forward_curve_id.as_str())
+            .is_ok()
+        {
+            ForwardDriver::PriceCurve
+        } else if let Some(ref spot_id) = self.spot_id {
+            ForwardDriver::SpotScalar(spot_id.clone())
+        } else {
+            return Err(finstack_quant_core::Error::Validation(
+                "Cannot compute vanna: no quoted_forward, PriceCurve, or spot_id available"
+                    .to_string(),
+            ));
+        };
+
+        let fwd_bump_pct = bumps.spot_bump_decimal;
+        let vol_bump = bumps.vol_bump_decimal;
+
+        let forward_price = self.forward_price(market, as_of)?;
+        let fwd_bump_size = forward_price * fwd_bump_pct;
+        if fwd_bump_size <= 0.0 {
+            return Ok(Some(0.0));
+        }
+
+        let pv_with_bumps = |fwd_bump_pct: f64,
+                             vol_bump: f64|
+         -> finstack_quant_core::Result<f64> {
+            match driver {
+                ForwardDriver::QuotedForward(fwd) => {
+                    let mut inst = self.clone();
+                    inst.quoted_forward = Some(fwd * (1.0 + fwd_bump_pct));
+                    let bumped =
+                        finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+                            market,
+                            self.vol_surface_id.as_str(),
+                            vol_bump,
+                        )?;
+                    Ok(inst.value(&bumped, as_of)?.amount())
+                }
+                ForwardDriver::PriceCurve => {
+                    use finstack_quant_core::market_data::bumps::{
+                        BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
+                    };
+                    let curve_id = CurveId::new(self.forward_curve_id.as_str());
+                    let bumped_price = market.bump([MarketBump::Curve {
+                        id: curve_id,
+                        spec: BumpSpec {
+                            bump_type: BumpType::Parallel,
+                            mode: BumpMode::Additive,
+                            units: BumpUnits::Percent,
+                            value: fwd_bump_pct * 100.0,
+                        },
+                    }])?;
+                    let bumped =
+                        finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+                            &bumped_price,
+                            self.vol_surface_id.as_str(),
+                            vol_bump,
+                        )?;
+                    Ok(self.value(&bumped, as_of)?.amount())
+                }
+                ForwardDriver::SpotScalar(ref spot_id) => {
+                    let bumped_spot = finstack_quant_valuations_core::metrics::bump_scalar_price(
+                        market,
+                        spot_id,
+                        fwd_bump_pct,
+                    )?;
+                    let bumped =
+                        finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+                            &bumped_spot,
+                            self.vol_surface_id.as_str(),
+                            vol_bump,
+                        )?;
+                    Ok(self.value(&bumped, as_of)?.amount())
+                }
+            }
+        };
+
+        let pv_up_up = pv_with_bumps(fwd_bump_pct, vol_bump)?;
+        let pv_up_dn = pv_with_bumps(fwd_bump_pct, -vol_bump)?;
+        let pv_dn_up = pv_with_bumps(-fwd_bump_pct, vol_bump)?;
+        let pv_dn_dn = pv_with_bumps(-fwd_bump_pct, -vol_bump)?;
+
+        // Report vanna per **vol point** on the σ axis (consistent with vega
+        // and `MetricId::Vanna`): the vol-axis width is the bump expressed in
+        // vol points; the forward axis is unchanged.
+        let width_vol_points =
+            vol_bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
+        Ok(Some(
+            (pv_up_up - pv_up_dn - pv_dn_up + pv_dn_dn) / (4.0 * fwd_bump_size * width_vol_points),
+        ))
+    }
+    fn option_volga(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        base_pv: f64,
+        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommoditySpotOption analytical Greeks support European exercise only".to_string(),
+            ));
+        }
+
+        let vol_bump = bumps.vol_bump_decimal;
+        let up = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+            market,
+            self.vol_surface_id.as_str(),
+            vol_bump,
+        )?;
+        let dn = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+            market,
+            self.vol_surface_id.as_str(),
+            -vol_bump,
+        )?;
+        let pv_up = self.value(&up, as_of)?.amount();
+        let pv_dn = self.value(&dn, as_of)?.amount();
+        let width_vol_points =
+            vol_bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
+        Ok(Some(
+            (pv_up - 2.0 * base_pv + pv_dn) / (width_vol_points * width_vol_points),
+        ))
+    }
+}
+
+finstack_quant_valuations_core::impl_empty_cashflow_provider!(
+    CommoditySpotOption,
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
+);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
+    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+
+    #[test]
+    fn test_default_settlement_type_is_cash() {
+        assert_eq!(
+            finstack_quant_valuations_core::serde_defaults::settlement_cash(),
+            SettlementType::Cash
+        );
+    }
+
+    #[test]
+    fn lognormal_option_rejects_signed_forward_override() {
+        let mut option = CommoditySpotOption::example().expect("example");
+        option.quoted_forward = Some(-5.0);
+        let market = MarketContext::new();
+        let as_of = option.expiry - time::Duration::days(30);
+        assert!(option.forward_price(&market, as_of).is_err());
+    }
+
+    #[test]
+    fn settlement_must_be_explicit() {
+        let mut value = serde_json::to_value(CommoditySpotOption::example().expect("example"))
+            .expect("serialize");
+        let obj = value
+            .as_object_mut()
+            .expect("CommoditySpotOption should serialize to an object");
+        obj.remove("settlement");
+        assert!(serde_json::from_value::<CommoditySpotOption>(value).is_err());
+    }
+
+    #[test]
+    fn canonical_dependencies_preserve_surface_pairing_and_strike() {
+        let mut option = CommoditySpotOption::example().expect("example");
+        option.spot_id = Some("WTI-SPOT".into());
+
+        let deps = option.market_dependencies().expect("dependencies");
+        assert_eq!(
+            deps.curves.discount_curves.as_slice(),
+            &[option.discount_curve_id.clone()]
+        );
+        assert_eq!(
+            deps.curves.forward_curves.as_slice(),
+            &[option.forward_curve_id.clone()]
+        );
+        assert_eq!(deps.market_scalar_ids, vec!["WTI-SPOT".to_string()]);
+        assert_eq!(deps.volatility_dependencies.len(), 1);
+        let volatility = &deps.volatility_dependencies[0];
+        assert_eq!(volatility.vol_surface_id, option.vol_surface_id);
+        assert_eq!(
+            volatility.spot_id.as_ref().map(|id| id.as_str()),
+            Some("WTI-SPOT")
+        );
+        assert_eq!(volatility.reference_strike, Some(option.strike));
+    }
+
+    #[test]
+    fn commodity_spot_option_default_equals_black76_for_pv_and_raw() {
+        let option = CommoditySpotOption::example().expect("example");
+        let as_of = Date::from_calendar_date(2025, time::Month::January, 15).expect("valid date");
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 0.97)])
+                    .build()
+                    .expect("discount curve"),
+            )
+            .insert(
+                PriceCurve::builder("WTI-FORWARD")
+                    .base_date(as_of)
+                    .spot_price(75.0)
+                    .knots([(0.0, 75.0), (1.0, 76.0)])
+                    .build()
+                    .expect("price curve"),
+            )
+            .insert_surface(
+                VolSurface::builder("WTI-VOL")
+                    .expiries(&[0.25, 0.5, 1.0])
+                    .strikes(&[60.0, 75.0, 90.0])
+                    .row(&[0.25, 0.25, 0.25])
+                    .row(&[0.25, 0.25, 0.25])
+                    .row(&[0.25, 0.25, 0.25])
+                    .build()
+                    .expect("vol surface"),
+            );
+        let registry = crate::exotics::EXOTICS.pricers();
+
+        let default = option
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[],
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
+            )
+            .expect("default commodity-option price");
+        let black76 = registry
+            .price_with_metrics(
+                &option,
+                finstack_quant_valuations_core::pricer::ModelKey::Black76,
+                &market,
+                as_of,
+                &[],
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
+            )
+            .expect("Black76 commodity-option price");
+        let default_raw = option
+            .value_raw(&market, as_of)
+            .expect("default commodity-option raw price");
+        let black76_raw = registry
+            .price_raw(
+                &option,
+                finstack_quant_valuations_core::pricer::ModelKey::Black76,
+                &market,
+                as_of,
+            )
+            .expect("Black76 commodity-option raw price");
+
+        assert_eq!(default.value, black76.value);
+        assert_eq!(default_raw, black76_raw);
+    }
+
+    #[test]
+    fn bermudan_exercise_requires_schedule() {
+        let mut option = CommoditySpotOption::example().expect("example");
+        option.exercise_style = ExerciseStyle::Bermudan;
+        option.spot_id = Some("WTI-SPOT".into());
+        let as_of = Date::from_calendar_date(2025, time::Month::January, 15).expect("valid");
+        let market = finstack_quant_core::market_data::context::MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 0.97)])
+                    .build()
+                    .expect("discount curve"),
+            )
+            .insert(
+                PriceCurve::builder("WTI-FORWARD")
+                    .base_date(as_of)
+                    .spot_price(75.0)
+                    .knots([(0.0, 75.0), (1.0, 76.0)])
+                    .build()
+                    .expect("price curve"),
+            )
+            .insert_surface(
+                VolSurface::builder("WTI-VOL")
+                    .expiries(&[0.25, 0.5, 1.0])
+                    .strikes(&[60.0, 75.0, 90.0])
+                    .row(&[0.25, 0.25, 0.25])
+                    .row(&[0.25, 0.25, 0.25])
+                    .row(&[0.25, 0.25, 0.25])
+                    .build()
+                    .expect("vol surface"),
+            );
+        let err = option
+            .value(&market, as_of)
+            .expect_err("Bermudan commodity options should require an exercise schedule");
+        assert!(err.to_string().contains("exercise_dates"));
+    }
+
+    /// W-13: `implied_carry` must guard against non-finite `forward` / `spot`.
+    /// A NaN or infinite input passes the `<= 0.0` checks (NaN comparisons are
+    /// always false), so without an `is_finite()` guard a non-finite cost-of-
+    /// carry `q` would flow straight into the binomial tree. The guard makes
+    /// `implied_carry` fall back to the risk-free rate (zero carry).
+    #[test]
+    fn w13_implied_carry_guards_against_non_finite_inputs() {
+        let r = 0.05;
+        let t = 0.5;
+
+        // NaN forward → fall back to r.
+        let q_nan_fwd = implied_carry(100.0, f64::NAN, r, t);
+        assert_eq!(
+            q_nan_fwd, r,
+            "NaN forward must fall back to the risk-free rate, got {q_nan_fwd}"
+        );
+        assert!(q_nan_fwd.is_finite());
+
+        // NaN spot → fall back to r.
+        let q_nan_spot = implied_carry(f64::NAN, 100.0, r, t);
+        assert_eq!(
+            q_nan_spot, r,
+            "NaN spot must fall back to the risk-free rate"
+        );
+
+        // Infinite forward → fall back to r.
+        let q_inf_fwd = implied_carry(100.0, f64::INFINITY, r, t);
+        assert_eq!(q_inf_fwd, r, "infinite forward must fall back to r");
+        assert!(q_inf_fwd.is_finite());
+
+        // Sanity: a well-formed input still yields the true cost-of-carry.
+        let q_ok = implied_carry(100.0, 105.0, r, t);
+        let expected = r - (105.0_f64 / 100.0).ln() / t;
+        assert!(
+            (q_ok - expected).abs() < 1e-12,
+            "well-formed inputs must yield the true implied carry"
+        );
+    }
+    #[test]
+    fn schwartz_smith_risk_retains_custom_registry_and_rejects_black_vega() {
+        use finstack_quant_core::market_data::scalars::MarketScalar;
+        use finstack_quant_valuations_core::instruments::PricingOptions;
+        use finstack_quant_valuations_core::metrics::MetricId;
+        use finstack_quant_valuations_core::pricer::{ModelKey, PricerRegistry};
+        use std::sync::Arc;
+        let mut option = CommoditySpotOption::example().unwrap();
+        option.quoted_forward = Some(76.0);
+        option.spot_id = Some("WTI-SPOT".into());
+        let as_of = Date::from_calendar_date(2025, time::Month::January, 15).unwrap();
+        let market = MarketContext::new()
+            .insert_price("WTI-SPOT", MarketScalar::Unitless(75.0))
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (5.0, 0.9)])
+                    .build()
+                    .unwrap(),
+            );
+        let mut registry = PricerRegistry::new();
+        registry
+            .register(super::super::pricer::CommoditySpotOptionMcPricer::new(
+                CommodityMcParams {
+                    params: SchwartzSmithParams::new(1.0, 0.1, 0.0, 0.05, 0.2).unwrap(),
+                    num_paths: 512,
+                    num_steps: 4,
+                    seed: Some(71),
+                },
+            ))
+            .unwrap();
+        let registry = Arc::new(registry);
+        let options = PricingOptions::default()
+            .with_model(ModelKey::MonteCarloSchwartzSmith)
+            .with_registry(Arc::clone(&registry));
+        let result = option
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Delta, MetricId::Gamma],
+                options.clone(),
+            )
+            .unwrap();
+        assert!(result.measures["delta"].is_finite());
+        assert!(result.measures["gamma"].is_finite());
+        for metric in [MetricId::Vega, MetricId::Vanna, MetricId::Volga] {
+            let error = option
+                .price_with_metrics(&market, as_of, &[metric], options.clone())
+                .unwrap_err();
+            assert!(error.to_string().contains("sigma_x/sigma_y"), "{error}");
+        }
+    }
+    #[test]
+    fn resolved_spot_claim_keeps_cash_or_physical_delivery_until_payment() {
+        use time::macros::date;
+        let as_of = date!(2025 - 06 - 16);
+        let payment = date!(2025 - 06 - 20);
+        let mut option = CommoditySpotOption::example().unwrap();
+        option.strike = 90.0;
+        option.quantity = 1.0;
+        option.exercise = Some(CommoditySpotOptionExercise {
+            date: option.expiry,
+            spot: 100.0,
+            settlement_date: payment,
+            exercised: true,
+        });
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .build()
+                    .unwrap(),
+            )
+            .insert(
+                PriceCurve::builder("WTI-FORWARD")
+                    .base_date(as_of)
+                    .knots([(0.0, 80.0), (1.0, 80.0)])
+                    .build()
+                    .unwrap(),
+            );
+        assert!((option.value(&market, as_of).unwrap().amount() - 10.0).abs() < 1e-12);
+        option.settlement = SettlementType::Physical;
+        assert!((option.value(&market, as_of).unwrap().amount() + 10.0).abs() < 1e-12);
+        let rebuilt: CommoditySpotOption =
+            serde_json::from_value(serde_json::to_value(&option).unwrap()).unwrap();
+        assert_eq!(
+            rebuilt.value(&market, as_of).unwrap(),
+            option.value(&market, as_of).unwrap()
+        );
+        assert_eq!(
+            rebuilt
+                .value(&market, payment.next_day().unwrap())
+                .unwrap()
+                .amount(),
+            0.0
+        );
+        option.exercise = None;
+        assert!(option.value(&market, as_of).is_err());
+    }
+
+    #[test]
+    fn spot_early_exercise_never_substitutes_a_future_for_spot() {
+        let mut option = CommoditySpotOption::example().unwrap();
+        option.exercise_style = ExerciseStyle::American;
+        option.spot_id = None;
+        assert!(option
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("spot_id"));
+    }
+}

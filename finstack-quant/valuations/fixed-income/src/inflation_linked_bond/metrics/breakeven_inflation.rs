@@ -1,0 +1,44 @@
+//! ILB breakeven inflation metric calculator.
+
+use crate::inflation_linked_bond::InflationLinkedBond;
+use finstack_quant_core::dates::DayCountContext;
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
+
+/// Breakeven inflation calculator for ILB.
+///
+/// Derives the nominal-yield leg of the Fisher identity from the bond's
+/// `discount_curve_id`. That field is a **nominal** curve by contract (see the
+/// `InflationLinkedBond::discount_curve_id` field docs), so the annually
+/// compounded zero rate read off it at the bond's maturity is a genuine nominal
+/// yield and the Fisher computation is correct. If a real curve is wired in
+/// despite the contract, the breakeven collapses toward zero; callers needing a
+/// different nominal-yield source should use
+/// [`InflationLinkedBond::breakeven_inflation`] directly with an explicit nominal yield.
+pub(crate) struct BreakevenInflationCalculator;
+
+impl MetricCalculator for BreakevenInflationCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let ilb: &InflationLinkedBond = context.instrument_as()?;
+        let curves = context.curves.as_ref();
+        let disc_curve = curves.get_discount(ilb.discount_curve_id.as_str())?;
+
+        let day_count = disc_curve.day_count();
+        let base_date = disc_curve.base_date();
+        // Provide the coupon frequency so an ACT/ACT (ISMA) discount-curve day
+        // count does not error; ignored by other conventions.
+        let t = day_count.year_fraction(
+            base_date,
+            ilb.maturity,
+            DayCountContext {
+                frequency: Some(ilb.frequency),
+                ..Default::default()
+            },
+        )?;
+        // Use annually-compounded (effective-annual) zero rate so that the
+        // nominal yield passed to `breakeven_inflation` is on the same basis as
+        // the real yield after its Street→Annual conversion inside that method.
+        let nominal_yield = disc_curve.zero_rate(t, finstack_quant_core::math::Compounding::Annual);
+
+        ilb.breakeven_inflation(nominal_yield, context.as_of)
+    }
+}

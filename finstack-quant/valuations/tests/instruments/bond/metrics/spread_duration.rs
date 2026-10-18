@@ -8,9 +8,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::constants::ONE_BASIS_POINT;
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread;
 use finstack_quant_valuations::instruments::fixed_income::bond::{
     Bond, BondSettlementConvention, CallPut, CallPutSchedule, CashflowSpec,

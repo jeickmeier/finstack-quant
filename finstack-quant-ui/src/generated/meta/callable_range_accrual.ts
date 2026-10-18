@@ -297,7 +297,7 @@ export default [
   {
     "path": "#/$defs/d_10afa2c48803544dc415",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikSchedule",
-    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
+    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
   },
   {
     "path": "#/$defs/d_10afa2c48803544dc415/oneOf/0",
@@ -4442,7 +4442,7 @@ export default [
   {
     "path": "#/$defs/d_bffef9e684ff0c351c83",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcOverride",
-    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
+    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
     "ref": "#/$defs/MertonMcConfig",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig"
   },
@@ -4844,7 +4844,7 @@ export default [
   {
     "path": "#/$defs/d_de9dcde9d5fad54ea251",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms",
-    "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides."
+    "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides."
   },
   {
     "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/bounds_type",
@@ -5193,7 +5193,7 @@ export default [
     "path": "#/$defs/d_f30e208982840b66d83c/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/BoundsType/oneOf/0",
     "const": "absolute",
-    "description": "Bounds are absolute levels (e.g., 4500.0 for SPX, or an absolute rate\nband for a rate-linked note priced via\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual))."
+    "description": "Bounds are absolute levels (e.g., 4500.0 for SPX, or an absolute rate\nband for a rate-linked note priced via\n[`CallableRangeAccrual`](crate::exotics::callable_range_accrual))."
   },
   {
     "path": "#/$defs/d_f30e208982840b66d83c/oneOf/1",

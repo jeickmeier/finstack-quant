@@ -19,7 +19,7 @@ use finstack_quant_valuations::instruments::Instrument;
 use proptest::prelude::*;
 use time::Month;
 
-use crate::instruments::common::test_helpers::scaled_tolerance;
+use finstack_quant_valuations_test_support::test_helpers::scaled_tolerance;
 
 fn create_option_market(
     base_date: Date,

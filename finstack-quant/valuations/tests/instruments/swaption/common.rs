@@ -1,5 +1,6 @@
 //! Common test utilities and fixtures for swaption tests.
 
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -10,7 +11,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_test_utils::assert::approx_eq;
 use finstack_quant_valuations::instruments::pricing_overrides::VolSurfaceExtrapolation;
 use finstack_quant_valuations::instruments::rates::irs::{
-    FixedLegSpec, FloatLegSpec, FloatingLegCompounding, InterestRateSwap, PayReceive,
+    FixedLegSpec, FloatLegSpec, InterestRateSwap, PayReceive,
 };
 use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
 use finstack_quant_valuations::instruments::{

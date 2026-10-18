@@ -1,0 +1,532 @@
+//! CDS Tranche types, builder entrypoint, and pricing impl.
+
+use finstack_quant_cashflows::builder::RollRule;
+use finstack_quant_cashflows::builder::ScheduleParams;
+use finstack_quant_core::dates::{
+    is_cds_date, BusinessDayConvention, Date, DayCount, StubKind, Tenor,
+};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations_core::instruments::common_impl::traits::{Attributes, Instrument};
+use finstack_quant_valuations_core::instruments::PayReceive;
+
+use super::parameters::CdsTrancheParams;
+use super::pricing;
+use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+
+/// CDS Tranche instrument definition (boilerplate)
+#[derive(
+    PartialEq,
+    Clone,
+    Debug,
+    finstack_quant_valuations_macros::FinancialBuilder,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CdsTranche {
+    /// Unique instrument identifier
+    pub id: InstrumentId,
+    /// Index name (e.g., "CDX.NA.IG", "CDX.NA.HY", "iTraxx EUR")
+    pub index_name: String,
+    /// Series number (e.g., 37)
+    pub series: u16,
+    /// Attachment point in percent (e.g., 0.0 for equity)
+    pub attach_pct: f64,
+    /// Detachment point in percent (e.g., 3.0 for 0-3% tranche)
+    pub detach_pct: f64,
+    /// Notional amount of the tranche
+    pub notional: Money,
+    /// Maturity date of the tranche
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub maturity: Date,
+    /// Running coupon in basis points (e.g., 100 = 1.00%)
+    pub coupon_bp: f64,
+    /// Payment frequency (typically quarterly)
+    pub frequency: Tenor,
+    /// Day count (typically Act/360)
+    pub day_count: DayCount,
+    /// Business day convention
+    #[builder(default = BusinessDayConvention::ModifiedFollowing)]
+    #[serde(default = "finstack_quant_valuations_core::serde_defaults::bdc_modified_following")]
+    pub business_day_convention: BusinessDayConvention,
+    /// Optional holiday calendar id
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
+    /// Discount curve identifier (by quote currency)
+    pub discount_curve_id: CurveId,
+    /// Credit index identifier for survival/loss modeling (placeholder)
+    pub credit_index_id: CurveId,
+    /// Tranche side, as on CDS and CdsIndex: `pay` buys protection (pays the
+    /// running premium), `receive` sells protection (receives the premium).
+    pub side: PayReceive,
+    /// Optional effective date for schedule anchoring (if None, uses as_of date)
+    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
+    pub start_date: Option<Date>,
+    /// Realized (settled) loss on the reference pool as a decimal fraction of
+    /// the original portfolio notional, in `[0, 1]`.
+    pub realized_loss: f64,
+    /// Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates
+    /// (20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke
+    /// schedule from `frequency` and `stub`. The equity-futures `imm` grid is
+    /// rejected. Use [`Self::standard`] for the IMM constructor.
+    #[builder(default)]
+    #[serde(default)]
+    pub roll_rule: RollRule,
+    /// Stub convention for a bespoke (`roll_rule = none`) coupon schedule.
+    /// Defaults to `short_front`.
+    #[builder(default = StubKind::ShortFront)]
+    #[serde(default = "finstack_quant_valuations_core::serde_defaults::stub_short_front")]
+    pub stub: StubKind,
+    /// Optional upfront payment (date, amount). Positive means paid by protection buyer.
+    #[serde(default)]
+    #[serde(with = "finstack_quant_core::wire::optional_dated_money")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
+    pub upfront: Option<(Date, Money)>,
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides:
+        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+    /// Attributes for scenario selection and tagging
+    pub attributes: Attributes,
+}
+
+impl CdsTranche {
+    pub(crate) fn contractual_start_date(&self, as_of: Date) -> Option<Date> {
+        if let Some(start_date) = self.start_date {
+            return Some(start_date);
+        }
+
+        if self.roll_rule != RollRule::CdsImm {
+            return None;
+        }
+
+        let mut current = as_of.min(self.maturity - time::Duration::days(1));
+        while !is_cds_date(current) {
+            current -= time::Duration::days(1);
+        }
+        Some(current)
+    }
+
+    /// Validate structural invariants of the tranche.
+    ///
+    /// Checks that attachment/detachment points are ordered and in range,
+    /// and that notional is positive. Can be called after builder construction
+    /// to catch configuration errors early.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        for (name, value) in [
+            ("attach_pct", self.attach_pct),
+            ("detach_pct", self.detach_pct),
+            ("coupon_bp", self.coupon_bp),
+            ("realized_loss", self.realized_loss),
+        ] {
+            if !value.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CDS tranche {name} must be finite, got {value}"
+                )));
+            }
+        }
+        if self.attach_pct >= self.detach_pct {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "attach_pct ({}) must be less than detach_pct ({})",
+                self.attach_pct, self.detach_pct
+            )));
+        }
+        if self.attach_pct < 0.0 || self.detach_pct > 100.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "attach_pct ({}) and detach_pct ({}) must be in [0, 100]",
+                self.attach_pct, self.detach_pct
+            )));
+        }
+        if self.detach_pct <= 1.0 && self.detach_pct > 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "detach_pct={} looks like a fraction; attach/detach are quoted in percent \
+                 (e.g., 3.0 for 3%). Multiply fractional inputs by 100.",
+                self.detach_pct
+            )));
+        }
+        if self.notional.amount() <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Tranche notional must be positive, got {}",
+                self.notional.amount()
+            )));
+        }
+        if !self.notional.amount().is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "CDS tranche notional must be finite".to_string(),
+            ));
+        }
+        if !(0.0..=1.0).contains(&self.realized_loss) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS tranche realized_loss must be in [0, 1], got {}",
+                self.realized_loss
+            )));
+        }
+        let currency = self.notional.currency();
+        if let Some((_, upfront)) = self.upfront {
+            if upfront.currency() != currency {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CDS tranche upfront currency {} must match notional currency {}",
+                    upfront.currency(),
+                    currency
+                )));
+            }
+        }
+        if self.roll_rule == RollRule::Imm {
+            return Err(finstack_quant_core::Error::Validation(
+                "CDS tranche roll_rule must be cds_imm or none, got imm".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Create a canonical example CDS tranche (CDX.NA.IG 0-3% equity tranche).
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        use finstack_quant_core::currency::Currency;
+        use time::macros::date;
+        let params = super::parameters::CdsTrancheParams::equity_tranche(
+            "CDX.NA.IG",
+            42,
+            Money::from((10_000_000_i64, Currency::USD)),
+            date!(2029 - 12 - 20),
+            100.0,
+        );
+        CdsTranche::standard(
+            InstrumentId::new("CDXIG-42-0X3"),
+            &params,
+            CurveId::new("USD-OIS"),
+            CurveId::new("CDX.NA.IG.HAZARD"),
+            PayReceive::Pay,
+        )
+    }
+    /// Create a new CDS tranche using parameter structs.
+    ///
+    /// Honors `schedule_params` for coupon frequency, day count, business-day
+    /// convention, calendar, stub and roll rule. Use [`Self::standard`] for
+    /// the IMM (20th of Mar/Jun/Sep/Dec) constructor.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique instrument identifier.
+    /// * `tranche_params` - Attachment/detachment points (percent), notional,
+    ///   maturity, running coupon in basis points, and index identity.
+    /// * `schedule_params` - Coupon frequency, day count, business-day
+    ///   convention, calendar, `stub` and `roll_rule` (`cds_imm` or `none`;
+    ///   `imm` is rejected by [`Self::validate`]).
+    /// * `discount_curve_id` - Discount curve identifier in the tranche quote
+    ///   currency.
+    /// * `credit_index_id` - Credit-index / hazard identifier used for
+    ///   survival and expected-loss.
+    /// * `side` - `Pay` buys protection, `Receive` sells protection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tranche parameters are invalid:
+    /// - `attach_pct` must be less than `detach_pct`
+    /// - Both must be in [0, 100] (percent, not fraction)
+    /// - Notional must be positive
+    pub fn new(
+        id: impl Into<InstrumentId>,
+        tranche_params: &CdsTrancheParams,
+        schedule_params: &ScheduleParams,
+        discount_curve_id: impl Into<CurveId>,
+        credit_index_id: impl Into<CurveId>,
+        side: PayReceive,
+    ) -> finstack_quant_core::Result<Self> {
+        if tranche_params.attach_pct >= tranche_params.detach_pct {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "attach_pct ({}) must be less than detach_pct ({})",
+                tranche_params.attach_pct, tranche_params.detach_pct
+            )));
+        }
+        if tranche_params.attach_pct < 0.0 || tranche_params.detach_pct > 100.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "attach_pct ({}) and detach_pct ({}) must be in [0, 100] (percent, not fraction)",
+                tranche_params.attach_pct, tranche_params.detach_pct
+            )));
+        }
+        if tranche_params.notional.amount() <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Tranche notional must be positive, got {}",
+                tranche_params.notional.amount()
+            )));
+        }
+
+        // Reject values that look like fractions (very small non-zero
+        // detachment). Tranche points are quoted in percent; a 0.03/0.07
+        // "3-7%" tranche passed as fractions would silently price a 100×
+        // thinner tranche.
+        if tranche_params.detach_pct <= 1.0 && tranche_params.detach_pct > 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "detach_pct={} looks like a fraction; attach/detach are quoted in percent \
+                 (e.g., 3.0 for 3%). Multiply fractional inputs by 100.",
+                tranche_params.detach_pct
+            )));
+        }
+
+        Ok(Self {
+            id: id.into(),
+            index_name: tranche_params.index_name.to_owned(),
+            series: tranche_params.series,
+            attach_pct: tranche_params.attach_pct,
+            detach_pct: tranche_params.detach_pct,
+            notional: tranche_params.notional,
+            maturity: tranche_params.maturity,
+            coupon_bp: tranche_params.coupon_bp,
+            frequency: schedule_params.frequency,
+            day_count: schedule_params.day_count,
+            business_day_convention: schedule_params.business_day_convention,
+            calendar_id: Some(schedule_params.calendar_id.clone()),
+            discount_curve_id: discount_curve_id.into(),
+            credit_index_id: credit_index_id.into(),
+            side,
+            start_date: None,
+            realized_loss: tranche_params.realized_loss,
+            roll_rule: schedule_params.roll_rule,
+            stub: schedule_params.stub,
+            upfront: None,
+            instrument_pricing_overrides:
+                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
+            attributes: Attributes::new(),
+        })
+    }
+
+    /// Create a standard CDS tranche with IMM coupon dates and market conventions.
+    ///
+    /// Builds with `roll_rule = cds_imm` (CDS roll dates, 20th of
+    /// Mar/Jun/Sep/Dec) and no `calendar_id`.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique instrument identifier.
+    /// * `tranche_params` - Attachment/detachment points (percent), notional,
+    ///   maturity, running coupon in basis points, and index identity.
+    /// * `discount_curve_id` - Discount curve identifier in the tranche quote
+    ///   currency.
+    /// * `credit_index_id` - Credit-index / hazard identifier used for
+    ///   survival and expected-loss.
+    /// * `side` - `Pay` buys protection, `Receive` sells protection.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same validation errors as [`Self::new`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn standard(
+        id: impl Into<InstrumentId>,
+        tranche_params: &CdsTrancheParams,
+        discount_curve_id: impl Into<CurveId>,
+        credit_index_id: impl Into<CurveId>,
+        side: PayReceive,
+    ) -> finstack_quant_core::Result<Self> {
+        use finstack_quant_cashflows::builder::RollRule;
+        use finstack_quant_cashflows::builder::ScheduleParams;
+        let sched = ScheduleParams {
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::Following,
+            calendar_id: "weekends_only".into(),
+            stub: StubKind::ShortFront,
+            end_of_month: false,
+            payment_lag_days: 0,
+            adjust_accrual_dates: false,
+            roll_rule: RollRule::CdsImm,
+        };
+
+        let mut tranche = Self::new(
+            id,
+            tranche_params,
+            &sched,
+            discount_curve_id,
+            credit_index_id,
+            side,
+        )?;
+        tranche.calendar_id = None;
+        Ok(tranche)
+    }
+
+    /// Model upfront: the tranche PV at its contractual running coupon.
+    ///
+    /// A computed analytic, distinct from the contractual `upfront` field
+    /// (which this PV already includes).
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market context holding the discount curve and the credit
+    ///   index data named by the tranche.
+    /// * `as_of` - Valuation date.
+    ///
+    /// # Returns
+    ///
+    /// The model upfront in the tranche notional currency (signed by side).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the tranche is invalid or required market data
+    /// is missing.
+    pub fn model_upfront(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let pricer = pricing::CdsTranchePricer::new();
+        pricer.calculate_model_upfront(self, market, as_of)
+    }
+
+    /// Calculate spread DV01 (sensitivity to 1bp change in running coupon)
+    pub fn spread_dv01(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let pricer = pricing::CdsTranchePricer::new();
+        pricer.calculate_spread_dv01(self, market, as_of)
+    }
+
+    /// Calculate the par spread (running coupon in basis points).
+    pub fn par_spread(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let pricer = pricing::CdsTranchePricer::new();
+        pricer.calculate_par_spread(self, market, as_of)
+    }
+
+    /// Calculate expected loss metric
+    pub fn expected_loss(&self, market: &MarketContext) -> finstack_quant_core::Result<f64> {
+        let pricer = pricing::CdsTranchePricer::new();
+        pricer.calculate_expected_loss(self, market)
+    }
+
+    /// Calculate jump-to-default metric
+    pub fn jump_to_default(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let pricer = pricing::CdsTranchePricer::new();
+        pricer.calculate_jump_to_default(self, market, as_of)
+    }
+
+    /// Calculate correlation delta (Correlation01): PV change per **1%
+    /// (0.01 absolute)** base-correlation shift, matching `Recovery01` units.
+    pub fn correlation_delta(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let pricer = pricing::CdsTranchePricer::new();
+        pricer.calculate_correlation_delta(self, market, as_of)
+    }
+
+    // Builder now provided by derive
+}
+
+// Attributable is provided via blanket impl for all Instrument types
+
+impl Instrument for CdsTranche {
+    impl_instrument_base!(
+        finstack_quant_valuations_core::pricer::InstrumentType::CdsTranche,
+        crate::CREDIT
+    );
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_credit_index(self.credit_index_id.clone());
+        Ok(deps)
+    }
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        CdsTranche::validate(self)
+    }
+
+    fn default_model(&self) -> finstack_quant_valuations_core::pricer::ModelKey {
+        finstack_quant_valuations_core::pricer::ModelKey::HazardRate
+    }
+
+    fn base_value(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Money> {
+        let pricer = pricing::CdsTranchePricer::new();
+        pricer.price_tranche(self, curves, as_of)
+    }
+
+    fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
+        Some(self.maturity)
+    }
+
+    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+}
+
+impl finstack_quant_cashflows::CashflowScheduleSource for CdsTranche {
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
+    }
+
+    fn raw_cashflow_schedule(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+        let pricer = pricing::CdsTranchePricer::new();
+        let schedule = pricer.build_projected_schedule(self, curves, as_of)?;
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn market_dependencies_preserve_credit_index_identity() {
+        let tranche = CdsTranche::example().expect("example");
+        let dependencies = tranche.market_dependencies().expect("tranche dependencies");
+
+        assert_eq!(dependencies.credit_index_ids, vec![tranche.credit_index_id]);
+        assert!(dependencies.curves.credit_curves.is_empty());
+    }
+}

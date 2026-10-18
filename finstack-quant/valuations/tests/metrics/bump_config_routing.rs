@@ -19,10 +19,7 @@
 //! stencil stays inside 5e-3 at `h = 2%` spot and 2 vol points, and the FX
 //! volga is Richardson-extrapolated from the `h` and `h/2` overrides.
 
-use crate::metrics::date_support::date;
-use crate::metrics::discount_forward_curve_support::flat_discount_with_tenor;
 use crate::metrics::option_support::{equity_option_european_call, fx_option_european_call};
-use crate::metrics::volatility_support::flat_vol_surface;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
@@ -48,6 +45,9 @@ use finstack_quant_valuations::instruments::{
     MetricPricingOverrides, Monitoring, OptionType, PricingOptions,
 };
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_test_support::date::date;
+use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
+use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 use std::sync::Arc;
 
 // ---------------------------------------------------------------- helpers

@@ -10,8 +10,8 @@ use crate::quotes::xccy::XccyQuote;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_rates::deposit::Deposit;
 use std::fmt;
 use std::sync::Arc;
 
@@ -135,7 +135,7 @@ pub(crate) fn prepare_rate_quote(
 /// Prepare an XCCY basis-swap quote into an instrument + pillar time.
 ///
 /// Uses the pair convention (registered via `XccyConventionId`) to construct the
-/// underlying [`finstack_quant_valuations::instruments::rates::xccy_swap::XccySwap`]. The pillar date is
+/// underlying [`finstack_quant_valuations_rates::xccy_swap::XccySwap`]. The pillar date is
 /// the swap's maturity (far date of the basis-swap quote). The convention's
 /// `notional_exchange` field determines whether the resulting swap is fixed-notional
 /// or `MtmResetting` — G10 pairs default to MtM-resetting per dealer convention.
@@ -211,7 +211,7 @@ mod tests {
         let future = prepared
             .instrument
             .as_any()
-            .downcast_ref::<finstack_quant_valuations::instruments::rates::ir_future::InterestRateFuture>()
+            .downcast_ref::<finstack_quant_valuations_rates::ir_future::InterestRateFuture>()
             .expect("expected interest rate future");
 
         assert_eq!(
@@ -277,10 +277,10 @@ mod tests {
         let quote = CdsQuote::CdsParSpread {
             id: QuoteId::new("CDS-TEST-IMM"),
             entity: "Test Corp".to_string(),
-            convention: finstack_quant_valuations::market::conventions::ids::CdsConventionKey {
+            convention: finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey {
                 currency: finstack_quant_core::currency::Currency::USD,
                 doc_clause:
-                    finstack_quant_valuations::market::conventions::ids::CdsDocClause::IsdaNa,
+                    finstack_quant_valuations_core::market::conventions::ids::CdsDocClause::IsdaNa,
             },
             pillar: Pillar::Date(explicit_maturity),
             spread_bp: 100.0,

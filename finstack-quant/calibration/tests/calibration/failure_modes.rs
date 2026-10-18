@@ -1,7 +1,6 @@
 //! Failure mode coverage for plan-driven calibration preflight checks.
 
 use crate::calibration::calibration_support as cal_utils;
-use crate::calibration::common::fixtures;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationStep,
@@ -25,7 +24,8 @@ use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::{HazardCurve, ParInterp};
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+use finstack_quant_valuations_test_support::fixtures;
 use std::sync::Arc;
 use time::Month;
 
@@ -136,7 +136,7 @@ fn inflation_preflight_rejects_invalid_observation_lag() {
         rate: 0.02,
         index: "USA-CPI-U".to_string(),
         convention:
-            finstack_quant_valuations::market::conventions::ids::InflationSwapConventionId::new(
+            finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId::new(
                 "USD",
             ),
     });
@@ -466,7 +466,7 @@ fn inflation_preflight_rejects_lag_mismatch_with_index() {
         rate: 0.02,
         index: "USD-CPI".to_string(),
         convention:
-            finstack_quant_valuations::market::conventions::ids::InflationSwapConventionId::new(
+            finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId::new(
                 "USD",
             ),
     });

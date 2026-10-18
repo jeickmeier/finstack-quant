@@ -1,7 +1,5 @@
 //! Metric tests for inflation caps/floors.
 
-use crate::instruments::inflation_swap::fixtures::{flat_discount, flat_inflation_curve};
-use crate::instruments::test_support::volatility::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, StubKind, Tenor, TenorUnit,
@@ -15,6 +13,8 @@ use finstack_quant_valuations::instruments::{
     Attributes, Instrument, InstrumentPricingOverrides, PricingOptions,
 };
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_test_support::inflation::{flat_discount, flat_inflation_curve};
+use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 use rust_decimal::Decimal;
 use time::Month;
 

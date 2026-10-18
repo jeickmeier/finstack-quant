@@ -7,6 +7,7 @@ use crate::config::CalibrationConfig;
 use crate::quotes::vol::VolQuote;
 use crate::quotes::MarketQuote;
 use crate::CalibrationReport;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{
     adjust, BusinessDayConvention, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };
@@ -16,13 +17,12 @@ use finstack_quant_core::market_data::surfaces::VolCube;
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_core::Result;
 use finstack_quant_models::{SabrCalibrator, SabrParameters, SabrShift};
-use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
-use finstack_quant_valuations::instruments::rates::swaption::contractual_swap_tenor_years;
-use finstack_quant_valuations::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_rates::swaption::contractual_swap_tenor_years;
 use std::collections::BTreeMap;
 
 #[cfg(test)]
-use finstack_quant_valuations::market::conventions::ids::SwaptionConventionId;
+use finstack_quant_valuations_core::market::conventions::ids::SwaptionConventionId;
 
 /// Bootstrapper for calibrating swaption volatility surfaces.
 ///
@@ -760,8 +760,7 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
                 DayCountContext::default(),
             )?;
             let coupon = if let Some(fwd) = &forward {
-                finstack_quant_valuations::instruments::pricing::time::rate_between_on_dates(
-                    fwd.as_ref(),
+                fwd.as_ref().rate_between_dates(
                     period.accrual_start,
                     period.accrual_end,
                     period.accrual_year_fraction,

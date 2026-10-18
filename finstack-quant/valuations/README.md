@@ -27,25 +27,44 @@ No crate that valuations depends on may depend back on it.
 
 ## Crate map
 
+The crate is an umbrella over two layers. The pricing framework lives in
+[`core/`](core/README.md) (package `finstack-quant-valuations-core`) and is
+re-exported here under the same paths; this crate adds the instrument families
+and the closed world around them.
+
 | Path | Role |
 |------|------|
-| [`src/instruments/`](src/instruments/README.md) | Instrument types by asset class, the `Instrument` trait, JSON loading |
-| `src/pricer/` | `InstrumentType`/`ModelKey`/`PricerKey` dispatch, `PricerRegistry`, and JSON pricing entry points |
-| [`src/metrics/`](src/metrics/README.md) | `MetricId`, `MetricCalculator`, `MetricRegistry`, sensitivities, historical VaR |
-| [`src/calibration/`](src/calibration/README.md) | Plan-driven calibration engine, solvers, targets, validation, bumps |
-| [`src/market/`](src/market/README.md) | Market quotes, convention registries, quote-to-instrument builders |
-| [`src/results/`](src/results/README.md) | `ValuationResult`, `ResultsMeta`, `ValuationRow` export |
-| `src/contract_specs.rs` | Embedded exchange contract specs (bond/equity-index/vol-index futures, repo defaults); crate-private, surfaced through the instruments that use them |
-| `src/constants.rs` | Basis-point and percent conversion constants for hot paths |
+| [`core/src/instruments/`](core/src/instruments/README.md) | The `Instrument` trait and its hooks, `PricingOptions`, parameter and override types, the generic pricer, the shared pricing kernels (`common_impl`), the cashflow exporter engine |
+| [`core/src/pricer/`](core/src/pricer/README.md) | `InstrumentType`/`ModelKey`/`PricerKey` dispatch, `Pricer`, `PricerRegistry`, `PricingDispatch`, the `Family` registration unit, metric enrichment, product defaults |
+| [`core/src/metrics/`](core/src/metrics/README.md) | `MetricId`, `MetricCalculator`, `MetricRegistry`, the universal calculators, sensitivities, historical VaR |
+| [`core/src/market/`](core/src/market/README.md) | Market quotes, convention registries, listed-product catalog |
+| [`core/src/results/`](core/src/results/README.md) | `ValuationResult`, `ResultsMeta`, `ValuationRow` export, the composite and structured-credit result DTOs |
+| `core/src/contract_specs.rs` | Embedded exchange contract specs (bond/equity-index/vol-index futures, repo defaults); hidden, surfaced through the instruments that use them |
+| `core/src/constants.rs`, `core/src/error.rs`, `core/src/recalibration.rs` | Constants, the crate `Error`/`Result` (re-exported at both crate roots), the recalibration contract |
+| [`fixed-income/`](fixed-income/README.md) | `finstack-quant-valuations-fixed-income`: the fixed-income family (bonds, bond futures, convertibles, inflation-linked bonds, term loans, revolving credit, FI-index TRS, agency MBS pass-throughs, TBAs, dollar rolls) with its `FIXED_INCOME` registration static; re-exported as `instruments::fixed_income` |
+| [`structured-credit/`](structured-credit/README.md) | `finstack-quant-valuations-structured-credit`: the structured-credit tier (ABS/RMBS/CMBS/CLO deals, agency CMOs, asset-backed facilities) with its `STRUCTURED_CREDIT` registration static; depends on fixed-income and rates; re-exported as `instruments::fixed_income::{structured_credit, cmo, asset_backed_facility}` |
+| [`rates/`](rates/README.md) | `finstack-quant-valuations-rates`: the interest-rate and inflation family (deposits, FRAs, futures, IRS, basis and cross-currency swaps, caps/floors, swaptions, CMS, repos, inflation swaps and caps/floors) with its `RATES` registration static; re-exported as `instruments::rates` |
+| [`credit/`](credit/README.md) | `finstack-quant-valuations-credit`: the credit-derivatives family (CDS, CDS indices, tranches, CDS options, the CS01 fast path) with its `CREDIT` registration static; re-exported as `instruments::credit_derivatives` |
+| [`equity/`](equity/README.md) | `finstack-quant-valuations-equity`: the equity family (spot, options, futures and futures options, variance swaps, TRS, autocallables, cliquets, vol-index futures, DCF equity, private-markets funds) with its `EQUITY` registration static; re-exported as `instruments::equity`; `real_estate` stays here under `instruments::equity::real_estate` |
+| [`exotics/`](exotics/README.md) | `finstack-quant-valuations-exotics`: the exotics family (Asian, barrier, lookback options, range accruals, TARN, snowball) and the commodity family (forwards, futures, swaps, options), one `EXOTICS` registration static; re-exported as `instruments::exotics` and `instruments::commodity`; `Basket` stays here under `instruments::exotics::basket` |
+| [`fx/`](fx/README.md) | `finstack-quant-valuations-fx`: the FX family (spot, forwards, swaps, NDFs, listed futures, vanilla/barrier/digital/touch/variance/quanto options) with its `FX` registration static; re-exported as `instruments::fx` |
+| [`src/instruments/`](src/instruments/README.md) | The façade modules of the family crates; the umbrella-resident instruments — `exotics::basket` and `equity::real_estate` (both register with `STANDARD`); `composite`; `json_loader` (`InstrumentJson`, the closed world); the JSON cashflow-export entry points |
+| `src/pricer/` | `FAMILIES`, the `STANDARD` family and `standard_pricer_registry()`, and the JSON pricing entry points in `pricer::json` |
+| `src/metrics/mod.rs`, `src/results.rs` | Façades over the core modules; `metrics::standard_registry()` |
 | `src/schema.rs` | Accessors and validators for the checked-in JSON Schema artifacts |
-| `src/error.rs` | Crate `Error`/`Result` (re-exported at the crate root) |
 | `src/bin/gen_schemas.rs` | `gen_schemas` binary that writes/checks [`schemas/`](schemas/README.md) |
 
-Supporting directories: [`tests/`](tests/README.md),
-[`benches/`](benches/README.md), [`schemas/`](schemas/README.md),
-[`examples/market_bootstrap/`](examples/market_bootstrap/README.md), and `data/`
-(embedded conventions, contract specs, calibration defaults, and structured-credit
-/ TBA assumptions compiled in with `include_str!`).
+Supporting directories: [`tests/`](tests/README.md) (integration tests,
+including the `core_framework` module that exercises the framework over
+built-in instruments), [`test-support/`](test-support/README.md) (the dev-only
+`finstack-quant-valuations-test-support` crate: market builders, fixtures,
+tolerances and parity assertions shared by every valuations test tree),
+[`benches/`](benches/README.md),
+[`schemas/`](schemas/README.md) and `examples/`. The embedded data lives with
+its crate: `core/data/` (conventions, contract specs, product defaults,
+listed-product catalog), `fixed-income/data/assumptions/` (TBA) and
+`structured-credit/data/assumptions/` (structured credit), all compiled in
+with `include_str!`.
 
 P&L attribution and covenant evaluation live in the separate
 `finstack-quant-attribution` and `finstack-quant-covenants` crates.
@@ -58,22 +77,24 @@ instrument (types, pricer, optional cashflows, and a `metrics/` module):
 | Group | Instruments |
 |-------|-------------|
 | `fixed_income/` | `asset_backed_facility`, `bond`, `bond_future`, `cmo`, `convertible`, `dollar_roll`, `fi_trs`, `inflation_linked_bond`, `mbs_passthrough`, `revolving_credit`, `structured_credit`, `tba`, `term_loan` |
-| `rates/` | `basis_swap`, `cap_floor`, `cms_option`, `cms_spread_option`, `cms_swap`, `deposit`, `fra`, `hw1f`, `inflation_cap_floor`, `inflation_swap`, `ir_future`, `irs`, `repo`, `swaption`, `xccy_swap` |
+| `rates/` | `basis_swap`, `cap_floor`, `cms_option`, `cms_spread_option`, `cms_swap`, `deposit`, `fra`, `inflation_cap_floor`, `inflation_swap`, `ir_future`, `irs`, `repo`, `swaption`, `xccy_swap` |
 | `credit_derivatives/` | `cds`, `cds_index`, `cds_option`, `cds_tranche` |
 | `equity/` | `autocallable`, `cliquet_option`, `dcf_equity`, `equity_future`, `equity_option`, `equity_total_return_future`, `equity_trs`, `pe_fund`, `real_estate`, `spot`, `variance_swap`, `vol_index_future` |
 | `fx/` | `fx_barrier_option`, `fx_digital_option`, `fx_forward`, `fx_future`, `fx_option`, `fx_spot`, `fx_swap`, `fx_touch_option`, `fx_variance_swap`, `ndf`, `quanto_option` |
 | `commodity/` | `commodity_asian_option`, `commodity_forward`, `commodity_spot_option`, `commodity_spread_option`, `commodity_swap`, `commodity_swaption`, `commodity_future` |
 | `exotics/` | `asian_option`, `barrier_option`, `basket`, `callable_range_accrual`, `lookback_option`, `range_accrual`, `snowball`, `tarn` |
 
-`common_impl/` is crate-private plumbing (the `Instrument` trait, shared
-parameter types, pricing helpers, cashflow export). Its public re-exports are at
-`instruments::*` and `instruments::pricing`.
+The `Instrument` trait, the shared parameter types and the pricing kernels the
+families build on are defined in [`core/src/instruments/`](core/src/instruments/README.md)
+(`common_impl/` is public but hidden from the rendered docs). Their re-exports
+are at `instruments::*` and `instruments::pricing`, the same paths as before the
+split.
 
 `pricer::InstrumentType` has 71 variants; the JSON registry in
 `instruments/json_loader.rs` covers 70 loadable instrument types. Several
 instruments carry their own README — for example
 [`fixed_income/bond`](src/instruments/fixed_income/bond/README.md),
-[`fixed_income/structured_credit`](src/instruments/fixed_income/structured_credit/README.md),
+[`structured_credit`](structured-credit/src/structured_credit/README.md),
 and [`rates/irs`](src/instruments/rates/irs/README.md).
 
 ## Example
@@ -142,7 +163,7 @@ assumption is applied it is stamped in `ResultsMeta::fx_policy_applied` (see
 otherwise. Fields and arguments named `*_bp` are basis points. Calibration bump
 quote-recalibration requests (`QuoteBump::ParallelBp`) are in basis points;
 volatility bumps use `VolBumpRequest` because absolute-vs-relative semantics
-differ. `constants::ONE_BASIS_POINT` exists for hot paths; prefer
+differ. `finstack_quant_core::math::units::ONE_BASIS_POINT` exists for hot paths; prefer
 `finstack_quant_core::types::{Rate, Bps}` elsewhere.
 
 **Day count and calendars.** Conventions come from the embedded registries in

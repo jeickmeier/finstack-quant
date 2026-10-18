@@ -94,7 +94,7 @@
       ]
     },
     "RateIndexKind": {
-      "description": "Type of rate index for convention determination.\n\nDistinguishes between overnight risk-free rate (RFR) indices and term indices, which have\ndifferent conventions for compounding, payment frequencies, and reset lags.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::market::conventions::RateIndexKind;\n\nlet overnight = RateIndexKind::OvernightRfr;\nlet term = RateIndexKind::Term;\n```",
+      "description": "Type of rate index for convention determination.\n\nDistinguishes between overnight risk-free rate (RFR) indices and term indices, which have\ndifferent conventions for compounding, payment frequencies, and reset lags.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::RateIndexKind;\n\nlet overnight = RateIndexKind::OvernightRfr;\nlet term = RateIndexKind::Term;\n```",
       "oneOf": [
         {
           "const": "overnight_rfr",

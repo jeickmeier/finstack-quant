@@ -54,6 +54,7 @@ fn market_context_json() -> String {
 }
 
 fn structured_credit_instrument_json() -> String {
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{
         DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
     };
@@ -61,7 +62,6 @@ fn structured_credit_instrument_json() -> String {
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::money::Money;
     use finstack_quant_models::credit::pool::{StochasticDefaultSpec, StochasticPrepaySpec};
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority,
         TrancheStructure,

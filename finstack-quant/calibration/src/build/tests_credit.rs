@@ -10,11 +10,9 @@ use crate::quotes::ids::Pillar;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, Tenor};
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::{
-    CdsConvention, CdsValuationConvention,
-};
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+use finstack_quant_valuations_credit::cds::{CdsConvention, CdsValuationConvention};
 use rust_decimal::Decimal;
 
 #[test]

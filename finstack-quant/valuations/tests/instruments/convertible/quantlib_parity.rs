@@ -18,7 +18,6 @@
 //! exercise features; finstack prices on the binomial tree.
 
 use super::fixtures::with_tree_steps;
-use crate::instruments::parity::ParityConfig;
 use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -37,6 +36,8 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
 use finstack_quant_valuations::instruments::GreekBumps;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_test_support::assert_parity;
+use finstack_quant_valuations_test_support::parity::ParityConfig;
 use time::macros::date;
 
 /// Helper: Create a flat discount curve for convertible bond tests

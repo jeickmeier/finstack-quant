@@ -280,7 +280,7 @@ export default [
   {
     "path": "#/$defs/d_10afa2c48803544dc415",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikSchedule",
-    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
+    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
   },
   {
     "path": "#/$defs/d_10afa2c48803544dc415/oneOf/0",
@@ -777,7 +777,7 @@ export default [
     "path": "#/$defs/d_52d6b1613948a4e1d273/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/BoundsType/oneOf/0",
     "const": "absolute",
-    "description": "Bounds are absolute levels (e.g., 4500.0 for SPX, or an absolute rate\nband for a rate-linked note priced via\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual))."
+    "description": "Bounds are absolute levels (e.g., 4500.0 for SPX, or an absolute rate\nband for a rate-linked note priced via\n[`CallableRangeAccrual`](crate::exotics::callable_range_accrual))."
   },
   {
     "path": "#/$defs/d_52d6b1613948a4e1d273/oneOf/1",
@@ -4380,7 +4380,7 @@ export default [
   {
     "path": "#/$defs/d_bffef9e684ff0c351c83",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcOverride",
-    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
+    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
     "ref": "#/$defs/MertonMcConfig",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig"
   },
@@ -4499,7 +4499,7 @@ export default [
   {
     "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual",
-    "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_observations_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`index_id`, `forward_curve_id`,\n`index_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation."
+    "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_observations_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`index_id`, `forward_curve_id`,\n`index_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation."
   },
   {
     "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/attributes",

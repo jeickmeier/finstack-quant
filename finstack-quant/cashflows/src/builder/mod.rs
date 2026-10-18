@@ -59,7 +59,8 @@ pub(crate) mod specs;
 
 pub use calendar::WEEKENDS_ONLY_ID;
 pub use credit_rates::{
-    abs_to_smm, cdr_to_mdr, cpr_to_smm, mdr_to_cdr, psa_cpr, smm_to_cpr, PSA_RAMP_MONTHS,
+    abs_to_smm, cdr_to_mdr, clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr,
+    clamped_smm_to_cpr, cpr_to_smm, mdr_to_cdr, psa_cpr, psa_to_cpr, smm_to_cpr, PSA_RAMP_MONTHS,
     PSA_TERMINAL_CPR,
 };
 pub use emission::emit_inflation_coupons;
@@ -86,6 +87,6 @@ pub use specs::{
     evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase,
     FeeSpec, FeeTier, FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding,
     FloatingRateFallback, FloatingRateSpec, Notional, OvernightIndexConstraintApplication,
-    PrepaymentModelSpec, PrincipalExchange, RecoveryModelSpec, RollRule, ScheduleParams,
+    PrepaymentModelSpec, PrincipalExchange, RateSpec, RecoveryModelSpec, RollRule, ScheduleParams,
     StepUpCouponSpec,
 };

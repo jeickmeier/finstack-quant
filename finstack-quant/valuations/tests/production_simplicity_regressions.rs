@@ -47,14 +47,13 @@ fn tied_custom_coupon_intervals_choose_shorter_frequency() {
         },
     );
     let schedule_json = serde_json::to_string(&schedule).expect("schedule JSON");
-    let wire =
-        finstack_quant_valuations::instruments::fixed_income::bond::bond_from_cashflows_json(
-            "TIED",
-            &schedule_json,
-            "USD-OIS",
-            None,
-        )
-        .expect("custom bond JSON");
+    let wire = finstack_quant_valuations::instruments::fixed_income::bond_from_cashflows_json(
+        "TIED",
+        &schedule_json,
+        "USD-OIS",
+        None,
+    )
+    .expect("custom bond JSON");
     let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
         serde_json::from_str(&wire).expect("bond envelope");
     let finstack_quant_valuations::instruments::InstrumentJson::Bond(bond) = envelope.instrument

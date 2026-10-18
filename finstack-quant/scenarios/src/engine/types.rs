@@ -6,6 +6,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_statements::types::NodeId;
 use finstack_quant_statements::FinancialModelSpec;
+use finstack_quant_valuations::instruments::instrument_json_of;
 use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope};
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
 use indexmap::IndexMap;
@@ -500,8 +501,7 @@ pub fn instrument_envelopes(
     inventory
         .iter()
         .map(|instrument| {
-            instrument
-                .to_instrument_json()
+            instrument_json_of(instrument.as_ref())
                 .map(InstrumentEnvelope::new)
                 .ok_or_else(|| {
                     <serde_json::Error as serde::ser::Error>::custom(format!(

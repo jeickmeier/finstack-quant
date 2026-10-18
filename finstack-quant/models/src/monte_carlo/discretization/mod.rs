@@ -8,6 +8,7 @@
 //! process state, convergence behavior, and positivity / stability guarantees.
 
 pub mod cheyette_rough;
+pub mod credit_line;
 pub mod euler;
 pub mod exact;
 pub mod exact_gbm_dividends;

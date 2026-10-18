@@ -39,7 +39,7 @@
       "oneOf": [
         {
           "const": "absolute",
-          "description": "Bounds are absolute levels (e.g., 4500.0 for SPX, or an absolute rate\nband for a rate-linked note priced via\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)).",
+          "description": "Bounds are absolute levels (e.g., 4500.0 for SPX, or an absolute rate\nband for a rate-linked note priced via\n[`CallableRangeAccrual`](crate::exotics::callable_range_accrual)).",
           "type": "string"
         },
         {
@@ -138,7 +138,7 @@
     },
     "RangeAccrualTerms": {
       "additionalProperties": false,
-      "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides.",
+      "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides.",
       "properties": {
         "bounds_type": {
           "$ref": "#/$defs/BoundsType",

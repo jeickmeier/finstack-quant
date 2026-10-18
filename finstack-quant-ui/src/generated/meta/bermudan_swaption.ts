@@ -364,7 +364,7 @@ export default [
   {
     "path": "#/$defs/d_10afa2c48803544dc415",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikSchedule",
-    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
+    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
   },
   {
     "path": "#/$defs/d_10afa2c48803544dc415/oneOf/0",
@@ -2720,7 +2720,7 @@ export default [
   {
     "path": "#/$defs/d_b532a9f21fa25370d47c",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/BermudanSwaption",
-    "description": "Bermudan swaption with multiple exercise dates.\n\nA Bermudan swaption gives the holder the right to enter into an interest rate\nswap at any of a set of predetermined exercise dates. This is the most common\ntype of exotic swaption in the market, used extensively for:\n\n- Callable bond hedging\n- Mortgage prepayment risk management\n- Structured product hedging\n\n# Pricing Methods\n\nBermudan swaptions require numerical methods for pricing:\n- **Hull-White Tree** (default): Industry standard, calibrated to swaption\n  volatility. Official PV and risk use this path unless a caller selects\n  [`crate::pricer::ModelKey::MonteCarloHullWhite1F`].\n- **LSMC**: Longstaff-Schwartz Monte Carlo, opt-in for path-dependent\n  validation and model comparison.\n\n# Example\n\n```\nuse finstack_quant_valuations::instruments::rates::swaption::{\n    BermudanSwaption, BermudanSchedule, BermudanType,\n};\nuse finstack_quant_valuations::instruments::SettlementType;\n\n// Create a 10NC2 (10-year swap, callable after 2 years)\nlet swaption = BermudanSwaption::example().expect(\"example\");\n```"
+    "description": "Bermudan swaption with multiple exercise dates.\n\nA Bermudan swaption gives the holder the right to enter into an interest rate\nswap at any of a set of predetermined exercise dates. This is the most common\ntype of exotic swaption in the market, used extensively for:\n\n- Callable bond hedging\n- Mortgage prepayment risk management\n- Structured product hedging\n\n# Pricing Methods\n\nBermudan swaptions require numerical methods for pricing:\n- **Hull-White Tree** (default): Industry standard, calibrated to swaption\n  volatility. Official PV and risk use this path unless a caller selects\n  [`finstack_quant_valuations_core::pricer::ModelKey::MonteCarloHullWhite1F`].\n- **LSMC**: Longstaff-Schwartz Monte Carlo, opt-in for path-dependent\n  validation and model comparison.\n\n# Example\n\n```\nuse finstack_quant_valuations_rates::swaption::{\n    BermudanSwaption, BermudanSchedule, BermudanType,\n};\nuse finstack_quant_valuations_core::instruments::SettlementType;\n\n// Create a 10NC2 (10-year swap, callable after 2 years)\nlet swaption = BermudanSwaption::example().expect(\"example\");\n```"
   },
   {
     "path": "#/$defs/d_b532a9f21fa25370d47c/properties/attributes",
@@ -3820,7 +3820,7 @@ export default [
   {
     "path": "#/$defs/d_bffef9e684ff0c351c83",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcOverride",
-    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
+    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
     "ref": "#/$defs/MertonMcConfig",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig"
   },

@@ -1,0 +1,532 @@
+//! Sensitivities configuration (user-facing defaults) resolved from `FinstackConfig` extensions.
+//!
+//! This module defines the versioned extension section:
+//! - `valuations.sensitivities.v1`
+//!
+//! It is intended for settings that users commonly tweak and need to persist for reproducible
+//! pipelines (Tier-3 configuration in the Rust code standards).
+
+use finstack_quant_core::config::FinstackConfig;
+
+/// Extension section key for sensitivities defaults.
+pub const SENSITIVITIES_CONFIG_KEY_V1: &str = "valuations.sensitivities.v1";
+
+/// Standard risk bucket grid in years used for IR DV01 and credit CS01.
+pub const STANDARD_BUCKETS_YEARS: [f64; 11] =
+    [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0];
+
+/// Standard bucket labels corresponding to [`STANDARD_BUCKETS_YEARS`].
+pub const STANDARD_BUCKET_LABELS: [&str; 11] = [
+    "3m", "6m", "1y", "2y", "3y", "5y", "7y", "10y", "15y", "20y", "30y",
+];
+
+/// Format a bucket time (in years) as a human-readable label.
+///
+/// For standard buckets (0.25, 0.5, 1, 2, 3, 5, 7, 10, 15, 20, 30 years),
+/// returns the canonical label ("3m", "6m", "1y", etc.).
+/// For non-standard buckets, dynamically formats as "{N}m" or "{N}y".
+///
+/// # Arguments
+///
+/// * `years` - Non-negative bucket tenor in years; canonical grid tenors use
+///   stable labels and other tenors are rendered as rounded months or years.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_valuations_core::metrics::format_bucket_label;
+///
+/// assert_eq!(format_bucket_label(0.25), "3m");
+/// assert_eq!(format_bucket_label(1.0), "1y");
+/// assert_eq!(format_bucket_label(10.0), "10y");
+/// assert_eq!(format_bucket_label(0.75), "9m"); // non-standard
+/// ```
+#[inline]
+pub fn format_bucket_label(years: f64) -> String {
+    format_bucket_label_cow(years).into_owned()
+}
+
+/// Same as [`format_bucket_label`] but returns `Cow<'static, str>` to avoid
+/// allocation for the 11 standard buckets (the common case in DV01/CS01 loops).
+#[inline]
+pub fn format_bucket_label_cow(years: f64) -> std::borrow::Cow<'static, str> {
+    for (i, &bucket_time) in STANDARD_BUCKETS_YEARS.iter().enumerate() {
+        if (years - bucket_time).abs() < 0.01 {
+            return std::borrow::Cow::Borrowed(STANDARD_BUCKET_LABELS[i]);
+        }
+    }
+
+    let s = if years < 1.0 {
+        format!("{:.0}m", (years * 12.0).round())
+    } else {
+        format!("{:.0}y", years)
+    };
+    std::borrow::Cow::Owned(s)
+}
+
+/// Format a key-rate coordinate without rounding away its year fraction.
+///
+/// # Arguments
+///
+/// * `years` - Nonnegative finite bucket time in years. Standard coordinates
+///   use their usual month/year names; other coordinates retain their exact
+///   decimal year fraction.
+pub fn format_key_rate_label(years: f64) -> String {
+    let label = format_bucket_label(years);
+    if parse_key_rate_label(&label).ok() == Some(years) {
+        label
+    } else {
+        format!("{years}y")
+    }
+}
+
+/// Recover the year coordinate from a key-rate sensitivity bucket label.
+///
+/// # Arguments
+///
+/// * `label` - Bucket label emitted by [`format_key_rate_label`], using years
+///   (`"1.4y"`) or a standard month coordinate (`"3m"`).
+///
+/// # Errors
+///
+/// Returns a validation error for an unsupported unit, negative or non-finite
+/// coordinate, or an invalid numeric value.
+pub fn parse_key_rate_label(label: &str) -> finstack_quant_core::Result<f64> {
+    let years = if let Some(value) = label.strip_suffix('y') {
+        value.parse::<f64>().ok()
+    } else if let Some(value) = label.strip_suffix('m') {
+        value.parse::<f64>().ok().map(|months| months / 12.0)
+    } else {
+        None
+    };
+    years
+        .filter(|years| years.is_finite() && *years >= 0.0)
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "invalid sensitivity bucket label '{label}'"
+            ))
+        })
+}
+
+/// Default relative spot bump: 1% of spot (0.01).
+const DEFAULT_SPOT_BUMP_DECIMAL: f64 = 0.01;
+
+/// Default volatility bump: **absolute** 1 vol point (0.01), e.g. 20% → 21%.
+/// It is an additive shift of implied volatility, not a 1% relative scaling.
+const DEFAULT_VOL_BUMP_DECIMAL: f64 = 0.01;
+
+/// Default parallel rate and credit-spread bump: 1bp (1.0 in bp units).
+const DEFAULT_BUMP_BP: f64 = 1.0;
+
+/// Resolved (fully-populated) sensitivities configuration.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SensitivitiesConfig {
+    /// Interest rate bump size in basis points (e.g., 1.0 = 1bp).
+    pub rate_bump_bp: f64,
+    /// Credit spread bump size in basis points (e.g., 1.0 = 1bp).
+    pub credit_spread_bump_bp: f64,
+    /// Spot bump size as a decimal fraction of spot (e.g., 0.01 = 1%).
+    pub spot_bump_decimal: f64,
+    /// Vol bump size (absolute) in decimal volatility (e.g., 0.01 = 1 vol point).
+    pub vol_bump_decimal: f64,
+    /// Yield bump in basis points for numerical yield duration/convexity, when
+    /// set by `metric_pricing_overrides.bump_config.ytm_bump_bp`. `None` lets
+    /// each calculator keep its own default shock.
+    pub ytm_bump_bp: Option<f64>,
+    /// Default DV01 key-rate buckets in years.
+    pub dv01_buckets_years: Vec<f64>,
+    /// Default CS01 key-rate buckets in years.
+    pub cs01_buckets_years: Vec<f64>,
+}
+
+impl Default for SensitivitiesConfig {
+    fn default() -> Self {
+        Self {
+            rate_bump_bp: DEFAULT_BUMP_BP,
+            credit_spread_bump_bp: DEFAULT_BUMP_BP,
+            spot_bump_decimal: DEFAULT_SPOT_BUMP_DECIMAL,
+            vol_bump_decimal: DEFAULT_VOL_BUMP_DECIMAL,
+            ytm_bump_bp: None,
+            dv01_buckets_years: STANDARD_BUCKETS_YEARS.to_vec(),
+            cs01_buckets_years: STANDARD_BUCKETS_YEARS.to_vec(),
+        }
+    }
+}
+
+impl From<&SensitivitiesConfig> for crate::instruments::GreekBumps {
+    fn from(cfg: &SensitivitiesConfig) -> Self {
+        Self {
+            spot_bump_decimal: cfg.spot_bump_decimal,
+            vol_bump_decimal: cfg.vol_bump_decimal,
+            rate_bump_bp: cfg.rate_bump_bp,
+        }
+    }
+}
+
+/// Resolve the sensitivities config of a metric request: the
+/// `valuations.sensitivities.v1` extension of its `FinstackConfig`, then the
+/// request's `metric_pricing_overrides.bump_config`.
+pub fn resolve(
+    context: &crate::metrics::MetricContext,
+) -> finstack_quant_core::Result<SensitivitiesConfig> {
+    from_context_or_default(context.get_config(), context.get_metric_pricing_overrides())
+}
+
+/// Optional-override form of [`SensitivitiesConfig`], deserialized from the
+/// `valuations.sensitivities.v1` `FinstackConfig` extension. Every field is
+/// optional; present fields override the resolved defaults in
+/// [`from_finstack_config_or_default`].
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SensitivitiesOverrides {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate_bump_bp: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credit_spread_bump_bp: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spot_bump_decimal: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vol_bump_decimal: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dv01_buckets_years: Option<Vec<f64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cs01_buckets_years: Option<Vec<f64>>,
+}
+
+fn ensure_finite_positive(name: &str, v: f64) -> finstack_quant_core::Result<()> {
+    if !v.is_finite() || v <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Invalid sensitivities config: '{name}' must be finite and > 0, got {v}"
+        )));
+    }
+    Ok(())
+}
+
+fn ensure_bucket_grid(name: &str, buckets: &[f64]) -> finstack_quant_core::Result<()> {
+    if buckets.is_empty() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Invalid sensitivities config: '{name}' must be non-empty"
+        )));
+    }
+    for (i, &t) in buckets.iter().enumerate() {
+        if !t.is_finite() || t <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Invalid sensitivities config: '{name}[{i}]' must be finite and > 0, got {t}"
+            )));
+        }
+    }
+    super::cs01::validate_buckets_strictly_increasing(buckets).map_err(|e| {
+        finstack_quant_core::Error::Validation(format!(
+            "Invalid sensitivities config: '{name}' {e}"
+        ))
+    })
+}
+
+/// Resolve sensitivities defaults from a `FinstackConfig`.
+///
+/// If the extension section `valuations.sensitivities.v1` is present, its fields override
+/// the defaults; otherwise defaults are used.
+pub fn from_finstack_config_or_default(
+    cfg: &FinstackConfig,
+) -> finstack_quant_core::Result<SensitivitiesConfig> {
+    let mut base = SensitivitiesConfig::default();
+
+    if let Some(raw) = cfg.extensions.get(SENSITIVITIES_CONFIG_KEY_V1) {
+        let overrides: SensitivitiesOverrides =
+            serde_json::from_value(raw.clone()).map_err(|e| {
+                finstack_quant_core::Error::Calibration {
+                    message: format!(
+                        "Failed to parse extension '{}': {}",
+                        SENSITIVITIES_CONFIG_KEY_V1, e
+                    ),
+                    category: "config".to_string(),
+                }
+            })?;
+
+        if let Some(v) = overrides.rate_bump_bp {
+            ensure_finite_positive("rate_bump_bp", v)?;
+            base.rate_bump_bp = v;
+        }
+        if let Some(v) = overrides.credit_spread_bump_bp {
+            ensure_finite_positive("credit_spread_bump_bp", v)?;
+            base.credit_spread_bump_bp = v;
+        }
+        if let Some(v) = overrides.spot_bump_decimal {
+            ensure_finite_positive("spot_bump_decimal", v)?;
+            base.spot_bump_decimal = v;
+        }
+        if let Some(v) = overrides.vol_bump_decimal {
+            ensure_finite_positive("vol_bump_decimal", v)?;
+            base.vol_bump_decimal = v;
+        }
+        if let Some(v) = overrides.dv01_buckets_years {
+            ensure_bucket_grid("dv01_buckets_years", &v)?;
+            base.dv01_buckets_years = v;
+        }
+        if let Some(v) = overrides.cs01_buckets_years {
+            ensure_bucket_grid("cs01_buckets_years", &v)?;
+            base.cs01_buckets_years = v;
+        }
+    }
+
+    Ok(base)
+}
+
+/// Resolve sensitivities defaults and then layer instrument-level pricing overrides.
+pub fn from_context_or_default(
+    cfg: &FinstackConfig,
+    pricing_overrides: Option<&crate::instruments::MetricPricingOverrides>,
+) -> finstack_quant_core::Result<SensitivitiesConfig> {
+    let base = from_finstack_config_or_default(cfg)?;
+    apply_pricing_overrides(base, pricing_overrides)
+}
+
+/// Apply per-instrument pricing overrides to a resolved sensitivities config.
+pub fn apply_pricing_overrides(
+    mut base: SensitivitiesConfig,
+    pricing_overrides: Option<&crate::instruments::MetricPricingOverrides>,
+) -> finstack_quant_core::Result<SensitivitiesConfig> {
+    let Some(po) = pricing_overrides else {
+        return Ok(base);
+    };
+
+    let bumps = &po.bump_config;
+    if let Some(v) = bumps.rate_bump_bp {
+        ensure_finite_positive("metric_pricing_overrides.bump_config.rate_bump_bp", v)?;
+        base.rate_bump_bp = v;
+    }
+    if let Some(v) = bumps.credit_spread_bump_bp {
+        ensure_finite_positive(
+            "metric_pricing_overrides.bump_config.credit_spread_bump_bp",
+            v,
+        )?;
+        base.credit_spread_bump_bp = v;
+    }
+    if let Some(v) = bumps.spot_bump_decimal {
+        ensure_finite_positive("metric_pricing_overrides.bump_config.spot_bump_decimal", v)?;
+        base.spot_bump_decimal = v;
+    }
+    if let Some(v) = bumps.vol_bump_decimal {
+        ensure_finite_positive("metric_pricing_overrides.bump_config.vol_bump_decimal", v)?;
+        base.vol_bump_decimal = v;
+    }
+    if let Some(v) = bumps.ytm_bump_bp {
+        ensure_finite_positive("metric_pricing_overrides.bump_config.ytm_bump_bp", v)?;
+        base.ytm_bump_bp = Some(v);
+    }
+
+    Ok(base)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn apply_pricing_overrides_prefers_explicit_fields() {
+        let base = SensitivitiesConfig::default();
+        let po = crate::instruments::MetricPricingOverrides {
+            bump_config: crate::instruments::BumpConfig::default(),
+            theta_period: None,
+            breakeven_config: None,
+            bond_risk_basis: None,
+            theta_day_basis: None,
+            var_config: None,
+        }
+        .with_rate_bump_bp(2.0)
+        .with_credit_spread_bump_bp(3.0)
+        .with_spot_bump_decimal(0.02)
+        .with_vol_bump_decimal(0.03);
+
+        let resolved = apply_pricing_overrides(base, Some(&po)).expect("valid overrides");
+        assert_eq!(resolved.rate_bump_bp, 2.0);
+        assert_eq!(resolved.credit_spread_bump_bp, 3.0);
+        assert_eq!(resolved.spot_bump_decimal, 0.02);
+        assert_eq!(resolved.vol_bump_decimal, 0.03);
+    }
+
+    #[test]
+    fn apply_pricing_overrides_carries_ytm_bump_only_when_set() {
+        let base = SensitivitiesConfig::default();
+        assert_eq!(base.ytm_bump_bp, None);
+        let po = crate::instruments::MetricPricingOverrides::default().with_ytm_bump_bp(2.5);
+        let resolved = apply_pricing_overrides(base, Some(&po)).expect("valid overrides");
+        assert_eq!(resolved.ytm_bump_bp, Some(2.5));
+    }
+
+    #[test]
+    fn greek_bumps_default_matches_resolved_default_config() {
+        let bumps = crate::instruments::GreekBumps::from(&SensitivitiesConfig::default());
+        assert_eq!(bumps, crate::instruments::GreekBumps::default());
+        assert_eq!(bumps.spot_bump_decimal, 0.01);
+        assert_eq!(bumps.vol_bump_decimal, 0.01);
+        assert_eq!(bumps.rate_bump_bp, 1.0);
+    }
+
+    #[test]
+    fn apply_pricing_overrides_rejects_non_positive_values() {
+        let base = SensitivitiesConfig::default();
+        let po = crate::instruments::MetricPricingOverrides::default().with_rate_bump_bp(0.0);
+
+        let err = apply_pricing_overrides(base, Some(&po)).expect_err("must fail");
+        assert!(
+            err.to_string().contains("must be finite and > 0"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn format_bucket_label_covers_standard_and_dynamic_values() {
+        assert_eq!(format_bucket_label(0.25), "3m");
+        assert_eq!(format_bucket_label(10.0), "10y");
+        assert_eq!(format_bucket_label(0.75), "9m");
+        assert_eq!(format_bucket_label(1.4), "1y");
+        assert_eq!(
+            format_bucket_label_cow(5.0),
+            std::borrow::Cow::Borrowed("5y")
+        );
+        assert_eq!(format_bucket_label_cow(1.25).into_owned(), "1y");
+    }
+
+    #[test]
+    fn key_rate_labels_round_trip_exact_coordinates() {
+        for coordinate in [0.25, 0.75, 1.0, 1.004, 1.4, 4.0, 9.0, 31.125] {
+            let label = format_key_rate_label(coordinate);
+            assert_eq!(
+                parse_key_rate_label(&label).expect("canonical label"),
+                coordinate
+            );
+        }
+        assert_eq!(format_key_rate_label(1.4), "1.4y");
+        assert_eq!(format_key_rate_label(1.004), "1.004y");
+        for invalid in ["NaNy", "infy", "-1y", "5x", "y"] {
+            assert!(parse_key_rate_label(invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn from_finstack_config_or_default_uses_defaults_without_extension() {
+        let cfg = FinstackConfig::default();
+        let resolved = from_finstack_config_or_default(&cfg).expect("default config should parse");
+
+        assert_eq!(resolved, SensitivitiesConfig::default());
+    }
+
+    #[test]
+    fn from_finstack_config_or_default_applies_valid_overrides() {
+        let mut cfg = FinstackConfig::default();
+        cfg.extensions
+            .insert(
+                SENSITIVITIES_CONFIG_KEY_V1,
+                json!({
+                    "rate_bump_bp": 2.5,
+                    "credit_spread_bump_bp": 3.0,
+                    "spot_bump_decimal": 0.02,
+                    "vol_bump_decimal": 0.03,
+                    "dv01_buckets_years": [0.5, 1.0, 5.0],
+                    "cs01_buckets_years": [1.0, 3.0, 7.0]
+                }),
+            )
+            .expect("valid extension key");
+
+        let resolved = from_finstack_config_or_default(&cfg).expect("overrides should parse");
+        assert_eq!(resolved.rate_bump_bp, 2.5);
+        assert_eq!(resolved.credit_spread_bump_bp, 3.0);
+        assert_eq!(resolved.spot_bump_decimal, 0.02);
+        assert_eq!(resolved.vol_bump_decimal, 0.03);
+        assert_eq!(resolved.dv01_buckets_years, vec![0.5, 1.0, 5.0]);
+        assert_eq!(resolved.cs01_buckets_years, vec![1.0, 3.0, 7.0]);
+    }
+
+    #[test]
+    fn from_finstack_config_or_default_rejects_parse_and_grid_errors() {
+        let mut bad_shape = FinstackConfig::default();
+        bad_shape
+            .extensions
+            .insert(SENSITIVITIES_CONFIG_KEY_V1, json!({"unexpected": 1}))
+            .expect("valid extension key");
+        let parse_err =
+            from_finstack_config_or_default(&bad_shape).expect_err("must reject unknown fields");
+        assert!(
+            parse_err.to_string().contains("Failed to parse extension"),
+            "unexpected error: {parse_err}"
+        );
+
+        let mut empty_grid = FinstackConfig::default();
+        empty_grid
+            .extensions
+            .insert(
+                SENSITIVITIES_CONFIG_KEY_V1,
+                json!({"dv01_buckets_years": []}),
+            )
+            .expect("valid extension key");
+        let empty_err = from_finstack_config_or_default(&empty_grid)
+            .expect_err("must reject empty bucket grid");
+        assert!(
+            empty_err.to_string().contains("must be non-empty"),
+            "unexpected error: {empty_err}"
+        );
+
+        let mut unsorted_grid = FinstackConfig::default();
+        unsorted_grid
+            .extensions
+            .insert(
+                SENSITIVITIES_CONFIG_KEY_V1,
+                json!({"cs01_buckets_years": [1.0, 1.0]}),
+            )
+            .expect("valid extension key");
+        let unsorted_err =
+            from_finstack_config_or_default(&unsorted_grid).expect_err("must reject unsorted grid");
+        assert!(
+            unsorted_err
+                .to_string()
+                .contains("must be strictly increasing"),
+            "unexpected error: {unsorted_err}"
+        );
+    }
+
+    #[test]
+    fn sensitivities_extension_rejects_retired_pct_bump_keys() {
+        // schema-rejection-test: `valuations.sensitivities.v1` retired keys
+        for retired in ["spot_bump_pct", "vol_bump_pct"] {
+            let mut cfg = FinstackConfig::default();
+            cfg.extensions
+                .insert(SENSITIVITIES_CONFIG_KEY_V1, json!({ retired: 0.01 }))
+                .expect("valid extension key");
+            from_finstack_config_or_default(&cfg)
+                .expect_err("retired sensitivities.v1 bump key must be rejected");
+        }
+    }
+
+    #[test]
+    fn from_context_or_default_layers_metric_overrides_on_top_of_config() {
+        let mut cfg = FinstackConfig::default();
+        cfg.extensions
+            .insert(
+                SENSITIVITIES_CONFIG_KEY_V1,
+                json!({
+                    "rate_bump_bp": 2.5,
+                    "vol_bump_decimal": 0.03
+                }),
+            )
+            .expect("valid extension key");
+        let pricing_overrides = crate::instruments::MetricPricingOverrides::default()
+            .with_rate_bump_bp(4.0)
+            .with_vol_bump_decimal(0.05);
+
+        let resolved = from_context_or_default(&cfg, Some(&pricing_overrides))
+            .expect("layered config should parse");
+        assert_eq!(resolved.rate_bump_bp, 4.0);
+        assert_eq!(resolved.vol_bump_decimal, 0.05);
+        assert_eq!(resolved.credit_spread_bump_bp, 1.0);
+    }
+
+    #[test]
+    fn apply_pricing_overrides_returns_base_when_missing() {
+        let base = SensitivitiesConfig::default();
+        let resolved =
+            apply_pricing_overrides(base.clone(), None).expect("missing overrides should be ok");
+        assert_eq!(resolved, base);
+    }
+}

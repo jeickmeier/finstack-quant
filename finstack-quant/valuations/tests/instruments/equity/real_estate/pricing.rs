@@ -1,6 +1,5 @@
 //! Pricing tests for real estate assets.
 
-use crate::instruments::test_support::date::date;
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, StubKind, Tenor};
@@ -16,6 +15,7 @@ use finstack_quant_valuations::instruments::fixed_income::term_loan::{
     AmortizationSpec, RateSpec, TermLoan,
 };
 use finstack_quant_valuations::instruments::{Attributes, Bond, Instrument, RealEstateFinancing};
+use finstack_quant_valuations_test_support::date::date;
 
 fn build_flat_discount_curve(
     id: &str,

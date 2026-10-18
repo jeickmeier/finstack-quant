@@ -12,12 +12,10 @@
 //! - `metrics`: Comprehensive metric calculator tests
 //! - `edge_cases`: Boundary conditions, error handling, corner cases
 
-mod fixtures;
-
 mod cashflows;
 mod collateral;
 mod construction;
 mod edge_cases;
-mod margin;
+mod fixtures;
 mod metrics;
 mod pricing;

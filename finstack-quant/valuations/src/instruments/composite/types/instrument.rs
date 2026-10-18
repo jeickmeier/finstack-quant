@@ -2,8 +2,7 @@
 
 use super::reporting::{
     aggregate_primitive_paths, flatten_composite, register_execution_definition,
-    CompositeExposureReport, CompositeLegValuation, CompositeRebalanceResult, CompositeTrade,
-    CompositeValuationDetails, PrimitiveExposure,
+    CompositeRebalanceResult, CompositeTrade,
 };
 use super::spec::CompositeSpec;
 use super::spec_support::{
@@ -16,6 +15,9 @@ use crate::instruments::{
     MetricPricingOverrides, PricingOptions, ScenarioPricingOverrides,
 };
 use crate::metrics::{is_additive_metric, MetricId};
+use crate::results::composite::{
+    CompositeExposureReport, CompositeLegValuation, CompositeValuationDetails, PrimitiveExposure,
+};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -43,7 +45,7 @@ use std::collections::BTreeMap;
 /// * `metrics` - Metric identifiers requested for the composite as a whole, in
 ///   caller order; the returned subset preserves that order.
 /// * `options` - Pricing options whose `metric_registry`, when present, decides
-///   applicability; otherwise the shared standard registry is used.
+///   applicability; otherwise the leg's own family registry is used.
 fn metrics_supported_by_leg(
     instrument: &dyn Instrument,
     metrics: &[MetricId],
@@ -51,7 +53,7 @@ fn metrics_supported_by_leg(
 ) -> Vec<MetricId> {
     let registry = match options.metric_registry.as_deref() {
         Some(registry) => registry,
-        None => crate::metrics::standard_registry(),
+        None => instrument.family().metrics(),
     };
     instrument.applicable_metrics(metrics, registry)
 }
@@ -355,9 +357,12 @@ impl CompositeInstrument {
         let mut paths = Vec::with_capacity(flattened.len());
         let mut supported = BTreeMap::<String, usize>::new();
         for mut exposure in flattened {
-            let instrument_json = exposure.instrument.as_ref().ok_or_else(|| {
-                Error::Internal("primitive exposure lost its runtime instrument".to_string())
-            })?;
+            let instrument_json = exposure
+                .instrument()
+                .and_then(crate::instruments::instrument_json_of)
+                .ok_or_else(|| {
+                    Error::Internal("primitive exposure lost its runtime instrument".to_string())
+                })?;
             let mut cache_key = InstrumentEnvelope::new(instrument_json.clone()).content_hash()?;
             if !exposure.metric_defaults.is_empty() {
                 cache_key.push_str(&format!("{:?}", exposure.metric_defaults));
@@ -365,7 +370,7 @@ impl CompositeInstrument {
             let result = match price_cache.get(&cache_key) {
                 Some(cached) => cached.clone(),
                 None => {
-                    let mut instrument = instrument_json.clone().into_boxed()?;
+                    let mut instrument = instrument_json.into_boxed()?;
                     if let Some(overrides) = instrument.get_metric_pricing_overrides_mut() {
                         overrides.apply_defaults(&exposure.metric_defaults);
                     }
@@ -567,6 +572,25 @@ impl Instrument for CompositeInstrument {
         crate::pricer::InstrumentType::Composite
     }
 
+    fn family(&self) -> &'static crate::pricer::Family {
+        &crate::pricer::STANDARD
+    }
+
+    fn composite_valuation(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        metrics: &[MetricId],
+        options: PricingOptions,
+    ) -> Result<Option<(IndexMap<MetricId, f64>, crate::results::ValuationDetails)>> {
+        let (measures, details) =
+            self.valuation_details_with_metrics(market, as_of, metrics, options)?;
+        Ok(Some((
+            measures,
+            crate::results::ValuationDetails::Composite(details),
+        )))
+    }
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -648,7 +672,7 @@ impl Instrument for CompositeInstrument {
     fn market_dependencies(&self) -> Result<MarketDependencies> {
         let mut dependencies = MarketDependencies::new();
         for (leg, instrument) in self.spec.legs.iter().zip(self.boxed_legs()?) {
-            dependencies.merge(MarketDependencies::from_instrument_json(
+            dependencies.merge(crate::instruments::market_dependencies_of(
                 leg.instrument.as_ref(),
             )?);
             if let Some(notional) = instrument.notional()? {
@@ -658,16 +682,6 @@ impl Instrument for CompositeInstrument {
             }
         }
         Ok(dependencies)
-    }
-
-    fn valuation_details(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Option<crate::results::ValuationDetails> {
-        self.valuation_details_with_metrics(market, as_of, &[], PricingOptions::default())
-            .ok()
-            .map(|(_, details)| crate::results::ValuationDetails::Composite(details))
     }
 
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
@@ -747,7 +761,7 @@ mod tests {
         composite
             .state
             .resolved_legs
-            .push(super::super::spec_support::ResolvedCompositeLeg {
+            .push(crate::results::composite::ResolvedCompositeLeg {
                 instrument_id: "THIRD".into(),
                 quantity: 2.0,
             });

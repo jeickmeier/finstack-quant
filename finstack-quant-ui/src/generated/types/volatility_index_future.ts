@@ -481,8 +481,8 @@ export interface DE1Bd96Bcaa7Ce74B7D1D {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
- * use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
+ * use finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;
+ * use finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -886,7 +886,7 @@ export interface DCdb8Fddc0106047270C4 {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */

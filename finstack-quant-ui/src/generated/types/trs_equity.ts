@@ -754,10 +754,8 @@ export interface DA04857579E2F6Abbb6Fa {
  *     currency::Currency, dates::DayCount, money::Money, types::InstrumentId,
  * };
  * use finstack_quant_cashflows::builder::ScheduleParams;
- * use finstack_quant_valuations::instruments::{
- *     Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive,
- * };
- * use finstack_quant_valuations::instruments::equity::equity_trs::{
+ * use finstack_quant_valuations_core::instruments::{Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive};
+ * use finstack_quant_valuations_equity::equity_trs::{
  *     EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec,
  * };
  * use rust_decimal::Decimal;
@@ -1272,7 +1270,7 @@ export interface DCdb8Fddc0106047270C4 {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */

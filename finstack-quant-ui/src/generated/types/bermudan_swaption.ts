@@ -396,17 +396,17 @@ export interface D_2A0Ca8Ab319Aae74249A {
  * Bermudan swaptions require numerical methods for pricing:
  * - **Hull-White Tree** (default): Industry standard, calibrated to swaption
  *   volatility. Official PV and risk use this path unless a caller selects
- *   [`crate::pricer::ModelKey::MonteCarloHullWhite1F`].
+ *   [`finstack_quant_valuations_core::pricer::ModelKey::MonteCarloHullWhite1F`].
  * - **LSMC**: Longstaff-Schwartz Monte Carlo, opt-in for path-dependent
  *   validation and model comparison.
  *
  * # Example
  *
  * ```
- * use finstack_quant_valuations::instruments::rates::swaption::{
+ * use finstack_quant_valuations_rates::swaption::{
  *     BermudanSwaption, BermudanSchedule, BermudanType,
  * };
- * use finstack_quant_valuations::instruments::SettlementType;
+ * use finstack_quant_valuations_core::instruments::SettlementType;
  *
  * // Create a 10NC2 (10-year swap, callable after 2 years)
  * let swaption = BermudanSwaption::example().expect("example");
@@ -820,7 +820,7 @@ export interface DCdb8Fddc0106047270C4 {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */

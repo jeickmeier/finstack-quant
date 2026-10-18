@@ -125,7 +125,7 @@ RESULT_ALIAS_EXCEPTIONS = tuple(
         ("portfolio", "src/error.rs"),
         ("scenarios", "src/error.rs"),
         ("statements", "src/error.rs"),
-        ("valuations", "src/error.rs"),
+        ("valuations-core", "src/error.rs"),
     )
     for entry in _classification(
         crate,
@@ -171,29 +171,29 @@ RUNTIME_RESULT_EXCEPTIONS = (
         ("WaterfallPeriodResult",),
     ),
     *_runtime_exception(
-        "valuations",
-        "src/instruments/credit_derivatives/cds_index/types.rs",
+        "valuations-credit",
+        "src/cds_index/types.rs",
         ("ConstituentResult", "IndexResult", "IndexParSpreadResult"),
     ),
     *_runtime_exception(
-        "valuations",
-        "src/instruments/fixed_income/bond/pricing/ytm_solver.rs",
+        "valuations-fixed-income",
+        "src/bond/pricing/ytm_solver.rs",
         ("YtmPricingSpec",),
         "runtime-spec",
     ),
     *_runtime_exception(
-        "valuations",
-        "src/instruments/fixed_income/cmo/waterfall.rs",
+        "valuations-structured-credit",
+        "src/cmo/waterfall.rs",
         ("CmoWaterfallPeriodResult",),
     ),
     *_runtime_exception(
-        "valuations",
-        "src/instruments/fixed_income/dollar_roll/carry.rs",
+        "valuations-fixed-income",
+        "src/dollar_roll/carry.rs",
         ("CarryResult",),
     ),
     *_runtime_exception(
-        "valuations",
-        "src/instruments/rates/cms_swap/types.rs",
+        "valuations-rates",
+        "src/cms_swap/types.rs",
         ("FundingLegSpec",),
         "runtime-spec",
     ),
@@ -220,7 +220,7 @@ MAINTAINED_CONTRACTS = frozenset({
     ("factor-model", "src/envelope.rs", "FactorModelConfigEnvelope"),
     ("factor-model", "src/credit/hierarchy.rs", "CreditFactorModel"),
     ("portfolio", "src/materialization/envelope.rs", "PortfolioMaterializationEnvelope"),
-    ("valuations", "src/results/valuation_result.rs", "ValuationResult"),
+    ("valuations-core", "src/results/valuation_result.rs", "ValuationResult"),
     ("statements", "src/evaluator/results.rs", "StatementResult"),
     ("portfolio", "src/results.rs", "PortfolioResult"),
     ("portfolio", "src/optimization/result.rs", "PortfolioOptimizationResult"),
@@ -232,8 +232,8 @@ MAINTAINED_CONTRACTS = frozenset({
 # fail-closed when module/re-export resolution changes.
 REQUIRED_PUBLIC_TYPES = {
     (
-        "valuations",
-        "src/instruments/common_impl/cashflow_export.rs",
+        "valuations-core",
+        "src/instruments/cashflow_export.rs",
         "InstrumentCashflowEnvelope",
     ): CAPABILITIES,
 }

@@ -181,7 +181,10 @@ impl LeveredRealEstateEquity {
 }
 
 impl Instrument for LeveredRealEstateEquity {
-    impl_instrument_base!(InstrumentType::LeveredRealEstateEquity);
+    impl_instrument_base!(
+        InstrumentType::LeveredRealEstateEquity,
+        crate::pricer::STANDARD
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()

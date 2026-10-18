@@ -26,6 +26,7 @@ use finstack_quant_core::contract::{
     Severity, ValidationReport,
 };
 use finstack_quant_core::{HashMap, HashSet};
+use finstack_quant_valuations::instruments::instrument_json_of;
 use finstack_quant_valuations::instruments::{InstrumentEnvelope, MarketDependencies};
 use serde::de::{IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
@@ -397,7 +398,7 @@ impl Portfolio {
         let books = self.books.clone();
 
         for position in &self.positions {
-            let instrument_json = position.instrument.to_instrument_json().ok_or_else(|| {
+            let instrument_json = instrument_json_of(position.instrument.as_ref()).ok_or_else(|| {
                 Error::invalid_input(format!(
                     "instrument '{}' on position '{}' does not support materialization serialization",
                     position.instrument_id, position.position_id

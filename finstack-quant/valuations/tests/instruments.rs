@@ -4,12 +4,10 @@
 
 // Common Test Infrastructure
 
-/// Common test utilities, helpers, models, and shared functionality.
-/// Includes a parity helper for documented reference-value comparisons.
+/// Shared parameter and registry contract tests.
 ///
-/// Tests should import [`parity::ParityConfig`] explicitly.
-/// The `assert_parity!` macro is available via `#[macro_use]` below.
-#[macro_use]
+/// Curve builders, tolerances and the parity helpers come from
+/// `finstack_quant_valuations_test_support`.
 #[path = "instruments/common/mod.rs"]
 mod common;
 #[path = "instruments/compounding_leg_wire_keys.rs"]
@@ -47,9 +45,6 @@ mod unit_suffix_wire_keys;
 #[allow(dead_code, unused_imports)]
 pub(crate) mod test_support;
 
-// Re-export parity helpers for explicit imports and macro expansion.
-pub use common::parity;
-
 // Fixed Income Instruments
 
 /// Bond tests - Fixed coupon bonds, zero-coupon bonds, floating rate notes
@@ -60,47 +55,15 @@ mod bond;
 #[path = "instruments/deposit/mod.rs"]
 mod deposit;
 
-/// Inflation-linked bond tests - Index-linked bonds (e.g., TIPS, linkers)
-#[path = "instruments/inflation_linked_bond/mod.rs"]
-mod inflation_linked_bond;
-
 /// Bond future tests - Treasury and government bond futures
 #[path = "instruments/bond_future/mod.rs"]
 mod bond_future;
 
 // Interest Rate Derivatives
 
-/// Basis swap tests - Multi-curve basis swaps (e.g., 3m vs 6m LIBOR)
-#[path = "instruments/basis_swap/mod.rs"]
-mod basis_swap;
-
-/// Cap/Floor tests - Interest rate caps and floors
-#[path = "instruments/cap_floor/mod.rs"]
-mod cap_floor;
-
-/// Forward Rate Agreement (FRA) tests - Single period rate agreements
-#[path = "instruments/fra/mod.rs"]
-mod fra;
-
-/// CMS Option tests - Constant Maturity Swap caps and floors
-#[path = "instruments/cms_option/mod.rs"]
-mod cms_option;
-
-/// Interest rate future tests - Exchange-traded IR futures
-#[path = "instruments/ir_future/mod.rs"]
-mod ir_future;
-
-/// Inflation swap tests - Zero-coupon and year-on-year inflation swaps
-#[path = "instruments/inflation_swap/mod.rs"]
-mod inflation_swap;
-
 /// Inflation cap/floor tests - YoY inflation caps/floors
 #[path = "instruments/inflation_cap_floor/mod.rs"]
 mod inflation_cap_floor;
-
-/// Interest Rate Swap (IRS) tests - Fixed-for-floating swaps
-#[path = "instruments/irs/mod.rs"]
-mod irs;
 
 /// Futures-option tests - Shared option-on-future wrappers
 #[path = "instruments/future_option/mod.rs"]
@@ -109,11 +72,6 @@ mod future_option;
 /// Swaption tests - Options on interest rate swaps
 #[path = "instruments/swaption/mod.rs"]
 mod swaption;
-
-/// Exotic-rate MC/LSMC harness validation tests
-/// (see `instruments/exotic_harness/mod.rs`)
-#[path = "instruments/exotic_harness/mod.rs"]
-mod exotic_harness;
 
 // Credit Derivatives
 
@@ -139,10 +97,6 @@ mod cds_tranche;
 #[path = "instruments/equity/mod.rs"]
 mod equity;
 
-/// Barrier option tests - Knock-in/knock-out options
-#[path = "instruments/barrier_option/mod.rs"]
-mod barrier_option;
-
 /// Basket option tests - Multi-underlying options
 #[path = "instruments/basket/mod.rs"]
 mod basket;
@@ -151,17 +105,9 @@ mod basket;
 #[path = "instruments/equity_option/mod.rs"]
 mod equity_option;
 
-/// Lookback option tests
-#[path = "instruments/lookback_option/mod.rs"]
-mod lookback_option;
-
 /// Total Return Swap (TRS) tests - Equity and asset swaps
 #[path = "instruments/trs/mod.rs"]
 mod trs;
-
-/// Variance swap tests - Volatility derivatives
-#[path = "instruments/variance_swap/mod.rs"]
-mod variance_swap;
 
 // FX Derivatives
 
@@ -181,25 +127,13 @@ mod fx_barrier_option;
 #[path = "instruments/fx_spot/mod.rs"]
 mod fx_spot;
 
-/// FX swap tests - FX forward and swap transactions
-#[path = "instruments/fx_swap/mod.rs"]
-mod fx_swap;
-
 /// FX variance swap tests - Volatility exposure on FX
 #[path = "instruments/fx_variance_swap/mod.rs"]
 mod fx_variance_swap;
 
-/// Quanto option tests - Cross-currency quanto-adjusted equity options
-#[path = "instruments/quanto_option/mod.rs"]
-mod quanto_option;
-
 /// NDF tests - Non-deliverable forwards for restricted currencies
 #[path = "instruments/ndf/mod.rs"]
 mod ndf;
-
-/// XCCY swap tests - Cross-currency swaps (multi-currency floating legs)
-#[path = "instruments/xccy_swap/mod.rs"]
-mod xccy_swap;
 
 // Commodity Derivatives
 
@@ -230,17 +164,9 @@ mod real_estate;
 
 // Structured Products
 
-/// Autocallable tests - Path-dependent structured notes with early redemption
-#[path = "instruments/autocallable/mod.rs"]
-mod autocallable;
-
 /// Convertible bond tests - Bonds with embedded conversion options
 #[path = "instruments/convertible/mod.rs"]
 mod convertible;
-
-/// Private market fund tests - Private equity and credit fund structures
-#[path = "instruments/private_market_fund/mod.rs"]
-mod private_market_fund;
 
 /// Structured credit tests - CLOs, CDOs, and synthetic structures
 #[path = "instruments/structured_credit/mod.rs"]

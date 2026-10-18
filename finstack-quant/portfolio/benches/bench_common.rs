@@ -8,6 +8,7 @@
 
 #![allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
 
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
 use finstack_quant_core::currency::Currency;
@@ -49,7 +50,6 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
 use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
     DeflationProtection, IndexationMethod, InflationLinkedBond,
 };
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
@@ -298,6 +298,17 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
     )
     .unwrap();
 
+    // Black volatility of the reference-CPI/base-CPI ratio, strike axis in
+    // ratio units: the TIPS fixtures carry maturity-only deflation protection,
+    // whose floor is priced off this surface while the CPI is unpublished.
+    let cpi_floor_vol = VolSurface::from_grid(
+        "USD-CPI-FLOOR-VOL",
+        &[0.25, 1.0, 2.0, 5.0, 10.0],
+        &[0.5, 1.0, 1.5],
+        &[0.02; 15],
+    )
+    .unwrap();
+
     let cds_spread_vol = VolSurface::from_grid(
         "CDS-SPREAD-VOL",
         &[0.25, 0.5, 1.0, 2.0],
@@ -395,6 +406,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         .insert_surface(swaption_vol)
         .insert_surface(fx_vol)
         .insert_surface(cds_spread_vol)
+        .insert_surface(cpi_floor_vol)
         .insert_fx(fx)
         .insert_series(aapl_history)
         .insert_series(sofr_fixings)
@@ -778,8 +790,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             fixing_calendar_id: None,
             start: expiry,
             end: swap_end,
-            compounding:
-                finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::Simple,
+            compounding: finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,
             payment_lag_days: 0,
             end_of_month: false,
         };
@@ -980,7 +991,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     // 14. Inflation-Linked Bonds
     for i in 0..positions_per_exotic.min(2) {
         let ilb_id = format!("TIPS_{}", i);
-        let ilb = InflationLinkedBond::builder()
+        let mut ilb = InflationLinkedBond::builder()
             .id(ilb_id.clone().into())
             .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
             .real_coupon(rust_decimal::Decimal::new(1, 2))
@@ -999,6 +1010,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .inflation_index_id("USD-CPI".into())
             .build()
             .expect("valid benchmark TIPS");
+        ilb.floor_vol_surface_id = Some("USD-CPI-FLOOR-VOL".into());
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(

@@ -529,7 +529,7 @@ export interface D_676A8Cced1Aa018A1106 {
  * standalone `RangeAccrual` pricers**, which support equity/FX (GBM)
  * underlyings only and return a validation error when these fields are set.
  * Price rate-linked range accrual notes through
- * [`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)
+ * [`CallableRangeAccrual`](crate::exotics::callable_range_accrual)
  * (whose `range_accrual` field carries these [`RangeAccrualTerms`]), which
  * models the reference rate under HW1F and reconstructs the term rate per
  * observation.
@@ -989,7 +989,7 @@ export interface DCdb8Fddc0106047270C4 {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */

@@ -13,11 +13,11 @@ use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{HazardCalibrationRecipe, HazardCurve};
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsValuationConvention;
-use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
-use finstack_quant_valuations::recalibration::{
+use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
+use finstack_quant_valuations_core::recalibration::{
     DealCdsQuoteOverride, HazardSpreadRiskBucket, QuoteBump,
 };
+use finstack_quant_valuations_credit::cds::CdsValuationConvention;
 #[cfg(test)]
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -498,7 +498,7 @@ fn recalibrate_from_par_spreads(
 /// Replay a scenario spread shock while verifying against its source dependencies.
 pub(crate) fn bump_hazard_on_target_market(
     cache: &HazardRecalibrationCache,
-    request: &finstack_quant_valuations::recalibration::HazardRecalibrationRequest,
+    request: &finstack_quant_valuations_core::recalibration::HazardRecalibrationRequest,
     hazard: &HazardCurve,
     bump: &QuoteBump,
 ) -> finstack_quant_core::Result<Arc<HazardCurve>> {
@@ -644,7 +644,7 @@ pub(crate) fn replay_hazard_spread_risk_center(
 /// Requote the conditional-survival curve at the horizon, then persist a fresh
 /// calibrated recipe. Old quote payloads are provenance, never horizon quotes.
 pub(crate) fn replay_hazard_at_horizon(
-    request: &finstack_quant_valuations::recalibration::HazardRecalibrationRequest,
+    request: &finstack_quant_valuations_core::recalibration::HazardRecalibrationRequest,
 ) -> finstack_quant_core::Result<HazardCurve> {
     if request.deal_quote_override.is_some() {
         return Err(finstack_quant_core::Error::Validation(
@@ -801,8 +801,8 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::{
         HazardCalibrationInput, HazardCalibrationRecipe,
     };
-    use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
-    use finstack_quant_valuations::market::conventions::ids::CdsConventionKey;
+    use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
+    use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
     use std::collections::BTreeMap;
 
     fn failed_report() -> CalibrationReport {

@@ -33,9 +33,7 @@ use finstack_quant_valuations::pricer::{
 use std::hint::black_box;
 use time::Month;
 
-#[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../tests/support/volatility.rs"]
-mod volatility_support;
+use finstack_quant_valuations_test_support::volatility as volatility_support;
 
 fn as_of() -> Date {
     Date::from_calendar_date(2025, Month::January, 1).unwrap()

@@ -196,7 +196,7 @@ export type Date = string;
  * # Example
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
+ * use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;
@@ -719,7 +719,7 @@ export interface DCb133E56Ebd239Cdb4Ee {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};
+ * use finstack_quant_valuations_fx::ndf::{Ndf, NdfQuoteConvention};
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;
@@ -1157,7 +1157,7 @@ export interface DCdb8Fddc0106047270C4 {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */

@@ -508,3 +508,132 @@ fn roll_forward_preserves_shaped_linear_curve() {
         );
     }
 }
+
+mod date_based_lookups {
+    //! Ported from the valuations `pricing::time` helpers when the date-based
+    //! lookups became `ForwardCurve` methods.
+
+    use super::ForwardCurve;
+    use crate::dates::{Date, DayCount, DayCountContext};
+    use crate::types::CurveId;
+    use time::Month;
+
+    fn date(year: i32, month: u8, day: u8) -> Date {
+        Date::from_calendar_date(year, Month::try_from(month).expect("valid month"), day)
+            .expect("valid date")
+    }
+
+    fn test_forward_curve(base_date: Date, day_count: DayCount) -> ForwardCurve {
+        ForwardCurve::builder(CurveId::new("TEST-FWD"), 0.25)
+            .base_date(base_date)
+            .day_count(day_count)
+            .knots(vec![(0.0, 0.03), (1.0, 0.035), (5.0, 0.04)])
+            .build()
+            .expect("test curve should build")
+    }
+
+    #[test]
+    fn curve_time_at_or_before_base_date_is_zero() {
+        let base = date(2024, 1, 1);
+        let fwd = test_forward_curve(base, DayCount::Act360);
+        assert!(fwd.curve_time(base).expect("base").abs() < 1e-12);
+        assert!(fwd.curve_time(date(2023, 6, 1)).expect("before base").abs() < 1e-12);
+    }
+
+    #[test]
+    fn curve_time_uses_curve_day_count() {
+        let base = date(2024, 1, 1);
+        let fwd_360 = test_forward_curve(base, DayCount::Act360);
+        let fwd_365 = test_forward_curve(base, DayCount::Act365F);
+        let target = date(2024, 7, 1);
+        let t_360 = fwd_360.curve_time(target).expect("act/360");
+        let t_365 = fwd_365.curve_time(target).expect("act/365F");
+        assert!((t_360 - t_365).abs() > 0.005, "360={t_360}, 365={t_365}");
+    }
+
+    #[test]
+    fn rate_period_between_dates_basic() {
+        let fwd = test_forward_curve(date(2024, 1, 1), DayCount::Act360);
+        let rate = fwd
+            .rate_period_between_dates(date(2024, 4, 1), date(2024, 7, 1))
+            .expect("should succeed");
+        assert!(rate > 0.0 && rate < 0.1, "unexpected forward rate: {rate}");
+    }
+
+    #[test]
+    fn rate_between_dates_matches_projection_discount_factors() {
+        let base = date(2024, 1, 1);
+        let fwd = ForwardCurve::builder("USD-TERM-3M", 0.25)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.01), (1.0, 0.21)])
+            .build()
+            .expect("forward curve should build");
+        let start = date(2024, 4, 1);
+        let end = date(2024, 7, 1);
+        let accrual = DayCount::Act360
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("contractual accrual");
+        let rate = fwd
+            .rate_between_dates(start, end, accrual)
+            .expect("should succeed");
+        let t_start = fwd.curve_time(start).expect("valid start time");
+        let t_end = fwd.curve_time(end).expect("valid end time");
+        let expected =
+            (fwd.df(t_start).expect("valid start DF") / fwd.df(t_end).expect("valid end DF") - 1.0)
+                / (t_end - t_start);
+        assert!((rate - expected).abs() < 1e-14);
+    }
+
+    #[test]
+    fn rate_between_dates_rejects_periods_before_the_curve_base() {
+        let fwd = test_forward_curve(date(2024, 1, 1), DayCount::Act360);
+        for (start, end) in [
+            (date(2023, 12, 1), date(2024, 2, 1)),
+            (date(2023, 10, 1), date(2023, 12, 1)),
+        ] {
+            let error = fwd
+                .rate_between_dates(start, end, 0.25)
+                .expect_err("a historical or straddling period requires a fixing");
+            assert!(error.to_string().contains("historical fixing"), "{error}");
+        }
+    }
+
+    #[test]
+    fn term_forward_preserves_contractual_rate_across_curve_clocks() {
+        let base = date(2025, 1, 2);
+        let start = date(2025, 4, 2);
+        let end = date(2025, 7, 2);
+        let accrual = 91.0 / 360.0;
+        for (day_count, denominator) in [(DayCount::Act360, 360.0), (DayCount::Act365F, 365.0)] {
+            let t_start = 90.0 / denominator;
+            let t_end = 181.0 / denominator;
+            let curve_rate = 0.04 * denominator / 360.0;
+            let fwd = ForwardCurve::builder("USD-TERM-3M", 0.25)
+                .base_date(base)
+                .day_count(day_count)
+                .knots([(0.0, curve_rate), (t_end, curve_rate)])
+                .projection_grid(vec![0.0, t_start, t_end])
+                .build()
+                .expect("equivalent forward curve");
+            let rate = fwd
+                .rate_between_dates(start, end, accrual)
+                .expect("contractual forward rate");
+            assert!((rate - 0.04).abs() < 1e-14, "{day_count:?}: {rate}");
+            let growth = fwd.df(t_start).expect("start DF") / fwd.df(t_end).expect("end DF") - 1.0;
+            assert!((rate * accrual - growth).abs() < 1e-14);
+        }
+    }
+
+    #[test]
+    fn term_forward_rejects_invalid_contractual_accrual() {
+        let base = date(2025, 1, 2);
+        let fwd = test_forward_curve(base, DayCount::Act360);
+        for accrual in [0.0, -0.25, f64::NAN, f64::INFINITY] {
+            let error = fwd
+                .rate_between_dates(base, date(2025, 4, 2), accrual)
+                .expect_err("invalid contractual accrual");
+            assert!(error.to_string().contains("contractual accrual"));
+        }
+    }
+}

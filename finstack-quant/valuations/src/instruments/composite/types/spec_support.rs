@@ -1,8 +1,10 @@
 //! Leg specifications, rebalance policy, weighting methods, resolved state,
 //! and shared numeric helpers for composite instruments.
 
+use crate::instruments::Instrument;
 use crate::instruments::InstrumentJson;
 use crate::metrics::MetricId;
+use crate::results::composite::ResolvedCompositeLeg;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     adjust, calendar_by_id_strict, BusinessDayConvention, Date, DateExt, HolidayCalendar, Tenor,
@@ -436,17 +438,6 @@ impl WeightingMethod {
     }
 }
 
-/// Immutable resolved quantity for one top-level composite leg.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct ResolvedCompositeLeg {
-    /// Identifier of the corresponding leg specification.
-    pub instrument_id: InstrumentId,
-    /// Signed quantity held from the state's effective date until the next rebalance.
-    pub quantity: f64,
-}
-
 /// Immutable holdings state used by pricing, risk, scenarios, and history.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -633,14 +624,13 @@ pub(super) fn unit_pnl_series(
 }
 
 pub(crate) fn cashflows_between(
-    instrument_json: &InstrumentJson,
+    instrument: &dyn Instrument,
     quantity: f64,
     reporting_currency: Currency,
     market: &MarketContext,
     start: Date,
     end: Date,
 ) -> Result<f64> {
-    let instrument = instrument_json.clone().into_boxed()?;
     let cashflows = instrument.dated_cashflows(market, start)?;
     let amounts = cashflows
         .into_iter()

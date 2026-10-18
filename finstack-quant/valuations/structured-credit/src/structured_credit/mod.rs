@@ -1,0 +1,122 @@
+//! Structured credit instruments: ABS, RMBS, CMBS, and CLO with waterfall modeling.
+//!
+//! modeling for asset-backed securities with:
+//! - Collateral pool management (prepayment, default, recovery)
+//! - Multi-tranche capital structure with seniority
+//! - Sequential-pay and pro-rata waterfall logic
+//! - Overcollateralization and coverage tests
+//! - Deal-specific metrics (WAL, WARF, WAS, DSCR, LTV)
+//!
+//! # Module Organization
+//!
+//! - `types`: All data structures (instrument, pool, tranches, waterfall, results)
+//! - `pricing`: Pure functions for cashflow simulation and waterfall execution
+//! - `metrics`: Risk metrics organized by category
+//! - `utils`: Helper functions (rate conversions, validation)
+//!
+//! # See Also
+//!
+//! - `StructuredCredit` for main instrument struct
+//! - `DealType` for ABS/RMBS/CMBS/CLO specification
+//! - `AssetPool` for collateral pool modeling
+//! - `Tranche` for tranche structure
+//! - waterfall engine for cashflow distribution
+
+pub(crate) mod assumptions;
+pub(crate) mod metrics;
+pub(crate) mod pricing;
+pub(crate) mod types;
+pub(crate) mod utils;
+
+mod family;
+pub use family::STRUCTURED_CREDIT;
+pub use utils::{validate_tiers, ValidationError};
+
+pub use types::{
+    calculate_pool_stats, AdvanceRate, AdvancingPolicy, AfcSpec, AllocationMode, AssetPool,
+    AssetType, BalloonSpec, BorrowingBaseReport, BorrowingBaseRules, CallAssumption,
+    CallExercisePolicy, CallScope, CardPortfolioSpec, CccBucketRule, CollateralInstrument,
+    ConcentrationLimit, ConcentrationScope, ControlledAccumulationSpec, CoveragePlacement,
+    CoverageRules, CoverageTestAction, CoverageTestSpec, CoverageTestType, CoverageTrigger,
+    CreditModelConfig, DealFees, DealType, DefaultedValuation, DelinquencyModel,
+    DiscountObligationRule, EarlyAmortizationSpec, EligibilityRule, EquityHistory,
+    ExcessSpreadSpec, FundingSource, HedgeSwap, IncentiveFeeSpec, InstrumentCollateral,
+    InstrumentExerciseOverride, LiquidationSpec, LiveCollateral, LossAllocationPolicy,
+    LossRecognition, ManagementFeeType, Metadata, ModificationSpec, PaymentCalculation,
+    PaymentMode, PaymentRecord, PaymentType, PenaltyStep, PoolAsset, PoolStats, PrepaymentPenalty,
+    PutExercisePolicy, Recipient, RecipientType, ReinvestmentAssumptions, ReinvestmentCriteria,
+    ReinvestmentPeriod, RepLine, ReserveAccountSpec, ReserveInterestDestination, ReserveTarget,
+    RoundingConvention, ShiftMode, ShiftingInterestSpec, ShiftingInterestStep,
+    SpecialServicingSpec, StepDownSpec, StepDownTrigger, StructuredCredit, StructuredCreditBuilder,
+    SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche, TrancheAccrualPeriod,
+    TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance, TrancheSeniority,
+    TrancheStructure, TrancheValuation, TriggerConsequence, Waterfall, WaterfallBuilder,
+    WaterfallDistribution, WaterfallRules, WaterfallTier,
+};
+pub use types::{
+    DefaultModelSpec, MarketConditions, PrepaymentModelSpec, RecoveryModelSpec,
+    StructuredCreditTranche,
+};
+
+pub use pricing::{execute_waterfall, generate_cashflows, run_simulation};
+
+pub use pricing::coverage_tests::{TestContext, TestResult};
+pub use pricing::stochastic::StructuredCreditPricingMode;
+pub use pricing::stochastic::{StochasticPricingResult, TranchePricingResult};
+pub use pricing::waterfall::WaterfallContext;
+pub use pricing::{
+    run_simulation_with_diagnostics, CoverageTestDiagnostic, PeriodDiagnostics,
+    SimulationDiagnostics, SimulationRun,
+};
+
+pub use metrics::{
+    calculate_equity_metrics,
+    calculate_tranche_breakeven_cdr,
+    calculate_tranche_convexity,
+    calculate_tranche_cs01,
+    calculate_tranche_discount_margin,
+    calculate_tranche_duration,
+    calculate_tranche_metrics,
+    calculate_tranche_oas,
+    calculate_tranche_wal,
+    calculate_tranche_z_spread,
+    scenario_table,
+    // Deal-specific metrics
+    AbsChargeOffCalculator,
+    AbsCreditEnhancementCalculator,
+    AbsDelinquencyCalculator,
+    AbsExcessSpreadCalculator,
+    AbsPaymentRateCalculator,
+    // Pricing metrics
+    AccruedCalculator,
+    CdrCalculator,
+    CleanPriceCalculator,
+    CloWarfCalculator,
+    CloWasCalculator,
+    CmbsDscrCalculator,
+    ConvexityCalculator,
+    CprCalculator,
+    Cs01Calculator,
+    DirtyPriceCalculator,
+    EquityMetrics,
+    // Risk metrics
+    MacaulayDurationCalculator,
+    ModifiedDurationCalculator,
+    OasConfig,
+    OasResult,
+    ScenarioCell,
+    ScenarioGrid,
+    ScenarioTable,
+    SpreadDurationCalculator,
+    TrancheMetrics,
+    WalCalculator,
+    // AssetPool metrics
+    WamCalculator,
+    YtmCalculator,
+    ZSpreadCalculator,
+};
+
+pub use types::constants::{
+    pool_balance_cleanup_threshold, BASIS_POINTS_DIVISOR, MIN_PREPAYMENT_RATE, MONTHS_PER_YEAR,
+    PERCENTAGE_MULTIPLIER, QUARTERLY_PERIODS_PER_YEAR,
+};

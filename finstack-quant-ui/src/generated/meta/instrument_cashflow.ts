@@ -130,7 +130,7 @@ export default [
   {
     "path": "#/$defs/d_674830a94dacf97e7ac8/properties/currency",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/currency",
-    "description": "Row currency (matters for `XccySwap` / `FxSwap`).",
+    "description": "Row currency (matters for instruments whose legs settle in several currencies).",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
@@ -175,7 +175,7 @@ export default [
   {
     "path": "#/$defs/d_674830a94dacf97e7ac8/properties/inflation_index_ratio",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/inflation_index_ratio",
-    "description": "Inflation index ratio (populated for `InflationLinkedBond`).",
+    "description": "Inflation index ratio (populated for index-linked flows).",
     "format": "double"
   },
   {

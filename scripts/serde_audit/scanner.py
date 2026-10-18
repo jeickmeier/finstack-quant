@@ -15,6 +15,7 @@ from .lexer import (
     _module_for_file,
     _parse_unit_declarations,
     _SourceUnit,
+    crate_directory,
 )
 from .models import (
     CAPABILITIES,
@@ -160,14 +161,26 @@ def _product_crates(root: Path) -> tuple[tuple[str, Path], ...]:
         raise AuditConfigurationError(
             f"audit root {root} does not contain the expected finstack-quant/ crate directory"
         )
-    for candidate in crates_root.iterdir():
+    for candidate in sorted(crates_root.iterdir()):
+        if not candidate.is_dir():
+            continue
         if (
-            candidate.is_dir()
-            and candidate.name not in NON_PRODUCT_CRATES
+            candidate.name not in NON_PRODUCT_CRATES
             and (candidate / "Cargo.toml").is_file()
             and (candidate / "src").is_dir()
         ):
             crates.append((candidate.name, candidate))
+        # Nested crates (`finstack-quant/valuations/core`) are keyed by the
+        # package-name suffix: ``valuations-core``.
+        for nested in sorted(candidate.iterdir()):
+            name = f"{candidate.name}-{nested.name}"
+            if (
+                nested.is_dir()
+                and name not in NON_PRODUCT_CRATES
+                and (nested / "Cargo.toml").is_file()
+                and (nested / "src").is_dir()
+            ):
+                crates.append((name, nested))
     return tuple(sorted(crates))
 
 
@@ -313,7 +326,7 @@ def audit_workspace(
             diagnostics.append(
                 Diagnostic(
                     crate=crate,
-                    path=Path("finstack-quant") / crate / crate_path,
+                    path=crate_directory(root, crate) / crate_path,
                     line=0,
                     type_name=type_name,
                     missing=tuple(
@@ -333,7 +346,7 @@ def audit_workspace(
             diagnostics.append(
                 Diagnostic(
                     crate=crate,
-                    path=Path("finstack-quant") / crate / crate_path,
+                    path=crate_directory(root, crate) / crate_path,
                     line=0,
                     type_name=type_name,
                     missing=tuple(sorted(required)),

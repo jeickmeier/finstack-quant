@@ -77,7 +77,7 @@ ENUM_NAMING_EXCEPTIONS = {
         "CalibrationSchema",
     ): "exact namespaced schema marker",
     (
-        "finstack-quant/valuations/src/instruments/json_loader.rs",
+        "finstack-quant/valuations/core/src/instruments/envelope.rs",
         "InstrumentSchema",
     ): "exact namespaced schema marker",
 }

@@ -3,8 +3,8 @@
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::{Error, HashMap, InputError, Result};
 
-use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsValuationConvention;
-use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
+use finstack_quant_valuations_credit::cds::CdsValuationConvention;
 
 /// Context for building instruments from market quotes.
 ///

@@ -418,7 +418,9 @@ mod tests {
     use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     use finstack_quant_core::types::CurveId;
     use finstack_quant_core::types::IndexId;
-    use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+    use finstack_quant_valuations_core::market::conventions::ids::{
+        CdsConventionKey, CdsDocClause,
+    };
     use std::sync::Arc;
     use time::Month;
 

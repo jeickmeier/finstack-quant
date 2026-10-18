@@ -41,27 +41,3 @@ pub mod unit;
 
 // Integration tests
 pub mod integration;
-
-// Examples (documentation)
-pub mod examples;
-
-// Golden tests (real-world scenarios)
-pub mod waterfall_golden;
-
-// Property tests (invariant verification)
-pub mod waterfall_properties;
-
-// Academic golden tests (Fabozzi, PSA, WARF references)
-pub mod academic_golden;
-
-// BucketedDv01 smoke tests
-pub mod test_bucketed_dv01;
-
-// Cashflow sensitivity sweep tests (CDR/CPR/Recovery/Lag)
-pub mod cashflow_sweep_tests;
-
-// End-to-end simulation tests with hand-calculated expectations
-pub mod simulation_e2e_tests;
-
-// Feature tests: loss allocation, cleanup call, reserve account, OC/IC cure
-pub mod feature_tests;

@@ -1,0 +1,260 @@
+//! Dollar roll risk and carry metrics.
+//!
+//! Standard rate-sensitivity metrics (DV01, bucketed DV01, theta) plus
+//! carry-specific analytics: implied financing rate and roll specialness.
+
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricRegistry};
+
+/// Implied financing rate metric calculator.
+///
+/// Computes the annualized implied repo rate from the dollar roll drop,
+/// expected coupon income, and principal paydown between settlement dates.
+/// Uses the MBS cashflow engine for carry inputs.
+///
+/// Prepayment follows the generic TBA pool's prepayment model.
+pub(crate) struct ImpliedFinancingRateCalculator;
+
+impl MetricCalculator for ImpliedFinancingRateCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let roll: &crate::DollarRoll = context.instrument_as()?;
+        let result = super::carry::implied_financing_rate(roll)?;
+        Ok(result.implied_rate)
+    }
+}
+
+/// Roll specialness metric calculator.
+///
+/// Returns specialness in basis points (repo rate - implied financing rate).
+/// Positive means rolling is cheaper than repo financing.
+///
+/// Uses the generic TBA pool's prepayment model and resolves repo financing
+/// over the actual roll interval.
+pub(crate) struct RollSpecialnessCalculator;
+
+impl MetricCalculator for RollSpecialnessCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let roll: &crate::DollarRoll = context.instrument_as()?;
+        let front = roll.effective_front_settlement_date()?;
+        let back = roll.effective_back_settlement_date()?;
+        let accrual = finstack_quant_core::dates::DayCount::Act360.year_fraction(
+            front,
+            back,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
+        let repo_curve_id = roll
+            .repo_curve_id
+            .as_ref()
+            .unwrap_or(&roll.discount_curve_id);
+        let curve = context.curves.get_discount(repo_curve_id)?;
+        let repo_rate = (1.0 / curve.df_between_dates(front, back)? - 1.0) / accrual;
+        super::carry::roll_specialness(roll, repo_rate)
+    }
+}
+
+/// Register dollar roll metrics with the registry.
+pub(crate) fn register_dollar_roll_metrics(
+    registry: &mut MetricRegistry,
+) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
+    use finstack_quant_valuations_core::pricer::InstrumentType;
+    finstack_quant_valuations_core::register_metrics! {
+        registry: registry,
+        instrument: InstrumentType::DollarRoll,
+        metrics: [
+            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (ImpliedFinancingRate, ImpliedFinancingRateCalculator),
+            (RollSpecialness, RollSpecialnessCalculator)
+        ]
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod production_mortgage_audit {
+    use super::*;
+    use finstack_quant_core::{
+        currency::Currency,
+        market_data::{context::MarketContext, term_structures::DiscountCurve},
+        money::Money,
+    };
+    use std::sync::Arc;
+    use time::macros::date;
+
+    /// The repo curve is a discount curve: the reference financing rate is the
+    /// simple ACT/360 rate implied by its discount factors over the roll
+    /// interval. On a curve with continuously compounded zero rate `r` and an
+    /// ACT/360 clock, DF(front)/DF(back) = exp(r·τ) with τ the ACT/360 accrual,
+    /// so the repo rate is (exp(r·τ) − 1)/τ. The only error left is the
+    /// log-linear interpolation round-off (~1e-16 relative), so 1e-9 bp is a
+    /// tight bound on specialness.
+    #[test]
+    fn specialness_resolves_the_supplied_repo_curve() {
+        let as_of = date!(2026 - 03 - 01);
+        let mut roll = crate::DollarRoll::example().expect("roll");
+        roll.front_settlement_date = Some(date!(2026 - 03 - 11));
+        roll.back_settlement_date = Some(date!(2026 - 04 - 11));
+        roll.repo_curve_id = Some("REPO".into());
+        let carry = crate::dollar_roll::carry::implied_financing_rate(&roll).expect("carry");
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (5.0, 1.0)])
+                    .build()
+                    .expect("curve"),
+            )
+            .insert(
+                DiscountCurve::builder("REPO")
+                    .base_date(as_of)
+                    .day_count(finstack_quant_core::dates::DayCount::Act360)
+                    .knots([(0.0, 1.0), (5.0, (-0.0375_f64 * 5.0).exp())])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .build()
+                    .expect("repo curve"),
+            );
+        let mut context = MetricContext::new(
+            Arc::new(roll),
+            Arc::new(market),
+            as_of,
+            Money::from((0_i64, Currency::USD)),
+            MetricContext::default_config(),
+        );
+        let actual = RollSpecialnessCalculator
+            .calculate(&mut context)
+            .expect("specialness");
+        let tau = 31.0 / 360.0;
+        let repo_rate = ((0.0375_f64 * tau).exp() - 1.0) / tau;
+        let expected = (repo_rate - carry.implied_rate) * 10000.0;
+        assert!(
+            (actual - expected).abs() < 1e-9,
+            "{actual} versus {expected}"
+        );
+    }
+}
+
+/// Prepayment-aware DV01 for the mortgage forwards and CMOs.
+///
+/// Hand calculation: on a flat 4% continuously compounded curve a ±1 bp
+/// parallel bump moves the continuously compounded rate to the pool's WAM by
+/// exactly ±1 bp, so the refinancing multiplier on the PSA speed is
+/// `exp(∓β × 0.0001) = 2^(∓0.01)` (β = ln 2 / 1%). DV01 is the central
+/// difference `(P_up − P_down) / 2` of the instrument repriced in the bumped
+/// market with its pool at `PSA × 2^(∓0.01)`. Repricing with the unchanged
+/// speed (the old behaviour for TBA, roll and CMO) misses the prepayment
+/// response and gives a different number. The CMO case lives beside the CMO
+/// pricer in the umbrella crate.
+#[cfg(test)]
+mod rate_risk_rebuild_tests {
+    use crate::dollar_roll::pricer::price_dollar_roll;
+    use crate::tba::pricer::{create_assumed_pool, price_tba};
+    use crate::{AgencyTba, DollarRoll};
+    use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::math::interp::InterpStyle;
+    use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
+    use finstack_quant_valuations_core::metrics::MetricId;
+    use time::macros::date;
+
+    const AS_OF: Date = date!(2026 - 01 - 15);
+
+    fn market() -> MarketContext {
+        MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(AS_OF)
+                .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                .interp(InterpStyle::LogLinear)
+                .build()
+                .expect("curve"),
+        )
+    }
+
+    fn bumped(bp: f64) -> MarketContext {
+        market()
+            .bump([MarketBump::Curve {
+                id: "USD-OIS".into(),
+                spec: BumpSpec::parallel_bp(bp),
+            }])
+            .expect("bump")
+    }
+
+    fn psa(model: &PrepaymentModelSpec) -> f64 {
+        match model {
+            PrepaymentModelSpec::Psa { speed_multiplier } => *speed_multiplier,
+            _ => panic!("generic pools use a PSA model"),
+        }
+    }
+
+    fn dv01(instrument: &dyn Instrument) -> f64 {
+        instrument
+            .price_with_metrics(
+                &market(),
+                AS_OF,
+                &[MetricId::Dv01],
+                PricingOptions::default(),
+            )
+            .expect("metrics")
+            .measures["dv01"]
+    }
+
+    fn assert_prepayment_aware(actual: f64, expected: f64, static_dv01: f64) {
+        assert!(
+            (actual - expected).abs() < 1e-6 * expected.abs().max(1.0),
+            "dv01 {actual} versus hand {expected}"
+        );
+        assert!(
+            (actual - static_dv01).abs() > 1e-3 * static_dv01.abs(),
+            "dv01 {actual} must differ from the static-prepayment {static_dv01}"
+        );
+    }
+
+    #[test]
+    fn tba_dv01_shifts_the_generic_pool_speed() {
+        let mut tba = AgencyTba::example().expect("tba");
+        tba.metric_pricing_overrides.bump_config.rate_bump_bp = Some(1.0);
+        let base_psa = psa(&create_assumed_pool(&tba).expect("pool").prepayment_spec);
+        let at = |bp: f64| {
+            let mut shifted = tba.clone();
+            shifted.prepayment_spec =
+                Some(PrepaymentModelSpec::psa(base_psa * 2f64.powf(-0.01 * bp)));
+            price_tba(&shifted, &bumped(bp), AS_OF)
+                .expect("price")
+                .amount()
+        };
+        let expected = (at(1.0) - at(-1.0)) / 2.0;
+        let static_dv01 = (price_tba(&tba, &bumped(1.0), AS_OF).expect("up").amount()
+            - price_tba(&tba, &bumped(-1.0), AS_OF)
+                .expect("down")
+                .amount())
+            / 2.0;
+        assert_prepayment_aware(dv01(&tba), expected, static_dv01);
+    }
+
+    #[test]
+    fn dollar_roll_dv01_shifts_both_legs_pool_speed() {
+        let mut roll = DollarRoll::example().expect("roll");
+        roll.metric_pricing_overrides.bump_config.rate_bump_bp = Some(1.0);
+        let base_psa = psa(&create_assumed_pool(&roll.front_leg().expect("leg"))
+            .expect("pool")
+            .prepayment_spec);
+        let at = |bp: f64| {
+            let mut shifted = roll.clone();
+            shifted.prepayment_spec =
+                Some(PrepaymentModelSpec::psa(base_psa * 2f64.powf(-0.01 * bp)));
+            price_dollar_roll(&shifted, &bumped(bp), AS_OF)
+                .expect("price")
+                .amount()
+        };
+        let expected = (at(1.0) - at(-1.0)) / 2.0;
+        let static_dv01 = (price_dollar_roll(&roll, &bumped(1.0), AS_OF)
+            .expect("up")
+            .amount()
+            - price_dollar_roll(&roll, &bumped(-1.0), AS_OF)
+                .expect("down")
+                .amount())
+            / 2.0;
+        assert_prepayment_aware(dv01(&roll), expected, static_dv01);
+    }
+}

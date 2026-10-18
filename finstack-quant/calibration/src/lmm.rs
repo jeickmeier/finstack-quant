@@ -62,8 +62,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::volatility::black_call;
 use finstack_quant_models::volatility::implied_vol_black;
-use finstack_quant_valuations::instruments::rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
-use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
+use finstack_quant_valuations_rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
+use finstack_quant_valuations_rates::swaption::BermudanSwaption;
 
 /// Inputs describing the co-terminal swap underlying one European swaption
 /// slice of a Bermudan exercise schedule, expressed in LMM forward-rate
@@ -319,8 +319,8 @@ pub fn calibrate_bermudan_lmm_base_vol(
 /// # Arguments
 ///
 /// * `instrument_json` - Canonical instrument envelope JSON. The payload
-///   `type` must be `bermudan_swaption`; any other supported instrument is
-///   rejected after parse.
+///   `type` must be `bermudan_swaption`; any other instrument type is
+///   rejected at parse (see [`BermudanSwaption::from_envelope_json`]).
 /// * `market` - Immutable market containing discount/projection curves and the
 ///   Black-lognormal swaption volatility surface.
 /// * `as_of` - Calibration date used for curve and expiry year fractions;
@@ -335,35 +335,25 @@ pub fn calibrate_bermudan_lmm_base_vol_from_json(
     market: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
-    let instrument =
-        finstack_quant_valuations::pricer::parse_instrument_from_json(instrument_json)?;
-    let finstack_quant_valuations::instruments::InstrumentJson::BermudanSwaption(swaption) =
-        instrument
-    else {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "instrument_json must contain a bermudan_swaption envelope, got '{}'",
-            instrument.type_tag()
-        )));
-    };
+    let swaption = BermudanSwaption::from_envelope_json(instrument_json)?;
     calibrate_bermudan_lmm_base_vol(&swaption, market, as_of)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Tenor;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::rates::hw1f::RateExoticMcConfig;
-    use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
-    use finstack_quant_valuations::instruments::rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
-    use finstack_quant_valuations::instruments::rates::swaption::{
-        BermudanSchedule, BermudanSwaption,
-    };
-    use finstack_quant_valuations::instruments::OptionType;
-    use finstack_quant_valuations::pricer::Pricer;
+    use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
+    use finstack_quant_valuations_core::instruments::OptionType;
+    use finstack_quant_valuations_core::pricer::Pricer;
+    use finstack_quant_valuations_rates::swaption::lmm_pricer::lmm_bermudan_mc_config;
+    use finstack_quant_valuations_rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
+    use finstack_quant_valuations_rates::swaption::{BermudanSchedule, BermudanSwaption};
     use time::Month;
 
     const SURFACE_VOL: f64 = 0.22;
@@ -726,10 +716,10 @@ mod tests {
             .lmm_base_vol = Some(base_vol);
 
         let pricing_market = MarketContext::new().insert(curve);
-        let pricer = BermudanSwaptionLmmPricer::with_config(RateExoticMcConfig {
+        let pricer = BermudanSwaptionLmmPricer::with_config(Hw1fMcConfig {
             num_paths: 32,
             min_steps_between_events: 1,
-            ..RateExoticMcConfig::lmm_bermudan()
+            ..lmm_bermudan_mc_config()
         });
         let result = pricer
             .price_dyn(&swaption, &pricing_market, as_of)
@@ -742,10 +732,10 @@ mod tests {
     fn pricing_rejects_missing_or_invalid_override_before_surface_lookup() {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
         let market = MarketContext::new().insert(test_discount_curve(as_of, "D"));
-        let pricer = BermudanSwaptionLmmPricer::with_config(RateExoticMcConfig {
+        let pricer = BermudanSwaptionLmmPricer::with_config(Hw1fMcConfig {
             num_paths: 8,
             min_steps_between_events: 1,
-            ..RateExoticMcConfig::lmm_bermudan()
+            ..lmm_bermudan_mc_config()
         });
 
         for invalid in [None, Some(0.0), Some(-0.1), Some(f64::NAN)] {

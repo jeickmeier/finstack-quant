@@ -228,7 +228,7 @@
           },
           "version": 1
         },
-        "version": "0.10.0"
+        "version": "0.11.0"
       },
       "rrao": 0.0,
       "scenario_breakdown": {
@@ -310,7 +310,7 @@
           },
           "version": 1
         },
-        "version": "0.10.0"
+        "version": "0.11.0"
       },
       "description": "Policy metadata stamped by the computing layer: numeric mode, active\nrounding context, any applied FX policy, and the parallel-execution\nflag."
     },

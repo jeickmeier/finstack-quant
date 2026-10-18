@@ -4,10 +4,7 @@
 //! - Exercise the calculators through the standard registry (public API).
 //! - Validate results against an explicit finite-difference reference implementation.
 
-use crate::metrics::date_support::date;
-use crate::metrics::discount_forward_curve_support::flat_discount_with_tenor;
 use crate::metrics::option_support::{equity_option_european_call, fx_option_european_call};
-use crate::metrics::volatility_support::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{
@@ -23,6 +20,9 @@ use finstack_quant_valuations::instruments::equity::equity_option::{
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations_test_support::date::date;
+use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
+use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 use std::sync::Arc;
 
 const SPOT_BUMP_PCT: f64 = 0.01;

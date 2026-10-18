@@ -1,0 +1,27 @@
+//! Variance swap DV01 using forward bump-and-reprice.
+
+use crate::variance_swap::VarianceSwap;
+use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
+
+/// Variance swap DV01 expressed as PV change per 1bp parallel discount-curve bump.
+pub(crate) struct Dv01Calculator;
+
+impl MetricCalculator for Dv01Calculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let swap: &VarianceSwap = context.instrument_as()?;
+        let bump_bp =
+            finstack_quant_valuations_core::metrics::sensitivities::config::resolve(context)?
+                .rate_bump_bp;
+
+        let base_pv = context.base_value.amount();
+        let bumped_ctx = context.curves.as_ref().bump([MarketBump::Curve {
+            id: swap.discount_curve_id.clone(),
+            spec: BumpSpec::parallel_bp(bump_bp),
+        }])?;
+        let bumped_pv = swap.value(&bumped_ctx, context.as_of)?.amount();
+
+        Ok((bumped_pv - base_pv) / bump_bp)
+    }
+}

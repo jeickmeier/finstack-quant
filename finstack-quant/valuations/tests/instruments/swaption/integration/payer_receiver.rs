@@ -1,13 +1,14 @@
 //! Payer vs Receiver swaption tests
 
 use crate::instruments::swaption::common::*;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::surfaces::{
     VolGridOpts, VolInterpolationMode, VolSurface, VolSurfaceAxis,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::rates::irs::{
-    FixedLegSpec, FloatLegSpec, FloatingLegCompounding, InterestRateSwap, PayReceive,
+    FixedLegSpec, FloatLegSpec, InterestRateSwap, PayReceive,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::VolatilityModel;

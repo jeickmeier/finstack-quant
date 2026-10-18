@@ -12,7 +12,7 @@ use finstack_quant_calibration::{CalibrationConfig, CalibrationReport};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::{CurveState, MarketContext, MarketContextState};
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::PricingOptions;
+use finstack_quant_valuations_core::instruments::PricingOptions;
 use std::sync::Arc;
 
 /// Build request-scoped pricing options with a fresh cached recalibration provider.

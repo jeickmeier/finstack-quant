@@ -1,0 +1,43 @@
+[package]
+name = "finstack-quant-valuations-fx"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "FX instruments of Finstack Quant valuations: spot, forwards, swaps, NDFs, listed futures and FX options (vanilla, barrier, digital, touch, variance, quanto)"
+autotests = false
+
+[dependencies]
+finstack-quant-cashflows = { path = "../../cashflows", version = "0.11.0", default-features = false }
+finstack-quant-core = { path = "../../core", version = "0.11.0", default-features = false }
+finstack-quant-models = { path = "../../models", version = "0.11.0", default-features = false }
+finstack-quant-valuations-macros = { path = "../macros", version = "0.11.0" }
+finstack-quant-valuations-core = { path = "../core", version = "0.11.0", default-features = false }
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true }
+schemars = { workspace = true, optional = true }
+
+[dev-dependencies]
+finstack-quant-valuations-test-support = { path = "../test-support", version = "0.11.0" }
+finstack-quant-test-utils = { path = "../../test-utils", version = "0.11.0" }
+time = { workspace = true, features = ["macros"] }
+
+[features]
+default = ["json-schema"]
+json-schema = [
+    "dep:schemars",
+    "finstack-quant-valuations-core/json-schema",
+    "finstack-quant-cashflows/json-schema",
+    "finstack-quant-core/json-schema",
+    "finstack-quant-models/json-schema",
+]
+
+[lints]
+workspace = true
+
+[[test]]
+name = "fx"
+path = "tests/main.rs"

@@ -1,0 +1,578 @@
+//! Guaranteed minimum-return ("return floor") call protection.
+//!
+//! A [`ReturnFloorSpec`] is an **issuer-side, call-protection-only** term: it
+//! declares that on any EARLY issuer-called or prepaid redemption, the
+//! redemption price is floored so the investor's realized return (measured from
+//! the issue date against the issue price `V0`) meets a target — either a
+//! money multiple (MOIC) or an annualized internal rate of return (XIRR).
+//! Deterministic pricing lowers the spec into a concrete
+//! [`crate::bond::CallPutSchedule`]. Stochastic
+//! rates-credit pricing evaluates the same return condition on simulated cash
+//! distributions at each exercise date.
+//!
+//! **The floor does NOT guarantee the held-to-maturity return.** It only
+//! protects early exits. The maturity path is whatever the contractual cashflows
+//! give, and is always unfloored. See the `*ToWorst` metrics for honest
+//! worst-case analysis across all paths including maturity.
+//!
+//! # Quick Example
+//!
+//! ```rust
+//! use finstack_quant_valuations_fixed_income::bond::{
+//!     ReturnFloorSpec, ReturnFloorKind, IssuePrice, ProtectionWindow,
+//! };
+//! use finstack_quant_core::types::Rate;
+//!
+//! // MOIC floor of 1.25× with default par issue price and full protection window
+//! let moic_floor = ReturnFloorSpec::moic(1.25);
+//! assert!(matches!(moic_floor.kind, ReturnFloorKind::Moic(_)));
+//!
+//! // XIRR floor at 12% with OID issue price
+//! let xirr_floor = ReturnFloorSpec::xirr(Rate::from_percent(12.0).expect("valid rate fixture"))
+//!     .issue_price(IssuePrice::PctOfPar(98.0));
+//! assert!(matches!(xirr_floor.issue_price, IssuePrice::PctOfPar(_)));
+//! ```
+
+use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Rate;
+
+/// Which return metric is guaranteed by the floor, and its target.
+///
+/// Use [`ReturnFloorKind::Moic`] for money-multiple protection (common in
+/// leveraged loans and private credit) or [`ReturnFloorKind::Xirr`] for
+/// annualized IRR protection.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[non_exhaustive]
+#[serde(rename_all = "snake_case")]
+pub enum ReturnFloorKind {
+    /// Minimum money-on-money multiple (e.g. `1.25` = 1.25× invested capital).
+    ///
+    /// On an early issuer-called redemption at time `t`, the redemption price is
+    /// the minimum amount such that `(received_cashflows + redemption) / V0 >=
+    /// multiple`, where `V0` is the invested capital defined by [`IssuePrice`].
+    /// The floor binds only on early redemptions, not at maturity.
+    Moic(f64),
+    /// Minimum annualized internal rate of return.
+    ///
+    /// On an early issuer-called redemption at time `t`, the redemption price is
+    /// computed so that the XIRR of all cashflows from issue equals the target
+    /// rate. The floor binds only on early redemptions, not at maturity. Day
+    /// count defaults to Act/365F (matching `core::cashflow::xirr`) unless
+    /// overridden via [`ReturnFloorSpec::day_count`].
+    Xirr(#[cfg_attr(feature = "json-schema", schemars(with = "f64"))] Rate),
+}
+
+/// Issue price = invested capital `V0` (amount funded at issue; IRR initial outflow
+/// and MOIC denominator).
+///
+/// Defaults to [`IssuePrice::Par`] when not specified.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[non_exhaustive]
+#[serde(rename_all = "snake_case")]
+pub enum IssuePrice {
+    /// Par notional (default). `V0 = notional`.
+    Par,
+    /// Explicit finite positive cash amount funded at issue. Must match the
+    /// bond's notional currency.
+    Amount(Money),
+    /// Finite positive percent of par, e.g. `98.0` for 2 points of original
+    /// issue discount.
+    /// `V0 = notional * pct / 100`.
+    PctOfPar(f64),
+}
+
+impl IssuePrice {
+    /// Resolve invested capital `V0` against a bond's `notional`.
+    ///
+    /// `Par` → `notional`; `PctOfPar(p)` → `notional * p / 100`; `Amount(m)` → the
+    /// explicit cash amount (which must be denominated in the notional's currency).
+    ///
+    /// This is the single source of truth for `V0`, shared by the floor lowering
+    /// and the MOIC/XIRR metrics so the two cannot drift.
+    ///
+    /// # Errors
+    /// Returns [`finstack_quant_core::Error::Validation`] if the resolved issue
+    /// price is not finite and strictly positive, or if an
+    /// [`IssuePrice::Amount`] is denominated in a different currency than
+    /// `notional`.
+    pub(crate) fn resolve(self, notional: Money) -> finstack_quant_core::Result<f64> {
+        let resolved = match self {
+            IssuePrice::Par => notional.amount(),
+            IssuePrice::PctOfPar(pct) => notional.amount() * pct / 100.0,
+            IssuePrice::Amount(m) => {
+                if m.currency() != notional.currency() {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "return floor IssuePrice::Amount currency must match notional".to_string(),
+                    ));
+                }
+                m.amount()
+            }
+        };
+        if !resolved.is_finite() || resolved <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "return floor issue price must resolve to a finite amount > 0, got {resolved}"
+            )));
+        }
+        Ok(resolved)
+    }
+}
+
+/// When the return-floor protection window applies.
+///
+/// The window defines the interval over which the issuer can trigger a
+/// floor-protected early redemption. Outside this window the floor is
+/// inactive (the bond behaves as uncallable or follows its normal call
+/// schedule). The floor binds only on early issuer-called redemptions; it
+/// never applies at maturity.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[non_exhaustive]
+#[serde(rename_all = "snake_case")]
+pub enum ProtectionWindow {
+    /// From issue (or `as_of`) up to — but not including — maturity (default).
+    /// The floor applies to any early issuer-called redemption during the
+    /// bond's life, but not to redemption at maturity.
+    Full,
+    /// Active only on or after this date (encodes a no-call period ending at
+    /// maturity). The floor is not applied to redemptions before `from`.
+    From(
+        #[serde(with = "finstack_quant_core::wire::date")]
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DateWire")
+        )]
+        Date,
+    ),
+    /// Explicit closed interval `[start, end]` (both ends inclusive). The floor
+    /// applies only for redemptions with `start <= redemption_date <= end`.
+    Between {
+        /// First date on which the floor-protected call window opens.
+        #[serde(with = "finstack_quant_core::wire::date")]
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DateWire")
+        )]
+        start: Date,
+        /// Last date on which the floor-protected call window closes (inclusive).
+        #[serde(with = "finstack_quant_core::wire::date")]
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DateWire")
+        )]
+        end: Date,
+    },
+}
+
+/// Guaranteed minimum-return call protection on a bond or loan.
+///
+/// Attaching this spec declares that on any early issuer-called or prepaid
+/// redemption within the protection window, the redemption price will be
+/// floored so the investor's realized return meets the target. This is the
+/// standard private-credit loan model (often called a "prepayment premium" or
+/// "call protection" in credit agreements). The floor is anchored at the issue
+/// date and issue price `V0`. The spec is lowered into a concrete call schedule
+/// deterministically or evaluated path by path by the rates-credit LSMC engine.
+///
+/// **Call-protection only**: the floor applies to EARLY issuer redemptions
+/// within the [`ProtectionWindow`] and never at maturity. The held-to-maturity
+/// path is unfloored. Use [`finstack_quant_valuations_core::metrics::MetricId::MoicToWorst`] /
+/// [`finstack_quant_valuations_core::metrics::MetricId::XirrToWorst`] to see the honest worst-case
+/// return across all paths including the unfloored maturity path.
+///
+/// # Mathematical Foundation
+///
+/// Let:
+/// - `V0` = invested capital (issue price).
+/// - `t` = early-redemption date.
+/// - `cash_through(t)` = sum of positive cashflows received by the holder in
+///   the half-open interval `(issue, t]` (coupons and amortization; excludes
+///   the redemption itself).
+/// - `yf(a, b)` = year fraction from date `a` to date `b` under `Act/365F`.
+///
+/// **MOIC floor** — minimum money-on-invested-capital multiple `m`:
+///
+/// ```text
+/// dirty_required(t) = m · V0 − cash_through(t)
+/// ```
+///
+/// The clean redemption amount is `dirty_required(t) − accrued(t)`, floored by
+/// the contractual clean call amount and par. The exercise engine adds
+/// `accrued(t)` exactly once, so the holder's total cash meets the target when
+/// the return floor binds.
+///
+/// **XIRR floor** — minimum annualized IRR `r`:
+///
+/// ```text
+/// dirty_required(t) = (1 + r)^yf(issue, t)
+///                     · (V0 − Σ_{q ≤ t} coupon_q / (1 + r)^yf(issue, q))
+/// ```
+///
+/// The day-count convention for `yf` defaults to `Act/365F`, matching
+/// [`finstack_quant_core::cashflow::xirr`] so the verification metrics
+/// reproduce the floor target exactly.
+///
+/// For both floors, accrued interest is subtracted before the clean redemption
+/// is clamped at par and divided by outstanding notional. Accrued is added once
+/// to the exercise proceeds by the pricing kernel.
+///
+/// # Pricing behavior
+///
+/// - Deterministic pricing produces a daily concrete call schedule.
+/// - Stochastic factors use pathwise cash and PIK state in the bond LSMC engine,
+///   including term-reset and overnight floating coupons.
+/// - Contractual make-whole calls compose with the floor: every issuer exercise
+///   amount is the greater of the return floor and that call's effective amount.
+/// - **`min_moic` / `min_xirr` shortcuts** set
+///   [`ProtectionWindow::Full`] (prepayable across the bond's entire life).
+///   Narrow the window via [`ReturnFloorSpec::window`] if a no-call period
+///   applies.
+///
+/// # Invariants
+///
+/// - MOIC multiple must be positive (`> 0`).
+/// - XIRR rate must be finite and greater than `-1` (i.e., `-100%`).
+/// - A [`ProtectionWindow::Between`] window must have `start < end`.
+///
+/// # References
+///
+/// - **MOIC**: Standard private-equity and private-credit return metric.
+///   MOIC = total distributions / invested capital. See e.g. Rosenbaum, J. &
+///   Pearl, J. (2013). *Investment Banking: Valuation, Leveraged Buyouts, and
+///   Mergers & Acquisitions* (2nd ed.). Wiley Finance. `docs/REFERENCES.md#rosenbaum-pearl-2020`
+/// - **XIRR / IRR**: Internal rate of return. See Brealey, R. A., Myers, S.
+///   C. & Allen, F. (2023). *Principles of Corporate Finance* (14th ed.).
+///   McGraw-Hill. Chapter 5 ("Net Present Value and Other Investment Criteria").
+/// - **Call-protection / prepayment premiums**: Standard private-credit
+///   agreement term. LSTA (Loan Syndications and Trading Association).
+///   *The Handbook of Loan Syndications and Trading* (2nd ed.). Chapter on
+///   loan documentation and call protection.
+/// - **Act/365F day count**: ISDA 2006 Definitions, Section 4.16(f). `docs/REFERENCES.md#isda-2006-definitions`
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_valuations_fixed_income::bond::{
+///     ReturnFloorSpec, IssuePrice,
+/// };
+/// use finstack_quant_core::types::Rate;
+///
+/// // 1.20× MOIC floor at par, full protection window
+/// let spec = ReturnFloorSpec::moic(1.20);
+/// assert!(spec.validate().is_ok());
+///
+/// // 10% XIRR floor with 98 OID, validated
+/// let spec = ReturnFloorSpec::xirr(Rate::from_percent(10.0).expect("valid rate fixture"))
+///     .issue_price(IssuePrice::PctOfPar(98.0));
+/// assert!(spec.validate().is_ok());
+/// ```
+///
+/// Attach to a bond using the fluent builder:
+///
+/// ```rust
+/// use finstack_quant_valuations_fixed_income::bond::{
+///     Bond, ReturnFloorSpec, ProtectionWindow,
+/// };
+/// use finstack_quant_core::currency::Currency;
+/// use finstack_quant_core::money::Money;
+/// use finstack_quant_core::types::Rate;
+/// use time::macros::date;
+///
+/// // 5-year loan with 1.25× MOIC floor active after a 2-year no-call period.
+/// let loan = Bond::fixed(
+///     "LOAN-001",
+///     Money::from((1_000_000_i64, Currency::USD)),
+///     Rate::from_percent(10.0).expect("valid rate fixture"),
+///     date!(2025 - 01 - 01),
+///     date!(2030 - 01 - 01),
+///     finstack_quant_core::dates::StubKind::None,
+///     "USD-OIS",
+/// )?
+/// .with_return_floor(
+///     ReturnFloorSpec::moic(1.25)
+///         .window(ProtectionWindow::From(date!(2027 - 01 - 01))),
+/// );
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+#[non_exhaustive]
+pub struct ReturnFloorSpec {
+    /// Which return metric is guaranteed, and its target.
+    pub kind: ReturnFloorKind,
+    /// Issue price = invested capital `V0` (amount funded at issue). Default: par.
+    #[serde(default = "default_issue_price")]
+    pub issue_price: IssuePrice,
+    /// Protection window. Default: [`ProtectionWindow::Full`].
+    #[serde(default = "default_window")]
+    pub window: ProtectionWindow,
+    /// Day count convention for XIRR discounting. Defaults to Act/365F
+    /// (matching `core::cashflow::xirr`) when `None`. Ignored for MOIC floors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub day_count: Option<DayCount>,
+}
+
+fn default_issue_price() -> IssuePrice {
+    IssuePrice::Par
+}
+
+fn default_window() -> ProtectionWindow {
+    ProtectionWindow::Full
+}
+
+impl ReturnFloorSpec {
+    /// Construct a minimum-MOIC floor.
+    ///
+    /// Defaults: issue price = par, protection window = full lifetime.
+    ///
+    /// # Arguments
+    ///
+    /// * `multiple` — target money-on-money multiple, e.g. `1.25` for 1.25×.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_valuations_fixed_income::bond::ReturnFloorSpec;
+    ///
+    /// let spec = ReturnFloorSpec::moic(1.25);
+    /// assert!(spec.validate().is_ok());
+    /// ```
+    pub fn moic(multiple: f64) -> Self {
+        Self {
+            kind: ReturnFloorKind::Moic(multiple),
+            issue_price: default_issue_price(),
+            window: default_window(),
+            day_count: None,
+        }
+    }
+
+    /// Construct a minimum-XIRR floor.
+    ///
+    /// Defaults: issue price = par, protection window = full lifetime.
+    ///
+    /// # Arguments
+    ///
+    /// * `rate` — target annualized internal rate of return (e.g. `Rate::from_percent(12.0).expect("valid rate fixture")`).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_valuations_fixed_income::bond::ReturnFloorSpec;
+    /// use finstack_quant_core::types::Rate;
+    ///
+    /// let spec = ReturnFloorSpec::xirr(Rate::from_percent(12.0).expect("valid rate fixture"));
+    /// assert!(spec.validate().is_ok());
+    /// ```
+    pub fn xirr(rate: impl Into<Rate>) -> Self {
+        Self {
+            kind: ReturnFloorKind::Xirr(rate.into()),
+            issue_price: default_issue_price(),
+            window: default_window(),
+            day_count: None,
+        }
+    }
+
+    /// Set the issue price (invested capital `V0`).
+    ///
+    /// # Returns
+    ///
+    /// `self` with `issue_price` updated (fluent builder).
+    ///
+    /// # Arguments
+    ///
+    /// * `price` - Invested capital at issue: par, a finite positive percent
+    ///   of par, or a finite positive cash amount in the bond's currency.
+    #[must_use]
+    pub fn issue_price(mut self, price: IssuePrice) -> Self {
+        self.issue_price = price;
+        self
+    }
+
+    /// Set the protection window.
+    ///
+    /// # Returns
+    ///
+    /// `self` with `window` updated (fluent builder).
+    ///
+    /// # Arguments
+    ///
+    /// * `window` - Calendar-date interval during which an issuer-triggered
+    ///   early redemption receives return-floor protection.
+    #[must_use]
+    pub fn window(mut self, window: ProtectionWindow) -> Self {
+        self.window = window;
+        self
+    }
+
+    /// Set the XIRR discounting day count convention.
+    ///
+    /// Has no effect on MOIC floors.
+    ///
+    /// # Returns
+    ///
+    /// `self` with `day_count` updated (fluent builder).
+    ///
+    /// # Arguments
+    ///
+    /// * `day_count` - Day-count convention used to convert calendar dates into year fractions.
+    #[must_use]
+    pub fn day_count(mut self, day_count: DayCount) -> Self {
+        self.day_count = Some(day_count);
+        self
+    }
+
+    /// Validate the spec independently of any bond.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if:
+    /// - The MOIC multiple is not finite or is `<= 0`.
+    /// - The XIRR rate is not finite or is `<= -1` (i.e., `-100%` or worse).
+    /// - An explicit issue-price amount or percent of par is not finite and
+    ///   strictly positive.
+    /// - A [`ProtectionWindow::Between`] window has `start >= end`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_valuations_fixed_income::bond::ReturnFloorSpec;
+    ///
+    /// assert!(ReturnFloorSpec::moic(1.25).validate().is_ok());
+    /// assert!(ReturnFloorSpec::moic(0.0).validate().is_err());
+    /// ```
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        match self.kind {
+            ReturnFloorKind::Moic(m) if !m.is_finite() || m <= 0.0 => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "return floor MOIC must be finite and > 0, got {m}"
+                )));
+            }
+            ReturnFloorKind::Xirr(r) if r.as_decimal() <= -1.0 || !r.as_decimal().is_finite() => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "return floor XIRR must be finite and > -1, got {}",
+                    r.as_decimal()
+                )));
+            }
+            _ => {}
+        }
+        let invalid_issue_price = match self.issue_price {
+            IssuePrice::PctOfPar(pct) if !pct.is_finite() || pct <= 0.0 => Some(pct),
+            IssuePrice::Amount(amount)
+                if !amount.amount().is_finite() || amount.amount() <= 0.0 =>
+            {
+                Some(amount.amount())
+            }
+            IssuePrice::Par | IssuePrice::PctOfPar(_) | IssuePrice::Amount(_) => None,
+        };
+        if let Some(value) = invalid_issue_price {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "return floor issue price must be finite and > 0, got {value}"
+            )));
+        }
+        if let ProtectionWindow::Between { start, end } = self.window {
+            if start >= end {
+                return Err(finstack_quant_core::Error::Validation(
+                    "return floor window: start must be before end".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::types::Rate;
+
+    #[test]
+    fn moic_constructor_defaults() {
+        let spec = ReturnFloorSpec::moic(1.25);
+        assert!(matches!(spec.kind, ReturnFloorKind::Moic(m) if (m - 1.25).abs() < 1e-12));
+        assert!(matches!(spec.issue_price, IssuePrice::Par));
+        assert!(matches!(spec.window, ProtectionWindow::Full));
+        assert!(spec.day_count.is_none());
+    }
+
+    #[test]
+    fn xirr_constructor_and_fluent_setters() {
+        let spec = ReturnFloorSpec::xirr(Rate::from_percent(12.0).expect("valid rate fixture"))
+            .issue_price(IssuePrice::PctOfPar(98.0));
+        assert!(matches!(spec.kind, ReturnFloorKind::Xirr(_)));
+        assert!(matches!(spec.issue_price, IssuePrice::PctOfPar(p) if (p - 98.0).abs() < 1e-12));
+    }
+
+    #[test]
+    fn validate_rejects_nonpositive_multiple() {
+        assert!(ReturnFloorSpec::moic(0.0).validate().is_err());
+        assert!(ReturnFloorSpec::moic(f64::NAN).validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_invalid_explicit_issue_prices() {
+        for pct in [f64::NAN, 0.0, -1.0] {
+            assert!(ReturnFloorSpec::moic(1.0)
+                .issue_price(IssuePrice::PctOfPar(pct))
+                .validate()
+                .is_err());
+        }
+        for amount in [0.0, -100.0] {
+            assert!(ReturnFloorSpec::moic(1.0)
+                .issue_price(IssuePrice::Amount(
+                    Money::new(amount, Currency::USD).expect("valid money fixture")
+                ))
+                .validate()
+                .is_err());
+        }
+    }
+
+    #[test]
+    fn resolve_rejects_nonpositive_and_currency_mismatched_issue_prices() {
+        let notional = Money::from((100_i64, Currency::USD));
+        assert!(IssuePrice::PctOfPar(0.0).resolve(notional).is_err());
+        assert!(IssuePrice::PctOfPar(f64::NAN).resolve(notional).is_err());
+        assert!(IssuePrice::Amount(Money::from((-1_i64, Currency::USD)))
+            .resolve(notional)
+            .is_err());
+        assert!(IssuePrice::Amount(Money::from((100_i64, Currency::EUR)))
+            .resolve(notional)
+            .is_err());
+    }
+
+    #[test]
+    fn validate_rejects_xirr_at_or_below_minus_one() {
+        assert!(
+            ReturnFloorSpec::xirr(Rate::from_decimal(-1.0).expect("valid rate fixture"))
+                .validate()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn validate_rejects_degenerate_between_window() {
+        use time::macros::date;
+
+        // start == end
+        let equal = ReturnFloorSpec::moic(1.25).window(ProtectionWindow::Between {
+            start: date!(2027 - 01 - 01),
+            end: date!(2027 - 01 - 01),
+        });
+        assert!(equal.validate().is_err());
+
+        // start > end
+        let inverted = ReturnFloorSpec::moic(1.25).window(ProtectionWindow::Between {
+            start: date!(2028 - 01 - 01),
+            end: date!(2027 - 01 - 01),
+        });
+        assert!(inverted.validate().is_err());
+    }
+
+    #[test]
+    fn validate_accepts_valid_spec() {
+        assert!(ReturnFloorSpec::moic(1.25).validate().is_ok());
+    }
+}

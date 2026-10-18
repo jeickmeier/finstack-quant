@@ -34,7 +34,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
@@ -56,7 +56,7 @@
       "registryDependencies": [],
       "dependencies": [],
       "categories": [],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "shared-schema-defs",
@@ -83,7 +83,7 @@
       "registryDependencies": ["@finstack/finstack-codec"],
       "dependencies": [],
       "categories": [],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "finstack-format",
@@ -107,12 +107,12 @@
         "big.js@7.0.1",
         "@tanstack/react-table@9.2.4",
         "@types/big.js@6.2.2",
-        "finstack-quant-wasm@0.10.0"
+        "finstack-quant-wasm@0.11.0"
       ],
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -148,7 +148,7 @@
       "registryDependencies": [],
       "dependencies": ["lossless-json@4.3.1", "zod@4.6.5"],
       "categories": [],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "contract-calibration",
@@ -177,7 +177,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json"
         ]
@@ -220,7 +220,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json"
         ]
@@ -263,7 +263,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json"
         ]
@@ -306,7 +306,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future_option.schema.json"
         ]
@@ -349,7 +349,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json"
         ]
@@ -392,7 +392,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json"
         ]
@@ -435,7 +435,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json"
         ]
@@ -478,7 +478,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json"
         ]
@@ -521,7 +521,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json"
         ]
@@ -567,7 +567,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json"
         ]
@@ -610,7 +610,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json"
         ]
@@ -653,7 +653,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json"
         ]
@@ -696,7 +696,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json"
         ]
@@ -739,7 +739,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json"
         ]
@@ -782,7 +782,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json"
         ]
@@ -825,7 +825,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/cliquet_option.schema.json"
         ]
@@ -868,7 +868,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json"
         ]
@@ -911,7 +911,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/equity_future_option.schema.json"
         ]
@@ -954,7 +954,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/equity_future.schema.json"
         ]
@@ -997,7 +997,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/equity_option.schema.json"
         ]
@@ -1040,7 +1040,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/equity_total_return_future.schema.json"
         ]
@@ -1083,7 +1083,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json"
         ]
@@ -1126,7 +1126,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json"
         ]
@@ -1169,7 +1169,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json"
         ]
@@ -1212,7 +1212,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/real_estate_asset.schema.json"
         ]
@@ -1255,7 +1255,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json"
         ]
@@ -1298,7 +1298,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json"
         ]
@@ -1341,7 +1341,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/volatility_index_future_option.schema.json"
         ]
@@ -1384,7 +1384,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/equity/volatility_index_future.schema.json"
         ]
@@ -1427,7 +1427,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/exotics/asian_option.schema.json"
         ]
@@ -1470,7 +1470,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/exotics/barrier_option.schema.json"
         ]
@@ -1516,7 +1516,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json"
         ]
@@ -1559,7 +1559,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json"
         ]
@@ -1602,7 +1602,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/exotics/lookback_option.schema.json"
         ]
@@ -1645,7 +1645,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json"
         ]
@@ -1688,7 +1688,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json"
         ]
@@ -1731,7 +1731,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json"
         ]
@@ -1774,7 +1774,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json"
         ]
@@ -1817,7 +1817,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_mbs_passthrough.schema.json"
         ]
@@ -1860,7 +1860,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json"
         ]
@@ -1906,7 +1906,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json"
         ]
@@ -1949,7 +1949,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json"
         ]
@@ -1992,7 +1992,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json"
         ]
@@ -2035,7 +2035,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json"
         ]
@@ -2078,7 +2078,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json"
         ]
@@ -2121,7 +2121,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json"
         ]
@@ -2164,7 +2164,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json"
         ]
@@ -2210,7 +2210,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json"
         ]
@@ -2253,7 +2253,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json"
         ]
@@ -2296,7 +2296,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json"
         ]
@@ -2339,7 +2339,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fx/fx_barrier_option.schema.json"
         ]
@@ -2382,7 +2382,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fx/fx_digital_option.schema.json"
         ]
@@ -2425,7 +2425,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json"
         ]
@@ -2468,7 +2468,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future_option.schema.json"
         ]
@@ -2511,7 +2511,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future.schema.json"
         ]
@@ -2554,7 +2554,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json"
         ]
@@ -2597,7 +2597,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json"
         ]
@@ -2640,7 +2640,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json"
         ]
@@ -2683,7 +2683,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json"
         ]
@@ -2726,7 +2726,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json"
         ]
@@ -2769,7 +2769,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json"
         ]
@@ -2812,7 +2812,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json"
         ]
@@ -2855,7 +2855,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json"
         ]
@@ -2898,7 +2898,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json"
         ]
@@ -2941,7 +2941,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json"
         ]
@@ -2984,7 +2984,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/cms_option.schema.json"
         ]
@@ -3027,7 +3027,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json"
         ]
@@ -3070,7 +3070,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json"
         ]
@@ -3113,7 +3113,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json"
         ]
@@ -3156,7 +3156,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/forward_rate_agreement.schema.json"
         ]
@@ -3199,7 +3199,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json"
         ]
@@ -3242,7 +3242,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json"
         ]
@@ -3285,7 +3285,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future_option.schema.json"
         ]
@@ -3328,7 +3328,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json"
         ]
@@ -3371,7 +3371,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json"
         ]
@@ -3414,7 +3414,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json"
         ]
@@ -3457,7 +3457,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json"
         ]
@@ -3500,7 +3500,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json"
         ]
@@ -3543,7 +3543,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json"
         ]
@@ -3576,7 +3576,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
         ]
@@ -3609,7 +3609,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json"
         ]
@@ -3642,7 +3642,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -3680,7 +3680,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json"
         ]
@@ -3713,7 +3713,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json"
         ]
@@ -3820,7 +3820,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
@@ -3928,7 +3928,7 @@
       "registryDependencies": [],
       "dependencies": [],
       "categories": [],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "finstack-views",
@@ -3950,7 +3950,7 @@
       "registryDependencies": [],
       "dependencies": [],
       "categories": [],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "finstack-host",
@@ -3965,9 +3965,9 @@
         }
       ],
       "registryDependencies": ["@finstack/finstack-codec"],
-      "dependencies": ["finstack-quant-wasm@0.10.0"],
+      "dependencies": ["finstack-quant-wasm@0.11.0"],
       "categories": [],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     }
   ]
 }

@@ -1,0 +1,1818 @@
+//! Utilities for instrument pricing and metrics assembly.
+//!
+//! Contains helpers shared across instrument implementations, notably metric
+//! context construction and deterministic measure assembly.
+
+use crate::instruments::PricingOptions;
+use crate::metrics::{MetricContext, MetricId};
+use crate::pricer::PricingDispatch;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::market_data::{
+    context::MarketContext,
+    scalars::{InflationIndex, MarketScalar, SeriesInterpolation},
+    surfaces::{VolQuoteType, VolSurfaceAxis},
+};
+use finstack_quant_core::money::Money;
+use indexmap::IndexMap;
+use std::sync::Arc;
+
+/// Read a scalar price amount without discarding an attached currency.
+pub fn scalar_price_amount(
+    scalar: &MarketScalar,
+    expected_currency: Currency,
+) -> finstack_quant_core::Result<f64> {
+    match scalar {
+        MarketScalar::Unitless(value) => Ok(*value),
+        MarketScalar::Price(price) if price.currency() == expected_currency => Ok(price.amount()),
+        MarketScalar::Price(price) => Err(finstack_quant_core::Error::CurrencyMismatch {
+            expected: expected_currency,
+            actual: price.currency(),
+        }),
+    }
+}
+
+pub fn attach_mc_diagnostics(
+    result: &mut crate::results::ValuationResult,
+    estimate: &finstack_quant_models::monte_carlo::results::MoneyEstimate,
+) {
+    for (id, value) in [
+        ("mc_stderr", estimate.stderr),
+        ("mc_ci_95_low", estimate.ci_95.0.amount()),
+        ("mc_ci_95_high", estimate.ci_95.1.amount()),
+        ("mc_num_paths", estimate.num_paths as f64),
+        (
+            "mc_num_simulated_paths",
+            estimate.num_simulated_paths as f64,
+        ),
+        ("mc_relative_stderr", estimate.relative_stderr()),
+    ] {
+        result.measures.insert(MetricId::custom(id), value);
+    }
+}
+
+/// Validated pricing boundary shared by direct and registry-backed routes.
+///
+/// Construction performs the only mandatory invariant/override validation
+/// step. Callers may then resolve the effective date, run their chosen model
+/// kernel, and apply the instrument-owned scenario adjustment exactly once.
+pub struct ValidatedPricingLifecycle<'a, I>
+where
+    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+{
+    instrument: &'a I,
+}
+
+impl<'a, I> ValidatedPricingLifecycle<'a, I>
+where
+    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+{
+    /// Validate the complete instrument pricing boundary.
+    pub fn new(instrument: &'a I) -> finstack_quant_core::Result<Self> {
+        instrument.validate_for_pricing()?;
+        Ok(Self { instrument })
+    }
+
+    /// Enter the lifecycle after a trusted boundary already validated the instrument.
+    pub fn from_validated(instrument: &'a I) -> Self {
+        Self { instrument }
+    }
+
+    /// Resolve the instrument's effective valuation date after validation.
+    pub fn effective_as_of(&self, market: &MarketContext, requested: Date) -> Date {
+        self.instrument.resolve_pricing_as_of(market, requested)
+    }
+
+    /// Apply the instrument scenario to a model `Money` result exactly once.
+    pub fn apply_value(&self, base_value: Money) -> finstack_quant_core::Result<Money> {
+        apply_scenario_value(self.instrument, base_value)
+    }
+
+    /// Apply the instrument scenario to a raw model result exactly once.
+    pub fn apply_raw_value(&self, base_value: f64) -> f64 {
+        apply_scenario_raw_value(self.instrument, base_value)
+    }
+}
+
+/// Apply an instrument's scenario price adjustment to a base present value.
+///
+/// Registry, direct-value, and metric assembly paths all route through this
+/// helper so the adjustment remains an exactly-once lifecycle step.
+#[inline]
+pub fn apply_scenario_value<I>(
+    instrument: &I,
+    base_value: Money,
+) -> finstack_quant_core::Result<Money>
+where
+    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+{
+    instrument
+        .get_scenario_pricing_overrides()
+        .map_or(Ok(base_value), |overrides| {
+            overrides.apply_to_value(base_value)
+        })
+}
+
+/// Apply an instrument's scenario price adjustment without currency rounding.
+///
+/// This is the raw-f64 counterpart to [`apply_scenario_value`]. Keeping the
+/// multiplier outside `Money` preserves the precision expected by finite-
+/// difference risk calculations.
+#[inline]
+pub fn apply_scenario_raw_value<I>(instrument: &I, base_value: f64) -> f64
+where
+    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+{
+    instrument
+        .get_scenario_pricing_overrides()
+        .and_then(|overrides| overrides.scenario_price_shock_decimal)
+        .map_or(base_value, |shock| base_value * (1.0 + shock))
+}
+
+/// Convert a discount factor to an effective continuously-compounded zero rate.
+///
+/// Returns `r` such that `exp(-r * t) = df`. Returns `Ok(0.0)` at expiry
+/// (`t <= 0`), which is the correct mathematical limit and matches the
+/// behaviour required by callers that short-circuit on `t <= 0` before using
+/// the returned rate.
+///
+/// # Errors
+///
+/// Returns a `Validation` error when `df` is not finite or non-positive.
+/// `df <= 0` would yield `NaN` or `+inf` from `ln`, masking a corrupted curve
+/// or extreme rate environment.
+#[inline]
+pub fn zero_rate_from_df(df: f64, t: f64, context: &str) -> finstack_quant_core::Result<f64> {
+    if t <= 0.0 {
+        return Ok(0.0);
+    }
+    if !df.is_finite() || df <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{context}: discount factor must be finite and > 0, got {df:.6e} for t={t:.6}"
+        )));
+    }
+    Ok(-df.ln() / t)
+}
+
+/// Compute year fraction between two dates using the given day-count convention.
+///
+/// This is the canonical helper for all instrument code that needs a plain
+/// `(start, end, day_count) → year_fraction` call without extra context.
+/// Avoids duplicating `day_count.year_fraction(start, end, DayCountContext::default())`
+/// in every pricer / calculator module.
+#[inline]
+pub fn year_fraction(
+    day_count: DayCount,
+    start: Date,
+    end: Date,
+) -> finstack_quant_core::Result<f64> {
+    day_count.year_fraction(start, end, DayCountContext::default())
+}
+
+/// Schedule → PV helper that uses the curve's own day count convention.
+///
+/// This variant ensures consistency between:
+/// - Metric calculations (e.g., par rate using `df_on_date`)
+/// - NPV calculations
+///
+/// Routes through `core::cashflow::npv`, which excludes flows on or before
+/// the valuation date. Valuation on a day assumes cash settling that day has
+/// already been paid.
+/// An empty remaining schedule returns zero in the instrument's notional
+/// currency; an instrument without a defined notional still returns an error.
+///
+/// # Arguments
+///
+/// * `instrument` - The instrument providing cashflows
+/// * `market` - Market data context
+/// * `as_of` - Valuation date
+/// * `discount_curve_id` - ID of the discount curve to use
+pub fn schedule_pv<S>(
+    instrument: &S,
+    market: &MarketContext,
+    as_of: Date,
+    discount_curve_id: &finstack_quant_core::types::CurveId,
+) -> finstack_quant_core::Result<Money>
+where
+    S: finstack_quant_cashflows::CashflowProvider,
+{
+    use finstack_quant_core::cashflow::npv;
+
+    let flows = S::dated_cashflows(instrument, market, as_of)?;
+    if flows.is_empty() {
+        let notional = instrument
+            .notional()?
+            .ok_or(finstack_quant_core::InputError::TooFewPoints)?;
+        return Ok(Money::from((0_i64, notional.currency())));
+    }
+    let disc = market.get_discount(discount_curve_id.as_str())?;
+    // Discount on the curve's own time axis, consistent with curve metrics.
+    npv(disc.as_ref(), as_of, &flows)
+}
+
+/// Schedule → PV helper that uses the curve's own day count convention (raw f64).
+///
+/// Returns unrounded NPV for high-precision calibration/risk.
+///
+/// Cashflows on or before `as_of` are excluded, matching [`schedule_pv`]. The
+/// only distinction is the unrounded scalar output used by calibration and risk.
+/// Empty remaining schedules return zero only when the instrument defines a
+/// notional, matching the known-currency boundary of [`schedule_pv`].
+pub fn schedule_pv_raw<S>(
+    instrument: &S,
+    market: &MarketContext,
+    as_of: Date,
+    discount_curve_id: &finstack_quant_core::types::CurveId,
+) -> finstack_quant_core::Result<f64>
+where
+    S: finstack_quant_cashflows::CashflowProvider,
+{
+    use finstack_quant_core::cashflow::npv_amounts_with_curve;
+
+    let flows = S::dated_cashflows(instrument, market, as_of)?;
+    if flows.is_empty() {
+        instrument
+            .notional()?
+            .ok_or(finstack_quant_core::InputError::TooFewPoints)?;
+        return Ok(0.0);
+    }
+    let disc = market.get_discount(discount_curve_id.as_str())?;
+
+    let amounts = flows
+        .into_iter()
+        .map(|(date, amount)| (date, amount.amount()))
+        .collect::<Vec<_>>();
+    npv_amounts_with_curve(disc.as_ref(), as_of, &amounts)
+}
+
+/// Schedule → raw trade NPV, including cashflows dated exactly on `as_of`.
+///
+/// This is narrower than [`schedule_pv_raw`]: truly past cashflows are excluded,
+/// while an inception exchange settling on the valuation date is retained at
+/// unit discount factor. Calibration instruments such as T+0 deposits need this
+/// convention so their quoted rate can zero the complete trade NPV.
+pub fn schedule_trade_pv_raw<S>(
+    instrument: &S,
+    market: &MarketContext,
+    as_of: Date,
+    discount_curve_id: &finstack_quant_core::types::CurveId,
+) -> finstack_quant_core::Result<f64>
+where
+    S: finstack_quant_cashflows::CashflowProvider,
+{
+    use finstack_quant_core::math::NeumaierAccumulator;
+
+    let flows = S::dated_cashflows(instrument, market, as_of)?;
+    let disc = market.get_discount(discount_curve_id.as_str())?;
+    let mut total = NeumaierAccumulator::new();
+
+    for (date, amount) in flows {
+        if date < as_of {
+            continue;
+        }
+        total.add(amount.amount() * disc.df_between_dates(as_of, date)?);
+    }
+
+    Ok(total.total())
+}
+
+/// Resolve an optional dividend-yield scalar from the market context.
+///
+/// Returns `0.0` only when no dividend yield ID is configured. If an ID is
+/// configured, missing or wrongly-typed market data is treated as a validation
+/// error rather than silently assuming zero carry.
+pub fn resolve_optional_dividend_yield(
+    market: &MarketContext,
+    div_yield_id: Option<&finstack_quant_core::types::PriceId>,
+) -> finstack_quant_core::Result<f64> {
+    let Some(div_id) = div_yield_id else {
+        return Ok(0.0);
+    };
+
+    let scalar = market.get_price(div_id.as_str()).map_err(|e| {
+        finstack_quant_core::Error::Validation(format!(
+            "Failed to fetch dividend yield '{}': {}",
+            div_id, e
+        ))
+    })?;
+
+    match scalar {
+        MarketScalar::Unitless(v) => Ok(*v),
+        MarketScalar::Price(m) => Err(finstack_quant_core::Error::Validation(format!(
+            "Dividend yield '{}' should be a unitless scalar, got Price({})",
+            div_id,
+            m.currency()
+        ))),
+    }
+}
+
+/// Build a time-varying GBM drift schedule from a discount curve.
+///
+/// Samples the cumulative risk-neutral log-drift `M(t) = ∫₀ᵗ (r(u) − q) du` at
+/// `num_steps + 1` evenly-spaced knots over `[0, t]`. The rate term structure
+/// comes from `disc_curve`; its cumulative log-DF shape is rescaled so `M(t)`
+/// matches the maturity-effective rate `r` exactly at `t` (terminal
+/// forward/discount consistency). The dividend leg uses the scalar yield `q`.
+///
+/// Attaching the result to a [`GbmProcess`](finstack_quant_models::monte_carlo::process::gbm::GbmProcess)
+/// removes the per-fixing forward bias the constant maturity-averaged drift
+/// introduces for path-dependent (Asian, lookback) Monte Carlo pricing on a
+/// non-flat curve. On a flat curve `M(t) = (r − q)·t`, so the schedule is
+/// bit-equivalent to the constant drift.
+///
+/// # Errors
+///
+/// Returns an error if the resulting schedule is degenerate (see
+/// `DriftSchedule::new`) — e.g. a non-finite curve evaluation.
+pub fn build_gbm_drift_schedule(
+    disc_curve: &finstack_quant_core::market_data::term_structures::DiscountCurve,
+    as_of: Date,
+    r: f64,
+    q: f64,
+    t: f64,
+    num_steps: usize,
+) -> finstack_quant_core::Result<finstack_quant_models::monte_carlo::process::gbm::DriftSchedule> {
+    use finstack_quant_models::monte_carlo::process::gbm::DriftSchedule;
+
+    let knots = num_steps.max(1);
+    // `DiscountCurve::df(t)` is measured from the curve base date.  The
+    // simulation, however, starts at `as_of`; use the curve's time coordinate
+    // at that date and normalize every sampled DF by DF(as_of).  Sampling
+    // `df(tk)` directly would splice historical curve time into the future
+    // path whenever the curve base predates valuation.
+    let as_of_curve_time = disc_curve.day_count().signed_year_fraction(
+        disc_curve.base_date(),
+        as_of,
+        DayCountContext::default(),
+    )?;
+    let as_of_df = disc_curve.df(as_of_curve_time);
+    if !as_of_df.is_finite() || as_of_df <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "GBM drift schedule: invalid discount factor at as_of {as_of}: {as_of_df}"
+        )));
+    }
+    // Rescale the curve's cumulative log-DF shape so the terminal cumulative
+    // rate equals r·t exactly — this keeps the simulated terminal forward
+    // consistent with the date-based discount factor used to discount the
+    // payoff. The curve supplies only the *shape* of the term structure.
+    let terminal_rate_cum = -(disc_curve.df(as_of_curve_time + t) / as_of_df).ln();
+    let scale = if terminal_rate_cum.abs() > 1e-12 {
+        (r * t) / terminal_rate_cum
+    } else {
+        1.0
+    };
+
+    let mut times = Vec::with_capacity(knots + 1);
+    let mut cumulative = Vec::with_capacity(knots + 1);
+    for k in 0..=knots {
+        let tk = t * (k as f64) / (knots as f64);
+        let rate_cum = if tk > 0.0 {
+            -(disc_curve.df(as_of_curve_time + tk) / as_of_df).ln() * scale
+        } else {
+            0.0
+        };
+        times.push(tk);
+        cumulative.push(rate_cum - q * tk);
+    }
+    DriftSchedule::new(times, cumulative)
+}
+
+/// Workspace-wide Monte Carlo defaults and resource limits.
+///
+/// These are the single source of truth for MC pricers across the
+/// equity / exotics / commodities / FX modules; per-pricer overrides go
+/// through [`resolve_mc_paths`] so the upper bound is always enforced.
+pub mod mc_defaults {
+    /// Default Monte Carlo path count when no instrument override is supplied.
+    pub const DEFAULT_MC_PATHS: usize = 100_000;
+
+    /// Default time-grid resolution (steps per year) for daily-discretised
+    /// path-dependent pricers.
+    pub const DEFAULT_STEPS_PER_YEAR: f64 = 252.0;
+
+    /// Default Monte Carlo step count for rough-volatility pricers
+    /// (rough Heston, rough Bergomi). These models discretise fractional
+    /// Brownian motion and a fixed step count is more meaningful than a
+    /// time-density.
+    pub const DEFAULT_ROUGH_VOL_STEPS: usize = 100;
+
+    /// Hard ceiling on the number of MC paths a single pricer call is
+    /// allowed to allocate. Enforced by [`resolve_mc_paths`](super::resolve_mc_paths) to prevent a
+    /// malformed `instrument_pricing_overrides.model_config.mc_paths` (or a typo) from
+    /// taking down a pricing service via OOM.
+    /// The cap is set conservatively for multi-tenant pricing hosts.
+    pub const MAX_MC_PATHS: usize = 5_000_000;
+}
+
+/// Resolve the effective Monte Carlo path count for a pricer call.
+///
+/// - If `override_paths` is `Some(n)` with `0 < n <= MAX_MC_PATHS`, returns `n`.
+/// - If `override_paths` is `Some(n)` with `n > MAX_MC_PATHS`, returns an
+///   error rather than silently clamping (silent clamps mask data errors and
+///   distort variance estimates).
+/// - If `override_paths` is `Some(0)` or `None`, returns `default`.
+///
+/// This is the single entry point all MC pricers should use to honour the
+/// per-instrument `instrument_pricing_overrides.model_config.mc_paths` knob.
+///
+/// # Errors
+///
+/// Returns `Validation` when the override exceeds `MAX_MC_PATHS`.
+#[inline]
+pub fn resolve_mc_paths(
+    override_paths: Option<usize>,
+    default: usize,
+) -> finstack_quant_core::Result<usize> {
+    let n = match override_paths {
+        Some(n) if n > 0 => n,
+        _ => default,
+    };
+    if n > mc_defaults::MAX_MC_PATHS {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Monte Carlo path count {} exceeds workspace cap MAX_MC_PATHS = {}; \
+             reduce `instrument_pricing_overrides.model_config.mc_paths` or raise the cap.",
+            n,
+            mc_defaults::MAX_MC_PATHS
+        )));
+    }
+    Ok(n)
+}
+
+/// Apply per-instrument path count and antithetic overrides to a base
+/// `PathDependentPricerConfig`, enforcing [`mc_defaults::MAX_MC_PATHS`].
+///
+/// Centralizes the merge logic shared by path-dependent MC pricers.
+///
+/// # Errors
+///
+/// Returns `Validation` when the override exceeds `MAX_MC_PATHS`.
+#[inline]
+pub fn merged_path_config(
+    base: &finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig,
+    overrides: &crate::instruments::InstrumentPricingOverrides,
+) -> finstack_quant_core::Result<
+    finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig,
+> {
+    let mut c = base.clone();
+    c.num_paths = resolve_mc_paths(overrides.model_config.mc_paths, c.num_paths)?;
+    if let Some(antithetic) = overrides.model_config.mc_antithetic {
+        c.antithetic = antithetic;
+    }
+    Ok(c)
+}
+
+/// Extract a unitless market scalar with a fallback default.
+///
+/// Read a required unitless market scalar, erroring when it is missing or typed.
+///
+/// Production model-parameter resolvers should prefer this over the lenient
+/// fallback form so missing or mistyped model scalars are surfaced.
+/// The `model` argument is purely diagnostic and appears in the error
+/// message (e.g. `"Heston"`, `"rough Bergomi"`).
+pub fn get_unitless_scalar_strict(
+    market: &MarketContext,
+    key: &str,
+    model: &str,
+) -> finstack_quant_core::Result<f64> {
+    match market.get_price(key) {
+        Ok(MarketScalar::Unitless(v)) => Ok(*v),
+        Ok(other) => Err(finstack_quant_core::Error::Validation(format!(
+            "{model} parameter '{key}' must be a unitless market scalar, got {other:?}"
+        ))),
+        Err(_) => Err(finstack_quant_core::Error::from(
+            finstack_quant_core::InputError::NotFound {
+                id: format!("{key} (required by {model} strict from_market resolver)"),
+            },
+        )),
+    }
+}
+
+/// Compute requested metric measures for an already-priced instrument.
+///
+/// The caller owns the `ValuationResult` envelope and passes the final,
+/// scenario-adjusted base value. This helper only builds the metric context and
+/// returns deterministic measures, preventing metric attachment from replacing
+/// model details or metadata.
+///
+/// This function uses trait objects to avoid generic monomorphization across
+/// compilation units, which can cause coverage metadata mismatches.
+///
+/// # Arguments
+///
+/// * `instrument` - The instrument to price (wrapped in Arc for efficiency)
+/// * `curves` - Market data context (wrapped in Arc for efficiency)
+/// * `as_of` - Valuation date
+/// * `base_value` - Final scenario-adjusted base value (NPV)
+/// * `metrics` - List of metrics to compute. Every entry is forwarded to the
+///   metric registry unfiltered, so each one either lands in the returned map
+///   or aborts the call with an error; requested metrics are never silently
+///   dropped. Callers that legitimately tolerate partial support across
+///   heterogeneous instruments (composites) must narrow this list themselves.
+/// * `cfg` - Optional FinstackConfig for user-tunable metric defaults (e.g., bump sizes).
+///   When `None`, uses global defaults.
+/// * `market_history` - Optional market history for Historical VaR / Expected Shortfall metrics.
+///   When `None`, these metrics will not be available.
+///
+/// # Errors
+///
+/// Returns `Error::UnknownMetric` when a requested identifier is not
+/// registered, `Error::MetricNotApplicable` when it is registered but has no
+/// calculator for this instrument type, and `Error::MetricCalculationFailed`
+/// when a calculator runs and fails (for example on a missing market input).
+///
+/// # Performance
+///
+/// Accepts Arc-wrapped arguments to avoid cloning on every call. Callers should
+/// clone the instrument and market context once into Arc at the call boundary.
+///
+/// # Thread Safety
+///
+/// The `curves` parameter is wrapped in `Arc` for efficiency, not thread synchronization.
+/// Callers must ensure the market context is not mutated concurrently. For multi-threaded
+/// pricing with market data updates, create a new `MarketContext` snapshot for each
+/// pricing batch.
+///
+/// The `instrument` parameter is also `Arc`-wrapped. Instruments are generally immutable
+/// after construction, so this is safe for concurrent reads.
+/// Crate-private bundle at the registry → metric boundary.
+#[derive(Default)]
+pub struct MetricBuildOptions {
+    pub pricing: PricingOptions,
+    pub pricing_dispatch: PricingDispatch,
+    /// Measures the model pricer already published for this valuation, taken
+    /// verbatim from its `ValuationResult`. Standard identifiers among them
+    /// seed the metric context; see [`compute_metrics_dyn`].
+    pub pricer_measures: IndexMap<MetricId, f64>,
+}
+
+pub fn compute_metrics_dyn(
+    instrument: Arc<dyn crate::instruments::common_impl::traits::Instrument>,
+    curves: Arc<MarketContext>,
+    as_of: Date,
+    base_value: Money,
+    metrics: &[crate::metrics::MetricId],
+    options: MetricBuildOptions,
+) -> finstack_quant_core::Result<IndexMap<crate::metrics::MetricId, f64>> {
+    let MetricBuildOptions {
+        pricing,
+        pricing_dispatch,
+        pricer_measures,
+    } = options;
+    let finstack_config = pricing.config.unwrap_or_else(MetricContext::default_config);
+    let mut context = MetricContext::new(
+        Arc::clone(&instrument),
+        curves,
+        as_of,
+        base_value,
+        finstack_config,
+    );
+
+    // Attach market history if provided (for Historical VaR / Expected Shortfall metrics)
+    if let Some(history) = pricing.market_history {
+        context = context.with_market_history(history);
+    }
+    context.set_recalibration_provider(pricing.recalibration_provider);
+    context.set_pricer_dispatch(pricing_dispatch);
+
+    // Preserve only the subsets consumed by the metric layer.
+    context.set_metric_pricing_overrides(instrument.get_metric_pricing_overrides().cloned());
+
+    // Allow instruments to pre-seed the metric context with cached data (e.g., pre-computed
+    // cashflows) to avoid redundant computation during metric calculation.
+    let market_ref: Arc<MarketContext> = Arc::clone(&context.curves);
+    instrument.seed_metric_context(&mut context, market_ref.as_ref(), as_of);
+
+    if !metrics.is_empty() {
+        if let PricingDispatch::Registered { model, registry } = context.clone_pricer_dispatch() {
+            let key = crate::pricer::PricerKey::new(instrument.key(), model);
+            if let Some(pricer) = registry.get_pricer(key) {
+                pricer.seed_metric_context(&mut context, metrics)?;
+            }
+        }
+    }
+
+    // A model may publish standard metric identifiers as side outputs of its own
+    // pricing pass — structured credit's `expected_loss`, the Merton bond
+    // engine's `expected_loss` — instead of leaving them to a registered
+    // calculator. Those values are the authoritative ones: the result envelope
+    // gives model measures precedence over calculator output. Seeding them here
+    // makes the metric layer read the same number rather than recompute it, and
+    // satisfies the registry's up-front applicability check, which exempts
+    // identifiers the context already carries.
+    //
+    // Only standard identifiers are seeded. Custom and composite keys are merged
+    // into the result envelope by the pricer itself, are not part of the
+    // registry's applicability contract, and seeding them would reorder the
+    // envelope's custom-measure tail.
+    for (metric_id, value) in pricer_measures {
+        if !metric_id.is_custom() {
+            context.computed.insert(metric_id, value);
+        }
+    }
+
+    let registry = match pricing.metric_registry.as_deref() {
+        Some(registry) => registry,
+        None => instrument.family().metrics(),
+    };
+    // Every requested metric is forwarded to the registry unfiltered: the
+    // registry rejects unknown identifiers and identifiers with no calculator
+    // for this instrument type. Silently dropping a caller-requested metric
+    // here would make "not supported" indistinguishable from "computed but
+    // missing" at the host-language boundary.
+    let metric_measures = registry.compute(metrics, &mut context)?;
+
+    // Pre-allocate capacity to avoid reallocations during insertion.
+    // Estimate: requested metrics + a few extras from composite keys.
+    let mut measures: IndexMap<MetricId, f64> = IndexMap::with_capacity(metrics.len() + 4);
+
+    // Deterministic insertion order: follow the requested metrics slice order
+    for metric_id in metrics {
+        if let Some(value) = metric_measures.get(metric_id) {
+            measures.insert(metric_id.clone(), *value);
+        }
+    }
+
+    // Include any composite keys (bucketed series, matrices, tensors, etc.) that were stored into
+    // `context.computed` during calculation.
+    //
+    // IMPORTANT:
+    // - Include composite/custom outputs and the bucketed-vega reconciliation
+    //   residual, while keeping unrequested internal dependency metrics private.
+    // - We insert in a stable order (sorted by key) to ensure deterministic results.
+    let mut extras: Vec<(&crate::metrics::MetricId, f64)> = context
+        .computed
+        .iter()
+        .filter_map(|(metric_id, value)| {
+            if (metric_id.is_custom()
+                || metric_id == &crate::metrics::MetricId::BucketedVegaResidual
+                || metric_id == &crate::metrics::MetricId::ThetaPeriodDays
+                || metric_id == &crate::metrics::MetricId::CarryDecompositionDegenerate)
+                && !measures.contains_key(metric_id)
+            {
+                Some((metric_id, *value))
+            } else {
+                None
+            }
+        })
+        .collect();
+    extras.sort_by(|(a, _), (b, _)| a.as_str().cmp(b.as_str()));
+    for (metric_id, value) in extras {
+        measures.insert(metric_id.clone(), value);
+    }
+
+    Ok(measures)
+}
+
+/// Test-only result builder for metric calculator unit fixtures.
+///
+/// Production pricing enriches the model-produced result envelope in the
+/// registry and must not construct a parallel `ValuationResult` here.
+#[cfg(test)]
+pub fn build_with_metrics_dyn(
+    instrument: Arc<dyn crate::instruments::common_impl::traits::Instrument>,
+    curves: Arc<MarketContext>,
+    as_of: Date,
+    base_value: Money,
+    metrics: &[crate::metrics::MetricId],
+    options: MetricBuildOptions,
+) -> finstack_quant_core::Result<crate::results::ValuationResult> {
+    let cfg = options
+        .pricing
+        .config
+        .clone()
+        .unwrap_or_else(MetricContext::default_config);
+    let instrument_id = instrument.id().to_string();
+    let measures = compute_metrics_dyn(instrument, curves, as_of, base_value, metrics, options)?;
+    let mut result = crate::results::ValuationResult::stamped_with_config(
+        &instrument_id,
+        as_of,
+        base_value,
+        cfg.as_ref(),
+    );
+    result.measures = measures;
+    Ok(result)
+}
+
+#[cfg(test)]
+#[allow(clippy::items_after_test_module)]
+mod tests {
+    use super::*;
+    use crate::instruments::common_impl::traits::{Attributes, Instrument};
+    use crate::metrics::MetricId;
+    use crate::pricer::InstrumentType;
+    use finstack_quant_cashflows::builder::CashFlowSchedule;
+    use finstack_quant_cashflows::{schedule_from_dated_flows, ScheduleBuildOpts};
+    use finstack_quant_core::config::FinstackConfig;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::math::interp::InterpStyle;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::CurveId;
+    use std::any::Any;
+    use std::sync::Arc;
+
+    #[test]
+    fn resolve_mc_paths_uses_default_when_override_missing() {
+        let n = resolve_mc_paths(None, 50_000).expect("default returned");
+        assert_eq!(n, 50_000);
+    }
+
+    #[test]
+    fn resolve_mc_paths_uses_default_when_override_is_zero() {
+        let n = resolve_mc_paths(Some(0), 50_000).expect("zero falls back");
+        assert_eq!(n, 50_000);
+    }
+
+    #[test]
+    fn resolve_mc_paths_honours_positive_override() {
+        let n = resolve_mc_paths(Some(123_456), 50_000).expect("override honoured");
+        assert_eq!(n, 123_456);
+    }
+
+    #[test]
+    fn resolve_mc_paths_rejects_override_above_cap() {
+        let too_many = mc_defaults::MAX_MC_PATHS + 1;
+        let err =
+            resolve_mc_paths(Some(too_many), 50_000).expect_err("override above cap must error");
+        let msg = err.to_string();
+        assert!(msg.contains("MAX_MC_PATHS"));
+        assert!(msg.contains(&too_many.to_string()));
+    }
+
+    #[test]
+    fn resolve_mc_paths_accepts_override_at_cap() {
+        let at_cap = mc_defaults::MAX_MC_PATHS;
+        let n = resolve_mc_paths(Some(at_cap), 50_000).expect("exact cap is allowed");
+        assert_eq!(n, at_cap);
+    }
+
+    #[test]
+    fn resolve_mc_paths_rejects_default_above_cap() {
+        let too_many = mc_defaults::MAX_MC_PATHS + 1;
+        // Even when the default itself exceeds the cap (a programmer bug),
+        // we surface it rather than silently allocating.
+        let err = resolve_mc_paths(None, too_many).expect_err("default above cap must error");
+        assert!(err.to_string().contains("MAX_MC_PATHS"));
+    }
+    use time::macros::date;
+    use time::Duration;
+
+    #[derive(Clone)]
+    struct StubInstrument {
+        id: String,
+        attrs: Attributes,
+        instrument_pricing_overrides:
+            crate::instruments::pricing_overrides::InstrumentPricingOverrides,
+        metric_pricing_overrides: crate::instruments::pricing_overrides::MetricPricingOverrides,
+        scenario_pricing_overrides: crate::instruments::pricing_overrides::ScenarioPricingOverrides,
+    }
+
+    crate::impl_empty_cashflow_provider!(
+        StubInstrument,
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
+    );
+
+    impl StubInstrument {
+        fn new(id: &str) -> Self {
+            Self {
+                id: id.to_string(),
+                attrs: Attributes::default(),
+                instrument_pricing_overrides: Default::default(),
+                metric_pricing_overrides: Default::default(),
+                scenario_pricing_overrides: Default::default(),
+            }
+        }
+    }
+
+    struct SingleFlowProvider;
+
+    impl finstack_quant_cashflows::CashflowScheduleSource for SingleFlowProvider {
+        fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+            Ok(Some(Money::from((100_i64, Currency::USD))))
+        }
+
+        fn raw_cashflow_schedule(
+            &self,
+            _curves: &MarketContext,
+            as_of: Date,
+        ) -> finstack_quant_core::Result<CashFlowSchedule> {
+            Ok(schedule_from_dated_flows(
+                vec![
+                    (as_of, Money::from((10_000_i64, Currency::USD))),
+                    (
+                        as_of + Duration::days(30),
+                        Money::from((100_i64, Currency::USD)),
+                    ),
+                ],
+                finstack_quant_cashflows::primitives::CFKind::Fixed,
+                DayCount::Act365F,
+                ScheduleBuildOpts {
+                    notional_hint: self.notional().expect("valid notional"),
+                    ..Default::default()
+                },
+            ))
+        }
+    }
+
+    impl Instrument for StubInstrument {
+        /// Test mock: reads no market data.
+        fn market_dependencies(
+            &self,
+        ) -> finstack_quant_core::Result<
+            crate::instruments::common_impl::dependencies::MarketDependencies,
+        > {
+            Ok(crate::instruments::common_impl::dependencies::MarketDependencies::new())
+        }
+
+        fn id(&self) -> &str {
+            &self.id
+        }
+
+        fn key(&self) -> InstrumentType {
+            InstrumentType::Bond
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+
+        fn base_value(
+            &self,
+            _market: &MarketContext,
+            _as_of: Date,
+        ) -> finstack_quant_core::Result<Money> {
+            Ok(Money::new(123.45, Currency::USD).expect("valid money fixture"))
+        }
+
+        fn attributes(&self) -> &Attributes {
+            &self.attrs
+        }
+
+        fn attributes_mut(&mut self) -> &mut Attributes {
+            &mut self.attrs
+        }
+
+        fn clone_box(&self) -> Box<dyn Instrument> {
+            Box::new(self.clone())
+        }
+
+        crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+
+        fn price_with_metrics(
+            &self,
+            market: &MarketContext,
+            as_of: Date,
+            metrics: &[MetricId],
+            options: crate::instruments::common_impl::traits::PricingOptions,
+        ) -> crate::Result<crate::results::ValuationResult> {
+            let base = self.value(market, as_of)?;
+            Ok(build_with_metrics_dyn(
+                Arc::from(self.clone_box()),
+                Arc::new(market.clone()),
+                as_of,
+                base,
+                metrics,
+                MetricBuildOptions {
+                    pricing: options,
+                    ..MetricBuildOptions::default()
+                },
+            )?)
+        }
+    }
+
+    #[test]
+    fn stamped_result_uses_provided_config() -> finstack_quant_core::Result<()> {
+        let instrument = Arc::new(StubInstrument::new("STUB"));
+        let market = Arc::new(MarketContext::new());
+        let as_of = date!(2024 - 01 - 01);
+        let base_value = Money::from((10_i64, Currency::USD));
+
+        let mut cfg = FinstackConfig::default();
+        // Set a non-default output scale to verify it is propagated into meta
+        cfg.rounding
+            .output_scale
+            .set_scale(Currency::USD, 4)
+            .expect("valid decimal scale");
+        let cfg = Arc::new(cfg);
+
+        let result = build_with_metrics_dyn(
+            instrument,
+            market,
+            as_of,
+            base_value,
+            &[],
+            MetricBuildOptions {
+                pricing: PricingOptions {
+                    config: Some(cfg),
+                    ..PricingOptions::default()
+                },
+                ..MetricBuildOptions::default()
+            },
+        )?;
+
+        let usd_scale = result
+            .meta
+            .rounding
+            .get_output_scale_by_currency()
+            .get(&Currency::USD)
+            .copied();
+        assert_eq!(usd_scale, Some(4), "meta should reflect provided config");
+        Ok(())
+    }
+
+    #[test]
+    fn metric_result_preserves_scenario_adjusted_base_value() -> finstack_quant_core::Result<()> {
+        let mut instrument = StubInstrument::new("STUB-SHOCK");
+        instrument.scenario_pricing_overrides = instrument
+            .scenario_pricing_overrides
+            .with_scenario_price_shock_decimal(-0.10);
+
+        let market = MarketContext::new();
+        let result = instrument.price_with_metrics(
+            &market,
+            date!(2024 - 01 - 01),
+            &[],
+            crate::instruments::PricingOptions::default(),
+        )?;
+
+        assert!((result.value.amount() - 111.105).abs() < 1e-9);
+        Ok(())
+    }
+
+    #[test]
+    fn instrument_value_default_applies_scenario_price_shock_once(
+    ) -> finstack_quant_core::Result<()> {
+        // base_value returns 123.45; -10% shock should yield 111.105 from value(),
+        // and value() == price_with_metrics().value to guarantee a single application.
+        let mut instrument = StubInstrument::new("STUB-VALUE");
+        instrument.scenario_pricing_overrides = instrument
+            .scenario_pricing_overrides
+            .with_scenario_price_shock_decimal(-0.10);
+
+        let market = MarketContext::new();
+        let as_of = date!(2024 - 01 - 01);
+
+        let direct = instrument.value(&market, as_of)?;
+        assert!((direct.amount() - 111.105).abs() < 1e-9);
+
+        let via_metrics = instrument
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )?
+            .value;
+        assert!((direct.amount() - via_metrics.amount()).abs() < 1e-9);
+        Ok(())
+    }
+
+    #[test]
+    fn instrument_base_value_is_unshocked() -> finstack_quant_core::Result<()> {
+        // base_value must ignore scenario overrides; only value() applies them.
+        let mut instrument = StubInstrument::new("STUB-BASE");
+        instrument.scenario_pricing_overrides = instrument
+            .scenario_pricing_overrides
+            .with_scenario_price_shock_decimal(-0.10);
+
+        let market = MarketContext::new();
+        let base = instrument.base_value(&market, date!(2024 - 01 - 01))?;
+        assert!((base.amount() - 123.45).abs() < 1e-9);
+        Ok(())
+    }
+
+    #[test]
+    fn black_scholes_inputs_df_r_eff_consistency() {
+        use super::BlackScholesInputsDf;
+
+        // Test that r_eff is consistent with df and t
+        // Given df = exp(-r * t), we should have r_eff = -ln(df) / t
+        let inputs = BlackScholesInputsDf {
+            spot: 100.0,
+            df: 0.95, // ~5% discount over the period
+            q: 0.02,
+            sigma: 0.20,
+            t: 1.0, // 1 year
+        };
+
+        let r_eff = inputs.r_eff();
+        // r_eff should be approximately -ln(0.95) / 1.0 ≈ 0.0513
+        let expected_r = -0.95_f64.ln() / 1.0;
+        assert!(
+            (r_eff - expected_r).abs() < 1e-10,
+            "r_eff = {}, expected = {}",
+            r_eff,
+            expected_r
+        );
+
+        // Verify round-trip: exp(-r_eff * t) should equal df
+        let reconstructed_df = (-r_eff * inputs.t).exp();
+        assert!(
+            (reconstructed_df - inputs.df).abs() < 1e-10,
+            "reconstructed_df = {}, original df = {}",
+            reconstructed_df,
+            inputs.df
+        );
+    }
+
+    #[test]
+    fn black_scholes_inputs_df_edge_cases() {
+        use super::BlackScholesInputsDf;
+
+        // At expiry (t = 0), r_eff should return 0.0
+        let at_expiry = BlackScholesInputsDf {
+            spot: 100.0,
+            df: 1.0,
+            q: 0.02,
+            sigma: 0.20,
+            t: 0.0,
+        };
+        assert_eq!(at_expiry.r_eff(), 0.0, "r_eff at expiry should be 0");
+
+        // Very short time horizon
+        let short_horizon = BlackScholesInputsDf {
+            spot: 100.0,
+            df: 0.9999,
+            q: 0.0,
+            sigma: 0.20,
+            t: 0.001,
+        };
+        let r_short = short_horizon.r_eff();
+        // Should be approximately -ln(0.9999) / 0.001 ≈ 0.1 (10%)
+        assert!(r_short > 0.0, "r_eff should be positive for df < 1");
+        assert!(r_short.is_finite(), "r_eff should be finite");
+    }
+
+    #[test]
+    fn configured_dividend_yield_must_exist() {
+        let market = MarketContext::new();
+        let err = resolve_optional_dividend_yield(
+            &market,
+            Some(&finstack_quant_core::types::PriceId::new("DIV")),
+        )
+        .err()
+        .map(|err| err.to_string());
+        assert!(err
+            .as_deref()
+            .is_some_and(|msg| msg.contains("Failed to fetch dividend yield")));
+    }
+
+    #[test]
+    fn configured_dividend_yield_must_be_unitless() {
+        let market = MarketContext::new().insert_price(
+            "DIV",
+            finstack_quant_core::market_data::scalars::MarketScalar::Price(Money::from((
+                1_i64,
+                Currency::USD,
+            ))),
+        );
+        let err = resolve_optional_dividend_yield(
+            &market,
+            Some(&finstack_quant_core::types::PriceId::new("DIV")),
+        )
+        .err()
+        .map(|err| err.to_string());
+        assert!(err
+            .as_deref()
+            .is_some_and(|msg| msg.contains("should be a unitless scalar")));
+    }
+
+    #[test]
+    fn schedule_pv_raw_excludes_as_of_cash() -> finstack_quant_core::Result<()> {
+        let as_of = date!(2024 - 01 - 01);
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("DISC")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (1.0, 0.95)])
+                .interp(InterpStyle::Linear)
+                .build()?,
+        );
+
+        let pv = schedule_pv_raw(&SingleFlowProvider, &market, as_of, &CurveId::new("DISC"))?;
+
+        assert!(pv > 0.0);
+        assert!(pv < 100.0);
+        Ok(())
+    }
+
+    #[test]
+    fn empty_schedule_without_known_currency_remains_an_error() {
+        let empty = StubInstrument::new("EMPTY-CURRENCY");
+        let market = MarketContext::new();
+        let curve_id = CurveId::new("DISC");
+        let as_of = date!(2025 - 01 - 16);
+        assert!(matches!(
+            schedule_pv(&empty, &market, as_of, &curve_id),
+            Err(finstack_quant_core::Error::Input(
+                finstack_quant_core::InputError::TooFewPoints
+            ))
+        ));
+        assert!(matches!(
+            schedule_pv_raw(&empty, &market, as_of, &curve_id),
+            Err(finstack_quant_core::Error::Input(
+                finstack_quant_core::InputError::TooFewPoints
+            ))
+        ));
+    }
+
+    #[test]
+    fn schedule_pv_excludes_as_of_cash() -> finstack_quant_core::Result<()> {
+        let as_of = date!(2024 - 01 - 01);
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("DISC")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (1.0, 0.95)])
+                .interp(InterpStyle::Linear)
+                .build()?,
+        );
+
+        let pv = schedule_pv(&SingleFlowProvider, &market, as_of, &CurveId::new("DISC"))?;
+
+        assert!(pv.amount() > 0.0);
+        assert!(pv.amount() < 100.0);
+        assert_eq!(pv.currency(), Currency::USD);
+        Ok(())
+    }
+}
+
+/// Black-Scholes inputs with discount factor (DF-first approach).
+///
+/// This struct provides the source-of-truth inputs for Black-Scholes/Garman-Kohlhagen
+/// pricing where discounting is done via date-based discount factors rather than rates.
+/// This avoids day-count basis mismatches between the rate `r` and time `t`.
+///
+/// # Fields
+///
+/// - `spot`: Current spot price
+/// - `df`: Discount factor from `as_of` to `expiry` (date-based, no year-fraction ambiguity)
+/// - `q`: Dividend yield / foreign rate (continuous)
+/// - `sigma`: Implied volatility from the vol surface
+/// - `t`: Time to expiry using the vol surface day count basis (for vol interpolation and Greeks)
+#[derive(Debug, Clone, Copy)]
+pub struct BlackScholesInputsDf {
+    /// Current spot price
+    pub spot: f64,
+    /// Discount factor from as_of to expiry (date-based)
+    pub df: f64,
+    /// Dividend yield / foreign rate (continuous)
+    pub q: f64,
+    /// Implied volatility
+    pub sigma: f64,
+    /// Time to expiry in years (vol surface basis)
+    pub t: f64,
+}
+
+impl BlackScholesInputsDf {
+    /// Derive an effective continuously-compounded rate consistent with `t` and `df`.
+    ///
+    /// This returns `r_eff = -ln(df) / t` such that `exp(-r_eff * t) = df`.
+    /// Use this when analytical formulas require a scalar rate.
+    ///
+    /// # Returns
+    ///
+    /// `r_eff` if `t > 0`, otherwise returns 0.0 (at expiry, rate is irrelevant).
+    #[inline]
+    pub fn r_eff(&self) -> f64 {
+        if self.t > 0.0 && self.df > 0.0 {
+            -self.df.ln() / self.t
+        } else {
+            0.0
+        }
+    }
+}
+
+/// Collect Black-Scholes inputs with discount factor (DF-first approach).
+///
+/// This is the preferred helper for option pricing as it avoids day-count basis
+/// mismatches. The discount factor is computed directly from dates, ensuring
+/// `exp(-r_eff * t) = df` when `r_eff` is derived via [`BlackScholesInputsDf::r_eff`].
+///
+/// # Arguments
+///
+/// * `spot_id` - ID of the spot price scalar
+/// * `discount_curve_id` - ID of the discount curve
+/// * `div_yield_id` - Optional ID of the dividend yield scalar (defaults to 0.0 if None)
+/// * `vol_surface_id` - ID of the volatility surface
+/// * `strike` - Strike price for volatility lookup
+/// * `expiry` - Expiry date
+/// * `day_count` - Day count convention for vol surface time calculation
+/// * `market` - Market data context
+/// * `as_of` - Valuation date
+///
+/// # Returns
+///
+/// [`BlackScholesInputsDf`] containing (spot, df, q, sigma, t_vol).
+#[allow(clippy::too_many_arguments)]
+pub fn collect_black_scholes_inputs_df(
+    spot_id: &str,
+    discount_curve_id: &finstack_quant_core::types::CurveId,
+    div_yield_id: Option<&finstack_quant_core::types::PriceId>,
+    vol_surface_id: &str,
+    strike: f64,
+    expiry: Date,
+    day_count: DayCount,
+    market: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<BlackScholesInputsDf> {
+    let disc_curve = market.get_discount(discount_curve_id.as_str())?;
+
+    // Time to expiry for vol surface lookup (using instrument's day count, which should
+    // match how the vol surface was calibrated - typically ACT/365F for equity options)
+    let t_vol = day_count.year_fraction(as_of, expiry, DayCountContext::default())?;
+
+    // Discount factor from as_of to expiry (date-based, no year-fraction ambiguity)
+    // This is the source of truth for discounting.
+    let df = disc_curve.df_between_dates(as_of, expiry)?;
+
+    if !df.is_finite() || df <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Invalid discount factor ({:.6e}) between {} and {}",
+            df, as_of, expiry
+        )));
+    }
+
+    // Spot price (S)
+    let spot_scalar = market.get_price(spot_id)?;
+    let spot = match spot_scalar {
+        MarketScalar::Unitless(v) => *v,
+        MarketScalar::Price(m) => m.amount(),
+    };
+
+    // Dividend yield (q)
+    let q = resolve_optional_dividend_yield(market, div_yield_id)?;
+
+    // Volatility (sigma) using vol surface's time basis
+    let vol_surface = market.get_surface(vol_surface_id)?;
+    vol_surface.require_quote_type(VolQuoteType::BlackLognormal)?;
+    vol_surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
+    let sigma =
+        finstack_quant_models::volatility::get_surface_vol_clamped(&vol_surface, t_vol, strike);
+
+    Ok(BlackScholesInputsDf {
+        spot,
+        df,
+        q,
+        sigma,
+        t: t_vol,
+    })
+}
+
+/// Collect standard Black-Scholes inputs (spot, r, q, sigma, t) from market context.
+///
+/// Retrieves and calculates the 5 standard parameters required for Black-Scholes pricing:
+/// - Spot price (S)
+/// - Risk-free rate (r) for the period to expiry
+/// - Dividend/Continuous yield (q)
+/// - Volatility (sigma) at strike/maturity
+/// - Time to expiry (t) in years
+///
+/// # Time-Consistency
+///
+/// This function derives `r` from the discount factor such that `exp(-r * t) = df`.
+/// This ensures the rate and time are on the same basis, avoiding day-count mismatches
+/// that can cause pricing errors in barrier options and other path-dependent derivatives.
+///
+/// # Arguments
+///
+/// * `spot_id` - ID of the spot price scalar
+/// * `discount_curve_id` - ID of the discount curve
+/// * `div_yield_id` - Optional ID of the dividend yield scalar (defaults to 0.0 if None)
+/// * `vol_surface_id` - ID of the volatility surface
+/// * `strike` - Strike price for volatility lookup
+/// * `expiry` - Expiry date
+/// * `day_count` - Day count convention for vol surface time calculation (should match vol surface calibration basis)
+/// * `market` - Market data context
+/// * `as_of` - Valuation date
+///
+/// # Returns
+///
+/// A tuple `(spot, r, q, sigma, t)` where:
+/// - `spot`: Current spot price
+/// - `r`: Effective continuously compounded rate such that `exp(-r*t) = df`
+/// - `q`: Dividend yield (0.0 if not provided)
+/// - `sigma`: Implied volatility from the vol surface at (t_vol, strike)
+/// - `t`: Time to expiry using the vol surface day count basis (t_vol)
+#[allow(clippy::too_many_arguments)]
+pub fn collect_black_scholes_inputs(
+    spot_id: &str,
+    discount_curve_id: &finstack_quant_core::types::CurveId,
+    div_yield_id: Option<&finstack_quant_core::types::PriceId>,
+    vol_surface_id: &str,
+    strike: f64,
+    expiry: Date,
+    day_count: DayCount,
+    market: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<(f64, f64, f64, f64, f64)> {
+    // Delegate to DF-based helper and derive r_eff
+    let inputs = collect_black_scholes_inputs_df(
+        spot_id,
+        discount_curve_id,
+        div_yield_id,
+        vol_surface_id,
+        strike,
+        expiry,
+        day_count,
+        market,
+        as_of,
+    )?;
+
+    // Derive effective rate: r_eff = -ln(df) / t such that exp(-r_eff * t) = df
+    let r_eff = inputs.r_eff();
+
+    Ok((inputs.spot, r_eff, inputs.q, inputs.sigma, inputs.t))
+}
+
+// Inflation Lag Helpers
+
+use finstack_quant_core::dates::DateExt;
+use finstack_quant_core::market_data::scalars::InflationLag;
+
+/// Apply an inflation lag to a date.
+///
+/// - `Months(m)` subtracts m calendar months
+/// - `Days(d)` subtracts d calendar days
+/// - `None` returns the date unchanged
+///
+/// Returns a validation error when the lag underflows the supported calendar
+/// or the lag convention is unsupported.
+pub fn apply_inflation_lag(date: Date, lag: InflationLag) -> finstack_quant_core::Result<Date> {
+    match lag {
+        InflationLag::None => Ok(date),
+        InflationLag::Months(m) => date.add_months(-i32::from(m)),
+        InflationLag::Days(d) => date.add_days(-i64::from(d)),
+        #[allow(unreachable_patterns)]
+        _ => Err(finstack_quant_core::Error::Validation(
+            "unsupported inflation lag convention".into(),
+        )),
+    }
+}
+
+/// Resolve the effective lag for an inflation instrument.
+///
+/// Priority: (1) the contract's explicit `lag`, (2) index lag from market context,
+/// (3) the projection curve's `indexation_lag_months`, (4)
+/// `InflationLag::None`.
+///
+/// A market that carries only a projection curve still carries that curve's
+/// indexation lag, and a bootstrapped inflation curve is anchored at its base
+/// date minus that lag. Ignoring it would read the curve on an unlagged time
+/// axis while the curve itself is built on a lagged one, silently
+/// over-projecting the reference index at both ends of a swap.
+pub fn resolve_inflation_lag(
+    contract_lag: Option<InflationLag>,
+    index_id: &str,
+    curves: &MarketContext,
+) -> InflationLag {
+    if let Some(lag) = contract_lag {
+        return lag;
+    }
+    if let Ok(index) = curves.get_inflation_index(index_id) {
+        return index.lag();
+    }
+    let Ok(curve) = curves.get_inflation_curve(index_id) else {
+        return InflationLag::None;
+    };
+    match u8::try_from(curve.indexation_lag_months()) {
+        Ok(0) | Err(_) => InflationLag::None,
+        Ok(months) => InflationLag::Months(months),
+    }
+}
+
+/// Resolve a realized CPI/RPI value from a supplied index history.
+///
+/// Historical observations are contractual fixings: once the effective fixing
+/// date is on or before `as_of`, missing coverage must be surfaced rather than
+/// silently replaced with a curve projection or an indefinitely stale value.
+/// Step interpolation may carry the published level through the remainder of
+/// its calendar month; linear interpolation requires a published right anchor.
+///
+/// The index is cloned with the instrument's effective lag so a contract-level
+/// lag override is honored without mutating shared market data.
+pub fn realized_inflation_index_value(
+    index: &InflationIndex,
+    unlagged_date: Date,
+    effective_date: Date,
+    effective_lag: InflationLag,
+) -> finstack_quant_core::Result<f64> {
+    if matches!(effective_lag, InflationLag::Months(_)) {
+        return index
+            .clone()
+            .with_lag(effective_lag)
+            .value_on(unlagged_date);
+    }
+    let (first, last) = index.date_range()?;
+    let is_covered = if effective_date < first {
+        false
+    } else {
+        match index.interpolation() {
+            SeriesInterpolation::Step => {
+                (effective_date.year(), effective_date.month()) <= (last.year(), last.month())
+            }
+            SeriesInterpolation::Linear => effective_date <= last,
+        }
+    };
+
+    if !is_covered {
+        return Err(finstack_quant_core::InputError::NotFound {
+            id: format!(
+                "inflation index '{}' fixing coverage for {} (available {} through {})",
+                index.id(),
+                effective_date,
+                first,
+                last
+            ),
+        }
+        .into());
+    }
+
+    index
+        .clone()
+        .with_lag(effective_lag)
+        .value_on(unlagged_date)
+}
+
+/// Resolved reference CPI together with the information needed to distinguish
+/// observed fixings from projections for option valuation.
+pub struct InflationReferenceValue {
+    /// Reference CPI after observation lag and monthly interpolation.
+    pub value: f64,
+    /// Whether every required anchor has an available historical fixing.
+    pub is_known: bool,
+    /// Date when all outstanding monthly anchors become available. `None` on
+    /// an unknown reference means its publication schedule is unspecified.
+    pub publication_date: Option<Date>,
+}
+
+/// Resolve a contractual reference CPI, applying month lag and daily weight once.
+/// Explicit monthly publication dates control availability independently of the
+/// observation lag. Without one, past reference anchors remain strictly required
+/// history; a stale feed cannot silently extend the forecast window.
+pub fn reference_inflation_value(
+    market: &MarketContext,
+    index_id: &str,
+    date: Date,
+    as_of: Date,
+    lag: InflationLag,
+    interpolation: SeriesInterpolation,
+) -> finstack_quant_core::Result<f64> {
+    Ok(resolve_reference_inflation(market, index_id, date, as_of, lag, interpolation)?.value)
+}
+
+/// Resolve reference CPI and the availability of every interpolation anchor.
+pub fn resolve_reference_inflation(
+    market: &MarketContext,
+    index_id: &str,
+    date: Date,
+    as_of: Date,
+    lag: InflationLag,
+    interpolation: SeriesInterpolation,
+) -> finstack_quant_core::Result<InflationReferenceValue> {
+    let index = market.get_inflation_index(index_id).ok();
+    // An explicit monthly publication schedule also establishes reference-month
+    // identity for zero/day-lag contracts. Publication is independent of the
+    // contractual date shift; it must not disappear when that shift is not Months.
+    let monthly = matches!(lag, InflationLag::Months(_))
+        || index
+            .as_ref()
+            .is_some_and(|index| !index.get_publication_dates().is_empty());
+    let cpi_on = |reference_date: Date| -> finstack_quant_core::Result<InflationReferenceValue> {
+        let publication_date = index
+            .as_ref()
+            .and_then(|index| index.get_publication_date(reference_date));
+        let is_known = publication_date.unwrap_or(reference_date) <= as_of;
+        let value = if is_known {
+            let index = market.get_inflation_index(index_id)?;
+            if monthly {
+                index.ref_cpi_months_lag(reference_date, 0)?
+            } else {
+                realized_inflation_index_value(
+                    index.as_ref(),
+                    reference_date,
+                    reference_date,
+                    InflationLag::None,
+                )?
+            }
+        } else {
+            market
+                .get_inflation_curve(index_id)?
+                .cpi_on_date(reference_date)?
+        };
+        Ok(InflationReferenceValue {
+            value,
+            is_known,
+            publication_date: if is_known { None } else { publication_date },
+        })
+    };
+    if monthly {
+        // Month lags retain the contractual month's daily weight; day lags
+        // move the reference date itself before applying monthly interpolation.
+        let (weight_date, months) = match lag {
+            InflationLag::Months(months) => (date, months),
+            _ => (apply_inflation_lag(date, lag)?, 0),
+        };
+        let first = weight_date
+            .replace_day(1)
+            .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?;
+        let anchor0 = first.add_months(-i32::from(months))?;
+        let cpi0 = cpi_on(anchor0)?;
+        if interpolation == SeriesInterpolation::Step || weight_date.day() == 1 {
+            return Ok(cpi0);
+        }
+        let cpi1 = cpi_on(anchor0.add_months(1)?)?;
+        let weight = f64::from(weight_date.day() - 1)
+            / f64::from(weight_date.month().length(weight_date.year()));
+        let publication_date = match (cpi0.is_known, cpi1.is_known) {
+            (true, true) => None,
+            (true, false) => cpi1.publication_date,
+            (false, true) => cpi0.publication_date,
+            (false, false) => cpi0
+                .publication_date
+                .zip(cpi1.publication_date)
+                .map(|(first, second)| first.max(second)),
+        };
+        Ok(InflationReferenceValue {
+            value: cpi0.value + weight * (cpi1.value - cpi0.value),
+            is_known: cpi0.is_known && cpi1.is_known,
+            publication_date,
+        })
+    } else {
+        cpi_on(apply_inflation_lag(date, lag)?)
+    }
+}
+
+#[cfg(test)]
+mod realized_inflation_index_tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+    use time::macros::date;
+
+    #[test]
+    fn publication_policy_is_independent_of_zero_or_day_observation_lag() {
+        use finstack_quant_core::market_data::term_structures::InflationCurve;
+
+        let january = date!(2026 - 01 - 01);
+        let february = date!(2026 - 02 - 01);
+        let index = InflationIndex::new(
+            "CPI",
+            vec![(january, 306.0), (february, 900.0)],
+            Currency::USD,
+        )
+        .expect("index")
+        .with_interpolation(SeriesInterpolation::Linear)
+        .with_publication_dates(vec![
+            (january, date!(2026 - 02 - 13)),
+            (february, date!(2026 - 03 - 13)),
+        ])
+        .expect("publication schedule");
+        let market = MarketContext::new()
+            .insert(
+                InflationCurve::builder("CPI")
+                    .base_date(date!(2025 - 12 - 01))
+                    .base_cpi(310.0)
+                    .knots([(0.0, 310.0), (2.0, 310.0)])
+                    .build()
+                    .expect("curve"),
+            )
+            .insert_inflation_index(index);
+        for (lag, exact_date, interpolation_date) in [
+            (InflationLag::None, january, date!(2026 - 01 - 16)),
+            (
+                InflationLag::Days(10),
+                date!(2026 - 01 - 11),
+                date!(2026 - 01 - 26),
+            ),
+        ] {
+            let unpublished = resolve_reference_inflation(
+                &market,
+                "CPI",
+                exact_date,
+                date!(2026 - 01 - 20),
+                lag,
+                SeriesInterpolation::Step,
+            )
+            .expect("unpublished January projects for either lag");
+            // The default log-linear curve performs a log/exp round trip,
+            // even for constant CPI. Allow only its floating-point rounding.
+            assert!((unpublished.value - 310.0).abs() <= 2.0 * f64::EPSILON * 310.0);
+            assert!(!unpublished.is_known);
+            assert_eq!(unpublished.publication_date, Some(date!(2026 - 02 - 13)));
+
+            let mixed = resolve_reference_inflation(
+                &market,
+                "CPI",
+                interpolation_date,
+                date!(2026 - 02 - 14),
+                lag,
+                SeriesInterpolation::Linear,
+            )
+            .expect("published January with projected February");
+            assert!((mixed.value - (306.0 + (310.0 - 306.0) * 15.0 / 31.0)).abs() < 1e-12);
+            assert!(!mixed.is_known);
+            assert_eq!(mixed.publication_date, Some(date!(2026 - 03 - 13)));
+        }
+    }
+
+    #[test]
+    fn no_publication_metadata_preserves_daily_calendar_interpolation() {
+        let index = InflationIndex::new(
+            "DAILY",
+            vec![
+                (date!(2026 - 01 - 10), 300.0),
+                (date!(2026 - 01 - 20), 302.0),
+            ],
+            Currency::USD,
+        )
+        .expect("daily index")
+        .with_interpolation(SeriesInterpolation::Linear);
+        let market = MarketContext::new().insert_inflation_index(index);
+        for (lag, contract_date) in [
+            (InflationLag::None, date!(2026 - 01 - 15)),
+            (InflationLag::Days(10), date!(2026 - 01 - 25)),
+        ] {
+            let result = resolve_reference_inflation(
+                &market,
+                "DAILY",
+                contract_date,
+                date!(2026 - 01 - 21),
+                lag,
+                SeriesInterpolation::Linear,
+            )
+            .expect("existing daily interpolation");
+            assert_eq!(result.value, 301.0);
+            assert!(result.is_known);
+        }
+    }
+
+    #[test]
+    fn monthly_reference_uses_release_dates_without_hiding_stale_history() {
+        use finstack_quant_core::market_data::term_structures::InflationCurve;
+
+        let december = date!(2025 - 12 - 01);
+        let january = date!(2026 - 01 - 01);
+        let release = date!(2026 - 02 - 13);
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![(december, 305.0), (january, 306.0)],
+            Currency::USD,
+        )
+        .expect("index")
+        .with_publication_dates(vec![(december, date!(2026 - 01 - 13)), (january, release)])
+        .expect("publication dates");
+        // A deliberately different projection makes source selection visible.
+        let curve = InflationCurve::builder("US-CPI")
+            .base_date(december)
+            .base_cpi(310.0)
+            .knots([(0.0, 310.0), (2.0, 310.0)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new()
+            .insert(curve)
+            .insert_inflation_index(index.clone());
+        let mixed = resolve_reference_inflation(
+            &market,
+            "US-CPI",
+            date!(2026 - 03 - 16),
+            date!(2026 - 01 - 20),
+            InflationLag::Months(3),
+            SeriesInterpolation::Linear,
+        )
+        .expect("one observed and one unpublished anchor");
+        assert!((mixed.value - (305.0 + 5.0 * 15.0 / 31.0)).abs() < 1e-12);
+        assert!(!mixed.is_known);
+        assert_eq!(mixed.publication_date, Some(release));
+
+        for as_of in [release, date!(2026 - 02 - 14)] {
+            let fixed = resolve_reference_inflation(
+                &market,
+                "US-CPI",
+                date!(2026 - 04 - 01),
+                as_of,
+                InflationLag::Months(3),
+                SeriesInterpolation::Step,
+            )
+            .expect("published anchor");
+            assert_eq!(fixed.value, 306.0);
+            assert!(fixed.is_known);
+        }
+
+        let stale = InflationIndex::new("US-CPI", vec![(december, 305.0)], Currency::USD)
+            .expect("stale history")
+            .with_publication_dates(index.get_publication_dates())
+            .expect("release dates");
+        let stale_market = market.clone().insert_inflation_index(stale);
+        assert!(reference_inflation_value(
+            &stale_market,
+            "US-CPI",
+            date!(2026 - 04 - 01),
+            release,
+            InflationLag::Months(3),
+            SeriesInterpolation::Step,
+        )
+        .is_err());
+
+        let no_metadata = InflationIndex::new("US-CPI", vec![(december, 305.0)], Currency::USD)
+            .expect("history with no publication policy");
+        let no_metadata_market = market.insert_inflation_index(no_metadata);
+        assert!(reference_inflation_value(
+            &no_metadata_market,
+            "US-CPI",
+            date!(2026 - 04 - 01),
+            date!(2026 - 01 - 20),
+            InflationLag::Months(3),
+            SeriesInterpolation::Step,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn date_offset_rejects_inflation_lag_underflow() {
+        for lag in [InflationLag::Months(1), InflationLag::Days(1)] {
+            assert!(apply_inflation_lag(Date::MIN, lag).is_err());
+        }
+        assert_eq!(
+            apply_inflation_lag(Date::MIN, InflationLag::None).expect("no date shift"),
+            Date::MIN
+        );
+    }
+
+    fn step_index() -> InflationIndex {
+        InflationIndex::new(
+            "US-CPI",
+            vec![
+                (date!(2025 - 01 - 01), 300.0),
+                (date!(2025 - 02 - 01), 301.0),
+            ],
+            Currency::USD,
+        )
+        .expect("valid index")
+        .with_lag(InflationLag::Months(3))
+    }
+
+    #[test]
+    fn rejects_historical_dates_outside_published_coverage() {
+        let index = step_index();
+        for effective_date in [date!(2024 - 12 - 15), date!(2025 - 03 - 01)] {
+            let result = realized_inflation_index_value(
+                &index,
+                effective_date,
+                effective_date,
+                InflationLag::None,
+            );
+            assert!(result.is_err(), "{effective_date} must require a fixing");
+        }
+    }
+
+    #[test]
+    fn step_interpolation_carries_only_within_last_published_month() {
+        let index = step_index();
+        let value = realized_inflation_index_value(
+            &index,
+            date!(2025 - 02 - 20),
+            date!(2025 - 02 - 20),
+            InflationLag::None,
+        )
+        .expect("same-month step fixing is covered");
+        assert_eq!(value, 301.0);
+    }
+
+    #[test]
+    fn contract_lag_replaces_index_default_lag() {
+        let index = step_index();
+        let value = realized_inflation_index_value(
+            &index,
+            date!(2025 - 02 - 15),
+            date!(2025 - 02 - 15),
+            InflationLag::None,
+        )
+        .expect("explicit no-lag override should use February fixing");
+        assert_eq!(value, 301.0);
+    }
+
+    #[test]
+    fn linear_interpolation_requires_a_published_right_anchor() {
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![(date!(2025 - 01 - 01), 300.0)],
+            Currency::USD,
+        )
+        .expect("valid index")
+        .with_interpolation(SeriesInterpolation::Linear);
+        let result = realized_inflation_index_value(
+            &index,
+            date!(2025 - 01 - 15),
+            date!(2025 - 01 - 15),
+            InflationLag::None,
+        );
+        assert!(
+            result.is_err(),
+            "linear interpolation needs the next anchor"
+        );
+    }
+}

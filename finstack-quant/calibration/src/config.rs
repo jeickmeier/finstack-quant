@@ -914,8 +914,7 @@ pub struct RatesStepConventions {
     /// price its bootstrap swaps with the same compounding to bit-match
     /// Bloomberg's resulting DFs.
     #[serde(default)]
-    pub ois_compounding:
-        Option<finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding>,
+    pub ois_compounding: Option<finstack_quant_cashflows::builder::FloatingLegCompounding>,
 }
 
 #[cfg(test)]

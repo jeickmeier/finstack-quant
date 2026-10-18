@@ -5,12 +5,12 @@
 //! pricing infrastructure.
 
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
-use crate::instruments::common_impl::validation;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::{fx::FxConversionPolicy, Money};
 use finstack_quant_core::types::{InstrumentId, PriceId};
+use finstack_quant_core::validation;
 use finstack_quant_core::Result;
 
 use crate::instruments::json_loader::InstrumentJson;
@@ -317,7 +317,10 @@ impl Basket {
 
 // Implement traits manually to handle InstrumentId properly
 impl Instrument for Basket {
-    impl_instrument_base!(crate::pricer::InstrumentType::Basket);
+    impl_instrument_base!(
+        crate::pricer::InstrumentType::Basket,
+        crate::pricer::STANDARD
+    );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()
@@ -332,11 +335,9 @@ impl Instrument for Basket {
         deps.add_discount_curve(self.discount_curve_id.clone());
         for constituent in &self.constituents {
             match &constituent.reference {
-                ConstituentReference::Instrument(instrument) => deps.merge(
-                    crate::instruments::common_impl::dependencies::MarketDependencies::from_instrument_json(
-                        instrument,
-                    )?,
-                ),
+                ConstituentReference::Instrument(instrument) => {
+                    deps.merge(crate::instruments::market_dependencies_of(instrument)?)
+                }
                 ConstituentReference::MarketData { price_id, .. } => {
                     deps.add_market_scalar_id(price_id.as_str());
                 }

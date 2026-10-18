@@ -314,7 +314,7 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
   });
   // Retain the native scenario authority alongside the matching facade declaration.
   const scenarioPath =
-    "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/scenario.rs";
+    "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/scenario.rs";
   const scenarioSource = await readFile(resolve(repo, scenarioPath), "utf8");
   return {
     inventory: {

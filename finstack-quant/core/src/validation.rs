@@ -196,6 +196,300 @@ pub fn validate_unique_ids<'a>(
     Ok(())
 }
 
+/// Validate `end > start` for a date range.
+///
+/// # Arguments
+///
+/// * `start` - Range start date.
+/// * `end` - Range end date, which must be strictly after `start`.
+/// * `context` - Name of the range used in the error message.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `end <= start`.
+#[inline]
+pub fn validate_date_range_strict(
+    start: crate::dates::Date,
+    end: crate::dates::Date,
+    context: &str,
+) -> crate::Result<()> {
+    require_with(end > start, || {
+        format!("Invalid {context} date range: end ({end}) must be after start ({start})")
+    })
+}
+
+/// Validate `end > start` for a date range with a caller-built message.
+///
+/// # Arguments
+///
+/// * `start` - Range start date.
+/// * `end` - Range end date, which must be strictly after `start`.
+/// * `message` - Builds the error message from `(start, end)` on failure.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` with `message(start, end)` when `end <= start`.
+#[inline]
+pub fn validate_date_range_strict_with(
+    start: crate::dates::Date,
+    end: crate::dates::Date,
+    message: impl FnOnce(crate::dates::Date, crate::dates::Date) -> String,
+) -> crate::Result<()> {
+    require_with(end > start, || message(start, end))
+}
+
+/// Validate `end >= start` for a date range.
+///
+/// # Arguments
+///
+/// * `start` - Range start date.
+/// * `end` - Range end date, which must not be before `start`.
+/// * `context` - Name of the range used in the error message.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `end < start`.
+#[inline]
+pub fn validate_date_range_non_strict(
+    start: crate::dates::Date,
+    end: crate::dates::Date,
+    context: &str,
+) -> crate::Result<()> {
+    require_with(end >= start, || {
+        format!("{context} start date ({start}) must not be after end date ({end})")
+    })
+}
+
+/// Validate that a monetary amount is finite.
+///
+/// # Arguments
+///
+/// * `money` - Amount to check.
+/// * `context` - Name of the amount used in the error message.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when the amount is NaN or infinite.
+#[inline]
+pub fn validate_money_finite(money: crate::money::Money, context: &str) -> crate::Result<()> {
+    require_with(money.amount().is_finite(), || {
+        format!("Invalid {context}: amount must be finite.")
+    })
+}
+
+/// Validate that a monetary amount exceeds a threshold.
+///
+/// # Arguments
+///
+/// * `money` - Amount to check.
+/// * `min` - Exclusive lower bound in the amount's own currency units.
+/// * `context` - Name of the amount used in the error message.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `money.amount() <= min`.
+#[inline]
+pub fn validate_money_gt(money: crate::money::Money, min: f64, context: &str) -> crate::Result<()> {
+    require_with(money.amount() > min, || {
+        format!("Invalid {context}: amount must be > {min}")
+    })
+}
+
+/// Validate that a monetary amount exceeds a threshold with a caller-built message.
+///
+/// # Arguments
+///
+/// * `money` - Amount to check.
+/// * `min` - Exclusive lower bound in the amount's own currency units.
+/// * `message` - Builds the error message from the offending amount.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` with `message(amount)` when `money.amount() <= min`.
+#[inline]
+pub fn validate_money_gt_with(
+    money: crate::money::Money,
+    min: f64,
+    message: impl FnOnce(f64) -> String,
+) -> crate::Result<()> {
+    require_with(money.amount() > min, || message(money.amount()))
+}
+
+/// Validate that a monetary amount carries the expected currency.
+///
+/// # Arguments
+///
+/// * `money` - Amount to check.
+/// * `expected` - Currency the amount must be denominated in.
+/// * `context` - Name of the amount used in the error message.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when the currencies differ.
+#[inline]
+pub fn validate_money_currency(
+    money: crate::money::Money,
+    expected: crate::currency::Currency,
+    context: &str,
+) -> crate::Result<()> {
+    require_with(money.currency() == expected, || {
+        format!(
+            "Invalid {context}: currency ({}) must match expected ({expected})",
+            money.currency()
+        )
+    })
+}
+
+/// Validate that an FX pair has distinct base and quote currencies.
+///
+/// # Arguments
+///
+/// * `base` - Base currency of the pair.
+/// * `quote` - Quote currency of the pair, which must differ from `base`.
+/// * `instrument_name` - Instrument name used in the error message.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `base == quote`.
+#[inline]
+pub fn validate_distinct_currencies(
+    base: crate::currency::Currency,
+    quote: crate::currency::Currency,
+    instrument_name: &str,
+) -> crate::Result<()> {
+    require_with(base != quote, || {
+        format!(
+            "{instrument_name} base_currency ({base}) must differ from quote_currency ({quote})"
+        )
+    })
+}
+
+/// Validate that `|value| <= max_abs`.
+///
+/// # Arguments
+///
+/// * `value` - Value to check.
+/// * `max_abs` - Inclusive bound on the absolute value.
+/// * `context` - Name of the value used in the error message.
+/// * `units_hint` - Optional unit label appended to the bound in the message.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `value.abs() > max_abs`.
+#[inline]
+pub fn validate_f64_abs_le(
+    value: f64,
+    max_abs: f64,
+    context: &str,
+    units_hint: Option<&str>,
+) -> crate::Result<()> {
+    require_with(value.abs() <= max_abs, || {
+        let units = units_hint.unwrap_or("");
+        format!("Invalid {context}: |value| exceeds {max_abs}{units} (got {value})")
+    })
+}
+
+/// Validate that a rate-like value is finite and within `±max_abs`.
+///
+/// # Arguments
+///
+/// * `value` - Rate as a decimal (`0.05` is 5 %).
+/// * `max_abs` - Inclusive bound on the absolute decimal value.
+/// * `context` - Name of the rate used in the error message.
+/// * `display_scale` - Multiplier applied to the value and bound in the
+///   message (`100.0` to display percent, `10_000.0` for basis points).
+/// * `display_units` - Unit label shown after the scaled numbers.
+/// * `guidance` - Extra sentence appended to the message; empty for none.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when the value is non-finite or exceeds the bound.
+#[inline]
+pub fn validate_rate_magnitude(
+    value: f64,
+    max_abs: f64,
+    context: &str,
+    display_scale: f64,
+    display_units: &str,
+    guidance: &str,
+) -> crate::Result<()> {
+    validate_f64_finite(value, context)?;
+    require_with(value.abs() <= max_abs, || {
+        let guidance = if guidance.is_empty() {
+            String::new()
+        } else {
+            format!(" {guidance}")
+        };
+        format!(
+            "Invalid {context}: {:.2}{display_units} exceeds maximum allowed magnitude ({:.0}{display_units}).{guidance}",
+            value * display_scale,
+            max_abs * display_scale,
+        )
+    })
+}
+
+/// Whether a rate-like value lies outside an inclusive range.
+///
+/// # Arguments
+///
+/// * `value` - Value to test.
+/// * `min` - Inclusive lower bound.
+/// * `max` - Inclusive upper bound.
+#[inline]
+#[must_use]
+pub fn rate_outside_range(value: f64, min: f64, max: f64) -> bool {
+    !(min..=max).contains(&value)
+}
+
+/// Validate that a recovery rate is a finite value in `[0, 1)`.
+///
+/// `R = 1.0` is rejected because LGD `1 - R = 0` makes a protection-leg
+/// integrand vanish identically, which breaks hazard-curve bootstrapping and
+/// produces meaningless tranche pricing; the ISDA standard convention also
+/// reserves `R < 1`.
+///
+/// # Arguments
+///
+/// * `recovery_rate` - Recovery as a decimal fraction of notional.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when the rate is non-finite or outside `[0, 1)`.
+#[inline]
+pub fn validate_recovery_rate(recovery_rate: f64) -> crate::Result<()> {
+    require_with(
+        recovery_rate.is_finite() && (0.0..1.0).contains(&recovery_rate),
+        || {
+            format!(
+                "Recovery rate must be a finite value in [0.0, 1.0), got {recovery_rate}. \
+                 R = 1.0 implies zero LGD, which makes protection legs degenerate."
+            )
+        },
+    )
+}
+
+/// Validate that dates are strictly increasing.
+///
+/// # Arguments
+///
+/// * `values` - Dates in the order they were supplied.
+/// * `context` - Name of the sequence used in the error message.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when any date is not strictly after its predecessor.
+#[inline]
+pub fn validate_sorted_strict(values: &[crate::dates::Date], context: &str) -> crate::Result<()> {
+    for pair in values.windows(2) {
+        if pair[0] >= pair[1] {
+            return Err(crate::Error::Validation(format!(
+                "{context} must be sorted in ascending order"
+            )));
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,5 +528,85 @@ mod tests {
         let err = validate_unique_ids("test registry", "record", records.iter().map(Vec::as_slice))
             .expect_err("trimmed aliases must be unique");
         assert!(matches!(err, Error::Validation(message) if message.contains("duplicate")));
+    }
+
+    #[test]
+    fn validate_date_range_strict_accepts_valid_order() {
+        let start = crate::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+            .expect("valid date");
+        let end = crate::dates::Date::from_calendar_date(2024, time::Month::February, 1)
+            .expect("valid date");
+        assert!(validate_date_range_strict(start, end, "test").is_ok());
+    }
+
+    #[test]
+    fn validate_date_range_strict_rejects_equal_or_reverse() {
+        let start = crate::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+            .expect("valid date");
+        assert!(validate_date_range_strict(start, start, "test").is_err());
+        assert!(validate_date_range_strict_with(start, start, |s, e| format!("{s} {e}")).is_err());
+    }
+
+    #[test]
+    fn validate_date_range_non_strict_accepts_equal() {
+        let start = crate::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+            .expect("valid date");
+        assert!(validate_date_range_non_strict(start, start, "test").is_ok());
+    }
+
+    #[test]
+    fn validate_money_checks_finite_gt_and_currency() {
+        let money = crate::money::Money::from((1_i64, crate::currency::Currency::USD));
+        assert!(validate_money_finite(money, "test").is_ok());
+        assert!(validate_money_gt(money, 0.0, "test").is_ok());
+        assert!(validate_money_gt(money, 2.0, "test").is_err());
+        assert!(validate_money_gt_with(money, 2.0, |amount| format!("{amount}")).is_err());
+        assert!(validate_money_currency(money, crate::currency::Currency::USD, "test").is_ok());
+        assert!(validate_money_currency(money, crate::currency::Currency::EUR, "test").is_err());
+        assert!(validate_distinct_currencies(
+            crate::currency::Currency::EUR,
+            crate::currency::Currency::USD,
+            "pair"
+        )
+        .is_ok());
+        assert!(validate_distinct_currencies(
+            crate::currency::Currency::USD,
+            crate::currency::Currency::USD,
+            "pair"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn validate_f64_abs_le_rejects_large_values() {
+        assert!(validate_f64_abs_le(2.0, 1.0, "test", None).is_err());
+        assert!(validate_f64_abs_le(0.5, 1.0, "test", Some("%")).is_ok());
+    }
+
+    #[test]
+    fn validate_rate_magnitude_rejects_large_values() {
+        assert!(validate_rate_magnitude(2.0, 1.0, "test rate", 100.0, "%", "").is_err());
+        assert!(validate_rate_magnitude(0.5, 1.0, "test rate", 100.0, "%", "").is_ok());
+        assert!(rate_outside_range(2.0, -1.0, 1.0));
+        assert!(!rate_outside_range(0.5, -1.0, 1.0));
+    }
+
+    #[test]
+    fn validate_recovery_rate_rejects_one_and_non_finite() {
+        assert!(validate_recovery_rate(0.4).is_ok());
+        assert!(validate_recovery_rate(1.0).is_err());
+        assert!(validate_recovery_rate(f64::NAN).is_err());
+    }
+
+    #[test]
+    fn validate_sorted_strict_rejects_unsorted() {
+        let d1 = crate::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+            .expect("valid date");
+        let d2 = crate::dates::Date::from_calendar_date(2024, time::Month::February, 1)
+            .expect("valid date");
+        let d3 = crate::dates::Date::from_calendar_date(2024, time::Month::January, 15)
+            .expect("valid date");
+        assert!(validate_sorted_strict(&[d1, d2, d3], "dates").is_err());
+        assert!(validate_sorted_strict(&[d1, d3, d2], "dates").is_ok());
     }
 }

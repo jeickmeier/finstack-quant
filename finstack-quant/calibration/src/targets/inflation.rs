@@ -21,11 +21,9 @@ use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolatio
 use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::rates::inflation_swap::{
-    InflationSwap, YoYInflationSwap,
-};
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_rates::inflation_swap::{InflationSwap, YoYInflationSwap};
 use rust_decimal::Decimal;
 use std::sync::Arc;
 
@@ -122,7 +120,7 @@ impl InflationCurveTarget {
         }
         let base_cpi = self.effective_base_cpi()?;
 
-        let swap: std::sync::Arc<dyn finstack_quant_valuations::instruments::Instrument> =
+        let swap: std::sync::Arc<dyn finstack_quant_valuations_core::instruments::Instrument> =
             if let Some(frequency) = frequency {
                 let instrument = YoYInflationSwap::builder()
                     .id("CALIB_YOY".into())

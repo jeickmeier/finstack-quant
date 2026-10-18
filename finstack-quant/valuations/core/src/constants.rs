@@ -1,0 +1,115 @@
+//! Common constants used throughout the valuations crate.
+//!
+//! This module centralizes numerical constants to improve maintainability
+//! and clarity across the codebase.
+//!
+//! # Rate Conversion: Type-Safe vs Raw Constants
+//!
+//! For rate/spread conversions, prefer the type-safe types from `finstack_quant_core::types`:
+//! - [`finstack_quant_core::types::Rate`] — `Rate::from_percent(5.0).expect("valid rate fixture")`, `Rate::from_bp(500)`
+//! - [`finstack_quant_core::types::Bps`] — `Bps::new(500).as_decimal()`
+//!
+//! The raw `f64` constants below (`ONE_BASIS_POINT`, `BASIS_POINTS_PER_UNIT`, and
+//! `DECIMAL_TO_PERCENT`) exist for use in **performance-sensitive inner loops** where:
+//! - Values are already `f64` (e.g., from `Decimal::to_f64()` or curve interpolation)
+//! - The `Rate`/`Bps` types are not in scope or would require `i32` truncation
+//!   (e.g., fractional basis point spreads)
+//! - Avoiding newtype construction overhead matters (tight pricing loops)
+//!
+//! When writing new code outside hot paths, prefer the core types for clarity and
+//! compile-time unit safety.
+
+/// Numerical constants for floating-point comparisons and integration.
+///
+/// These constants replace magic numbers scattered throughout the codebase,
+/// providing consistent tolerances and step sizes with documented rationale.
+pub mod numerical {
+    /// Tolerance for checking if a value is effectively zero (1e-10).
+    ///
+    /// Re-exported from [`finstack_quant_core::math::ZERO_TOLERANCE`].
+    pub use finstack_quant_core::math::ZERO_TOLERANCE;
+
+    /// Tolerance for comparing floating-point rates and spreads.
+    ///
+    /// Used when checking if two rates are "equal" for purposes like
+    /// detecting unchanged spreads or matching calibration targets.
+    ///
+    /// Value: 1e-12 (tighter than ZERO_TOLERANCE because rates are typically
+    /// O(0.01) to O(0.1), so relative precision matters more).
+    pub const RATE_COMPARISON_TOLERANCE: f64 = 1e-12;
+
+    // NOTE: A `DIVISION_EPSILON` constant was intentionally removed. The
+    // `numerator / (denominator + epsilon)` idiom it encouraged is a weak
+    // guard — for a denominator of exactly 0 it still yields `numerator * 1e15`
+    // (garbage) rather than a clean error. Guard small denominators with an
+    // explicit `if denom.abs() < tol { ... }` check instead.
+}
+
+/// Bloomberg CDSO numerical-quadrature conventions.
+pub mod bloomberg_cdso {
+    /// Bloomberg CDSO calendar-day denominator (DOCS 2055833 §2.1).
+    pub const G_DAYS_IN_YEAR: f64 = 365.0;
+
+    /// Bloomberg CDSO theta day basis (DOCS 2055833 §2.5).
+    ///
+    /// The 0.25-day inconsistency with [`G_DAYS_IN_YEAR`] is faithful to the
+    /// published convention: theta shortens exercise time by `1/365.25`.
+    pub const THETA_DAYS_IN_YEAR: f64 = 365.25;
+
+    /// Minimum standard-normal quadrature half-width for the Bloomberg CDSO
+    /// driver grid.
+    pub const MIN_Z_LIMIT: f64 = 6.0;
+
+    /// Step size for the Bloomberg CDSO standard-normal quadrature grid.
+    pub const Z_STEP: f64 = 0.05;
+}
+
+/// ISDA 2014 standard recovery constant used by the engine.
+pub mod isda {
+    /// Standard recovery rate for senior unsecured (40%)
+    pub const STANDARD_RECOVERY_SENIOR: f64 = 0.40;
+}
+
+/// US-market business-days-per-year convention.
+pub mod time {
+    /// Business days per year for North America (US markets)
+    pub const BUSINESS_DAYS_PER_YEAR_US: f64 = 252.0;
+}
+
+/// Credit derivatives specific constants
+pub mod credit {
+    /// Survival probability floor for numerical stability.
+    ///
+    /// When computing conditional survival probabilities (S(t)/S(t0)), if S(t0)
+    /// falls below this threshold, we treat the entity as already defaulted.
+    /// This prevents division by near-zero values producing inf/NaN.
+    ///
+    /// Value: 1e-15 (well above f64 machine epsilon ~2.2e-16, allowing for
+    /// cumulative multiplication errors in survival probability calculations).
+    pub const SURVIVAL_PROBABILITY_FLOOR: f64 = 1e-15;
+
+    /// Par spread denominator tolerance.
+    ///
+    /// If the risky annuity (denominator) is below this, par spread is undefined.
+    pub const PAR_SPREAD_DENOM_TOLERANCE: f64 = 1e-12;
+
+    /// Calendar days per year for settlement delay calculations.
+    ///
+    /// Re-exported from `finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR` (ACT/365 Fixed).
+    pub use finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR;
+}
+
+/// Standard number of trading/business days per year (US equity markets).
+///
+/// Alias for [`time::BUSINESS_DAYS_PER_YEAR_US`] (252). This is the conventional
+/// denominator for annualizing daily equity and FX option statistics (realized vol,
+/// Sharpe ratio, theta decay, etc.).
+pub const TRADING_DAYS_PER_YEAR: f64 = time::BUSINESS_DAYS_PER_YEAR_US;
+
+/// Default day-count denominator for per-day theta in the closed-form Greeks.
+///
+/// Re-exported from `finstack_quant_models::closed_form`, which owns it next to
+/// `bs_greeks` (ACT/365; pass [`TRADING_DAYS_PER_YEAR`] (252) instead for
+/// business-day-scaled theta). Both host bindings' `theta_days_per_year`
+/// parameters default to that one constant.
+pub use finstack_quant_models::closed_form::DEFAULT_THETA_DAYS_PER_YEAR;

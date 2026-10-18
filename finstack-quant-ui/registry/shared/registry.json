@@ -17,7 +17,7 @@
       "registryDependencies": ["@finstack/finstack-base"],
       "dependencies": ["react@19.2.8"],
       "categories": [],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "field-frame",
@@ -41,7 +41,7 @@
         "popover"
       ],
       "categories": ["Primitive Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "finstack-table",
@@ -72,7 +72,7 @@
       "categories": ["Primitive Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -100,7 +100,7 @@
         "select"
       ],
       "categories": ["Primitive Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "json-viewer",
@@ -121,7 +121,7 @@
         "button"
       ],
       "categories": ["Primitive Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] },
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] },
       "dependencies": ["lossless-json@4.3.1"]
     },
     {
@@ -146,7 +146,7 @@
       ],
       "dependencies": ["@tanstack/react-virtual@3.14.13"],
       "categories": ["Primitive Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "finstack-chart",
@@ -198,7 +198,7 @@
         "@types/culori@4.0.1"
       ],
       "categories": ["Primitive Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "figure-example",
@@ -231,7 +231,7 @@
         "label"
       ],
       "categories": ["Individual Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "use-finstack",
@@ -276,7 +276,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -298,7 +298,7 @@
       ],
       "dependencies": ["react@19.2.8"],
       "categories": [],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "finstack-form",
@@ -322,7 +322,7 @@
       ],
       "dependencies": ["@tanstack/react-form@1.33.5", "react@19.2.8"],
       "categories": ["Primitive Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "finstack-worker",
@@ -352,11 +352,11 @@
         "@finstack/finstack-format",
         "@finstack/contract-market-context-state"
       ],
-      "dependencies": ["finstack-quant-wasm@0.10.0", "comlink@4.4.2"],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "comlink@4.4.2"],
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"

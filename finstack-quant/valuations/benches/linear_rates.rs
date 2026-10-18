@@ -3,6 +3,7 @@
 #![allow(clippy::unwrap_used)]
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -19,7 +20,6 @@ use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
 use finstack_quant_valuations::instruments::rates::ir_future::{
     FutureContractSpecs, InterestRateFuture,
 };
-use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, Repo};
 use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::PricingOptions;
@@ -32,9 +32,7 @@ use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
 
-#[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../tests/support/date.rs"]
-mod date_support;
+use finstack_quant_valuations_test_support::date as date_support;
 
 fn base_date() -> Date {
     Date::from_calendar_date(2025, Month::January, 1).unwrap()

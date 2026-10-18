@@ -4,21 +4,5 @@
 //!
 //! - `mc`: Monte Carlo pricing tests (feature-gated)
 
-pub mod mc;
-
 mod analyst_coverage;
 mod basic;
-mod cashflows;
-mod construction;
-pub mod draw_option_cost;
-mod error_propagation;
-mod fixings;
-pub mod metrics;
-mod pricing;
-mod review_fixes;
-mod revolving_credit_acceptance;
-mod revolving_credit_parity;
-mod revolving_credit_properties;
-mod test_pricing_review;
-pub mod validation;
-mod weighted_average_cost;

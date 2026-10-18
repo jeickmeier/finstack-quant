@@ -21,8 +21,7 @@ use crate::errors::{core_to_py, display_to_py};
 use super::convert::{bps_from_py, enum_to_py_string, opt_repr, rate_decimal_from_py};
 use super::instruments::{decimal_from_f64, enum_from_str, stub_kind_from_py};
 
-type FloatingLegCompounding =
-    finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
+type FloatingLegCompounding = finstack_quant_cashflows::builder::FloatingLegCompounding;
 
 /// Coerce `str | dict` to a `FloatingLegCompounding`.
 ///

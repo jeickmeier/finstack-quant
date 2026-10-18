@@ -1,0 +1,964 @@
+//! Bond type tests (construction, cashflows, floating, amortization).
+
+use super::*;
+use finstack_quant_cashflows::builder::{
+    CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
+};
+use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::term_structures::ForwardCurve;
+use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations_core::instruments::common_impl::traits::{Attributes, Instrument};
+use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+use rust_decimal::Decimal;
+use time::Month;
+
+#[test]
+fn test_bond_with_custom_cashflows() {
+    // Setup dates
+    let issue = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2027, Month::January, 15).expect("Valid test date");
+
+    // Build a custom cashflow schedule with step-up coupons
+    let schedule_params = ScheduleParams {
+        frequency: Tenor::semi_annual(),
+        day_count: DayCount::Act365F,
+        business_day_convention: BusinessDayConvention::Following,
+        calendar_id: "weekends_only".into(),
+        stub: StubKind::None,
+        end_of_month: false,
+        payment_lag_days: 0,
+        adjust_accrual_dates: false,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+    };
+
+    let step1_date = Date::from_calendar_date(2026, Month::January, 15).expect("Valid test date");
+
+    let custom_schedule = CashFlowSchedule::builder()
+        .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
+        .step_up_cf(finstack_quant_cashflows::builder::StepUpCouponSpec {
+            coupon_type: CouponType::Cash,
+            initial_rate: Decimal::new(3, 2),
+            step_schedule: vec![(step1_date, Decimal::new(5, 2))],
+            schedule: schedule_params,
+        })
+        .build(None)
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+
+    // Create bond from custom cashflows
+    let bond = Bond::from_cashflows(
+        "CUSTOM_STEPUP_BOND",
+        custom_schedule.clone(),
+        "USD-OIS",
+        Some(98.5),
+    )
+    .expect("Bond::from_cashflows should succeed with valid test data");
+
+    // Verify bond properties
+    assert_eq!(bond.id.as_str(), "CUSTOM_STEPUP_BOND");
+    assert_eq!(bond.discount_curve_id.as_str(), "USD-OIS");
+    assert_eq!(
+        bond.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct,
+        Some(98.5)
+    );
+    assert_eq!(bond.issue_date, issue);
+    assert_eq!(bond.maturity, maturity);
+    assert!(bond.custom_cashflows.is_some());
+
+    // Create curves for pricing
+    let disc_curve = DiscountCurve::builder("USD-OIS")
+        .base_date(issue)
+        .knots([(0.0, 1.0), (3.0, 0.95)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .build()
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+    let curves = MarketContext::new().insert(disc_curve);
+
+    // Build schedule and verify it uses custom cashflows
+    let flows = bond
+        .dated_cashflows(&curves, issue)
+        .expect("Schedule building should succeed in test");
+    assert!(!flows.is_empty());
+
+    // The signed schedule preserves all flows except pure PIK
+    let expected_flow_count = custom_schedule
+        .get_flows()
+        .iter()
+        .filter(|cf| cf.kind != finstack_quant_cashflows::primitives::CFKind::Pik)
+        .count();
+    assert_eq!(flows.len(), expected_flow_count);
+}
+
+#[test]
+fn test_bond_builder_with_custom_cashflows() {
+    let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
+
+    // Build custom cashflow with PIK toggle
+    let custom_schedule = CashFlowSchedule::builder()
+        .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
+        .fixed_cf(FixedCouponSpec {
+            coupon_type: CouponType::Split {
+                cash_fraction: Decimal::try_from(0.5).expect("valid"),
+                pik_fraction: Decimal::try_from(0.5).expect("valid"),
+            },
+            rate: Decimal::try_from(0.06).expect("valid"),
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                frequency: Tenor::quarterly(),
+
+                day_count: DayCount::Thirty360,
+
+                business_day_convention: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".into(),
+
+                stub: StubKind::None,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+            },
+        })
+        .build(None)
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+
+    // Use builder pattern (default cashflow_spec since custom_cashflows overrides)
+    let bond = Bond::builder()
+        .id("PIK_TOGGLE_BOND".into())
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
+        .issue_date(issue)
+        .maturity(maturity)
+        .cashflow_spec(CashflowSpec::default())
+        .custom_cashflows_opt(Some(custom_schedule))
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .instrument_pricing_overrides(
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.0),
+        )
+        .attributes(Attributes::new())
+        .build()
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+
+    assert_eq!(bond.id.as_str(), "PIK_TOGGLE_BOND");
+    assert_eq!(bond.discount_curve_id.as_str(), "USD-OIS");
+    assert_eq!(
+        bond.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct,
+        Some(99.0)
+    );
+    assert!(bond.custom_cashflows.is_some());
+    assert_eq!(bond.notional.currency(), Currency::USD);
+}
+
+#[test]
+fn test_bond_with_cashflows_method() {
+    let issue = Date::from_calendar_date(2025, Month::March, 1).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2030, Month::March, 1).expect("Valid test date");
+
+    // Create a traditional bond first (builder)
+    let mut bond = Bond::builder()
+        .id(InstrumentId::new("REGULAR_BOND"))
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
+        .issue_date(issue)
+        .maturity(maturity)
+        .cashflow_spec(
+            CashflowSpec::fixed(0.04, Tenor::semi_annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .credit_curve_id_opt(None)
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
+        .call_put_opt(None)
+        .custom_cashflows_opt(None)
+        .attributes(Attributes::new())
+        .settlement_convention_opt(None)
+        .build()
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+
+    // Build a custom schedule separately
+    let custom_schedule = CashFlowSchedule::builder()
+        .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
+        .fixed_cf(FixedCouponSpec {
+            coupon_type: CouponType::Cash,
+            rate: Decimal::try_from(0.055).expect("valid"),
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                // Different from default spec
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act365F,
+                business_day_convention: BusinessDayConvention::Following,
+                calendar_id: "weekends_only".into(),
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+            },
+        })
+        .build(None)
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+
+    // Apply custom cashflows
+    bond = bond.with_custom_cashflows(custom_schedule);
+
+    assert!(bond.custom_cashflows.is_some());
+    // The original cashflow_spec is preserved but custom_cashflows takes precedence
+}
+
+#[test]
+fn test_custom_cashflows_override_regular_generation() {
+    let issue = Date::from_calendar_date(2025, Month::June, 1).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2026, Month::June, 1).expect("Valid test date");
+
+    // Create bond with regular specs (builder)
+    let regular_bond = Bond::builder()
+        .id(InstrumentId::new("TEST"))
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
+        .issue_date(issue)
+        .maturity(maturity)
+        .cashflow_spec(
+            CashflowSpec::fixed(0.03, Tenor::annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .credit_curve_id_opt(None)
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
+        .call_put_opt(None)
+        .custom_cashflows_opt(None)
+        .attributes(Attributes::new())
+        .settlement_convention_opt(None)
+        .build()
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+
+    // Same bond with custom cashflows
+    let custom_schedule = CashFlowSchedule::builder()
+        .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
+        .fixed_cf(FixedCouponSpec {
+            coupon_type: CouponType::Cash,
+            rate: Decimal::try_from(0.05).expect("valid"),
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                // Different rate
+                frequency: Tenor::semi_annual(),
+                // Different frequency
+                day_count: DayCount::Act365F,
+                business_day_convention: BusinessDayConvention::Following,
+                calendar_id: "weekends_only".into(),
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+            },
+        })
+        .build(None)
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+
+    let custom_bond = regular_bond.clone().with_custom_cashflows(custom_schedule);
+
+    // Create curves
+    let disc_curve = DiscountCurve::builder("USD-OIS")
+        .base_date(issue)
+        .knots([(0.0, 1.0), (2.0, 0.98)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .build()
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+    let curves = MarketContext::new().insert(disc_curve);
+
+    // Build schedules
+    let regular_flows = regular_bond
+        .dated_cashflows(&curves, issue)
+        .expect("Schedule building should succeed in test");
+    let custom_flows = custom_bond
+        .dated_cashflows(&curves, issue)
+        .expect("Schedule building should succeed in test");
+
+    // Should have different number of flows due to different frequency
+    assert_ne!(regular_flows.len(), custom_flows.len());
+
+    // Custom bond should have semi-annual flows (more flows)
+    assert!(custom_flows.len() > regular_flows.len());
+}
+
+#[test]
+fn test_bond_floating_value() {
+    let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
+    let notional = Money::from((1_000_000_i64, Currency::USD));
+
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(issue)
+        .knots([(0.0, 1.0), (2.0, 0.95)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        .base_date(issue - time::Duration::days(10))
+        .knots([(0.0, 0.05), (2.0, 0.055)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+    let ctx = MarketContext::new().insert(disc).insert(fwd);
+
+    let bond = Bond::floating(
+        "FRN-TEST",
+        notional,
+        "USD-SOFR-3M",
+        150,
+        issue,
+        maturity,
+        Tenor::quarterly(),
+        DayCount::Act360,
+        "USD-OIS",
+    )
+    .unwrap();
+
+    // Price should be finite and positive under positive forwards
+    let pv = bond
+        .value(&ctx, issue)
+        .expect("Bond valuation should succeed in test");
+    assert!(pv.amount().is_finite());
+}
+
+#[test]
+fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
+    use finstack_quant_cashflows::primitives::CFKind;
+    use time::Duration;
+
+    let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
+    let notional = Money::from((1_000_000_i64, Currency::USD));
+
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(issue)
+        .knots([(0.0, 1.0), (2.0, 0.95)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .expect("DiscountCurve builder should succeed in test");
+    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        .base_date(issue - time::Duration::days(10))
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.05), (2.0, 0.055)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .expect("ForwardCurve builder should succeed in test");
+    let ctx = MarketContext::new().insert(disc).insert(fwd);
+
+    let mut bond = Bond::floating(
+        "FRN-EX-COUPON",
+        notional,
+        "USD-SOFR-3M",
+        150,
+        issue,
+        maturity,
+        Tenor::quarterly(),
+        DayCount::Act360,
+        "USD-OIS",
+    )
+    .unwrap();
+    bond.settlement_convention = Some(BondSettlementConvention {
+        ex_coupon_days: 5,
+        ..Default::default()
+    });
+
+    // Use the full schedule to locate the first coupon end date
+    let full_schedule = bond
+        .full_cashflow_schedule(&ctx)
+        .expect("Full schedule retrieval should succeed in test");
+    let first_coupon_date = full_schedule
+        .get_flows()
+        .iter()
+        .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::FloatReset | CFKind::Stub))
+        .map(|cf| cf.date)
+        .filter(|d| *d > issue)
+        .min()
+        .expect("FRN should have at least one coupon date in test");
+
+    let record_date = first_coupon_date - Duration::days(5);
+    let day_before_record = record_date - Duration::days(1);
+
+    // Settlement before the record date retains the coupon.
+    let schedule_before = bond
+        .full_cashflow_schedule(&ctx)
+        .expect("Full schedule should build");
+    let ai_before = finstack_quant_cashflows::accrual::accrued_interest_amount(
+        &schedule_before,
+        day_before_record,
+        &bond.accrual_config(),
+    )
+    .expect("Accrued interest calculation should succeed before the record date");
+    assert!(
+        ai_before > 0.0,
+        "Accrued interest should be positive before the record date"
+    );
+
+    let ai_record = finstack_quant_cashflows::accrual::accrued_interest_amount(
+        &full_schedule,
+        record_date,
+        &bond.accrual_config(),
+    )
+    .expect("Accrued interest calculation should succeed on the record date");
+    assert!(
+        ai_record > 0.0,
+        "Settlement on the record date retains the coupon"
+    );
+
+    // Strictly after the record date, the buyer forgoes the upcoming coupon
+    // and accrued interest is the negative rebate of the remaining stub.
+    let schedule_ex = bond
+        .full_cashflow_schedule(&ctx)
+        .expect("Full schedule should build");
+    let ai_ex = finstack_quant_cashflows::accrual::accrued_interest_amount(
+        &schedule_ex,
+        record_date + Duration::days(1),
+        &bond.accrual_config(),
+    )
+    .expect("Accrued interest calculation should succeed inside the ex-coupon window");
+    assert!(
+        ai_ex < 0.0,
+        "Accrued interest in ex-coupon window should be negative, got {}",
+        ai_ex
+    );
+}
+
+#[test]
+fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
+    use finstack_quant_cashflows::builder::AmortizationSpec;
+    use finstack_quant_cashflows::primitives::CFKind;
+    use time::Duration;
+
+    let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2028, Month::January, 1).expect("Valid test date");
+    let notional = Money::from((1_000_000_i64, Currency::USD));
+
+    // Amortizing bond with annual 5% coupon, 1/3 principal returned each year.
+    // StepRemaining schedule specifies remaining balance AFTER each date.
+    // After step1: 2/3 remaining (paid 1/3), after step2: 1/3 remaining (paid 2/3),
+    // after maturity: 0 remaining (all paid).
+    let step1 = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
+    let step2 = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
+    let amort_spec = AmortizationSpec::StepRemaining {
+        schedule: vec![
+            (
+                step1,
+                Money::new(2.0 * 1_000_000.0 / 3.0, Currency::USD).expect("valid money fixture"),
+            ), // 2/3 remaining
+            (
+                step2,
+                Money::new(1_000_000.0 / 3.0, Currency::USD).expect("valid money fixture"),
+            ), // 1/3 remaining
+            (maturity, Money::from((0_i64, Currency::USD))), // 0 remaining
+        ],
+    };
+    let base_spec =
+        CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
+    let cashflow_spec = CashflowSpec::amortizing(base_spec, amort_spec);
+
+    let mut bond = Bond::builder()
+        .id("AMORT-EX-COUPON".into())
+        .notional(notional)
+        .issue_date(issue)
+        .maturity(maturity)
+        .cashflow_spec(cashflow_spec)
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
+        .attributes(Attributes::new())
+        .build()
+        .expect("Amortizing bond construction should succeed in test");
+
+    bond.settlement_convention = Some(BondSettlementConvention {
+        ex_coupon_days: 7,
+        ..Default::default()
+    });
+
+    // Curves for pricing (levels are not important for accrual)
+    let disc_curve = DiscountCurve::builder("USD-OIS")
+        .base_date(issue)
+        .knots([(0.0, 1.0), (3.0, 0.9)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .expect("DiscountCurve builder should succeed in test");
+    let ctx = MarketContext::new().insert(disc_curve);
+
+    // Use the full schedule to locate the first coupon end date
+    let full_schedule = bond
+        .full_cashflow_schedule(&ctx)
+        .expect("Full schedule retrieval should succeed in test");
+    let first_coupon_date = full_schedule
+        .get_flows()
+        .iter()
+        .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
+        .map(|cf| cf.date)
+        .filter(|d| *d > issue)
+        .min()
+        .expect("Amortizing bond should have at least one coupon date in test");
+
+    let record_date = first_coupon_date - Duration::days(7);
+    let day_before_record = record_date - Duration::days(1);
+
+    // Settlement before the record date retains the coupon.
+    let schedule_before = bond
+        .full_cashflow_schedule(&ctx)
+        .expect("Full schedule should build");
+    let ai_before = finstack_quant_cashflows::accrual::accrued_interest_amount(
+        &schedule_before,
+        day_before_record,
+        &bond.accrual_config(),
+    )
+    .expect("Accrued interest calculation should succeed before the record date");
+    assert!(
+        ai_before > 0.0,
+        "Accrued interest should be positive before the record date for amortizing bond"
+    );
+
+    let ai_record = finstack_quant_cashflows::accrual::accrued_interest_amount(
+        &full_schedule,
+        record_date,
+        &bond.accrual_config(),
+    )
+    .expect("Accrued interest calculation should succeed on the record date");
+    assert!(
+        ai_record > 0.0,
+        "Settlement on the record date retains the coupon"
+    );
+
+    // Strictly after the record date, the buyer forgoes the upcoming coupon
+    // and accrued interest is the negative rebate of the remaining stub.
+    let schedule_ex = bond
+        .full_cashflow_schedule(&ctx)
+        .expect("Full schedule should build");
+    let ai_ex = finstack_quant_cashflows::accrual::accrued_interest_amount(
+        &schedule_ex,
+        record_date + Duration::days(1),
+        &bond.accrual_config(),
+    )
+    .expect("Accrued interest calculation should succeed inside the ex-coupon window");
+    assert!(
+        ai_ex < 0.0,
+        "Accrued interest in ex-coupon window should be negative for amortizing bond, got {}",
+        ai_ex
+    );
+}
+
+#[test]
+fn test_bond_frn_dated_cashflows_uses_builder() {
+    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_cashflows::CashflowProvider;
+
+    let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
+
+    // Create FRN
+    let frn = Bond::floating(
+        "FRN-BUILDER-TEST",
+        Money::from((1_000_000_i64, Currency::USD)),
+        "USD-SOFR",
+        100,
+        issue,
+        maturity,
+        Tenor::quarterly(),
+        DayCount::Act360,
+        "USD-OIS",
+    )
+    .unwrap();
+
+    // Create market with forward curve
+    let disc_curve = DiscountCurve::builder("USD-OIS")
+        .base_date(issue)
+        .knots([(0.0, 1.0), (1.0, 0.95)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+
+    let fwd_curve = ForwardCurve::builder("USD-SOFR", 0.25)
+        .base_date(issue - time::Duration::days(10))
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.03), (1.0, 0.035)])
+        .build()
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+
+    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+
+    // Get full schedule to verify it includes FloatReset CFKind
+    let full_schedule = frn
+        .full_cashflow_schedule(&market)
+        .expect("Full schedule retrieval should succeed in test");
+    let has_floating = full_schedule
+        .get_flows()
+        .iter()
+        .any(|cf| matches!(cf.kind, CFKind::FloatReset));
+    assert!(
+        has_floating,
+        "Full schedule should include CFKind::FloatReset for FRN"
+    );
+
+    // The holder-view dated cashflow projection should flatten the canonical schedule.
+    let flows = frn
+        .dated_cashflows(&market, issue)
+        .expect("Schedule building should succeed in test");
+    assert!(!flows.is_empty(), "FRN should have cashflows");
+
+    // Verify flows include floating coupons (should be > just redemption)
+    assert!(
+        flows.len() > 1,
+        "FRN should have coupon flows + redemption, got {} flows",
+        flows.len()
+    );
+}
+
+#[test]
+fn test_bond_amortization_signed_schedule_preserves_all_flows() {
+    use finstack_quant_cashflows::builder::AmortizationSpec;
+    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_cashflows::CashflowProvider;
+
+    let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
+
+    // Create amortizing bond using CashflowSpec::Amortizing
+    let step1 = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
+    let amort_spec = AmortizationSpec::StepRemaining {
+        schedule: vec![
+            (step1, Money::from((500_000_i64, Currency::USD))),
+            (maturity, Money::from((0_i64, Currency::USD))),
+        ],
+    };
+    let base_spec = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)
+        .expect("finite test coupon");
+    let cashflow_spec = CashflowSpec::amortizing(base_spec, amort_spec);
+
+    let bond = Bond::builder()
+        .id("AMORT-TEST".into())
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
+        .issue_date(issue)
+        .maturity(maturity)
+        .cashflow_spec(cashflow_spec)
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
+        .attributes(Attributes::new())
+        .build()
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+
+    let disc_curve = DiscountCurve::builder("USD-OIS")
+        .base_date(issue)
+        .knots([(0.0, 1.0), (2.0, 0.95)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .expect("CashFlowSchedule builder should succeed with valid test data");
+    let market = MarketContext::new().insert(disc_curve);
+
+    // Get full schedule to check internal representation
+    let full_schedule = bond
+        .full_cashflow_schedule(&market)
+        .expect("Full schedule retrieval should succeed in test");
+
+    // Find initial notional (should be negative - issuer receives)
+    let initial_notional = full_schedule
+        .get_flows()
+        .iter()
+        .find(|cf| cf.date == issue && matches!(cf.kind, CFKind::Notional));
+    assert!(
+        initial_notional.is_some(),
+        "Full schedule should have initial notional"
+    );
+    assert!(
+        initial_notional
+            .expect("Initial notional should exist")
+            .amount
+            .amount()
+            < 0.0,
+        "Initial notional should be negative (issuer receives)"
+    );
+
+    // Find amortization flows (should be positive in full schedule)
+    let amort_flows: Vec<_> = full_schedule
+        .get_flows()
+        .iter()
+        .filter(|cf| matches!(cf.kind, CFKind::Amortization))
+        .collect();
+    assert!(!amort_flows.is_empty(), "Should have amortization flows");
+    for cf in &amort_flows {
+        assert!(
+            cf.amount.amount() > 0.0,
+            "Amortization in full schedule should be positive"
+        );
+    }
+
+    // The signed schedule preserves all flows including negative notionals.
+    let flows = bond
+        .dated_cashflows(&market, issue)
+        .expect("Schedule building should succeed in test");
+
+    // Initial draw should be present (negative notional)
+    let has_negative_initial = flows.iter().any(|(d, m)| *d == issue && m.amount() < 0.0);
+    assert!(
+        has_negative_initial,
+        "Signed schedule preserves the initial negative notional draw"
+    );
+
+    // Amortization should still appear as positive principal repayments
+    let amort_in_schedule: Vec<_> = flows
+        .iter()
+        .filter(|(d, _)| *d == step1 || *d == maturity)
+        .collect();
+    let has_positive_amort = amort_in_schedule.iter().any(|(_, m)| m.amount() > 0.0);
+    assert!(
+        has_positive_amort,
+        "Amortization in signed schedule should be positive (principal repayment)"
+    );
+
+    // Final redemption at maturity: the maturity date can include coupon,
+    // amortization, and/or redemption flows with both positive and negative signs.
+}
+
+#[test]
+fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
+    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+
+    let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2028, Month::January, 1).expect("Valid test date");
+
+    let notional = Money::from((1_000_000_i64, Currency::USD));
+
+    // Common discount curve: flat-ish, just needs to be decreasing
+    let disc_curve = DiscountCurve::builder("USD-OIS")
+        .base_date(issue)
+        .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.94), (3.0, 0.91)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .expect("DiscountCurve builder should succeed in test");
+    let market = MarketContext::new().insert(disc_curve);
+
+    // Bullet bond: 3-year annual, 1% coupon, full principal at maturity
+    let bullet_cashflow_spec =
+        CashflowSpec::fixed(0.01, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
+    let bullet_bond = Bond::builder()
+        .id("BULLET-TEST".into())
+        .notional(notional)
+        .issue_date(issue)
+        .maturity(maturity)
+        .cashflow_spec(bullet_cashflow_spec)
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
+        .attributes(Attributes::new())
+        .build()
+        .expect("Bullet bond construction should succeed in test");
+
+    // Amortizing bond with same coupon but 1/3 principal returned each year.
+    // StepRemaining schedule specifies remaining balance AFTER each date.
+    // After step1: 2/3 remaining (paid 1/3), after step2: 1/3 remaining (paid 2/3).
+    let amort_step1 = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
+    let amort_step2 = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
+    let amort_schedule = AmortizationSpec::StepRemaining {
+        schedule: vec![
+            (
+                amort_step1,
+                Money::new(2.0 * 1_000_000.0 / 3.0, Currency::USD).expect("valid money fixture"), // 2/3 remaining
+            ),
+            (
+                amort_step2,
+                Money::new(1_000_000.0 / 3.0, Currency::USD).expect("valid money fixture"),
+            ), // 1/3 remaining
+            (maturity, Money::from((0_i64, Currency::USD))), // 0 remaining
+        ],
+    };
+    let amort_base_spec =
+        CashflowSpec::fixed(0.01, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
+    let amort_spec = CashflowSpec::amortizing(amort_base_spec, amort_schedule);
+    let amort_bond = Bond::builder()
+        .id("AMORT-TEST-PV".into())
+        .notional(notional)
+        .issue_date(issue)
+        .maturity(maturity)
+        .cashflow_spec(amort_spec)
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
+        .attributes(Attributes::new())
+        .build()
+        .expect("Amortizing bond construction should succeed in test");
+
+    let pv_bullet = bullet_bond
+        .value(&market, issue)
+        .expect("Bullet bond valuation should succeed in test")
+        .amount();
+    let pv_amort = amort_bond
+        .value(&market, issue)
+        .expect("Amortizing bond valuation should succeed in test")
+        .amount();
+
+    // With earlier principal repayments and a coupon below the curve's
+    // effective yield, the amortizing bond should have a higher PV than
+    // the bullet (principal is returned sooner and reinvested at higher
+    // rates).
+    assert!(
+        pv_amort > pv_bullet,
+        "Amortizing bond PV ({}) should be greater than bullet PV ({}) for the same yield curve",
+        pv_amort,
+        pv_bullet
+    );
+}
+
+#[test]
+fn bond_maturing_before_issue_is_rejected_by_validation() {
+    // The builder rejects an inverted term at construction, but deserialization
+    // does not go through the builder: neither serde nor JSON Schema relates one
+    // date field to another. `validate_invariants` is what the JSON path relies
+    // on, so it is exercised here against a struct in the state a decoded
+    // payload can reach.
+    let issue = Date::from_calendar_date(2024, Month::January, 15).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2034, Month::January, 15).expect("Valid test date");
+
+    let mut bond = Bond::builder()
+        .id(InstrumentId::new("INVERTED_TERM"))
+        .notional(Money::from((1000000_i64, Currency::USD)))
+        .issue_date(issue)
+        .maturity(maturity)
+        .cashflow_spec(CashflowSpec::default())
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .attributes(Attributes::new())
+        .build()
+        .expect("builder succeeds for a normal term");
+
+    bond.maturity = Date::from_calendar_date(2020, Month::January, 15).expect("Valid test date");
+
+    let Err(error) = bond.validate_for_pricing() else {
+        panic!("a bond maturing before issue must not validate");
+    };
+    let message = error.to_string();
+    assert!(
+        message.contains("2020-01-15") && message.contains("2024-01-15"),
+        "the error names both dates: {message}"
+    );
+}
+
+#[test]
+fn bond_maturing_after_issue_validates() {
+    let issue = Date::from_calendar_date(2024, Month::January, 15).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2034, Month::January, 15).expect("Valid test date");
+
+    let bond = Bond::builder()
+        .id(InstrumentId::new("NORMAL_TERM"))
+        .notional(Money::from((1000000_i64, Currency::USD)))
+        .issue_date(issue)
+        .maturity(maturity)
+        .cashflow_spec(CashflowSpec::default())
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .attributes(Attributes::new())
+        .build()
+        .expect("builder succeeds");
+
+    assert!(bond.validate_for_pricing().is_ok());
+}
+
+fn floating_test_dates() -> (Date, Date) {
+    (
+        Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date"),
+        Date::from_calendar_date(2030, Month::January, 15).expect("Valid test date"),
+    )
+}
+
+#[test]
+fn bond_floating_usd_uses_us_corporate_settlement() {
+    let (issue, maturity) = floating_test_dates();
+    let bond = Bond::floating(
+        "FRN-USD",
+        Money::from((1000000_i64, Currency::USD)),
+        "USD-SOFR-3M",
+        100,
+        issue,
+        maturity,
+        Tenor::quarterly(),
+        DayCount::Act360,
+        "USD-OIS",
+    )
+    .expect("USD FRN");
+    assert_eq!(bond.settlement_days(), Some(1));
+    let CashflowSpec::Floating(spec) = &bond.cashflow_spec else {
+        panic!("expected floating spec");
+    };
+    assert_eq!(spec.schedule.calendar_id, "usny");
+    assert_eq!(
+        spec.schedule.business_day_convention,
+        BusinessDayConvention::ModifiedFollowing
+    );
+}
+
+#[test]
+fn bond_floating_eur_uses_eur_corporate_settlement() {
+    let (issue, maturity) = floating_test_dates();
+    let bond = Bond::floating(
+        "FRN-EUR",
+        Money::from((1000000_i64, Currency::EUR)),
+        "EUR-EURIBOR-3M",
+        100,
+        issue,
+        maturity,
+        Tenor::quarterly(),
+        DayCount::Act360,
+        "EUR-OIS",
+    )
+    .expect("EUR FRN");
+    assert_eq!(bond.settlement_days(), Some(2));
+    let CashflowSpec::Floating(spec) = &bond.cashflow_spec else {
+        panic!("expected floating spec");
+    };
+    assert_eq!(spec.schedule.calendar_id, "target2");
+    assert_eq!(
+        spec.schedule.business_day_convention,
+        BusinessDayConvention::ModifiedFollowing
+    );
+}
+
+#[test]
+fn bond_floating_gbp_uses_uk_gilt_t1_not_t2() {
+    let (issue, maturity) = floating_test_dates();
+    let bond = Bond::floating(
+        "FRN-GBP",
+        Money::from((1000000_i64, Currency::GBP)),
+        "GBP-SONIA",
+        100,
+        issue,
+        maturity,
+        Tenor::quarterly(),
+        DayCount::Act365F,
+        "GBP-SONIA",
+    )
+    .expect("GBP FRN");
+    assert_eq!(bond.settlement_days(), Some(1));
+    let CashflowSpec::Floating(spec) = &bond.cashflow_spec else {
+        panic!("expected floating spec");
+    };
+    assert_eq!(
+        spec.schedule.business_day_convention,
+        BusinessDayConvention::Following
+    );
+}
+
+#[test]
+fn bond_floating_unmapped_currency_requires_convention() {
+    let (issue, maturity) = floating_test_dates();
+    let err = Bond::floating(
+        "FRN-CHF",
+        Money::from((1000000_i64, Currency::CHF)),
+        "CHF-SARON",
+        100,
+        issue,
+        maturity,
+        Tenor::quarterly(),
+        DayCount::Act360,
+        "CHF-SARON",
+    )
+    .expect_err("CHF has no mapped FRN convention");
+    assert!(
+        err.to_string().contains("floating_with_convention"),
+        "unexpected error: {err}"
+    );
+}

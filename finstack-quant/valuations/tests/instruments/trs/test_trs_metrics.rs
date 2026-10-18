@@ -24,7 +24,7 @@ use finstack_quant_valuations::metrics::MetricId;
 /// two engines disagreed by the daily-compounding convexity, so plugging the
 /// par spread back into the contract did NOT zero the NPV.
 fn assert_par_spread_reprices_to_zero(
-    compounding: finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding,
+    compounding: finstack_quant_cashflows::builder::FloatingLegCompounding,
 ) {
     let market = create_market_context();
     let as_of = as_of_date();
@@ -58,14 +58,16 @@ fn assert_par_spread_reprices_to_zero(
 #[test]
 fn par_spread_reprices_term_rate_equity_trs_to_zero() {
     assert_par_spread_reprices_to_zero(
-        finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::Simple,
+        finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,
     );
 }
 
 #[test]
 fn par_spread_reprices_overnight_compounded_equity_trs_to_zero() {
     assert_par_spread_reprices_to_zero(
-        finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+        finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 0,
+        },
     );
 }
 

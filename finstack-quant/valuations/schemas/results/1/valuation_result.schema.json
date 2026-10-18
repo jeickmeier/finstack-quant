@@ -167,7 +167,7 @@
               },
               "version": 1
             },
-            "version": "0.10.0"
+            "version": "0.11.0"
           },
           "description": "Audit stamp: numeric mode, rounding context, and FX policy in force."
         },
@@ -365,7 +365,7 @@
       "type": "object"
     },
     "ModelKey": {
-      "description": "Pricing model selection for the pricer registry.\n\nDetermines which mathematical model is used to price an instrument.\nEach model has different computational characteristics and accuracy\nprofiles for different instrument types.\n\n# Model Categories\n\n## Analytical Models\n- [`Discounting`](Self::Discounting): Simple present value discounting\n- [`Black76`](Self::Black76): Black-76 formula for options\n- [`Normal`](Self::Normal): Bachelier (normal) model for rate options\n\n## Tree Models\n- [`Tree`](Self::Tree): Binomial/trinomial lattice\n- [`HullWhite1F`](Self::HullWhite1F): Hull-White one-factor short rate\n\n## Credit Models\n- [`HazardRate`](Self::HazardRate): Fractional-recovery hazard-rate pricing\n- [`RatesCredit`](Self::RatesCredit): Joint short-rate and hazard-rate pricing\n\n## Monte Carlo Models\n- [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation\n- [`MonteCarloHeston`](Self::MonteCarloHeston): Heston stochastic vol\n- [`MonteCarloThreeFactor`](Self::MonteCarloThreeFactor): revolver\n  utilization, short-rate and credit-spread simulation\n\n## Exotic Analytical\n- [`BarrierBSContinuous`](Self::BarrierBSContinuous): Reiner-Rubinstein barriers\n- [`AsianGeometricBS`](Self::AsianGeometricBS): Geometric Asian (exact)\n- [`AsianTurnbullWakeman`](Self::AsianTurnbullWakeman): Arithmetic Asian (approx)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::pricer::ModelKey;\n\n// Select appropriate model for instrument type\nlet model = ModelKey::Discounting;  // For bonds\nlet model = ModelKey::Black76;      // For caps/floors\nlet model = ModelKey::MonteCarloGBM; // For path-dependent exotics\n\n// Parse from string\nlet model: ModelKey = \"black76\".parse().unwrap();\nassert_eq!(model, ModelKey::Black76);\n```",
+      "description": "Pricing model selection for the pricer registry.\n\nDetermines which mathematical model is used to price an instrument.\nEach model has different computational characteristics and accuracy\nprofiles for different instrument types.\n\n# Model Categories\n\n## Analytical Models\n- [`Discounting`](Self::Discounting): Simple present value discounting\n- [`Black76`](Self::Black76): Black-76 formula for options\n- [`Normal`](Self::Normal): Bachelier (normal) model for rate options\n\n## Tree Models\n- [`Tree`](Self::Tree): Binomial/trinomial lattice\n- [`HullWhite1F`](Self::HullWhite1F): Hull-White one-factor short rate\n\n## Credit Models\n- [`HazardRate`](Self::HazardRate): Fractional-recovery hazard-rate pricing\n- [`RatesCredit`](Self::RatesCredit): Joint short-rate and hazard-rate pricing\n\n## Monte Carlo Models\n- [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation\n- [`MonteCarloHeston`](Self::MonteCarloHeston): Heston stochastic vol\n- [`MonteCarloThreeFactor`](Self::MonteCarloThreeFactor): revolver\n  utilization, short-rate and credit-spread simulation\n\n## Exotic Analytical\n- [`BarrierBSContinuous`](Self::BarrierBSContinuous): Reiner-Rubinstein barriers\n- [`AsianGeometricBS`](Self::AsianGeometricBS): Geometric Asian (exact)\n- [`AsianTurnbullWakeman`](Self::AsianTurnbullWakeman): Arithmetic Asian (approx)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::pricer::ModelKey;\n\n// Select appropriate model for instrument type\nlet model = ModelKey::Discounting;  // For bonds\nlet model = ModelKey::Black76;      // For caps/floors\nlet model = ModelKey::MonteCarloGBM; // For path-dependent exotics\n\n// Parse from string\nlet model: ModelKey = \"black76\".parse().unwrap();\nassert_eq!(model, ModelKey::Black76);\n```",
       "oneOf": [
         {
           "const": "discounting",
@@ -1032,7 +1032,7 @@
     },
     "StructuredCreditPricingMode": {
       "additionalProperties": false,
-      "description": "Stochastic pricing mode.\n\nMonte Carlo is the only engine: each scenario path draws its monthly\nsystematic factors from a seeded Philox substream and runs the full deal\nwaterfall. The mode is echoed on\n[`StochasticPricingResult::pricing_mode`](super::StochasticPricingResult)\nso a result records the estimator count it was produced with.\n\nTest coverage:\n`tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`\nplus the convergence tests.",
+      "description": "Stochastic pricing mode.\n\nMonte Carlo is the only engine: each scenario path draws its monthly\nsystematic factors from a seeded Philox substream and runs the full deal\nwaterfall. The mode is echoed on\n[`StochasticPricingResult::pricing_mode`]\nso a result records the estimator count it was produced with.\n\nTest coverage:\n`tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`\nplus the convergence tests.",
       "properties": {
         "monte_carlo": {
           "additionalProperties": false,
@@ -1464,7 +1464,7 @@
           },
           "version": 1
         },
-        "version": "0.10.0"
+        "version": "0.11.0"
       },
       "schema_version": 1,
       "value": {
@@ -1543,7 +1543,7 @@
     },
     "value": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-      "description": "Present value in the instrument's native currency.\n\nThis is the primary pricing output and is **always available** regardless\nof which metrics are requested. The PV is **not** included in the `measures`\nmap - it is provided here as a `Money` type with full currency information.\n\nFor cross-currency instruments, this may be in a different currency than\nthe base calculation currency.\n\n# Example\n```rust\n# use finstack_quant_valuations::results::ValuationResult;\n# use finstack_quant_core::currency::Currency;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::dates::create_date;\n# use time::Month;\n# fn main() -> Result<(), Box<dyn std::error::Error>> {\n# let as_of = create_date(2025, Month::January, 15)?;\n# let pv = Money::from((1_000_000_i64, Currency::USD));\n# let result = ValuationResult::stamped(\"BOND-001\", as_of, pv);\n// PV is always in result.value, not in measures\nlet pv_money = result.value;  // Money type\nlet pv_amount = result.value.amount();  // f64 value\nlet currency = result.value.currency();  // Currency type\n# Ok(())\n# }\n```"
+      "description": "Present value in the instrument's native currency.\n\nThis is the primary pricing output and is **always available** regardless\nof which metrics are requested. The PV is **not** included in the `measures`\nmap - it is provided here as a `Money` type with full currency information.\n\nFor cross-currency instruments, this may be in a different currency than\nthe base calculation currency.\n\n# Example\n```rust\n# use finstack_quant_valuations_core::results::ValuationResult;\n# use finstack_quant_core::currency::Currency;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::dates::create_date;\n# use time::Month;\n# fn main() -> Result<(), Box<dyn std::error::Error>> {\n# let as_of = create_date(2025, Month::January, 15)?;\n# let pv = Money::from((1_000_000_i64, Currency::USD));\n# let result = ValuationResult::stamped(\"BOND-001\", as_of, pv);\n// PV is always in result.value, not in measures\nlet pv_money = result.value;  // Money type\nlet pv_amount = result.value.amount();  // f64 value\nlet currency = result.value.currency();  // Currency type\n# Ok(())\n# }\n```"
     }
   },
   "required": [

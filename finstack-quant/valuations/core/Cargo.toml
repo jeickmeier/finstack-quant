@@ -1,0 +1,50 @@
+[package]
+name = "finstack-quant-valuations-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Pricing framework of Finstack Quant valuations: the Instrument trait, pricer and metric registries, market conventions and result envelopes shared by every instrument family"
+
+[dependencies]
+finstack-quant-core = { path = "../../core", version = "0.11.0", default-features = false }
+finstack-quant-cashflows = { path = "../../cashflows", version = "0.11.0", default-features = false }
+finstack-quant-covenants = { path = "../../covenants", version = "0.11.0", default-features = false }
+finstack-quant-margin = { path = "../../margin", version = "0.11.0", default-features = false }
+finstack-quant-models = { path = "../../models", version = "0.11.0", default-features = false }
+finstack-quant-valuations-macros = { path = "../macros", version = "0.11.0" }
+indexmap = { workspace = true, features = ["serde"] }
+smallvec = { version = "1.15", default-features = false, features = ["serde"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true }
+rust_decimal = { workspace = true }
+schemars = { workspace = true, optional = true }
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+thiserror = { workspace = true }
+strum = { workspace = true, features = ["derive"] }
+
+# rayon has no working thread pool on single-threaded wasm32; parallel
+# code paths are cfg-gated to native targets, so the dependency is too.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rayon = "1.11"
+
+[dev-dependencies]
+time = { workspace = true, features = ["macros"] }
+rust_decimal_macros = { workspace = true }
+
+[features]
+default = ["json-schema"]
+json-schema = [
+    "dep:schemars",
+    "finstack-quant-core/json-schema",
+    "finstack-quant-cashflows/json-schema",
+    "finstack-quant-covenants/json-schema",
+    "finstack-quant-margin/json-schema",
+    "finstack-quant-models/json-schema",
+]
+
+[lints]
+workspace = true

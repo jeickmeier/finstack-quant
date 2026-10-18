@@ -1,12 +1,12 @@
 //! Model-aware term-loan credit-spread sensitivity regressions.
 
-use crate::instruments::common::test_helpers::flat_discount_curve;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
+use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve;
 use time::macros::date;
 
 fn credit_loan_and_market() -> (TermLoan, MarketContext) {

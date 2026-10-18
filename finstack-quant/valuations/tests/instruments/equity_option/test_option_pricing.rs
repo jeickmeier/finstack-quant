@@ -4,8 +4,6 @@
 //! bitwise-identical results across multiple runs, and validates correctness
 //! against market standards (put-call parity, Greeks bounds).
 
-#[allow(unused_imports)]
-use crate::instruments::common::test_helpers::tolerances;
 use crate::instruments::test_support::equity_fx_options as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -18,6 +16,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+#[allow(unused_imports)]
+use finstack_quant_valuations_test_support::test_helpers::tolerances;
 use time::Month;
 
 fn create_test_call() -> EquityOption {

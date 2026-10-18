@@ -166,7 +166,7 @@
     },
     "d_05625cf1aa46e3810fc5": {
       "additionalProperties": false,
-      "description": "Dollar roll - simultaneous sale and purchase of TBAs for different months.\n\nA dollar roll involves:\n1. Selling TBA for near-month settlement\n2. Buying TBA for far-month settlement\n\nThe price difference between the two legs represents the \"drop\" and\nimplies a financing rate.\n\n# Financing and Carry\n\nDollar rolls are used for:\n- **Financing**: Implied repo rate is often cheaper than repo\n- **Carry trades**: Profit from drop vs. expected prepayment\n- **Roll specialness**: When roll drops exceed fair value\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;\nuse finstack_quant_valuations::instruments::fixed_income::tba::TbaTerm;\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyProgram;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\nlet roll = DollarRoll::builder()\n    .id(InstrumentId::new(\"FN30-4.0-ROLL-0326-0426\"))\n    .agency(AgencyProgram::Fnma)\n    .coupon(0.04)\n    .term(TbaTerm::ThirtyYear)\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .front_settlement_year(2026)\n    .front_settlement_month(3)\n    .back_settlement_year(2026)\n    .back_settlement_month(4)\n    .front_price(98.5)\n    .back_price(98.0)\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid dollar roll\");\n```",
+      "description": "Dollar roll - simultaneous sale and purchase of TBAs for different months.\n\nA dollar roll involves:\n1. Selling TBA for near-month settlement\n2. Buying TBA for far-month settlement\n\nThe price difference between the two legs represents the \"drop\" and\nimplies a financing rate.\n\n# Financing and Carry\n\nDollar rolls are used for:\n- **Financing**: Implied repo rate is often cheaper than repo\n- **Carry trades**: Profit from drop vs. expected prepayment\n- **Roll specialness**: When roll drops exceed fair value\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::dollar_roll::DollarRoll;\nuse finstack_quant_valuations_fixed_income::tba::TbaTerm;\nuse finstack_quant_valuations_fixed_income::mbs_passthrough::AgencyProgram;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\nlet roll = DollarRoll::builder()\n    .id(InstrumentId::new(\"FN30-4.0-ROLL-0326-0426\"))\n    .agency(AgencyProgram::Fnma)\n    .coupon(0.04)\n    .term(TbaTerm::ThirtyYear)\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .front_settlement_year(2026)\n    .front_settlement_month(3)\n    .back_settlement_year(2026)\n    .back_settlement_month(4)\n    .front_price(98.5)\n    .back_price(98.0)\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid dollar roll\");\n```",
       "properties": {
         "agency": {
           "$ref": "#/$defs/d_c99bdd5aeffa2972aa87",
@@ -278,7 +278,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional repo/financing curve identifier (carry-only).\n\nDiscount curve used by roll specialness to calculate the simple\nfinancing rate `(DF(front)/DF(back) − 1)/τ` over the front/back\nsettlement interval, with `τ` on ACT/360.\nThe implied financing rate itself is determined by prices and carry.\nSee the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]\nmodule). Does **not** affect\nthe mark-to-market PV, which always discounts both legs at\n`discount_curve_id`.\n\nWhen `None`, the discount curve rate is used as the reference\nfinancing rate for carry analytics."
+          "description": "Optional repo/financing curve identifier (carry-only).\n\nDiscount curve used by roll specialness to calculate the simple\nfinancing rate `(DF(front)/DF(back) − 1)/τ` over the front/back\nsettlement interval, with `τ` on ACT/360.\nThe implied financing rate itself is determined by prices and carry.\nSee the carry calculations (see [`crate::dollar_roll::carry`]\nmodule). Does **not** affect\nthe mark-to-market PV, which always discounts both legs at\n`discount_curve_id`.\n\nWhen `None`, the discount curve rate is used as the reference\nfinancing rate for carry analytics."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -431,7 +431,7 @@
       "type": "object"
     },
     "d_10afa2c48803544dc415": {
-      "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```",
+      "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3385,7 +3385,7 @@
     },
     "d_bffef9e684ff0c351c83": {
       "$ref": "#/$defs/d_10a2b628165f3f3e10e7",
-      "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`]."
+      "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`]."
     },
     "d_c08279a20372931820e0": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",

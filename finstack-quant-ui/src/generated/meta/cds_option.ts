@@ -303,7 +303,7 @@ export default [
   {
     "path": "#/$defs/d_10afa2c48803544dc415",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikSchedule",
-    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
+    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
   },
   {
     "path": "#/$defs/d_10afa2c48803544dc415/oneOf/0",
@@ -1114,7 +1114,7 @@ export default [
   {
     "path": "#/$defs/d_7c4b78c24d7d35f10a0b",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOptionStrike",
-    "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate(), 0.0325);\n\nlet price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```"
+    "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_credit::cds_option::CdsOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate(), 0.0325);\n\nlet price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```"
   },
   {
     "path": "#/$defs/d_7c4b78c24d7d35f10a0b/oneOf/0",
@@ -3409,7 +3409,7 @@ export default [
   {
     "path": "#/$defs/d_bffef9e684ff0c351c83",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcOverride",
-    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
+    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
     "ref": "#/$defs/MertonMcConfig",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig"
   },

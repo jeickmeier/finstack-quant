@@ -301,11 +301,12 @@ fn build_irs(
     start: Date,
     end: Date,
 ) -> finstack_quant_valuations::instruments::InterestRateSwap {
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount as DC, StubKind, Tenor};
     use finstack_quant_core::decimal::f64_to_decimal;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_valuations::instruments::rates::irs::{
-        FixedLegSpec, FloatLegSpec, FloatingLegCompounding, PayReceive,
+        FixedLegSpec, FloatLegSpec, PayReceive,
     };
     use finstack_quant_valuations::instruments::InterestRateSwap;
     use rust_decimal::Decimal;

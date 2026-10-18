@@ -24,10 +24,10 @@ use finstack_quant_core::market_data::term_structures::{
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
-use finstack_quant_valuations::instruments::rates::ir_future::InterestRateFuture;
-use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+use finstack_quant_valuations_rates::deposit::Deposit;
+use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
+use finstack_quant_valuations_rates::ir_future::InterestRateFuture;
+use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use std::cell::{Cell, RefCell};
 
 /// Parameters for constructing a `ForwardCurveTarget`.
@@ -597,7 +597,7 @@ impl GlobalSolveTarget for ForwardCurveTarget {
                         DayCountContext::default(),
                     )?;
                     let idx_conv =
-                        finstack_quant_valuations::market::conventions::ConventionRegistry::try_global()?
+                        finstack_quant_valuations_core::market::conventions::ConventionRegistry::try_global()?
                             .require_rate_index(index)?;
                     let deposit_accrual = idx_conv.day_count.year_fraction(
                         start,
@@ -680,9 +680,9 @@ mod tests {
     };
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::InstrumentId;
-    use finstack_quant_valuations::instruments::{Attributes, Instrument};
-    use finstack_quant_valuations::market::conventions::ids::IrFutureContractId;
-    use finstack_quant_valuations::pricer::InstrumentType;
+    use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
+    use finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId;
+    use finstack_quant_valuations_core::pricer::InstrumentType;
     use std::any::Any;
     use std::sync::Arc;
     use time::Month;
@@ -690,7 +690,7 @@ mod tests {
     #[derive(Clone)]
     struct DummyInstrument;
 
-    finstack_quant_valuations::impl_empty_cashflow_provider!(
+    finstack_quant_valuations_core::impl_empty_cashflow_provider!(
         DummyInstrument,
         finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
     );
@@ -699,9 +699,10 @@ mod tests {
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,
-        ) -> finstack_quant_core::Result<finstack_quant_valuations::instruments::MarketDependencies>
-        {
-            Ok(finstack_quant_valuations::instruments::MarketDependencies::new())
+        ) -> finstack_quant_core::Result<
+            finstack_quant_valuations_core::instruments::MarketDependencies,
+        > {
+            Ok(finstack_quant_valuations_core::instruments::MarketDependencies::new())
         }
 
         fn id(&self) -> &str {

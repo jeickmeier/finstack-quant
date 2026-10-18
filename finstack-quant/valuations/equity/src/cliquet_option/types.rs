@@ -1,0 +1,590 @@
+//! Cliquet option instrument definition.
+
+use crate::EquityPathModel;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
+pub use finstack_quant_models::monte_carlo::payoff::cliquet::CliquetPayoffType;
+use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use time::macros::date;
+
+/// Cliquet option instrument.
+#[derive(
+    PartialEq,
+    Clone,
+    Debug,
+    finstack_quant_valuations_macros::FinancialBuilder,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields, try_from = "CliquetOptionUnchecked")]
+pub struct CliquetOption {
+    /// Unique instrument identifier
+    pub id: InstrumentId,
+    /// Underlying asset ticker symbol
+    pub underlying_ticker: String,
+    /// Reset dates for periodic return locking
+    #[serde(with = "finstack_quant_core::wire::dates")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
+    pub reset_dates: Vec<Date>,
+    /// Explicit terminal expiry date for the structure.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub expiry: Date,
+    /// Local cap on individual period returns
+    pub local_cap: f64,
+    /// Local floor on individual period returns (default 0.0)
+    pub local_floor: f64,
+    /// Global cap on sum of all period returns
+    pub global_cap: f64,
+    /// Global floor on sum of all period returns (default 0.0)
+    pub global_floor: f64,
+    /// Notional amount
+    pub notional: Money,
+    /// Day count convention
+    pub day_count: finstack_quant_core::dates::DayCount,
+    /// Discount curve ID for present value calculations
+    pub discount_curve_id: CurveId,
+    /// Spot price identifier
+    pub spot_id: PriceId,
+    /// Volatility surface ID
+    pub vol_surface_id: CurveId,
+    /// Explicit path model selection.
+    ///
+    /// `AtmTermGbm` is an ATM-term-structure approximation and does not model
+    /// equity strike skew; callers must opt into that limitation.
+    pub path_model: EquityPathModel,
+    /// Optional dividend-yield scalar ID.
+    ///
+    /// `Some(id)`: lookup MUST succeed (a missing or non-unitless scalar
+    /// returns an error). `None`: no implicit default; treated as zero
+    /// continuous dividend yield. Set explicitly for index underlyings.
+    pub div_yield_id: Option<PriceId>,
+    /// Strike-set underlying level anchoring the first period's return.
+    ///
+    /// `None` (the default) uses the spot at the valuation date, which is only
+    /// correct for a new trade priced on its strike-set date. **Required for
+    /// seasoned trades** (any reset date strictly before `as_of`): pricing
+    /// errors otherwise. Do not duplicate the strike-set date inside
+    /// `reset_dates` when providing this — reset dates are period-end
+    /// observations.
+    #[builder(default)]
+    #[serde(default)]
+    pub initial_level: Option<f64>,
+    /// Observed underlying fixings for seasoned trades (date, level pairs).
+    ///
+    /// Every reset date strictly before the valuation date must have a
+    /// matching fixing here; pricing errors otherwise. Locked-in period
+    /// returns are computed deterministically from these fixings (with local
+    /// cap/floor applied) and only the remaining future periods are simulated.
+    #[builder(default)]
+    #[serde(default)]
+    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
+    )]
+    pub past_fixings: Vec<(Date, f64)>,
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides:
+        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+    /// Attributes for scenario selection and grouping
+    pub attributes: Attributes,
+    /// Payoff aggregation type (default: Additive)
+    #[builder(default)]
+    #[serde(default)]
+    pub payoff_type: CliquetPayoffType,
+}
+
+/// Mirror of `CliquetOption` used by serde to apply `validate()` after
+/// deserialization. Not part of the public API.
+#[derive(Debug, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct CliquetOptionUnchecked {
+    /// Unique instrument identifier
+    id: InstrumentId,
+    /// Underlying asset ticker symbol
+    underlying_ticker: String,
+    /// Reset dates for periodic return locking
+    #[serde(with = "finstack_quant_core::wire::dates")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
+    reset_dates: Vec<Date>,
+    /// Explicit terminal expiry date for the structure.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    expiry: Date,
+    /// Local cap on individual period returns
+    local_cap: f64,
+    /// Local floor on individual period returns (default 0.0)
+    local_floor: f64,
+    /// Global cap on sum of all period returns
+    global_cap: f64,
+    /// Global floor on sum of all period returns (default 0.0)
+    global_floor: f64,
+    /// Notional amount
+    notional: Money,
+    /// Day count convention
+    day_count: finstack_quant_core::dates::DayCount,
+    /// Discount curve ID for present value calculations
+    discount_curve_id: CurveId,
+    /// Spot price identifier
+    spot_id: PriceId,
+    /// Volatility surface ID
+    vol_surface_id: CurveId,
+    /// Explicit path model selection; required to acknowledge model risk.
+    path_model: EquityPathModel,
+    /// Optional dividend-yield scalar ID.
+    ///
+    /// `Some(id)`: lookup MUST succeed (a missing or non-unitless scalar
+    /// returns an error). `None`: no implicit default; treated as zero
+    /// continuous dividend yield. Set explicitly for index underlyings.
+    #[serde(default)]
+    div_yield_id: Option<PriceId>,
+    /// Strike-set underlying level anchoring the first period's return.
+    ///
+    /// `None` (the default) uses the spot at the valuation date, which is only
+    /// correct for a new trade priced on its strike-set date. **Required for
+    /// seasoned trades** (any reset date strictly before `as_of`): pricing
+    /// errors otherwise. Do not duplicate the strike-set date inside
+    /// `reset_dates` when providing this — reset dates are period-end
+    /// observations.
+    #[serde(default)]
+    initial_level: Option<f64>,
+    /// Observed underlying fixings for seasoned trades (date, level pairs).
+    ///
+    /// Every reset date strictly before the valuation date must have a
+    /// matching fixing here; pricing errors otherwise. Locked-in period
+    /// returns are computed deterministically from these fixings (with local
+    /// cap/floor applied) and only the remaining future periods are simulated.
+    #[serde(default)]
+    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
+    )]
+    past_fixings: Vec<(Date, f64)>,
+    /// Instrument-owned pricing inputs.
+    #[serde(default)]
+    instrument_pricing_overrides:
+        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+    /// Attributes for scenario selection and grouping
+    attributes: Attributes,
+    /// Payoff aggregation type (default: Additive)
+    #[serde(default)]
+    payoff_type: CliquetPayoffType,
+}
+
+impl TryFrom<CliquetOptionUnchecked> for CliquetOption {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(value: CliquetOptionUnchecked) -> std::result::Result<Self, Self::Error> {
+        let opt = Self {
+            id: value.id,
+            underlying_ticker: value.underlying_ticker,
+            reset_dates: value.reset_dates,
+            expiry: value.expiry,
+            local_cap: value.local_cap,
+            local_floor: value.local_floor,
+            global_cap: value.global_cap,
+            global_floor: value.global_floor,
+            notional: value.notional,
+            day_count: value.day_count,
+            discount_curve_id: value.discount_curve_id,
+            spot_id: value.spot_id,
+            vol_surface_id: value.vol_surface_id,
+            path_model: value.path_model,
+            div_yield_id: value.div_yield_id,
+            initial_level: value.initial_level,
+            past_fixings: value.past_fixings,
+            instrument_pricing_overrides: value.instrument_pricing_overrides,
+            metric_pricing_overrides: value.metric_pricing_overrides,
+            scenario_pricing_overrides: value.scenario_pricing_overrides,
+            attributes: value.attributes,
+            payoff_type: value.payoff_type,
+        };
+        opt.validate()?;
+        Ok(opt)
+    }
+}
+
+// Declare canonical market dependencies for the DV01 calculator.
+impl CliquetOption {
+    /// Validate structural invariants required by the pricing engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `reset_dates` is empty (the schedule needs at least one observation)
+    /// - `reset_dates` are not strictly increasing
+    /// - any reset date is strictly after `expiry`
+    /// - `local_floor > local_cap` or `global_floor > global_cap`
+    /// - `notional.amount()` is not finite
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if self.reset_dates.is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "CliquetOption requires at least one reset_dates entry".into(),
+            ));
+        }
+        for window in self.reset_dates.windows(2) {
+            if window[0] >= window[1] {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CliquetOption reset_dates must be strictly increasing; got {} >= {}",
+                    window[0], window[1]
+                )));
+            }
+        }
+        // Safe: reset_dates is non-empty (checked above).
+        if let Some(&last_reset) = self.reset_dates.last() {
+            if last_reset > self.expiry {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CliquetOption last reset date {} is after expiry {}",
+                    last_reset, self.expiry
+                )));
+            }
+        }
+        if self.local_floor > self.local_cap {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CliquetOption local_floor ({}) must be <= local_cap ({})",
+                self.local_floor, self.local_cap
+            )));
+        }
+        if self.global_floor > self.global_cap {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CliquetOption global_floor ({}) must be <= global_cap ({})",
+                self.global_floor, self.global_cap
+            )));
+        }
+        // This instrument prices the LONG OPTION LEG: the payoff is
+        // `max(0, clamp(Σ returns))·notional`, so a negative global floor can
+        // never bind — accepting one would silently price full downside
+        // protection while the user believes they modelled a capital-at-risk
+        // note. Fail closed instead of carrying an inert knob.
+        if self.global_floor < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CliquetOption global_floor ({}) must be >= 0: the engine prices the long \
+                 option leg (payoff floored at zero), so a negative global floor is \
+                 economically inert. Model capital-at-risk notes as a separate short-put \
+                 position instead",
+                self.global_floor
+            )));
+        }
+        if !self.notional.amount().is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "CliquetOption notional amount must be finite".into(),
+            ));
+        }
+        if let Some(level) = self.initial_level {
+            if !level.is_finite() || level <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CliquetOption initial_level = {} must be finite and positive",
+                    level
+                )));
+            }
+        }
+        for (d, v) in &self.past_fixings {
+            if !v.is_finite() || *v <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CliquetOption past_fixings[{}] = {} must be finite and positive",
+                    d, v
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Look up the observed fixing for a reset date, if provided.
+    pub fn fixing_on(&self, date: Date) -> Option<f64> {
+        self.past_fixings
+            .iter()
+            .find(|(d, _)| *d == date)
+            .map(|(_, v)| *v)
+    }
+
+    /// Create a canonical example cliquet option (quarterly resets with local/global caps).
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::dates::DayCount;
+        let reset_dates = vec![
+            date!(2024 - 03 - 29),
+            date!(2024 - 06 - 28),
+            date!(2024 - 09 - 30),
+            date!(2024 - 12 - 31),
+        ];
+        CliquetOption::builder()
+            .id(InstrumentId::new("CLIQ-SPX-QTR"))
+            .underlying_ticker("SPX".to_string())
+            .reset_dates(reset_dates)
+            .expiry(date!(2024 - 12 - 31))
+            .local_cap(0.05) // 5% per period
+            .local_floor(0.0) // 0% per period (min)
+            .global_cap(0.20) // 20% max cumulative
+            .global_floor(0.0) // 0% min cumulative
+            .notional(Money::from((100_000_i64, Currency::USD)))
+            .day_count(DayCount::Act365F)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .spot_id("SPX-SPOT".into())
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .path_model(crate::EquityPathModel::AtmTermGbm)
+            .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
+            .attributes(Attributes::new())
+            .build()
+    }
+}
+
+impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
+    for CliquetOption
+{
+    impl_instrument_base!(
+        finstack_quant_valuations_core::pricer::InstrumentType::CliquetOption,
+        crate::EQUITY
+    );
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
+    fn default_model(&self) -> finstack_quant_valuations_core::pricer::ModelKey {
+        finstack_quant_valuations_core::pricer::ModelKey::MonteCarloGBM
+    }
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_market_scalar_id(self.spot_id.as_str());
+        deps.add_volatility_dependency(
+            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                Some(self.spot_id.clone()),
+                None,
+            ),
+        );
+        if let Some(dividend_yield) = &self.div_yield_id {
+            deps.add_market_scalar_id(dividend_yield.as_str());
+        }
+        Ok(deps)
+    }
+
+    fn base_value(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        use crate::cliquet_option::pricer;
+        self.validate()?;
+        pricer::compute_pv(self, market, as_of)
+    }
+
+    fn expiry(&self) -> Option<Date> {
+        Some(self.expiry)
+    }
+
+    /// Record the held `as_of` spot for observations the roll passes.
+    ///
+    /// Reset dates in `[as_of, rolled_date)` with no recorded fixing are added at
+    /// the `as_of` level of `spot_id`, since theta holds spot fixed (a reset on
+    /// `rolled_date` already uses the live spot). A trade without
+    /// `initial_level` (strike set at `as_of`) gets that level as its
+    /// strike-set level once a reset falls before `rolled_date`.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of` supplying the `spot_id` level held over the roll.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at.
+    fn theta_observed_state(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<
+        Option<
+            Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument>,
+        >,
+    > {
+        let rolled_fixings: Vec<Date> = self
+            .reset_dates
+            .iter()
+            .copied()
+            .filter(|date| *date >= as_of && *date < rolled_date && self.fixing_on(*date).is_none())
+            .collect();
+        let needs_initial_level =
+            self.initial_level.is_none() && self.reset_dates.iter().any(|date| *date < rolled_date);
+        if rolled_fixings.is_empty() && !needs_initial_level {
+            return Ok(None);
+        }
+        let spot =
+            finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+                market.get_price(&self.spot_id)?,
+                self.notional.currency(),
+            )?;
+        let mut observed = self.clone();
+        if needs_initial_level {
+            observed.initial_level = Some(spot);
+        }
+        observed
+            .past_fixings
+            .extend(rolled_fixings.into_iter().map(|date| (date, spot)));
+        observed.past_fixings.sort_by_key(|(date, _)| *date);
+        Ok(Some(Box::new(observed)))
+    }
+
+    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+}
+
+finstack_quant_valuations_core::impl_empty_cashflow_provider!(
+    CliquetOption,
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
+);
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+mod validation_tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_valuations_core::instruments::Attributes;
+
+    #[test]
+    fn builder_rejects_empty_reset_dates() {
+        let result = CliquetOption::builder()
+            .id(InstrumentId::new("CLIQ-EMPTY"))
+            .underlying_ticker("SPX".to_string())
+            .reset_dates(vec![])
+            .expiry(date!(2024 - 12 - 31))
+            .local_cap(0.05)
+            .local_floor(0.0)
+            .global_cap(0.20)
+            .global_floor(0.0)
+            .notional(Money::from((100_000_i64, Currency::USD)))
+            .day_count(DayCount::Act365F)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .spot_id("SPX-SPOT".into())
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .path_model(crate::EquityPathModel::AtmTermGbm)
+            .div_yield_id_opt(None)
+            .attributes(Attributes::new())
+            .build();
+        assert!(result.is_err(), "empty reset_dates must be rejected");
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("reset_dates"),
+            "error message should mention reset_dates: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn builder_rejects_reset_dates_after_expiry() {
+        let result = CliquetOption::builder()
+            .id(InstrumentId::new("CLIQ-PAST-EXPIRY"))
+            .underlying_ticker("SPX".to_string())
+            .reset_dates(vec![date!(2025 - 01 - 01)])
+            .expiry(date!(2024 - 12 - 31))
+            .local_cap(0.05)
+            .local_floor(0.0)
+            .global_cap(0.20)
+            .global_floor(0.0)
+            .notional(Money::from((100_000_i64, Currency::USD)))
+            .day_count(DayCount::Act365F)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .spot_id("SPX-SPOT".into())
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .path_model(crate::EquityPathModel::AtmTermGbm)
+            .div_yield_id_opt(None)
+            .attributes(Attributes::new())
+            .build();
+        assert!(result.is_err(), "reset_dates after expiry must be rejected");
+    }
+
+    #[test]
+    fn builder_rejects_unsorted_reset_dates() {
+        let result = CliquetOption::builder()
+            .id(InstrumentId::new("CLIQ-UNSORTED"))
+            .underlying_ticker("SPX".to_string())
+            .reset_dates(vec![date!(2024 - 06 - 30), date!(2024 - 03 - 30)])
+            .expiry(date!(2024 - 12 - 31))
+            .local_cap(0.05)
+            .local_floor(0.0)
+            .global_cap(0.20)
+            .global_floor(0.0)
+            .notional(Money::from((100_000_i64, Currency::USD)))
+            .day_count(DayCount::Act365F)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .spot_id("SPX-SPOT".into())
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .path_model(crate::EquityPathModel::AtmTermGbm)
+            .div_yield_id_opt(None)
+            .attributes(Attributes::new())
+            .build();
+        assert!(result.is_err(), "unsorted reset_dates must be rejected");
+    }
+
+    #[test]
+    fn instrument_expiry_returns_explicit_expiry_field() {
+        // After construction the explicit expiry, not the last reset date,
+        // is the contract maturity.
+        let opt = CliquetOption::example().expect("example builds");
+        assert_eq!(
+            finstack_quant_valuations_core::instruments::Instrument::expiry(&opt),
+            Some(opt.expiry)
+        );
+    }
+
+    #[test]
+    fn instrument_expiry_does_not_panic_on_empty_reset_dates() {
+        // Construct via builder (validated) then mutate to simulate corrupted
+        // state from an unsanitised JSON path. expiry() must not panic.
+        let mut opt = CliquetOption::example().expect("example builds");
+        opt.reset_dates.clear();
+        assert_eq!(
+            finstack_quant_valuations_core::instruments::Instrument::expiry(&opt),
+            Some(opt.expiry)
+        );
+    }
+}

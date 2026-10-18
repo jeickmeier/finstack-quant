@@ -21,7 +21,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../tests/support/rates.rs"]
+#[path = "../rates/tests/support/rates.rs"]
 mod rates_support;
 use rust_decimal_macros::dec;
 use std::hint::black_box;

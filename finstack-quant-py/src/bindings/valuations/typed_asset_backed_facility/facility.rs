@@ -22,12 +22,13 @@ use crate::bindings::valuations::typed_structured_credit::{
     PyAssetPool, PySimulationDiagnostics, PyStructuredCredit, PyTrancheCashflows,
 };
 use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::{
     AmortizationEvent, AssetBackedFacility, BorrowingBaseRules, FacilityProjection, TermOutSpec,
 };
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::{DrawEvent, RateSpec};
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::DrawEvent;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::CreditModelConfig;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::DealFees;
 use finstack_quant_valuations::instruments::InstrumentJson;

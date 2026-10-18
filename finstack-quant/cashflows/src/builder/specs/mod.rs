@@ -13,6 +13,7 @@
 //! - `prepayment`: Prepayment models (CPR/PSA)
 //! - `default`: Default models (CDR/SDA) and events
 //! - `recovery`: Recovery specifications
+//! - `rate`: Loan coupon specification (fixed all-in rate or floating index plus spread)
 //!
 //! ## Responsibilities
 //!
@@ -29,6 +30,7 @@ mod default;
 mod fees;
 mod prepayment;
 mod principal;
+mod rate;
 mod recovery;
 mod schedule;
 
@@ -68,5 +70,6 @@ pub use default::DefaultModelSpec;
 pub use fees::{evaluate_fee_tiers, FeeAccrualBasis, FeeBase, FeeSpec, FeeTier};
 pub use prepayment::PrepaymentModelSpec;
 pub use principal::PrincipalExchange;
+pub use rate::RateSpec;
 pub use recovery::RecoveryModelSpec;
 pub use schedule::{RollRule, ScheduleParams};

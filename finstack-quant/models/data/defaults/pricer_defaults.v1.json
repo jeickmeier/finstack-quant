@@ -26,6 +26,13 @@
       "seed": 42,
       "use_parallel": false,
       "antithetic": true
+    },
+    "hw1f": {
+      "num_paths": 10000,
+      "seed": 42,
+      "antithetic": true,
+      "min_steps_between_events": 4,
+      "basis_degree": 2
     }
   },
   "convenience": {

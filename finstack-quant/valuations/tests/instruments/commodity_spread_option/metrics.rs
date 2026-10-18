@@ -3,10 +3,6 @@
 //! Exercises the registered-but-previously-untested metric calculators:
 //! `Delta` (leg-1 forward sensitivity), `Vega`, `Dv01`, and `BucketedDv01`.
 
-use crate::instruments::test_support::commodity_curves::flat_price_curve;
-use crate::instruments::test_support::date::date;
-use crate::instruments::test_support::discount_forward_curves::flat_discount_with_tenor;
-use crate::instruments::test_support::volatility::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -14,6 +10,10 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::commodity::commodity_spread_option::CommoditySpreadOption;
 use finstack_quant_valuations::instruments::{Instrument, OptionType};
 use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations_test_support::commodity_curves::flat_price_curve;
+use finstack_quant_valuations_test_support::date::date;
+use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
+use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 use std::sync::Arc;
 
 /// Build an ITM commodity spread call (F1 > F2, small strike) plus its market.

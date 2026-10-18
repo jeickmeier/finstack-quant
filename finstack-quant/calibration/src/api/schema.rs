@@ -29,7 +29,7 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::{CurveId, IndexId};
-use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsValuationConvention;
+use finstack_quant_valuations_credit::cds::CdsValuationConvention;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 

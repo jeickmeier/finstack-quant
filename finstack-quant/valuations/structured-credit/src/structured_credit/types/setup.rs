@@ -1,0 +1,106 @@
+//! Deal fee structures for structured credit instruments.
+//!
+//! Every other deal-level assumption reaches the engine through a field on
+//! [`super::StructuredCredit`], [`super::AssetPool`], [`super::Tranche`] or
+//! [`super::WaterfallRules`]; this module only holds the fee schedule the
+//! template waterfall turns into fee tiers.
+
+use crate::structured_credit::assumptions::{embedded_registry_or_panic, required_assumption};
+use finstack_quant_core::money::Money;
+
+use serde::{Deserialize, Serialize};
+
+/// Fee structure for structured credit deals
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DealFees {
+    /// Fixed trustee fee per annum; the waterfall divides it by the payment
+    /// periods per year.
+    pub trustee_fee: Money,
+    /// Senior management fee (basis points per annum on collateral)
+    pub senior_mgmt_fee_bp: f64,
+    /// Subordinated management fee (basis points per annum), paid after every
+    /// note coupon.
+    pub subordinated_mgmt_fee_bp: f64,
+    /// Servicing fee (basis points per annum)
+    pub servicing_fee_bp: f64,
+    /// Master servicer fee (for CMBS/RMBS, basis points)
+    pub master_servicer_fee_bp: Option<f64>,
+    /// Special servicer fee (for CMBS, basis points per annum on the
+    /// specially serviced balance: loans flagged at closing plus every loan
+    /// that has since defaulted or taken a balloon loss).
+    pub special_servicer_fee_bp: Option<f64>,
+    /// Special servicer workout fee as a percent of the principal and
+    /// interest collected on specially serviced loans (`1.0` = 1%), taken
+    /// off the top of those collections; `None` for no workout fee.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workout_fee_pct: Option<f64>,
+    /// Special servicer liquidation fee as a percent of the liquidation
+    /// proceeds of defaulted loans (`1.0` = 1%), taken before the recovery
+    /// reaches the waterfall; `None` for no liquidation fee.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub liquidation_fee_pct: Option<f64>,
+    /// Manager incentive fee paid from the residual once equity has earned
+    /// its hurdle IRR; `None` for deals without one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub incentive_fee: Option<IncentiveFeeSpec>,
+}
+
+/// Manager incentive fee: once the equity IRR to date (invested capital at
+/// closing against every distribution to date, including the residual on the
+/// current payment date) reaches `hurdle_irr`, the manager takes `share`
+/// of the residual interest proceeds ahead of equity.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct IncentiveFeeSpec {
+    /// Equity IRR hurdle as an annual decimal (`0.12` = 12%).
+    pub hurdle_irr: f64,
+    /// Share of the residual paid to the manager once the hurdle is met, as
+    /// a decimal fraction in `[0, 1]`.
+    pub share: f64,
+}
+
+impl DealFees {
+    /// Create CLO-style fee structure
+    pub fn clo_standard(currency: finstack_quant_core::currency::Currency) -> Self {
+        required_assumption(embedded_registry_or_panic().deal_fees("clo_standard", currency))
+    }
+
+    /// Create ABS-style fee structure
+    pub fn abs_standard(currency: finstack_quant_core::currency::Currency) -> Self {
+        required_assumption(embedded_registry_or_panic().deal_fees("abs_auto_standard", currency))
+    }
+
+    /// Create CMBS-style fee structure
+    pub fn cmbs_standard(currency: finstack_quant_core::currency::Currency) -> Self {
+        required_assumption(embedded_registry_or_panic().deal_fees("cmbs_standard", currency))
+    }
+
+    /// Create RMBS-style fee structure
+    pub fn rmbs_standard(currency: finstack_quant_core::currency::Currency) -> Self {
+        required_assumption(embedded_registry_or_panic().deal_fees("rmbs_standard", currency))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+
+    #[test]
+    fn test_clo_fee_structure() {
+        let fees = DealFees::clo_standard(Currency::USD);
+
+        assert_eq!(fees.trustee_fee.amount(), 50_000.0);
+        // BSL CLO convention: a small senior fee ahead of the notes and the
+        // larger subordinated fee behind them.
+        assert_eq!(fees.senior_mgmt_fee_bp, 15.0);
+        assert_eq!(fees.subordinated_mgmt_fee_bp, 35.0);
+        assert!(fees.senior_mgmt_fee_bp < fees.subordinated_mgmt_fee_bp);
+        let incentive = fees.incentive_fee.expect("standard CLO incentive fee");
+        assert_eq!(incentive.hurdle_irr, 0.12);
+        assert_eq!(incentive.share, 0.2);
+    }
+}

@@ -7,7 +7,7 @@ use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
 use crate::utils::input::js_string;
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, StructuredCredit, TrancheStructure,
 };

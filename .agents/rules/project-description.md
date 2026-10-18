@@ -39,8 +39,19 @@ Workspace (umbrella crate: finstack-quant)
  │  models               ← model kernels: closed-form, Monte Carlo (Philox RNG, processes,     │
  │                         payoffs, engine), PDE, trees, Fourier, vol, short-rate, credit,     │
  │                         factor models, copulas/correlation, liquidity                       │
- │  valuations           ← instruments, pricer registry, metrics, market conventions (hub)     │
- │  calibration          ← curve/hazard/vol bootstraps and global calibration on valuations   │
+ │  valuations/core      ← pricing framework: Instrument trait, pricer/metric registries,     │
+ │                         Family, results, market conventions (no instrument types)           │
+ │  valuations/{rates,   ← one crate per instrument family (packages                           │
+ │   fixed-income,          finstack-quant-valuations-<family>), each with its Family static;  │
+ │   credit, equity,        depend on valuations/core only, never on each other                │
+ │   fx, exotics}                                                                              │
+ │  valuations/structured-credit ← second tier (structured credit, CMO, asset-backed facility); │
+ │                         depends on fixed-income and rates                                   │
+ │  valuations           ← umbrella: re-exports core + the family crates under unchanged     │
+ │                         paths; basket, real estate, composite, json_loader, STANDARD        │
+ │                         registries, schemas (the closed world)                              │
+ │  calibration          ← curve/hazard/vol bootstraps and global calibration on valuations/  │
+ │                         {core, rates, credit} (the umbrella is a dev-dependency only)       │
  │  attribution          ← multi-period P&L attribution (waterfall, Taylor, metrics-based)     │
  │  statements           ← model graph (Value > Forecast > Formula), evaluation                │
  │  statements-analytics ← DCF, scenario sets, sensitivity, ECL, backtesting                   │
@@ -49,6 +60,7 @@ Workspace (umbrella crate: finstack-quant)
  │                                                                                             │
  │ Supporting crates (not re-exported by the umbrella crate — depend on them directly)         │
  │  valuations/macros    ← FinancialBuilder derive                                             │
+ │  valuations/test-support ← dev-only market builders, fixtures, tolerances, parity (core-only) │
  │  arrow-interchange    ← finstack-quant-arrow: TableEnvelope → Arrow RecordBatch             │
  │  test-utils           ← golden-test framework (dev-dependency only; not published surface)  │
  │  finstack-quant-py    ← Python bindings (PyO3); src/bindings/ mirrors the 14 domains        │
@@ -58,22 +70,34 @@ Workspace (umbrella crate: finstack-quant)
 Dependency direction (read off the manifests):
   core → {analytics, cashflows, covenants, features, margin}
   core + analytics + cashflows → models
-  core + cashflows + covenants + margin + models → valuations
-  valuations (+ core, cashflows, models) → calibration
+  core + cashflows + covenants + margin + models → valuations/core
+  valuations/core → valuations/{rates, fixed-income, credit, equity, fx, exotics} (in parallel)
+  valuations/fixed-income + valuations/rates → valuations/structured-credit
+  valuations/core + the six family crates + valuations/structured-credit → valuations
+  valuations/{core, rates, credit} (+ core, cashflows, models) → calibration
   calibration + valuations → attribution
   valuations (+ core, cashflows) → statements → statements-analytics (+ covenants, models)
   {attribution, calibration, models, statements, valuations} → scenarios
   {attribution, calibration, cashflows, margin, models, scenarios, valuations} → portfolio
 
-  Short form: core → cashflows/models → valuations → calibration → attribution →
-  statements/scenarios → portfolio.
+  Short form: core → cashflows/models → valuations/core → the family crates → valuations →
+  calibration → attribution → statements/scenarios → portfolio.
+  `finstack-quant-valuations-core` (`finstack-quant/valuations/core`) is the pricing
+  framework; the six family crates implement it and depend on nothing else in
+  valuations; the umbrella `finstack-quant-valuations` re-exports all of them under
+  the same paths and adds the closed world, so downstream crates and bindings depend
+  on the umbrella only. Instruments that hold other families' legs (composite,
+  basket, levered real estate) stay in the umbrella; the structured-credit tier
+  (`finstack-quant-valuations-structured-credit`: structured credit, CMO, asset-backed
+  facility) depends on fixed-income and rates and is re-exported under its old paths.
   `margin` depends only on `core`; exposure generation is out of its scope. The
   `Marginable` trait is the seam and `valuations` implements it.
   `models` depends on `analytics`, `cashflows` and `core` only; Monte Carlo and
   factor models are modules of it (`models::monte_carlo`, `models::factor`),
   not crates.
-  `calibration` depends on `valuations` (it calibrates against valuations
-  pricers); `valuations` does not depend on `calibration`.
+  `calibration` depends on `valuations/{core, rates, credit}` (it calibrates against
+  the rates and credit pricers) and dev-depends on the umbrella for its
+  `InstrumentJson` tests; no valuations crate depends on `calibration`.
   Bindings depend on the Rust crates; no Rust crate depends on a binding.
 ```
 

@@ -235,7 +235,7 @@
       "type": "object"
     },
     "d_10afa2c48803544dc415": {
-      "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```",
+      "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3040,7 +3040,7 @@
     },
     "d_bffef9e684ff0c351c83": {
       "$ref": "#/$defs/d_10a2b628165f3f3e10e7",
-      "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`]."
+      "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`]."
     },
     "d_c08279a20372931820e0": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3599,7 +3599,7 @@
     },
     "d_f5452489af2759ebedff": {
       "additionalProperties": false,
-      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
+      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",

@@ -1,0 +1,2313 @@
+{
+  "available_metrics": [
+    "abf_advance_rate_utilization",
+    "abf_borrowing_base",
+    "abf_borrowing_base_cushion",
+    "abf_facility_irr",
+    "abf_residual_irr",
+    "abs_ce_level",
+    "abs_charge_off",
+    "abs_delinquency",
+    "abs_excess_spread",
+    "abs_payment_rate",
+    "accrued",
+    "accrued_interest",
+    "all_in_rate",
+    "annuity",
+    "annuity_primary",
+    "annuity_reference",
+    "asw_market",
+    "asw_par",
+    "available_capacity",
+    "base_amount",
+    "basis",
+    "basis_par_spread",
+    "bond_floor",
+    "breakeven",
+    "breakeven_inflation",
+    "bucketed_cs01",
+    "bucketed_dv01",
+    "bucketed_vega",
+    "carry01",
+    "carry_accrued",
+    "carry_pv",
+    "carry_total",
+    "cdr",
+    "charm",
+    "clean_price",
+    "clo_warf",
+    "clo_was",
+    "cmbs_dscr",
+    "collateral_coverage",
+    "collateral_haircut01",
+    "collateral_price01",
+    "collateral_value",
+    "color",
+    "constituent_count",
+    "constituent_delta",
+    "conversion01",
+    "conversion_factor",
+    "conversion_premium",
+    "conversion_value",
+    "convexity",
+    "convexity_adjustment",
+    "convexity_adjustment_risk",
+    "correlation01",
+    "coupon_income",
+    "cpr",
+    "cross_gamma_credit_vol",
+    "cross_gamma_fx_rates",
+    "cross_gamma_fx_vol",
+    "cross_gamma_rates_credit",
+    "cross_gamma_spot_credit",
+    "cross_gamma_spot_vol",
+    "cs01",
+    "cs_gamma",
+    "dcf::wacc01",
+    "default01",
+    "default_exposure",
+    "delta",
+    "delta::leg1",
+    "delta::leg2",
+    "delta_forward",
+    "delta_premium_adjusted_forward",
+    "delta_premium_adjusted_spot",
+    "delta_vol",
+    "deposit_par_rate",
+    "df_end",
+    "df_end_from_quote",
+    "df_start",
+    "dirty_price",
+    "discount_margin",
+    "dividend01",
+    "dpi_lp",
+    "draw_option_cost",
+    "duration_dv01",
+    "duration_mac",
+    "duration_mod",
+    "dv01",
+    "dv01_domestic",
+    "dv01_foreign",
+    "effective_rate",
+    "embedded_option_value",
+    "enterprise_value",
+    "equity_dividend_yield",
+    "equity_forward_price",
+    "equity_price_per_share",
+    "equity_shares",
+    "equity_value",
+    "expected_exercise_time",
+    "expected_loss",
+    "expected_shortfall",
+    "expense_ratio",
+    "exposure_at_default",
+    "financing_annuity",
+    "fixed_leg_pv",
+    "foreign_rho",
+    "forward_points",
+    "forward_pv01",
+    "funding_cost",
+    "funding_risk",
+    "futures_price",
+    "fx01",
+    "fx_delta",
+    "fx_vega",
+    "gamma",
+    "gp_carry_total",
+    "hurdle01",
+    "hvar",
+    "hw_sigma_vega",
+    "i_spread",
+    "implied_collateral_return",
+    "implied_financing_rate",
+    "implied_forward",
+    "implied_vol",
+    "incremental_par_spread",
+    "index_delta",
+    "index_ratio",
+    "inflation01",
+    "inflation_convexity",
+    "inflation_leg_pv",
+    "inverse_rate",
+    "ir_convexity",
+    "ir_cross_gamma",
+    "japanese_simple_yield",
+    "jump_to_default",
+    "jump_to_default_lgd_only",
+    "lp_irr",
+    "model_upfront",
+    "moic",
+    "moic_lp",
+    "moic_to_worst",
+    "moosmuller_ytm",
+    "nav01",
+    "oas",
+    "oid_eir_amortization",
+    "par_rate",
+    "par_spread",
+    "parity",
+    "premium_leg_pv",
+    "prepayment01",
+    "price_from_dm",
+    "protection_leg_pv",
+    "pull_to_par",
+    "pv01",
+    "pv_fixed",
+    "pv_float",
+    "pv_primary",
+    "pv_reference",
+    "quote_rate",
+    "real_duration",
+    "real_estate::cap_rate01",
+    "real_estate::debt_payoff_at_exit",
+    "real_estate::discount_rate01",
+    "real_estate::dscr_min",
+    "real_estate::dscr_min_interest_only",
+    "real_estate::equity_multiple",
+    "real_estate::exit_cap_rate",
+    "real_estate::going_in_cap_rate",
+    "real_estate::levered_irr",
+    "real_estate::ltv",
+    "real_estate::ltv_at_origination",
+    "real_estate::unlevered_cash_on_cash_first",
+    "real_estate::unlevered_irr",
+    "real_estate::unlevered_multiple",
+    "real_yield",
+    "recovery01",
+    "repo_interest",
+    "required_collateral",
+    "rho",
+    "risky_annuity",
+    "risky_pv01",
+    "roll_down",
+    "roll_specialness",
+    "severity01",
+    "speed",
+    "spot_rate",
+    "spread01",
+    "spread_duration",
+    "spread_dv01",
+    "tail_dependence",
+    "terminal_value_pv",
+    "theta",
+    "theta_carry",
+    "theta_period_days",
+    "theta_roll_down",
+    "time_to_maturity",
+    "tvpi_lp",
+    "utilization_rate",
+    "vanna",
+    "variance_expected",
+    "variance_notional",
+    "variance_realized",
+    "variance_strike_vol",
+    "variance_time_to_maturity",
+    "variance_vega",
+    "vega",
+    "vega::leg1",
+    "vega::leg2",
+    "volga",
+    "wal",
+    "wam",
+    "weight_risk",
+    "weighted_average_cost",
+    "xirr",
+    "xirr_to_worst",
+    "yf",
+    "yield_dv01",
+    "yt2y",
+    "yt3y",
+    "yt4y",
+    "ytc",
+    "ytm",
+    "ytw",
+    "z_spread"
+  ],
+  "instrument_types": {
+    "agency_cmo": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "z_spread"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "agency_mbs_passthrough": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "convexity",
+        "coupon_income",
+        "duration_mod",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "oas",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "agency_tba": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "asian_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vanna",
+        "vega",
+        "volga"
+      ],
+      "models": [
+        "monte_carlo_gbm",
+        "monte_carlo_heston",
+        "asian_geometric_bs",
+        "asian_turnbull_wakeman"
+      ]
+    },
+    "asset_backed_facility": {
+      "metrics": [
+        "abf_advance_rate_utilization",
+        "abf_borrowing_base",
+        "abf_borrowing_base_cushion",
+        "abf_facility_irr",
+        "abf_residual_irr",
+        "breakeven",
+        "bucketed_cs01",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "cs01",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "autocallable": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vanna",
+        "vega",
+        "volga"
+      ],
+      "models": [
+        "monte_carlo_gbm"
+      ]
+    },
+    "barrier_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vanna",
+        "vega",
+        "volga"
+      ],
+      "models": [
+        "monte_carlo_gbm",
+        "monte_carlo_heston",
+        "barrier_bs_continuous",
+        "pde_crank_nicolson_1d"
+      ]
+    },
+    "basis_swap": {
+      "metrics": [
+        "annuity_primary",
+        "annuity_reference",
+        "basis_par_spread",
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "incremental_par_spread",
+        "pull_to_par",
+        "pv_primary",
+        "pv_reference",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "basket": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "constituent_count",
+        "constituent_delta",
+        "coupon_income",
+        "expected_shortfall",
+        "expense_ratio",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "weight_risk"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "bermudan_swaption": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "expected_exercise_time",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "hw_sigma_vega",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "hull_white_1f",
+        "monte_carlo_hull_white_1f",
+        "lmm_monte_carlo"
+      ]
+    },
+    "bond": {
+      "metrics": [
+        "accrued",
+        "asw_market",
+        "asw_par",
+        "breakeven",
+        "bucketed_cs01",
+        "bucketed_dv01",
+        "carry_total",
+        "clean_price",
+        "convexity",
+        "coupon_income",
+        "cross_gamma_rates_credit",
+        "cs01",
+        "dirty_price",
+        "discount_margin",
+        "duration_mac",
+        "duration_mod",
+        "dv01",
+        "embedded_option_value",
+        "expected_loss",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "i_spread",
+        "japanese_simple_yield",
+        "moic",
+        "moic_to_worst",
+        "moosmuller_ytm",
+        "oas",
+        "pull_to_par",
+        "roll_down",
+        "spread_duration",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega",
+        "wal",
+        "xirr",
+        "xirr_to_worst",
+        "yield_dv01",
+        "ytm",
+        "ytw",
+        "z_spread"
+      ],
+      "models": [
+        "discounting",
+        "tree",
+        "hazard_rate",
+        "rates_credit",
+        "merton_mc"
+      ]
+    },
+    "bond_future": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "conversion_factor",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "futures_price",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "bond_future_clean_price_proxy"
+      ]
+    },
+    "callable_range_accrual": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "monte_carlo_hull_white_1f"
+      ]
+    },
+    "cap_floor": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "forward_pv01",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "hw_sigma_vega",
+        "implied_vol",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "black76",
+        "hull_white_1f"
+      ]
+    },
+    "cds_index": {
+      "metrics": [
+        "breakeven",
+        "bucketed_cs01",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "cs01",
+        "dv01",
+        "expected_loss",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "jump_to_default",
+        "par_spread",
+        "premium_leg_pv",
+        "protection_leg_pv",
+        "pull_to_par",
+        "recovery01",
+        "risky_pv01",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "hazard_rate"
+      ]
+    },
+    "cds_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_cs01",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "cs01",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "implied_vol",
+        "par_spread",
+        "pull_to_par",
+        "recovery01",
+        "roll_down",
+        "spread_dv01",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "bloomberg_cdso"
+      ]
+    },
+    "cds_tranche": {
+      "metrics": [
+        "breakeven",
+        "bucketed_cs01",
+        "bucketed_dv01",
+        "carry_total",
+        "correlation01",
+        "coupon_income",
+        "cs01",
+        "dv01",
+        "expected_loss",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "jump_to_default",
+        "model_upfront",
+        "par_spread",
+        "pull_to_par",
+        "recovery01",
+        "roll_down",
+        "spread_dv01",
+        "tail_dependence",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "hazard_rate"
+      ]
+    },
+    "cliquet_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vanna",
+        "vega",
+        "volga"
+      ],
+      "models": [
+        "monte_carlo_gbm"
+      ]
+    },
+    "cms_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "convexity_adjustment_risk",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vanna",
+        "vega",
+        "volga"
+      ],
+      "models": [
+        "black76",
+        "static_replication"
+      ]
+    },
+    "cms_spread_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "static_replication"
+      ]
+    },
+    "cms_swap": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "convexity_adjustment_risk",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "black76",
+        "static_replication"
+      ]
+    },
+    "commodity_asian_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "asian_turnbull_wakeman"
+      ]
+    },
+    "commodity_forward": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "commodity_future": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "expected_shortfall",
+        "funding_cost",
+        "futures_price",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "commodity_future_option": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "commodity_spot_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vanna",
+        "vega",
+        "volga"
+      ],
+      "models": [
+        "black76",
+        "monte_carlo_schwartz_smith"
+      ]
+    },
+    "commodity_spread_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "delta::leg1",
+        "delta::leg2",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega",
+        "vega::leg1",
+        "vega::leg2"
+      ],
+      "models": [
+        "black76"
+      ]
+    },
+    "commodity_swap": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "commodity_swaption": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "black76"
+      ]
+    },
+    "composite": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "convertible_bond": {
+      "metrics": [
+        "accrued",
+        "bond_floor",
+        "breakeven",
+        "bucketed_cs01",
+        "bucketed_dv01",
+        "carry_total",
+        "clean_price",
+        "conversion01",
+        "conversion_premium",
+        "conversion_value",
+        "coupon_income",
+        "cross_gamma_credit_vol",
+        "cross_gamma_rates_credit",
+        "cross_gamma_spot_credit",
+        "cross_gamma_spot_vol",
+        "cs01",
+        "delta",
+        "dividend01",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "implied_vol",
+        "oas",
+        "parity",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "tree"
+      ]
+    },
+    "credit_default_swap": {
+      "metrics": [
+        "breakeven",
+        "bucketed_cs01",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "cs01",
+        "cs_gamma",
+        "default_exposure",
+        "dv01",
+        "expected_loss",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "jump_to_default",
+        "jump_to_default_lgd_only",
+        "par_spread",
+        "premium_leg_pv",
+        "protection_leg_pv",
+        "pull_to_par",
+        "recovery01",
+        "risky_annuity",
+        "risky_pv01",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "hazard_rate"
+      ]
+    },
+    "deposit": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "deposit_par_rate",
+        "df_end",
+        "df_end_from_quote",
+        "df_start",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "quote_rate",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "yf"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "discounted_cash_flow": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "dcf::wacc01",
+        "enterprise_value",
+        "equity_price_per_share",
+        "equity_shares",
+        "equity_value",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "terminal_value_pv",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "dollar_roll": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "implied_financing_rate",
+        "pull_to_par",
+        "roll_down",
+        "roll_specialness",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "equity": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "equity_dividend_yield",
+        "equity_forward_price",
+        "equity_price_per_share",
+        "equity_shares",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "equity_future": {
+      "metrics": [
+        "basis",
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "futures_price",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "equity_future_option": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "equity_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "bucketed_vega",
+        "carry_total",
+        "charm",
+        "color",
+        "coupon_income",
+        "cross_gamma_spot_vol",
+        "delta",
+        "dividend01",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "implied_vol",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "speed",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vanna",
+        "vega",
+        "volga"
+      ],
+      "models": [
+        "black76",
+        "monte_carlo_heston",
+        "heston_fourier",
+        "monte_carlo_rough_bergomi",
+        "monte_carlo_rough_heston",
+        "rough_heston_fourier",
+        "pde_crank_nicolson_1d",
+        "pde_adi_2d"
+      ]
+    },
+    "equity_total_return_future": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "expected_shortfall",
+        "funding_cost",
+        "futures_price",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "spread01",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "forward_rate_agreement": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "forward_pv01",
+        "funding_cost",
+        "hvar",
+        "par_rate",
+        "pull_to_par",
+        "pv01",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "fx_barrier_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vanna",
+        "vega",
+        "volga"
+      ],
+      "models": [
+        "monte_carlo_gbm",
+        "fx_barrier_bs_continuous"
+      ]
+    },
+    "fx_digital_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "black76"
+      ]
+    },
+    "fx_forward": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "fx01",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "fx_future": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "futures_price",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "fx_future_option": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "fx_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "cross_gamma_fx_rates",
+        "cross_gamma_fx_vol",
+        "delta",
+        "delta_forward",
+        "delta_premium_adjusted_forward",
+        "delta_premium_adjusted_spot",
+        "dv01",
+        "expected_shortfall",
+        "foreign_rho",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "implied_vol",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vanna",
+        "vega",
+        "volga"
+      ],
+      "models": [
+        "black76"
+      ]
+    },
+    "fx_spot": {
+      "metrics": [
+        "base_amount",
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "expected_shortfall",
+        "funding_cost",
+        "fx01",
+        "fx_delta",
+        "hvar",
+        "inverse_rate",
+        "pull_to_par",
+        "roll_down",
+        "spot_rate",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "fx_swap": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_pv",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "dv01_domestic",
+        "dv01_foreign",
+        "expected_shortfall",
+        "forward_points",
+        "funding_cost",
+        "fx01",
+        "fx_delta",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "fx_touch_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "black76"
+      ]
+    },
+    "fx_variance_swap": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "variance_expected",
+        "variance_notional",
+        "variance_realized",
+        "variance_strike_vol",
+        "variance_time_to_maturity",
+        "variance_vega",
+        "vega"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "inflation_cap_floor": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "inflation01",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "black76",
+        "normal"
+      ]
+    },
+    "inflation_linked_bond": {
+      "metrics": [
+        "breakeven",
+        "breakeven_inflation",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "index_ratio",
+        "inflation01",
+        "inflation_convexity",
+        "pull_to_par",
+        "real_duration",
+        "real_yield",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "inflation_swap": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "fixed_leg_pv",
+        "funding_cost",
+        "hvar",
+        "inflation01",
+        "inflation_convexity",
+        "inflation_leg_pv",
+        "par_rate",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "interest_rate_future": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "convexity_adjustment",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "futures_price",
+        "hvar",
+        "implied_forward",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "interest_rate_future_option": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "interest_rate_swap": {
+      "metrics": [
+        "annuity",
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "ir_convexity",
+        "ir_cross_gamma",
+        "par_rate",
+        "pull_to_par",
+        "pv01",
+        "pv_fixed",
+        "pv_float",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "levered_real_estate_equity": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "real_estate::cap_rate01",
+        "real_estate::debt_payoff_at_exit",
+        "real_estate::discount_rate01",
+        "real_estate::dscr_min",
+        "real_estate::dscr_min_interest_only",
+        "real_estate::equity_multiple",
+        "real_estate::levered_irr",
+        "real_estate::ltv",
+        "real_estate::ltv_at_origination",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "lookback_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vanna",
+        "vega",
+        "volga"
+      ],
+      "models": [
+        "monte_carlo_gbm",
+        "lookback_bs_continuous"
+      ]
+    },
+    "ndf": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "fx01",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "private_markets_fund": {
+      "metrics": [
+        "breakeven",
+        "carry01",
+        "carry_accrued",
+        "carry_total",
+        "coupon_income",
+        "dpi_lp",
+        "expected_shortfall",
+        "funding_cost",
+        "gp_carry_total",
+        "hurdle01",
+        "hvar",
+        "lp_irr",
+        "moic_lp",
+        "nav01",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "tvpi_lp"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "quanto_option": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "correlation01",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "foreign_rho",
+        "funding_cost",
+        "fx_delta",
+        "fx_vega",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vanna",
+        "vega",
+        "volga"
+      ],
+      "models": [
+        "quanto_bs"
+      ]
+    },
+    "range_accrual": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vanna",
+        "vega",
+        "volga"
+      ],
+      "models": [
+        "monte_carlo_gbm",
+        "static_replication"
+      ]
+    },
+    "real_estate_asset": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "real_estate::cap_rate01",
+        "real_estate::discount_rate01",
+        "real_estate::exit_cap_rate",
+        "real_estate::going_in_cap_rate",
+        "real_estate::unlevered_cash_on_cash_first",
+        "real_estate::unlevered_irr",
+        "real_estate::unlevered_multiple",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "repo": {
+      "metrics": [
+        "accrued",
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "collateral_coverage",
+        "collateral_haircut01",
+        "collateral_price01",
+        "collateral_value",
+        "coupon_income",
+        "dv01",
+        "effective_rate",
+        "expected_shortfall",
+        "funding_cost",
+        "funding_risk",
+        "hvar",
+        "implied_collateral_return",
+        "pull_to_par",
+        "repo_interest",
+        "required_collateral",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "time_to_maturity"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "revolving_credit": {
+      "metrics": [
+        "accrued_interest",
+        "all_in_rate",
+        "available_capacity",
+        "breakeven",
+        "bucketed_cs01",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "cs01",
+        "discount_margin",
+        "draw_option_cost",
+        "dv01",
+        "expected_loss",
+        "expected_shortfall",
+        "exposure_at_default",
+        "funding_cost",
+        "hvar",
+        "oid_eir_amortization",
+        "price_from_dm",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "utilization_rate",
+        "weighted_average_cost",
+        "ytm"
+      ],
+      "models": [
+        "discounting",
+        "monte_carlo_three_factor"
+      ]
+    },
+    "snowball": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting",
+        "monte_carlo_hull_white_1f"
+      ]
+    },
+    "structured_credit": {
+      "metrics": [
+        "abs_ce_level",
+        "abs_charge_off",
+        "abs_delinquency",
+        "abs_excess_spread",
+        "abs_payment_rate",
+        "accrued",
+        "breakeven",
+        "bucketed_cs01",
+        "bucketed_dv01",
+        "carry_total",
+        "cdr",
+        "clean_price",
+        "clo_warf",
+        "clo_was",
+        "cmbs_dscr",
+        "convexity",
+        "coupon_income",
+        "cpr",
+        "cs01",
+        "default01",
+        "dirty_price",
+        "duration_mac",
+        "duration_mod",
+        "dv01",
+        "expected_loss",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "prepayment01",
+        "pull_to_par",
+        "recovery01",
+        "roll_down",
+        "severity01",
+        "spread_duration",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "wal",
+        "wam",
+        "ytm",
+        "z_spread"
+      ],
+      "models": [
+        "discounting",
+        "structured_credit_stochastic"
+      ]
+    },
+    "swaption": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "hw_sigma_vega",
+        "implied_vol",
+        "pull_to_par",
+        "rho",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "black76",
+        "hull_white_1f",
+        "normal"
+      ]
+    },
+    "tarn": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "monte_carlo_hull_white_1f"
+      ]
+    },
+    "term_loan": {
+      "metrics": [
+        "all_in_rate",
+        "breakeven",
+        "bucketed_cs01",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "cs01",
+        "discount_margin",
+        "dv01",
+        "embedded_option_value",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "oas",
+        "oid_eir_amortization",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "yt2y",
+        "yt3y",
+        "yt4y",
+        "ytc",
+        "ytm",
+        "ytw"
+      ],
+      "models": [
+        "discounting",
+        "tree"
+      ]
+    },
+    "trs_equity": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dividend01",
+        "dv01",
+        "expected_shortfall",
+        "financing_annuity",
+        "funding_cost",
+        "hvar",
+        "index_delta",
+        "par_spread",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "trs_fixed_income_index": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "duration_dv01",
+        "dv01",
+        "expected_shortfall",
+        "financing_annuity",
+        "funding_cost",
+        "hvar",
+        "par_spread",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "variance_swap": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "variance_expected",
+        "variance_notional",
+        "variance_realized",
+        "variance_strike_vol",
+        "variance_time_to_maturity",
+        "variance_vega",
+        "vega"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "volatility_index_future": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "delta_vol",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "volatility_index_future_option": {
+      "metrics": [
+        "breakeven",
+        "carry_total",
+        "coupon_income",
+        "delta",
+        "expected_shortfall",
+        "funding_cost",
+        "gamma",
+        "hvar",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "vega"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "xccy_swap": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "cross_gamma_fx_rates",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "fx01",
+        "fx_delta",
+        "hvar",
+        "pull_to_par",
+        "pv01",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
+    "yoy_inflation_swap": {
+      "metrics": [
+        "breakeven",
+        "bucketed_dv01",
+        "carry_total",
+        "coupon_income",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "inflation01",
+        "pull_to_par",
+        "roll_down",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down"
+      ],
+      "models": [
+        "discounting"
+      ]
+    }
+  }
+}

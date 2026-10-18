@@ -27,10 +27,6 @@
 
 // Shared Test Utilities
 
-/// Common test utilities: fixtures, tolerances, assertions, builders
-#[path = "../../valuations/tests/common/mod.rs"]
-pub(crate) mod common;
-
 #[path = "support/calibration.rs"]
 #[allow(dead_code, unused_imports)]
 pub(crate) mod calibration_support;

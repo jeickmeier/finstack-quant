@@ -1,34 +1,10 @@
-//! Metrics framework for clean separation of pricing and financial measures.
+//! Metrics framework: metric identifiers, calculators and registries, with the
+//! standard registry that merges every instrument family.
 //!
-//! This module provides a trait-based architecture for computing financial
-//! metrics independently from core pricing logic. Metrics can be computed
-//! on-demand, have dependencies, and are cached for efficiency.
-//!
-//! # Metric Contract
-//!
-//! Metric values are returned as raw `f64` values, but they are not unitless.
-//! The authoritative semantic contract for each measure lives on
-//! [`crate::metrics::MetricId`],
-//! including:
-//!
-//! - units such as currency, currency per bp, decimal rate, or vol point
-//! - bump conventions such as per-1bp or per-1 vol point
-//! - sign conventions for long-holder, payer/receiver, or spot-up interpretations
-//! - distinctions between similarly named measures such as `Dv01`, `Pv01`,
-//!   `YieldDv01`, and `Cs01`
-//!
-//! Consumers should interpret values from
-//! [`crate::results::ValuationResult::measures`] through
-//! [`crate::metrics::MetricId`] rather than assuming every `f64` is a currency
-//! amount.
-//!
-//! # Key Features
-//!
-//! - **Trait-based design**: `MetricCalculator` trait for custom metric implementations
-//! - **Dependency management**: Automatic computation ordering based on metric dependencies
-//! - **Caching**: Built-in caching of intermediate results like cashflows and discount factors
-//! - **Instrument-specific**: Metrics can be registered for specific instrument types
-//! - **Standard registry**: Pre-configured registry with common financial metrics
+//! Everything but [`standard_registry`](crate::metrics::standard_registry) is defined in
+//! `finstack_quant_valuations_core::metrics` and re-exported here unchanged.
+//! Metric values are raw `f64`s whose units, bump and sign conventions are the
+//! contract on [`MetricId`](finstack_quant_valuations_core::metrics::MetricId); see the core module docs for the architecture.
 //!
 //! # Quick Start Examples
 //!
@@ -262,141 +238,23 @@
 //! # }
 //! ```
 //!
-//! # Architecture
-//!
-//! - **`MetricId`**: Strongly-typed identifiers for all metrics
-//! - **`MetricCalculator`**: Trait for implementing custom metrics
-//! - **`MetricContext`**: Context containing instrument, market data, and cached results
-//! - **`MetricRegistry`**: Registry for managing calculators and dependencies
-//! - **Risk metrics**: Specialized calculators for DV01, bucketed risk, and time decay
-//!
-//! # References
-//!
-//! - Fixed-income risk measures: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
-//! - Curve construction and sensitivities: `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
-//! - VaR and Expected Shortfall interpretation: `docs/REFERENCES.md#mcneil-frey-embrechts-qrm`
-//!
 
-// Internal submodules (organized by concern)
+pub use finstack_quant_valuations_core::metrics::*;
 
-mod aggregation;
-mod core;
-pub mod risk;
-pub(crate) mod sensitivities;
-mod shared;
-
-// Core surface (supported)
-pub use aggregation::is_additive_metric;
-pub use core::finite_difference::bump_surface_vol_absolute;
-pub(crate) use core::ids::closest_metric_names;
-pub use core::ids::{MetricGroup, MetricId, MetricUnit};
-pub use core::registry::{MetricRegistry, MetricRegistryError};
-pub use core::standard_registry::standard_registry;
-pub use core::traits::{MetricCalculator, MetricContext};
-/// Format a standard risk bucket (years) as a human-readable label.
-pub use sensitivities::config::{
-    format_bucket_label, format_key_rate_label, parse_key_rate_label, STANDARD_BUCKETS_YEARS,
-    STANDARD_BUCKET_LABELS,
-};
-pub(crate) use sensitivities::cross_factor::CrossFactorCalculator;
-pub use sensitivities::cross_factor::CrossFactorPair;
-pub use sensitivities::theta::{collect_cashflows_in_period, collect_period_cash, PeriodCash};
-
-// Crate-internal re-exports (NOT part of the public API)
-//
-// These are used across `finstack-quant-valuations` (instrument metric registries, etc.) but are not
-// supported as a stable downstream API. Keep them `pub(crate)` so we can refactor module layout
-// without creating public breakage surface.
-pub(crate) use core::finite_difference::{
-    bump_active_volatility, bump_discount_curve_parallel, bump_scalar_price,
-    central_diff_by_half_bump, central_diff_by_width, central_diff_scalar_relative,
-    replace_scalar_value, scalar_numeric_value, scaled_central_diff_by_width, CORRELATION_BUMP,
-    VOL_POINTS_PER_ABSOLUTE_VOL,
-};
-pub(crate) use sensitivities::cross_factor::{
-    make_credit_bumper, make_fx_bumper, make_rates_bumper, make_spot_bumper, make_vol_bumper,
-};
-pub(crate) use sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs01};
-pub(crate) use sensitivities::cs01_z_spread::{
-    quoted_z_spread, ZSpreadBucketedCs01, ZSpreadCs01, ZSpreadCs01Inputs, ZSpreadParallelCs01,
-};
-pub(crate) use sensitivities::dv01::{Dv01CalculatorConfig, UnifiedDv01Calculator};
-pub(crate) use sensitivities::fd_greeks::{
-    GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVega, GenericFdVolga,
-};
-pub(crate) use sensitivities::option_greeks::OptionGreekCalculator;
-pub(crate) use sensitivities::rf_component_dv01::{RfComponentDv01Calculator, RfComponentPriced};
-pub(crate) use sensitivities::theta::{calculate_theta_date, theta_period};
-pub(crate) use sensitivities::vega::KeyRateVega;
-pub(crate) use shared::df::GenericDfCalculator;
-
-// Error helper functions
-
-/// Create a NotFound error for missing metrics.
+/// The shared metric registry merging every built-in family.
 ///
-/// Use this when a metric dependency or required metric is not available.
+/// This registry includes metrics for:
+/// - **Bonds**: YTM, duration, convexity, accrued interest, credit spreads
+/// - **Interest Rate Swaps**: DV01, annuity factors, par rates
+/// - **Deposits**: Discount factors, par rates, year fractions
+/// - **Risk**: Bucketed DV01, time decay (theta)
 ///
-/// # Examples
+/// It is the metric registry of the umbrella family
+/// [`STANDARD`](crate::pricer::STANDARD). An instrument priced without an
+/// explicit registry resolves its own family's registry instead, which
+/// answers identically for the instrument types that family owns.
 ///
-/// ```
-/// use finstack_quant_valuations::metrics::{metric_not_found, MetricId};
-/// use finstack_quant_core::Result;
-/// use finstack_quant_core::HashMap;
-///
-/// fn get_metric(id: MetricId, results: &HashMap<MetricId, f64>) -> Result<f64> {
-///     results.get(&id).copied().ok_or_else(|| metric_not_found(id))
-/// }
-/// ```
-/// Create a typed NotFound error for a missing metric.
-///
-/// # Arguments
-///
-/// * `metric` - Required metric identifier that was absent from a valuation
-///   result or dependency set; it is embedded in the returned `metric:` ID.
-#[inline]
-pub fn metric_not_found(metric: MetricId) -> finstack_quant_core::Error {
-    finstack_quant_core::InputError::NotFound {
-        id: format!("metric:{metric:?}"),
-    }
-    .into()
-}
-
-/// Create a NotFound error for missing context fields.
-///
-/// Use this when a required field is not present in a context or configuration.
-///
-/// # Examples
-///
-/// ```
-/// use finstack_quant_valuations::metrics::context_not_found;
-/// use finstack_quant_core::types::CurveId;
-/// use finstack_quant_core::Result;
-///
-/// struct PricingContext {
-///     discount_curve_id: Option<CurveId>,
-/// }
-///
-/// impl PricingContext {
-///     fn discount_curve_id(&self) -> Option<&CurveId> {
-///         self.discount_curve_id.as_ref()
-///     }
-/// }
-///
-/// fn get_curve_id(context: &PricingContext) -> Result<&CurveId> {
-///     context
-///         .discount_curve_id()
-///         .ok_or_else(|| context_not_found("discount_curve_id"))
-/// }
-/// ```
-///
-/// # Arguments
-///
-/// * `field` - Required context field name that was absent; it is embedded in
-///   the returned `context.`-prefixed not-found identifier.
-#[inline]
-pub fn context_not_found(field: &str) -> finstack_quant_core::Error {
-    finstack_quant_core::InputError::NotFound {
-        id: format!("context.{field}"),
-    }
-    .into()
+/// See unit tests and `examples/` for usage.
+pub fn standard_registry() -> &'static MetricRegistry {
+    crate::pricer::STANDARD.metrics()
 }

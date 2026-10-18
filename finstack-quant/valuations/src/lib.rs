@@ -51,6 +51,10 @@
 //!
 //! Product-independent model engines are provided by [`finstack_quant_models`].
 //!
+//! The pricing framework (the trait, registries, metrics, results and conventions) is
+//! defined in `finstack-quant-valuations-core` and re-exported here; this crate adds the
+//! instrument families and the closed world around them.
+//!
 //! ## Supporting APIs
 //!
 //! - [`crate::constants`]: shared numerical constants.
@@ -92,32 +96,22 @@
 
 extern crate self as finstack_quant_valuations;
 
-/// Shared numerical constants and basis point helpers.
-pub mod constants;
-pub(crate) mod contract_specs;
-/// Error types for pricing and valuation workflows.
-pub mod error;
-/// Market quotes and conventions
-pub mod market;
-/// Convenient re-exports for pricing and risk calculations.
+// The framework crate's exported macros keep their `finstack_quant_valuations::` paths.
+pub use finstack_quant_valuations_core::{
+    impl_empty_cashflow_provider, impl_focused_pricing_overrides, impl_future_option_instrument,
+    impl_instrument_base, register_generic, register_metrics,
+};
+
+#[doc(hidden)]
+pub use finstack_quant_valuations_core::{__private, contract_specs, serde_defaults};
+pub use finstack_quant_valuations_core::{constants, error, market, recalibration};
 /// Pricing dispatch and registry infrastructure.
 pub mod pricer;
-/// Contracts for quote-driven market recalibration supplied by the calibration crate.
-pub mod recalibration;
 /// Valuation result envelopes and metadata.
 pub mod results;
 /// JSON Schema generation for API contracts.
 pub mod schema;
-pub(crate) mod serde_defaults;
 
-/// Hidden support paths for exported macros.
-#[doc(hidden)]
-pub mod __private {
-    /// Cashflow crate path used by exported macros without exposing `cashflow`.
-    pub use finstack_quant_cashflows;
-}
-
-#[macro_use]
 /// Financial instrument definitions and builders.
 pub mod instruments;
 /// Risk metric calculators and registries.

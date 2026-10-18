@@ -10,14 +10,14 @@
 use crate::config::CalibrationMethod;
 use crate::quotes::ids::{Pillar, QuoteId};
 use crate::quotes::rates::RateQuote;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::market_data::term_structures::{
     RateCalibrationFutureContractId, RateCalibrationMethod, RateCalibrationOisCompounding,
     RateCalibrationPillar, RateCalibrationQuote, RateCalibrationRecipe,
 };
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
-use finstack_quant_valuations::market::conventions::ids::IrFutureContractId;
+use finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId;
 
 impl From<&CalibrationMethod> for RateCalibrationMethod {
     fn from(method: &CalibrationMethod) -> Self {

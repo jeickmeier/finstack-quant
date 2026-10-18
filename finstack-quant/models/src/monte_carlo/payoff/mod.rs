@@ -9,8 +9,11 @@
 //! inspect named state variables and record path-level cashflows.
 
 pub mod asian;
+pub mod autocallable;
 pub mod barrier;
+pub mod cliquet;
 pub mod lookback;
+pub mod range_accrual;
 pub mod vanilla;
 
 /// Read a named payoff input, returning an error when it is missing or non-finite.

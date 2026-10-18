@@ -150,7 +150,7 @@
         }
       },
       "categories": [],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     }
   ]
 }

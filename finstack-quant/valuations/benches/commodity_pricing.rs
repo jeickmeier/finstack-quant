@@ -32,12 +32,8 @@ use finstack_quant_valuations::instruments::{
     SettlementType,
 };
 use finstack_quant_valuations::metrics::MetricId;
-#[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../tests/support/commodity_curves.rs"]
-mod commodity_curve_support;
-#[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../tests/support/volatility.rs"]
-mod volatility_support;
+use finstack_quant_valuations_test_support::commodity_curves as commodity_curve_support;
+use finstack_quant_valuations_test_support::volatility as volatility_support;
 use std::hint::black_box;
 use time::Month;
 

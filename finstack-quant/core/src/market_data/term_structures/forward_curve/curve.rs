@@ -109,6 +109,113 @@ impl ForwardCurve {
         Ok(self.rate(t))
     }
 
+    /// Curve time of a calendar date: year fraction from the curve base date on
+    /// the curve's own day count, with dates on or before the base date mapping
+    /// to zero.
+    ///
+    /// Forward-curve lookups must use the curve's own time basis, not the
+    /// instrument's accrual day count; this is the date-to-time mapping every
+    /// date-based lookup below shares.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Reset, payment or observation date; dates on or before the
+    ///   curve base date map to `0.0`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates a failure while computing the curve day-count fraction.
+    #[inline]
+    pub fn curve_time(&self, date: Date) -> crate::Result<f64> {
+        if date <= self.base {
+            return Ok(0.0);
+        }
+        let t = crate::market_data::term_structures::common::year_fraction_to(
+            self.base,
+            date,
+            self.day_count,
+        )?;
+        Ok(t.max(0.0))
+    }
+
+    /// Discount-factor-implied simple term forward over a date interval,
+    /// annualized on the contractual index accrual fraction.
+    ///
+    /// Dates map to projection discount factors on the curve's own day count
+    /// and base date; the resulting growth is divided by
+    /// `accrual_year_fraction`, which may use a different day count, so the
+    /// curve clock cannot change the economics of a quoted rate.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - Period start date, on or after the curve base date; an
+    ///   earlier start is historical or straddles the projection boundary and
+    ///   must be served from an observed fixing instead.
+    /// * `end` - Exclusive period end date after `start`.
+    /// * `accrual_year_fraction` - Finite, strictly positive year fraction for
+    ///   `[start, end]` under the contractual index day count (for example
+    ///   `90.0 / 360.0` for a 90-calendar-day ACT/360 fixing).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when `end <= start`, when `start` is before
+    /// the curve base date, when `accrual_year_fraction` is non-finite or
+    /// non-positive, or when the implied rate is not finite; propagates
+    /// day-count failures.
+    pub fn rate_between_dates(
+        &self,
+        start: Date,
+        end: Date,
+        accrual_year_fraction: f64,
+    ) -> crate::Result<f64> {
+        if end <= start {
+            return Err(crate::Error::Validation(format!(
+                "term forward period requires end > start; got start={start}, end={end}"
+            )));
+        }
+        if start < self.base {
+            return Err(crate::Error::Validation(format!(
+                "term forward period starts before the '{}' curve base date {}; \
+                 use the historical fixing for reset date {} instead of projection",
+                self.id, self.base, start
+            )));
+        }
+        if !accrual_year_fraction.is_finite() || accrual_year_fraction <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "term forward requires a finite positive contractual accrual fraction; got {accrual_year_fraction}"
+            )));
+        }
+        let t_start = self.curve_time(start)?;
+        let t_end = self.curve_time(end)?;
+        let rate = self.rate_between(t_start, t_end)? * ((t_end - t_start) / accrual_year_fraction);
+        if !rate.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "term forward for '{}' over {start} -> {end} is not finite on accrual {accrual_year_fraction}",
+                self.id
+            )));
+        }
+        Ok(rate)
+    }
+
+    /// Simpson-rule integral average of the curve over a date interval.
+    ///
+    /// Only appropriate for averaging overnight observation sub-windows; an
+    /// arbitrary term projection interval uses [`Self::rate_between_dates`].
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - Beginning date of the overnight observation sub-window.
+    /// * `end` - End date of the sub-window, on or after `start`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates a failure while mapping either date to curve time.
+    pub fn rate_period_between_dates(&self, start: Date, end: Date) -> crate::Result<f64> {
+        let t_start = self.curve_time(start)?;
+        let t_end = self.curve_time(end)?;
+        Ok(self.rate_period(t_start, t_end))
+    }
+
     /// Curve-basis forward rate starting at time `t` for the curve's tenor.
     ///
     /// The raw rate is annualized on [`Self::day_count`], the same clock used by

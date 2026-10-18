@@ -2275,7 +2275,7 @@ export interface D_1A872A78F6334F77801F {
  *
  * # Example
  * ```rust
- * # use finstack_quant_valuations::results::ValuationResult;
+ * # use finstack_quant_valuations_core::results::ValuationResult;
  * # use finstack_quant_core::currency::Currency;
  * # use finstack_quant_core::money::Money;
  * # use finstack_quant_core::dates::create_date;

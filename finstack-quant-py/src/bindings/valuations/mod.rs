@@ -658,7 +658,7 @@ fn bond_from_cashflows_json(
     quoted_clean_price_pct: Option<f64>,
 ) -> PyResult<String> {
     py.detach(|| {
-        finstack_quant_valuations::instruments::fixed_income::bond::bond_from_cashflows_json(
+        finstack_quant_valuations::instruments::fixed_income::bond_from_cashflows_json(
             instrument_id,
             schedule_json,
             discount_curve_id,

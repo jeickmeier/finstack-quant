@@ -127,7 +127,7 @@ fn prepare_hw_swaption_input(
     let periods = SwaptionVolTarget::build_fixed_leg_periods(swap_start, swap_end, &conventions)?;
     let floating_periods =
         SwaptionVolTarget::build_float_leg_periods(swap_start, swap_end, &conventions)?;
-    use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     let floating_is_compounded = match conventions.float_compounding {
         FloatingLegCompounding::Simple => false,
         FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
@@ -218,7 +218,7 @@ fn prepare_hw_cap_schedule(
     use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
     use finstack_quant_core::dates::{adjust, DateExt, StubKind};
     use finstack_quant_models::rates::clock::model_time;
-    use finstack_quant_valuations::market::conventions::{ConventionRegistry, RateIndexKind};
+    use finstack_quant_valuations_core::market::conventions::{ConventionRegistry, RateIndexKind};
     let convention = ConventionRegistry::try_global()?.require_rate_index(&params.index_id)?;
     if convention.currency != params.currency {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -734,13 +734,11 @@ mod tests {
     };
     use finstack_quant_core::types::{CurveId, UnderlyingId};
     use finstack_quant_models::rates::hull_white::HullWhiteParams;
-    use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-        CdsTranchePricer, CopulaSpec,
-    };
-    use finstack_quant_valuations::instruments::OptionType;
-    use finstack_quant_valuations::market::conventions::ids::{
+    use finstack_quant_valuations_core::instruments::OptionType;
+    use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause, SwaptionConventionId,
     };
+    use finstack_quant_valuations_credit::cds_tranche::{CdsTranchePricer, CopulaSpec};
     use std::sync::Arc;
     use time::Month;
 

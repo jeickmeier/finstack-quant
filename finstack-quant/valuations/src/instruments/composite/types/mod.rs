@@ -5,16 +5,17 @@ mod reporting;
 mod spec;
 mod spec_support;
 
-pub use instrument::CompositeInstrument;
-pub use reporting::{
-    CompositeExposureReport, CompositeLegValuation, CompositeRebalanceResult, CompositeTrade,
-    CompositeValuationDetails, PrimitiveAggregate, PrimitiveExposure,
+pub use crate::results::composite::{
+    CompositeExposureReport, CompositeLegValuation, CompositeValuationDetails, PrimitiveAggregate,
+    PrimitiveExposure, ResolvedCompositeLeg,
 };
+pub use instrument::CompositeInstrument;
+pub use reporting::{CompositeRebalanceResult, CompositeTrade};
 pub use spec::CompositeSpec;
 pub(crate) use spec_support::{cashflows_between, validate_history};
 pub use spec_support::{
-    CompositeLegSpec, CompositeMarketObservation, CompositeState, RebalanceRule,
-    ResolvedCompositeLeg, WeightingMethod, MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS,
+    CompositeLegSpec, CompositeMarketObservation, CompositeState, RebalanceRule, WeightingMethod,
+    MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS,
 };
 
 #[cfg(test)]

@@ -520,7 +520,7 @@ export default [
   {
     "path": "#/$defs/d_10afa2c48803544dc415",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikSchedule",
-    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
+    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
   },
   {
     "path": "#/$defs/d_10afa2c48803544dc415/oneOf/0",
@@ -1320,7 +1320,7 @@ export default [
   {
     "path": "#/$defs/d_3c319da7190ff52c5100",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RateSpec",
-    "description": "Contractual coupon of a loan facility or note: a fixed all-in rate or a\nfloating index plus spread.\n\nShared by `TermLoan.rate`, `RevolvingCredit.rate`, `AssetBackedFacility.rate`\nand structured-credit `Tranche.coupon`.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;\n\nlet fixed = RateSpec::Fixed { rate: 0.06 }; // 6% all-in\nassert!(matches!(fixed, RateSpec::Fixed { .. }));\n```"
+    "description": "Contractual coupon of a loan facility or note: a fixed all-in rate or a\nfloating index plus spread.\n\nShared by the valuations term loan, revolving credit facility, asset-backed\nfacility and structured-credit tranche coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RateSpec;\n\nlet fixed = RateSpec::Fixed { rate: 0.06 }; // 6% all-in\nassert!(matches!(fixed, RateSpec::Fixed { .. }));\n```"
   },
   {
     "path": "#/$defs/d_3c319da7190ff52c5100/oneOf/0",
@@ -1340,7 +1340,7 @@ export default [
   {
     "path": "#/$defs/d_3c319da7190ff52c5100/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RateSpec/oneOf/1",
-    "description": "Floating index plus spread, with the canonical floor, cap, gearing and\nreset conventions of [`FloatingRateSpec`]."
+    "description": "Floating index plus spread, with the canonical floor, cap, gearing and\nreset conventions of [`FloatingRateSpec`](super::FloatingRateSpec)."
   },
   {
     "path": "#/$defs/d_3c319da7190ff52c5100/oneOf/1/properties/floating",
@@ -4502,7 +4502,7 @@ export default [
   {
     "path": "#/$defs/d_bffef9e684ff0c351c83",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcOverride",
-    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
+    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
     "ref": "#/$defs/MertonMcConfig",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig"
   },

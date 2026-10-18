@@ -8,6 +8,7 @@
 //! carry and breakeven). The injected values are written independently of the
 //! schedule's recorded projections.
 
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     calendar_by_id_strict, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
@@ -18,9 +19,7 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::rates::irs::{
-    FixedLegSpec, FloatLegSpec, FloatingLegCompounding, PayReceive,
-};
+use finstack_quant_valuations::instruments::rates::irs::{FixedLegSpec, FloatLegSpec, PayReceive};
 use finstack_quant_valuations::instruments::{
     BreakevenConfig, BreakevenMode, BreakevenTarget, Instrument, InterestRateSwap, PricingOptions,
 };

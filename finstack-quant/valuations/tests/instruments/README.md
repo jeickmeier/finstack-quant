@@ -13,7 +13,7 @@ Everything here is compiled into one integration target,
 
 ```
 instruments/
-├── common/                 # Shared fixtures, tolerances, parity helpers (see common/README.md)
+├── common/                 # Parameter and registry contract tests (see common/README.md)
 ├── <instrument>/           # 48 directories: one per instrument, plus exotic_harness/
 ├── json_examples/          # 71 GENERATED canonical instrument fixtures (do not hand-edit)
 ├── coverage_manifest.toml  # registry tag -> fixture path -> persistence policy
@@ -38,7 +38,7 @@ larger ones split into subdirectories:
 |-----------|----------------|
 | `bond`, `cap_floor`, `irs` | `metrics/`, `validation/`, `integration/` |
 | `swaption` | `core/`, `pricing/`, `market/`, `metrics/`, `edge_cases/`, `integration/` |
-| `structured_credit` | `unit/` (with `components/`, `metrics/`), `integration/` |
+| `structured_credit` | `unit/`, `integration/` (the JSON round-trip and `price_instrument` tests; the rest of the suite is in `../../structured-credit/tests/`) |
 | `term_loan`, `revolving_credit`, `fra` | `metrics/`, `validation/` |
 | `deposit`, `fx_spot`, `inflation_swap` | `metrics/`, `integration/` |
 | `equity` | `real_estate/` |
@@ -72,11 +72,11 @@ enforces the same invariant outside cargo.
 
 ## Shared helpers
 
-Import fixtures and tolerances from `crate::common::test_helpers`; see
-[`common/README.md`](common/README.md) for the full inventory.
+Import fixtures and tolerances from the dev-only crate
+[`finstack-quant-valuations-test-support`](../../test-support/README.md).
 
 ```rust
-use crate::common::test_helpers::{dates, flat_discount_curve, tolerances};
+use finstack_quant_valuations_test_support::test_helpers::{dates, flat_discount_curve, tolerances};
 
 #[test]
 fn bond_prices_near_par_at_coupon_rate() {
@@ -87,11 +87,12 @@ fn bond_prices_near_par_at_coupon_rate() {
 }
 ```
 
-Curve, quote, and option builders shared with the non-instrument test binaries
-live in [`../support/`](../support/) and are reachable here as
-`crate::test_support::*` (`date`, `rates`, `credit`, `volatility`,
-`discount_forward_curves`, `commodity_curves`, `equity_fx_options`,
-`calibration`).
+Instrument builders shared with the non-instrument test binaries live in
+[`../support/`](../support/) and are reachable here as
+`crate::instruments::test_support::*` (`rates`, `credit`, `equity_fx_options`,
+`calibration`). One-line curve and surface constructors (`date`,
+`discount_forward_curves`, `volatility`, `commodity_curves`) come from the
+test-support crate.
 
 ## Coverage expectations
 

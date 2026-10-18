@@ -1,0 +1,646 @@
+//! CDS Index types and implementations.
+//!
+//! This module defines the `CdsIndex` instrument along with its pricing
+//! configuration and constituents. The index can be priced in two modes:
+//! - `SingleCurve`: delegate to a synthetic single-name CDS priced off a
+//!   single index hazard curve.
+//! - `Constituents`: expand into per-name CDS positions with weights and
+//!   aggregate results across names.
+
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
+use finstack_quant_valuations_core::instruments::common_impl::parameters::CreditParams;
+use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use rust_decimal::Decimal;
+use time::macros::date;
+
+// Reuse CDS components for conventions and legs
+use crate::cds::{CdsConvention, CreditDefaultSwap, PayReceive, PremiumLegSpec, ProtectionLegSpec};
+
+use super::parameters::CdsIndexParams;
+use super::pricer::CdsIndexPricer;
+use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+
+/// Pricing mode for CDS indices.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum IndexPricing {
+    /// Price the index against a single index hazard curve (synthetic CDS)
+    SingleCurve,
+    /// Price each issuer separately and aggregate by weight
+    Constituents,
+}
+
+/// Constituent in a CDS index with weight and credit parameters.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CdsIndexConstituent {
+    /// Credit configuration for the issuer (includes hazard curve id and recovery)
+    pub credit: CreditParams,
+    /// Weight of the issuer in the index notional (e.g., 1/125.0 for CDX IG)
+    pub weight: f64,
+    /// Whether the constituent has defaulted. Defaulted names are excluded from the
+    /// premium leg but their settled protection payment is already reflected in `index_factor`.
+    /// Per O'Kane (2008) Ch. 7: "On default, the protection payment is settled and the
+    /// name is removed from the index. The index factor adjusts to reflect the reduced notional."
+    #[serde(default)]
+    pub defaulted: bool,
+}
+
+impl CdsIndexConstituent {
+    /// Construct an active (non-defaulted) constituent.
+    ///
+    /// Common case for new trades: `defaulted` defaults to `false`. Mark
+    /// names as defaulted explicitly via the struct literal when modeling
+    /// post-default state.
+    pub fn active(credit: CreditParams, weight: f64) -> Self {
+        Self {
+            credit,
+            weight,
+            defaulted: false,
+        }
+    }
+}
+
+/// Per-constituent result entry for index-level analytics.
+#[derive(Debug, Clone)]
+pub struct ConstituentResult<T> {
+    /// Hazard curve identifier for the constituent.
+    pub credit_curve_id: CurveId,
+    /// Recovery rate used for the constituent.
+    pub recovery_rate: f64,
+    /// Raw weight supplied on the index definition.
+    pub weight_raw: f64,
+    /// Effective weight used after optional normalization.
+    pub weight_effective: f64,
+    /// Computed value for the constituent.
+    pub value: T,
+}
+
+/// Aggregate result for index-level analytics.
+///
+/// In `SingleCurve` mode, `constituents` is empty.
+#[derive(Debug, Clone)]
+pub struct IndexResult<T> {
+    /// Total aggregated value.
+    pub total: T,
+    /// Optional per-constituent breakdown.
+    pub constituents: Vec<ConstituentResult<T>>,
+}
+
+impl<T> IndexResult<T> {
+    /// Construct a single-curve result with no breakdown.
+    pub fn single_curve(total: T) -> Self {
+        Self {
+            total,
+            constituents: Vec::new(),
+        }
+    }
+}
+
+/// Detailed par spread result for CDS indices.
+///
+/// Note: constituent par spreads are informational and are not additive.
+#[derive(Debug, Clone)]
+pub struct IndexParSpreadResult {
+    /// Total par spread in basis points.
+    pub total_spread_bp: f64,
+    /// Per-constituent par spreads in basis points (informational).
+    pub constituents_spread_bp: Vec<ConstituentResult<f64>>,
+    /// Aggregated protection PV used in the total calculation.
+    pub numerator_protection_pv: Money,
+    /// Aggregated denominator used in the total calculation.
+    pub denominator: f64,
+}
+
+/// CDS Index instrument definition
+#[derive(
+    Clone,
+    Debug,
+    finstack_quant_valuations_macros::FinancialBuilder,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CdsIndex {
+    /// Unique instrument identifier
+    pub id: InstrumentId,
+    /// Index name, e.g., "CDX.NA.IG", "CDX.NA.HY", "iTraxx Europe"
+    pub index_name: String,
+    /// Series number (e.g., 42)
+    pub series: u16,
+    /// Version number within series
+    pub version: u16,
+    /// Notional amount of the index
+    pub notional: Money,
+    /// Index factor (fraction of surviving notional since series inception)
+    pub index_factor: f64,
+    /// Protection buyer/seller perspective
+    pub side: PayReceive,
+    /// Regional ISDA convention
+    pub convention: CdsConvention,
+    /// Premium leg specification (coupon schedule and discounting)
+    pub premium_leg: PremiumLegSpec,
+    /// Protection leg specification (credit curve and settlement)
+    pub protection_leg: ProtectionLegSpec,
+    /// Pricing aggregation mode
+    pub pricing: IndexPricing,
+    /// Optional list of constituents when using `IndexPricing::Constituents`
+    pub constituents: Vec<CdsIndexConstituent>,
+    /// Number of reference entities in the index pool.
+    ///
+    /// Required for portfolio-level analytics (e.g. jump-to-default) when
+    /// `constituents` is empty (`SingleCurve` mode), since the per-name
+    /// risk number is `notional / N · LGD`. Index pool sizes drift with
+    /// series — iTraxx Crossover has been 75 names only since Series 9,
+    /// and CDX.NA.HY membership varies — so this is supplied explicitly
+    /// rather than inferred from `index_name`. Standard presets populate
+    /// it via `CdsIndex::from_preset`; set it directly with
+    /// `with_num_constituents` for custom indices.
+    #[serde(default)]
+    #[builder(default)]
+    pub num_constituents: Option<u32>,
+    /// Contractual upfront payment `(payment date, amount)` on the index
+    /// notional. A positive amount is paid by the protection buyer to the
+    /// seller; a negative amount by the seller to the buyer. It is
+    /// discounted from its payment date and dropped once that date is before
+    /// the valuation date.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(with = "finstack_quant_core::wire::optional_dated_money")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
+    #[builder(default)]
+    pub upfront: Option<(Date, Money)>,
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides:
+        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+    /// Optional OTC margin specification for VM/IM.
+    ///
+    /// CDS indices are typically cleared through ICE Clear Credit. Use
+    /// `OtcMarginSpec::cleared("ICE", Currency::USD)` for standard cleared
+    /// indices. Bilateral SIMM indices must attach an explicit
+    /// `SimmCreditClassification` rather than infer qualifying status from the
+    /// index name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub margin_spec: Option<OtcMarginSpec>,
+    /// Attributes for tagging and selection
+    #[serde(default)]
+    #[builder(default)]
+    pub attributes: Attributes,
+}
+
+impl CdsIndex {
+    fn premium_with_standard_defaults(&self) -> finstack_quant_core::Result<PremiumLegSpec> {
+        let mut premium = self.premium_leg.clone();
+        if premium.calendar_id.is_none() {
+            premium.calendar_id = Some(self.convention.get_spec()?.calendar_id.as_str().into());
+        }
+        Ok(premium)
+    }
+
+    fn protection_with_standard_defaults(&self) -> finstack_quant_core::Result<ProtectionLegSpec> {
+        let mut protection = self.protection_leg.clone();
+        if protection.settlement_delay == 0 {
+            protection.settlement_delay = self.convention.get_spec()?.settlement_days;
+        }
+        Ok(protection)
+    }
+
+    /// Create a canonical example CDS Index for testing and documentation.
+    ///
+    /// Returns a CDX.NA.IG series 42 index with standard conventions.
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        let convention = CdsConvention::IsdaNa;
+        let day_count = convention.get_spec()?.day_count;
+        let frequency = convention.get_spec()?.frequency;
+        let business_day_convention = convention.get_spec()?.business_day_convention;
+        let stub = convention.get_spec()?.stub;
+
+        Ok(Self {
+            id: InstrumentId::new("CDX-IG-42"),
+            index_name: "CDX.NA.IG".to_string(),
+            series: 42,
+            version: 1,
+            notional: Money::from((10_000_000_i64, Currency::USD)),
+            index_factor: 1.0,
+            side: PayReceive::Pay,
+            convention,
+            premium_leg: PremiumLegSpec {
+                roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
+                start: date!(2024 - 03 - 20),
+                end: date!(2029 - 12 - 20),
+                frequency,
+                stub,
+                business_day_convention,
+                calendar_id: Some(convention.get_spec()?.calendar_id.as_str().into()),
+                day_count,
+                coupon_bp: Decimal::from(60),
+                discount_curve_id: CurveId::new("USD-OIS"),
+            },
+            protection_leg: ProtectionLegSpec {
+                credit_curve_id: CurveId::new("CDX.NA.IG.HAZARD"),
+                recovery_rate: 0.40,
+                settlement_delay: convention.get_spec()?.settlement_days,
+            },
+            pricing: IndexPricing::SingleCurve,
+            constituents: Vec::new(),
+            num_constituents: Some(125),
+            upfront: None,
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
+            margin_spec: None,
+            attributes: Attributes::new(),
+        })
+    }
+
+    /// Construct a `CdsIndex` from a preset descriptor + trade-specific args.
+    ///
+    /// Replaces the previous `new_standard` constructor. Trade state that is
+    /// orthogonal to the preset (constituents, index factor) is attached
+    /// via the chained `with_*` methods on the returned instrument.
+    ///
+    /// # Example
+    ///
+    /// ```text
+    /// let idx = CdsIndex::from_preset(
+    ///     &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
+    ///     "CDX-IG-42",
+    ///     Money::from((10_000_000_i64, Currency::USD)),
+    ///     PayReceive::Pay,
+    ///     start, end,
+    ///     0.40,
+    ///     "USD-OIS",
+    ///     "CDX.NA.IG.HAZARD",
+    /// )?
+    /// .with_index_factor(0.96)
+    /// .with_constituents(constituents);
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `preset.coupon_bp` cannot be represented
+    /// as `Decimal`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_preset(
+        preset: &CdsIndexParams,
+        id: impl Into<InstrumentId>,
+        notional: Money,
+        side: PayReceive,
+        start: finstack_quant_core::dates::Date,
+        end: finstack_quant_core::dates::Date,
+        recovery_rate: f64,
+        discount_curve_id: impl Into<CurveId>,
+        credit_curve_id: impl Into<CurveId>,
+    ) -> finstack_quant_core::Result<Self> {
+        let convention = preset.convention;
+        let day_count = convention.get_spec()?.day_count;
+        let frequency = convention.get_spec()?.frequency;
+        let business_day_convention = convention.get_spec()?.business_day_convention;
+        let stub = convention.get_spec()?.stub;
+
+        let coupon_bp = Decimal::try_from(preset.coupon_bp).map_err(|e| {
+            finstack_quant_core::Error::Validation(format!(
+                "coupon_bp {} cannot be represented as Decimal: {}",
+                preset.coupon_bp, e
+            ))
+        })?;
+
+        Ok(Self {
+            id: id.into(),
+            index_name: preset.index_name.clone(),
+            series: preset.series,
+            version: preset.version,
+            notional,
+            index_factor: 1.0,
+            side,
+            convention,
+            premium_leg: PremiumLegSpec {
+                roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
+                start,
+                end,
+                frequency,
+                stub,
+                business_day_convention,
+                calendar_id: Some(convention.get_spec()?.calendar_id.as_str().into()),
+                day_count,
+                coupon_bp,
+                discount_curve_id: discount_curve_id.into(),
+            },
+            protection_leg: ProtectionLegSpec {
+                credit_curve_id: credit_curve_id.into(),
+                recovery_rate,
+                settlement_delay: convention.get_spec()?.settlement_days,
+            },
+            pricing: IndexPricing::SingleCurve,
+            constituents: Vec::new(),
+            num_constituents: preset.num_constituents,
+            upfront: None,
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
+            margin_spec: None,
+            attributes: Attributes::new(),
+        })
+    }
+
+    /// Set the number of reference entities in the index pool.
+    ///
+    /// Use this for custom or off-series indices whose membership count is
+    /// not carried by a standard preset. Required for jump-to-default and
+    /// other per-name analytics when `constituents` is empty.
+    pub fn with_num_constituents(mut self, num_constituents: u32) -> Self {
+        self.num_constituents = Some(num_constituents);
+        self
+    }
+
+    /// Set the index factor (fraction of original notional surviving).
+    ///
+    /// Defaults to 1.0. Set to less than 1.0 when modeling an index after
+    /// one or more constituents have defaulted; pair with `defaulted=true`
+    /// on the corresponding `CdsIndexConstituent`s. Validation occurs at
+    /// pricing time and rejects `index_factor` values that exceed
+    /// `1 − Σ defaulted weights`.
+    pub fn with_index_factor(mut self, factor: f64) -> Self {
+        self.index_factor = factor;
+        self
+    }
+
+    /// Validate trade-state invariants shared by all pricing modes.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if !self.index_factor.is_finite() || !(0.0..=1.0).contains(&self.index_factor) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS Index '{}' has invalid index_factor {} (must be finite and within [0, 1])",
+                self.id, self.index_factor
+            )));
+        }
+        if !self.notional.amount().is_finite() || self.notional.amount() == 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS Index '{}' notional must be finite and non-zero, got {}",
+                self.id,
+                self.notional.amount()
+            )));
+        }
+        if let Some(margin_spec) = &self.margin_spec {
+            margin_spec.validate_for_credit()?;
+        }
+        if let Some((_, upfront)) = self.upfront {
+            if upfront.currency() != self.notional.currency() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CDS Index '{}' upfront currency {} must match notional currency {}",
+                    self.id,
+                    upfront.currency(),
+                    self.notional.currency()
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Map this index to a synthetic single-name CDS for valuation reuse.
+    ///
+    /// The synthetic CDS notional reflects `notional × index_factor`, i.e.
+    /// the surviving notional. Pricing this synthetic CDS directly therefore
+    /// produces the same dollar leg PVs as `IndexPricing::SingleCurve` mode
+    /// on the index itself.
+    pub fn to_synthetic_cds(&self) -> finstack_quant_core::Result<CreditDefaultSwap> {
+        Ok(CreditDefaultSwap {
+            id: self.id.to_owned(),
+            notional: Money::new(
+                self.notional.amount() * self.index_factor,
+                self.notional.currency(),
+            )?,
+            side: self.side,
+            convention: self.convention,
+            premium_leg: self.premium_with_standard_defaults()?,
+            protection_leg: self.protection_with_standard_defaults()?,
+            instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
+            metric_pricing_overrides: self.metric_pricing_overrides.clone(),
+            scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
+            valuation_convention: crate::cds::CdsValuationConvention::default(),
+            upfront: None,
+            doc_clause: None,
+            protection_effective_date: None,
+            margin_spec: self.margin_spec.clone(),
+            attributes: self.attributes.clone(),
+        })
+    }
+
+    /// Configure equal-weight constituents by credit parameter set per name.
+    /// Each name receives weight = 1/(n names). Mode switches to `Constituents`.
+    pub fn with_constituents_equal_weight(
+        mut self,
+        names: impl IntoIterator<Item = CreditParams>,
+    ) -> Self {
+        let list: Vec<CreditParams> = names.into_iter().collect();
+        if list.is_empty() {
+            self.constituents.clear();
+            self.pricing = IndexPricing::SingleCurve;
+            return self;
+        }
+        let w = 1.0 / (list.len() as f64);
+        self.constituents = list
+            .into_iter()
+            .map(|credit| CdsIndexConstituent {
+                credit,
+                weight: w,
+                defaulted: false,
+            })
+            .collect();
+        self.pricing = IndexPricing::Constituents;
+        self
+    }
+
+    /// Configure explicit constituents with custom weights.
+    pub fn with_constituents(mut self, constituents: Vec<CdsIndexConstituent>) -> Self {
+        if constituents.is_empty() {
+            self.constituents.clear();
+            self.pricing = IndexPricing::SingleCurve;
+        } else {
+            self.constituents = constituents;
+            self.pricing = IndexPricing::Constituents;
+        }
+        self
+    }
+
+    /// Calculate protection leg PV
+    pub fn pv_protection_leg(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        let pricer = CdsIndexPricer::new();
+        pricer.pv_protection_leg(self, market, as_of)
+    }
+
+    /// Calculate premium leg PV
+    pub fn pv_premium_leg(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        let pricer = CdsIndexPricer::new();
+        pricer.pv_premium_leg(self, market, as_of)
+    }
+
+    /// Calculate par spread
+    pub fn par_spread(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let pricer = CdsIndexPricer::new();
+        pricer.par_spread(self, market, as_of)
+    }
+
+    /// Calculate risky PV01
+    pub fn risky_pv01(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let pricer = CdsIndexPricer::new();
+        pricer.risky_pv01(self, market, as_of)
+    }
+
+    /// Calculate CS01
+    pub fn cs01(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        provider: &dyn finstack_quant_valuations_core::recalibration::RecalibrationProvider,
+    ) -> finstack_quant_core::Result<f64> {
+        let pricer = CdsIndexPricer::new();
+        pricer.cs01(self, market, as_of, provider)
+    }
+}
+
+impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for CdsIndex {
+    impl_instrument_base!(
+        finstack_quant_valuations_core::pricer::InstrumentType::CdsIndex,
+        crate::CREDIT
+    );
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        CdsIndex::validate(self)
+    }
+
+    fn default_model(&self) -> finstack_quant_valuations_core::pricer::ModelKey {
+        finstack_quant_valuations_core::pricer::ModelKey::HazardRate
+    }
+
+    fn as_marginable(&self) -> Option<&dyn finstack_quant_margin::Marginable> {
+        Some(self)
+    }
+    fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
+        let mut deps = MarketDependencies::new();
+        deps.add_discount_curve(self.premium_leg.discount_curve_id.clone());
+        deps.add_credit_curve(self.protection_leg.credit_curve_id.clone());
+        if self.pricing == IndexPricing::Constituents {
+            for constituent in &self.constituents {
+                if !constituent.defaulted {
+                    deps.add_credit_curve(constituent.credit.credit_curve_id.clone());
+                }
+            }
+        }
+        Ok(deps)
+    }
+
+    fn base_value(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        let pricer = CdsIndexPricer::new();
+        pricer.npv(self, curves, as_of)
+    }
+
+    fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
+        Some(self.premium_leg.end)
+    }
+
+    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+}
+
+impl finstack_quant_cashflows::CashflowScheduleSource for CdsIndex {
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
+    }
+
+    fn raw_cashflow_schedule(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+        let pricer = CdsIndexPricer::new();
+        let schedule = pricer.build_projected_schedule(self, curves, as_of)?;
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
+    }
+}
+
+// Declare canonical market dependencies for the DV01 calculator.
+// In Constituents mode, include per-constituent credit curves so that DV01/BucketedDV01
+// correctly bump all credit curves, not just the index-level one.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simm_margin_spec_without_credit_classification_is_rejected() {
+        let mut index = CdsIndex::example().expect("example");
+        index.margin_spec =
+            Some(finstack_quant_margin::OtcMarginSpec::usd_bilateral().expect("margin spec"));
+
+        let error = index.validate().expect_err("classification is mandatory");
+        assert!(error.to_string().contains("simm_credit_classification"));
+    }
+
+    #[test]
+    fn classified_simm_margin_spec_is_valid() {
+        let mut index = CdsIndex::example().expect("example");
+        index.margin_spec = Some(
+            finstack_quant_margin::OtcMarginSpec::usd_bilateral()
+                .expect("margin spec")
+                .with_simm_credit_classification(
+                    finstack_quant_margin::SimmCreditClassification::Qualifying {
+                        sector: finstack_quant_margin::SimmCreditSector::Residual,
+                    },
+                ),
+        );
+
+        index.validate().expect("classified index");
+    }
+}

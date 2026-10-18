@@ -12,7 +12,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
-use finstack_quant_valuations::instruments::rates::hw1f::RateExoticMcConfig;
+use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 use finstack_quant_valuations::instruments::rates::swaption::{
     BermudanSchedule, BermudanSwaption, BermudanSwaptionPricer, BermudanSwaptionPricerConfig,
     PreparedHullWhiteModel,
@@ -84,7 +84,7 @@ fn bench_bermudan_lsmc(c: &mut Criterion) {
             |b, &n| {
                 let pricer =
                     BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-                        mc: RateExoticMcConfig {
+                        mc: Hw1fMcConfig {
                             num_paths: n,
                             seed: 42,
                             ..BermudanSwaptionPricerConfig::DEFAULT_MC

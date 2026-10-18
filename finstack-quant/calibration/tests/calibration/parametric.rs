@@ -19,7 +19,7 @@ use crate::calibration::calibration_support as cal_utils;
 
 fn contractual_quote_dates(base: Date, index: &str, tenor: &str) -> (Date, Date) {
     use finstack_quant_core::dates::{adjust, calendar_by_id_strict, DateExt};
-    use finstack_quant_valuations::market::conventions::ConventionRegistry;
+    use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 
     let registry = ConventionRegistry::try_global().expect("conventions");
     let convention = registry
@@ -310,8 +310,8 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
     use finstack_quant_core::market_data::term_structures::{NelsonSiegelModel, ParametricCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-    use finstack_quant_valuations::market::conventions::ConventionRegistry;
+    use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+    use finstack_quant_valuations_rates::deposit::Deposit;
 
     let base = Date::from_calendar_date(2025, Month::January, 2).expect("date");
     let models = [
@@ -448,6 +448,7 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
 
 #[test]
 fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_cashflows::builder::RollRule;
     use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
     use finstack_quant_core::currency::Currency;
@@ -456,8 +457,8 @@ fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
     use finstack_quant_core::market_data::term_structures::{NelsonSiegelModel, ParametricCurve};
     use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::rates::irs::{
-        ConventionSwapParams, FloatingLegCompounding, InterestRateSwap, PayReceive,
+    use finstack_quant_valuations_rates::irs::{
+        ConventionSwapParams, InterestRateSwap, PayReceive,
     };
 
     // Each term is (overnight accrual start, overnight accrual end, delayed

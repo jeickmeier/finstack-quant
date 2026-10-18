@@ -6,8 +6,8 @@ use crate::quotes::ids::{Pillar, QuoteId};
 use crate::quotes::xccy::XccyQuote;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::market::conventions::ids::XccyConventionId;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::market::conventions::ids::XccyConventionId;
 
 fn xccy_build_ctx(as_of: Date) -> BuildCtx {
     let mut curve_ids = finstack_quant_core::HashMap::default();
@@ -60,7 +60,7 @@ fn test_build_xccy_basis_swap() {
     assert!(
         matches!(
             swap.leg1.leg.compounding,
-            finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::CompoundedInArrears { .. }
+            finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears { .. }
         ),
         "EUR contractual ESTR-OIS must compound in arrears, got {:?}",
         swap.leg1.leg.compounding
@@ -68,7 +68,7 @@ fn test_build_xccy_basis_swap() {
     assert!(
         matches!(
             swap.leg2.leg.compounding,
-            finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::CompoundedInArrears { .. }
+            finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears { .. }
         ),
         "USD contractual SOFR-OIS must compound in arrears, got {:?}",
         swap.leg2.leg.compounding
@@ -106,7 +106,7 @@ fn unregistered_forward_override_keeps_contractual_overnight_compounding() {
     assert!(
         matches!(
             swap.leg2.leg.compounding,
-            finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::CompoundedInArrears { .. }
+            finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears { .. }
         ),
         "unregistered forward alias must keep contractual overnight compounding, got {:?}",
         swap.leg2.leg.compounding
@@ -144,9 +144,7 @@ fn registered_term_forward_override_on_ois_convention_is_rejected() {
 #[cfg(test)]
 mod mtm_reset_builder_tests {
     use super::*;
-    use finstack_quant_valuations::instruments::rates::xccy_swap::{
-        NotionalExchange, ResettingSide,
-    };
+    use finstack_quant_valuations_rates::xccy_swap::{NotionalExchange, ResettingSide};
 
     #[test]
     fn building_g10_pair_produces_mtm_resetting_swap() {

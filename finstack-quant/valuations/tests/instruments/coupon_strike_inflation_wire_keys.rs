@@ -20,6 +20,7 @@
 //! independently reconciled in the September 2026 valuation audit evidence.
 
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_valuations::instruments::instrument_json_of;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};
 use serde_json::Value;
@@ -328,10 +329,7 @@ fn price_case(
         }
         PvReference::CanonicalRoundtrip => {
             let canonical_json = finstack_quant_valuations::instruments::InstrumentEnvelope::new(
-                parsed
-                    .as_instrument()
-                    .to_instrument_json()
-                    .expect("registered instrument"),
+                instrument_json_of(parsed.as_instrument()).expect("registered instrument"),
             );
             instrument = serde_json::to_value(canonical_json).expect("canonical contract JSON");
             let canonical = parse_boxed_instrument_from_json(&instrument.to_string(), None)

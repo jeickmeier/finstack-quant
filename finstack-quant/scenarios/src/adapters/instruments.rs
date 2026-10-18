@@ -5,6 +5,7 @@
 //! otherwise they are stored as metadata attributes for downstream processing.
 
 use crate::warning::Warning;
+use finstack_quant_valuations::instruments::instrument_json_of;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::pricer::InstrumentType;
 
@@ -150,7 +151,7 @@ where
         if child_changed == 0 {
             continue;
         }
-        if let Some(updated) = child.to_instrument_json() {
+        if let Some(updated) = instrument_json_of(child.as_ref()) {
             *leg.instrument = updated;
             changed += child_changed;
         }

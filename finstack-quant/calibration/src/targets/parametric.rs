@@ -22,7 +22,7 @@ use finstack_quant_core::market_data::term_structures::{
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::rates::deposit::Deposit;
+use finstack_quant_valuations_rates::deposit::Deposit;
 use std::collections::BTreeSet;
 
 /// Parameters for constructing a [`ParametricCurveTarget`].

@@ -882,7 +882,7 @@ export interface DA3D5F3B41D0C911162Ff {
  * - **Conversion factors**: Supplied per deliverable, preferably from the exchange.
  * - **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,
  *   then the sole basket member. A larger basket requires an explicit or embedded CTD.
- * - **CTD analysis**: [`crate::instruments::Instrument::value`] marks the
+ * - **CTD analysis**: [`finstack_quant_valuations_core::instruments::Instrument::value`] marks the
  *   caller-supplied CTD only; it does not rank the basket. Refresh the CTD
  *   selection daily when the basket can switch.
  *
@@ -891,10 +891,10 @@ export interface DA3D5F3B41D0C911162Ff {
  * ```rust
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use finstack_quant_valuations::instruments::fixed_income::bond_future::{
+ * use finstack_quant_valuations_fixed_income::bond_future::{
  *     BondFuture, BondFutureSpecs, DeliverableBond,
  * };
- * use finstack_quant_valuations::instruments::{Attributes, ListedFutureTerms, Position};
+ * use finstack_quant_valuations_core::instruments::{Attributes, ListedFutureTerms, Position};
  * use time::macros::date;
  *
  * # fn main() -> finstack_quant_core::Result<()> {
@@ -1017,7 +1017,7 @@ export interface D_5193595B8B998A0Dc94C {
  * and custom cashflow schedule overrides. Uses a clean `CashflowSpec` that wraps
  * the canonical builder coupon specs for maximum flexibility and parity.
  *
- * [`crate::instruments::Instrument::value`] is the **dirty NPV at `as_of`**,
+ * [`finstack_quant_valuations_core::instruments::Instrument::value`] is the **dirty NPV at `as_of`**,
  * not the market dirty quote at settlement. Quoted YTM, z-spread, and DM
  * remain settlement-anchored.
  */
@@ -1175,7 +1175,7 @@ export interface Attributes1 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+ * use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
  * use finstack_quant_core::dates::Date;
  * use time::Month;
  *
@@ -1207,7 +1207,7 @@ export interface DF511Cd9E47303Dbb5Ea1 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::CallPut;
+ * use finstack_quant_valuations_fixed_income::bond::CallPut;
  * use finstack_quant_core::dates::Date;
  * use time::Month;
  *
@@ -2986,7 +2986,7 @@ export interface DCdb8Fddc0106047270C4 {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */
@@ -3750,8 +3750,8 @@ export interface Money4 {
  *
  * **Call-protection only**: the floor applies to EARLY issuer redemptions
  * within the [`ProtectionWindow`] and never at maturity. The held-to-maturity
- * path is unfloored. Use [`crate::metrics::MetricId::MoicToWorst`] /
- * [`crate::metrics::MetricId::XirrToWorst`] to see the honest worst-case
+ * path is unfloored. Use [`finstack_quant_valuations_core::metrics::MetricId::MoicToWorst`] /
+ * [`finstack_quant_valuations_core::metrics::MetricId::XirrToWorst`] to see the honest worst-case
  * return across all paths including the unfloored maturity path.
  *
  * # Mathematical Foundation
@@ -3826,7 +3826,7 @@ export interface Money4 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{
+ * use finstack_quant_valuations_fixed_income::bond::{
  *     ReturnFloorSpec, IssuePrice,
  * };
  * use finstack_quant_core::types::Rate;
@@ -3844,7 +3844,7 @@ export interface Money4 {
  * Attach to a bond using the fluent builder:
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{
+ * use finstack_quant_valuations_fixed_income::bond::{
  *     Bond, ReturnFloorSpec, ProtectionWindow,
  * };
  * use finstack_quant_core::currency::Currency;

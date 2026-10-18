@@ -21,6 +21,7 @@
 //! inputs compare against an independently constructed canonical rate spec.
 
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_valuations::instruments::instrument_json_of;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};
 use serde_json::Value;
@@ -147,10 +148,7 @@ fn price_case(cases: &Value, ty: &str, extra: &[(Value, Value)]) -> String {
     )
     .unwrap_or_else(|e| panic!("{ty}: {e}"));
     let canonical_json = finstack_quant_valuations::instruments::InstrumentEnvelope::new(
-        parsed
-            .as_instrument()
-            .to_instrument_json()
-            .expect("registered instrument"),
+        instrument_json_of(parsed.as_instrument()).expect("registered instrument"),
     );
     let canonical = parse_boxed_instrument_from_json(
         &serde_json::to_string(&canonical_json).expect("canonical JSON"),
@@ -447,8 +445,8 @@ fn migrated_inputs_reprice_to_recorded_reference() {
 #[test]
 fn floating_facility_wire_rate_matches_canonical_rate_spec() {
     use finstack_quant_cashflows::builder::FloatingRateSpec;
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::dates::Tenor;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use rust_decimal::Decimal;
     use serde_json::json;
 
@@ -566,7 +564,7 @@ fn retired_facility_limit_keys_are_rejected() {
 #[test]
 // schema-rejection-test: RateSpec fixed `rate_bp`, TermLoan amortization `bp`, LoanCallType make_whole `treasury_spread_bp`
 fn retired_term_loan_keys_are_rejected() {
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
+    use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::term_loan::{
         AmortizationSpec, LoanCallType,
     };

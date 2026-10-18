@@ -8,7 +8,13 @@ import math
 from pathlib import Path
 from typing import Any
 
-from baseline_identity import require_baseline_name, require_sha256, require_tree_revision
+try:
+    # Imported as `scripts.check_criterion_regressions` (the PR benchmark runner
+    # and its tests): resolve the sibling through the package.
+    from .baseline_identity import require_baseline_name, require_sha256, require_tree_revision
+except ImportError:
+    # Run as a script from `scripts/`, where the sibling is a top-level module.
+    from baseline_identity import require_baseline_name, require_sha256, require_tree_revision
 
 MATERIALIZATION_CASES = (
     "cold_a_5000_unique",

@@ -1,0 +1,438 @@
+//! Bond type definitions and deserialization.
+
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+
+use super::CashflowSpec;
+
+fn is_linear_accrual_method(method: &finstack_quant_cashflows::accrual::AccrualMethod) -> bool {
+    matches!(
+        method,
+        finstack_quant_cashflows::accrual::AccrualMethod::Linear
+    )
+}
+
+/// Bond settlement and ex-coupon conventions.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct BondSettlementConvention {
+    /// Number of settlement days after trade date (e.g., 2 for T+2).
+    #[serde(default)]
+    pub settlement_days: u32,
+    /// Number of ex-coupon days before coupon date.
+    #[serde(default)]
+    pub ex_coupon_days: u32,
+    /// Calendar identifier for ex-coupon day counting.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ex_coupon_calendar_id: Option<finstack_quant_core::types::CalendarId>,
+}
+
+/// Bond instrument with fixed, floating, or amortizing cashflows.
+///
+/// Cashflow sign convention (holder view):
+/// - All contractual cashflows **received by a long holder** (coupons,
+///   amortization, final redemption) are represented as **positive** amounts.
+/// - Cash outflows for the holder (e.g., purchase price, funding, short
+///   positions) are represented as **negative** amounts and are handled at
+///   trade level rather than in the bond's contractual schedule.
+///
+/// Supports call/put schedules, quoted prices for yield-to-maturity calculations,
+/// and custom cashflow schedule overrides. Uses a clean `CashflowSpec` that wraps
+/// the canonical builder coupon specs for maximum flexibility and parity.
+///
+/// [`finstack_quant_valuations_core::instruments::Instrument::value`] is the **dirty NPV at `as_of`**,
+/// not the market dirty quote at settlement. Quoted YTM, z-spread, and DM
+/// remain settlement-anchored.
+#[derive(Clone, Debug, finstack_quant_valuations_macros::FinancialBuilder, serde::Serialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
+pub struct Bond {
+    /// Unique identifier for the bond.
+    pub id: InstrumentId,
+    /// Principal amount of the bond.
+    pub notional: Money,
+    /// Issue date of the bond.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub issue_date: Date,
+    /// Maturity date of the bond.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub maturity: Date,
+    /// Cashflow specification (fixed, floating, or amortizing).
+    pub cashflow_spec: CashflowSpec,
+    /// Discount curve identifier for pricing.
+    pub discount_curve_id: CurveId,
+    /// Optional credit curve identifier (default intensity). When present,
+    /// credit-rate pricing is enabled.
+    pub credit_curve_id: Option<CurveId>,
+    /// Optional repo (financing) discount curve for carry cost computation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(default)]
+    pub repo_curve_id: Option<CurveId>,
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides:
+        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+    /// Optional call/put schedule (dates and redemption prices as % of par amount).
+    pub call_put: Option<CallPutSchedule>,
+    /// Optional guaranteed minimum-return ("return floor") call protection.
+    ///
+    /// When present, the bond is treated as prepayable across the protection
+    /// window with redemption floored so the investor meets the target MOIC/XIRR.
+    /// Deterministic pricing lowers it into `call_put`; stochastic
+    /// rates-credit pricing evaluates it against each simulated distribution
+    /// and balance path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(default)]
+    pub return_floor: Option<super::return_floor::ReturnFloorSpec>,
+    /// Optional pre-built cashflow schedule. If provided, this will be used instead of
+    /// generating cashflows from the cashflow_spec.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_cashflows: Option<CashFlowSchedule>,
+    /// Accrual method for interest calculation between coupon dates.
+    ///
+    /// Determines how accrued interest is calculated:
+    /// - `Linear` (default): Simple interest interpolation (most bonds)
+    /// - `Compounded`: Actuarial accrual per ICMA Rule 251 (some European bonds)
+    ///
+    /// For inflation-linked bonds (TIPS, UK Linkers), use the dedicated
+    /// `InflationLinkedBond` instrument which handles index-ratio accrual.
+    #[serde(default, skip_serializing_if = "is_linear_accrual_method")]
+    #[cfg_attr(feature = "json-schema", schemars(extend("default" = "linear")))]
+    #[builder(default)]
+    pub accrual_method: finstack_quant_cashflows::accrual::AccrualMethod,
+    /// Attributes for scenario selection and tagging.
+    pub attributes: Attributes,
+    /// Settlement and ex-coupon conventions.
+    #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
+    pub settlement_convention: Option<BondSettlementConvention>,
+}
+
+impl<'de> serde::Deserialize<'de> for Bond {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct BondHelper {
+            id: InstrumentId,
+            notional: Money,
+            issue_date: Option<Date>,
+            maturity: Date,
+            cashflow_spec: CashflowSpec,
+            discount_curve_id: CurveId,
+            credit_curve_id: Option<CurveId>,
+            #[serde(default)]
+            repo_curve_id: Option<CurveId>,
+            #[serde(default)]
+            instrument_pricing_overrides:
+                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+            #[serde(default)]
+            metric_pricing_overrides:
+                finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+            #[serde(default)]
+            scenario_pricing_overrides:
+                finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+            call_put: Option<CallPutSchedule>,
+            #[serde(default)]
+            return_floor: Option<super::return_floor::ReturnFloorSpec>,
+            #[serde(default)]
+            custom_cashflows: Option<CashFlowSchedule>,
+            #[serde(default)]
+            accrual_method: finstack_quant_cashflows::accrual::AccrualMethod,
+            attributes: Attributes,
+            settlement_days: Option<u32>,
+            ex_coupon_days: Option<u32>,
+            ex_coupon_calendar_id: Option<String>,
+        }
+
+        let helper = BondHelper::deserialize(deserializer)?;
+        let issue_date = if let Some(issue) = helper.issue_date {
+            issue
+        } else if let Some(ref sched) = helper.custom_cashflows {
+            // Infer issue date from the first date in the custom cashflow schedule.
+            let dates = sched.dates();
+            if dates.is_empty() {
+                return Err(serde::de::Error::custom(
+                    "Bond requires `issue_date` (custom_cashflows schedule has no dates to infer from)",
+                ));
+            }
+            dates[0]
+        } else {
+            return Err(serde::de::Error::custom(
+                "Bond requires `issue_date` unless `custom_cashflows` is provided",
+            ));
+        };
+
+        let settlement_convention = if helper.settlement_days.is_some()
+            || helper.ex_coupon_days.is_some()
+            || helper.ex_coupon_calendar_id.is_some()
+        {
+            Some(BondSettlementConvention {
+                settlement_days: helper.settlement_days.unwrap_or(0),
+                ex_coupon_days: helper.ex_coupon_days.unwrap_or(0),
+                ex_coupon_calendar_id: helper.ex_coupon_calendar_id.map(Into::into),
+            })
+        } else {
+            None
+        };
+
+        Ok(Bond {
+            id: helper.id,
+            notional: helper.notional,
+            issue_date,
+            maturity: helper.maturity,
+            cashflow_spec: helper.cashflow_spec,
+            discount_curve_id: helper.discount_curve_id,
+            credit_curve_id: helper.credit_curve_id,
+            repo_curve_id: helper.repo_curve_id,
+            instrument_pricing_overrides: helper.instrument_pricing_overrides,
+            metric_pricing_overrides: helper.metric_pricing_overrides,
+            scenario_pricing_overrides: helper.scenario_pricing_overrides,
+            call_put: helper.call_put,
+            return_floor: helper.return_floor,
+            custom_cashflows: helper.custom_cashflows,
+            accrual_method: helper.accrual_method,
+            attributes: helper.attributes,
+            settlement_convention,
+        })
+    }
+}
+
+/// Call or put option on a bond.
+///
+/// Represents a single call or put option with an exercise period and redemption price.
+/// Call options allow the issuer to redeem early; put options allow the holder to redeem early.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_valuations_fixed_income::bond::CallPut;
+/// use finstack_quant_core::dates::Date;
+/// use time::Month;
+///
+/// // Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027
+/// let call = CallPut {
+///     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+///     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+///     price_pct_of_par: 102.0,
+///     make_whole: None,
+/// };
+/// ```
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CallPut {
+    /// First date when the option can be exercised.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub start: Date,
+    /// Last date when the option can be exercised, inclusive.
+    ///
+    /// Use the same value as `start` for one-day/discrete exercise.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub end: Date,
+    /// Clean redemption price as percentage of par amount (100 means par).
+    /// Accrued coupon interest at exercise is added to determine the cash payment.
+    pub price_pct_of_par: f64,
+    /// Optional make-whole call specification.
+    ///
+    /// When set, the call price is computed as:
+    ///   `max(clean_floor, PV of remaining cashflows - accrued) + accrued`
+    ///
+    /// Here `clean_floor` is notional times `price_pct_of_par / 100`; the
+    /// reference PV discounts remaining cashflows at the reference curve plus
+    /// spread, and accrued interest is paid exactly once.
+    ///
+    /// This ensures the holder is compensated at treasury + spread for early redemption.
+    /// Common in investment-grade corporate and convertible bonds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub make_whole: Option<MakeWholeSpec>,
+}
+
+/// Make-whole call specification.
+///
+/// Defines the reference curve and spread used to compute the make-whole redemption
+/// price. The issuer pays the holder the greater of par and the present value of
+/// remaining cashflows discounted at the reference rate plus a spread.
+///
+/// # Industry Practice
+///
+/// - Investment-grade corporates: typically Treasury + 25-50 bp
+/// - High-yield: typically Treasury + 50-100 bp
+/// - Convertibles: typically Treasury + 50 bp
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MakeWholeSpec {
+    /// Reference curve identifier (e.g., "USD-TREASURY").
+    pub reference_curve_id: CurveId,
+    /// Spread over the reference curve in basis points (e.g., 50.0 = T+50bps).
+    pub spread_bp: f64,
+}
+
+/// Schedule of call and put options for a bond.
+///
+/// Contains lists of call and put options that can be exercised during the bond's life.
+/// Used for pricing callable/putable bonds and calculating yield-to-worst.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
+/// use finstack_quant_core::dates::Date;
+/// use time::Month;
+///
+/// let mut schedule = CallPutSchedule::default();
+/// schedule.calls.push(CallPut {
+///     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+///     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+///     price_pct_of_par: 102.0,
+///     make_whole: None,
+/// });
+/// ```
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CallPutSchedule {
+    /// Call options (issuer can redeem early).
+    pub calls: Vec<CallPut>,
+    /// Put options (holder can redeem early).
+    pub puts: Vec<CallPut>,
+}
+
+impl CallPutSchedule {
+    /// Check if this schedule has any active call or put options.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the schedule contains at least one call or put option, `false` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_valuations_fixed_income::bond::CallPutSchedule;
+    ///
+    /// let schedule = CallPutSchedule::default();
+    /// assert!(!schedule.has_options());
+    /// ```
+    pub fn has_options(&self) -> bool {
+        !self.calls.is_empty() || !self.puts.is_empty()
+    }
+
+    /// Validate call and put entries against an instrument's contractual life.
+    pub(crate) fn validate_for_life(
+        &self,
+        issue_date: Date,
+        maturity: Date,
+        instrument_name: &str,
+    ) -> finstack_quant_core::Result<()> {
+        validate_call_put_entries(&self.calls, "call", issue_date, maturity, instrument_name)?;
+        validate_call_put_entries(&self.puts, "put", issue_date, maturity, instrument_name)
+    }
+}
+
+fn validate_call_put_entries(
+    entries: &[CallPut],
+    side: &str,
+    issue_date: Date,
+    maturity: Date,
+    instrument_name: &str,
+) -> finstack_quant_core::Result<()> {
+    for entry in entries {
+        if !entry.price_pct_of_par.is_finite() || entry.price_pct_of_par <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{instrument_name} {side} price must be finite and positive, got {} for period [{}, {}]",
+                entry.price_pct_of_par, entry.start, entry.end
+            )));
+        }
+        if entry.start < issue_date || entry.start > maturity {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{instrument_name} {side} exercise start date {} is outside instrument life [{}, {}]",
+                entry.start, issue_date, maturity
+            )));
+        }
+        if entry.end > maturity {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{instrument_name} {side} exercise end date {} is after maturity {}",
+                entry.end, maturity
+            )));
+        }
+        if entry.start > entry.end {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{instrument_name} {side} exercise start date {} is after end date {}",
+                entry.start, entry.end
+            )));
+        }
+        if let Some(make_whole) = &entry.make_whole {
+            if !make_whole.spread_bp.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{instrument_name} {side} make-whole spread must be finite, got {} for period [{}, {}]",
+                    make_whole.spread_bp, entry.start, entry.end
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod return_floor_field_tests {
+    use crate::bond::types::return_floor::ReturnFloorSpec;
+
+    #[test]
+    fn bond_roundtrips_return_floor_via_serde() {
+        let mut bond = crate::bond::Bond::example().unwrap();
+        bond.return_floor = Some(ReturnFloorSpec::moic(1.25));
+        let json = serde_json::to_string(&bond).unwrap();
+        assert!(json.contains("return_floor"));
+        let back: crate::bond::Bond = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.return_floor, Some(ReturnFloorSpec::moic(1.25)));
+    }
+
+    #[test]
+    fn bond_omits_return_floor_from_json_when_none() {
+        let bond = crate::bond::Bond::example().unwrap();
+        assert!(bond.return_floor.is_none());
+        let json = serde_json::to_string(&bond).unwrap();
+        assert!(!json.contains("return_floor"));
+    }
+}

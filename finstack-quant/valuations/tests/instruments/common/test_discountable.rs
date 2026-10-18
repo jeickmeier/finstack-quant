@@ -11,7 +11,7 @@ use finstack_quant_core::types::CurveId;
 use rust_decimal_macros::dec;
 use time::Month;
 
-use crate::instruments::common::test_helpers::*;
+use finstack_quant_valuations_test_support::test_helpers::*;
 
 struct FlatCurve {
     id: CurveId,

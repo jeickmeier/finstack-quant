@@ -10,34 +10,8 @@ use finstack_quant_core::contract::{
 use finstack_quant_core::Result;
 use serde::{Deserialize, Serialize};
 
-/// Maximum permitted size of a JSON instrument definition, in bytes.
-///
-/// 16 MiB is far larger than any realistic single-instrument JSON payload
-/// (the largest observed real-world instruments are well under 1 MiB), but
-/// small enough to prevent unbounded allocations from malicious or
-/// accidentally huge inputs.  The capped loaders enforce this limit before
-/// handing bytes to the JSON parser, so a multi-gigabyte input can never
-/// cause an OOM allocation.
-pub const MAX_JSON_BYTES: usize = 16 * 1024 * 1024; // 16 MiB
-
-/// Map bounded loading diagnostics into the ordinary pricing error surface.
-pub(crate) fn instrument_load_error(error: ContractError) -> finstack_quant_core::Error {
-    let message = match error {
-        ContractError::Report(report) if !report.diagnostics.is_empty() => report
-            .diagnostics
-            .iter()
-            .map(|diagnostic| match diagnostic.pointer.as_deref() {
-                Some(pointer) if !pointer.is_empty() => {
-                    format!("{pointer}: {}", diagnostic.message)
-                }
-                _ => diagnostic.message.clone(),
-            })
-            .collect::<Vec<_>>()
-            .join("; "),
-        error => error.to_string(),
-    };
-    finstack_quant_core::Error::Validation(format!("invalid instrument envelope JSON: {message}"))
-}
+pub(crate) use finstack_quant_valuations_core::instruments::envelope::instrument_load_error;
+pub use finstack_quant_valuations_core::instruments::envelope::{InstrumentSchema, MAX_JSON_BYTES};
 
 // Strict callers retain their supplied limits.
 fn decode_json<T: serde::de::DeserializeOwned>(
@@ -45,34 +19,6 @@ fn decode_json<T: serde::de::DeserializeOwned>(
     limits: &LoadLimits,
 ) -> std::result::Result<T, ContractError> {
     deserialize_json_value(parse_json_value(bytes, limits)?, limits)
-}
-
-/// Canonical schema marker for persisted instrument envelopes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub enum InstrumentSchema {
-    /// The sole supported instrument contract.
-    #[serde(rename = "finstack_quant.instrument/1")]
-    Instrument,
-}
-
-impl InstrumentSchema {
-    /// The exact marker required by every persisted instrument envelope.
-    pub const CURRENT: Self = Self::Instrument;
-
-    /// Return the persisted schema marker.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Instrument => "finstack_quant.instrument/1",
-        }
-    }
-}
-
-impl std::fmt::Display for InstrumentSchema {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.as_str())
-    }
 }
 
 /// Versioned envelope for JSON instrument definitions.
@@ -588,6 +534,47 @@ macro_rules! instrument_json_from_any_match {
 
 pub(crate) fn instrument_json_from_any(value: &dyn std::any::Any) -> Option<InstrumentJson> {
     with_instrument_json_registry!(instrument_json_from_any_match, value)
+}
+
+/// The registry-backed tagged union of a runtime instrument.
+///
+/// Recognizes every concrete runtime type in the instrument registry and
+/// clones it into its canonical [`InstrumentJson`] variant. Custom or
+/// otherwise unregistered [`Instrument`] implementations give `None`.
+/// Conversion itself is infallible; serialization of the returned tagged
+/// union may still fail through the serializer used by the caller.
+///
+/// # Arguments
+///
+/// * `instrument` - Runtime instrument to convert; only its concrete type and
+///   contents matter.
+///
+/// # Returns
+///
+/// `Some(InstrumentJson)` for a registered runtime type, or `None` for an
+/// unregistered implementation.
+pub fn instrument_json_of(instrument: &dyn Instrument) -> Option<InstrumentJson> {
+    instrument_json_from_any(instrument.as_any())
+}
+
+/// Market dependencies of a JSON-tagged instrument.
+///
+/// Routes through [`InstrumentJson::into_boxed`] so JSON-loaded instruments
+/// stay on the same dependency path as trait-object pricing.
+///
+/// # Arguments
+///
+/// * `instrument` - Tagged instrument definition; it is validated and boxed
+///   before its dependencies are read.
+///
+/// # Errors
+///
+/// Returns the validation error of the instrument payload or the dependency
+/// error of the runtime instrument.
+pub fn market_dependencies_of(
+    instrument: &InstrumentJson,
+) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+    instrument.clone().into_boxed()?.market_dependencies()
 }
 
 /// Error for a payload whose `type` is not the one the caller asked for.

@@ -182,12 +182,12 @@ The complete set of features across all crates (read from each `Cargo.toml`) is:
 | Crate | Features |
 | --- | --- |
 | `core`, `cashflows`, `valuations` | `json-schema` (default), `jsonschema-validate` (default; implies `json-schema`) |
-| `models`, `calibration`, `portfolio` | `json-schema` (default) |
+| `models`, `calibration`, `portfolio`, `valuations/core` (package `finstack-quant-valuations-core`), `valuations/{rates,fixed-income,structured-credit,credit,equity,fx,exotics}` (packages `finstack-quant-valuations-<family>`) | `json-schema` (default) |
 | `analytics`, `covenants`, `features`, `margin`, `attribution`, `statements`, `statements-analytics`, `scenarios` | `json-schema` (default) |
 | `finstack-quant` (umbrella) | `json-schema` (default), `jsonschema-validate` (default) |
 | `finstack-quant-py` | `extension-module` (PyO3 requirement) |
 | `finstack-quant-wasm` | `contract-generation` (the `generate_contracts` example) |
-| `arrow-interchange`, `test-utils`, `valuations/macros` | none |
+| `arrow-interchange`, `test-utils`, `valuations/macros`, `valuations/test-support` | none |
 
 `json-schema` gates every `schemars::JsonSchema` derive, `core::schema` and the
 `gen_*_schemas` binaries; each downstream crate's `json-schema` forwards to its

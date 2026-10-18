@@ -84,8 +84,9 @@
 //!   (`Instrument`, ...), parameter types, and the `pricing`
 //!   submodule for shared pricing infrastructure used by this crate and by
 //!   `finstack-quant-calibration` (`swap_legs`, overnight conventions, time helpers).
-//! - **Internal**: `common_impl` is crate-private. A few of its modules are
-//!   re-exported through `pricing` and the instrument root.
+//! - **Framework**: the trait, options, parameters and shared kernels are defined in
+//!   `finstack-quant-valuations-core` and re-exported here unchanged; `common_impl` is
+//!   public but hidden from the rendered docs.
 //!
 //! # Supported Instrument Types
 //!
@@ -146,46 +147,24 @@
 //! - Bond-market accrued-interest conventions: `docs/REFERENCES.md#icma-rule-book`
 //! - Fixed-income risk and hedging intuition: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 
-// Common functionality (traits, macros, helpers)
-#[macro_use]
-pub(crate) mod common_impl;
-
-mod marginable;
-
-/// Shared pricing helpers used by this crate and `finstack-quant-calibration`.
-pub mod pricing {
-    pub use super::common_impl::pricing::overnight::default_rate_calendar_id;
-    pub use super::common_impl::pricing::overnight_conventions;
-    pub use super::common_impl::pricing::swap_legs;
-    pub use super::common_impl::pricing::time;
-    #[doc(hidden)]
-    pub use super::common_impl::pricing::GenericInstrumentPricer;
-}
+pub use finstack_quant_valuations_core::instruments::*;
 
 /// Per-flow cashflow export with DF / survival / PV columns.
 ///
 /// See [`cashflow_export::instrument_cashflows`] for the primary entry
 /// point used by the Python and WASM bindings.
-pub mod cashflow_export {
-    pub use super::common_impl::cashflow_export::*;
-}
-
-pub use common_impl::fx_dates::fx_spot_date_for_pair;
-pub use finstack_quant_core::dates::{resolve_calendar, resolve_joint_calendar};
-
-/// Model parameter snapshots used by attribution.
-pub mod model_params;
-
-/// Canonical long/short position direction.
-pub mod position;
-pub use position::Position;
+pub mod cashflow_export;
 
 /// Commodity derivatives.
-pub mod commodity;
+pub mod commodity {
+    pub use finstack_quant_valuations_exotics::commodity::*;
+}
 /// Generic cross-asset composite and synthetic instruments.
 pub mod composite;
 /// Credit derivatives: CDS and related instruments.
-pub mod credit_derivatives;
+pub mod credit_derivatives {
+    pub use finstack_quant_valuations_credit::*;
+}
 /// Equity instruments and equity derivatives.
 pub mod equity;
 /// Exotic and path-dependent options.
@@ -193,9 +172,13 @@ pub mod exotics;
 /// Fixed income instruments: bonds, loans, MBS, and structured products.
 pub mod fixed_income;
 /// FX instruments and FX derivatives.
-pub mod fx;
+pub mod fx {
+    pub use finstack_quant_valuations_fx::*;
+}
 /// Interest rate derivatives and money market instruments.
-pub mod rates;
+pub mod rates {
+    pub use finstack_quant_valuations_rates::*;
+}
 
 pub use fixed_income::{
     AgencyCmo, AgencyMbsPassthrough, AgencyProgram, AgencyTba, AssetBackedFacility, Bond,
@@ -239,11 +222,6 @@ pub use commodity::{
 
 pub use rates::InterestRateFutureOption;
 
-pub use common_impl::listed::{
-    FutureOptionExercise, FutureOptionModel, FutureOptionPremiumStyle, FutureOptionSettlement,
-    FutureOptionTerms, ListedDeliveryObligation, ListedFutureSettlement, ListedFutureTerms,
-};
-
 pub use composite::{
     CompositeExposureReport, CompositeHistoryRow, CompositeInstrument, CompositeLegSpec,
     CompositeMarketObservation, CompositeRebalanceResult, CompositeSpec, CompositeState,
@@ -256,34 +234,8 @@ pub use exotics::{
     LookbackType, RangeAccrual, Snowball, SnowballVariant, Tarn,
 };
 
-mod breakeven;
-pub use breakeven::{BreakevenConfig, BreakevenMode, BreakevenTarget};
-pub use common_impl::dependencies::{
-    FxPair, InstrumentCurves, MarketDependencies, RatesCurveKind, VolatilityDependency,
-};
-pub use common_impl::pricing::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
-pub use common_impl::traits::{
-    Attributes, GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
-    OptionGreeksRequest, PricingOptions,
-};
-
-pub use common_impl::parameters::{
-    BondConvention, CommodityUnderlyingParams, CreditParams, EquityUnderlyingParams, ExerciseStyle,
-    FinancingLegSpec, FixedLegSpec, FloatLegSpec, FxUnderlyingParams, IndexUnderlyingParams,
-    Monitoring, OptionMarketParams, OptionType, PayReceive, PremiumLegSpec, ProtectionLegSpec,
-    QuantoSpec, SettlementType, TotalReturnLegSpec, VolatilityModel,
-};
-
-pub use common_impl::parameters::trs_common::TrsScheduleSpec;
-
-/// Pricing overrides module.
-pub mod pricing_overrides;
-pub use pricing_overrides::{
-    BondRiskBasis, BumpConfig, InstrumentPricingOverrides, MarketQuoteOverrides,
-    MetricPricingOverrides, ModelConfig, ScenarioPricingOverrides, ShortRateTreeModel,
-    ThetaDayBasis,
-};
-
 pub mod json_loader;
 
-pub use json_loader::{registry_tags, InstrumentEnvelope, InstrumentJson};
+pub use json_loader::{
+    instrument_json_of, market_dependencies_of, registry_tags, InstrumentEnvelope, InstrumentJson,
+};

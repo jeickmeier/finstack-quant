@@ -1,0 +1,1573 @@
+//! Zero-coupon Inflation Swap types and pricing implementation.
+
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::CashFlowAccrual;
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
+};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
+use finstack_quant_core::validation;
+use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
+use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use rust_decimal::Decimal;
+
+/// Zero-coupon Inflation Swap instrument.
+///
+/// Represents a zero-coupon inflation swap where one party pays a fixed real rate
+/// and the other receives the cumulative inflation over the swap's life. At maturity:
+///
+/// ```text
+/// Inflation leg = Notional × [CPI(T_mat - Lag) / CPI(T_start - Lag) - 1]
+/// Fixed leg     = Notional × [(1 + fixed_rate)^τ - 1]
+/// ```
+///
+/// # Market Conventions
+///
+/// - **Lag**: Standard 3-month lag for US CPI/EUR HICP; 2-month for UK RPI
+/// - **Day Count**: Standard fixed legs compound annually with 1/1 accrual per period
+/// - **Business Day**: Payment dates adjusted per calendar; index observation typically unadjusted
+///
+/// # Validation
+///
+/// Call [`validate()`](Self::validate) to check structural invariants before pricing.
+#[derive(
+    PartialEq,
+    Clone,
+    Debug,
+    finstack_quant_valuations_macros::FinancialBuilder,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct InflationSwap {
+    /// Unique instrument identifier
+    pub id: InstrumentId,
+    /// Notional in quote currency
+    pub notional: Money,
+    /// Start date of indexation
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub start_date: Date,
+    /// Maturity date
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub maturity: Date,
+    /// Fixed real rate (as decimal)
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub fixed_rate: Decimal,
+    /// Inflation index identifier (e.g., US-CPI-U)
+    pub inflation_index_id: CurveId,
+    /// Discount curve identifier (quote currency)
+    pub discount_curve_id: CurveId,
+    /// Day count for accrual calculation (fixed leg compounding)
+    pub day_count: DayCount,
+    /// Trade side
+    pub side: PayReceive,
+    /// Contractual CPI observation lag; when `None` the index lag, then the
+    /// curve's indexation lag, applies.
+    pub lag: Option<InflationLag>,
+    /// Contractual monthly reference-index interpolation; takes precedence over index metadata;
+    /// without either source the default is monthly step interpolation.
+    pub interpolation: Option<SeriesInterpolation>,
+    /// Explicit Base CPI (reference index level at start with lag applied).
+    /// If not provided, it will be looked up/calculated from start date.
+    pub base_cpi: Option<f64>,
+    /// Business day convention for payment date adjustment.
+    /// Defaults to `Following` if not specified.
+    #[builder(default = BusinessDayConvention::ModifiedFollowing)]
+    #[serde(default = "finstack_quant_valuations_core::serde_defaults::bdc_modified_following")]
+    pub business_day_convention: BusinessDayConvention,
+    /// Holiday calendar identifier for payment date adjustment.
+    /// If not specified, payment dates are used unadjusted.
+    pub calendar_id: Option<CalendarId>,
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides:
+        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+    /// Attributes for scenario selection and tagging
+    pub attributes: Attributes,
+}
+
+impl InflationSwap {
+    /// Create a canonical example zero-coupon inflation swap (US CPI, 5Y).
+    ///
+    /// Returns a 5-year USD inflation swap with standard 3-month CPI lag.
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        use finstack_quant_core::currency::Currency;
+        InflationSwap::builder()
+            .id(InstrumentId::new("INFLSWAP-USD-5Y"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .start_date(time::macros::date!(2024 - 01 - 15))
+            .maturity(time::macros::date!(2029 - 01 - 15))
+            .fixed_rate(Decimal::try_from(0.02).map_err(|e: rust_decimal::Error| {
+                finstack_quant_core::Error::Validation(e.to_string())
+            })?)
+            .inflation_index_id(CurveId::new("US-CPI"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .side(PayReceive::Pay)
+            .lag(InflationLag::Months(3))
+            .business_day_convention(BusinessDayConvention::Following)
+            .attributes(Attributes::new())
+            .build()
+    }
+
+    /// Validate structural invariants of the inflation swap.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `start >= maturity` (invalid date ordering)
+    /// - `notional` is non-positive
+    /// - `base_cpi` is provided but non-positive
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        validation::require_or(
+            self.start_date < self.maturity,
+            finstack_quant_core::InputError::InvalidDateRange,
+        )?;
+        validation::require_or(
+            self.notional.amount() > 0.0,
+            finstack_quant_core::InputError::NonPositiveValue,
+        )?;
+        if let Some(base) = self.base_cpi {
+            validation::require_or(
+                base > 0.0,
+                finstack_quant_core::InputError::NonPositiveValue,
+            )?;
+        }
+        let fixed_rate = self.fixed_rate.as_f64();
+        validation::require_with(fixed_rate > -1.0, || {
+            format!(
+                "InflationSwap fixed_rate ({fixed_rate}) must be greater than -1.0 for geometric compounding"
+            )
+        })?;
+        Ok(())
+    }
+
+    fn effective_lag(&self, curves: &MarketContext) -> InflationLag {
+        finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_inflation_lag(
+            self.lag,
+            self.inflation_index_id.as_str(),
+            curves,
+        )
+    }
+
+    fn cpi_value(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+        date: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let interpolation = self
+            .interpolation
+            .or_else(|| {
+                curves
+                    .get_inflation_index(self.inflation_index_id.as_str())
+                    .ok()
+                    .map(|index| index.interpolation())
+            })
+            .unwrap_or_default();
+        finstack_quant_valuations_core::instruments::common_impl::helpers::reference_inflation_value(
+            curves,
+            self.inflation_index_id.as_str(),
+            date,
+            as_of,
+            self.effective_lag(curves),
+            interpolation,
+        )
+    }
+
+    /// Calculate the projected index ratio I(T_mat - Lag) / I(T_start - Lag).
+    ///
+    /// When using an InflationIndex, the index applies its own lag internally via `value_on()`,
+    /// so we pass unlagged dates. When falling back to the inflation curve, we must apply
+    /// the lag ourselves since the curve works in year fractions from its base date.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Inflation curve is not found
+    /// - Base CPI (start index) is non-positive
+    pub(crate) fn projected_index_ratio(
+        &self,
+        curves: &MarketContext,
+        discount_base: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let i_start = if let Some(base) = self.base_cpi {
+            base
+        } else {
+            self.cpi_value(curves, discount_base, self.start_date)?
+        };
+
+        if !i_start.is_finite() || i_start <= 0.0 {
+            return Err(finstack_quant_core::InputError::NonPositiveValue.into());
+        }
+
+        let i_maturity_projected = self.cpi_value(curves, discount_base, self.maturity)?;
+
+        Ok(i_maturity_projected / i_start)
+    }
+
+    /// Get the adjusted payment date based on business day convention and calendar.
+    ///
+    /// If no calendar is specified, returns the unadjusted date.
+    fn adjusted_payment_date(&self, date: Date) -> finstack_quant_core::Result<Date> {
+        let business_day_convention = self.business_day_convention;
+        if let Some(ref cal_id) = self.calendar_id {
+            use finstack_quant_core::dates::calendar_by_id_strict;
+            let cal = calendar_by_id_strict(cal_id)?;
+            return finstack_quant_core::dates::adjust(date, business_day_convention, cal);
+        }
+        // No calendar specified - return unadjusted (common for inflation swaps)
+        Ok(date)
+    }
+
+    /// Calculate PV of the fixed leg (real rate leg).
+    ///
+    /// The fixed leg pays `Notional × [(1 + fixed_rate)^τ - 1]` at maturity,
+    /// where τ counts the annual contractual periods under 1/1: one for each
+    /// full year, plus a short initial stub as the fraction of the year it
+    /// covers. Other explicitly selected day counts use their full-term year
+    /// fraction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Discount curve is not found
+    /// - Year fraction calculation fails
+    pub fn pv_fixed_leg(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Money> {
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+
+        // Use instrument day count for accrual period
+        let tau_accrual = self.fixed_accrual()?;
+
+        let fixed_rate = self.fixed_rate.as_f64();
+        let fixed_payment = self
+            .notional
+            .checked_mul_f64((1.0 + fixed_rate).powf(tau_accrual) - 1.0)?;
+
+        // Date-based DF from as_of to payment: correct when the curve base
+        // date differs from as_of.
+        let payment_date = self.adjusted_payment_date(self.maturity)?;
+        let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
+
+        fixed_payment.checked_mul_f64(df)
+    }
+
+    /// Compounding term τ of the fixed leg in years.
+    ///
+    /// Under 1/1 every full annual period, rolled back from maturity, counts
+    /// exactly one. A swap whose term is not a whole number of years has a
+    /// short first period; it counts as its share of the annual period that
+    /// ends on the first roll date, so τ is continuous in the maturity date
+    /// (a 5-year-and-one-day swap compounds for 5.003 years, not 6).
+    fn fixed_accrual(&self) -> finstack_quant_core::Result<f64> {
+        if self.day_count != DayCount::OneOne {
+            return self.day_count.year_fraction(
+                self.start_date,
+                self.maturity,
+                DayCountContext::default(),
+            );
+        }
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
+                start: self.start_date,
+                end: self.maturity,
+                frequency: Tenor::annual(),
+                stub: StubKind::ShortFront,
+                business_day_convention: BusinessDayConvention::Unadjusted,
+                calendar_id: finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
+                end_of_month: false,
+                day_count: DayCount::OneOne,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+            },
+        )?;
+        let Some(first) = periods.first() else {
+            return Ok(0.0);
+        };
+        let reference_start = first.accrual_end.add_months(-12)?;
+        let first_fraction = if first.accrual_start <= reference_start {
+            1.0
+        } else {
+            (first.accrual_end - first.accrual_start).whole_days() as f64
+                / (first.accrual_end - reference_start).whole_days() as f64
+        };
+        Ok((periods.len() - 1) as f64 + first_fraction)
+    }
+
+    fn fixed_leg_amount(&self) -> finstack_quant_core::Result<Money> {
+        let tau_accrual = self.fixed_accrual()?;
+        let fixed_rate = self.fixed_rate.as_f64();
+        self.notional
+            .checked_mul_f64((1.0 + fixed_rate).powf(tau_accrual) - 1.0)
+    }
+
+    /// Calculate PV of the inflation leg.
+    ///
+    /// The inflation leg pays `Notional × [I(T_mat - Lag) / I(T_start - Lag) - 1]`
+    /// at maturity, where I(t) is the inflation index value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Discount curve is not found
+    /// - Inflation curve is not found
+    /// - Index ratio calculation fails
+    /// - Year fraction calculation fails
+    pub fn pv_inflation_leg(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Money> {
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        let index_ratio = self.projected_index_ratio(market, as_of)?;
+        let inflation_payment = self.notional.checked_mul_f64(index_ratio - 1.0)?;
+
+        // Date-based DF from as_of to payment: correct when the curve base
+        // date differs from as_of.
+        let payment_date = self.adjusted_payment_date(self.maturity)?;
+        let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
+
+        inflation_payment.checked_mul_f64(df)
+    }
+
+    fn inflation_leg_amount(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Money> {
+        let index_ratio = self.projected_index_ratio(curves, as_of)?;
+        self.notional.checked_mul_f64(index_ratio - 1.0)
+    }
+
+    /// Fixed rate that sets the swap's present value to zero (par real rate / breakeven).
+    ///
+    /// For a zero-coupon inflation swap, the par rate K satisfies:
+    /// ```text
+    /// (1 + K)^τ = I(T_mat - Lag) / I(T_start - Lag)
+    /// K = [I(T_mat - Lag) / I(T_start - Lag)]^(1/τ) - 1
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Index ratio is non-positive
+    /// - Year fraction calculation fails
+    pub fn par_rate(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let index_ratio = self.projected_index_ratio(market, as_of)?;
+
+        if index_ratio <= 0.0 {
+            return Err(finstack_quant_core::InputError::NonPositiveValue.into());
+        }
+
+        let tau = self.fixed_accrual()?;
+        if tau <= 0.0 {
+            return Ok(0.0);
+        }
+
+        Ok(index_ratio.powf(1.0 / tau) - 1.0)
+    }
+
+    /// Raw (unrounded `f64`) present value of the swap from the holder's
+    /// perspective, used by finite-difference metrics (convexity, gamma)
+    /// where Money quantization noise would be amplified by tiny bump sizes.
+    pub fn npv_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+        let payment_date = self.adjusted_payment_date(self.maturity)?;
+        if as_of >= payment_date {
+            return Ok(0.0);
+        }
+
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
+
+        let tau_accrual = self.fixed_accrual()?;
+        let fixed_rate = self.fixed_rate.as_f64();
+        let fixed_pv = self.notional.amount() * ((1.0 + fixed_rate).powf(tau_accrual) - 1.0) * df;
+
+        let index_ratio = self.projected_index_ratio(market, as_of)?;
+        let inflation_pv = self.notional.amount() * (index_ratio - 1.0) * df;
+
+        Ok(match self.side {
+            PayReceive::Receive => fixed_pv - inflation_pv,
+            PayReceive::Pay => inflation_pv - fixed_pv,
+        })
+    }
+}
+
+impl InflationSwapBuilder {}
+
+impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
+    for InflationSwap
+{
+    impl_instrument_base!(
+        finstack_quant_valuations_core::pricer::InstrumentType::InflationSwap,
+        crate::RATES
+    );
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        InflationSwap::validate(self)
+    }
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_inflation_curve(self.inflation_index_id.clone());
+        Ok(deps)
+    }
+
+    fn base_value(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        let payment_date = self.adjusted_payment_date(self.maturity)?;
+        if as_of >= payment_date {
+            return Ok(finstack_quant_core::money::Money::from((
+                0_i64,
+                self.notional.currency(),
+            )));
+        }
+
+        let pv_fixed = self.pv_fixed_leg(curves, as_of)?;
+        let pv_inflation = self.pv_inflation_leg(curves, as_of)?;
+        match self.side {
+            PayReceive::Receive => pv_fixed.checked_sub(pv_inflation),
+            PayReceive::Pay => pv_inflation.checked_sub(pv_fixed),
+        }
+    }
+
+    fn base_value_raw(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
+        self.npv_raw(curves, as_of)
+    }
+
+    fn base_value_raw_with_currency(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
+        Ok((self.npv_raw(curves, as_of)?, self.notional.currency()))
+    }
+
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
+
+    fn last_payment_date(
+        &self,
+        _curves: &MarketContext,
+        _as_of: Date,
+    ) -> finstack_quant_core::Result<Option<Date>> {
+        Ok(Some(self.adjusted_payment_date(self.maturity)?))
+    }
+
+    fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
+        Some(self.maturity)
+    }
+
+    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+}
+
+impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
+    }
+
+    fn raw_cashflow_schedule(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<CashFlowSchedule> {
+        let payment_date = self.adjusted_payment_date(self.maturity)?;
+        let fixed_amount = self.fixed_leg_amount()?;
+        let inflation_amount = self.inflation_leg_amount(curves, as_of)?;
+        let (fixed_signed, inflation_signed) = match self.side {
+            PayReceive::Pay => (-fixed_amount.amount(), inflation_amount.amount()),
+            PayReceive::Receive => (fixed_amount.amount(), -inflation_amount.amount()),
+        };
+        let ccy = self.notional.currency();
+        let accrual_factor = self.fixed_accrual()?;
+        let fixed_rate = self.fixed_rate.as_f64();
+        let inflation_rate = (accrual_factor > 0.0)
+            .then_some(inflation_amount.amount() / self.notional.amount() / accrual_factor);
+        let fixed_flow = CashFlow::new(
+            payment_date,
+            None,
+            Money::new(fixed_signed, ccy)?,
+            CFKind::Fixed,
+            accrual_factor,
+            Some(fixed_rate),
+        )
+        .with_accrual(CashFlowAccrual {
+            coupon_period: None,
+            end_is_termination_date: false,
+            calendar_id: None,
+            start: self.start_date,
+            end: self.maturity,
+            day_count: self.day_count,
+            projected_index_rate: None,
+        });
+        let inflation_flow = CashFlow::new(
+            payment_date,
+            Some(self.start_date),
+            Money::new(inflation_signed, ccy)?,
+            CFKind::InflationCoupon,
+            accrual_factor,
+            inflation_rate,
+        )
+        .with_accrual(CashFlowAccrual {
+            coupon_period: None,
+            end_is_termination_date: false,
+            calendar_id: None,
+            start: self.start_date,
+            end: self.maturity,
+            day_count: self.day_count,
+            projected_index_rate: inflation_rate,
+        });
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
+            vec![fixed_flow, inflation_flow],
+            self.day_count,
+            finstack_quant_cashflows::ScheduleBuildOpts {
+                notional_hint: Some(self.notional),
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
+            },
+        );
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
+    }
+}
+
+// Declare canonical market dependencies for the DV01 calculator.
+/// Year-on-year (YoY) Inflation Swap instrument.
+///
+/// Pays periodic inflation rates (CPI ratios over each period) versus a fixed rate.
+#[derive(
+    PartialEq,
+    Clone,
+    Debug,
+    finstack_quant_valuations_macros::FinancialBuilder,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct YoYInflationSwap {
+    /// Unique instrument identifier
+    pub id: InstrumentId,
+    /// Notional in quote currency
+    pub notional: Money,
+    /// Start date of the first accrual period
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub start_date: Date,
+    /// Maturity date
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub maturity: Date,
+    /// Fixed rate (decimal)
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub fixed_rate: Decimal,
+    /// Payment frequency
+    pub frequency: Tenor,
+    /// Inflation index identifier (e.g., US-CPI-U)
+    pub inflation_index_id: CurveId,
+    /// Discount curve identifier (quote currency)
+    pub discount_curve_id: CurveId,
+    /// Day count for fixed leg accrual calculation
+    pub day_count: DayCount,
+    /// Trade side
+    pub side: PayReceive,
+    /// Contractual CPI observation lag; when `None` the index lag, then the
+    /// curve's indexation lag, applies.
+    pub lag: Option<InflationLag>,
+    /// Contractual monthly reference-index interpolation; takes precedence over index metadata;
+    /// without either source the default is monthly step interpolation.
+    pub interpolation: Option<SeriesInterpolation>,
+    /// Observed contractual reference CPI at start, with lag and interpolation
+    /// already applied. If absent, start CPI must resolve from market observations.
+    pub base_cpi: Option<f64>,
+    /// Business day convention for payment date adjustment.
+    #[builder(default = BusinessDayConvention::ModifiedFollowing)]
+    #[serde(default = "finstack_quant_valuations_core::serde_defaults::bdc_modified_following")]
+    pub business_day_convention: BusinessDayConvention,
+    /// Holiday calendar identifier for payment date adjustment.
+    pub calendar_id: Option<CalendarId>,
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides:
+        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+    /// Attributes for scenario selection and tagging
+    pub attributes: Attributes,
+}
+
+impl YoYInflationSwap {
+    /// Create a canonical example USD 5Y YoY inflation swap (US-CPI, annual payments).
+    ///
+    /// Returns a 5-year pay-fixed YoY inflation swap with 2.5% fixed rate,
+    /// $1M notional, annual frequency, and standard 3-month CPI lag.
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        use finstack_quant_core::currency::Currency;
+
+        YoYInflationSwap::builder()
+            .id(InstrumentId::new("YOYSWAP-USD-5Y"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .start_date(time::macros::date!(2024 - 01 - 15))
+            .maturity(time::macros::date!(2029 - 01 - 15))
+            .fixed_rate(Decimal::try_from(0.025).map_err(|e: rust_decimal::Error| {
+                finstack_quant_core::Error::Validation(e.to_string())
+            })?)
+            .frequency(Tenor::annual())
+            .inflation_index_id(CurveId::new("US-CPI"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .side(PayReceive::Pay)
+            .lag(InflationLag::Months(3))
+            .business_day_convention(BusinessDayConvention::ModifiedFollowing)
+            .attributes(Attributes::new())
+            .build()
+    }
+
+    /// Validate structural invariants of the YoY inflation swap.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        validation::require_or(
+            self.start_date < self.maturity,
+            finstack_quant_core::InputError::InvalidDateRange,
+        )?;
+        validation::require_or(
+            self.notional.amount() > 0.0,
+            finstack_quant_core::InputError::NonPositiveValue,
+        )?;
+        validation::require_or(
+            self.frequency.count() != 0,
+            finstack_quant_core::Error::Validation(
+                "frequency count must be greater than zero".to_string(),
+            ),
+        )?;
+        if self
+            .base_cpi
+            .is_some_and(|cpi| !cpi.is_finite() || cpi <= 0.0)
+        {
+            return Err(finstack_quant_core::InputError::NonPositiveValue.into());
+        }
+        Ok(())
+    }
+
+    fn effective_lag(&self, curves: &MarketContext) -> InflationLag {
+        finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_inflation_lag(
+            self.lag,
+            self.inflation_index_id.as_str(),
+            curves,
+        )
+    }
+
+    fn cpi_value(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+        date: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        if date == self.start_date {
+            if let Some(base) = self.base_cpi {
+                if !base.is_finite() || base <= 0.0 {
+                    return Err(finstack_quant_core::InputError::NonPositiveValue.into());
+                }
+                return Ok(base);
+            }
+        }
+        let interpolation = self
+            .interpolation
+            .or_else(|| {
+                curves
+                    .get_inflation_index(self.inflation_index_id.as_str())
+                    .ok()
+                    .map(|index| index.interpolation())
+            })
+            .unwrap_or_default();
+        finstack_quant_valuations_core::instruments::common_impl::helpers::reference_inflation_value(
+            curves,
+            self.inflation_index_id.as_str(),
+            date,
+            as_of,
+            self.effective_lag(curves),
+            interpolation,
+        )
+    }
+
+    fn schedule(&self) -> finstack_quant_core::Result<Vec<(Date, Date, Date)>> {
+        let business_day_convention = self.business_day_convention;
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
+                start: self.start_date,
+                end: self.maturity,
+                frequency: self.frequency,
+                stub: StubKind::None,
+                business_day_convention,
+                calendar_id: self
+                    .calendar_id
+                    .as_deref()
+                    .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+                end_of_month: false,
+                day_count: self.day_count,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+            },
+        )?;
+
+        if periods.is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "inflation swap schedule produced no periods".to_string(),
+            ));
+        }
+
+        Ok(periods
+            .into_iter()
+            .map(|period| {
+                (
+                    period.accrual_start,
+                    period.accrual_end,
+                    period.payment_date,
+                )
+            })
+            .collect())
+    }
+
+    /// Calculates the raw present value (f64) of the YoY inflation swap.
+    ///
+    /// # Model limitation — no YoY convexity / timing adjustment
+    ///
+    /// The year-on-year inflation leg is valued with the deterministic ratio
+    /// `F(CPI_end) / F(CPI_start) − 1`. Under the payment measure the true
+    /// expectation `E^{T_pay}[CPI(tᵢ)/CPI(tᵢ₋₁)]` differs from
+    /// `F(tᵢ)/F(tᵢ₋₁)` by a convexity/timing correction that depends on
+    /// inflation volatility and the rate–inflation correlation (Brigo-Mercurio
+    /// Ch. 16; Mercurio 2005). This implementation omits that correction, so
+    /// for long-dated YoY swaps it carries a few-bp-to-material bias. Use a
+    /// stochastic-inflation model where that bias is unacceptable.
+    pub fn npv_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        let mut pv = 0.0_f64;
+
+        for (start, end, pay) in self.schedule()? {
+            if pay <= as_of {
+                continue;
+            }
+            let accrual = self
+                .day_count
+                .year_fraction(start, end, DayCountContext::default())?;
+
+            let cpi_start = self.cpi_value(market, as_of, start)?;
+            if cpi_start <= 0.0 {
+                return Err(finstack_quant_core::InputError::NonPositiveValue.into());
+            }
+            let cpi_end = self.cpi_value(market, as_of, end)?;
+
+            let inflation_leg = self.notional.amount() * (cpi_end / cpi_start - 1.0);
+            let fixed_rate = self.fixed_rate.as_f64();
+            let fixed_leg = self.notional.amount() * fixed_rate * accrual;
+
+            let net = match self.side {
+                PayReceive::Pay => inflation_leg - fixed_leg,
+                PayReceive::Receive => fixed_leg - inflation_leg,
+            };
+
+            // Date-based DF from as_of to payment: correct when the curve base
+            // date differs from as_of.
+            let df = disc.as_ref().df_between_dates(as_of, pay)?;
+            pv += net * df;
+        }
+
+        Ok(pv)
+    }
+
+    /// Fixed rate that sets the swap's present value to zero (par rate / breakeven).
+    ///
+    /// For a YoY inflation swap, the par rate K satisfies:
+    /// ```text
+    /// Sum_i [ DF_i × (CPI_i / CPI_{i-1} - 1) ] = Sum_i [ DF_i × K × accrual_i ]
+    ///
+    /// K = Sum_i [ DF_i × (CPI_i / CPI_{i-1} - 1) ] / Sum_i [ DF_i × accrual_i ]
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Discount curve is not found
+    /// - Inflation curve/index is not found
+    /// - Any CPI value is non-positive
+    /// - The annuity (sum of discounted accruals) is zero
+    pub fn par_rate(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+
+        let mut sum_infl_pv = 0.0_f64;
+        let mut sum_annuity = 0.0_f64;
+
+        for (start, end, pay) in self.schedule()? {
+            if pay <= as_of {
+                continue;
+            }
+            let accrual = self
+                .day_count
+                .year_fraction(start, end, DayCountContext::default())?;
+
+            let cpi_start = self.cpi_value(market, as_of, start)?;
+            if cpi_start <= 0.0 {
+                return Err(finstack_quant_core::InputError::NonPositiveValue.into());
+            }
+            let cpi_end = self.cpi_value(market, as_of, end)?;
+
+            let df = disc.as_ref().df_between_dates(as_of, pay)?;
+
+            // Inflation leg contribution: DF × (CPI_end / CPI_start - 1)
+            sum_infl_pv += df * (cpi_end / cpi_start - 1.0);
+
+            // Annuity contribution: DF × accrual
+            sum_annuity += df * accrual;
+        }
+
+        if sum_annuity.abs() < 1e-15 {
+            // Degenerate case: no accrual periods
+            return Ok(0.0);
+        }
+
+        Ok(sum_infl_pv / sum_annuity)
+    }
+
+    fn signed_period_flows(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Vec<CashFlow>> {
+        let mut flows = Vec::new();
+        let fixed_rate = self.fixed_rate.as_f64();
+
+        for (start, end, pay) in self.schedule()? {
+            if pay < as_of {
+                continue;
+            }
+            let accrual = self
+                .day_count
+                .year_fraction(start, end, DayCountContext::default())?;
+            let cpi_start = self.cpi_value(curves, as_of, start)?;
+            if cpi_start <= 0.0 {
+                return Err(finstack_quant_core::InputError::NonPositiveValue.into());
+            }
+            let cpi_end = self.cpi_value(curves, as_of, end)?;
+
+            let fixed_leg = self.notional.amount() * fixed_rate * accrual;
+            let inflation_leg = self.notional.amount() * (cpi_end / cpi_start - 1.0);
+            let inflation_rate = (cpi_end / cpi_start - 1.0) / accrual;
+            let (fixed_signed, inflation_signed) = match self.side {
+                PayReceive::Pay => (-fixed_leg, inflation_leg),
+                PayReceive::Receive => (fixed_leg, -inflation_leg),
+            };
+            let fixed_flow = CashFlow::new(
+                pay,
+                None,
+                Money::new(fixed_signed, self.notional.currency())?,
+                CFKind::Fixed,
+                accrual,
+                Some(fixed_rate),
+            )
+            .with_accrual(CashFlowAccrual {
+                coupon_period: None,
+                end_is_termination_date: false,
+                calendar_id: None,
+                start,
+                end,
+                day_count: self.day_count,
+                projected_index_rate: None,
+            });
+            let inflation_flow = CashFlow::new(
+                pay,
+                Some(start),
+                Money::new(inflation_signed, self.notional.currency())?,
+                CFKind::InflationCoupon,
+                accrual,
+                Some(inflation_rate),
+            )
+            .with_accrual(CashFlowAccrual {
+                coupon_period: None,
+                end_is_termination_date: false,
+                calendar_id: None,
+                start,
+                end,
+                day_count: self.day_count,
+                projected_index_rate: Some(inflation_rate),
+            });
+            flows.push(fixed_flow);
+            flows.push(inflation_flow);
+        }
+
+        Ok(flows)
+    }
+}
+
+impl YoYInflationSwapBuilder {}
+
+impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
+    for YoYInflationSwap
+{
+    impl_instrument_base!(
+        finstack_quant_valuations_core::pricer::InstrumentType::YoYInflationSwap,
+        crate::RATES
+    );
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_inflation_curve(self.inflation_index_id.clone());
+        Ok(deps)
+    }
+
+    fn base_value(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        let pv = self.npv_raw(curves, as_of)?;
+        finstack_quant_core::money::Money::new(pv, self.notional.currency())
+    }
+
+    fn base_value_raw(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
+        self.npv_raw(curves, as_of)
+    }
+
+    fn base_value_raw_with_currency(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
+        Ok((self.npv_raw(curves, as_of)?, self.notional.currency()))
+    }
+
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
+
+    fn last_payment_date(
+        &self,
+        _curves: &MarketContext,
+        _as_of: Date,
+    ) -> finstack_quant_core::Result<Option<Date>> {
+        Ok(self.schedule()?.last().map(|(_, _, payment)| *payment))
+    }
+
+    fn expiry(&self) -> Option<Date> {
+        Some(self.maturity)
+    }
+
+    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+}
+
+impl finstack_quant_cashflows::CashflowScheduleSource for YoYInflationSwap {
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
+    }
+
+    fn raw_cashflow_schedule(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<CashFlowSchedule> {
+        let flows = self.signed_period_flows(curves, as_of)?;
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
+            flows,
+            self.day_count,
+            finstack_quant_cashflows::ScheduleBuildOpts {
+                notional_hint: Some(self.notional),
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
+            },
+        );
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_cashflows::CashflowProvider;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::scalars::InflationIndex;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
+    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use time::Month;
+
+    fn d(year: i32, month: Month, day: u8) -> Date {
+        Date::from_calendar_date(year, month, day).expect("valid date")
+    }
+
+    fn sample_inflation_curve(base_date: Date) -> InflationCurve {
+        InflationCurve::builder("US-CPI")
+            .base_date(base_date)
+            .base_cpi(100.0)
+            .knots([(0.0, 100.0), (1.0, 110.0), (2.0, 121.0)])
+            .build()
+            .expect("inflation curve should build")
+    }
+
+    fn sample_discount_curve(base_date: Date) -> DiscountCurve {
+        DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .knots([(0.0, 1.0), (2.0, 1.0)])
+            .build()
+            .expect("discount curve should build")
+    }
+
+    fn flat_historical_index() -> InflationIndex {
+        InflationIndex::new(
+            "US-CPI",
+            vec![
+                (d(2020, Month::January, 1), 100.0),
+                (d(2030, Month::January, 1), 100.0),
+            ],
+            Currency::USD,
+        )
+        .expect("inflation index should build")
+    }
+
+    fn sample_swap(start_date: Date, maturity: Date) -> InflationSwap {
+        InflationSwap::builder()
+            .id(InstrumentId::new("INFL-SWAP"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .start_date(start_date)
+            .maturity(maturity)
+            .fixed_rate(Decimal::ZERO)
+            .inflation_index_id(CurveId::new("US-CPI"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .side(PayReceive::Pay)
+            .lag(InflationLag::None)
+            .attributes(Attributes::new())
+            .build()
+            .expect("swap should build")
+    }
+
+    #[test]
+    fn inflation_theta_collects_settlement_cash_and_adjusted_final_payment() {
+        use finstack_quant_valuations_core::instruments::PricingOptions;
+        use finstack_quant_valuations_core::metrics::MetricId;
+        use time::macros::date;
+        let as_of = date!(2025 - 01 - 31);
+        let maturity = date!(2025 - 02 - 01);
+        let market = MarketContext::new()
+            .insert(sample_discount_curve(as_of))
+            .insert(
+                InflationCurve::builder("US-CPI")
+                    .base_date(as_of)
+                    .base_cpi(310.0)
+                    .knots([(0.0, 310.0), (1.0, 310.0)])
+                    .indexation_lag_months(0)
+                    .build()
+                    .expect("CPI curve"),
+            )
+            .insert_inflation_index(
+                InflationIndex::new(
+                    "US-CPI",
+                    vec![(date!(2024 - 01 - 01), 300.0), (maturity, 310.0)],
+                    Currency::USD,
+                )
+                .expect("published CPI")
+                .with_lag(InflationLag::None),
+            );
+        let mut swap = sample_swap(date!(2025 - 01 - 01), maturity);
+        swap.base_cpi = Some(300.0);
+        for (calendar, convention, days) in [
+            (None, BusinessDayConvention::Unadjusted, 1.0),
+            (
+                Some("weekends_only".into()),
+                BusinessDayConvention::Following,
+                3.0,
+            ),
+        ] {
+            swap.calendar_id = calendar;
+            swap.business_day_convention = convention;
+            swap.metric_pricing_overrides.theta_period =
+                Some(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Weeks).expect("week"));
+            let result = swap
+                .price_with_metrics(
+                    &market,
+                    as_of,
+                    &[
+                        MetricId::Theta,
+                        MetricId::ThetaCarry,
+                        MetricId::ThetaPeriodDays,
+                    ],
+                    PricingOptions::default(),
+                )
+                .expect("theta");
+            assert!((result.value.amount() - 1_000_000.0 / 30.0).abs() < 1e-8);
+            assert!(result.metric(MetricId::Theta).expect("theta").abs() < 1e-8);
+            assert!(
+                (result.metric(MetricId::ThetaCarry).expect("carry") - result.value.amount()).abs()
+                    < 1e-8
+            );
+            assert_eq!(result.metric(MetricId::ThetaPeriodDays), Some(days));
+        }
+        let mut yoy = YoYInflationSwap::example().expect("YoY swap");
+        yoy.start_date = date!(2024 - 02 - 01);
+        yoy.maturity = maturity;
+        yoy.fixed_rate = Decimal::ZERO;
+        yoy.base_cpi = Some(300.0);
+        yoy.lag = Some(InflationLag::None);
+        yoy.calendar_id = Some("weekends_only".into());
+        yoy.business_day_convention = BusinessDayConvention::Following;
+        yoy.metric_pricing_overrides.theta_period = swap.metric_pricing_overrides.theta_period;
+        let result = yoy
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[
+                    MetricId::Theta,
+                    MetricId::ThetaCarry,
+                    MetricId::ThetaPeriodDays,
+                ],
+                PricingOptions::default(),
+            )
+            .expect("YoY theta");
+        assert!(result.metric(MetricId::Theta).expect("theta").abs() < 1e-8);
+        assert!(
+            (result.metric(MetricId::ThetaCarry).expect("carry") - result.value.amount()).abs()
+                < 1e-8
+        );
+        assert_eq!(result.metric(MetricId::ThetaPeriodDays), Some(3.0));
+    }
+
+    #[test]
+    fn projected_index_ratio_uses_inflation_curve_anchor_date() {
+        let curve_base = d(2024, Month::January, 1);
+        let discount_base = d(2024, Month::June, 1);
+        let start = d(2024, Month::March, 1);
+        let maturity = d(2025, Month::March, 1);
+        let swap = sample_swap(start, maturity);
+        let inflation_curve = sample_inflation_curve(curve_base);
+        let market = MarketContext::new()
+            .insert(sample_discount_curve(discount_base))
+            .insert(inflation_curve.clone())
+            .insert_inflation_index(flat_historical_index());
+
+        let ratio = swap
+            .projected_index_ratio(&market, discount_base)
+            .expect("ratio should compute");
+        let expected = inflation_curve.cpi_on_date(maturity).expect("maturity CPI") / 100.0;
+
+        assert!(
+            (ratio - expected).abs() < 1e-10,
+            "expected ratio {expected}, got {ratio}"
+        );
+    }
+
+    #[test]
+    fn yoy_swap_prices_with_curve_only_market() {
+        let as_of = d(2025, Month::January, 1);
+        let market = MarketContext::new()
+            .insert(sample_discount_curve(as_of))
+            .insert(sample_inflation_curve(as_of));
+        let swap = YoYInflationSwap::builder()
+            .id(InstrumentId::new("YOY-CURVE-ONLY"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .start_date(as_of)
+            .maturity(d(2027, Month::January, 1))
+            .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
+            .frequency(Tenor::annual())
+            .inflation_index_id(CurveId::new("US-CPI"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .side(PayReceive::Pay)
+            .lag(InflationLag::None)
+            .base_cpi(100.0)
+            .attributes(Attributes::new())
+            .build()
+            .expect("yoy swap should build");
+
+        let pv = swap
+            .npv_raw(&market, as_of)
+            .expect("curve-only market should price");
+
+        assert!(pv.is_finite());
+    }
+
+    #[test]
+    fn matured_but_unpaid_swap_retains_value_until_adjusted_payment_date() {
+        let start = d(2024, Month::January, 15);
+        let maturity = d(2025, Month::January, 18);
+        let as_of = d(2025, Month::January, 19);
+        let mut swap = sample_swap(start, maturity);
+        swap.business_day_convention = BusinessDayConvention::Following;
+        swap.calendar_id = Some("nyse".into());
+
+        let market = MarketContext::new()
+            .insert(sample_discount_curve(as_of))
+            .insert(sample_inflation_curve(d(2024, Month::January, 1)))
+            .insert_inflation_index(
+                InflationIndex::new(
+                    "US-CPI",
+                    vec![(start, 100.0), (maturity, 110.0)],
+                    Currency::USD,
+                )
+                .expect("inflation index should build"),
+            );
+
+        let pv = swap.value(&market, as_of).expect("value should compute");
+        assert!(
+            pv.amount().abs() > 0.0,
+            "swap should retain value between contractual maturity and adjusted payment date"
+        );
+    }
+
+    #[test]
+    fn zero_coupon_swap_cashflow_provider_emits_two_maturity_flows() {
+        let as_of = d(2025, Month::January, 1);
+        let maturity = d(2027, Month::January, 1);
+        let market = MarketContext::new()
+            .insert(sample_discount_curve(as_of))
+            .insert(sample_inflation_curve(as_of))
+            .insert_inflation_index(flat_historical_index());
+        let swap = InflationSwap::builder()
+            .id(InstrumentId::new("INFL-CF"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .start_date(as_of)
+            .maturity(maturity)
+            .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
+            .inflation_index_id(CurveId::new("US-CPI"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .side(PayReceive::Pay)
+            .lag(InflationLag::None)
+            .attributes(Attributes::new())
+            .build()
+            .expect("swap should build");
+
+        let flows = swap
+            .dated_cashflows(&market, as_of)
+            .expect("contractual schedule should build");
+        let schedule = swap
+            .cashflow_schedule(&market, as_of)
+            .expect("classified inflation schedule");
+
+        assert_eq!(flows.len(), 2, "zc inflation swap should emit both legs");
+        assert!(flows.iter().all(|(date, _)| *date == maturity));
+        assert!(
+            flows[0].1.amount() < 0.0,
+            "pay-fixed swap should pay fixed leg"
+        );
+        assert!(
+            flows[1].1.amount() > 0.0,
+            "pay-fixed swap should receive inflation leg"
+        );
+        assert_eq!(schedule.get_flows()[0].kind, CFKind::Fixed);
+        assert_eq!(schedule.get_flows()[1].kind, CFKind::InflationCoupon);
+        assert!(schedule
+            .get_flows()
+            .iter()
+            .all(|flow| flow.accrual.is_some()));
+    }
+
+    /// YoY `npv_raw` must discount with DF(as_of → pay) = DF(pay)/DF(as_of)
+    /// (curve-base relative), not DF(yf(as_of, pay)) which silently assumes
+    /// the curve base equals as_of.
+    #[test]
+    fn yoy_npv_raw_discounts_relative_to_as_of_on_rebased_curve() {
+        let curve_base = d(2024, Month::January, 1);
+        let as_of = d(2025, Month::January, 1);
+        let maturity = d(2026, Month::January, 1);
+
+        // Non-trivial DF shape so DF(pay)/DF(as_of) != DF(yf(as_of, pay)).
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(curve_base)
+            .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.88), (3.0, 0.80)])
+            .build()
+            .expect("discount curve should build");
+        // Flat CPI so the inflation leg is exactly zero.
+        let infl = InflationCurve::builder("US-CPI")
+            .base_date(curve_base)
+            .base_cpi(100.0)
+            .knots([(0.0, 100.0), (3.0, 100.0)])
+            .build()
+            .expect("inflation curve should build");
+        let market = MarketContext::new()
+            .insert(disc.clone())
+            .insert(infl)
+            .insert_inflation_index(flat_historical_index());
+
+        let swap = YoYInflationSwap::builder()
+            .id(InstrumentId::new("YOY-REBASE"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .start_date(as_of)
+            .maturity(maturity)
+            .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
+            .frequency(Tenor::annual())
+            .inflation_index_id(CurveId::new("US-CPI"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .side(PayReceive::Receive)
+            .lag(InflationLag::None)
+            .attributes(Attributes::new())
+            .build()
+            .expect("yoy swap should build");
+
+        let pv = swap.npv_raw(&market, as_of).expect("npv should compute");
+
+        // Inflation leg is 0 (flat CPI); fixed leg = N * r * accrual * DF.
+        let accrual = DayCount::Act365F
+            .year_fraction(as_of, maturity, DayCountContext::default())
+            .expect("accrual");
+        let df_expected = disc.df_between_dates(as_of, maturity).expect("relative df");
+        let expected = 1_000_000.0 * 0.02 * accrual * df_expected;
+        assert!(
+            (pv - expected).abs() < 1e-6,
+            "expected relative-DF PV {expected}, got {pv}"
+        );
+
+        // Sanity: the buggy absolute-time DF would differ materially.
+        let t_wrong = DayCount::Act365F
+            .year_fraction(as_of, maturity, DayCountContext::default())
+            .expect("yf");
+        let df_wrong = disc.df(t_wrong);
+        assert!(
+            (df_expected - df_wrong).abs() > 1e-3,
+            "test setup must distinguish the two discounting conventions"
+        );
+    }
+
+    /// Realized CPI fixings dated after `as_of` must not be consulted
+    /// (look-ahead bias): pricing must match the curve-projection PV.
+    #[test]
+    fn yoy_cpi_value_ignores_fixings_after_as_of() {
+        let as_of = d(2025, Month::January, 1);
+        let maturity = d(2026, Month::January, 1);
+
+        let disc = sample_discount_curve(as_of);
+        let infl = InflationCurve::builder("US-CPI")
+            .base_date(as_of)
+            .base_cpi(100.0)
+            .knots([(0.0, 100.0), (2.0, 110.0)])
+            .build()
+            .expect("inflation curve should build");
+
+        let market_no_index = MarketContext::new()
+            .insert(disc.clone())
+            .insert(infl.clone())
+            .insert_inflation_index(flat_historical_index());
+
+        // Index with a *future* fixing wildly different from the curve.
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![(d(2024, Month::December, 1), 100.0), (maturity, 500.0)],
+            Currency::USD,
+        )
+        .expect("index should build");
+        let market_with_future_fixing = MarketContext::new()
+            .insert(disc)
+            .insert(infl)
+            .insert_inflation_index(index);
+
+        let swap = YoYInflationSwap::builder()
+            .id(InstrumentId::new("YOY-LOOKAHEAD"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .start_date(as_of)
+            .maturity(maturity)
+            .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
+            .frequency(Tenor::annual())
+            .inflation_index_id(CurveId::new("US-CPI"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .side(PayReceive::Pay)
+            .lag(InflationLag::None)
+            .attributes(Attributes::new())
+            .build()
+            .expect("yoy swap should build");
+
+        let pv_clean = swap
+            .npv_raw(&market_no_index, as_of)
+            .expect("clean pv should compute");
+        let pv_with_future = swap
+            .npv_raw(&market_with_future_fixing, as_of)
+            .expect("pv with future fixing should compute");
+
+        assert!(
+            (pv_clean - pv_with_future).abs() < 1e-6,
+            "future-dated fixings must not affect PV (look-ahead bias): \
+             clean={pv_clean}, with_future_fixing={pv_with_future}"
+        );
+    }
+
+    #[test]
+    fn yoy_swap_cashflow_provider_emits_two_flows_per_period() {
+        let as_of = d(2025, Month::January, 1);
+        let market = MarketContext::new()
+            .insert(sample_discount_curve(as_of))
+            .insert(sample_inflation_curve(as_of))
+            .insert_inflation_index(flat_historical_index());
+        let swap = YoYInflationSwap::builder()
+            .id(InstrumentId::new("YOY-CF"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .start_date(as_of)
+            .maturity(d(2027, Month::January, 1))
+            .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
+            .frequency(Tenor::annual())
+            .inflation_index_id(CurveId::new("US-CPI"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .side(PayReceive::Pay)
+            .lag(InflationLag::None)
+            .attributes(Attributes::new())
+            .build()
+            .expect("yoy swap should build");
+
+        let flows = swap
+            .dated_cashflows(&market, as_of)
+            .expect("yoy contractual schedule should build");
+        let schedule = swap
+            .cashflow_schedule(&market, as_of)
+            .expect("classified yoy schedule");
+
+        assert_eq!(
+            flows.len(),
+            4,
+            "two annual periods should emit fixed and inflation rows"
+        );
+        assert_eq!(
+            flows
+                .iter()
+                .filter(|(_, money)| money.amount() < 0.0)
+                .count(),
+            2
+        );
+        assert_eq!(
+            flows
+                .iter()
+                .filter(|(_, money)| money.amount() > 0.0)
+                .count(),
+            2
+        );
+        assert_eq!(
+            schedule
+                .get_flows()
+                .iter()
+                .filter(|flow| flow.kind == CFKind::Fixed)
+                .count(),
+            2
+        );
+        assert_eq!(
+            schedule
+                .get_flows()
+                .iter()
+                .filter(|flow| flow.kind == CFKind::InflationCoupon)
+                .count(),
+            2
+        );
+        assert!(schedule
+            .get_flows()
+            .iter()
+            .all(|flow| flow.accrual.is_some()));
+    }
+}

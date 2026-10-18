@@ -48,8 +48,11 @@ pub fn calculate_var(
         _ => VarConfig::default(),
     };
     let model = js_opt_string(model.as_ref(), "model")?;
-    let dispatch =
-        PricingDispatch::from_model(model.as_deref().unwrap_or("default")).map_err(to_js_err)?;
+    let dispatch = PricingDispatch::from_model(
+        model.as_deref().unwrap_or("default"),
+        finstack_quant_valuations::pricer::STANDARD.shared_pricers(),
+    )
+    .map_err(to_js_err)?;
     let refs: Vec<_> = parsed.iter().map(|p| p.as_ref()).collect();
     let result = finstack_quant_valuations::metrics::risk::calculate_var(
         &refs,

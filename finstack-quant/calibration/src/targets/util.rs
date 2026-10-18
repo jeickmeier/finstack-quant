@@ -8,6 +8,7 @@ use crate::constants::{OrderedF64, TOLERANCE_DUP_KNOTS, WEIGHT_MIN_FLOOR};
 use crate::quotes::rates::RateQuote;
 use crate::quotes::vol::VolQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::dividends::DividendKind;
@@ -17,8 +18,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 use finstack_quant_models::rates::clock::model_time_on_curve;
-use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
-use finstack_quant_valuations::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 

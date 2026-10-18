@@ -537,8 +537,8 @@ mod tests {
 
     #[test]
     fn structured_credit_default_claim_is_paid_once_without_repeating_historical_loss() {
+        use finstack_quant_cashflows::builder::RateSpec;
         use finstack_quant_core::{currency::Currency, money::Money};
-        use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
         use time::macros::date;
 
         let fixture = structured_credit_fixture();

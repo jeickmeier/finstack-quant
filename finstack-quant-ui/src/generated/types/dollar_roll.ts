@@ -372,9 +372,9 @@ export interface D_118A287E0C7Ff970F2Af {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
- * use finstack_quant_valuations::instruments::fixed_income::tba::TbaTerm;
- * use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyProgram;
+ * use finstack_quant_valuations_fixed_income::dollar_roll::DollarRoll;
+ * use finstack_quant_valuations_fixed_income::tba::TbaTerm;
+ * use finstack_quant_valuations_fixed_income::mbs_passthrough::AgencyProgram;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::money::Money;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -460,7 +460,7 @@ export interface D_05625Cf1Aa46E3810Fc5 {
    * financing rate `(DF(front)/DF(back) − 1)/τ` over the front/back
    * settlement interval, with `τ` on ACT/360.
    * The implied financing rate itself is determined by prices and carry.
-   * See the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]
+   * See the carry calculations (see [`crate::dollar_roll::carry`]
    * module). Does **not** affect
    * the mark-to-market PV, which always discounts both legs at
    * `discount_curve_id`.
@@ -853,7 +853,7 @@ export interface DCdb8Fddc0106047270C4 {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */

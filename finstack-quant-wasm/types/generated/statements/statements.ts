@@ -801,7 +801,7 @@ export type CashflowRepresentation = "contractual" | "projected" | "placeholder"
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */
@@ -1337,7 +1337,7 @@ export type FinancialStatementInstrument =
  * same ratio accretion — the pricer implements both variants through the
  * single ratio-accretion mechanism. Accretion composes multiplicatively on
  * top of any anti-dilution adjustments from
- * [`ConvertibleBond::effective_conversion_ratio`].
+ * `ConvertibleBond::effective_conversion_ratio`.
  */
 export type DividendAdjustment = "none" | "adjust_price" | "adjust_ratio";
 /**
@@ -1470,8 +1470,8 @@ export type UpfrontFee =
  * Contractual coupon of a loan facility or note: a fixed all-in rate or a
  * floating index plus spread.
  *
- * Shared by `TermLoan.rate`, `RevolvingCredit.rate`, `AssetBackedFacility.rate`
- * and structured-credit `Tranche.coupon`.
+ * Shared by the valuations term loan, revolving credit facility, asset-backed
+ * facility and structured-credit tranche coupons.
  */
 export type RateSpec =
   | {
@@ -2184,7 +2184,7 @@ export interface BalanceSheetArticulation {
  * and custom cashflow schedule overrides. Uses a clean `CashflowSpec` that wraps
  * the canonical builder coupon specs for maximum flexibility and parity.
  *
- * [`crate::instruments::Instrument::value`] is the **dirty NPV at `as_of`**,
+ * [`finstack_quant_valuations_core::instruments::Instrument::value`] is the **dirty NPV at `as_of`**,
  * not the market dirty quote at settlement. Quoted YTM, z-spread, and DM
  * remain settlement-anchored.
  */
@@ -3829,8 +3829,8 @@ export interface VarConfig {
  *
  * **Call-protection only**: the floor applies to EARLY issuer redemptions
  * within the [`ProtectionWindow`] and never at maturity. The held-to-maturity
- * path is unfloored. Use [`crate::metrics::MetricId::MoicToWorst`] /
- * [`crate::metrics::MetricId::XirrToWorst`] to see the honest worst-case
+ * path is unfloored. Use [`finstack_quant_valuations_core::metrics::MetricId::MoicToWorst`] /
+ * [`finstack_quant_valuations_core::metrics::MetricId::XirrToWorst`] to see the honest worst-case
  * return across all paths including the unfloored maturity path.
  *
  * # Mathematical Foundation
@@ -5302,7 +5302,7 @@ export interface ScheduledFee {
  *
  * # Pricing
  *
- * Implements [`Instrument::value()`](crate::instruments::common_impl::traits::Instrument::value)
+ * Implements [`Instrument::value()`](finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::value)
  * using deterministic cashflow discounting. PIK interest is capitalized and excluded from PV.
  *
  * # Invariants

@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 rust-version = "1.97.1"
 authors = ["Jon Eickmeier (me@jeickmeier.com)"]
@@ -19,7 +19,16 @@ members = [
     "finstack-quant/statements",
     "finstack-quant/statements-analytics",
     "finstack-quant/valuations",
+    "finstack-quant/valuations/core",
+    "finstack-quant/valuations/fixed-income",
+    "finstack-quant/valuations/structured-credit",
+    "finstack-quant/valuations/rates",
+    "finstack-quant/valuations/equity",
+    "finstack-quant/valuations/credit",
+    "finstack-quant/valuations/exotics",
+    "finstack-quant/valuations/fx",
     "finstack-quant/valuations/macros",
+    "finstack-quant/valuations/test-support",
     "finstack-quant/features",
     "finstack-quant/portfolio",
     "finstack-quant/scenarios",
@@ -44,6 +53,14 @@ default-members = [
     "finstack-quant/statements",
     "finstack-quant/statements-analytics",
     "finstack-quant/valuations",
+    "finstack-quant/valuations/core",
+    "finstack-quant/valuations/fixed-income",
+    "finstack-quant/valuations/structured-credit",
+    "finstack-quant/valuations/rates",
+    "finstack-quant/valuations/equity",
+    "finstack-quant/valuations/credit",
+    "finstack-quant/valuations/exotics",
+    "finstack-quant/valuations/fx",
     "finstack-quant/features",
     "finstack-quant/portfolio",
     "finstack-quant/scenarios",
@@ -55,7 +72,7 @@ default-members = [
 # Coverage configuration: only run on core Rust library, not bindings
 exclude = ["finstack-quant-py", "finstack-quant-wasm"]
 # Additional patterns to exclude from coverage reports
-ignore-filename-regex = ["tests?/", "target/", "\\.cargo/", ".*finstack-quant-py/.*", ".*finstack-quant-wasm/.*"]
+ignore-filename-regex = ["tests?/", "test-support/", "target/", "\\.cargo/", ".*finstack-quant-py/.*", ".*finstack-quant-wasm/.*"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
