@@ -80,6 +80,7 @@
 //!
 //! - Metric and sensitivity interpretation: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 
+pub mod composite;
 pub(crate) mod dataframe;
 mod provenance;
 pub mod structured_credit;

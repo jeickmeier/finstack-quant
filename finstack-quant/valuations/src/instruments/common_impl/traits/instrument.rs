@@ -816,25 +816,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         None
     }
 
-    /// Convert this instrument to its JSON representation for serialization.
-    ///
-    /// Converts this instrument to the registry-backed
-    /// [`InstrumentJson`](crate::instruments::InstrumentJson) tagged union.
-    ///
-    /// The default implementation recognizes every concrete runtime type in the
-    /// instrument registry and clones it into its canonical tagged-union variant.
-    /// Custom or otherwise unregistered [`Instrument`] implementations return
-    /// `None`. Conversion itself is infallible; serialization of the returned
-    /// tagged union may still fail through the serializer used by the caller.
-    ///
-    /// # Returns
-    ///
-    /// `Some(InstrumentJson)` for a registered runtime type, or `None` for an
-    /// unregistered implementation.
-    fn to_instrument_json(&self) -> Option<crate::instruments::InstrumentJson> {
-        crate::instruments::json_loader::instrument_json_from_any(self.as_any())
-    }
-
     /// Whether valuation includes cash payable on the valuation date.
     ///
     /// The default is start-of-day valuation (`date >= as_of`). Instruments
@@ -958,6 +939,46 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     fn with_bumped_fx_quote(&self, relative: f64) -> Option<Box<dyn Instrument>> {
         let _ = relative;
         None
+    }
+
+    /// Value the instrument's legs and report their details, for an
+    /// instrument composed of other instruments.
+    ///
+    /// Metric enrichment calls this before the generic calculators. A
+    /// composite prices each leg with `metrics` through `options`, aggregates
+    /// the additive measures over its holdings and returns the per-leg detail
+    /// for the result envelope; the generic path is then skipped, and the
+    /// details are attached even when `metrics` is empty. The default is
+    /// `Ok(None)`: the instrument is valued as one unit.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market the legs are priced in.
+    /// * `as_of` - Valuation date, already resolved through the pricing
+    ///   lifecycle.
+    /// * `metrics` - Metric identifiers requested for the instrument as a
+    ///   whole, in caller order.
+    /// * `options` - Pricing options forwarded to each leg; they carry the
+    ///   pricer and metric registries the instrument itself was priced with.
+    ///
+    /// # Returns
+    ///
+    /// The aggregated measures keyed by metric, with the structured details to
+    /// attach to the valuation result.
+    fn composite_valuation(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        metrics: &[MetricId],
+        options: PricingOptions,
+    ) -> finstack_quant_core::Result<
+        Option<(
+            indexmap::IndexMap<MetricId, f64>,
+            crate::results::ValuationDetails,
+        )>,
+    > {
+        let _ = (market, as_of, metrics, options);
+        Ok(None)
     }
 
     /// Rebuild the instrument for a rate scenario when its projected

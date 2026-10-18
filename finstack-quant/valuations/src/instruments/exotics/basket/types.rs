@@ -335,11 +335,9 @@ impl Instrument for Basket {
         deps.add_discount_curve(self.discount_curve_id.clone());
         for constituent in &self.constituents {
             match &constituent.reference {
-                ConstituentReference::Instrument(instrument) => deps.merge(
-                    crate::instruments::common_impl::dependencies::MarketDependencies::from_instrument_json(
-                        instrument,
-                    )?,
-                ),
+                ConstituentReference::Instrument(instrument) => {
+                    deps.merge(crate::instruments::market_dependencies_of(instrument)?)
+                }
                 ConstituentReference::MarketData { price_id, .. } => {
                     deps.add_market_scalar_id(price_id.as_str());
                 }

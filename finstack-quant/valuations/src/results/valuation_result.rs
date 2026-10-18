@@ -20,7 +20,7 @@ use indexmap::IndexMap;
 #[serde(tag = "type", content = "data", rename_all = "snake_case")]
 pub enum ValuationDetails {
     /// Recursive leg valuation and primitive exposure detail for a composite.
-    Composite(crate::instruments::CompositeValuationDetails),
+    Composite(super::composite::CompositeValuationDetails),
     /// Credit-derivative pricing metadata.
     CreditDerivative(CreditDerivativeValuationDetails),
     /// Scenario-waterfall structured credit stochastic pricing result.

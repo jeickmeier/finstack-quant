@@ -286,4 +286,6 @@ pub use pricing_overrides::{
 
 pub mod json_loader;
 
-pub use json_loader::{registry_tags, InstrumentEnvelope, InstrumentJson};
+pub use json_loader::{
+    instrument_json_of, market_dependencies_of, registry_tags, InstrumentEnvelope, InstrumentJson,
+};

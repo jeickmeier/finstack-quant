@@ -15,7 +15,7 @@ use std::sync::Arc;
 pub(super) struct EnrichmentRequest<'a> {
     pub(super) instrument: &'a dyn Instrument,
     pub(super) model: ModelKey,
-    pub(super) market: Arc<MarketContext>,
+    pub(super) market: &'a MarketContext,
     pub(super) as_of: Date,
     pub(super) metrics: &'a [MetricId],
     pub(super) cfg: Option<Arc<FinstackConfig>>,
@@ -44,27 +44,29 @@ pub(super) fn enrich(
     } = request;
     let err_ctx = PricingErrorContext::from_instrument(instrument).model(model);
 
-    if let Some(composite) = instrument
-        .as_any()
-        .downcast_ref::<crate::instruments::CompositeInstrument>()
+    let leg_options = crate::instruments::PricingOptions {
+        config: cfg.clone(),
+        market_history: market_history.clone(),
+        model: None,
+        registry: Some(Arc::clone(&pricer_registry)),
+        metric_registry: metric_registry.clone(),
+        recalibration_provider: recalibration_provider.clone(),
+        explain: finstack_quant_core::explain::ExplainOpts::disabled(),
+        instrument_validated: false,
+    };
+    if let Some((metric_measures, details)) = instrument
+        .composite_valuation(market, as_of, metrics, leg_options)
+        .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?
     {
-        let options = crate::instruments::PricingOptions {
-            config: cfg,
-            market_history,
-            model: None,
-            registry: Some(Arc::clone(&pricer_registry)),
-            metric_registry,
-            recalibration_provider,
-            explain: finstack_quant_core::explain::ExplainOpts::disabled(),
-            instrument_validated: false,
-        };
-        let (metric_measures, details) = composite
-            .valuation_details_with_metrics(market.as_ref(), as_of, metrics, options)
-            .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?;
-        base_result.details = Some(crate::results::ValuationDetails::Composite(details));
+        base_result.details = Some(details);
         attach_metric_measures(&mut base_result, metric_measures);
         return Ok(base_result);
     }
+
+    if metrics.is_empty() {
+        return Ok(base_result);
+    }
+    let market = Arc::new(market.clone());
 
     if model == ModelKey::Discounting || !instrument.has_custom_metrics_equivalent() {
         let metric_measures = compute_metrics_dyn(

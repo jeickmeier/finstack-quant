@@ -5,6 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use finstack_quant_valuations::instruments::instrument_json_of;
 use finstack_quant_valuations::instruments::json_loader::{instrument_registry, registry_tags};
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use serde::Deserialize;
@@ -661,7 +662,7 @@ fn every_registered_instrument_satisfies_persistence_contract() {
             first_runtime
                 .validate_for_pricing()
                 .unwrap_or_else(|error| panic!("{tag}: semantic validation failed: {error}"));
-            let runtime_json = first_runtime.to_instrument_json().unwrap_or_else(|| {
+            let runtime_json = instrument_json_of(first_runtime.as_ref()).unwrap_or_else(|| {
                 panic!("{tag}: runtime instrument is not registry-serializable")
             });
             let runtime_value = serde_json::to_value(runtime_json).unwrap_or_else(|error| {

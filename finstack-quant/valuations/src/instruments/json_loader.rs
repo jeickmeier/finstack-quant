@@ -590,6 +590,47 @@ pub(crate) fn instrument_json_from_any(value: &dyn std::any::Any) -> Option<Inst
     with_instrument_json_registry!(instrument_json_from_any_match, value)
 }
 
+/// The registry-backed tagged union of a runtime instrument.
+///
+/// Recognizes every concrete runtime type in the instrument registry and
+/// clones it into its canonical [`InstrumentJson`] variant. Custom or
+/// otherwise unregistered [`Instrument`] implementations give `None`.
+/// Conversion itself is infallible; serialization of the returned tagged
+/// union may still fail through the serializer used by the caller.
+///
+/// # Arguments
+///
+/// * `instrument` - Runtime instrument to convert; only its concrete type and
+///   contents matter.
+///
+/// # Returns
+///
+/// `Some(InstrumentJson)` for a registered runtime type, or `None` for an
+/// unregistered implementation.
+pub fn instrument_json_of(instrument: &dyn Instrument) -> Option<InstrumentJson> {
+    instrument_json_from_any(instrument.as_any())
+}
+
+/// Market dependencies of a JSON-tagged instrument.
+///
+/// Routes through [`InstrumentJson::into_boxed`] so JSON-loaded instruments
+/// stay on the same dependency path as trait-object pricing.
+///
+/// # Arguments
+///
+/// * `instrument` - Tagged instrument definition; it is validated and boxed
+///   before its dependencies are read.
+///
+/// # Errors
+///
+/// Returns the validation error of the instrument payload or the dependency
+/// error of the runtime instrument.
+pub fn market_dependencies_of(
+    instrument: &InstrumentJson,
+) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+    instrument.clone().into_boxed()?.market_dependencies()
+}
+
 /// Error for a payload whose `type` is not the one the caller asked for.
 ///
 /// Shared by every generated `TryFrom<InstrumentJson>` impl, so each typed

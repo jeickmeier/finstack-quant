@@ -4,8 +4,6 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::{CurveId, PriceId};
 use smallvec::SmallVec;
 
-use crate::instruments::json_loader::InstrumentJson;
-
 /// Collection of curves used by an instrument, categorized by market role.
 #[derive(Default, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -322,14 +320,6 @@ impl MarketDependencies {
         for id in other.series_ids {
             self.add_series_id(id);
         }
-    }
-
-    /// Build dependencies from a JSON-tagged instrument representation.
-    ///
-    /// Routes through `InstrumentJson::into_boxed` so JSON-loaded instruments
-    /// stay on the same dependency path as trait-object pricing.
-    pub fn from_instrument_json(instrument: &InstrumentJson) -> finstack_quant_core::Result<Self> {
-        instrument.clone().into_boxed()?.market_dependencies()
     }
 }
 

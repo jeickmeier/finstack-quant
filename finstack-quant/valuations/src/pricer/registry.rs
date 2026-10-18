@@ -477,14 +477,10 @@ impl PricerRegistry {
             );
         }
 
-        if metrics.is_empty() && instrument.key() != InstrumentType::Composite {
-            return Ok(base_result);
-        }
-
         super::enrichment::enrich(super::enrichment::EnrichmentRequest {
             instrument,
             model,
-            market: Arc::new(market.clone()),
+            market,
             as_of: effective_as_of,
             metrics,
             cfg,

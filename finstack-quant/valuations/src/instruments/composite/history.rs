@@ -272,11 +272,11 @@ fn composite_cashflows_between(
     let amounts = primitives
         .iter()
         .map(|primitive| {
-            let instrument_json = primitive.instrument.as_ref().ok_or_else(|| {
+            let primitive_instrument = primitive.instrument.as_deref().ok_or_else(|| {
                 Error::Internal("primitive exposure lost its runtime instrument".to_string())
             })?;
             cashflows_between(
-                instrument_json,
+                primitive_instrument,
                 primitive.quantity,
                 instrument.spec.reporting_currency,
                 market,

@@ -5,6 +5,7 @@ use crate::error::{Error, Result};
 use crate::types::{AttributeValue, EntityId, PositionId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::instrument_json_of;
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -509,7 +510,7 @@ impl Position {
     /// A serializable `PositionSpec` carrying tags, metadata, and an optional
     /// instrument payload.
     pub fn to_spec(&self) -> PositionSpec {
-        let instrument_spec = self.instrument.to_instrument_json();
+        let instrument_spec = instrument_json_of(self.instrument.as_ref());
 
         PositionSpec {
             position_id: self.position_id.clone(),

@@ -6,10 +6,11 @@ use super::reporting::CompositeRebalanceResult;
 use super::spec_support::{
     convert_amount, leg_index, normalized_scores, sample_std_dev, unit_pnl_series,
     validate_history, CompositeLegSpec, CompositeMarketObservation, CompositeState, RebalanceRule,
-    ResolvedCompositeLeg, WeightingMethod, MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS, MIN_ABS_INPUT,
+    WeightingMethod, MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS, MIN_ABS_INPUT,
 };
 use crate::instruments::{Attributes, InstrumentEnvelope, InstrumentJson, PricingOptions};
 use crate::metrics::{is_additive_metric, MetricId};
+use crate::results::composite::ResolvedCompositeLeg;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::expr::{CompiledExpr, Expr, SimpleContext};

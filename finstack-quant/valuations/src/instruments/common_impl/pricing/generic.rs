@@ -83,10 +83,8 @@ where
         })?;
 
         let mut result = ValuationResult::stamped(typed_instrument.id(), as_of, pv);
-        if typed_instrument.key() != crate::pricer::InstrumentType::Composite {
-            if let Some(details) = typed_instrument.valuation_details(market, as_of) {
-                result = result.with_details(details);
-            }
+        if let Some(details) = typed_instrument.valuation_details(market, as_of) {
+            result = result.with_details(details);
         }
         Ok(result)
     }

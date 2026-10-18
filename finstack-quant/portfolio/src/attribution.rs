@@ -23,6 +23,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::instrument_json_of;
 use finstack_quant_valuations::instruments::{CompositeInstrument, Instrument, PricingOptions};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -350,16 +351,19 @@ fn attribute_composite_primitives(
     aggregate.residual = Money::from((0_i64, reporting_currency));
 
     for exposure in composite.flatten_primitives().map_err(Error::Core)? {
-        let definition = exposure.instrument_definition().ok_or_else(|| {
-            Error::valuation(
-                composite.id(),
-                finstack_quant_core::error::ErrorKind::Computation,
-                format!(
-                    "primitive path '{}' lost its embedded definition",
-                    exposure.path.join("/")
-                ),
-            )
-        })?;
+        let definition = exposure
+            .instrument()
+            .and_then(instrument_json_of)
+            .ok_or_else(|| {
+                Error::valuation(
+                    composite.id(),
+                    finstack_quant_core::error::ErrorKind::Computation,
+                    format!(
+                        "primitive path '{}' lost its embedded definition",
+                        exposure.path.join("/")
+                    ),
+                )
+            })?;
         let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> =
             Arc::from(definition.clone().into_boxed().map_err(Error::Core)?);
         let value_t0 = instrument.value(market_t0, as_of_t0).map_err(Error::Core)?;

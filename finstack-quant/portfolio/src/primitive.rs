@@ -12,6 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::composite::CompositeInstrument;
+use finstack_quant_valuations::instruments::instrument_json_of;
 use finstack_quant_valuations::instruments::{InstrumentEnvelope, PricingOptions};
 use finstack_quant_valuations::metrics::{is_additive_metric, MetricId};
 use indexmap::IndexMap;
@@ -173,8 +174,8 @@ fn position_primitive_report(
         let mut paths = Vec::with_capacity(report.paths.len());
         let mut definitions = Vec::with_capacity(report.paths.len());
         for exposure in report.paths {
-            if let Some(definition) = exposure.instrument_definition() {
-                definitions.push((exposure.instrument_id.clone(), definition.clone()));
+            if let Some(definition) = exposure.instrument().and_then(instrument_json_of) {
+                definitions.push((exposure.instrument_id.clone(), definition));
             }
             let value = convert_to_base(
                 exposure.value,
@@ -205,7 +206,7 @@ fn position_primitive_report(
         return Ok(PositionPrimitiveReport { paths, definitions });
     }
 
-    let definition = position.instrument.to_instrument_json().ok_or_else(|| {
+    let definition = instrument_json_of(position.instrument.as_ref()).ok_or_else(|| {
         Error::valuation(
             position.position_id.clone(),
             finstack_quant_core::error::ErrorKind::Validation,
