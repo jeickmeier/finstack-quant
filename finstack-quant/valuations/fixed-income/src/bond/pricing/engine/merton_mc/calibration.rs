@@ -10,8 +10,6 @@ use crate::bond::pricing::quote_conversions::{
 };
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::types::Bond;
-use crate::bond::CashflowSpec;
-use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{InputError, Result};
@@ -42,32 +40,13 @@ pub struct MertonMcCalibrationOutput {
 ///   converted to cash coupons on the clone; the caller's bond is never
 ///   mutated and floating coupon specifications are rejected.
 pub fn cash_equivalent_bond(bond: &Bond) -> Result<Bond> {
-    fn cashify_spec(spec: &CashflowSpec) -> Result<CashflowSpec> {
-        Ok(match spec {
-            CashflowSpec::Fixed(fixed) => {
-                let mut f = fixed.clone();
-                f.coupon_type = CouponType::Cash;
-                CashflowSpec::Fixed(f)
-            }
-            CashflowSpec::Floating(_) => {
-                return Err(finstack_quant_core::Error::Validation(
-                    "Merton MC calibration supports fixed and step-up coupons only".to_string(),
-                ))
-            }
-            CashflowSpec::StepUp(s) => {
-                let mut s = s.clone();
-                s.coupon_type = CouponType::Cash;
-                CashflowSpec::StepUp(s)
-            }
-            CashflowSpec::Amortizing { base, schedule } => CashflowSpec::Amortizing {
-                base: Box::new(cashify_spec(base.as_ref())?),
-                schedule: schedule.clone(),
-            },
-        })
+    if bond.cashflow_spec.floating_rate_spec().is_some() {
+        return Err(finstack_quant_core::Error::Validation(
+            "Merton MC calibration supports fixed and step-up coupons only".to_string(),
+        ));
     }
-
     let mut b = bond.clone();
-    b.cashflow_spec = cashify_spec(&b.cashflow_spec)?;
+    b.cashflow_spec.make_cash_pay();
     Ok(b)
 }
 

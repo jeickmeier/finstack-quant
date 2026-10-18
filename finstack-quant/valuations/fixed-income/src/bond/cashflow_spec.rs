@@ -598,6 +598,24 @@ impl CashflowSpec {
         }
     }
 
+    /// Convert the coupon leg to pay entirely in cash.
+    ///
+    /// Sets `coupon_type` to [`CouponType::Cash`] on the fixed, floating or
+    /// step-up coupon spec (the base spec for amortizing bonds), so PIK and
+    /// split coupons no longer capitalize into principal. Rates, schedules
+    /// and amortization are unchanged.
+    ///
+    /// [`CouponType::Cash`]: finstack_quant_cashflows::builder::CouponType::Cash
+    pub(crate) fn make_cash_pay(&mut self) {
+        use finstack_quant_cashflows::builder::CouponType;
+        match self {
+            Self::Fixed(spec) => spec.coupon_type = CouponType::Cash,
+            Self::Floating(spec) => spec.coupon_type = CouponType::Cash,
+            Self::StepUp(spec) => spec.coupon_type = CouponType::Cash,
+            Self::Amortizing { base, .. } => base.make_cash_pay(),
+        }
+    }
+
     /// Floating-rate terms of the coupon leg, when it is floating (directly or
     /// as the base of an amortizing spec).
     pub(crate) fn floating_rate_spec(
