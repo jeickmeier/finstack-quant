@@ -8,7 +8,6 @@ from pathlib import Path
 
 from . import registries
 from .lexer import (
-    crate_directory,
     _crate_relative,
     _inline_module_spans,
     _mask_disabled_inline_modules,
@@ -16,6 +15,7 @@ from .lexer import (
     _module_for_file,
     _parse_unit_declarations,
     _SourceUnit,
+    crate_directory,
 )
 from .models import (
     CAPABILITIES,
