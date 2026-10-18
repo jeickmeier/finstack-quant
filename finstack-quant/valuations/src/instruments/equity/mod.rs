@@ -69,69 +69,17 @@
 //! - [`VarianceSwap`] for variance/volatility swaps
 //! - [`Autocallable`] for structured notes
 //! - [`PrivateMarketsFund`] for PE/credit fund valuation
+//!
+//! The family lives in `finstack-quant-valuations-equity` and is re-exported
+//! here unchanged. [`real_estate`] stays in this crate: `RealEstateFinancing`
+//! holds `Bond`, `TermLoan`, `RevolvingCredit` and `Repo` legs from other
+//! families, so it registers with [`STANDARD`](crate::pricer::STANDARD) rather
+//! than with [`EQUITY`](finstack_quant_valuations_equity::EQUITY).
 
-/// Explicit stochastic model policy for path-dependent equity structures.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum EquityPathModel {
-    /// Piecewise GBM calibrated to the ATM-forward total-variance term
-    /// structure. This model does not represent strike skew or smile and must
-    /// be selected explicitly as an approximation.
-    AtmTermGbm,
-}
+pub use finstack_quant_valuations_equity::*;
 
-/// Autocallable module - Autocallable structured notes.
-pub mod autocallable;
-/// Cliquet option module - Cliquet/ratchet options.
-pub mod cliquet_option;
-/// DCF equity module - Discounted cash flow for equity (renamed from dcf).
-pub mod dcf_equity;
-pub(crate) mod dividend01;
-/// Exchange-listed equity, equity-index, and fixed-currency quanto futures.
-pub mod equity_future;
-/// Exchange-listed options on equity futures.
-pub mod equity_future_option;
-/// Equity option module - Vanilla equity options.
-pub mod equity_option;
-/// Exchange-listed equity and equity-index total-return futures.
-pub mod equity_total_return_future;
-/// Equity TRS module - Equity total return swaps.
-pub mod equity_trs;
-/// PE fund module - Private equity/markets funds (renamed from private_markets_fund).
-pub mod pe_fund;
-/// Shared piecewise-constant GBM process and forward-vol/rate bootstrap for the
-/// equity path-dependent MC pricers (cliquet, autocallable).
-pub(crate) mod piecewise_gbm;
-/// Real estate module - Real estate asset valuation.
+/// Real estate assets and levered real-estate equity.
 pub mod real_estate;
-/// Equity spot module - Equity spot positions.
-pub mod spot;
-/// Variance swap module - Variance and volatility swaps.
-pub mod variance_swap;
-/// Volatility index future module.
-pub mod vol_index_future;
-/// Exchange-listed options on volatility-index futures.
-pub mod vol_index_future_option;
-
-mod family;
-pub use family::EQUITY;
-
-pub use autocallable::{Autocallable, FinalPayoffType};
-pub use cliquet_option::CliquetOption;
-pub use dcf_equity::{DiscountedCashFlow, TerminalValueSpec};
-pub use equity_future::EquityFuture;
-pub use equity_future_option::EquityFutureOption;
-pub use equity_option::{
-    EquityOption, EquityOptionExercise, EquityOptionMarketData, EquityOptionParams,
-};
-pub use equity_total_return_future::EquityTotalReturnFuture;
-pub use equity_trs::{EquityTotalReturnSwap, TrsDividendSettlement};
-pub use pe_fund::PrivateMarketsFund;
 pub use real_estate::{
     LeveredRealEstateEquity, RealEstateAsset, RealEstateFinancing, RealEstateValuationMethod,
 };
-pub use spot::Equity;
-pub use variance_swap::{EquityPriceSeriesPolicy, VarianceSwap};
-pub use vol_index_future::VolatilityIndexFuture;
-pub use vol_index_future_option::VolatilityIndexFutureOption;

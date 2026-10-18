@@ -1,0 +1,264 @@
+//! Rough Heston semi-analytical pricer via Fourier inversion.
+//!
+//! Uses the fractional Riccati solver from `finstack_quant_models::volatility::rough_heston`
+//! to price European equity options under the rough Heston model (El Euch & Rosenbaum 2019).
+//! Model parameters are sourced from required market scalars.
+
+use super::pricing::{
+    collect_inputs, reject_future_discrete_dividends_for_stochastic_vol, require_european,
+    resolve_lifecycle_value,
+};
+use super::types::EquityOption;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
+use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::pricer::expect_inst;
+use finstack_quant_valuations_core::pricer::PricingError;
+
+/// Equity option rough Heston semi-analytical pricer (Fourier inversion).
+///
+/// Prices European options by solving the fractional Riccati ODE for the
+/// characteristic function and performing numerical Fourier inversion via the
+/// Lewis (2000) single-integral formula.
+///
+/// Rough Heston parameters are read from required market scalars:
+///
+/// | Scalar Key | Description |
+/// |---|---|
+/// | `ROUGH_HESTON_V0` | Initial variance |
+/// | `ROUGH_HESTON_KAPPA` | Mean reversion speed |
+/// | `ROUGH_HESTON_THETA` | Long-run variance |
+/// | `ROUGH_HESTON_SIGMA_V` | Vol-of-vol |
+/// | `ROUGH_HESTON_RHO` | Spot-vol correlation |
+/// | `ROUGH_HESTON_HURST` | Hurst exponent |
+pub(crate) struct EquityOptionRoughHestonFourierPricer;
+
+impl EquityOptionRoughHestonFourierPricer {
+    /// Create a new rough Heston Fourier pricer.
+    pub(crate) fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for EquityOptionRoughHestonFourierPricer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonFourierPricer {
+    fn key(&self) -> finstack_quant_valuations_core::pricer::PricerKey {
+        finstack_quant_valuations_core::pricer::PricerKey::new(
+            finstack_quant_valuations_core::pricer::InstrumentType::EquityOption,
+            finstack_quant_valuations_core::pricer::ModelKey::RoughHestonFourier,
+        )
+    }
+
+    #[tracing::instrument(
+        name = "equity_option.rough_heston_fourier.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(inst_id = %instrument.id(), as_of = %as_of),
+        err,
+    )]
+    fn price_dyn(
+        &self,
+        instrument: &dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<finstack_quant_valuations_core::results::ValuationResult, PricingError>
+    {
+        let equity_option = expect_inst::<EquityOption>(
+            instrument,
+            finstack_quant_valuations_core::pricer::InstrumentType::EquityOption,
+        )?;
+        if let Some(pv) =
+            resolve_lifecycle_value(equity_option, market, as_of).map_err(|error| {
+                finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
+                    error.to_string(),
+                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
+                        equity_option,
+                    )
+                    .model(finstack_quant_valuations_core::pricer::ModelKey::RoughHestonFourier),
+                )
+            })?
+        {
+            return Ok(
+                finstack_quant_valuations_core::results::ValuationResult::stamped(
+                    equity_option.id(),
+                    as_of,
+                    pv,
+                ),
+            );
+        }
+        require_european(equity_option, "Rough Heston Fourier").map_err(|e| {
+            finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
+                e.to_string(),
+                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
+                    equity_option,
+                ),
+            )
+        })?;
+
+        reject_future_discrete_dividends_for_stochastic_vol(
+            equity_option,
+            as_of,
+            finstack_quant_valuations_core::pricer::ModelKey::RoughHestonFourier,
+            "rough Heston Fourier",
+        )?;
+
+        let inputs = collect_inputs(equity_option, market, as_of).map_err(|e| {
+            finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
+                e.to_string(),
+                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
+                    equity_option,
+                )
+                .model(finstack_quant_valuations_core::pricer::ModelKey::RoughHestonFourier),
+            )
+        })?;
+        let (spot, r, q, _sigma, t) = (inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol);
+
+        if t <= 0.0 {
+            let intrinsic = match equity_option.option_type {
+                OptionType::Call => (spot - equity_option.strike).max(0.0),
+                OptionType::Put => (equity_option.strike - spot).max(0.0),
+            };
+            return Ok(finstack_quant_valuations_core::results::ValuationResult::stamped(
+                equity_option.id(),
+                as_of,
+                Money::new(intrinsic * equity_option.quantity, equity_option.currency).map_err(
+                    |error| {
+                        finstack_quant_valuations_core::pricer::PricingError::from_core(
+                            error,
+                            finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(equity_option),
+                        )
+                    },
+                )?,
+            ));
+        }
+
+        let err_ctx = finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
+            equity_option,
+        )
+        .model(finstack_quant_valuations_core::pricer::ModelKey::RoughHestonFourier);
+
+        // Source production rough-Heston parameters from explicit market scalars.
+        let s = crate::equity_option::rough_heston_market::RoughHestonScalars::from_market_strict(
+            market,
+        )
+        .map_err(|e| {
+            finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
+        })?;
+
+        let params =
+            finstack_quant_models::volatility::rough_heston::RoughHestonFourierParams::new(
+                s.v0, s.kappa, s.theta, s.sigma_v, s.rho, s.hurst,
+            )
+            .map_err(|e| {
+                finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx)
+            })?;
+
+        let is_call = matches!(equity_option.option_type, OptionType::Call);
+        let price = params.price_european(spot, equity_option.strike, r, q, t, is_call);
+
+        let pv = Money::new(price * equity_option.quantity, equity_option.currency).map_err(
+            |error| {
+                finstack_quant_valuations_core::pricer::PricingError::from_core(
+                    error,
+                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
+                        equity_option,
+                    ),
+                )
+            },
+        )?;
+        Ok(
+            finstack_quant_valuations_core::results::ValuationResult::stamped(
+                equity_option.id(),
+                as_of,
+                pv,
+            ),
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::market_data::scalars::MarketScalar;
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_valuations_core::instruments::common_impl::parameters::ExerciseStyle;
+    use finstack_quant_valuations_core::instruments::{Attributes, SettlementType};
+    use finstack_quant_valuations_core::pricer::Pricer;
+    use time::Month;
+
+    fn date(year: i32, month: u8, day: u8) -> Date {
+        Date::from_calendar_date(year, Month::try_from(month).expect("month"), day)
+            .expect("valid date")
+    }
+
+    fn market(as_of: Date) -> MarketContext {
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+            .build()
+            .expect("curve");
+        let surface = VolSurface::builder("SPX-VOL")
+            .expiries(&[1.0])
+            .strikes(&[100.0])
+            .row(&[0.20])
+            .build()
+            .expect("surface");
+        MarketContext::new()
+            .insert(curve)
+            .insert_surface(surface)
+            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
+            .insert_price("ROUGH_HESTON_V0", MarketScalar::Unitless(0.04))
+            .insert_price("ROUGH_HESTON_KAPPA", MarketScalar::Unitless(2.0))
+            .insert_price("ROUGH_HESTON_THETA", MarketScalar::Unitless(0.04))
+            .insert_price("ROUGH_HESTON_SIGMA_V", MarketScalar::Unitless(0.3))
+            .insert_price("ROUGH_HESTON_RHO", MarketScalar::Unitless(-0.7))
+            .insert_price("ROUGH_HESTON_HURST", MarketScalar::Unitless(0.1))
+    }
+
+    fn option(expiry: Date) -> EquityOption {
+        EquityOption::builder()
+            .id(InstrumentId::new("EQ-OPT-ROUGH-TEST"))
+            .underlying_ticker("SPX".to_string())
+            .strike(100.0)
+            .option_type(OptionType::Call)
+            .exercise_style(ExerciseStyle::European)
+            .expiry(expiry)
+            .quantity(100.0)
+            .currency(Currency::USD)
+            .day_count(DayCount::Act365F)
+            .settlement(SettlementType::Cash)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .spot_id("SPX-SPOT".into())
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .attributes(Attributes::new())
+            .build()
+            .expect("equity option")
+    }
+
+    #[test]
+    fn rough_heston_fourier_rejects_future_discrete_dividend() {
+        let as_of = date(2025, 1, 1);
+        let mut inst = option(date(2026, 1, 1));
+        inst.discrete_dividends = vec![(date(2025, 7, 1), 2.0)];
+
+        let err = EquityOptionRoughHestonFourierPricer::new()
+            .price_dyn(&inst, &market(as_of), as_of)
+            .expect_err("rough Heston Fourier must reject discrete dividends");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("discrete dividends"),
+            "unexpected error message: {msg}"
+        );
+    }
+}

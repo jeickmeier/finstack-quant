@@ -141,10 +141,6 @@ mod equity_option;
 #[path = "instruments/trs/mod.rs"]
 mod trs;
 
-/// Variance swap tests - Volatility derivatives
-#[path = "instruments/variance_swap/mod.rs"]
-mod variance_swap;
-
 // FX Derivatives
 
 /// FX forward tests - Outright FX forward contracts
@@ -204,17 +200,9 @@ mod real_estate;
 
 // Structured Products
 
-/// Autocallable tests - Path-dependent structured notes with early redemption
-#[path = "instruments/autocallable/mod.rs"]
-mod autocallable;
-
 /// Convertible bond tests - Bonds with embedded conversion options
 #[path = "instruments/convertible/mod.rs"]
 mod convertible;
-
-/// Private market fund tests - Private equity and credit fund structures
-#[path = "instruments/private_market_fund/mod.rs"]
-mod private_market_fund;
 
 /// Structured credit tests - CLOs, CDOs, and synthetic structures
 #[path = "instruments/structured_credit/mod.rs"]

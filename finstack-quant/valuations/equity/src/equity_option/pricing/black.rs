@@ -1,0 +1,581 @@
+//! Black–Scholes / tree pricing and cash greeks for equity options.
+
+use super::inputs::{
+    collect_inputs, early_exercise_market_params, escrowed_spot_drho, future_dividends,
+    resolve_lifecycle_value,
+};
+use crate::equity_option::types::EquityOption;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
+use finstack_quant_core::Result;
+use finstack_quant_models::closed_form::vanilla::{bs_greeks_unchecked, bs_price_unchecked};
+use finstack_quant_models::trees::binomial_tree::BinomialTree;
+use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
+use finstack_quant_valuations_core::instruments::common_impl::parameters::{
+    OptionMarketParams, OptionType,
+};
+use finstack_quant_valuations_core::instruments::{ExerciseStyle, SettlementType};
+use finstack_quant_valuations_core::pricer::expect_inst;
+
+/// Present value using Black–Scholes; result currency is the instrument currency.
+pub(crate) fn compute_pv(
+    inst: &EquityOption,
+    curves: &MarketContext,
+    as_of: Date,
+) -> Result<Money> {
+    if let Some(value) = resolve_lifecycle_value(inst, curves, as_of)? {
+        return Ok(value);
+    }
+    let ccy = inst.currency;
+    let unit_price = match inst.exercise_style {
+        ExerciseStyle::European => {
+            let super::inputs::EquityOptionInputs {
+                spot,
+                r,
+                q,
+                sigma,
+                t_vol: t,
+            } = collect_inputs(inst, curves, as_of)?;
+            bs_price_unchecked(spot, inst.strike, r, q, sigma, t, inst.option_type)
+        }
+        ExerciseStyle::American => {
+            let steps = inst
+                .instrument_pricing_overrides
+                .model_config
+                .tree_steps
+                .unwrap_or(201);
+            let tree = BinomialTree::leisen_reimer(steps);
+            let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
+            if dividends.is_empty() {
+                tree.price_american(&params)?
+            } else {
+                tree.price_american_with_discrete_dividends(&params, &dividends)?
+            }
+        }
+        ExerciseStyle::Bermudan => {
+            let schedule = inst.exercise_dates.as_ref().ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "Bermudan equity option requires exercise_dates".to_string(),
+                )
+            })?;
+            let steps = inst
+                .instrument_pricing_overrides
+                .model_config
+                .tree_steps
+                .unwrap_or(201);
+            let tree = BinomialTree::leisen_reimer(steps);
+            let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
+            let exercise_times: Vec<f64> = schedule
+                .iter()
+                .filter_map(|date| {
+                    let year_fraction = inst
+                        .day_count
+                        .year_fraction(as_of, *date, Default::default())
+                        .ok()?;
+                    (year_fraction > 0.0 && year_fraction <= params.time_to_expiry)
+                        .then_some(year_fraction)
+                })
+                .collect();
+            if exercise_times.is_empty() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Bermudan equity option has no exercise dates remaining after valuation date"
+                        .to_string(),
+                ));
+            }
+            if dividends.is_empty() {
+                tree.price_bermudan(&params, &exercise_times)?
+            } else {
+                tree.price_bermudan_with_discrete_dividends(&params, &exercise_times, &dividends)?
+            }
+        }
+    };
+
+    let unit_price = finstack_quant_models::closed_form::checked_closed_form_value(
+        unit_price,
+        "equity option unit price",
+    )?;
+    Money::new(unit_price * inst.quantity, ccy)
+}
+/// Cash greeks for an equity option (scaled by contract size; vega per 1% vol,
+/// rho per 1bp).
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct EquityOptionGreeks {
+    /// Delta: sensitivity to underlying price (scaled by contract size)
+    pub delta: f64,
+    /// Gamma: rate of change of delta with respect to underlying price
+    pub gamma: f64,
+    /// Vega: sensitivity to 1% change in volatility
+    pub vega: f64,
+    /// Theta: smooth time decay per reporting day. European cash-dividend
+    /// theta holds each remaining cashflow's zero yield fixed and excludes
+    /// the discontinuous spot change on an ex-dividend date.
+    pub theta: f64,
+    /// Rho: PV change per 1bp (0.0001) move in the risk-free rate, in currency
+    pub rho: f64,
+}
+
+/// Compute greeks consistent with the pricing inputs.
+///
+/// Uses proper day count handling:
+/// - Rate lookups use the discount curve's day count
+/// - Vol time uses the configured model day count (ACT/365F by default)
+///
+/// European theta holds spot, volatility, and the current zero yield for each
+/// remaining cashflow fixed while shortening model times. Cash-dividend theta
+/// excludes the ex-date jump, which belongs in a dated scenario revaluation.
+pub(crate) fn compute_greeks(
+    inst: &EquityOption,
+    curves: &MarketContext,
+    as_of: Date,
+) -> Result<EquityOptionGreeks> {
+    if let Some(lifecycle_value) = resolve_lifecycle_value(inst, curves, as_of)? {
+        if inst.quantity == 0.0 {
+            return Ok(EquityOptionGreeks::default());
+        }
+        let delta = match (inst.exercise, inst.settlement) {
+            (Some(exercise), SettlementType::Physical)
+                if exercise.exercised && as_of <= exercise.settlement_date =>
+            {
+                let has_discrete_dividend = inst
+                    .discrete_dividends
+                    .iter()
+                    .any(|(date, _)| *date > as_of && *date <= exercise.settlement_date);
+                let carry = if has_discrete_dividend {
+                    1.0
+                } else {
+                    let q = if let Some(dividend_yield_id) = &inst.div_yield_id {
+                        match curves.get_price(dividend_yield_id.as_str())? {
+                            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(
+                                value,
+                            ) => *value,
+                            finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => {
+                                return Err(finstack_quant_core::Error::Validation(format!(
+                                    "Dividend yield '{}' must be unitless",
+                                    dividend_yield_id
+                                )));
+                            }
+                        }
+                    } else {
+                        0.0
+                    };
+                    let t = year_fraction(inst.day_count, as_of, exercise.settlement_date)?;
+                    (-q * t).exp()
+                };
+                let direction = match inst.option_type {
+                    OptionType::Call => 1.0,
+                    OptionType::Put => -1.0,
+                };
+                direction * carry * inst.quantity
+            }
+            _ => 0.0,
+        };
+        let mut rho = 0.0;
+        let mut theta = 0.0;
+        if let Some(exercise) = inst
+            .exercise
+            .filter(|e| e.exercised && as_of < e.settlement_date)
+        {
+            let disc = curves.get_discount(inst.discount_curve_id.as_str())?;
+            let t = year_fraction(inst.day_count, as_of, exercise.settlement_date)?;
+            let df = disc.df_between_dates(as_of, exercise.settlement_date)?;
+            let r = -df.ln() / t;
+            let days = inst.metric_pricing_overrides.theta_days_per_year();
+            match inst.settlement {
+                SettlementType::Cash => {
+                    rho = -t * lifecycle_value.amount() * 1e-4;
+                    theta = r * lifecycle_value.amount() / days;
+                }
+                SettlementType::Physical => {
+                    let direction = if inst.option_type == OptionType::Call {
+                        1.0
+                    } else {
+                        -1.0
+                    };
+                    let strike_pv = inst.strike * df;
+                    let mut rate_exposure = t * strike_pv;
+                    let mut time_exposure = -r * strike_pv;
+                    let dividends: Vec<_> = inst
+                        .discrete_dividends
+                        .iter()
+                        .filter(|(date, _)| *date > as_of && *date <= exercise.settlement_date)
+                        .collect();
+                    if dividends.is_empty() {
+                        let spot = finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+                            curves.get_price(&inst.spot_id)?,
+                            inst.currency,
+                        )?;
+                        let prepaid =
+                            lifecycle_value.amount() / (inst.quantity * direction) + strike_pv;
+                        let q = -(prepaid / spot).ln() / t;
+                        time_exposure -= q * prepaid;
+                    } else {
+                        for (date, amount) in dividends {
+                            let dt = year_fraction(inst.day_count, as_of, *date)?;
+                            let dividend_df = disc.df_between_dates(as_of, *date)?;
+                            let pv = amount * dividend_df;
+                            rate_exposure += dt * pv;
+                            time_exposure += dividend_df.ln() / dt * pv;
+                        }
+                    }
+                    rho = direction * inst.quantity * rate_exposure * 1e-4;
+                    theta = direction * inst.quantity * time_exposure / days;
+                }
+            }
+        }
+        return Ok(EquityOptionGreeks {
+            delta,
+            rho,
+            theta,
+            ..Default::default()
+        });
+    }
+    let inputs = collect_inputs(inst, curves, as_of)?;
+    let (spot, r, q, sigma, t) = (inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol);
+
+    if t <= 0.0 {
+        // At expiry, delta is the step function of the payoff.
+        // ATM (spot == strike) uses the convention 0.5 / -0.5,
+        // consistent with QuantLib and Bloomberg.
+        let strike = inst.strike;
+        let delta_unit = match inst.option_type {
+            OptionType::Call => {
+                if spot > strike {
+                    1.0
+                } else if (spot - strike).abs() < 1e-12 * strike.abs().max(1.0) {
+                    0.5
+                } else {
+                    0.0
+                }
+            }
+            OptionType::Put => {
+                if spot < strike {
+                    -1.0
+                } else if (spot - strike).abs() < 1e-12 * strike.abs().max(1.0) {
+                    -0.5
+                } else {
+                    0.0
+                }
+            }
+        };
+        let scale = inst.quantity;
+        return Ok(EquityOptionGreeks {
+            delta: delta_unit * scale,
+            ..Default::default()
+        });
+    }
+
+    match inst.exercise_style {
+        ExerciseStyle::European => {
+            let greeks_unit = bs_greeks_unchecked(
+                spot,
+                inst.strike,
+                r,
+                q,
+                sigma,
+                t,
+                inst.option_type,
+                inst.metric_pricing_overrides.theta_days_per_year(),
+            );
+
+            // Escrowed-dividend rho correction.
+            //
+            // Under the escrowed-dividend model the BS inputs use the adjusted
+            // spot `S* = S − Σ D_i·e^{−r·t_i}`, which itself depends on `r`.
+            // `bs_greeks` computes rho holding `S*` fixed, so it misses the
+            // `∂V/∂S* · ∂S*/∂r` chain-rule term. Total rho is
+            // rho_total = rho_BS(S*) + delta(S*) · ∂S*/∂r,
+            // expressed per 1% rate move (hence the `ONE_PERCENT` factor:
+            // `greeks_unit.rho_r` is per-1%, while `delta` and `∂S*/∂r` are
+            // per-unit). The result is rescaled to per 1bp below.
+            let (rho_pct, theta) = {
+                let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
+                let future_divs = future_dividends(inst, disc_curve.as_ref(), as_of)?;
+                if future_divs.is_empty() {
+                    (greeks_unit.rho_r, greeks_unit.theta)
+                } else {
+                    // `future_divs` already contains each dividend's PV.
+                    let ds_star_dr = escrowed_spot_drho(0.0, &future_divs);
+                    const ONE_PERCENT: f64 = 0.01;
+                    let rho_pct = greeks_unit.rho_r + greeks_unit.delta * ds_star_dr * ONE_PERCENT;
+
+                    // Smooth calendar theta also differentiates S* = S - PV(D).
+                    // Hold each dividend's own zero yield fixed as its remaining
+                    // time shrinks: dS*/dt = -sum(z_i * PV(D_i)). This reduces to
+                    // -r * PV(D) for a flat curve, with no ex-date jump included.
+                    let mut dividend_carry = 0.0;
+                    for &(ex_date, amount) in &inst.discrete_dividends {
+                        if ex_date > as_of && ex_date <= inst.expiry {
+                            let t_div = year_fraction(inst.day_count, as_of, ex_date)?;
+                            if t_div > 0.0 {
+                                let df = disc_curve.df_between_dates(as_of, ex_date)?;
+                                let zero_yield = -df.ln() / t_div;
+                                dividend_carry += zero_yield * amount * df;
+                            }
+                        }
+                    }
+                    let theta = greeks_unit.theta
+                        - greeks_unit.delta * dividend_carry
+                            / inst.metric_pricing_overrides.theta_days_per_year();
+                    (rho_pct, theta)
+                }
+            };
+
+            let scale = inst.quantity;
+            Ok(EquityOptionGreeks {
+                delta: greeks_unit.delta * scale,
+                gamma: greeks_unit.gamma * scale,
+                vega: greeks_unit.vega * scale,
+                theta: theta * scale,
+                rho: rho_pct * scale / 100.0,
+            })
+        }
+        ExerciseStyle::American => {
+            let steps = inst
+                .instrument_pricing_overrides
+                .model_config
+                .tree_steps
+                .unwrap_or(201);
+            let tree = BinomialTree::leisen_reimer(steps);
+            let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
+            let price_fn = |market_params: &OptionMarketParams| -> Result<f64> {
+                let elapsed = params.time_to_expiry - market_params.time_to_expiry;
+                let dividends: Vec<_> = dividends
+                    .iter()
+                    .filter_map(|(time, amount)| {
+                        let remaining = time - elapsed;
+                        (remaining > 0.0).then_some((remaining, *amount))
+                    })
+                    .collect();
+                if dividends.is_empty() {
+                    tree.price_american(market_params)
+                } else {
+                    tree.price_american_with_discrete_dividends(market_params, &dividends)
+                }
+            };
+            tree_finite_difference_greeks(
+                &params,
+                inst.quantity,
+                inst.metric_pricing_overrides.theta_days_per_year(),
+                price_fn,
+            )
+        }
+        ExerciseStyle::Bermudan => {
+            let schedule = inst.exercise_dates.as_ref().ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "Bermudan equity option requires exercise_dates".to_string(),
+                )
+            })?;
+            let steps = inst
+                .instrument_pricing_overrides
+                .model_config
+                .tree_steps
+                .unwrap_or(201);
+            let tree = BinomialTree::leisen_reimer(steps);
+            let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
+            let exercise_times: Vec<f64> = schedule
+                .iter()
+                .filter_map(|date| {
+                    let year_fraction = inst
+                        .day_count
+                        .year_fraction(as_of, *date, Default::default())
+                        .ok()?;
+                    (year_fraction > 0.0 && year_fraction <= params.time_to_expiry)
+                        .then_some(year_fraction)
+                })
+                .collect();
+            if exercise_times.is_empty() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Bermudan equity option has no exercise dates remaining after valuation date"
+                        .to_string(),
+                ));
+            }
+            let price_fn = |market_params: &OptionMarketParams| -> Result<f64> {
+                let elapsed = params.time_to_expiry - market_params.time_to_expiry;
+                let dividends: Vec<_> = dividends
+                    .iter()
+                    .filter_map(|(time, amount)| {
+                        let remaining = time - elapsed;
+                        (remaining > 0.0).then_some((remaining, *amount))
+                    })
+                    .collect();
+                let exercise_times: Vec<_> = exercise_times
+                    .iter()
+                    .filter_map(|time| {
+                        let remaining = time - elapsed;
+                        (remaining > 0.0).then_some(remaining)
+                    })
+                    .collect();
+                if dividends.is_empty() {
+                    tree.price_bermudan(market_params, &exercise_times)
+                } else {
+                    tree.price_bermudan_with_discrete_dividends(
+                        market_params,
+                        &exercise_times,
+                        &dividends,
+                    )
+                }
+            };
+            tree_finite_difference_greeks(
+                &params,
+                inst.quantity,
+                inst.metric_pricing_overrides.theta_days_per_year(),
+                price_fn,
+            )
+        }
+    }
+}
+
+fn tree_finite_difference_greeks(
+    params: &OptionMarketParams,
+    scale: f64,
+    theta_days_per_year: f64,
+    mut price_fn: impl FnMut(&OptionMarketParams) -> Result<f64>,
+) -> Result<EquityOptionGreeks> {
+    let base_price = price_fn(params)?;
+
+    // Delta: small 1%-of-spot central bump (accuracy-limited; the first
+    // difference's noise is O(ε_tree / h), so a small bump is fine).
+    let h_s = params.spot * 0.01;
+    let mut p_up = params.clone();
+    p_up.spot += h_s;
+    let price_up = price_fn(&p_up)?;
+    let mut p_dn = params.clone();
+    p_dn.spot -= h_s;
+    let price_dn = price_fn(&p_dn)?;
+
+    let delta_unit = (price_up - price_dn) / (2.0 * h_s);
+
+    // LR adapts its lattice to spot and strike. A bounded 2%-5% spot
+    // stencil resolves curvature without spanning most of the payoff domain
+    // at high volatility. Both spot evaluations remain strictly positive.
+    let gamma_unit = {
+        let vol_t = params.volatility * params.time_to_expiry.sqrt();
+        let h_g = params.spot * (0.1 * vol_t).clamp(0.02, 0.05);
+        let mut up = params.clone();
+        let mut down = params.clone();
+        up.spot += h_g;
+        down.spot -= h_g;
+        (price_fn(&up)? - 2.0 * base_price + price_fn(&down)?) / (h_g * h_g)
+    };
+
+    // Vega (1% vol bump)
+    let h_v = 0.01;
+    let mut p_v_up = params.clone();
+    p_v_up.volatility += h_v;
+    let price_v_up = price_fn(&p_v_up)?;
+    let mut p_v_dn = params.clone();
+    p_v_dn.volatility = (p_v_dn.volatility - h_v).max(1e-8);
+    let price_v_dn = price_fn(&p_v_dn)?;
+    let actual_vol_width = p_v_up.volatility - p_v_dn.volatility;
+    let vega_unit = (price_v_up - price_v_dn) / actual_vol_width * h_v;
+
+    // Rho: central difference over a ±1% rate bump (wide enough to stay
+    // clear of lattice noise), which gives the PV change per 1%; divided by
+    // 100 below to report per 1bp.
+    let h_r = 0.01;
+    let mut p_r_up = params.clone();
+    p_r_up.rate += h_r;
+    let price_r_up = price_fn(&p_r_up)?;
+    let mut p_r_dn = params.clone();
+    p_r_dn.rate -= h_r;
+    let price_r_dn = price_fn(&p_r_dn)?;
+    let rho_pct = (price_r_up - price_r_dn) / 2.0;
+
+    // Theta: one day on the instrument's configured reporting basis.
+    let dt = 1.0 / theta_days_per_year;
+    let theta_unit = if params.time_to_expiry > dt {
+        let mut p_t = params.clone();
+        p_t.time_to_expiry -= dt;
+        let price_t = price_fn(&p_t)?;
+        price_t - base_price
+    } else {
+        0.0
+    };
+
+    Ok(EquityOptionGreeks {
+        delta: delta_unit * scale,
+        gamma: gamma_unit * scale,
+        vega: vega_unit * scale,
+        theta: theta_unit * scale,
+        rho: rho_pct * scale / 100.0,
+    })
+}
+
+/// Registry pricer for Equity Option using Black-Scholes model
+pub(crate) struct SimpleEquityOptionBlackPricer;
+
+impl SimpleEquityOptionBlackPricer {
+    /// Create new Black-Scholes pricer with default model.
+    ///
+    /// Uses `ModelKey::Black76` which is the library-wide convention for
+    /// lognormal option pricing. BSM and Black-76 are mathematically
+    /// equivalent (BSM is Black-76 applied to the forward
+    /// `F = S × exp((r-q)T)`), so the same model key covers both.
+    pub(crate) fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for SimpleEquityOptionBlackPricer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl finstack_quant_valuations_core::pricer::Pricer for SimpleEquityOptionBlackPricer {
+    fn key(&self) -> finstack_quant_valuations_core::pricer::PricerKey {
+        finstack_quant_valuations_core::pricer::PricerKey::new(
+            finstack_quant_valuations_core::pricer::InstrumentType::EquityOption,
+            finstack_quant_valuations_core::pricer::ModelKey::Black76,
+        )
+    }
+
+    #[tracing::instrument(
+        name = "equity_option.black.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(
+            pricer = ?self.key(),
+            inst_id = %instrument.id(),
+            as_of = %as_of,
+        ),
+        err,
+    )]
+    fn price_dyn(
+        &self,
+        instrument: &dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<
+        finstack_quant_valuations_core::results::ValuationResult,
+        finstack_quant_valuations_core::pricer::PricingError,
+    > {
+        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+
+        // Type-safe downcasting
+        let equity_option = expect_inst::<crate::equity_option::EquityOption>(
+            instrument,
+            finstack_quant_valuations_core::pricer::InstrumentType::EquityOption,
+        )?;
+
+        // Use the provided as_of date for consistency
+        let pv = compute_pv(equity_option, market, as_of).map_err(|e| {
+            finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
+                e.to_string(),
+                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
+                    equity_option,
+                )
+                .model(self.key().model),
+            )
+        })?;
+
+        Ok(
+            finstack_quant_valuations_core::results::ValuationResult::stamped(
+                equity_option.id(),
+                as_of,
+                pv,
+            ),
+        )
+    }
+}

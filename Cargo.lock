@@ -1064,6 +1064,7 @@ dependencies = [
  "finstack-quant-test-utils",
  "finstack-quant-valuations-core",
  "finstack-quant-valuations-credit",
+ "finstack-quant-valuations-equity",
  "finstack-quant-valuations-exotics",
  "finstack-quant-valuations-fx",
  "finstack-quant-valuations-macros",
@@ -1124,6 +1125,27 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "time",
+ "tracing",
+]
+
+[[package]]
+name = "finstack-quant-valuations-equity"
+version = "0.10.0"
+dependencies = [
+ "finstack-quant-cashflows",
+ "finstack-quant-core",
+ "finstack-quant-margin",
+ "finstack-quant-models",
+ "finstack-quant-valuations-core",
+ "finstack-quant-valuations-macros",
+ "finstack-quant-valuations-test-support",
+ "indexmap",
+ "rust_decimal",
+ "schemars",
+ "serde",
+ "serde_json",
+ "smallvec",
  "time",
  "tracing",
 ]

@@ -131,3 +131,25 @@ fn test_convenience_constructors_keep_scalar_strike() {
 
     assert_eq!(option.strike, 4000.0);
 }
+
+/// The shared test builders apply the standard equity-option conventions.
+#[test]
+fn convenience_constructors_apply_standard_conventions() {
+    let expiry = date!(2025 - 12 - 31);
+    let call =
+        test_utils::equity_option_european_call("SPX-CALL", "SPX", 100.0, expiry, 100.0).unwrap();
+    assert_eq!(call.exercise_style, ExerciseStyle::European);
+    assert_eq!(call.option_type, OptionType::Call);
+    assert_eq!(call.discount_curve_id, CurveId::new("USD-OIS"));
+    assert_eq!(call.spot_id.as_str(), "EQUITY-SPOT");
+    assert_eq!(call.vol_surface_id, CurveId::new("EQUITY-VOL"));
+
+    let put = test_utils::equity_option_european_put("SPX-PUT", "SPX", 90.0, expiry, 50.0).unwrap();
+    assert_eq!(put.option_type, OptionType::Put);
+    assert_eq!(put.quantity, 50.0);
+
+    let american =
+        test_utils::equity_option_american_call("SPX-AMER", "SPX", 105.0, expiry, 75.0).unwrap();
+    assert_eq!(american.exercise_style, ExerciseStyle::American);
+    assert_eq!(american.quantity, 75.0);
+}

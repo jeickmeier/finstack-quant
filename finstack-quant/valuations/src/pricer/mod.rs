@@ -53,8 +53,9 @@ pub static FAMILIES: [&Family; 7] = [
 /// The umbrella family: every built-in family merged, plus the composite
 /// instruments.
 ///
-/// `Composite` and `Basket` hold legs of any family, so they belong here
-/// rather than to one asset class. The JSON entry points and registry
+/// `Composite` and `Basket` hold legs of any family, and levered real estate
+/// holds financing legs from several families, so they belong here rather
+/// than to one asset class. The JSON entry points and registry
 /// introspection (`list_models`, `list_standard_metrics`) read this family's
 /// registries.
 pub static STANDARD: Family = Family::new(
@@ -77,6 +78,18 @@ fn register_standard_pricers(registry: &mut PricerRegistry) -> Result<(), Pricin
         InstrumentType::Basket,
         crate::instruments::exotics::basket::Basket
     );
+    // Levered real estate holds financing legs from several families, so the
+    // real-estate instruments register here rather than with `EQUITY`.
+    register_generic!(
+        registry,
+        InstrumentType::RealEstateAsset,
+        crate::instruments::equity::real_estate::RealEstateAsset
+    );
+    register_generic!(
+        registry,
+        InstrumentType::LeveredRealEstateEquity,
+        crate::instruments::equity::real_estate::LeveredRealEstateEquity
+    );
     Ok(())
 }
 
@@ -84,7 +97,9 @@ fn register_standard_metrics(registry: &mut MetricRegistry) -> Result<(), Metric
     for family in FAMILIES {
         family.register_metrics(registry)?;
     }
-    crate::instruments::exotics::basket::metrics::register_basket_metrics(registry)
+    crate::instruments::exotics::basket::metrics::register_basket_metrics(registry)?;
+    crate::instruments::equity::real_estate::metrics::register_real_estate_metrics(registry)?;
+    crate::instruments::equity::real_estate::metrics::register_levered_real_estate_metrics(registry)
 }
 
 /// Return the shared standard pricer registry by reference.
@@ -196,7 +211,8 @@ mod tests {
     }
 
     /// Every pricer has exactly one owning family, and the umbrella is the
-    /// union of the families plus the composite instruments.
+    /// union of the families plus the instruments that register with
+    /// `STANDARD` because they hold legs of several families.
     #[test]
     fn families_own_disjoint_instrument_types_that_cover_the_standard_registry() {
         let mut owner: BTreeMap<InstrumentType, &str> = BTreeMap::new();
@@ -213,8 +229,14 @@ mod tests {
                 }
             }
         }
-        owner.insert(InstrumentType::Composite, STANDARD.name());
-        owner.insert(InstrumentType::Basket, STANDARD.name());
+        for umbrella_resident in [
+            InstrumentType::Composite,
+            InstrumentType::Basket,
+            InstrumentType::RealEstateAsset,
+            InstrumentType::LeveredRealEstateEquity,
+        ] {
+            owner.insert(umbrella_resident, STANDARD.name());
+        }
 
         let standard: Vec<InstrumentType> = standard_pricer_registry()
             .all_models_grouped()
