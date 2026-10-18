@@ -50,50 +50,25 @@
 //! - [`StructuredCredit`] for ABS, CLO, and securitized products
 //! - [`AgencyMbsPassthrough`] for mortgage pass-throughs
 //! - [`finstack_quant_cashflows`] for cashflow generation
+//!
+//! The family lives in `finstack-quant-valuations-fixed-income` and is
+//! re-exported here unchanged. Three modules stay in this crate until the
+//! structured-credit crate exists (plan Phase 3): [`structured_credit`],
+//! [`cmo`] and [`asset_backed_facility`] register with
+//! [`STRUCTURED_CREDIT`](structured_credit::STRUCTURED_CREDIT), not with
+//! [`FIXED_INCOME`](finstack_quant_valuations_fixed_income::FIXED_INCOME).
 
-/// Revolving credit facility module.
+pub use finstack_quant_valuations_fixed_income::*;
+
+/// Asset-backed facility module - warehouse lines against collateral pools.
 pub mod asset_backed_facility;
-/// Bond module - Fixed and floating rate bonds.
-pub mod bond;
-/// Bond future module - Bond futures contracts.
-pub mod bond_future;
-/// CMO module - Collateralized Mortgage Obligations (renamed from agency_cmo).
+mod bond_json;
+/// CMO module - Collateralized Mortgage Obligations.
 pub mod cmo;
-/// Convertible bond module.
-pub mod convertible;
-/// Dollar roll module - MBS dollar rolls.
-pub mod dollar_roll;
-/// Fixed income TRS module - Fixed income index total return swaps.
-pub mod fi_trs;
-/// Inflation-linked bond module.
-pub mod inflation_linked_bond;
-/// Quote arithmetic shared by term loans and revolving credit facilities.
-pub mod loan_quotes;
-/// Dated loan terms shared by term loans and revolving credit facilities.
-pub mod loan_terms;
-/// MBS passthrough module - Agency MBS pass-throughs (renamed from agency_mbs_passthrough).
-pub mod mbs_passthrough;
-pub mod revolving_credit;
 /// Structured credit module - ABS, RMBS, CMBS, CLO.
 pub mod structured_credit;
-/// TBA module - To Be Announced trades (renamed from agency_tba).
-pub mod tba;
-/// Term loan module.
-pub mod term_loan;
-
-mod family;
-pub use family::FIXED_INCOME;
 
 pub use asset_backed_facility::AssetBackedFacility;
-pub use bond::{Bond, BondSettlementConvention};
-pub use bond_future::{BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond};
+pub use bond_json::bond_from_cashflows_json;
 pub use cmo::{AgencyCmo, CmoTranche, CmoTrancheType, CmoWaterfall};
-pub use convertible::ConvertibleBond;
-pub use dollar_roll::DollarRoll;
-pub use fi_trs::FiIndexTotalReturnSwap;
-pub use inflation_linked_bond::InflationLinkedBond;
-pub use mbs_passthrough::{AgencyMbsPassthrough, AgencyProgram, PoolType};
-pub use revolving_credit::RevolvingCredit;
 pub use structured_credit::StructuredCredit;
-pub use tba::{AgencyTba, TbaTerm};
-pub use term_loan::TermLoan;

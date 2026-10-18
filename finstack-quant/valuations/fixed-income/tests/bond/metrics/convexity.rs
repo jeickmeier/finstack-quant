@@ -1,0 +1,61 @@
+//! Convexity calculator tests.
+
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_fixed_income::bond::Bond;
+use time::macros::date;
+
+/// Convexity validation for vanilla bonds
+///
+/// All vanilla (non-callable) bonds have positive convexity.
+///
+/// For a 5-year par bond at ~5% YTM, raw convexity is typically in the range
+/// 15-40, and the public metric reports Bloomberg-style display units (`raw / 100`).
+/// The analytical formula: C = Σ[t(t+1) × CF_t × DF_t] / (P × (1+y/m)²)
+#[test]
+fn test_convexity_positive() {
+    let as_of = date!(2025 - 01 - 01);
+    let mut bond = Bond::fixed(
+        "CVX1",
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
+        as_of,
+        date!(2030 - 01 - 01),
+        finstack_quant_core::dates::StubKind::ShortFront,
+        "USD-OIS",
+    )
+    .unwrap();
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
+
+    let curve =
+        finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (5.0, 0.80)])
+            .build()
+            .unwrap();
+    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+
+    let result = bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Convexity],
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+    let cvx = *result.measures.get("convexity").unwrap();
+
+    // All vanilla bonds have positive convexity
+    assert!(cvx > 0.0, "Vanilla bonds should have positive convexity");
+
+    // Bloomberg YAS display units scale raw mathematical convexity by 1/100.
+    assert!(
+        cvx > 0.15 && cvx < 0.40,
+        "5Y par bond convexity {:.2} outside expected range [0.15, 0.40]",
+        cvx
+    );
+}

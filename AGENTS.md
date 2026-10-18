@@ -12,7 +12,7 @@
 
 ## Project Structure
 
-- Multi-crate Rust workspace: `finstack-quant/core`, `finstack-quant/analytics`, `finstack-quant/valuations` (umbrella over `finstack-quant/valuations/core`, the pricing framework crate `finstack-quant-valuations-core`), `finstack-quant/calibration`, `finstack-quant/statements`, `finstack-quant/statements-analytics`, `finstack-quant/scenarios`, `finstack-quant/portfolio`, `finstack-quant/margin`, `finstack-quant/models`, `finstack-quant/arrow-interchange` (package `finstack-quant-arrow`; supporting Arrow/`TableEnvelope` adapters, not umbrella-re-exported)
+- Multi-crate Rust workspace: `finstack-quant/core`, `finstack-quant/analytics`, `finstack-quant/valuations` (umbrella over the pricing framework `finstack-quant/valuations/core` and the six instrument-family crates `finstack-quant/valuations/{rates,fixed-income,credit,equity,fx,exotics}`, packages `finstack-quant-valuations-{core,rates,fixed-income,credit,equity,fx,exotics}`; `valuations/test-support` is their dev-only fixture crate), `finstack-quant/calibration`, `finstack-quant/statements`, `finstack-quant/statements-analytics`, `finstack-quant/scenarios`, `finstack-quant/portfolio`, `finstack-quant/margin`, `finstack-quant/models`, `finstack-quant/arrow-interchange` (package `finstack-quant-arrow`; supporting Arrow/`TableEnvelope` adapters, not umbrella-re-exported)
 - Python bindings in `finstack-quant-py/` (PyO3); WASM bindings in `finstack-quant-wasm/` (wasm-bindgen)
 - Python binding Rust code lives under `finstack-quant-py/src/bindings/` (one subdirectory per crate domain)
 - WASM binding Rust code lives under `finstack-quant-wasm/src/api/` with a hand-written JS facade at `finstack-quant-wasm/index.js`

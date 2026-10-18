@@ -279,7 +279,7 @@ pub fn bond_from_cashflows_json(
     let instrument_id: &str = &js_string(&instrument_id, "instrumentId")?;
     let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
     let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
-    finstack_quant_valuations::instruments::fixed_income::bond::bond_from_cashflows_json(
+    finstack_quant_valuations::instruments::fixed_income::bond_from_cashflows_json(
         instrument_id,
         schedule_json,
         discount_curve_id,

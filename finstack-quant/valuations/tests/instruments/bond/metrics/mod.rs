@@ -19,23 +19,8 @@
 //! Note: DV01 tests are consolidated in `tests/metrics/tests/dv01.rs` which provides
 //! comprehensive coverage across Bond, IRS, and Deposit instruments.
 
-mod accrued;
 mod asw;
-mod bucketed_dv01;
 mod callable_credit_risk;
-mod convexity;
 mod credit_quote_risk;
 mod cs01;
-mod dm;
-mod duration;
-mod japanese_simple_yield;
-mod moosmuller_ytm;
-mod oas;
-mod prices;
-mod quote_engine;
 mod spread_duration;
-mod spreads;
-mod theta;
-mod wal;
-mod ytm;
-mod ytw;

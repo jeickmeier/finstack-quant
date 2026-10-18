@@ -5,4 +5,3 @@
 //! - Serialization roundtrips
 
 mod integration;
-mod serde;

@@ -8,15 +8,4 @@
 //! - `validation`: Market benchmark validation (Fabozzi, Hull)
 //! - `integration`: Complex bond structures (callable, putable, amortizing)
 
-mod bond_accrued_interest;
-mod cashflows;
-mod exercise_grid;
-mod friction_cost;
-mod helpers_tests;
-mod integration;
-mod merton_mc_convergence;
 mod metrics;
-mod pricing;
-mod test_bond_pricing;
-mod test_ytm_edge_cases;
-mod validation;

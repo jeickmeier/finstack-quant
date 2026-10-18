@@ -912,3 +912,97 @@ mod persistent_pac_regressions {
         }
     }
 }
+
+/// DV01 rebuilds the collateral at the bumped prepayment speed; see the
+/// dollar-roll metrics tests in `finstack-quant-valuations-fixed-income` for
+/// the TBA and roll cases of the same invariant.
+#[cfg(test)]
+mod rate_risk_rebuild_tests {
+    use super::{price_cmo, resolve_collateral};
+    use crate::instruments::fixed_income::cmo::AgencyCmo;
+    use crate::instruments::{Instrument, PricingOptions};
+    use crate::metrics::MetricId;
+    use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::math::interp::InterpStyle;
+    use time::macros::date;
+
+    const AS_OF: Date = date!(2026 - 01 - 15);
+
+    fn market() -> MarketContext {
+        MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(AS_OF)
+                .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                .interp(InterpStyle::LogLinear)
+                .build()
+                .expect("curve"),
+        )
+    }
+
+    fn bumped(bp: f64) -> MarketContext {
+        market()
+            .bump([MarketBump::Curve {
+                id: "USD-OIS".into(),
+                spec: BumpSpec::parallel_bp(bp),
+            }])
+            .expect("bump")
+    }
+
+    fn psa(model: &PrepaymentModelSpec) -> f64 {
+        match model {
+            PrepaymentModelSpec::Psa { speed_multiplier } => *speed_multiplier,
+            _ => panic!("generic pools use a PSA model"),
+        }
+    }
+
+    fn dv01(instrument: &dyn Instrument) -> f64 {
+        instrument
+            .price_with_metrics(
+                &market(),
+                AS_OF,
+                &[MetricId::Dv01],
+                PricingOptions::default(),
+            )
+            .expect("metrics")
+            .measures["dv01"]
+    }
+
+    fn assert_prepayment_aware(actual: f64, expected: f64, static_dv01: f64) {
+        assert!(
+            (actual - expected).abs() < 1e-6 * expected.abs().max(1.0),
+            "dv01 {actual} versus hand {expected}"
+        );
+        assert!(
+            (actual - static_dv01).abs() > 1e-3 * static_dv01.abs(),
+            "dv01 {actual} must differ from the static-prepayment {static_dv01}"
+        );
+    }
+
+    #[test]
+    fn cmo_dv01_shifts_the_collateral_speed() {
+        let mut cmo = AgencyCmo::example().expect("cmo");
+        cmo.metric_pricing_overrides.bump_config.rate_bump_bp = Some(1.0);
+        let collateral = resolve_collateral(&cmo, AS_OF).expect("collateral");
+        let base_psa = psa(&collateral.prepayment_spec);
+        let at = |bp: f64| {
+            let mut pool = collateral.clone();
+            pool.prepayment_spec = PrepaymentModelSpec::psa(base_psa * 2f64.powf(-0.01 * bp));
+            let mut shifted = cmo.clone();
+            shifted.collateral = Some(Box::new(pool));
+            price_cmo(&shifted, &bumped(bp), AS_OF)
+                .expect("price")
+                .amount()
+        };
+        let expected = (at(1.0) - at(-1.0)) / 2.0;
+        let static_dv01 = (price_cmo(&cmo, &bumped(1.0), AS_OF).expect("up").amount()
+            - price_cmo(&cmo, &bumped(-1.0), AS_OF)
+                .expect("down")
+                .amount())
+            / 2.0;
+        assert_prepayment_aware(dv01(&cmo), expected, static_dv01);
+    }
+}

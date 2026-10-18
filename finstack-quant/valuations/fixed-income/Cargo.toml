@@ -1,0 +1,58 @@
+[package]
+name = "finstack-quant-valuations-fixed-income"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Fixed-income instruments of Finstack Quant valuations: bonds and bond futures, convertibles, inflation-linked bonds, term loans and revolving credit, fixed-income index TRS, agency MBS pass-throughs, TBAs and dollar rolls"
+autotests = false
+
+[dependencies]
+finstack-quant-cashflows = { path = "../../cashflows", version = "0.10.0", default-features = false }
+finstack-quant-core = { path = "../../core", version = "0.10.0", default-features = false }
+finstack-quant-covenants = { path = "../../covenants", version = "0.10.0", default-features = false }
+finstack-quant-margin = { path = "../../margin", version = "0.10.0", default-features = false }
+finstack-quant-models = { path = "../../models", version = "0.10.0", default-features = false }
+finstack-quant-valuations-macros = { path = "../macros", version = "0.10.0" }
+finstack-quant-valuations-core = { path = "../core", version = "0.10.0", default-features = false }
+indexmap = { workspace = true, features = ["serde"] }
+smallvec = { version = "1.15", default-features = false, features = ["serde"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true }
+rust_decimal = { workspace = true }
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+schemars = { workspace = true, optional = true }
+
+# rayon has no working thread pool on single-threaded wasm32; parallel
+# code paths are cfg-gated to native targets, so the dependency is too.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rayon = "1.11"
+
+[dev-dependencies]
+finstack-quant-valuations-test-support = { path = "../test-support", version = "0.10.0" }
+finstack-quant-test-utils = { path = "../../test-utils", version = "0.10.0" }
+time = { workspace = true, features = ["macros"] }
+rust_decimal_macros = { workspace = true }
+proptest = "1.11.0"
+
+[features]
+default = ["json-schema"]
+json-schema = [
+    "dep:schemars",
+    "finstack-quant-valuations-core/json-schema",
+    "finstack-quant-cashflows/json-schema",
+    "finstack-quant-core/json-schema",
+    "finstack-quant-covenants/json-schema",
+    "finstack-quant-margin/json-schema",
+    "finstack-quant-models/json-schema",
+]
+
+[lints]
+workspace = true
+
+[[test]]
+name = "fixed-income"
+path = "tests/main.rs"

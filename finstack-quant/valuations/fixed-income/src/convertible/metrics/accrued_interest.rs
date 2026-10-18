@@ -1,0 +1,36 @@
+//! Accrued interest and clean price calculators for convertible bonds.
+//!
+//! Provides dirty/clean price decomposition essential for market quote reconciliation.
+//! - **Accrued interest**: Pro-rata coupon since last payment date.
+//! - **Clean price**: Settlement dirty price less settlement accrued interest.
+
+use crate::convertible::{calculate_accrued_interest, ConvertibleBond};
+use finstack_quant_core::Result;
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
+
+/// Accrued interest calculator for convertible bonds.
+pub(crate) struct AccruedInterestCalculator;
+
+impl MetricCalculator for AccruedInterestCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let bond: &ConvertibleBond = context.instrument_as()?;
+        calculate_accrued_interest(bond, &context.curves, context.as_of)
+    }
+}
+
+/// Clean price calculator: `dirty_price - accrued_interest`.
+pub(crate) struct CleanPriceCalculator;
+
+impl MetricCalculator for CleanPriceCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let bond: &ConvertibleBond = context.instrument_as()?;
+        let dirty_price = crate::convertible::pricing::settlement_dirty_price(
+            bond,
+            &context.curves,
+            context.as_of,
+            context.base_value.amount(),
+        )?;
+        let accrued = calculate_accrued_interest(bond, &context.curves, context.as_of)?;
+        Ok(dirty_price - accrued)
+    }
+}

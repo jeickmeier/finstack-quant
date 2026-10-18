@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1003205,
+      "bytes": 1003066,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -290,7 +290,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1011118,
+      "bytes": 1010979,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -407,7 +407,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
-      "bytes": 189392,
+      "bytes": 189380,
       "kind": "input",
       "path": "schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
       "summary": "Property equity net of its financing stack.",
@@ -488,7 +488,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1010095,
+      "bytes": 1009956,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -542,7 +542,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json",
-      "bytes": 21340,
+      "bytes": 21326,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/agency_cmo.schema.json",
       "summary": "Agency CMO tranche carved from a collateral pool.",
@@ -551,7 +551,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_mbs_passthrough.schema.json",
-      "bytes": 11953,
+      "bytes": 11939,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/agency_mbs_passthrough.schema.json",
       "summary": "Agency mortgage pass-through priced off a prepayment model.",
@@ -560,7 +560,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json",
-      "bytes": 19747,
+      "bytes": 19705,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/agency_tba.schema.json",
       "summary": "To-be-announced agency MBS forward trade.",
@@ -569,7 +569,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
-      "bytes": 278449,
+      "bytes": 278437,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
       "summary": "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base.",
@@ -578,7 +578,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
-      "bytes": 94983,
+      "bytes": 95002,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/bond.schema.json",
       "summary": "Fixed- or floating-rate cash bond with a coupon schedule.",
@@ -587,7 +587,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
-      "bytes": 108510,
+      "bytes": 108545,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/bond_future.schema.json",
       "summary": "Exchange-traded bond future with a deliverable basket and CTD.",
@@ -596,7 +596,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json",
-      "bytes": 75434,
+      "bytes": 75406,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/convertible_bond.schema.json",
       "summary": "Corporate bond convertible into a fixed number of shares.",
@@ -605,7 +605,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json",
-      "bytes": 12457,
+      "bytes": 12388,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/dollar_roll.schema.json",
       "summary": "Simultaneous TBA sale and forward repurchase.",
@@ -632,7 +632,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
-      "bytes": 394235,
+      "bytes": 394223,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
@@ -641,7 +641,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json",
-      "bytes": 65075,
+      "bytes": 65044,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/term_loan.schema.json",
       "summary": "Amortising leveraged loan with call protection and covenants.",
@@ -650,7 +650,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json",
-      "bytes": 46054,
+      "bytes": 46022,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/trs_fixed_income_index.schema.json",
       "summary": "Total-return swap on a fixed-income index versus a funding leg.",
@@ -767,7 +767,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1101209,
+      "bytes": 1101070,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -947,7 +947,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1012726,
+      "bytes": 1012587,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",

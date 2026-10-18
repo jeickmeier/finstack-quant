@@ -1,0 +1,76 @@
+//! Yield-to-worst for term loans with callable schedules.
+//!
+//! Computes the minimum yield across all valid call dates and final maturity,
+//! using kind-aware cashflow filtering and pre-exercise outstanding principal
+//! for redemption amounts.
+
+use crate::TermLoan;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
+
+use super::irr_helpers::{
+    cached_full_schedule, exercisable_call_candidates, solve_irr_to_exercise,
+    target_price_from_quote_or_model,
+};
+
+/// Yield-to-worst calculator for callable term loans.
+///
+/// Solves for the worst (minimum) yield across all exercisable call
+/// candidates (including a standing, already-effective provision evaluated at
+/// the first coupon date after settlement) and final maturity.
+pub(crate) struct YtwCalculator;
+
+impl MetricCalculator for YtwCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let as_of = context.as_of;
+
+        // Use the cached internal schedule (reused across all candidates).
+        let schedule = cached_full_schedule(context)?;
+
+        // Snapshot scalar fields off the loan after populating the cache.
+        let (currency, maturity, candidate_calls) = {
+            let loan: &TermLoan = context.instrument_as()?;
+            let calls = exercisable_call_candidates(loan, &schedule, as_of, &context.curves)?;
+            (loan.currency, loan.maturity, calls)
+        };
+        let dirty_now = {
+            let loan: &TermLoan = context.instrument_as()?;
+            target_price_from_quote_or_model(
+                loan,
+                &schedule,
+                &context.curves,
+                as_of,
+                context.base_value,
+            )?
+        };
+
+        // Candidate exercises: each exercisable call and final maturity.
+        let mut candidates: Vec<(Date, Money)> = Vec::with_capacity(candidate_calls.len() + 1);
+        candidates.extend(candidate_calls);
+
+        // The canonical schedule already includes final redemption.
+        candidates.push((maturity, Money::from((0_i64, currency))));
+
+        // Re-borrow the loan for the IRR solver (only immutable borrows of
+        // context outstanding at this point).
+        let loan: &TermLoan = context.instrument_as()?;
+
+        // Worst yield = min yield across candidates
+        let mut y_worst = f64::INFINITY;
+        for (exercise_date, redemption) in candidates {
+            let y = solve_irr_to_exercise(
+                loan,
+                &schedule,
+                as_of,
+                dirty_now,
+                exercise_date,
+                redemption,
+            )?;
+            if y < y_worst {
+                y_worst = y;
+            }
+        }
+        Ok(y_worst)
+    }
+}

@@ -55,10 +55,6 @@ mod bond;
 #[path = "instruments/deposit/mod.rs"]
 mod deposit;
 
-/// Inflation-linked bond tests - Index-linked bonds (e.g., TIPS, linkers)
-#[path = "instruments/inflation_linked_bond/mod.rs"]
-mod inflation_linked_bond;
-
 /// Bond future tests - Treasury and government bond futures
 #[path = "instruments/bond_future/mod.rs"]
 mod bond_future;

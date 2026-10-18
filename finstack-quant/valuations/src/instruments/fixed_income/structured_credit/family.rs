@@ -22,11 +22,25 @@ pub static STRUCTURED_CREDIT: Family =
 fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     register_generic!(registry, InstrumentType::StructuredCredit, StructuredCredit);
     registry.register(StructuredCreditStochasticPricer)?;
+    // CMOs and asset-backed facilities stay in the umbrella with structured
+    // credit until the structured-credit crate exists; they register here.
+    register_generic!(
+        registry,
+        InstrumentType::AgencyCmo,
+        crate::instruments::fixed_income::cmo::AgencyCmo
+    );
+    register_generic!(
+        registry,
+        InstrumentType::AssetBackedFacility,
+        crate::instruments::fixed_income::asset_backed_facility::AssetBackedFacility
+    );
     Ok(())
 }
 
 fn register_metrics(registry: &mut MetricRegistry) -> Result<(), MetricRegistryError> {
     super::metrics::register_structured_credit_metrics(registry)?;
+    crate::instruments::fixed_income::cmo::metrics::register_cmo_metrics(registry)?;
+    crate::instruments::fixed_income::asset_backed_facility::metrics::register_asset_backed_facility_metrics(registry)?;
     // `StructuredCreditStochasticPricer` publishes `expected_loss` and
     // `expected_shortfall` from the deal Monte Carlo pass. The entries record
     // that ownership: `expected_shortfall` has a universal historical-
