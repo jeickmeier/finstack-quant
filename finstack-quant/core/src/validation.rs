@@ -368,7 +368,8 @@ pub fn validate_distinct_currencies(
 ///
 /// # Arguments
 ///
-/// * `value` - Value to check.
+/// * `value` - Finite or non-finite `f64` whose magnitude is compared; its sign
+///   is ignored, and NaN fails the check because `NaN <= max_abs` is false.
 /// * `max_abs` - Inclusive bound on the absolute value.
 /// * `context` - Name of the value used in the error message.
 /// * `units_hint` - Optional unit label appended to the bound in the message.
@@ -432,7 +433,8 @@ pub fn validate_rate_magnitude(
 ///
 /// # Arguments
 ///
-/// * `value` - Value to test.
+/// * `value` - Rate-like quantity in the same representation as `min` and
+///   `max` (for example a decimal rate); NaN is reported as outside the range.
 /// * `min` - Inclusive lower bound.
 /// * `max` - Inclusive upper bound.
 #[inline]
