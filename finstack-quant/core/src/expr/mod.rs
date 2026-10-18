@@ -1,8 +1,9 @@
 //! Expression engine: a shared AST and a scalar DAG evaluator.
 //!
-//! [`Expr`]/[`ExprNode`] build the tree and [`Function`] enumerates every
-//! operator the `statements` DSL and the valuations composite instrument
-//! share. Only the elementwise subset evaluates here:
+//! [`Expr`](crate::expr::Expr)/[`ExprNode`](crate::expr::ExprNode) build the
+//! tree and [`Function`](crate::expr::Function) enumerates every operator the
+//! `statements` DSL and the valuations composite instrument share. Only the
+//! elementwise subset evaluates here:
 //! - abs / sign / pow / round / floor / ceil / ln / exp / log10 / sqrt /
 //!   clamp / is_missing
 //! - arithmetic, comparison and logical operators, `if … then … else`
@@ -11,16 +12,19 @@
 //! `rolling_*`, `cumsum`, `ewm_*`, `std`, `median`, `rank`, `quantile`, …)
 //! and the period-aware functions (`ttm`, `ytd`, `growth_rate`, …) are
 //! evaluated by the `statements` crate's period evaluator;
-//! [`CompiledExpr::new`] rejects them ([`Function::is_scalar_evaluable`]).
+//! [`CompiledExpr::new`](crate::expr::CompiledExpr::new) rejects them
+//! ([`Function::is_scalar_evaluable`](crate::expr::Function::is_scalar_evaluable)).
 //!
 //! # Execution model
 //!
 //! Expressions operate over column-oriented numeric arrays. A
-//! [`SimpleContext`] maps column names to column positions, [`CompiledExpr`]
-//! plans the expression once (structurally identical sub-trees are evaluated
-//! exactly once per call) and evaluation returns an [`EvaluationResult`]
-//! containing both values and metadata describing the run. Results are
-//! deterministic for the same inputs.
+//! [`SimpleContext`](crate::expr::SimpleContext) maps column names to column
+//! positions, [`CompiledExpr`](crate::expr::CompiledExpr) plans the expression
+//! once (structurally identical sub-trees are evaluated exactly once per call)
+//! and evaluation returns an
+//! [`EvaluationResult`](crate::expr::EvaluationResult) containing both values
+//! and metadata describing the run. Results are deterministic for the same
+//! inputs.
 //!
 //! # Quick example
 //!
