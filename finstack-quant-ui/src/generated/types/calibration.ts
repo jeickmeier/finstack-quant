@@ -6361,9 +6361,15 @@ export interface D_6B0044A7Dc5Fa1F3E1De {
   };
 }
 /**
- * Serialized source grid and time origin for a rolled interpolation.
+ * Serialized source grid and time origin of a rolled curve.
  */
 export interface DB539D636Bb6F89D140E2 {
+  /**
+   * Current origin in the source interpolation's year-fraction coordinates.
+   */
   offset: number;
+  /**
+   * Source pillars `(time, value)` in the source curve's own coordinates.
+   */
   source_points: [number, number][];
 }

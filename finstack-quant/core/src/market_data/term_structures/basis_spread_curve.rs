@@ -35,9 +35,8 @@
 //! - Fujii, M., Shimada, Y., & Takahashi, A. (2011). "A Note on Construction of
 //!   Multiple Swap Curves with and without Collateral." *FSA Research Review*, 7. `docs/REFERENCES.md#fujii-shimada-takahashi-2010`
 
-use super::common::{roll_knots, year_fraction_to};
+use super::common::{roll_knots, validate_pillars, year_fraction_to, InterpRollState};
 use crate::dates::DateExt;
-use crate::math::interp::types::InterpRollState;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::{
     dates::{Date, DayCount},
@@ -66,7 +65,10 @@ pub struct BasisSpreadCurve {
     knots: Box<[f64]>,
     /// Continuously compounded spread values at each knot.
     spreads: Box<[f64]>,
+    /// Source interpolation; the unrolled source when `roll` is set.
     interp: Interp,
+    /// Source grid and origin of a rolled curve.
+    roll: Option<InterpRollState>,
 }
 
 /// Raw serializable state of BasisSpreadCurve.
@@ -109,7 +111,7 @@ impl From<BasisSpreadCurve> for RawBasisSpreadCurve {
             knot_points,
             interp_style: curve.interp.style(),
             extrapolation: curve.interp.extrapolation(),
-            roll_transform: curve.interp.roll_state(),
+            roll_transform: curve.roll,
         }
     }
 }
@@ -148,7 +150,10 @@ impl BasisSpreadCurve {
     #[must_use]
     #[inline]
     pub fn spread(&self, t: f64) -> f64 {
-        self.interp.interp(t)
+        match &self.roll {
+            Some(state) => state.interp(&self.interp, t),
+            None => self.interp.interp(t),
+        }
     }
 
     /// Curve identifier.
@@ -250,7 +255,8 @@ impl BasisSpreadCurve {
         self.metadata_builder(self.id.clone())
             .base_date(new_base)
             .knots(rolled)
-            .roll_transform(self.interp.next_roll_state(
+            .roll_transform(InterpRollState::advance(
+                self.roll.as_ref(),
                 dt,
                 self.knots.iter().copied().zip(self.spreads.iter().copied()),
             )?)
@@ -269,7 +275,7 @@ impl BasisSpreadCurve {
     pub fn to_builder_with_id(&self, id: CurveId) -> BasisSpreadCurveBuilder {
         self.metadata_builder(id)
             .knots(self.knots.iter().copied().zip(self.spreads.iter().copied()))
-            .roll_transform(self.interp.roll_state())
+            .roll_transform(self.roll.clone())
     }
 
     /// Builder seeded with this curve's base date, day count, interpolation
@@ -370,14 +376,18 @@ impl BasisSpreadCurveBuilder {
             ValidationPolicy::AllowNegative,
         )?;
 
-        if let Some(state) = self.roll_transform {
-            interp = Interp::restore_rolled(
+        if let Some(state) = &self.roll_transform {
+            interp = state.restore(
                 self.style,
                 self.extrapolation,
                 ValidationPolicy::AllowNegative,
-                state,
             )?;
-            interp.validate_roll_samples(knots.iter().copied().zip(spreads.iter().copied()))?;
+            validate_pillars(
+                knots.iter().copied().zip(spreads.iter().copied()),
+                false,
+                "rolled interpolation",
+                |t| state.interp(&interp, t),
+            )?;
         }
 
         Ok(BasisSpreadCurve {
@@ -387,6 +397,7 @@ impl BasisSpreadCurveBuilder {
             knots,
             spreads,
             interp,
+            roll: self.roll_transform,
         })
     }
 }
@@ -467,7 +478,7 @@ mod tests {
             .build()
             .unwrap();
         let rolled = source.roll_forward(30).unwrap();
-        assert!(rolled.interp.roll_state().is_some());
+        assert!(rolled.roll.is_some());
         let dt = 30.0 / 365.0;
         for time in [1.2, 1.5, 2.5] {
             assert!((rolled.spread(time - dt) - source.spread(time)).abs() < 1e-12);

@@ -5149,16 +5149,18 @@ export default [
   {
     "path": "#/$defs/d_b539d636bb6f89d140e2",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState",
-    "description": "Serialized source grid and time origin for a rolled interpolation."
+    "description": "Serialized source grid and time origin of a rolled curve."
   },
   {
     "path": "#/$defs/d_b539d636bb6f89d140e2/properties/offset",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState/properties/offset",
+    "description": "Current origin in the source interpolation's year-fraction coordinates.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_b539d636bb6f89d140e2/properties/source_points",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState/properties/source_points"
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState/properties/source_points",
+    "description": "Source pillars `(time, value)` in the source curve's own coordinates."
   },
   {
     "path": "#/$defs/d_b539d636bb6f89d140e2/properties/source_points/items",

@@ -72,16 +72,12 @@
 //!   - Fleckenstein, M., Longstaff, F. A., & Lustig, H. (2017). "Deflation Risk."
 //!     *Review of Financial Studies*, 30(8), 2719-2760. `docs/REFERENCES.md#kerkhof-2005`
 
-use super::common::roll_knots;
+use super::common::{roll_knots, validate_pillars, InterpRollState};
 use crate::dates::DateExt;
 use crate::dates::{Date, DayCount};
 use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
-use crate::{
-    error::InputError,
-    math::interp::types::{Interp, InterpRollState},
-    types::CurveId,
-};
+use crate::{error::InputError, math::interp::types::Interp, types::CurveId};
 
 /// Default indexation lag in months for inflation-linked securities.
 ///
@@ -142,7 +138,10 @@ pub struct InflationCurve {
     knots: Box<[f64]>,
     /// CPI index levels at each knot.
     cpi_levels: Box<[f64]>,
+    /// Source interpolation; the unrolled source when `roll` is set.
     interp: Interp,
+    /// Source grid and origin of a rolled curve.
+    roll: Option<InterpRollState>,
 }
 
 /// Raw serializable state of an InflationCurve
@@ -201,7 +200,7 @@ impl From<InflationCurve> for RawInflationCurve {
             knot_points,
             interp_style: curve.interp.style(),
             extrapolation: curve.interp.extrapolation(),
-            roll_transform: curve.interp.roll_state(),
+            roll_transform: curve.roll,
         }
     }
 }
@@ -268,7 +267,10 @@ impl InflationCurve {
         if t <= 0.0 {
             return self.base_cpi;
         }
-        self.interp.interp(t)
+        match &self.roll {
+            Some(state) => state.interp(&self.interp, t),
+            None => self.interp.interp(t),
+        }
     }
 
     /// CPI level at time `t` (years), adjusted for the indexation lag.
@@ -518,7 +520,7 @@ impl InflationCurve {
                     .copied()
                     .zip(self.cpi_levels.iter().copied()),
             )
-            .roll_transform(self.interp.roll_state())
+            .roll_transform(self.roll.clone())
     }
 
     /// Builder seeded with this curve's base CPI, base date, day count,
@@ -572,15 +574,14 @@ impl InflationCurve {
             .base_date(new_base)
             .base_cpi(new_base_cpi)
             .knots(rolled_points)
-            .roll_transform(
-                self.interp.next_roll_state(
-                    dt_years,
-                    self.knots
-                        .iter()
-                        .copied()
-                        .zip(self.cpi_levels.iter().copied()),
-                )?,
-            )
+            .roll_transform(InterpRollState::advance(
+                self.roll.as_ref(),
+                dt_years,
+                self.knots
+                    .iter()
+                    .copied()
+                    .zip(self.cpi_levels.iter().copied()),
+            )?)
             .build()
     }
 }
@@ -742,14 +743,14 @@ impl InflationCurveBuilder {
             self.extrapolation,
             ValidationPolicy::Strict,
         )?;
-        if let Some(state) = self.roll_transform {
-            interp = Interp::restore_rolled(
-                self.style,
-                self.extrapolation,
-                ValidationPolicy::Strict,
-                state,
+        if let Some(state) = &self.roll_transform {
+            interp = state.restore(self.style, self.extrapolation, ValidationPolicy::Strict)?;
+            validate_pillars(
+                knots.iter().copied().zip(cpi_levels.iter().copied()),
+                false,
+                "rolled interpolation",
+                |t| state.interp(&interp, t),
             )?;
-            interp.validate_roll_samples(knots.iter().copied().zip(cpi_levels.iter().copied()))?;
         }
         Ok(InflationCurve {
             id: self.id,
@@ -760,6 +761,7 @@ impl InflationCurveBuilder {
             knots,
             cpi_levels,
             interp,
+            roll: self.roll_transform,
         })
     }
 }
@@ -809,10 +811,13 @@ impl Bumpable for InflationCurve {
         let builder = self.metadata_builder(bumped_id);
         // A rolled curve shocks its source pillars and reads its current
         // pillars back, so base and shocked curves share one interpolation.
-        if let Some((state, levels)) =
-            self.interp
-                .bump_rolled(ValidationPolicy::Strict, self.knots(), shocked_cpi)?
-        {
+        if let Some(roll) = &self.roll {
+            let (state, levels) = roll.bump(
+                &self.interp,
+                ValidationPolicy::Strict,
+                self.knots(),
+                shocked_cpi,
+            )?;
             return builder
                 .knots(self.knots().iter().copied().zip(levels))
                 .roll_transform(Some(state))

@@ -1393,10 +1393,16 @@ export interface HazardCalibrationInput {
   };
 }
 /**
- * Serialized source grid and time origin for a rolled interpolation.
+ * Serialized source grid and time origin of a rolled curve.
  */
 export interface InterpRollState {
+  /**
+   * Current origin in the source interpolation's year-fraction coordinates.
+   */
   offset: number;
+  /**
+   * Source pillars `(time, value)` in the source curve's own coordinates.
+   */
   source_points: [unknown, unknown][];
 }
 /**

@@ -176,13 +176,15 @@
     },
     "d_13ceef63597b70bc1a71": {
       "additionalProperties": false,
-      "description": "Serialized source grid and time origin for a rolled interpolation.",
+      "description": "Serialized source grid and time origin of a rolled curve.",
       "properties": {
         "offset": {
+          "description": "Current origin in the source interpolation's year-fraction coordinates.",
           "format": "double",
           "type": "number"
         },
         "source_points": {
+          "description": "Source pillars `(time, value)` in the source curve's own coordinates.",
           "items": {
             "maxItems": 2,
             "minItems": 2,
