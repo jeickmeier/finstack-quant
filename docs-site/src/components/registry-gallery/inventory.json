@@ -717,7 +717,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/core/cubes/cases.json",
-      "sha256": "97828ccbe300dc467357625fd55182cdf3f56179726890c0255f126360e4be58"
+      "sha256": "f3b4eb7c73f55bfca69f3e45499285000e491846d17844680960b78616cb7830"
     },
     {
       "path": "finstack-quant-ui/tests/calibration/cases.json",
