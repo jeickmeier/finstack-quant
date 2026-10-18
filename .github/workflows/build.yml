@@ -347,7 +347,7 @@ jobs:
       - name: Stage benchmark runner outside the checkout
         run: |
           mkdir -p "$RUNNER_TEMP/pr-bench/scripts"
-          cp scripts/__init__.py scripts/pr_benchmarks.py scripts/check_criterion_regressions.py "$RUNNER_TEMP/pr-bench/scripts/"
+          cp scripts/__init__.py scripts/pr_benchmarks.py scripts/check_criterion_regressions.py scripts/baseline_identity.py "$RUNNER_TEMP/pr-bench/scripts/"
 
       - name: Set up swap space
         uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
