@@ -38,7 +38,6 @@ pub mod parameters;
 pub mod pricing;
 
 // Enriched per-flow cashflow export with DF/SP/PV columns.
-pub mod cashflow_export;
 
 #[doc(hidden)]
 pub use pricing::GenericInstrumentPricer;

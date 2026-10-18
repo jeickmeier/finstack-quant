@@ -857,6 +857,32 @@ impl XccySwap {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for XccySwap {
+    fn cashflow_export_terms(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<crate::instruments::cashflow_export::CashflowExportTerms> {
+        // Each leg discounts on its own currency's curve; the envelope reports
+        // in the swap's reporting currency on that currency's leg curve.
+        let mut terms = crate::instruments::cashflow_export::CashflowExportTerms::from_schedule(
+            finstack_quant_cashflows::CashflowProvider::cashflow_schedule(self, market, as_of)?,
+        );
+        terms.currency_discount_curves.insert(
+            self.leg1.notional.currency(),
+            self.leg1.leg.discount_curve_id.clone(),
+        );
+        terms.currency_discount_curves.insert(
+            self.leg2.notional.currency(),
+            self.leg2.leg.discount_curve_id.clone(),
+        );
+        terms.discount_curve_id = terms
+            .currency_discount_curves
+            .get(&self.reporting_currency)
+            .cloned();
+        terms.reporting_currency = Some(self.reporting_currency);
+        Ok(terms)
+    }
+
     impl_instrument_base!(
         crate::pricer::InstrumentType::XccySwap,
         crate::instruments::rates::RATES

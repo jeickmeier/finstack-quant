@@ -3504,7 +3504,7 @@ export default [
   {
     "path": "#/$defs/d_fcd765f028a63b1f206f",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode",
-    "description": "Stochastic pricing mode.\n\nMonte Carlo is the only engine: each scenario path draws its monthly\nsystematic factors from a seeded Philox substream and runs the full deal\nwaterfall. The mode is echoed on\n[`StochasticPricingResult::pricing_mode`](super::StochasticPricingResult)\nso a result records the estimator count it was produced with.\n\nTest coverage:\n`tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`\nplus the convergence tests."
+    "description": "Stochastic pricing mode.\n\nMonte Carlo is the only engine: each scenario path draws its monthly\nsystematic factors from a seeded Philox substream and runs the full deal\nwaterfall. The mode is echoed on\n[`StochasticPricingResult::pricing_mode`]\nso a result records the estimator count it was produced with.\n\nTest coverage:\n`tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`\nplus the convergence tests."
   },
   {
     "path": "#/$defs/d_fcd765f028a63b1f206f/properties/monte_carlo",

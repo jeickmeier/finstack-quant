@@ -198,7 +198,7 @@ export type DayCount =
  */
 export type Date1 = string;
 /**
- * Row currency (matters for `XccySwap` / `FxSwap`).
+ * Row currency (matters for instruments whose legs settle in several currencies).
  */
 export type Currency1 =
   | "AED"
@@ -476,7 +476,7 @@ export interface D_674830A94Dacf97E7Ac8 {
    */
   index_rate?: number | null;
   /**
-   * Inflation index ratio (populated for `InflationLinkedBond`).
+   * Inflation index ratio (populated for index-linked flows).
    */
   inflation_index_ratio?: number | null;
   /**

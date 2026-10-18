@@ -167,9 +167,7 @@ pub mod pricing {
 ///
 /// See [`cashflow_export::instrument_cashflows`] for the primary entry
 /// point used by the Python and WASM bindings.
-pub mod cashflow_export {
-    pub use super::common_impl::cashflow_export::*;
-}
+pub mod cashflow_export;
 
 pub use finstack_quant_core::dates::{resolve_calendar, resolve_joint_calendar};
 

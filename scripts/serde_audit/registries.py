@@ -233,7 +233,7 @@ MAINTAINED_CONTRACTS = frozenset({
 REQUIRED_PUBLIC_TYPES = {
     (
         "valuations",
-        "src/instruments/common_impl/cashflow_export.rs",
+        "src/instruments/cashflow_export.rs",
         "InstrumentCashflowEnvelope",
     ): CAPABILITIES,
 }

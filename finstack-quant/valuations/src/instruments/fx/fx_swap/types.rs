@@ -350,6 +350,27 @@ impl FxSwap {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for FxSwap {
+    fn cashflow_export_terms(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<crate::instruments::cashflow_export::CashflowExportTerms> {
+        // Each leg settles in its own currency and discounts on that
+        // currency's curve; the envelope reports in the quote currency.
+        let mut terms = crate::instruments::cashflow_export::CashflowExportTerms::from_schedule(
+            finstack_quant_cashflows::CashflowProvider::cashflow_schedule(self, market, as_of)?,
+        );
+        terms
+            .currency_discount_curves
+            .insert(self.base_currency, self.foreign_discount_curve_id.clone());
+        terms
+            .currency_discount_curves
+            .insert(self.quote_currency, self.domestic_discount_curve_id.clone());
+        terms.discount_curve_id = Some(self.domestic_discount_curve_id.clone());
+        terms.reporting_currency = Some(self.quote_currency);
+        Ok(terms)
+    }
+
     impl_instrument_base!(
         crate::pricer::InstrumentType::FxSwap,
         crate::instruments::fx::FX

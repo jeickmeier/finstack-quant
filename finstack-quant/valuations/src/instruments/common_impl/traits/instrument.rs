@@ -981,6 +981,56 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         Ok(None)
     }
 
+    /// Validate that the cashflow exporter can decompose this instrument
+    /// under `model`.
+    ///
+    /// The exporter lists the instrument's value as a static sum of discounted
+    /// flows. An instrument whose value under `model` depends on a future
+    /// decision (an exercise, a return floor) rejects the export here, so the
+    /// caller is told to request the model price instead. The default accepts.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - Pricing model the decomposition would reconcile to.
+    ///
+    /// # Errors
+    ///
+    /// A validation error saying why the flows cannot carry the value.
+    fn validate_cashflow_export(&self, model: ModelKey) -> finstack_quant_core::Result<()> {
+        let _ = model;
+        Ok(())
+    }
+
+    /// The flows and discounting the cashflow exporter decomposes this
+    /// instrument with.
+    ///
+    /// The default exports the instrument's own cashflow schedule on its first
+    /// declared discount curve. Instruments override it to export a projected
+    /// schedule, to discount each leg currency on its own curve, or to stamp
+    /// inflation index ratios on the rows; see
+    /// [`CashflowExportTerms`](crate::instruments::cashflow_export::CashflowExportTerms).
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market the flows are projected in.
+    /// * `as_of` - Effective valuation date the exported flows are discounted
+    ///   to.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the schedule projection error.
+    fn cashflow_export_terms(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<crate::instruments::cashflow_export::CashflowExportTerms> {
+        Ok(
+            crate::instruments::cashflow_export::CashflowExportTerms::from_schedule(
+                self.cashflow_schedule(market, as_of)?,
+            ),
+        )
+    }
+
     /// Rebuild the instrument for a rate scenario when its projected
     /// cashflows respond to rates.
     ///

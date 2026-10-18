@@ -4,6 +4,8 @@
 
 #[path = "core/breakeven.rs"]
 mod breakeven;
+#[path = "core/cashflow_export.rs"]
+mod cashflow_export;
 #[path = "core/cross_factor.rs"]
 mod cross_factor;
 #[path = "core/dv01.rs"]

@@ -466,15 +466,13 @@ impl PricerRegistry {
             })?,
         );
         if explain.enabled && base_result.explanation.is_none() {
-            base_result.explanation = Some(
-                crate::instruments::common_impl::cashflow_export::pricing_trace(
-                    instrument,
-                    market,
-                    model,
-                    &base_result,
-                    explain,
-                ),
-            );
+            base_result.explanation = Some(crate::instruments::cashflow_export::pricing_trace(
+                instrument,
+                market,
+                model,
+                &base_result,
+                explain,
+            ));
         }
 
         super::enrichment::enrich(super::enrichment::EnrichmentRequest {

@@ -202,7 +202,7 @@ def test_production_recursive_glob_discovers_cashflow_envelope() -> None:
     assert "instruments::cashflow_export::InstrumentCashflowEnvelope" in (declaration.export_paths)
     identity = (
         "valuations",
-        "src/instruments/common_impl/cashflow_export.rs",
+        "src/instruments/cashflow_export.rs",
         "InstrumentCashflowEnvelope",
     )
     assert identity in _MODULE.REQUIRED_PUBLIC_TYPES

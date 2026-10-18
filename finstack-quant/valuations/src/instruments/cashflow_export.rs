@@ -27,8 +27,10 @@
 //! the envelope's `scenario_price_shock_decimal`) gives `pv`.
 //!
 //! Hazard-only columns are populated when `model = "hazard_rate"`.
-//! Inflation / MBS columns are populated by concrete-type downcasts when the
-//! instrument is `InflationLinkedBond` / `AgencyMbsPassthrough`.
+//! Inflation / MBS columns are populated from the instrument's
+//! [`CashflowExportTerms`](crate::instruments::cashflow_export::CashflowExportTerms):
+//! index-linked bonds supply index ratios and
+//! prepaying pools supply their paydown states.
 //!
 //! **CMO tranche pool state** is intentionally exported as `null`: the waterfall
 //! engine does not yet expose a stable per-tranche balance hook for this path.
@@ -45,15 +47,10 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{Error, Result};
 use serde::Serialize;
 
-use crate::instruments::fixed_income::bond::Bond;
-use crate::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
-use crate::instruments::fixed_income::mbs_passthrough::{
-    pricer::project_cashflows as project_mbs_cashflows, AgencyMbsPassthrough,
-};
-use crate::instruments::fx::fx_swap::FxSwap;
-use crate::instruments::rates::xccy_swap::XccySwap;
 use crate::instruments::Instrument;
 use crate::pricer::{ModelKey, ParsedInstrument, PricerKey};
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use std::collections::HashMap;
 
 // Envelope schema
 
@@ -110,7 +107,7 @@ pub struct CashflowRow {
     pub date: Date,
     /// Signed cashflow amount in row currency.
     pub amount: f64,
-    /// Row currency (matters for `XccySwap` / `FxSwap`).
+    /// Row currency (matters for instruments whose legs settle in several currencies).
     pub currency: Currency,
     /// `CFKind` discriminator (serde rename: `fixed`, `notional`, …).
     pub kind: CFKind,
@@ -174,7 +171,7 @@ pub struct CashflowRow {
     /// Interval default probability `SP(t_{i-1}) − SP(t_i)` (hazard mode only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conditional_default_prob: Option<f64>,
-    /// Inflation index ratio (populated for `InflationLinkedBond`).
+    /// Inflation index ratio (populated for index-linked flows).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inflation_index_ratio: Option<f64>,
     /// Single Monthly Mortality for the period (populated for agency MBS).
@@ -312,23 +309,7 @@ fn ensure_decomposable(instrument: &dyn Instrument, model_key: ModelKey) -> Resu
         )));
     }
 
-    if let Some(bond) = instrument.as_any().downcast_ref::<Bond>() {
-        let has_embedded_options = bond
-            .call_put
-            .as_ref()
-            .is_some_and(crate::instruments::fixed_income::bond::CallPutSchedule::has_options)
-            || bond.return_floor.is_some();
-        if has_embedded_options {
-            return Err(Error::Validation(format!(
-                "instrument_cashflows: static cashflow rows cannot decompose the \
-                 exercise-contingent value of bond '{}' under model '{}'; request the model \
-                 price directly",
-                bond.id(),
-                model_key.as_str()
-            )));
-        }
-    }
-    Ok(())
+    instrument.validate_cashflow_export(model_key)
 }
 
 /// Build the per-flow trace attached to a valuation result's `explanation`.
@@ -336,7 +317,8 @@ fn ensure_decomposable(instrument: &dyn Instrument, model_key: ModelKey) -> Resu
 /// Uses the same rows as [`instrument_cashflows`], so the trace reconciles to
 /// `priced.value`. When the model has no static per-flow decomposition the
 /// trace holds one `computation_step` entry carrying the reason.
-pub(crate) fn pricing_trace(
+#[doc(hidden)]
+pub fn pricing_trace(
     instrument: &dyn Instrument,
     market: &MarketContext,
     model_key: ModelKey,
@@ -383,6 +365,63 @@ pub(crate) fn pricing_trace(
 /// `canonical_result` must come from the registered `model_key` pricer for
 /// `instrument`; its `as_of` is the effective valuation date and its `value`
 /// is the reconciliation target.
+/// How the cashflow exporter decomposes one instrument into dated, discounted
+/// flows.
+///
+/// [`Instrument::cashflow_export_terms`] returns these; the default exports the
+/// instrument's own schedule on its first declared discount curve, and
+/// instruments with several leg currencies, a projected (prepaying) schedule
+/// or inflation-indexed flows fill the optional parts.
+#[derive(Debug, Clone)]
+pub struct CashflowExportTerms {
+    /// Flows to export, in schedule order.
+    pub schedule: CashFlowSchedule,
+    /// Discount curve per flow currency when legs settle in several currencies;
+    /// a currency not listed discounts on `discount_curve_id`.
+    pub currency_discount_curves: HashMap<Currency, CurveId>,
+    /// Curve discounting flows whose currency is not listed; `None` uses the
+    /// instrument's first declared discount curve.
+    pub discount_curve_id: Option<CurveId>,
+    /// Currency the envelope reports in; `None` uses the first flow's currency.
+    pub reporting_currency: Option<Currency>,
+    /// Pool paydown state per payment date for prepaying pools.
+    pub pool_states: Option<HashMap<Date, CashflowPoolState>>,
+    /// Inflation index ratio per flow date for index-linked flows; a date
+    /// without a ratio exports an empty cell.
+    pub index_ratios: Option<HashMap<Date, f64>>,
+}
+
+impl CashflowExportTerms {
+    /// Terms exporting `schedule` on the instrument's declared discount curve.
+    ///
+    /// # Arguments
+    ///
+    /// * `schedule` - Flows to export, usually the instrument's own cashflow
+    ///   schedule at the effective valuation date.
+    #[must_use]
+    pub fn from_schedule(schedule: CashFlowSchedule) -> Self {
+        Self {
+            schedule,
+            currency_discount_curves: HashMap::new(),
+            discount_curve_id: None,
+            reporting_currency: None,
+            pool_states: None,
+            index_ratios: None,
+        }
+    }
+}
+
+/// Pool paydown state behind one exported flow of a prepaying pool.
+#[derive(Debug, Clone, Copy)]
+pub struct CashflowPoolState {
+    /// Single monthly mortality applied in the period, as a decimal fraction.
+    pub smm: f64,
+    /// Pool balance at the start of the period.
+    pub beginning_balance: f64,
+    /// Pool balance at the end of the period.
+    pub ending_balance: f64,
+}
+
 fn envelope_for_priced(
     instrument: &dyn Instrument,
     market: &MarketContext,
@@ -399,34 +438,10 @@ fn envelope_for_priced(
             "instrument has no declared discount curve; cannot compute cashflow DFs".into(),
         )
     })?;
-    let mut currency_discount_curves = std::collections::HashMap::new();
-    let (discount_curve_id, reporting_currency) = if let Some(swap) =
-        instrument.as_any().downcast_ref::<FxSwap>()
-    {
-        currency_discount_curves.insert(swap.base_currency, swap.foreign_discount_curve_id.clone());
-        currency_discount_curves
-            .insert(swap.quote_currency, swap.domestic_discount_curve_id.clone());
-        (
-            swap.domestic_discount_curve_id.clone(),
-            Some(swap.quote_currency),
-        )
-    } else if let Some(swap) = instrument.as_any().downcast_ref::<XccySwap>() {
-        currency_discount_curves.insert(
-            swap.leg1.notional.currency(),
-            swap.leg1.leg.discount_curve_id.clone(),
-        );
-        currency_discount_curves.insert(
-            swap.leg2.notional.currency(),
-            swap.leg2.leg.discount_curve_id.clone(),
-        );
-        let primary = currency_discount_curves
-            .get(&swap.reporting_currency)
-            .cloned()
-            .unwrap_or(default_discount_curve_id);
-        (primary, Some(swap.reporting_currency))
-    } else {
-        (default_discount_curve_id, None)
-    };
+    let terms = instrument.cashflow_export_terms(market, as_of_date)?;
+    let currency_discount_curves = terms.currency_discount_curves;
+    let discount_curve_id = terms.discount_curve_id.unwrap_or(default_discount_curve_id);
+    let reporting_currency = terms.reporting_currency;
     let primary_discount = market.get_discount(discount_curve_id.as_str())?;
 
     let (credit_curve_id, hazard_arc) = if matches!(model_key, ModelKey::HazardRate) {
@@ -443,30 +458,8 @@ fn envelope_for_priced(
     let recovery_rate = hazard_arc.as_ref().map(|h| h.recovery_rate());
 
     // --- Build one schedule, retaining MBS diagnostics from the same projection. ---
-    let (schedule, mbs_state) =
-        if let Some(mbs) = instrument.as_any().downcast_ref::<AgencyMbsPassthrough>() {
-            let projection = project_mbs_cashflows(mbs, as_of_date, Some(mbs.wam_months + 12))?;
-            let states: std::collections::HashMap<Date, MbsState> = projection
-                .diagnostics
-                .into_iter()
-                .map(|row| {
-                    (
-                        row.payment_date,
-                        MbsState {
-                            smm: row.smm,
-                            beginning_balance: row.beginning_balance,
-                            ending_balance: row.ending_balance,
-                        },
-                    )
-                })
-                .collect();
-            (projection.schedule, Some(states))
-        } else {
-            (instrument.cashflow_schedule(market, as_of_date)?, None)
-        };
-    let inflation_bond: Option<&InflationLinkedBond> =
-        instrument.as_any().downcast_ref::<InflationLinkedBond>();
-
+    let schedule = terms.schedule;
+    let mbs_state = terms.pool_states;
     let dc_ctx = DayCountContext::default();
 
     // Survival probability at `as_of` under the hazard curve's own time origin.
@@ -621,22 +614,10 @@ fn envelope_for_priced(
         // when the lookup fails on an instrument that carries an inflation
         // link. (Instruments with no inflation bond keep the column empty by
         // design.)
-        let inflation_index_ratio = match inflation_bond
-            .map(|b| b.index_ratio_from_market(flow.date, market, as_of_date))
-        {
-            Some(Ok(ratio)) => Some(ratio),
-            Some(Err(err)) => {
-                tracing::warn!(
-                    instrument_id = %instrument_id,
-                    date = %flow.date,
-                    %err,
-                    "cashflow export: inflation index ratio lookup failed; \
-                     exporting an empty index_ratio cell"
-                );
-                None
-            }
-            None => None,
-        };
+        let inflation_index_ratio = terms
+            .index_ratios
+            .as_ref()
+            .and_then(|ratios| ratios.get(&flow.date).copied());
 
         rows.push(CashflowRow {
             date: flow.date,
@@ -748,13 +729,6 @@ fn accrual_start_balances(
     )
 }
 
-#[derive(Clone, Copy)]
-struct MbsState {
-    smm: f64,
-    beginning_balance: f64,
-    ending_balance: f64,
-}
-
 fn sum_pvs<I>(pvs: I) -> f64
 where
     I: IntoIterator<Item = f64>,
@@ -768,543 +742,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::instruments::fixed_income::revolving_credit::{
-        DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
-    };
-    use crate::instruments::fixed_income::structured_credit::StructuredCredit;
-    use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-    use crate::instruments::{Instrument, ScenarioPricingOverrides};
-    use finstack_quant_cashflows::builder::RateSpec;
-    use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{DayCount, Tenor};
-    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
-    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
-    use finstack_quant_core::money::Money;
-    use std::sync::Arc;
-    use time::Month;
-
-    fn serialize_bond(bond: &Bond) -> String {
-        let envelope = InstrumentEnvelope {
-            schema: crate::instruments::json_loader::InstrumentSchema::CURRENT,
-            instrument: InstrumentJson::Bond(bond.clone()),
-        };
-        serde_json::to_string(&envelope).expect("serialize bond envelope")
-    }
-
-    #[test]
-    fn cashflow_export_rejects_exercise_contingent_bond_rows() {
-        let bond = Bond::example_callable().expect("callable example");
-        for model in ["discounting", "hazard_rate"] {
-            let err = instrument_cashflows_json(
-                &serialize_bond(&bond),
-                &MarketContext::new(),
-                "2025-01-01",
-                model,
-            )
-            .expect_err("static rows cannot represent exercise-contingent value");
-
-            assert!(
-                err.to_string().contains("exercise-contingent value"),
-                "unexpected error for {model}: {err}"
-            );
-        }
-    }
-
-    #[test]
-    fn revolving_credit_credit_risk_export_fails_instead_of_returning_false_reconciliation() {
-        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-        let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        let facility = RevolvingCredit::builder()
-            .id("RC-CASHFLOW-CREDIT".into())
-            .commitment(Money::from((1_000_000_i64, Currency::USD)))
-            .drawn(Money::from((1_000_000_i64, Currency::USD)))
-            .issue_date(as_of)
-            .maturity(maturity)
-            .rate(RateSpec::Fixed { rate: 0.05 })
-            .day_count(DayCount::Act365F)
-            .frequency(Tenor::annual())
-            .fees(RevolvingCreditFees::default())
-            .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
-            .discount_curve_id("USD-OIS".into())
-            .credit_curve_id("USD-HZ".into())
-            .recovery_rate(0.4)
-            .build()
-            .expect("facility");
-        let market = MarketContext::new()
-            .insert(
-                DiscountCurve::builder("USD-OIS")
-                    .base_date(as_of)
-                    .knots([(0.0, 1.0), (1.0, 1.0)])
-                    .build()
-                    .expect("discount curve"),
-            )
-            .insert(
-                HazardCurve::builder("USD-HZ")
-                    .base_date(as_of)
-                    .recovery_rate(0.4)
-                    .knots([(1.0, 0.20), (5.0, 0.20)])
-                    .build()
-                    .expect("hazard curve"),
-            );
-        let json = serde_json::to_string(&InstrumentEnvelope::new(
-            InstrumentJson::RevolvingCredit(facility),
-        ))
-        .expect("serialize");
-
-        let err = instrument_cashflows_json(&json, &market, "2025-01-01", "discounting")
-            .expect_err("generic rows cannot represent the recovery leg");
-        assert!(
-            err.to_string()
-                .contains("model-specific cashflow decomposition"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn malformed_instrument_precedes_model_and_date_errors() {
-        let mut deal = StructuredCredit::example().expect("example");
-        deal.cleanup_call_decimal = Some(-0.5);
-        let json = serde_json::to_string(&InstrumentEnvelope::new(
-            InstrumentJson::StructuredCredit(Box::new(deal)),
-        ))
-        .expect("serialize structured credit");
-
-        let err =
-            instrument_cashflows_json(&json, &MarketContext::new(), "not-a-date", "not-a-model")
-                .expect_err("instrument validation must win");
-
-        assert!(
-            err.to_string().contains("cleanup_call_decimal"),
-            "unexpected error ordering: {err}"
-        );
-    }
-
-    #[test]
-    fn mixed_currency_fx_swap_rows_use_native_curves_and_reporting_currency_pv() {
-        let as_of = Date::from_calendar_date(2024, Month::January, 1).expect("date");
-        let swap = FxSwap::example().expect("example");
-        let provider = Arc::new(SimpleFxProvider::new());
-        provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
-            .expect("fx quote");
-        let market = MarketContext::new()
-            .insert(
-                DiscountCurve::builder("USD-OIS")
-                    .base_date(as_of)
-                    .knots([(0.0, 1.0), (1.0, 0.95)])
-                    .build()
-                    .expect("usd curve"),
-            )
-            .insert(
-                DiscountCurve::builder("EUR-OIS")
-                    .base_date(as_of)
-                    .knots([(0.0, 1.0), (1.0, 0.97)])
-                    .build()
-                    .expect("eur curve"),
-            )
-            .insert_fx(FxMatrix::new(provider));
-        let instrument = InstrumentEnvelope {
-            schema: crate::instruments::json_loader::InstrumentSchema::CURRENT,
-            instrument: InstrumentJson::FxSwap(swap),
-        };
-        let json = serde_json::to_string(&instrument).expect("serialize fx swap");
-
-        let payload = instrument_cashflows_json(&json, &market, "2024-01-01", "discounting")
-            .expect("mixed-currency cashflow export");
-        let envelope: InstrumentCashflowEnvelope =
-            serde_json::from_str(&payload).expect("parse envelope");
-
-        assert_eq!(envelope.currency, Currency::USD);
-        assert!(envelope.reconciles_with_base_value);
-        assert!(envelope.flows.iter().any(|row| {
-            row.currency == Currency::EUR && row.discount_curve_id.as_str() == "EUR-OIS"
-        }));
-        assert!(envelope.flows.iter().any(|row| {
-            row.currency == Currency::USD && row.discount_curve_id.as_str() == "USD-OIS"
-        }));
-        for row in &envelope.flows {
-            if row.currency == Currency::EUR {
-                assert_eq!(row.fx_rate, Some(1.10));
-                assert!((row.native_pv * 1.10 - row.pv).abs() < 0.01);
-            } else {
-                assert!(row.fx_rate.is_none());
-            }
-        }
-    }
-
-    #[test]
-    fn discounting_reconciles_with_schedule_pv_for_fixed_bond() {
-        use crate::instruments::common_impl::helpers::schedule_pv_raw;
-
-        let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
-        let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
-        let bond = Bond::fixed(
-            "BOND-DISC-RECONCILE",
-            Money::from((1_000_000_i64, Currency::USD)),
-            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            issue,
-            maturity,
-            finstack_quant_core::dates::StubKind::ShortFront,
-            "USD-OIS",
-        )
-        .expect("bond");
-
-        // Use as_of strictly after issue so the initial notional outflow is
-        // unambiguously in the past and excluded by both the schedule-based
-        // engine and `base_value`. Note this makes the instrument *seasoned*
-        // (as_of != curve base_date), which is exactly the case where a wrong
-        // time origin in the exporter's discount factors would surface.
-        let as_of_date = Date::from_calendar_date(2025, Month::July, 1).expect("date");
-
-        let disc = DiscountCurve::builder("USD-OIS")
-            .base_date(issue)
-            .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
-            .build()
-            .expect("discount curve");
-        let market = MarketContext::new().insert(disc);
-
-        let json = serialize_bond(&bond);
-        let payload = instrument_cashflows_json(&json, &market, "2025-07-01", "discounting")
-            .expect("cashflows envelope");
-        let envelope: InstrumentCashflowEnvelope =
-            serde_json::from_str(&payload).expect("parse envelope");
-
-        // The raw and Money paths share the core relative-discounting kernel;
-        // the raw path is used here to avoid Money rounding in reconciliation.
-        let discount_curve_id = bond
-            .market_dependencies()
-            .expect("deps")
-            .curves
-            .discount_curves
-            .first()
-            .cloned()
-            .expect("bond should declare a discount curve");
-        let reference =
-            schedule_pv_raw(&bond, &market, as_of_date, &discount_curve_id).expect("schedule pv");
-
-        let diff = (envelope.total_pv - reference).abs();
-        assert!(
-            diff < 1e-2,
-            "total_pv {} should reconcile with schedule PV {} (diff={})",
-            envelope.total_pv,
-            reference,
-            diff,
-        );
-        assert_eq!(envelope.model, "discounting");
-        assert_eq!(envelope.currency, Currency::USD);
-        assert!(envelope.reconciles_with_base_value);
-        assert!(!envelope.flows.is_empty());
-        for row in &envelope.flows {
-            assert!(row.survival_probability.is_none());
-            assert!(row.discount_factor > 0.0);
-            assert!(row.fx_rate.is_none());
-            if row.date > as_of_date {
-                assert!((row.pv - row.native_pv).abs() < 1e-9);
-            }
-        }
-        assert!(envelope.scenario_price_shock_decimal.is_none());
-
-        // Every coupon row carries the inputs it was computed from.
-        let coupons: Vec<_> = envelope
-            .flows
-            .iter()
-            .filter(|row| row.kind == CFKind::Fixed)
-            .collect();
-        assert!(!coupons.is_empty());
-        for row in coupons {
-            let start = row.accrual_start.expect("accrual start");
-            let end = row.accrual_end.expect("accrual end");
-            assert!(start < end && end <= row.date);
-            assert!(row.accrual_day_count.is_some());
-            let notional = row.accrual_notional.expect("accrual notional");
-            let rate = row.rate.expect("coupon rate");
-            assert!((notional - 1_000_000.0).abs() < 1e-9);
-            assert!((notional * rate * row.accrual_factor - row.amount).abs() < 1e-6);
-        }
-    }
-
-    #[test]
-    fn explained_price_carries_reconciling_trace_and_provenance() {
-        use crate::instruments::PricingOptions;
-        use crate::metrics::MetricId;
-        use finstack_quant_core::explain::{ExplainOpts, TraceEntry};
-
-        let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
-        let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
-        let mut bond = Bond::fixed(
-            "BOND-EXPLAIN",
-            Money::from((1_000_000_i64, Currency::USD)),
-            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            issue,
-            maturity,
-            finstack_quant_core::dates::StubKind::ShortFront,
-            "USD-OIS",
-        )
-        .expect("bond");
-        bond.scenario_pricing_overrides =
-            ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
-        bond.metric_pricing_overrides.bump_config.rate_bump_bp = Some(5.0);
-        let as_of = Date::from_calendar_date(2025, Month::July, 1).expect("date");
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(issue)
-                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
-                .build()
-                .expect("discount curve"),
-        );
-
-        let plain = bond
-            .price_with_metrics(&market, as_of, &[], PricingOptions::default())
-            .expect("plain price");
-        assert!(plain.explanation.is_none());
-        let provenance = plain.provenance.expect("registry stamps provenance");
-        assert_eq!(provenance.model, ModelKey::Discounting);
-        assert_eq!(provenance.requested_as_of, as_of);
-        assert_eq!(
-            provenance.market_dependencies,
-            bond.market_dependencies().expect("deps")
-        );
-        assert_eq!(provenance.scenario_price_shock_decimal, Some(-0.10));
-        assert!(provenance.sensitivity_bumps.is_none());
-
-        let explained = bond
-            .price_with_metrics(
-                &market,
-                as_of,
-                &[MetricId::Dv01],
-                PricingOptions::default().with_explain(ExplainOpts::enabled()),
-            )
-            .expect("explained price");
-        assert_eq!(explained.value, plain.value);
-        let bumps = explained
-            .provenance
-            .as_ref()
-            .and_then(|p| p.sensitivity_bumps.as_ref())
-            .expect("metric request stamps bumps");
-        assert_eq!(bumps.rate_bump_bp, 5.0);
-        assert_eq!(bumps.vol_bump_decimal, 0.01);
-
-        let trace = explained.explanation.expect("trace");
-        assert_eq!(trace.trace_type, "pricing");
-        let mut total = 0.0;
-        for entry in &trace.entries {
-            let TraceEntry::CashflowPV {
-                pv_amount,
-                curve_id,
-                survival_probability,
-                ..
-            } = entry
-            else {
-                panic!("unexpected entry {entry:?}");
-            };
-            assert_eq!(curve_id, "USD-OIS");
-            assert!(survival_probability.is_none());
-            total += pv_amount;
-        }
-        assert!(!trace.entries.is_empty());
-        assert!((total - explained.value.amount()).abs() < 1e-2);
-    }
-
-    #[test]
-    fn trace_names_the_reason_when_no_decomposition_exists() {
-        use finstack_quant_core::explain::{ExplainOpts, TraceEntry};
-
-        let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
-        let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
-        let bond = Bond::fixed(
-            "BOND-TREE",
-            Money::from((1_000_000_i64, Currency::USD)),
-            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            issue,
-            maturity,
-            finstack_quant_core::dates::StubKind::ShortFront,
-            "USD-OIS",
-        )
-        .expect("bond");
-        let priced = crate::results::ValuationResult::stamped(
-            "BOND-TREE",
-            issue,
-            Money::from((1_000_000_i64, Currency::USD)),
-        );
-
-        let trace = pricing_trace(
-            &bond,
-            &MarketContext::new(),
-            ModelKey::Tree,
-            &priced,
-            ExplainOpts::enabled(),
-        );
-
-        assert!(matches!(
-            trace.entries.as_slice(),
-            [TraceEntry::ComputationStep { name, description, .. }]
-                if name == "cashflow_trace_unavailable" && description.contains("tree")
-        ));
-    }
-
-    #[test]
-    fn scenario_price_shock_scales_cashflow_rows_and_total_once() {
-        let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
-        let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
-        let mut bond = Bond::fixed(
-            "BOND-CASHFLOW-SCENARIO",
-            Money::from((1_000_000_i64, Currency::USD)),
-            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            issue,
-            maturity,
-            finstack_quant_core::dates::StubKind::ShortFront,
-            "USD-OIS",
-        )
-        .expect("bond");
-        let as_of = Date::from_calendar_date(2025, Month::July, 1).expect("date");
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(issue)
-                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
-                .build()
-                .expect("discount curve"),
-        );
-
-        let baseline: InstrumentCashflowEnvelope = serde_json::from_str(
-            &instrument_cashflows_json(
-                &serialize_bond(&bond),
-                &market,
-                "2025-07-01",
-                "discounting",
-            )
-            .expect("baseline cashflows"),
-        )
-        .expect("baseline envelope");
-
-        bond.scenario_pricing_overrides =
-            ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
-        let shocked: InstrumentCashflowEnvelope = serde_json::from_str(
-            &instrument_cashflows_json(
-                &serialize_bond(&bond),
-                &market,
-                "2025-07-01",
-                "discounting",
-            )
-            .expect("shocked cashflows"),
-        )
-        .expect("shocked envelope");
-
-        assert_eq!(shocked.as_of, as_of);
-        assert_eq!(shocked.scenario_price_shock_decimal, Some(-0.10));
-        assert!((shocked.total_pv - baseline.total_pv * 0.90).abs() < 1e-8);
-        assert!(shocked.reconciles_with_base_value);
-        for (baseline_row, shocked_row) in baseline.flows.iter().zip(&shocked.flows) {
-            assert!((shocked_row.pv - baseline_row.pv * 0.90).abs() < 1e-8);
-            assert_eq!(shocked_row.native_pv, baseline_row.native_pv);
-        }
-    }
-
-    #[test]
-    fn seasoned_instrument_discount_factors_use_correct_time_origin() {
-        // Failure mode: `discount.df(year_fraction)` measures `year_fraction`
-        // from `as_of`, but `DiscountCurve::df` expects time from the curve's
-        // own `base_date`. When `as_of != base_date` (a seasoned instrument)
-        // every exported discount factor and PV lands on the wrong time origin,
-        // and `total_pv` no longer reconciles with `base_value`
-        // (`Instrument::value`), which uses date-based `df_between_dates`.
-        let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
-        let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
-        let bond = Bond::fixed(
-            "BOND-SEASONED-TIME-ORIGIN",
-            Money::from((1_000_000_i64, Currency::USD)),
-            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            issue,
-            maturity,
-            finstack_quant_core::dates::StubKind::ShortFront,
-            "USD-OIS",
-        )
-        .expect("bond");
-
-        // as_of strictly after the curve base_date => seasoned instrument.
-        let as_of_date = Date::from_calendar_date(2025, Month::July, 1).expect("date");
-
-        // Curve base_date == issue, deliberately != as_of.
-        let disc = DiscountCurve::builder("USD-OIS")
-            .base_date(issue)
-            .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
-            .build()
-            .expect("discount curve");
-        let market = MarketContext::new().insert(disc.clone());
-
-        // base_value: the canonical price from Instrument::value, which the
-        // discounting BondEngine computes via df_between_dates(as_of, date).
-        let base_value = bond
-            .value(&market, as_of_date)
-            .expect("bond base value")
-            .amount();
-
-        let json = serialize_bond(&bond);
-        let payload = instrument_cashflows_json(&json, &market, "2025-07-01", "discounting")
-            .expect("cashflows envelope");
-        let envelope: InstrumentCashflowEnvelope =
-            serde_json::from_str(&payload).expect("parse envelope");
-
-        // total_pv must reconcile with base_value within rounding.
-        let diff = (envelope.total_pv - base_value).abs();
-        assert!(
-            diff < 1e-2,
-            "seasoned-instrument total_pv {} must reconcile with base_value {} (diff={}); \
-             a wrong time origin in the exported discount factors breaks reconciliation",
-            envelope.total_pv,
-            base_value,
-            diff,
-        );
-
-        // Each exported discount factor must equal df_between_dates(as_of, date).
-        for row in &envelope.flows {
-            if row.year_fraction < 0.0 {
-                continue;
-            }
-            let expected_df = disc
-                .df_between_dates(as_of_date, row.date)
-                .expect("df_between_dates");
-            assert!(
-                (row.discount_factor - expected_df).abs() < 1e-12,
-                "discount_factor for flow {} is {}, expected df_between_dates(as_of, date)={}",
-                row.date,
-                row.discount_factor,
-                expected_df,
-            );
-        }
-
-        // The reconciliation flag must be honest: it is only `true` here
-        // because the export actually reconciles.
-        assert!(envelope.reconciles_with_base_value);
-    }
-
-    #[test]
-    fn rejects_unsupported_model_for_equity_option_style_instrument() {
-        let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
-        let maturity = Date::from_calendar_date(2026, Month::January, 15).expect("date");
-        let bond = Bond::fixed(
-            "BOND-BAD-MODEL",
-            Money::from((1_000_000_i64, Currency::USD)),
-            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            issue,
-            maturity,
-            finstack_quant_core::dates::StubKind::ShortFront,
-            "USD-OIS",
-        )
-        .expect("bond");
-        let json = serialize_bond(&bond);
-        let market = MarketContext::new();
-
-        let err = instrument_cashflows_json(&json, &market, "2025-01-15", "monte_carlo_gbm")
-            .expect_err("monte_carlo_gbm should reject bond");
-        let msg = err.to_string();
-        assert!(
-            msg.contains("monte_carlo_gbm")
-                || msg.contains("not priced")
-                || msg.contains("supported"),
-            "error should explain unsupported model: {msg}"
-        );
-    }
+    use super::sum_pvs;
 
     #[test]
     fn total_pv_uses_compensated_summation_for_mixed_sign_flows() {
@@ -1312,12 +750,4 @@ mod tests {
 
         assert_eq!(total, 1.0);
     }
-
-    // NOTE: A hazard_rate reconciliation test would require an instrument that
-    // (a) declares a canonical credit-curve dependency AND (b) has a
-    // registered `HazardRate` pricer. The existing CDS and bond-with-hazard
-    // pathways satisfy both via the instrument JSON layer, which is exercised
-    // by the workspace-wide test suite (see `tests/instruments/cds/`). The
-    // per-flow PV formula here is byte-identical to the one validated by
-    // `period_pv.rs::test_periodized_pv_credit_adjusted_matches_detailed_engine`.
 }

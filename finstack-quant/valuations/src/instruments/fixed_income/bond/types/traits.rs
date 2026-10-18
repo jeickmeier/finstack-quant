@@ -17,6 +17,27 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         Some(self.issue_date)
     }
 
+    fn validate_cashflow_export(
+        &self,
+        model: crate::pricer::ModelKey,
+    ) -> finstack_quant_core::Result<()> {
+        let has_embedded_options = self
+            .call_put
+            .as_ref()
+            .is_some_and(crate::instruments::fixed_income::bond::CallPutSchedule::has_options)
+            || self.return_floor.is_some();
+        if has_embedded_options {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "instrument_cashflows: static cashflow rows cannot decompose the \
+                 exercise-contingent value of bond '{}' under model '{}'; request the model \
+                 price directly",
+                self.id.as_str(),
+                model.as_str()
+            )));
+        }
+        Ok(())
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         self.default_pricing_model()
     }

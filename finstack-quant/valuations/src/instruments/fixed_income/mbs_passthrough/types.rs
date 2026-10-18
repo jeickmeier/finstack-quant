@@ -538,6 +538,35 @@ impl AgencyMbsPassthrough {
 }
 
 impl crate::instruments::common_impl::traits::Instrument for AgencyMbsPassthrough {
+    fn cashflow_export_terms(
+        &self,
+        _market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<crate::instruments::cashflow_export::CashflowExportTerms> {
+        // The exported flows are the prepayment projection, with the pool
+        // balance and single monthly mortality behind every payment.
+        let projection = super::pricer::project_cashflows(self, as_of, Some(self.wam_months + 12))?;
+        let states = projection
+            .diagnostics
+            .into_iter()
+            .map(|row| {
+                (
+                    row.payment_date,
+                    crate::instruments::cashflow_export::CashflowPoolState {
+                        smm: row.smm,
+                        beginning_balance: row.beginning_balance,
+                        ending_balance: row.ending_balance,
+                    },
+                )
+            })
+            .collect();
+        let mut terms = crate::instruments::cashflow_export::CashflowExportTerms::from_schedule(
+            projection.schedule,
+        );
+        terms.pool_states = Some(states);
+        Ok(terms)
+    }
+
     impl_instrument_base!(
         crate::pricer::InstrumentType::AgencyMbsPassthrough,
         crate::instruments::fixed_income::FIXED_INCOME

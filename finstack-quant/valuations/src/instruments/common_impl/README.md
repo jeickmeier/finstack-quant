@@ -3,8 +3,8 @@
 **This directory is internal.** `instruments/mod.rs` declares it
 `#[macro_use] pub(crate) mod common_impl;`. Nothing here is reachable by path
 from outside `finstack-quant-valuations`; the supported items are re-exported
-flat from `instruments::*` or through the two public sub-namespaces
-`instruments::pricing` and `instruments::cashflow_export`. Add items here when
+flat from `instruments::*` or through the public sub-namespace
+`instruments::pricing`. Add items here when
 two or more instruments need them, and export them deliberately — a `pub fn` in
 a `pub(crate) mod` is still crate-private. The one exception is
 `#[macro_export]`, which hoists a macro to the crate root and ignores module
@@ -29,7 +29,6 @@ numeric-serde helpers that keep instrument invariants uniform.
 | `parameters/` | Shared parameter types (see table below) |
 | `pricing/` | Shared pricing kernels (see table below) |
 | `dependencies.rs` | `MarketDependencies`, `InstrumentCurves`, `RatesCurveKind`, `FxPair`, `VolatilityDependency` |
-| `cashflow_export.rs` | `instrument_cashflows_json` + `InstrumentCashflowEnvelope` / `CashflowRow` — the per-flow DF/survival/PV export behind the Python and WASM bindings |
 | `helpers.rs` | `ValidatedPricingLifecycle`, metric-context construction, `schedule_pv*`, GBM drift schedules, market-scalar lookups, Black-Scholes input collection, inflation-lag resolution |
 | `validation.rs` | Structural invariant checks (`validate_date_range_strict`, `validate_money_gt`, `validate_recovery_rate`, `validate_rate_magnitude`, …) |
 | `numeric.rs` | `decimal_to_f64` plus the serde adapters that reject non-finite / out-of-range `f64` on the wire |
@@ -82,8 +81,10 @@ Everything below is re-exported by `instruments/mod.rs`; the module paths under
   `CreditParams`, `OptionMarketParams`,
   `BondConvention` and the four `*UnderlyingParams`).
 - `instruments::pricing` — glob of `common_impl::pricing`'s public items.
-- `instruments::cashflow_export` — `instrument_cashflows_json`,
-  `InstrumentCashflowEnvelope`, `CashflowRow`.
+- `instruments::cashflow_export` is a sibling module, not part of this
+  directory: the per-flow exporter asks each instrument for its
+  `CashflowExportTerms` through the `Instrument` hooks defined in
+  `traits/instrument.rs`.
 - Crate root, via `#[macro_export]` — `impl_instrument_base!`,
   `impl_focused_pricing_overrides!`, `impl_empty_cashflow_provider!` (all three
   in `traits/macros.rs`) and `impl_equity_exotic_traits!` (in

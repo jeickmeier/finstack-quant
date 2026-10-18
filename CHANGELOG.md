@@ -7,6 +7,7 @@
 #### Added
 
 - `finstack_quant_valuations::pricer::Family`, the registration unit of the valuations stack. Each built-in family is a `static` beside its instruments — `instruments::rates::RATES`, `instruments::fixed_income::FIXED_INCOME`, `instruments::fixed_income::structured_credit::STRUCTURED_CREDIT`, `instruments::credit_derivatives::CREDIT`, `instruments::equity::EQUITY`, `instruments::fx::FX` and `instruments::exotics::EXOTICS` (which owns the commodity leaves) — whose `pricers()` and `metrics()` registries are built on first use. `pricer::FAMILIES` lists them; `pricer::STANDARD` merges them and adds `Composite` and `Basket`. `Instrument::family()` names an instrument's family (`impl_instrument_base!` now takes it as its second argument); the default, `Family::unregistered()`, registers no pricers and only the universal metrics.
+- `Instrument::validate_cashflow_export(model)` and `Instrument::cashflow_export_terms(market, as_of)`, the hooks the per-flow cashflow exporter (`instruments::cashflow_export`, formerly re-exported from `common_impl`) decomposes an instrument with. `CashflowExportTerms` carries the schedule to export, per-currency discount curves, the reporting currency, pool paydown states (`CashflowPoolState`) and inflation index ratios. `Bond` rejects the export of embedded options and return floors; `FxSwap`, `XccySwap`, `AgencyMbsPassthrough` and `InflationLinkedBond` supply what the exporter used to obtain by downcasting. Exported rows are unchanged.
 
 #### Changed
 

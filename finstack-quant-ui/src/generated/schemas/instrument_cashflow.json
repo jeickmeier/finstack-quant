@@ -193,7 +193,7 @@
         },
         "currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-          "description": "Row currency (matters for `XccySwap` / `FxSwap`)."
+          "description": "Row currency (matters for instruments whose legs settle in several currencies)."
         },
         "date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -233,7 +233,7 @@
           ]
         },
         "inflation_index_ratio": {
-          "description": "Inflation index ratio (populated for `InflationLinkedBond`).",
+          "description": "Inflation index ratio (populated for index-linked flows).",
           "format": "double",
           "type": [
             "number",

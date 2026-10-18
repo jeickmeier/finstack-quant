@@ -742,6 +742,39 @@ impl InflationLinkedBond {
 
 // Explicit Instrument trait implementation (replaces macro for better IDE visibility)
 impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond {
+    fn cashflow_export_terms(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<crate::instruments::cashflow_export::CashflowExportTerms> {
+        let mut terms = crate::instruments::cashflow_export::CashflowExportTerms::from_schedule(
+            finstack_quant_cashflows::CashflowProvider::cashflow_schedule(self, market, as_of)?,
+        );
+        // A ratio the market cannot supply exports as an empty cell.
+        let ratios = terms
+            .schedule
+            .get_flows()
+            .iter()
+            .filter_map(
+                |flow| match self.index_ratio_from_market(flow.date, market, as_of) {
+                    Ok(ratio) => Some((flow.date, ratio)),
+                    Err(err) => {
+                        tracing::warn!(
+                            instrument_id = %self.id.as_str(),
+                            date = %flow.date,
+                            %err,
+                            "cashflow export: inflation index ratio lookup failed; \
+                             exporting an empty index_ratio cell"
+                        );
+                        None
+                    }
+                },
+            )
+            .collect();
+        terms.index_ratios = Some(ratios);
+        Ok(terms)
+    }
+
     impl_instrument_base!(
         crate::pricer::InstrumentType::InflationLinkedBond,
         crate::instruments::fixed_income::FIXED_INCOME

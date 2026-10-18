@@ -1032,7 +1032,7 @@
     },
     "StructuredCreditPricingMode": {
       "additionalProperties": false,
-      "description": "Stochastic pricing mode.\n\nMonte Carlo is the only engine: each scenario path draws its monthly\nsystematic factors from a seeded Philox substream and runs the full deal\nwaterfall. The mode is echoed on\n[`StochasticPricingResult::pricing_mode`](super::StochasticPricingResult)\nso a result records the estimator count it was produced with.\n\nTest coverage:\n`tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`\nplus the convergence tests.",
+      "description": "Stochastic pricing mode.\n\nMonte Carlo is the only engine: each scenario path draws its monthly\nsystematic factors from a seeded Philox substream and runs the full deal\nwaterfall. The mode is echoed on\n[`StochasticPricingResult::pricing_mode`]\nso a result records the estimator count it was produced with.\n\nTest coverage:\n`tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`\nplus the convergence tests.",
       "properties": {
         "monte_carlo": {
           "additionalProperties": false,

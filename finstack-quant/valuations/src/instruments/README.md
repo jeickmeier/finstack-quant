@@ -45,11 +45,11 @@ Files at this level:
 | `model_params.rs` | `ModelParamsSnapshot` used by attribution |
 | `position.rs` | `Position` (long/short direction) |
 | `breakeven.rs` | `BreakevenConfig`, `BreakevenMode`, `BreakevenTarget` |
+| `cashflow_export.rs` | `instrument_cashflows_json`, `InstrumentCashflowEnvelope`, `CashflowRow`, and `CashflowExportTerms` — the per-flow DF / survival / PV export behind the bindings and the explain trace; it decomposes an instrument through `Instrument::cashflow_export_terms` and `Instrument::validate_cashflow_export` |
 
 `common_impl` is `pub(crate)`. Its supported surface is re-exported flat from
-`instruments::*`, plus two public sub-namespaces: `instruments::pricing`
-(schedules, generic pricers, `TrsEngine`) and `instruments::cashflow_export`
-(per-flow DF / survival / PV columns used by the bindings).
+`instruments::*`, plus the public sub-namespace `instruments::pricing`
+(schedules, generic pricers, `TrsEngine`).
 
 ## Core trait
 
