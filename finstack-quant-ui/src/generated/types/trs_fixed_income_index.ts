@@ -768,11 +768,9 @@ export interface D_29A90D894679A1E11782 {
  *     currency::Currency, dates::DayCount, money::Money, types::InstrumentId,
  * };
  * use finstack_quant_cashflows::builder::ScheduleParams;
- * use finstack_quant_valuations::instruments::{
- *     Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,
- * };
- * use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
- * use finstack_quant_valuations::instruments::fixed_income::fi_trs::{
+ * use finstack_quant_valuations_core::instruments::{Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive};
+ * use finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap;
+ * use finstack_quant_valuations_fixed_income::fi_trs::{
  *     TrsScheduleSpec,
  * };
  * use rust_decimal::Decimal;

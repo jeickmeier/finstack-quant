@@ -530,7 +530,7 @@ export interface D_24D6Afbb949D55F73647 {
 }
 /**
  * Option on spot commodity. Options on a specified futures contract use
- * [`crate::instruments::CommodityFutureOption`], including futures delivery.
+ * [`crate::CommodityFutureOption`], including futures delivery.
  *
  * # Pricing
  *

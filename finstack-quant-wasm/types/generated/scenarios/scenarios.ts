@@ -6452,7 +6452,7 @@ export interface InstrumentEnvelope {
  * and custom cashflow schedule overrides. Uses a clean `CashflowSpec` that wraps
  * the canonical builder coupon specs for maximum flexibility and parity.
  *
- * [`crate::instruments::Instrument::value`] is the **dirty NPV at `as_of`**,
+ * [`finstack_quant_valuations_core::instruments::Instrument::value`] is the **dirty NPV at `as_of`**,
  * not the market dirty quote at settlement. Quoted YTM, z-spread, and DM
  * remain settlement-anchored.
  */
@@ -7295,8 +7295,8 @@ export interface Notional {
  *
  * **Call-protection only**: the floor applies to EARLY issuer redemptions
  * within the [`ProtectionWindow`] and never at maturity. The held-to-maturity
- * path is unfloored. Use [`crate::metrics::MetricId::MoicToWorst`] /
- * [`crate::metrics::MetricId::XirrToWorst`] to see the honest worst-case
+ * path is unfloored. Use [`finstack_quant_valuations_core::metrics::MetricId::MoicToWorst`] /
+ * [`finstack_quant_valuations_core::metrics::MetricId::XirrToWorst`] to see the honest worst-case
  * return across all paths including the unfloored maturity path.
  *
  * # Mathematical Foundation
@@ -7762,7 +7762,7 @@ export interface InflationLinkedBond {
  *
  * # Pricing
  *
- * Implements [`Instrument::value()`](crate::instruments::common_impl::traits::Instrument::value)
+ * Implements [`Instrument::value()`](finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::value)
  * using deterministic cashflow discounting. PIK interest is capitalized and excluded from PV.
  *
  * # Invariants
@@ -8730,7 +8730,7 @@ export interface DollarRoll {
    * financing rate `(DF(front)/DF(back) − 1)/τ` over the front/back
    * settlement interval, with `τ` on ACT/360.
    * The implied financing rate itself is determined by prices and carry.
-   * See the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]
+   * See the carry calculations (see [`crate::dollar_roll::carry`]
    * module). Does **not** affect
    * the mark-to-market PV, which always discounts both legs at
    * `discount_curve_id`.
@@ -9964,7 +9964,7 @@ export interface SabrParameters {
  * Bermudan swaptions require numerical methods for pricing:
  * - **Hull-White Tree** (default): Industry standard, calibrated to swaption
  *   volatility. Official PV and risk use this path unless a caller selects
- *   [`crate::pricer::ModelKey::MonteCarloHullWhite1F`].
+ *   [`finstack_quant_valuations_core::pricer::ModelKey::MonteCarloHullWhite1F`].
  * - **LSMC**: Longstaff-Schwartz Monte Carlo, opt-in for path-dependent
  *   validation and model comparison.
  */
@@ -12400,7 +12400,7 @@ export interface VarianceSwap {
    * A contract term of the variance-swap confirmation: daily observations
    * are annualised by `trading_days_per_year / observation_frequency.count()`.
    * Must be finite and positive. Defaults to
-   * [`crate::constants::TRADING_DAYS_PER_YEAR`] (252).
+   * [`finstack_quant_valuations_core::constants::TRADING_DAYS_PER_YEAR`] (252).
    */
   trading_days_per_year?: number;
   /**
@@ -13430,7 +13430,7 @@ export interface FxVarianceSwap {
    * A contract term of the variance-swap confirmation: daily observations
    * are annualised by `trading_days_per_year / observation_frequency.count()`.
    * Must be finite and positive. Defaults to
-   * [`crate::constants::TRADING_DAYS_PER_YEAR`] (252).
+   * [`finstack_quant_valuations_core::constants::TRADING_DAYS_PER_YEAR`] (252).
    */
   trading_days_per_year?: number;
   /**
@@ -13540,7 +13540,7 @@ export interface QuantoOption {
 }
 /**
  * Option on spot commodity. Options on a specified futures contract use
- * [`crate::instruments::CommodityFutureOption`], including futures delivery.
+ * [`crate::CommodityFutureOption`], including futures delivery.
  *
  * # Pricing
  *
@@ -14905,7 +14905,7 @@ export interface CliquetOption {
  * standalone `RangeAccrual` pricers**, which support equity/FX (GBM)
  * underlyings only and return a validation error when these fields are set.
  * Price rate-linked range accrual notes through
- * [`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)
+ * [`CallableRangeAccrual`](crate::exotics::callable_range_accrual)
  * (whose `range_accrual` field carries these [`RangeAccrualTerms`]), which
  * models the reference rate under HW1F and reconstructs the term rate per
  * observation.
@@ -16348,7 +16348,7 @@ export interface CallableRangeAccrual {
  * Contract terms of a range accrual note, without identity or pricing overrides.
  *
  * [`RangeAccrual`] flattens these terms into its own payload, and
- * [`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)
+ * [`CallableRangeAccrual`](crate::exotics::callable_range_accrual::CallableRangeAccrual)
  * nests them under `range_accrual`, so the callable note has exactly one
  * `id`, one `attributes` map and one set of pricing overrides.
  */
@@ -16449,7 +16449,7 @@ export interface RangeAccrualTerms {
  * - **Conversion factors**: Supplied per deliverable, preferably from the exchange.
  * - **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,
  *   then the sole basket member. A larger basket requires an explicit or embedded CTD.
- * - **CTD analysis**: [`crate::instruments::Instrument::value`] marks the
+ * - **CTD analysis**: [`finstack_quant_valuations_core::instruments::Instrument::value`] marks the
  *   caller-supplied CTD only; it does not rank the basket. Refresh the CTD
  *   selection daily when the basket can switch.
  */

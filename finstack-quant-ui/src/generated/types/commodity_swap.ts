@@ -501,9 +501,9 @@ export interface D_921Fa1B968E60C3C7Bf0 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
- * use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
- * use finstack_quant_valuations::instruments::PayReceive;
+ * use finstack_quant_valuations_exotics::commodity::commodity_swap::CommoditySwap;
+ * use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
+ * use finstack_quant_valuations_core::instruments::PayReceive;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};
  * use finstack_quant_core::types::{CurveId, InstrumentId};

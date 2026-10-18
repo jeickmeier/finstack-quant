@@ -840,7 +840,7 @@ export interface Attributes {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+ * use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
  * use finstack_quant_core::dates::Date;
  * use time::Month;
  *
@@ -872,7 +872,7 @@ export interface DE61Aca20D5275E83942B {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::CallPut;
+ * use finstack_quant_valuations_fixed_income::bond::CallPut;
  * use finstack_quant_core::dates::Date;
  * use time::Month;
  *

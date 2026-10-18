@@ -352,8 +352,8 @@ export interface D_4F077E8Bfdae2A5Fc362 {
  * # Examples
  * ```rust
  * use finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};
- * use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
- * use finstack_quant_valuations::instruments::FloatLegSpec;
+ * use finstack_quant_valuations_rates::basis_swap::BasisSwap;
+ * use finstack_quant_valuations_core::instruments::FloatLegSpec;
  * use time::Month;
  *
  * let start = Date::from_calendar_date(2024, Month::January, 3).expect("valid date");

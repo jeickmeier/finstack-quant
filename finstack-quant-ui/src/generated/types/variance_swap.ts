@@ -458,7 +458,7 @@ export interface D_85Bc3Ccea16Ecaa23151 {
    * A contract term of the variance-swap confirmation: daily observations
    * are annualised by `trading_days_per_year / observation_frequency.count()`.
    * Must be finite and positive. Defaults to
-   * [`crate::constants::TRADING_DAYS_PER_YEAR`] (252).
+   * [`finstack_quant_valuations_core::constants::TRADING_DAYS_PER_YEAR`] (252).
    */
   trading_days_per_year?: number;
   /**

@@ -196,7 +196,7 @@ export type Date = string;
  * # Example
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
+ * use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;
@@ -719,7 +719,7 @@ export interface DCb133E56Ebd239Cdb4Ee {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};
+ * use finstack_quant_valuations_fx::ndf::{Ndf, NdfQuoteConvention};
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;

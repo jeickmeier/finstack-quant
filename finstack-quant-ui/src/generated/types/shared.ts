@@ -1970,7 +1970,7 @@ export type Date35 = string;
  * # Examples
  *
  * ```text
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;
+ * use finstack_quant_valuations_fixed_income::term_loan::spec::OidPolicy;
  * use finstack_quant_core::money::Money;
  * use finstack_quant_core::currency::Currency;
  *
@@ -6874,7 +6874,7 @@ export type Date99 = string;
  * # Example
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
+ * use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;
@@ -13865,7 +13865,7 @@ export type CdsConvention = "isda_na" | "isda_eu" | "isda_as" | "custom";
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;
+ * use finstack_quant_valuations_credit::cds_option::CdsOptionStrike;
  * use rust_decimal::Decimal;
  *
  * let spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp
@@ -17024,7 +17024,7 @@ export interface Attributes {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{
+ * use finstack_quant_valuations_fixed_income::mbs_passthrough::{
  *     AgencyMbsPassthrough, AgencyProgram, PoolType,
  * };
  * use finstack_quant_cashflows::builder::PrepaymentModelSpec;
@@ -18999,8 +18999,8 @@ export interface PacPayment {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::tba::{AgencyTba, TbaTerm};
- * use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyProgram;
+ * use finstack_quant_valuations_fixed_income::tba::{AgencyTba, TbaTerm};
+ * use finstack_quant_valuations_fixed_income::mbs_passthrough::AgencyProgram;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::money::Money;
  * use finstack_quant_core::dates::Date;
@@ -21985,7 +21985,7 @@ export interface InstrumentCollateral {
  * and custom cashflow schedule overrides. Uses a clean `CashflowSpec` that wraps
  * the canonical builder coupon specs for maximum flexibility and parity.
  *
- * [`crate::instruments::Instrument::value`] is the **dirty NPV at `as_of`**,
+ * [`finstack_quant_valuations_core::instruments::Instrument::value`] is the **dirty NPV at `as_of`**,
  * not the market dirty quote at settlement. Quoted YTM, z-spread, and DM
  * remain settlement-anchored.
  *
@@ -22146,7 +22146,7 @@ export interface Attributes5 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+ * use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
  * use finstack_quant_core::dates::Date;
  * use time::Month;
  *
@@ -22181,7 +22181,7 @@ export interface CallPutSchedule {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::CallPut;
+ * use finstack_quant_valuations_fixed_income::bond::CallPut;
  * use finstack_quant_core::dates::Date;
  * use time::Month;
  *
@@ -23516,8 +23516,8 @@ export interface Money16 {
  *
  * **Call-protection only**: the floor applies to EARLY issuer redemptions
  * within the [`ProtectionWindow`] and never at maturity. The held-to-maturity
- * path is unfloored. Use [`crate::metrics::MetricId::MoicToWorst`] /
- * [`crate::metrics::MetricId::XirrToWorst`] to see the honest worst-case
+ * path is unfloored. Use [`finstack_quant_valuations_core::metrics::MetricId::MoicToWorst`] /
+ * [`finstack_quant_valuations_core::metrics::MetricId::XirrToWorst`] to see the honest worst-case
  * return across all paths including the unfloored maturity path.
  *
  * # Mathematical Foundation
@@ -23592,7 +23592,7 @@ export interface Money16 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{
+ * use finstack_quant_valuations_fixed_income::bond::{
  *     ReturnFloorSpec, IssuePrice,
  * };
  * use finstack_quant_core::types::Rate;
@@ -23610,7 +23610,7 @@ export interface Money16 {
  * Attach to a bond using the fluent builder:
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{
+ * use finstack_quant_valuations_fixed_income::bond::{
  *     Bond, ReturnFloorSpec, ProtectionWindow,
  * };
  * use finstack_quant_core::currency::Currency;
@@ -25960,7 +25960,7 @@ export interface Money24 {
  * covenant and call schedules):
  *
  * ```
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
+ * use finstack_quant_valuations_fixed_income::term_loan::TermLoan;
  *
  * let loan = TermLoan::example()?;
  * loan.validate()?;
@@ -25975,7 +25975,7 @@ export interface Money24 {
  *
  * # Pricing
  *
- * Implements [`Instrument::value()`](crate::instruments::common_impl::traits::Instrument::value)
+ * Implements [`Instrument::value()`](finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::value)
  * using deterministic cashflow discounting. PIK interest is capitalized and excluded from PV.
  *
  * # Invariants
@@ -26154,7 +26154,7 @@ export interface Attributes7 {
  * # Examples
  *
  * ```text
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::{LoanCallSchedule, LoanCall};
+ * use finstack_quant_valuations_fixed_income::term_loan::spec::{LoanCallSchedule, LoanCall};
  * use finstack_quant_core::dates::create_date;
  * use time::Month;
  *
@@ -26487,7 +26487,7 @@ export interface PikToggle {
  * # Examples
  *
  * ```text
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;
+ * use finstack_quant_valuations_fixed_income::term_loan::spec::*;
  * use finstack_quant_core::money::Money;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::create_date;
@@ -29284,8 +29284,8 @@ export interface ScenarioPricingOverrides9 {
  * # Examples
  * ```rust
  * use finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};
- * use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
- * use finstack_quant_valuations::instruments::FloatLegSpec;
+ * use finstack_quant_valuations_rates::basis_swap::BasisSwap;
+ * use finstack_quant_valuations_core::instruments::FloatLegSpec;
  * use time::Month;
  *
  * let start = Date::from_calendar_date(2024, Month::January, 3).expect("valid date");
@@ -31245,9 +31245,9 @@ export interface ScenarioPricingOverrides12 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
- * use finstack_quant_valuations::instruments::fixed_income::tba::TbaTerm;
- * use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyProgram;
+ * use finstack_quant_valuations_fixed_income::dollar_roll::DollarRoll;
+ * use finstack_quant_valuations_fixed_income::tba::TbaTerm;
+ * use finstack_quant_valuations_fixed_income::mbs_passthrough::AgencyProgram;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::money::Money;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -31348,7 +31348,7 @@ export interface DollarRoll {
    * financing rate `(DF(front)/DF(back) − 1)/τ` over the front/back
    * settlement interval, with `τ` on ACT/360.
    * The implied financing rate itself is determined by prices and carry.
-   * See the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]
+   * See the carry calculations (see [`crate::dollar_roll::carry`]
    * module). Does **not** affect
    * the mark-to-market PV, which always discounts both legs at
    * `discount_curve_id`.
@@ -35724,17 +35724,17 @@ export interface FloatLegSpec4 {
  * Bermudan swaptions require numerical methods for pricing:
  * - **Hull-White Tree** (default): Industry standard, calibrated to swaption
  *   volatility. Official PV and risk use this path unless a caller selects
- *   [`crate::pricer::ModelKey::MonteCarloHullWhite1F`].
+ *   [`finstack_quant_valuations_core::pricer::ModelKey::MonteCarloHullWhite1F`].
  * - **LSMC**: Longstaff-Schwartz Monte Carlo, opt-in for path-dependent
  *   validation and model comparison.
  *
  * # Example
  *
  * ```
- * use finstack_quant_valuations::instruments::rates::swaption::{
+ * use finstack_quant_valuations_rates::swaption::{
  *     BermudanSwaption, BermudanSchedule, BermudanType,
  * };
- * use finstack_quant_valuations::instruments::SettlementType;
+ * use finstack_quant_valuations_core::instruments::SettlementType;
  *
  * // Create a 10NC2 (10-year swap, callable after 2 years)
  * let swaption = BermudanSwaption::example().expect("example");
@@ -40864,7 +40864,7 @@ export interface VarianceSwap {
    * A contract term of the variance-swap confirmation: daily observations
    * are annualised by `trading_days_per_year / observation_frequency.count()`.
    * Must be finite and positive. Defaults to
-   * [`crate::constants::TRADING_DAYS_PER_YEAR`] (252).
+   * [`finstack_quant_valuations_core::constants::TRADING_DAYS_PER_YEAR`] (252).
    */
   trading_days_per_year?: number;
   /**
@@ -41156,8 +41156,8 @@ export interface ScenarioPricingOverrides36 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
- * use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
+ * use finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;
+ * use finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -42158,7 +42158,7 @@ export interface ScenarioPricingOverrides40 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
+ * use finstack_quant_valuations_fx::fx_forward::FxForward;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;
@@ -42505,7 +42505,7 @@ export interface ScenarioPricingOverrides41 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};
+ * use finstack_quant_valuations_fx::ndf::{Ndf, NdfQuoteConvention};
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;
@@ -44400,7 +44400,7 @@ export interface FxVarianceSwap {
    * A contract term of the variance-swap confirmation: daily observations
    * are annualised by `trading_days_per_year / observation_frequency.count()`.
    * Must be finite and positive. Defaults to
-   * [`crate::constants::TRADING_DAYS_PER_YEAR`] (252).
+   * [`finstack_quant_valuations_core::constants::TRADING_DAYS_PER_YEAR`] (252).
    */
   trading_days_per_year?: number;
   vol_surface_id: Id156;
@@ -44993,7 +44993,7 @@ export interface ScenarioPricingOverrides48 {
 }
 /**
  * Option on spot commodity. Options on a specified futures contract use
- * [`crate::instruments::CommodityFutureOption`], including futures delivery.
+ * [`crate::CommodityFutureOption`], including futures delivery.
  *
  * # Pricing
  *
@@ -45417,9 +45417,9 @@ export interface ScenarioPricingOverrides50 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
- * use finstack_quant_valuations::instruments::Position;
- * use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
+ * use finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;
+ * use finstack_quant_valuations_core::instruments::Position;
+ * use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -45669,9 +45669,9 @@ export interface ScenarioPricingOverrides51 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
- * use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
- * use finstack_quant_valuations::instruments::PayReceive;
+ * use finstack_quant_valuations_exotics::commodity::commodity_swap::CommoditySwap;
+ * use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
+ * use finstack_quant_valuations_core::instruments::PayReceive;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};
  * use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -45872,9 +45872,9 @@ export interface ScenarioPricingOverrides52 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;
- * use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
- * use finstack_quant_valuations::instruments::OptionType;
+ * use finstack_quant_valuations_exotics::commodity::commodity_swaption::CommoditySwaption;
+ * use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
+ * use finstack_quant_valuations_core::instruments::OptionType;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::{Date, Tenor, TenorUnit};
  * use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -46073,8 +46073,8 @@ export interface Tenor21 {
  * # Example
  *
  * ```
- * use finstack_quant_valuations::instruments::commodity::CommoditySpreadOption;
- * use finstack_quant_valuations::instruments::OptionType;
+ * use finstack_quant_valuations_exotics::commodity::CommoditySpreadOption;
+ * use finstack_quant_valuations_core::instruments::OptionType;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
  * use time::macros::date;
  *
@@ -47803,7 +47803,7 @@ export interface ScenarioPricingOverrides62 {
  * standalone `RangeAccrual` pricers**, which support equity/FX (GBM)
  * underlyings only and return a validation error when these fields are set.
  * Price rate-linked range accrual notes through
- * [`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)
+ * [`CallableRangeAccrual`](crate::exotics::callable_range_accrual)
  * (whose `range_accrual` field carries these [`RangeAccrualTerms`]), which
  * models the reference rate under HW1F and reconstructs the term rate per
  * observation.
@@ -49238,10 +49238,8 @@ export interface Tenor25 {
  *     currency::Currency, dates::DayCount, money::Money, types::InstrumentId,
  * };
  * use finstack_quant_cashflows::builder::ScheduleParams;
- * use finstack_quant_valuations::instruments::{
- *     Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive,
- * };
- * use finstack_quant_valuations::instruments::equity::equity_trs::{
+ * use finstack_quant_valuations_core::instruments::{Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive};
+ * use finstack_quant_valuations_equity::equity_trs::{
  *     EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec,
  * };
  * use rust_decimal::Decimal;
@@ -49797,11 +49795,9 @@ export interface EquityUnderlyingParams {
  *     currency::Currency, dates::DayCount, money::Money, types::InstrumentId,
  * };
  * use finstack_quant_cashflows::builder::ScheduleParams;
- * use finstack_quant_valuations::instruments::{
- *     Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,
- * };
- * use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
- * use finstack_quant_valuations::instruments::fixed_income::fi_trs::{
+ * use finstack_quant_valuations_core::instruments::{Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive};
+ * use finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap;
+ * use finstack_quant_valuations_fixed_income::fi_trs::{
  *     TrsScheduleSpec,
  * };
  * use rust_decimal::Decimal;
@@ -51461,7 +51457,7 @@ export interface ScenarioPricingOverrides72 {
  * - **Conversion factors**: Supplied per deliverable, preferably from the exchange.
  * - **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,
  *   then the sole basket member. A larger basket requires an explicit or embedded CTD.
- * - **CTD analysis**: [`crate::instruments::Instrument::value`] marks the
+ * - **CTD analysis**: [`finstack_quant_valuations_core::instruments::Instrument::value`] marks the
  *   caller-supplied CTD only; it does not rank the basket. Refresh the CTD
  *   selection daily when the basket can switch.
  *
@@ -51470,10 +51466,10 @@ export interface ScenarioPricingOverrides72 {
  * ```rust
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use finstack_quant_valuations::instruments::fixed_income::bond_future::{
+ * use finstack_quant_valuations_fixed_income::bond_future::{
  *     BondFuture, BondFutureSpecs, DeliverableBond,
  * };
- * use finstack_quant_valuations::instruments::{Attributes, ListedFutureTerms, Position};
+ * use finstack_quant_valuations_core::instruments::{Attributes, ListedFutureTerms, Position};
  * use time::macros::date;
  *
  * # fn main() -> finstack_quant_core::Result<()> {
@@ -57830,7 +57826,7 @@ export interface ProtectionLegSpec2 {
  * Contract terms of a range accrual note, without identity or pricing overrides.
  *
  * [`RangeAccrual`] flattens these terms into its own payload, and
- * [`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)
+ * [`CallableRangeAccrual`](crate::exotics::callable_range_accrual::CallableRangeAccrual)
  * nests them under `range_accrual`, so the callable note has exactly one
  * `id`, one `attributes` map and one set of pricing overrides.
  *

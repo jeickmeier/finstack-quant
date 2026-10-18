@@ -1313,7 +1313,7 @@ export default [
     "path": "#/$defs/d_6e351f851936941d91a0/properties/trading_days_per_year",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json#/$defs/FxVarianceSwap/properties/trading_days_per_year",
     "default": 252,
-    "description": "Trading days per year used to annualise daily realized variance.\n\nA contract term of the variance-swap confirmation: daily observations\nare annualised by `trading_days_per_year / observation_frequency.count()`.\nMust be finite and positive. Defaults to\n[`crate::constants::TRADING_DAYS_PER_YEAR`] (252).",
+    "description": "Trading days per year used to annualise daily realized variance.\n\nA contract term of the variance-swap confirmation: daily observations\nare annualised by `trading_days_per_year / observation_frequency.count()`.\nMust be finite and positive. Defaults to\n[`finstack_quant_valuations_core::constants::TRADING_DAYS_PER_YEAR`] (252).",
     "format": "double"
   },
   {

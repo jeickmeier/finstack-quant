@@ -4844,7 +4844,7 @@ export default [
   {
     "path": "#/$defs/d_de9dcde9d5fad54ea251",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms",
-    "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides."
+    "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides."
   },
   {
     "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/bounds_type",
@@ -5193,7 +5193,7 @@ export default [
     "path": "#/$defs/d_f30e208982840b66d83c/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/BoundsType/oneOf/0",
     "const": "absolute",
-    "description": "Bounds are absolute levels (e.g., 4500.0 for SPX, or an absolute rate\nband for a rate-linked note priced via\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual))."
+    "description": "Bounds are absolute levels (e.g., 4500.0 for SPX, or an absolute rate\nband for a rate-linked note priced via\n[`CallableRangeAccrual`](crate::exotics::callable_range_accrual))."
   },
   {
     "path": "#/$defs/d_f30e208982840b66d83c/oneOf/1",

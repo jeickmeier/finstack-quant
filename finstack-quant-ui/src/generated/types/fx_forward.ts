@@ -649,7 +649,7 @@ export interface D_644Fac7163A2Fe78B985 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
+ * use finstack_quant_valuations_fx::fx_forward::FxForward;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;

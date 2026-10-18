@@ -466,7 +466,7 @@ export interface Attributes {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{
+ * use finstack_quant_valuations_fixed_income::mbs_passthrough::{
  *     AgencyMbsPassthrough, AgencyProgram, PoolType,
  * };
  * use finstack_quant_cashflows::builder::PrepaymentModelSpec;

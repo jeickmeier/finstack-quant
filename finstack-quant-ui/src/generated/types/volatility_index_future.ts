@@ -481,8 +481,8 @@ export interface DE1Bd96Bcaa7Ce74B7D1D {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
- * use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
+ * use finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;
+ * use finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
