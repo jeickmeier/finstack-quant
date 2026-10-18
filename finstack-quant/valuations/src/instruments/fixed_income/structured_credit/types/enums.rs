@@ -46,34 +46,6 @@ impl core::fmt::Display for DealType {
     }
 }
 
-/// Tranche seniority levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[non_exhaustive]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "snake_case")]
-pub enum TrancheSeniority {
-    /// Most senior debt tranche
-    Senior = 0,
-    /// Mezzanine debt tranches
-    Mezzanine = 1,
-    /// Subordinated debt tranches
-    Subordinated = 2,
-    /// Equity/first loss piece
-    Equity = 3,
-}
-
-impl core::fmt::Display for TrancheSeniority {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            TrancheSeniority::Senior => write!(f, "senior"),
-            TrancheSeniority::Mezzanine => write!(f, "mezzanine"),
-            TrancheSeniority::Subordinated => write!(f, "subordinated"),
-            TrancheSeniority::Equity => write!(f, "equity"),
-        }
-    }
-}
-
 /// Asset type classification for pool composition (flattened hierarchy)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]

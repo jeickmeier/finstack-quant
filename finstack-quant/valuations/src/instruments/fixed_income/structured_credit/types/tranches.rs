@@ -12,7 +12,8 @@ use finstack_quant_core::types::InstrumentId;
 
 use serde::{Deserialize, Serialize};
 
-use super::enums::{TrancheSeniority, TriggerConsequence};
+use super::enums::TriggerConsequence;
+use crate::results::structured_credit::TrancheSeniority;
 use finstack_quant_core::types::CreditRating;
 
 /// Coverage-test trigger specification for a tranche or deal.

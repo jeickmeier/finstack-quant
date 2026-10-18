@@ -13,4 +13,5 @@ pub(crate) mod metrics;
 pub(crate) mod pricing_mtm;
 mod types;
 
-pub use types::{NotionalExchange, ResettingSide, XccySwap, XccySwapLeg};
+pub use crate::instruments::common_impl::parameters::{NotionalExchange, ResettingSide};
+pub use types::{XccySwap, XccySwapLeg};

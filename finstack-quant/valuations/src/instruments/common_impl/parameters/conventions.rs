@@ -385,6 +385,146 @@ impl std::str::FromStr for CommodityConvention {
     }
 }
 
+/// Notional exchange convention for XCCY swaps.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum NotionalExchange {
+    /// No principal exchange.
+    None,
+    /// Exchange principal at maturity only.
+    Final,
+    /// Exchange principal at start and maturity (typical for fixed-notional XCCY basis swaps).
+    #[default]
+    InitialAndFinal,
+    /// Mark-to-market resetting. The notional of `resetting_side` is re-marked at each
+    /// of its coupon reset dates to match the constant leg's notional in current FX.
+    /// A rebalancing cashflow is paid on the resetting leg only — the constant leg's
+    /// principal-and-coupon schedule is unchanged, matching standard MtM-XCCY market
+    /// convention (QuantLib's `MtMCrossCurrencyBasisSwap` follows the same pattern).
+    /// Under CIP no-FX-vol the constant-currency leg of the FX swap that funds the
+    /// rebalancing is PV-fair from today's perspective, so the resetting-leg flow is
+    /// the only cashflow that needs to be emitted explicitly. Implies initial AND
+    /// final principal exchange.
+    MtmResetting {
+        /// Which leg (`Leg1` or `Leg2`) has its notional reset each period.
+        resetting_side: ResettingSide,
+    },
+}
+
+impl std::fmt::Display for NotionalExchange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => write!(f, "none"),
+            Self::Final => write!(f, "final"),
+            Self::InitialAndFinal => write!(f, "initial_and_final"),
+            Self::MtmResetting { resetting_side } => {
+                write!(f, "mtm_resetting:{resetting_side}")
+            }
+        }
+    }
+}
+
+/// Identifies which leg of an XCCY swap has its notional reset under
+/// MtM-resetting. `Leg1` and `Leg2` refer to `XccySwap::leg1` and `XccySwap::leg2`
+/// respectively.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ResettingSide {
+    /// The first leg (`XccySwap::leg1`) has its notional reset each period.
+    Leg1,
+    /// The second leg (`XccySwap::leg2`) has its notional reset each period.
+    Leg2,
+}
+
+impl std::fmt::Display for ResettingSide {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Leg1 => write!(f, "leg1"),
+            Self::Leg2 => write!(f, "leg2"),
+        }
+    }
+}
+
+impl std::str::FromStr for ResettingSide {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "leg1" => Ok(Self::Leg1),
+            "leg2" => Ok(Self::Leg2),
+            _ => Err(format!("Unknown resetting side: '{s}'. Valid: leg1, leg2")),
+        }
+    }
+}
+
+/// Quote convention for NDF contract rates.
+///
+/// NDFs can be quoted in two conventions depending on the market:
+///
+/// # BasePerSettlement (default)
+///
+/// Rate is quoted as units of base currency per one unit of settlement currency.
+/// Example: USD/CNY = 7.25 means 7.25 CNY per 1 USD.
+///
+/// Settlement formula:
+/// ```text
+/// Settlement = Notional_base × (1/F_fixing - 1/F_contract)
+/// ```
+///
+/// This is the standard convention for most Asian NDF markets (CNY, KRW, INR, etc.)
+/// where the restricted currency is the base and USD is the settlement currency.
+///
+/// # SettlementPerBase
+///
+/// Rate is quoted as units of settlement currency per one unit of base currency.
+/// Example: CNY/USD = 0.138 means 0.138 USD per 1 CNY.
+///
+/// Settlement formula:
+/// ```text
+/// Settlement = Notional_base × (F_fixing - F_contract)
+/// ```
+///
+/// This is less common but may be used in some markets or for consistency with
+/// other FX instruments that quote in this direction.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum NdfQuoteConvention {
+    /// Rate quoted as base currency per settlement currency (e.g., 7.25 CNY per USD).
+    /// Settlement = Notional_base × (1/F_fixing - 1/F_contract)
+    #[default]
+    BasePerSettlement,
+    /// Rate quoted as settlement currency per base currency (e.g., 0.138 USD per CNY).
+    /// Settlement = Notional_base × (F_fixing - F_contract)
+    SettlementPerBase,
+}
+
+impl std::fmt::Display for NdfQuoteConvention {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NdfQuoteConvention::BasePerSettlement => write!(f, "base_per_settlement"),
+            NdfQuoteConvention::SettlementPerBase => write!(f, "settlement_per_base"),
+        }
+    }
+}
+
+impl std::str::FromStr for NdfQuoteConvention {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "base_per_settlement" => Ok(NdfQuoteConvention::BasePerSettlement),
+            "settlement_per_base" => Ok(NdfQuoteConvention::SettlementPerBase),
+            _ => Err(format!("Unknown NDF quote convention: {s}")),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

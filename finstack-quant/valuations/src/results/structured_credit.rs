@@ -1,9 +1,14 @@
-//! Stochastic pricing results.
+//! Structured-credit stochastic pricing results.
+//!
+//! The deal-level [`StochasticPricingResult`] and per-tranche
+//! [`TranchePricingResult`] are the payload of
+//! [`ValuationDetails::StructuredCreditStochastic`](crate::results::ValuationDetails);
+//! [`StructuredCreditPricingMode`] records how the pass was run and
+//! [`TrancheSeniority`] ranks the tranches. They are plain data: the engine
+//! that fills them lives with the structured-credit instrument.
 
 use finstack_quant_core::money::Money;
-
-use super::config::StructuredCreditPricingMode;
-use crate::instruments::fixed_income::structured_credit::types::TrancheSeniority;
+use serde::{Deserialize, Serialize};
 
 /// Stochastic pricing result for a structured credit deal.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -293,6 +298,92 @@ impl TranchePricingResult {
     /// Tranche thickness in percent of the capital structure (`detach_pct - attach_pct`).
     pub fn thickness(&self) -> f64 {
         self.detach_pct - self.attach_pct
+    }
+}
+
+/// Stochastic pricing mode.
+///
+/// Monte Carlo is the only engine: each scenario path draws its monthly
+/// systematic factors from a seeded Philox substream and runs the full deal
+/// waterfall. The mode is echoed on
+/// [`StochasticPricingResult::pricing_mode`](super::StochasticPricingResult)
+/// so a result records the estimator count it was produced with.
+///
+/// Test coverage:
+/// `tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`
+/// plus the convergence tests.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[non_exhaustive]
+pub enum StructuredCreditPricingMode {
+    /// Monte Carlo pricing with a specified number of independent estimators.
+    MonteCarlo {
+        /// Number of independent estimators; must be at least two to estimate
+        /// sampling uncertainty. With `antithetic` each estimator averages a
+        /// `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
+        /// Sample standard error and the Student-t interval use this estimator
+        /// count, with `num_paths - 1` degrees of freedom.
+        #[cfg_attr(feature = "json-schema", schemars(range(min = 2)))]
+        num_paths: usize,
+        /// Pair each estimator's path with its sign-flipped mirror.
+        antithetic: bool,
+    },
+}
+
+impl Default for StructuredCreditPricingMode {
+    /// 5,000 antithetic estimators (10,000 simulated paths), matching what
+    /// `default_stochastic_pricing_mode` selects, so the standalone default
+    /// agrees with the public `price_stochastic` entry point.
+    fn default() -> Self {
+        StructuredCreditPricingMode::MonteCarlo {
+            num_paths: 5_000,
+            antithetic: true,
+        }
+    }
+}
+
+impl StructuredCreditPricingMode {
+    /// Create an antithetic Monte Carlo pricing mode.
+    ///
+    /// # Arguments
+    ///
+    /// * `num_paths` - Number of independent antithetic estimators, clamped to
+    ///   at least 50 (100 simulated paths); the engine simulates
+    ///   `2 × num_paths` scenario paths.
+    pub fn monte_carlo(num_paths: usize) -> Self {
+        StructuredCreditPricingMode::MonteCarlo {
+            num_paths: num_paths.max(50),
+            antithetic: true,
+        }
+    }
+}
+
+/// Tranche seniority levels
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[non_exhaustive]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "snake_case")]
+pub enum TrancheSeniority {
+    /// Most senior debt tranche
+    Senior = 0,
+    /// Mezzanine debt tranches
+    Mezzanine = 1,
+    /// Subordinated debt tranches
+    Subordinated = 2,
+    /// Equity/first loss piece
+    Equity = 3,
+}
+
+impl core::fmt::Display for TrancheSeniority {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            TrancheSeniority::Senior => write!(f, "senior"),
+            TrancheSeniority::Mezzanine => write!(f, "mezzanine"),
+            TrancheSeniority::Subordinated => write!(f, "subordinated"),
+            TrancheSeniority::Equity => write!(f, "equity"),
+        }
     }
 }
 

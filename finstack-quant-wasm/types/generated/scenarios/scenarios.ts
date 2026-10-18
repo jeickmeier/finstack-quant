@@ -372,7 +372,7 @@ export type Id = string;
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */
@@ -1597,7 +1597,7 @@ export type ProtectionWindow =
  * same ratio accretion — the pricer implements both variants through the
  * single ratio-accretion mechanism. Accretion composes multiplicatively on
  * top of any anti-dilution adjustments from
- * [`ConvertibleBond::effective_conversion_ratio`].
+ * `ConvertibleBond::effective_conversion_ratio`.
  */
 export type DividendAdjustment = "none" | "adjust_price" | "adjust_ratio";
 /**

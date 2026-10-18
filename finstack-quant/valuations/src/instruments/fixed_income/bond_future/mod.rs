@@ -17,5 +17,6 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
+pub use crate::contract_specs::BondFutureSpecs;
 pub use pricer::BondFuturePricer;
-pub use types::{BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond};
+pub use types::{BondFuture, BondFutureBuilder, DeliverableBond};

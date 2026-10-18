@@ -21,7 +21,7 @@ struct XccyConventionRecord {
     business_day_convention: BusinessDayConvention,
     base_calendar_id: String,
     quote_calendar_id: String,
-    notional_exchange: crate::instruments::rates::xccy_swap::NotionalExchange,
+    notional_exchange: crate::instruments::common_impl::parameters::NotionalExchange,
 }
 
 impl XccyConventionRecord {
@@ -75,7 +75,7 @@ pub(crate) fn load_registry() -> Result<HashMap<XccyConventionId, XccyConvention
 #[cfg(test)]
 mod mtm_reset_loader_tests {
     use super::*;
-    use crate::instruments::rates::xccy_swap::{NotionalExchange, ResettingSide};
+    use crate::instruments::common_impl::parameters::{NotionalExchange, ResettingSide};
 
     #[test]
     fn eur_usd_xccy_convention_defaults_to_mtm_resetting_on_usd_leg2() {

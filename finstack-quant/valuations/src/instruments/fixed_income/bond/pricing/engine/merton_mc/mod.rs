@@ -30,11 +30,12 @@ mod types;
 
 pub mod calibration;
 
+pub use crate::instruments::common_impl::parameters::merton_mc::{
+    BarrierCrossing, CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, PikMode,
+    PikSchedule,
+};
 pub(crate) use engine::MertonBondTerms;
 pub use engine::MertonMcEngine;
-pub use types::{
-    BarrierCrossing, CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, MertonMcResult,
-    MertonMcRun, PathStatistics, PikMode, PikSchedule,
-};
+pub use types::{MertonMcResult, MertonMcRun, PathStatistics};
 
 pub(crate) use pricer::SimpleBondMertonMcPricer;

@@ -301,7 +301,7 @@ impl FloatLegSpec {
         if self.compounding
             == finstack_quant_cashflows::builder::FloatingLegCompounding::SimpleAverage
         {
-            return Err(crate::instruments::rates::irs::simple_average_unsupported());
+            return Err(simple_average_unsupported());
         }
         finstack_quant_core::validation::validate_date_range_strict(
             self.start,

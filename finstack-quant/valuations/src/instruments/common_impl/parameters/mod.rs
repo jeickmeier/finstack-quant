@@ -9,8 +9,10 @@
 
 pub mod bermudan_call;
 pub mod conventions;
+pub mod convertible;
 pub mod legs;
 pub mod market;
+pub mod merton_mc;
 pub mod monitoring;
 pub mod quanto;
 pub mod trs_common;
@@ -18,7 +20,9 @@ pub mod underlying;
 pub mod volatility;
 
 pub use bermudan_call::BermudanCallProvision;
-pub use conventions::{BondConvention, CommodityConvention};
+pub use conventions::{
+    BondConvention, CommodityConvention, NdfQuoteConvention, NotionalExchange, ResettingSide,
+};
 pub use finstack_quant_models::types::OptionMarketParams;
 pub use legs::{
     FinancingLegSpec, FixedLegSpec, FloatLegSpec, PayReceive, PremiumLegSpec, ProtectionLegSpec,

@@ -93,7 +93,8 @@
 
 mod types;
 
-pub use types::{Ndf, NdfFixingSource, NdfQuoteConvention};
+pub use crate::instruments::common_impl::parameters::NdfQuoteConvention;
+pub use types::{Ndf, NdfFixingSource};
 
 /// Metrics submodule for NDF risk measures.
 pub(crate) mod metrics;

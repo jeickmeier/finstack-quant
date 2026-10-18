@@ -26,7 +26,7 @@ use std::sync::Arc;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::Result;
 
-use crate::instruments::fx::ndf::NdfQuoteConvention;
+use crate::instruments::common_impl::parameters::NdfQuoteConvention;
 use crate::instruments::{FxForward, FxSpot, Instrument, Ndf};
 use crate::metrics::{MetricCalculator, MetricContext};
 

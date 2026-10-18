@@ -271,7 +271,7 @@ pub struct XccyConventions {
     /// notional in current FX. Pair conventions registered the other way around (USD
     /// as base) must invert this to `Leg2`. Registry entries must state it
     /// explicitly.
-    pub notional_exchange: crate::instruments::rates::xccy_swap::NotionalExchange,
+    pub notional_exchange: crate::instruments::common_impl::parameters::NotionalExchange,
 }
 
 /// Rule for deriving an interest-rate future's reference period from its expiry.
@@ -324,4 +324,137 @@ pub struct IrFutureConventions {
     /// Optional convexity adjustment in rate terms.
     #[serde(default)]
     pub convexity_adjustment: Option<f64>,
+}
+
+/// Valuation presentation and pricing policy for CDS marks.
+///
+/// Each variant bundles a coherent set of choices (premium-leg accrual schedule,
+/// Act/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,
+/// par-spread denominator). Mixing those choices via separate boolean
+/// overrides is intentionally not supported — the variants here are the only
+/// conventions traded in practice.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum CdsValuationConvention {
+    /// ISDA-style dirty model PV.
+    ///
+    /// Premium-leg cashflows accrue between unadjusted IMM dates, the final
+    /// coupon excludes the maturity day, and the reported NPV is the dirty
+    /// model PV (no add-back of accrued premium). Par spread uses the risky
+    /// annuity denominator. Use only for direct reproduction of academic ISDA
+    /// Standard Model literature.
+    IsdaDirty,
+    /// Bloomberg CDSW clean principal presentation and premium-leg policy.
+    ///
+    /// This is the industry-standard convention used by Bloomberg CDSW and
+    /// the ISDA Standard Upfront Model. It is the default for new
+    /// `CreditDefaultSwap` instances:
+    ///
+    /// - Intermediate premium cashflows accrue between business-day-adjusted
+    ///   dates. Final accrual ends on unadjusted maturity; the final payment
+    ///   follows the business-day convention independently.
+    /// - The final coupon period is inclusive of the maturity date (extra
+    ///   day) per CDSW convention.
+    /// - The reported NPV is the clean principal value (Bloomberg
+    ///   "Principal" line). Cash settlement is `Principal + Accrued`.
+    /// - Par spread uses the risky annuity denominator (matches the CDSW
+    ///   screen for investment-grade credits).
+    /// - Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)
+    ///   inherits the same CDSW pricer convention so sensitivities are
+    ///   self-consistent with the base PV.
+    #[default]
+    BloombergCdswClean,
+    /// Bloomberg CDSW clean principal with full premium leg in the par-spread
+    /// denominator (distressed-credit variant).
+    ///
+    /// Identical to [`Self::BloombergCdswClean`] except the par spread
+    /// denominator includes accrual-on-default. The difference vs. risky
+    /// annuity is typically < 1bp for investment grade and 2-5bps for
+    /// distressed credits (hazard rate > 3%).
+    BloombergCdswCleanFullPremium,
+    /// QuantLib `IsdaCdsEngine` parity convention.
+    ///
+    /// Reproduces QuantLib's CDS output: dirty PV (no clean add-back),
+    /// business-day-adjusted premium accrual periods, full premium leg in
+    /// the par-spread denominator, QuantLib `Actual360(true)` accrual (every
+    /// Act/360 premium period includes its end date) and the `IsdaCdsEngine`
+    /// `HalfDayBias` accrual-on-default adjustment.
+    QuantLibIsdaParity,
+}
+
+impl CdsValuationConvention {
+    /// Whether the convention reports clean principal (with accrued add-back).
+    #[must_use]
+    pub fn uses_clean_price(self) -> bool {
+        matches!(
+            self,
+            Self::BloombergCdswClean | Self::BloombergCdswCleanFullPremium
+        )
+    }
+
+    /// Whether the convention uses business-day-adjusted premium accrual periods.
+    #[must_use]
+    pub fn uses_adjusted_premium_accrual_dates(self) -> bool {
+        matches!(
+            self,
+            Self::BloombergCdswClean
+                | Self::BloombergCdswCleanFullPremium
+                | Self::QuantLibIsdaParity
+        )
+    }
+
+    /// Whether the par-spread denominator includes accrual-on-default.
+    #[must_use]
+    pub fn par_spread_uses_full_premium(self) -> bool {
+        matches!(
+            self,
+            Self::BloombergCdswCleanFullPremium | Self::QuantLibIsdaParity
+        )
+    }
+
+    /// Whether every Act/360 premium accrual period includes its end date.
+    ///
+    /// Matches QuantLib's `Actual360(true)` day count, used only by
+    /// [`Self::QuantLibIsdaParity`]. The Bloomberg CDSW conventions include
+    /// the maturity day in the final period only.
+    #[must_use]
+    pub fn act360_includes_last_day(self) -> bool {
+        matches!(self, Self::QuantLibIsdaParity)
+    }
+
+    /// Whether the accrual-on-default integral adds QuantLib's half-day bias.
+    ///
+    /// Matches `IsdaCdsEngine::HalfDayBias`, used only by
+    /// [`Self::QuantLibIsdaParity`].
+    #[must_use]
+    pub fn aod_half_day_bias(self) -> bool {
+        matches!(self, Self::QuantLibIsdaParity)
+    }
+
+    /// Calendar days between `as_of` and the protection step-in (effective)
+    /// date used as the lower bound of the protection-leg integral.
+    ///
+    /// - ISDA Standard Model / Markit step protection in at T+1: a default on
+    ///   the valuation date itself is not covered (~$5/$10M/day on a 100bp
+    ///   name).
+    /// - QuantLib's `IsdaCdsEngine` integrates the default leg from the
+    ///   valuation date even when the instrument carries a T+1 protection
+    ///   start (verified against QuantLib 1.42.1; the in-tree
+    ///   `cds_quantlib_flat_hazard_decomposition` golden pins this), so the
+    ///   parity convention uses 0 days.
+    /// - Bloomberg CDSW/CDSO integrate from the valuation date itself
+    ///   ("Protection starts immediately", DOCS 2057273 §3); the in-tree
+    ///   Bloomberg parity goldens pin this behaviour.
+    #[must_use]
+    pub fn protection_step_in_days(self) -> i64 {
+        match self {
+            Self::IsdaDirty => 1,
+            Self::QuantLibIsdaParity
+            | Self::BloombergCdswClean
+            | Self::BloombergCdswCleanFullPremium => 0,
+        }
+    }
 }

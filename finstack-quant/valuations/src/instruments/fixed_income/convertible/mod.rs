@@ -51,10 +51,12 @@ pub(crate) mod metrics;
 pub(crate) mod pricing;
 mod types;
 
-pub use types::{
-    AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, ConvertibleBond,
-    ConvertibleBondBuilder, ConvertibleGreeks, ConvertibleSettlement, DilutionEvent,
+pub use crate::instruments::common_impl::parameters::convertible::{
+    AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DilutionEvent,
     DividendAdjustment, PriceTrigger,
+};
+pub use types::{
+    ConvertibleBond, ConvertibleBondBuilder, ConvertibleGreeks, ConvertibleSettlement,
 };
 
 pub use pricing::{

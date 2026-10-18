@@ -14273,7 +14273,7 @@ export type DigitalPayoutType = "cash_or_nothing" | "asset_or_nothing";
  * same ratio accretion — the pricer implements both variants through the
  * single ratio-accretion mechanism. Accretion composes multiplicatively on
  * top of any anti-dilution adjustments from
- * [`ConvertibleBond::effective_conversion_ratio`].
+ * `ConvertibleBond::effective_conversion_ratio`.
  *
  * # Examples
  *
@@ -17670,7 +17670,7 @@ export interface DCdb8Fddc0106047270C4 {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */
@@ -58753,7 +58753,7 @@ export interface DB0A5Fc543381Da6A57221 {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  *

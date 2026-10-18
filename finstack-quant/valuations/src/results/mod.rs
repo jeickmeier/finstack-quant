@@ -82,6 +82,7 @@
 
 pub(crate) mod dataframe;
 mod provenance;
+pub mod structured_credit;
 mod valuation_result;
 
 pub use dataframe::{ValuationLongRow, ValuationRow};

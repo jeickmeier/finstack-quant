@@ -19,9 +19,8 @@
 //! Canonical citation: `docs/REFERENCES.md`
 //! (`#andersen-piterbarg-xccy-mtm-reset`).
 
-use crate::instruments::rates::xccy_swap::types::{
-    initial_principal_sign, ResettingSide, XccySwap,
-};
+use crate::instruments::common_impl::parameters::ResettingSide;
+use crate::instruments::rates::xccy_swap::types::{initial_principal_sign, XccySwap};
 use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::summation::NeumaierAccumulator;

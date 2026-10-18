@@ -35,6 +35,7 @@ mod stochastic;
 mod structured_credit_impl;
 mod tranche_view;
 
+pub use crate::results::structured_credit::TrancheSeniority;
 pub use borrowing_base::{
     AdvanceRate, BorrowingBaseReport, BorrowingBaseRules, ConcentrationLimit, ConcentrationScope,
     EligibilityRule, LiveCollateral,
@@ -44,7 +45,6 @@ pub use card::CardPortfolioSpec;
 pub use cmbs::{BalloonSpec, PenaltyStep, PrepaymentPenalty, SpecialServicingSpec};
 pub use delinquency::{AdvancingPolicy, DelinquencyModel, ModificationSpec};
 pub use draws::{TrancheDraw, TrancheReadvance};
-pub use enums::TrancheSeniority;
 pub use enums::{
     AssetType, DealType, LossAllocationPolicy, LossRecognition, PaymentMode, TriggerConsequence,
 };

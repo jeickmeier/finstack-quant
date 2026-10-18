@@ -24,9 +24,7 @@ pub enum ValuationDetails {
     /// Credit-derivative pricing metadata.
     CreditDerivative(CreditDerivativeValuationDetails),
     /// Scenario-waterfall structured credit stochastic pricing result.
-    StructuredCreditStochastic(
-        crate::instruments::fixed_income::structured_credit::StochasticPricingResult,
-    ),
+    StructuredCreditStochastic(super::structured_credit::StochasticPricingResult),
     /// FX-bearing instrument pricing metadata (forwards, options, quanto, …).
     ///
     /// Surfaces the [`FxMatrix`](finstack_quant_core::money::fx::FxMatrix) lookup

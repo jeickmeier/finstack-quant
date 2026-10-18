@@ -57,8 +57,8 @@
 //!   (short bond, buy protection) gains when spreads widen, so CS01 is
 //!   positive.
 
-use crate::instruments::credit_derivatives::cds::CdsValuationConvention;
 use crate::market::conventions::ids::CdsDocClause;
+use crate::market::conventions::CdsValuationConvention;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricContext, MetricId};
 use crate::recalibration::{DealCdsQuoteOverride, QuoteBump};

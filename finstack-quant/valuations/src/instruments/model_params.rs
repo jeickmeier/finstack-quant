@@ -1,6 +1,6 @@
 //! Model parameter snapshots for instrument-level attribution.
 
-use crate::instruments::fixed_income::convertible::ConversionSpec;
+use crate::instruments::common_impl::parameters::convertible::ConversionSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 
 /// Snapshot of extractable model parameters from an instrument.

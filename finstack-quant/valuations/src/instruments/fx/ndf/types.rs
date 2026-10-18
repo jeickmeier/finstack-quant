@@ -4,6 +4,7 @@
 //! restricted currencies. Supports both pre-fixing (forward rate estimation)
 //! and post-fixing (observed rate) valuation modes.
 
+use crate::instruments::common_impl::parameters::NdfQuoteConvention;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
@@ -14,70 +15,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
-
-/// Quote convention for NDF contract rates.
-///
-/// NDFs can be quoted in two conventions depending on the market:
-///
-/// # BasePerSettlement (default)
-///
-/// Rate is quoted as units of base currency per one unit of settlement currency.
-/// Example: USD/CNY = 7.25 means 7.25 CNY per 1 USD.
-///
-/// Settlement formula:
-/// ```text
-/// Settlement = Notional_base × (1/F_fixing - 1/F_contract)
-/// ```
-///
-/// This is the standard convention for most Asian NDF markets (CNY, KRW, INR, etc.)
-/// where the restricted currency is the base and USD is the settlement currency.
-///
-/// # SettlementPerBase
-///
-/// Rate is quoted as units of settlement currency per one unit of base currency.
-/// Example: CNY/USD = 0.138 means 0.138 USD per 1 CNY.
-///
-/// Settlement formula:
-/// ```text
-/// Settlement = Notional_base × (F_fixing - F_contract)
-/// ```
-///
-/// This is less common but may be used in some markets or for consistency with
-/// other FX instruments that quote in this direction.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum NdfQuoteConvention {
-    /// Rate quoted as base currency per settlement currency (e.g., 7.25 CNY per USD).
-    /// Settlement = Notional_base × (1/F_fixing - 1/F_contract)
-    #[default]
-    BasePerSettlement,
-    /// Rate quoted as settlement currency per base currency (e.g., 0.138 USD per CNY).
-    /// Settlement = Notional_base × (F_fixing - F_contract)
-    SettlementPerBase,
-}
-
-impl std::fmt::Display for NdfQuoteConvention {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NdfQuoteConvention::BasePerSettlement => write!(f, "base_per_settlement"),
-            NdfQuoteConvention::SettlementPerBase => write!(f, "settlement_per_base"),
-        }
-    }
-}
-
-impl std::str::FromStr for NdfQuoteConvention {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "base_per_settlement" => Ok(NdfQuoteConvention::BasePerSettlement),
-            "settlement_per_base" => Ok(NdfQuoteConvention::SettlementPerBase),
-            _ => Err(format!("Unknown NDF quote convention: {s}")),
-        }
-    }
-}
 
 /// Official NDF fixing source/benchmark.
 ///

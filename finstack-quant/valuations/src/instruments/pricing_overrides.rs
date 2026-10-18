@@ -404,14 +404,14 @@ impl BumpConfig {
 /// Merton Monte Carlo configuration stored on the bond for registry-based pricing.
 ///
 /// This is a wrapper around
-/// [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
+/// [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
 /// that allows the pricer registry to access the MC configuration from
 /// [`InstrumentPricingOverrides`].
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(transparent)]
 pub struct MertonMcOverride(
-    pub crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig,
+    pub crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig,
 );
 
 /// Model selection and tree pricing parameters.
@@ -939,7 +939,7 @@ impl InstrumentPricingOverrides {
     /// Set the Merton Monte Carlo configuration.
     pub fn with_merton_mc_config(
         mut self,
-        config: crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig,
+        config: crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig,
     ) -> Self {
         self.model_config.merton_mc_config = Some(MertonMcOverride(config));
         self

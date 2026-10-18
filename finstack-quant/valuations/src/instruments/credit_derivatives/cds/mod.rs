@@ -141,7 +141,7 @@ mod types;
 
 pub use crate::market::conventions::ids::CdsDocClause;
 pub use crate::market::conventions::CdsConvention;
-pub use types::CdsValuationConvention;
+pub use crate::market::conventions::CdsValuationConvention;
 pub use types::CreditDefaultSwap;
 pub use types::CreditDefaultSwapBuilder;
 pub use types::PayReceive;
