@@ -211,19 +211,9 @@ pub(crate) fn register_bond_metrics(
     registry: &mut finstack_quant_valuations_core::metrics::MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
     use finstack_quant_valuations_core::metrics::{
-        make_credit_bumper, make_rates_bumper, CrossFactorCalculator, MetricId,
+        make_credit_bumper, make_rates_bumper, CrossFactorCalculator,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
-    use std::sync::Arc;
-
-    registry.register_metric(
-        MetricId::CrossGammaRatesCredit,
-        Arc::new(CrossFactorCalculator::new(
-            make_rates_bumper,
-            make_credit_bumper,
-        )),
-        &[InstrumentType::Bond],
-    )?;
 
     finstack_quant_valuations_core::register_metrics! {
         registry: registry,
@@ -269,6 +259,7 @@ pub(crate) fn register_bond_metrics(
             (MoicToWorst, return_metrics::moic::MoicToWorstCalculator),
             (Xirr, return_metrics::xirr::XirrCalculator),
             (XirrToWorst, return_metrics::xirr::XirrToWorstCalculator),
+            (CrossGammaRatesCredit, CrossFactorCalculator::new(make_rates_bumper, make_credit_bumper)),
 
         ]
     };

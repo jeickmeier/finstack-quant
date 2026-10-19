@@ -1,7 +1,6 @@
 //! Deposit-specific metrics module.
 //!
-//! Provides metric calculators for deposit instruments, split into focused
-//! files for clarity and parity with other instruments. Metrics include:
+//! Provides metric calculators for deposit instruments. Metrics include:
 //! - Year fraction (instrument day-count)
 //! - Discount factors at start and end dates
 //! - Par (simple) rate
@@ -14,15 +13,15 @@ mod df;
 
 mod df_end_from_quote;
 mod par_rate;
-mod quote_rate;
-mod year_fraction;
 
 pub(crate) use df_end_from_quote::DfEndFromQuoteCalculator;
 pub(crate) use par_rate::DepositParRateCalculator;
-pub(crate) use quote_rate::QuoteRateCalculator;
-pub(crate) use year_fraction::YearFractionCalculator;
 
+use crate::deposit::Deposit;
+use finstack_quant_valuations_core::metrics::MetricCalculator;
+use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
+use rust_decimal::prelude::ToPrimitive;
 
 /// Registers all deposit metrics to a registry.
 ///
@@ -47,4 +46,54 @@ pub(crate) fn register_deposit_metrics(
         ]
     };
     Ok(())
+}
+
+/// Quoted rate passthrough for deposits.
+///
+/// Returns the quoted simple rate from the instrument.
+///
+/// # Errors
+/// Returns an error if the deposit does not have a quoted rate set.
+pub(crate) struct QuoteRateCalculator;
+
+impl MetricCalculator for QuoteRateCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let deposit: &Deposit = context.instrument_as()?;
+        deposit
+            .fixed_rate
+            .ok_or_else(|| {
+                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
+                    id: "fixed_rate (deposit has no fixed_rate set)".to_string(),
+                })
+            })?
+            .to_f64()
+            .ok_or(finstack_quant_core::InputError::ConversionOverflow.into())
+    }
+}
+
+/// Calculates year fraction for deposits.
+///
+/// Computes the time period between effective start and end dates using the deposit's
+/// day count convention.
+pub(crate) struct YearFractionCalculator;
+
+impl MetricCalculator for YearFractionCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let deposit: &Deposit = context.instrument_as()?;
+        let effective_start = deposit.effective_start_date()?;
+        let effective_end = deposit.effective_end_date()?;
+
+        if effective_end <= effective_start {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "YearFraction: effective end date ({}) must be after effective start date ({})",
+                effective_end, effective_start
+            )));
+        }
+
+        deposit.day_count.year_fraction(
+            effective_start,
+            effective_end,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )
+    }
 }

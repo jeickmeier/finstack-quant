@@ -79,10 +79,7 @@ impl PyCandidatePosition {
         min_weight: f64,
         attributes: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        let envelope_json = crate::bindings::extract::extract_instrument_json(instrument)?;
-        let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
-            serde_json::from_str(&envelope_json).map_err(crate::errors::display_to_py)?;
-        let boxed = envelope.into_boxed().map_err(crate::errors::core_to_py)?;
+        let boxed = crate::bindings::portfolio::types::extract_position_instrument(instrument)?;
         let unit = crate::bindings::portfolio::types::extract_position_unit(py, unit)?;
         let mut inner = CandidatePosition::new(id, entity_id, std::sync::Arc::from(boxed), unit)
             .with_max_weight(max_weight)

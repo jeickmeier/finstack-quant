@@ -15,7 +15,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::calendar_by_id_strict;
-use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date, DayCount, HolidayCalendar};
+use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
@@ -322,18 +322,7 @@ impl Deposit {
     /// # Returns
     /// The effective start date after all adjustments.
     pub fn effective_start_date(&self) -> finstack_quant_core::Result<Date> {
-        let calendar: Option<&dyn HolidayCalendar> = match self.calendar_id.as_deref() {
-            Some(id) => Some(calendar_by_id_strict(id)?),
-            None => None,
-        };
-
-        let business_day_convention = self.business_day_convention;
-
-        if let Some(cal) = calendar {
-            adjust(self.start_date, business_day_convention, cal)
-        } else {
-            Ok(self.start_date)
-        }
+        self.adjust_to_calendar(self.start_date)
     }
 
     /// Compute the effective end date considering business day adjustments.
@@ -348,18 +337,18 @@ impl Deposit {
     /// # Returns
     /// The effective end date after all adjustments.
     pub fn effective_end_date(&self) -> finstack_quant_core::Result<Date> {
-        let calendar: Option<&dyn HolidayCalendar> = match self.calendar_id.as_deref() {
-            Some(id) => Some(calendar_by_id_strict(id)?),
-            None => None,
-        };
+        self.adjust_to_calendar(self.maturity)
+    }
 
-        let business_day_convention = self.business_day_convention;
-
-        // Apply business day adjustment if calendar is available
-        if let Some(cal) = calendar {
-            adjust(self.maturity, business_day_convention, cal)
-        } else {
-            Ok(self.maturity)
+    /// Adjust `date` by the business day convention when `calendar_id` is set.
+    fn adjust_to_calendar(&self, date: Date) -> finstack_quant_core::Result<Date> {
+        match self.calendar_id.as_deref() {
+            Some(id) => adjust(
+                date,
+                self.business_day_convention,
+                calendar_by_id_strict(id)?,
+            ),
+            None => Ok(date),
         }
     }
 }

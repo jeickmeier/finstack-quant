@@ -493,11 +493,12 @@ impl XccySwap {
         finstack_quant_core::dates::calendar_by_id_strict(self.resolve_leg_calendar_id(leg)?)
     }
 
-    /// Build one leg's accrual periods. Single source for both the pricing
-    /// path (`pv_leg_in_reporting_currency`) and the reporting path
-    /// (`leg_coupon_schedule`), so period boundaries, payment dates, and
-    /// reset dates can never drift between priced and reported cashflows.
-    fn leg_build_periods(
+    /// Build one leg's accrual periods. Single source for the pricing paths
+    /// (`pv_leg_in_reporting_currency` and the MtM-resetting pricer) and the
+    /// reporting path (`leg_coupon_schedule`), so period boundaries, payment
+    /// dates, and reset dates can never drift between priced and reported
+    /// cashflows.
+    pub(crate) fn leg_build_periods(
         &self,
         leg: &XccySwapLeg,
         calendar_id: &str,

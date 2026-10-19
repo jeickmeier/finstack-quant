@@ -135,12 +135,6 @@ pub mod dates {
         date!(2025 - 01 - 01)
     }
 
-    /// Two years from TODAY
-    #[allow(dead_code)]
-    pub fn two_years_hence() -> Date {
-        date!(2026 - 01 - 01)
-    }
-
     /// Five years from TODAY
     pub fn five_years_hence() -> Date {
         date!(2029 - 01 - 01)
@@ -561,16 +555,6 @@ pub fn usd(amount: f64) -> Money {
 /// * `amount` - Monetary amount in euros.
 pub fn eur(amount: f64) -> Money {
     Money::new(amount, Currency::EUR).expect("valid money fixture")
-}
-
-/// Create test money in GBP
-///
-/// # Arguments
-///
-/// * `amount` - Monetary amount in pounds sterling.
-#[allow(dead_code)]
-pub fn gbp(amount: f64) -> Money {
-    Money::new(amount, Currency::GBP).expect("valid money fixture")
 }
 
 /// Standard day count for testing

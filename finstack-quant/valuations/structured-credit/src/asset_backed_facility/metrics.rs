@@ -9,7 +9,7 @@ use crate::structured_credit::calculate_equity_metrics;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::metrics::{
-    MetricCalculator, MetricContext, MetricId, MetricRegistry, ZSpreadCs01, ZSpreadCs01Inputs,
+    MetricCalculator, MetricContext, MetricRegistry, ZSpreadCs01, ZSpreadCs01Inputs,
 };
 use finstack_quant_valuations_core::pricer::InstrumentType;
 
@@ -146,33 +146,13 @@ pub(crate) fn register_asset_backed_facility_metrics(
             (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
                 finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate()
             )),
+            (AbfBorrowingBase, AbfBorrowingBaseCalculator),
+            (AbfBorrowingBaseCushion, AbfBorrowingBaseCushionCalculator),
+            (AbfAdvanceRateUtilization, AbfAdvanceRateUtilizationCalculator),
+            (AbfFacilityIrr, AbfFacilityIrrCalculator),
+            (AbfResidualIrr, AbfResidualIrrCalculator),
         ]
     }
 
-    registry.register_metric(
-        MetricId::AbfBorrowingBase,
-        Arc::new(AbfBorrowingBaseCalculator),
-        &[InstrumentType::AssetBackedFacility],
-    )?;
-    registry.register_metric(
-        MetricId::AbfBorrowingBaseCushion,
-        Arc::new(AbfBorrowingBaseCushionCalculator),
-        &[InstrumentType::AssetBackedFacility],
-    )?;
-    registry.register_metric(
-        MetricId::AbfAdvanceRateUtilization,
-        Arc::new(AbfAdvanceRateUtilizationCalculator),
-        &[InstrumentType::AssetBackedFacility],
-    )?;
-    registry.register_metric(
-        MetricId::AbfFacilityIrr,
-        Arc::new(AbfFacilityIrrCalculator),
-        &[InstrumentType::AssetBackedFacility],
-    )?;
-    registry.register_metric(
-        MetricId::AbfResidualIrr,
-        Arc::new(AbfResidualIrrCalculator),
-        &[InstrumentType::AssetBackedFacility],
-    )?;
     Ok(())
 }

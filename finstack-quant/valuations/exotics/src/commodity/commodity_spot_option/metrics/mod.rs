@@ -18,9 +18,8 @@
 
 pub(crate) mod selected_model;
 
-use finstack_quant_valuations_core::metrics::{MetricId, MetricRegistry};
+use finstack_quant_valuations_core::metrics::MetricRegistry;
 use finstack_quant_valuations_core::pricer::InstrumentType;
-use std::sync::Arc;
 
 /// Register commodity option metrics with the registry.
 pub(crate) fn register_commodity_spot_option_metrics(
@@ -36,27 +35,10 @@ pub(crate) fn register_commodity_spot_option_metrics(
             (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::CommoditySpotOption>::vega()),
             (Vanna, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::CommoditySpotOption>::vanna()),
             (Volga, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::CommoditySpotOption>::volga()),
+            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
 
-    registry.register_metric(
-        MetricId::Dv01,
-        Arc::new(
-            finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-                finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined(),
-            ),
-        ),
-        &[InstrumentType::CommoditySpotOption],
-    )?;
-    registry.register_metric(
-        MetricId::BucketedDv01,
-        Arc::new(
-            finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-                finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate(
-                ),
-            ),
-        ),
-        &[InstrumentType::CommoditySpotOption],
-    )?;
     Ok(())
 }

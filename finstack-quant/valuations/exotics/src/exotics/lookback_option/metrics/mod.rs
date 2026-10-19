@@ -3,8 +3,7 @@
 //! Provides full greek coverage for lookback options using finite difference methods.
 //! Delta and Gamma use generic FD calculators.
 
-use finstack_quant_valuations_core::metrics::{MetricId, MetricRegistry};
-use std::sync::Arc;
+use finstack_quant_valuations_core::metrics::MetricRegistry;
 
 /// Register lookback option metrics with the registry.
 pub(crate) fn register_lookback_option_metrics(
@@ -14,30 +13,6 @@ pub(crate) fn register_lookback_option_metrics(
         GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVolga,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
-
-    registry.register_metric(
-        MetricId::Delta,
-        Arc::new(GenericFdDelta::<crate::LookbackOption>::default()),
-        &[InstrumentType::LookbackOption],
-    )?;
-
-    registry.register_metric(
-        MetricId::Gamma,
-        Arc::new(GenericFdGamma::<crate::LookbackOption>::default()),
-        &[InstrumentType::LookbackOption],
-    )?;
-
-    registry.register_metric(
-        MetricId::Vanna,
-        Arc::new(GenericFdVanna::<crate::LookbackOption>::default()),
-        &[InstrumentType::LookbackOption],
-    )?;
-
-    registry.register_metric(
-        MetricId::Volga,
-        Arc::new(GenericFdVolga::<crate::LookbackOption>::default()),
-        &[InstrumentType::LookbackOption],
-    )?;
 
     {
         finstack_quant_valuations_core::register_metrics! {
@@ -49,7 +24,11 @@ pub(crate) fn register_lookback_option_metrics(
                 (Rho, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_discount_only())),
                 (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
                 (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
-                // Theta is now registered universally in crate::exotics::EXOTICS.metrics()
+                // Theta is now registered universally in crate::exotics::EXOTICS.metrics(),
+                (Delta, GenericFdDelta::<crate::LookbackOption>::default()),
+                (Gamma, GenericFdGamma::<crate::LookbackOption>::default()),
+                (Vanna, GenericFdVanna::<crate::LookbackOption>::default()),
+                (Volga, GenericFdVolga::<crate::LookbackOption>::default()),
             ]
         }
     }

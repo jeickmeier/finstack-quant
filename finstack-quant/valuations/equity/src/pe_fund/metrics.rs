@@ -219,26 +219,7 @@ mod nav01;
 pub(crate) fn register_private_markets_fund_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::MetricId;
     use finstack_quant_valuations_core::pricer::InstrumentType;
-    use std::sync::Arc;
-
-    // Private markets fund-specific risk metrics (custom metrics)
-    registry.register_metric(
-        MetricId::Nav01,
-        Arc::new(nav01::Nav01Calculator),
-        &[InstrumentType::PrivateMarketsFund],
-    )?;
-    registry.register_metric(
-        MetricId::Carry01,
-        Arc::new(carry01::Carry01Calculator),
-        &[InstrumentType::PrivateMarketsFund],
-    )?;
-    registry.register_metric(
-        MetricId::Hurdle01,
-        Arc::new(hurdle01::Hurdle01Calculator),
-        &[InstrumentType::PrivateMarketsFund],
-    )?;
 
     finstack_quant_valuations_core::register_metrics! {
         registry: registry,
@@ -250,6 +231,10 @@ pub(crate) fn register_private_markets_fund_metrics(
             (DpiLp, DpiLpCalculator),
             (TvpiLp, TvpiLpCalculator),
             (CarryAccrued, CarryAccruedCalculator),
+            // Private markets fund-specific risk metrics (custom metrics)
+            (Nav01, nav01::Nav01Calculator),
+            (Carry01, carry01::Carry01Calculator),
+            (Hurdle01, hurdle01::Hurdle01Calculator),
         ]
     }
     Ok(())

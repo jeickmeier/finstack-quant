@@ -10,18 +10,16 @@
 //!
 //! Note: Present value is handled by the instrument's built-in value() method.
 
-mod constituent_count;
 mod constituent_delta;
-mod expense_ratio;
 mod weight_risk;
 
-use crate::metrics::MetricId;
 use crate::metrics::MetricRegistry;
-use std::sync::Arc;
 
-use constituent_count::ConstituentCountCalculator;
+use crate::instruments::exotics::basket::types::Basket;
+use crate::metrics::MetricCalculator;
+use crate::metrics::MetricContext;
 pub(crate) use constituent_delta::ConstituentDeltaCalculator;
-use expense_ratio::ExpenseRatioCalculator;
+use finstack_quant_core::Result;
 pub(crate) use weight_risk::WeightRiskCalculator;
 
 /// Register all Basket metrics with the registry
@@ -29,17 +27,6 @@ pub(crate) fn register_basket_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
     use crate::pricer::InstrumentType;
-    // Custom metrics for basket-specific risks
-    registry.register_metric(
-        MetricId::ConstituentDelta,
-        Arc::new(ConstituentDeltaCalculator),
-        &[InstrumentType::Basket],
-    )?;
-    registry.register_metric(
-        MetricId::WeightRisk,
-        Arc::new(WeightRiskCalculator),
-        &[InstrumentType::Basket],
-    )?;
 
     crate::register_metrics! {
         registry: registry,
@@ -47,7 +34,34 @@ pub(crate) fn register_basket_metrics(
         metrics: [
             (ConstituentCount, ConstituentCountCalculator),
             (ExpenseRatio, ExpenseRatioCalculator),
+            // Custom metrics for basket-specific risks
+            (ConstituentDelta, ConstituentDeltaCalculator),
+            (WeightRisk, WeightRiskCalculator),
         ]
     };
     Ok(())
+}
+
+/// Calculate number of constituents in the basket
+///
+/// Returns the number of constituents in the basket.
+pub(super) struct ConstituentCountCalculator;
+
+impl MetricCalculator for ConstituentCountCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let basket = context.instrument_as::<Basket>()?;
+        Ok(basket.constituent_count() as f64)
+    }
+}
+
+/// Calculate expense ratio as percentage
+///
+/// Returns the configured expense ratio as a percentage.
+pub(super) struct ExpenseRatioCalculator;
+
+impl MetricCalculator for ExpenseRatioCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let basket = context.instrument_as::<Basket>()?;
+        Ok(basket.expense_ratio * 100.0)
+    }
 }

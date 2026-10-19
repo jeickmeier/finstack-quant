@@ -6,13 +6,11 @@
 //! - **ConvexityAdjustmentRisk**: Dollar value of the convexity adjustment
 
 use finstack_quant_valuations_core::metrics::MetricRegistry;
-use std::sync::Arc;
 
 /// Register CMS swap metrics with the registry.
 pub(crate) fn register_cms_swap_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::MetricId;
     use finstack_quant_valuations_core::pricer::InstrumentType;
 
     finstack_quant_valuations_core::register_metrics! {
@@ -21,15 +19,9 @@ pub(crate) fn register_cms_swap_metrics(
         metrics: [
             (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (ConvexityAdjustmentRisk, crate::cms_common::ConvexityAdjustmentRiskCalculator::<crate::cms_swap::CmsSwap>(std::marker::PhantomData)),
         ]
     }
 
-    registry.register_metric(
-        MetricId::ConvexityAdjustmentRisk,
-        Arc::new(crate::cms_common::ConvexityAdjustmentRiskCalculator::<
-            crate::cms_swap::CmsSwap,
-        >(std::marker::PhantomData)),
-        &[InstrumentType::CmsSwap],
-    )?;
     Ok(())
 }

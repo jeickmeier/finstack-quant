@@ -1,12 +1,12 @@
 //! FX option metrics module.
 //!
-//! Splits FX option metrics into focused calculators per greek and registers
+//! Defines FX option metric calculators per greek and registers
 //! them with the `MetricRegistry`. Calculators reuse the pricing engine
 //! helpers to ensure consistency between PV and greeks.
 
 mod delta_conventions;
-mod implied_vol;
 
+use crate::fx_option::FxOption;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
 
 /// Register FX option metrics with the registry.
@@ -14,56 +14,9 @@ pub(crate) fn register_fx_option_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
     use finstack_quant_valuations_core::metrics::{
-        make_fx_bumper, make_rates_bumper, make_vol_bumper, CrossFactorCalculator, MetricId,
+        make_fx_bumper, make_rates_bumper, make_vol_bumper, CrossFactorCalculator,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
-    use std::sync::Arc;
-
-    // Standard metrics for rho split by domestic/foreign.
-    registry.register_metric(
-        MetricId::Rho,
-        Arc::new(
-            finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxOption>::rho(
-            ),
-        ),
-        &[InstrumentType::FxOption],
-    )?;
-    registry.register_metric(
-        MetricId::ForeignRho,
-        Arc::new(finstack_quant_valuations_core::metrics::OptionGreekCalculator::<
-            crate::FxOption,
-        >::foreign_rho()),
-        &[InstrumentType::FxOption],
-    )?;
-    registry.register_metric(
-        MetricId::DeltaForward,
-        Arc::new(delta_conventions::DeltaForwardCalculator),
-        &[InstrumentType::FxOption],
-    )?;
-    registry.register_metric(
-        MetricId::DeltaPremiumAdjustedSpot,
-        Arc::new(delta_conventions::DeltaPremiumAdjustedSpotCalculator),
-        &[InstrumentType::FxOption],
-    )?;
-    registry.register_metric(
-        MetricId::DeltaPremiumAdjustedForward,
-        Arc::new(delta_conventions::DeltaPremiumAdjustedForwardCalculator),
-        &[InstrumentType::FxOption],
-    )?;
-
-    registry.register_metric(
-        MetricId::CrossGammaFxVol,
-        Arc::new(CrossFactorCalculator::new(make_fx_bumper, make_vol_bumper)),
-        &[InstrumentType::FxOption],
-    )?;
-    registry.register_metric(
-        MetricId::CrossGammaFxRates,
-        Arc::new(CrossFactorCalculator::new(
-            make_fx_bumper,
-            make_rates_bumper,
-        )),
-        &[InstrumentType::FxOption],
-    )?;
 
     // Standard metrics using macro
     finstack_quant_valuations_core::register_metrics! {
@@ -76,13 +29,43 @@ pub(crate) fn register_fx_option_metrics(
             (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
             // Override universal theta (carry) with model theta for FX options.
             (Theta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxOption>::theta()),
-            (ImpliedVol, implied_vol::ImpliedVolCalculator),
+            (ImpliedVol, ImpliedVolCalculator),
             (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
             (Vanna, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxOption>::vanna()),
             (Volga, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxOption>::volga()),
+            // Standard metrics for rho split by domestic/foreign.
+            (Rho, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxOption>::rho()),
+            (ForeignRho, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxOption>::foreign_rho()),
+            (DeltaForward, delta_conventions::DeltaForwardCalculator),
+            (DeltaPremiumAdjustedSpot, delta_conventions::DeltaPremiumAdjustedSpotCalculator),
+            (DeltaPremiumAdjustedForward, delta_conventions::DeltaPremiumAdjustedForwardCalculator),
+            (CrossGammaFxVol, CrossFactorCalculator::new(make_fx_bumper, make_vol_bumper)),
+            (CrossGammaFxRates, CrossFactorCalculator::new(make_fx_bumper, make_rates_bumper)),
         ]
     }
     Ok(())
+}
+
+/// Implied volatility metric for FX options.
+///
+/// Solves for σ such that model PV(σ) equals the observed option premium in
+/// `instrument_pricing_overrides.market_quotes.quoted_premium`, using the
+/// configured pricer (Hybrid solver under the hood) with log-σ
+/// parameterization.
+pub(crate) struct ImpliedVolCalculator;
+
+impl finstack_quant_valuations_core::metrics::MetricCalculator for ImpliedVolCalculator {
+    fn calculate(
+        &self,
+        context: &mut finstack_quant_valuations_core::metrics::MetricContext,
+    ) -> finstack_quant_core::Result<f64> {
+        let option: &FxOption = context.instrument_as()?;
+        let target_price = option
+            .instrument_pricing_overrides
+            .market_quotes
+            .required_quoted_premium()?;
+        option.implied_vol(&context.curves, context.as_of, target_price)
+    }
 }
 
 #[cfg(test)]

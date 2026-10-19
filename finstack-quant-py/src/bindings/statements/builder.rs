@@ -1272,8 +1272,8 @@ impl PyModelBuilder {
         id: &str,
         instrument: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let envelope = crate::bindings::extract::extract_instrument_json(instrument)?;
-        let spec = finstack_quant_valuations::pricer::json::parse_instrument_from_json(&envelope)
+        let spec = crate::bindings::extract::extract_instrument(instrument)?
+            .into_instrument_json()
             .map_err(core_to_py)?;
         let spec = FinancialStatementInstrument::try_from(spec).map_err(statements_to_py)?;
         let state = slf.take_any()?;

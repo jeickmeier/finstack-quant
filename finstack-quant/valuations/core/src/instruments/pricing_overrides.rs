@@ -835,7 +835,7 @@ impl InstrumentPricingOverrides {
     /// * `vol` - option-implied volatility as a decimal (e.g. `0.35`); this
     ///   is an option-quote channel, not a short-rate σ — the bond lattices
     ///   read [`Self::with_hw1f_sigma`], `model_config.bdt_sigma` or
-    ///   [`Self::with_bk_sigma`] instead
+    ///   `model_config.bk_sigma` instead
     pub fn with_implied_volatility(mut self, vol: f64) -> Self {
         self.market_quotes.implied_volatility = Some(vol);
         self
@@ -866,34 +866,6 @@ impl InstrumentPricingOverrides {
     /// * `kappa` - mean-reversion speed per year (e.g. `0.03` is 3%/yr)
     pub fn with_hw1f_mean_reversion(mut self, kappa: f64) -> Self {
         self.model_config.hw1f_mean_reversion = Some(kappa);
-        self
-    }
-
-    /// Set the Black-Karasinski lognormal short-rate volatility σ.
-    ///
-    /// Read only by the rates-only bond tree when `tree_model = black_karasinski`,
-    /// which also requires [`Self::with_bk_mean_reversion`].
-    ///
-    /// # Arguments
-    ///
-    /// * `sigma` - lognormal short-rate volatility as a decimal proportion
-    ///   (e.g. `0.20` is 20%)
-    pub fn with_bk_sigma(mut self, sigma: f64) -> Self {
-        self.model_config.bk_sigma = Some(sigma);
-        self
-    }
-
-    /// Set the Black-Karasinski mean-reversion speed κ (annualised).
-    ///
-    /// Companion to [`Self::with_bk_sigma`]: the rates-only bond tree
-    /// requires the complete pair when `tree_model = black_karasinski`.
-    ///
-    /// # Arguments
-    ///
-    /// * `kappa` - mean-reversion speed of the log short rate per year
-    ///   (e.g. `0.03` is 3%/yr); must be strictly positive
-    pub fn with_bk_mean_reversion(mut self, kappa: f64) -> Self {
-        self.model_config.bk_mean_reversion = Some(kappa);
         self
     }
 
