@@ -23,17 +23,19 @@ in [`../../mise.toml`](../../mise.toml); nothing here pins a compiler.
 
 ### nightly.yml
 
-`prime-cache` is a single-writer job that populates the mise cache; every other
+`prime-cache` runs first as the single writer of the mise cache; every other
 job reads it with `cache_save: false` to avoid concurrent `actions/cache/save`
-races on the shared `mise.toml`-derived key. Jobs then fan out in parallel:
+races on the shared `mise.toml`-derived key. Supply-chain Security runs next
+and gates the rest. Once it passes, Lint and the three test jobs fan out in
+parallel, and SonarQube runs after all three test jobs:
 
 | Job | Command | Notes |
 | --- | --- | --- |
+| Supply-chain Security | `mise run all-audit` | `cargo deny check` (advisories, licenses, bans), then OSV-Scanner over `Cargo.lock`, `uv.lock` and `finstack-quant-wasm/package-lock.json`, filtered by `osv-scanner.toml`. |
 | Lint | `mise run pre-commit-run`, then `mise run gen-check` | `SKIP: cargo-deny`, which the supply-chain job owns. Clippy covers lib/bins/tests/examples (`--all-features`), not Criterion benches. |
 | Test Rust | `mise run rust-test --coverage` | The fast nextest lib and integration targets under `cargo llvm-cov` (no doctests, no `#[ignore]`d tests); uploads `coverage/rust/lcov.info`. |
 | Test Python | `mise run python-test --coverage` | maturin dev build, then the fast pytest suite (`-m 'not slow and not doctest'`) with coverage; uploads `coverage/python/coverage.xml`. |
 | Test WASM | `python3 scripts/check_wasm_boundary.py`, then `mise run wasm-test` | Serializer and error-path check, then wasm-bindgen tests plus the Node facade suite (the documented code samples run under `--doctest`). |
-| Supply-chain Security | `mise run all-audit` | `cargo deny check` (advisories, licenses, bans), then OSV-Scanner over `Cargo.lock`, `uv.lock` and `finstack-quant-wasm/package-lock.json`, filtered by `osv-scanner.toml`. |
 | SonarQube | `SonarSource/sonarqube-scan-action` | `master` only, so it is skipped inside a release run. Scan only: it imports the two coverage artifacts and runs no tests and no clippy (`sonar.rust.clippy.enabled=false`; Lint owns clippy). |
 
 Two details worth knowing before editing:

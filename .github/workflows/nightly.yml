@@ -52,6 +52,30 @@ jobs:
           MISE_JOBS: "1"
 
   # ============================================
+  # Supply-chain security: cargo-deny (advisories, licenses, bans), then
+  # OSV-Scanner over Cargo.lock, uv.lock and package-lock.json. Gates every
+  # job after the cache prime.
+  # ============================================
+  supply-chain:
+    name: Supply-chain Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: prime-cache
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          cache: true
+          cache_save: false
+
+      - name: Audit dependencies
+        run: mise run all-audit
+
+  # ============================================
   # Lint — pre-commit checks and generated-artifact drift
   # ============================================
   lint:
@@ -60,7 +84,7 @@ jobs:
     # Clippy + gen-check are cargo-heavy; keep headroom above the ~50m wall
     # that cancelled a green run during post-step cleanup.
     timeout-minutes: 90
-    needs: prime-cache
+    needs: supply-chain
 
     env:
       # ubuntu-latest is 4 vCPUs; keep parallelism matched (was 2 for OOM caution).
@@ -137,7 +161,7 @@ jobs:
     runs-on: ubuntu-latest
     # Coverage instrumentation slows the suite.
     timeout-minutes: 90
-    needs: prime-cache
+    needs: supply-chain
 
     env:
       CARGO_BUILD_JOBS: 4
@@ -184,7 +208,7 @@ jobs:
     name: Test Python
     runs-on: ubuntu-latest
     timeout-minutes: 50
-    needs: prime-cache
+    needs: supply-chain
 
     env:
       CARGO_BUILD_JOBS: 4
@@ -240,7 +264,7 @@ jobs:
     name: Test WASM
     runs-on: ubuntu-latest
     timeout-minutes: 50
-    needs: prime-cache
+    needs: supply-chain
 
     env:
       # Four parallel rust-lld links of the wasm-bindgen test graph SIGBUS on
@@ -288,37 +312,15 @@ jobs:
         run: mise run wasm-test
 
   # ============================================
-  # Supply-chain security: cargo-deny (advisories, licenses, bans), then
-  # OSV-Scanner over Cargo.lock, uv.lock and package-lock.json
-  # ============================================
-  supply-chain:
-    name: Supply-chain Security
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: prime-cache
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-
-      - name: Provision toolchain (mise)
-        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
-        with:
-          cache: true
-          cache_save: false
-
-      - name: Audit dependencies
-        run: mise run all-audit
-
-  # ============================================
-  # SonarQube — scan only, on master; imports coverage from the test jobs
+  # SonarQube — scan only, on master; runs after all three test jobs and
+  # imports the Rust and Python coverage
   # ============================================
   sonarqube:
     name: SonarQube
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [test-rust, test-python]
+    needs: [test-rust, test-python, test-wasm]
 
     steps:
       - name: Checkout repository
