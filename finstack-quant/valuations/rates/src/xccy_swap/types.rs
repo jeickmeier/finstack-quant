@@ -289,10 +289,12 @@ impl XccySwap {
     /// Validate the swap's static configuration.
     ///
     /// Checks each leg independently (notional currency consistency, finite/positive
-    /// notional, non-negative payment lag) and then applies additional guards
-    /// when [`NotionalExchange::MtmResetting`] is configured:
+    /// notional, non-negative payment lag), requires the two legs to have
+    /// different currencies (same-currency basis trades are a `BasisSwap`), and
+    /// then applies additional guards when [`NotionalExchange::MtmResetting`] is
+    /// configured:
     ///
-    /// - The two legs must have different currencies (`partition_legs` guard).
+    /// - The resetting side must resolve (`partition_legs` guard).
     /// - Both legs must share the same start and end dates (schedule alignment).
     ///
     /// Frequency, day count, calendar, BDC, stub, payment lag, and reset lag are
@@ -305,6 +307,14 @@ impl XccySwap {
     pub fn validate(&self) -> Result<()> {
         self.validate_leg(&self.leg1)?;
         self.validate_leg(&self.leg2)?;
+
+        if self.leg1.notional.currency() == self.leg2.notional.currency() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "XccySwap legs must have different currencies; both are {}. \
+                 Use BasisSwap for same-currency basis trades.",
+                self.leg1.notional.currency()
+            )));
+        }
 
         // MtM notional exchanges require aligned contractual start/end dates;
         // coupon schedules remain leg-specific.
@@ -954,16 +964,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
-        self.validate_leg(&self.leg1)?;
-        self.validate_leg(&self.leg2)?;
-
-        if self.leg1.notional.currency() == self.leg2.notional.currency() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "XccySwap legs must have different currencies; both are {}. \
-                 Use BasisSwap for same-currency basis trades.",
-                self.leg1.notional.currency()
-            )));
-        }
+        // One structural check shared with `validate_invariants`: leg
+        // invariants, distinct leg currencies and MtM schedule alignment.
+        self.validate()?;
 
         // Pre-flight FX reachability: fail loud with currency-pair context
         // BEFORE descending into per-cashflow conversion. Without this, missing
@@ -972,9 +975,6 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         self.validate_fx_reachable(market)?;
 
         if let NotionalExchange::MtmResetting { resetting_side } = self.notional_exchange {
-            // Run the full `validate()` so MtM-specific notional-exchange
-            // alignment and currency checks fire before per-period math.
-            self.validate()?;
             return crate::xccy_swap::pricing_mtm::pv_mtm_reset(
                 self,
                 resetting_side,
@@ -1433,6 +1433,23 @@ mod tests {
 
         swap.validate()
             .expect("each MtM leg owns its coupon frequency");
+    }
+
+    #[test]
+    fn validate_rejects_same_currency_legs_without_mtm_reset() {
+        let mut swap = XccySwap::example()
+            .expect("example")
+            .with_notional_exchange(NotionalExchange::InitialAndFinal);
+        swap.leg2.notional = finstack_quant_core::money::Money::from((1_i64, Currency::USD));
+
+        let err = swap
+            .validate()
+            .expect_err("same-currency legs must be rejected by validate()");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("different currencies") && msg.contains("USD"),
+            "expected same-currency error mentioning USD; got: {msg}"
+        );
     }
 
     #[test]

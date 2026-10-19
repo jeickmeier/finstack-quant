@@ -150,12 +150,14 @@ impl CdsTranchePricer {
                 },
             ));
         }
-        let (_, valuation_date, _, _) = self.prepare_projection_inputs(tranche, market, as_of)?;
         let flows = self
             .project_discountable_rows(tranche, market, as_of)?
             .into_iter()
             .map(|row| row.cashflow)
             .collect();
+        // Same settlement date the projection inputs resolve; read directly so
+        // the expected-loss curve is integrated only once.
+        let valuation_date = self.calculate_settlement_date(tranche, market, as_of)?;
 
         Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             flows,

@@ -1133,4 +1133,39 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn rho_reprices_with_the_requested_model() {
+        use finstack_quant_valuations_core::instruments::PricingOptions;
+        use finstack_quant_valuations_core::metrics::{bump_discount_curve_parallel, MetricId};
+
+        let as_of = date(2024, 1, 1);
+        let curves = market(as_of);
+        let mut inst = RangeAccrual::example().expect("example");
+        inst.terms.observation_dates = vec![date(2024, 6, 30), date(2024, 12, 31)];
+        inst.terms.payment_date = Some(date(2025, 1, 2));
+        inst.instrument_pricing_overrides =
+            inst.instrument_pricing_overrides.clone().with_mc_paths(256);
+        let mc = || PricingOptions::default().with_model(ModelKey::MonteCarloGBM);
+
+        let rho = inst
+            .price_with_metrics(&curves, as_of, &[MetricId::Rho], mc())
+            .expect("mc rho")
+            .metric(MetricId::Rho)
+            .expect("rho present");
+
+        let mc_pv = |bp: f64| {
+            let bumped = bump_discount_curve_parallel(&curves, &inst.terms.discount_curve_id, bp)
+                .expect("bumped market");
+            inst.price_with_metrics(&bumped, as_of, &[], mc())
+                .expect("mc pv")
+                .value
+                .amount()
+        };
+        let expected = (mc_pv(1.0) - mc_pv(-1.0)) / 2.0;
+        assert!(
+            (rho - expected).abs() <= 1e-9 * expected.abs().max(1e-12),
+            "MC rho {rho} must match the same-model central bump {expected}"
+        );
+    }
 }

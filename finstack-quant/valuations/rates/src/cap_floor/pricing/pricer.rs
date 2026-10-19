@@ -170,7 +170,9 @@ impl Pricer for SimpleCapFloorBlackPricer {
             InstrumentType::CapFloor,
         )?;
 
-        let pv = price_cap_floor(cap_floor, market, as_of)?;
+        // Unshocked holder NPV, net of any unsettled premium; the registry
+        // applies the pricing lifecycle (scenario overrides) on top.
+        let pv = cap_floor.base_value(market, as_of)?;
 
         Ok(ValuationResult::stamped(cap_floor.id(), as_of, pv))
     }

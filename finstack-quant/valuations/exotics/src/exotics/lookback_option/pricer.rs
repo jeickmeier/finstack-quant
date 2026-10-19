@@ -67,11 +67,7 @@ impl LookbackOptionMcPricer {
                 "LookbackOption discount curve",
             )?;
 
-        let spot_scalar = curves.get_price(&inst.spot_id)?;
-        let spot = match spot_scalar {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-        };
+        let spot = lookback_spot(inst, curves)?;
 
         let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
             curves,
@@ -303,15 +299,16 @@ fn require_observed_extremum(
     Ok(())
 }
 
+/// Underlying spot from `spot_id`; a price-typed scalar must be quoted in the
+/// option currency (a lookback has no quanto leg), else `CurrencyMismatch`.
 fn lookback_spot(
+    inst: &LookbackOption,
     curves: &MarketContext,
-    spot_id: &finstack_quant_core::types::PriceId,
 ) -> finstack_quant_core::Result<f64> {
-    let spot_scalar = curves.get_price(spot_id)?;
-    Ok(match spot_scalar {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-    })
+    finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+        curves.get_price(&inst.spot_id)?,
+        inst.currency,
+    )
 }
 
 fn terminal_lookback_spot(
@@ -323,7 +320,7 @@ fn terminal_lookback_spot(
         return Ok(fixing);
     }
     if as_of == inst.expiry {
-        return lookback_spot(curves, &inst.spot_id);
+        return lookback_spot(inst, curves);
     }
     Err(finstack_quant_core::Error::Validation(format!(
         "LookbackOption '{}' requires expiry_fixing when valued after expiry {}",
@@ -393,17 +390,13 @@ fn collect_lookback_inputs(
     let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
     let df = disc_curve.df_between_dates(as_of, inst.expiry)?;
     // Keep analytical rate consistent with date-based discounting used by the curve.
-    let r = if t > 0.0 && df > 0.0 {
-        -df.ln() / t
-    } else {
-        0.0
-    };
+    let r = finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+        df,
+        t,
+        "LookbackOption discount curve",
+    )?;
 
-    let spot_scalar = curves.get_price(&inst.spot_id)?;
-    let spot = match spot_scalar {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-    };
+    let spot = lookback_spot(inst, curves)?;
 
     let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
         curves,
@@ -1102,5 +1095,99 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn missing_discount_curve_surfaces_as_not_found() {
+        let as_of = date(2025, 1, 2);
+        let curves = market(as_of, 100.0, 0.25, 0.03, 0.0);
+        let mut option = fixed_strike_call(date(2026, 1, 2), 100.0, None);
+        option.discount_curve_id = CurveId::new("MISSING-OIS");
+        let err = option.value(&curves, as_of).expect_err("missing curve");
+        assert!(
+            matches!(
+                err,
+                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound { .. })
+            ),
+            "missing discount curve must stay NotFound, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn foreign_currency_spot_price_is_rejected_on_every_path() {
+        let as_of = date(2025, 1, 2);
+        let expiry = date(2026, 1, 2);
+        let curves = market(as_of, 100.0, 0.25, 0.03, 0.0).insert_price(
+            "SPX-SPOT",
+            MarketScalar::Price(Money::new(100.0, Currency::EUR).expect("valid money fixture")),
+        );
+
+        // Continuous monitoring: analytical pricer.
+        let continuous = fixed_strike_call(expiry, 100.0, None);
+        let err = continuous.value(&curves, as_of).expect_err("analytical");
+        assert!(
+            err.to_string().contains("Currency mismatch"),
+            "analytical: {err:?}"
+        );
+
+        // Expired at expiry without a fixing: terminal spot read.
+        let mut expiring = fixed_strike_call(as_of, 100.0, Some(110.0));
+        expiring.expiry_fixing = None;
+        let err = expiring.value(&curves, as_of).expect_err("terminal spot");
+        assert!(
+            err.to_string().contains("Currency mismatch"),
+            "terminal: {err:?}"
+        );
+
+        // Discrete monitoring: Monte Carlo pricer.
+        let mut discrete = fixed_strike_call(expiry, 100.0, None);
+        discrete.monitoring = finstack_quant_valuations_core::instruments::Monitoring::Discrete {
+            observation_dates: vec![date(2025, 7, 1), expiry],
+        };
+        discrete.instrument_pricing_overrides.model_config.mc_paths = Some(16);
+        let err = discrete.value(&curves, as_of).expect_err("mc");
+        assert!(
+            matches!(
+                err,
+                finstack_quant_core::Error::CurrencyMismatch {
+                    expected: Currency::USD,
+                    actual: Currency::EUR,
+                }
+            ),
+            "mc: {err:?}"
+        );
+    }
+
+    #[test]
+    fn rho_reprices_with_the_requested_model() {
+        use finstack_quant_valuations_core::instruments::PricingOptions;
+        use finstack_quant_valuations_core::metrics::{bump_discount_curve_parallel, MetricId};
+
+        let as_of = date(2025, 1, 2);
+        let curves = market(as_of, 100.0, 0.25, 0.03, 0.0);
+        let mut option = fixed_strike_call(date(2026, 1, 2), 100.0, None);
+        option.instrument_pricing_overrides.model_config.mc_paths = Some(2_000);
+        let mc = || PricingOptions::default().with_model(ModelKey::MonteCarloGBM);
+
+        let rho = option
+            .price_with_metrics(&curves, as_of, &[MetricId::Rho], mc())
+            .expect("mc rho")
+            .metric(MetricId::Rho)
+            .expect("rho present");
+
+        let mc_pv = |bp: f64| {
+            let bumped = bump_discount_curve_parallel(&curves, &option.discount_curve_id, bp)
+                .expect("bumped market");
+            option
+                .price_with_metrics(&bumped, as_of, &[], mc())
+                .expect("mc pv")
+                .value
+                .amount()
+        };
+        let expected = (mc_pv(1.0) - mc_pv(-1.0)) / 2.0;
+        assert!(
+            (rho - expected).abs() <= 1e-9 * expected.abs().max(1e-12),
+            "MC rho {rho} must match the same-model central bump {expected}"
+        );
     }
 }

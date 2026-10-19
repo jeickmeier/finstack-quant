@@ -173,6 +173,11 @@ impl MetricCalculator for VannaCalculator {
             if payment_date <= as_of {
                 continue;
             }
+            // Seasoned period: the pricer values it as intrinsic on the
+            // recorded fixing, which has no vol dependence.
+            if fixing_date < as_of {
+                continue;
+            }
 
             // 1. Calculate Forward Swap Rate
             let reference_swap = inst.reference_swap();
@@ -196,26 +201,34 @@ impl MetricCalculator for VannaCalculator {
                 continue;
             }
 
+            // As in the pricer: σ(K) prices the Black payoff, σ(F) drives the
+            // convexity adjustment (a property of the swap-rate distribution).
             let vol = finstack_quant_models::volatility::get_surface_vol_clamped(
                 &vol_surface,
                 time_to_fixing,
                 strike,
             );
+            let atm_vol = finstack_quant_models::volatility::get_surface_vol_clamped(
+                &vol_surface,
+                time_to_fixing,
+                forward_swap_rate,
+            );
 
             // 3. Convexity Adjustment Derivative
-            // Convexity = 0.5 * vol^2 * T * G(S)
+            // Convexity = 0.5 * σ(F)^2 * T * G(S)
             // where G(S) = swap_tenor / (1 + S * swap_tenor)^2
-            // d(Convexity)/d(Vol) = vol * T * G(S) = 2 * Convexity / Vol
+            // d(Convexity)/dσ(F) = 2 * Convexity / σ(F); a parallel vol shift
+            // moves σ(F) and σ(K) equally, so this is also d/dσ.
             let conv_adj = convexity_adjustment_with_frequency(
-                vol,
+                atm_vol,
                 time_to_fixing,
                 inst.cms_tenor.to_years(),
                 forward_swap_rate,
                 reference_swap.payments_per_year()?,
                 crate::cms_common::signed_act365f_year_fraction(swap_start, payment_date)?,
             );
-            let d_conv_d_vol = if vol.abs() > 1e-10 {
-                2.0 * conv_adj / vol
+            let d_conv_d_vol = if atm_vol.abs() > 1e-10 {
+                2.0 * conv_adj / atm_vol
             } else {
                 0.0
             };

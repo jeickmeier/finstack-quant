@@ -20,11 +20,7 @@ impl MetricCalculator for ConversionValueCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bond: &ConvertibleBond = context.instrument_as()?;
 
-        let spot_price = context.curves.get_price(&bond.spot_id)?;
-        let spot = match spot_price {
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => money.amount(),
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
-        };
+        let spot = bond.spot_value(context.curves.get_price(&bond.spot_id)?)?;
 
         crate::convertible::pricing::compute_conversion_value(bond, spot)
     }

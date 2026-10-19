@@ -317,12 +317,16 @@ fn quanto_vega_is_per_volatility_percentage_point() {
     let option = build_option(-0.35);
     let market = build_market(0.20, 0.10);
     let vol_bump = 0.01;
+    // Central difference over ±1 vol point, normalized per vol point.
     let expected = (option
         .value(&build_market(0.20 + vol_bump, 0.10), AS_OF)
-        .expect("bumped PV")
+        .expect("up PV")
         .amount()
-        - option.value(&market, AS_OF).expect("base PV").amount())
-        / (vol_bump * 100.0);
+        - option
+            .value(&build_market(0.20 - vol_bump, 0.10), AS_OF)
+            .expect("down PV")
+            .amount())
+        / (2.0 * vol_bump * 100.0);
     let result = option
         .price_with_metrics(&market, AS_OF, &[MetricId::Vega], PricingOptions::default())
         .expect("vega result");
@@ -371,4 +375,63 @@ fn quanto_generic_theta_horizon_caps_at_expiry() {
         .expect("expired theta");
     assert_eq!(expired.metric(MetricId::Theta), Some(0.0));
     assert_eq!(expired.metric(MetricId::ThetaPeriodDays), Some(0.0));
+}
+
+#[test]
+fn quanto_vol_greeks_bump_the_implied_volatility_override() {
+    let with_vol = |vol: f64| {
+        let mut option = build_option(-0.35);
+        option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(vol);
+        option
+    };
+    // Surface at 0.30 is present but unused: the 0.20 override drives pricing.
+    let market = build_market(0.30, 0.10);
+    let base = with_vol(0.20);
+    let pv = |option: &QuantoOption| option.value(&market, AS_OF).expect("PV").amount();
+    let width = 0.01 * 100.0;
+    let pv_up = pv(&with_vol(0.21));
+    let pv_dn = pv(&with_vol(0.19));
+    let vega_ref = (pv_up - pv_dn) / (2.0 * width);
+    let volga_ref = (pv_up - 2.0 * pv(&base) + pv_dn) / (width * width);
+
+    let result = base
+        .price_with_metrics(
+            &market,
+            AS_OF,
+            &[MetricId::Vega, MetricId::Volga, MetricId::Vanna],
+            PricingOptions::default(),
+        )
+        .expect("override vol greeks");
+    let vega = result.metric(MetricId::Vega).expect("vega");
+    let volga = result.metric(MetricId::Volga).expect("volga");
+    let vanna = result.metric(MetricId::Vanna).expect("vanna");
+    assert!(vega.abs() > 1.0, "vega must not be zero, got {vega}");
+    assert!(
+        (vega - vega_ref).abs() <= 1e-9 * vega_ref.abs().max(1.0),
+        "override vega: expected {vega_ref}, got {vega}"
+    );
+    assert!(
+        (volga - volga_ref).abs() <= 1e-9 * volga_ref.abs().max(1.0),
+        "override volga: expected {volga_ref}, got {volga}"
+    );
+    assert!(vanna.abs() > 0.0, "vanna must not be zero, got {vanna}");
+}
+
+#[test]
+fn quanto_missing_curve_surfaces_as_not_found() {
+    let mut option = build_option(-0.35);
+    option.domestic_discount_curve_id = CurveId::new("MISSING-OIS");
+    let error = option
+        .value(&build_market(0.20, 0.10), AS_OF)
+        .expect_err("missing curve must fail");
+    assert!(
+        matches!(
+            error,
+            finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound { .. })
+        ),
+        "missing curve must stay NotFound, got {error:?}"
+    );
 }

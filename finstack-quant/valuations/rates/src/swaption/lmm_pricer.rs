@@ -671,4 +671,61 @@ mod tests {
             assert!(error.contains(message), "expected {message:?} in {error:?}");
         }
     }
+
+    /// `ExpectedExerciseTime` is published by the Hull-White tree pricer's own
+    /// exercise policy. Under LMM it must fail clearly rather than silently
+    /// calibrate a Hull-White tree for a swaption priced under another model.
+    #[test]
+    fn expected_exercise_time_is_not_derived_from_a_hw_tree_under_lmm() {
+        use crate::RATES;
+        use finstack_quant_valuations_core::instruments::PricingOptions;
+        use finstack_quant_valuations_core::metrics::MetricId;
+        use finstack_quant_valuations_core::pricer::PricerRegistry;
+        use std::sync::Arc;
+
+        let (as_of, mut option, market) = supported_contract();
+        // Complete HW1F inputs, so a Hull-White tree *could* be built.
+        let config = &mut option.instrument_pricing_overrides.model_config;
+        config.hw1f_mean_reversion = Some(0.03);
+        config.hw1f_sigma = Some(0.01);
+
+        let mut registry = PricerRegistry::new();
+        RATES
+            .register_pricers(&mut registry)
+            .expect("rates pricers");
+        registry.replace(BermudanSwaptionLmmPricer::with_config(Hw1fMcConfig {
+            num_paths: 4,
+            antithetic: true,
+            oos_lsmc: false,
+            ..Default::default()
+        }));
+        let registry = Arc::new(registry);
+        let price = |model: ModelKey| {
+            option.price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::ExpectedExerciseTime],
+                PricingOptions::default()
+                    .with_model(model)
+                    .with_registry(Arc::clone(&registry)),
+            )
+        };
+
+        let error = price(ModelKey::LmmMonteCarlo)
+            .expect_err("LMM does not publish an expected exercise time")
+            .to_string();
+        assert!(
+            error.contains("did not produce it"),
+            "expected a not-published error, got {error:?}"
+        );
+
+        // The Hull-White tree pricer still publishes it from its own policy.
+        let tree = price(ModelKey::HullWhite1F).expect("HW tree pricing");
+        let value = tree
+            .measures
+            .get(MetricId::ExpectedExerciseTime.as_str())
+            .copied()
+            .expect("published expected exercise time");
+        assert!(value.is_finite() && value > 0.0, "got {value}");
+    }
 }

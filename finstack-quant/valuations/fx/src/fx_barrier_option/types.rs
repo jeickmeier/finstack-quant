@@ -303,6 +303,51 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::OptionGre
     }
 }
 impl FxBarrierOption {
+    /// Market with the FX spot bumped relatively on the source pricing reads:
+    /// the `fx_spot_id` scalar when set, else the `FxMatrix` base/quote rate.
+    fn spot_bumped_market(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        bump_pct: f64,
+    ) -> finstack_quant_core::Result<finstack_quant_core::market_data::context::MarketContext> {
+        match self.fx_spot_id.as_ref() {
+            Some(spot_id) => finstack_quant_valuations_core::metrics::bump_scalar_price(
+                market, spot_id, bump_pct,
+            ),
+            None => Ok(market
+                .clone()
+                .insert_fx(market.fx_required()?.with_bumped_rate(
+                    self.base_currency,
+                    self.quote_currency,
+                    bump_pct,
+                    as_of,
+                )?)),
+        }
+    }
+
+    /// Central spot delta of `self` in `market`, bumping the spot source
+    /// pricing reads by `±bump_pct` relative to `spot`.
+    fn spot_delta(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        spot: f64,
+        bump_pct: f64,
+    ) -> finstack_quant_core::Result<f64> {
+        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+
+        let up = self.spot_bumped_market(market, as_of, bump_pct)?;
+        let down = self.spot_bumped_market(market, as_of, -bump_pct)?;
+        let pv_up = self.value(&up, as_of)?.amount();
+        let pv_dn = self.value(&down, as_of)?.amount();
+        finstack_quant_valuations_core::metrics::central_diff_by_width(
+            pv_up,
+            pv_dn,
+            2.0 * spot * bump_pct,
+        )
+    }
+
     fn option_delta(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -317,21 +362,13 @@ impl FxBarrierOption {
         if t <= 0.0 {
             return Ok(Some(0.0));
         }
-        let spot_id = self.fx_spot_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "FxBarrierOption delta requires fx_spot_id for finite-difference spot bumps"
-                    .to_string(),
-            )
-        })?;
-        Ok(Some(
-            finstack_quant_valuations_core::metrics::central_diff_scalar_relative(
-                self,
-                market,
-                as_of,
-                spot_id,
-                bumps.spot_bump_decimal,
-            )?,
-        ))
+        let spot = crate::fx_barrier_option::pricer::resolve_fx_spot(self, market, as_of)?;
+        Ok(Some(self.spot_delta(
+            market,
+            as_of,
+            spot,
+            bumps.spot_bump_decimal,
+        )?))
     }
     fn option_gamma(
         &self,
@@ -352,31 +389,15 @@ impl FxBarrierOption {
 
         let base_pv = self.value(market, as_of)?.amount();
 
-        let spot_id = self.fx_spot_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "FxBarrierOption gamma requires fx_spot_id for finite-difference spot bumps"
-                    .to_string(),
-            )
-        })?;
-        let spot_scalar = market.get_price(spot_id)?;
-        let current_spot =
-            finstack_quant_valuations_core::metrics::scalar_numeric_value(spot_scalar);
+        let current_spot = crate::fx_barrier_option::pricer::resolve_fx_spot(self, market, as_of)?;
         let bump_size = current_spot * bumps.spot_bump_decimal;
         if bump_size <= 0.0 {
             return Ok(Some(0.0));
         }
 
-        let up = finstack_quant_valuations_core::metrics::bump_scalar_price(
-            market,
-            spot_id,
-            bumps.spot_bump_decimal,
-        )?;
+        let up = self.spot_bumped_market(market, as_of, bumps.spot_bump_decimal)?;
         let pv_up = self.value(&up, as_of)?.amount();
-        let down = finstack_quant_valuations_core::metrics::bump_scalar_price(
-            market,
-            spot_id,
-            -bumps.spot_bump_decimal,
-        )?;
+        let down = self.spot_bumped_market(market, as_of, -bumps.spot_bump_decimal)?;
         let pv_down = self.value(&down, as_of)?.amount();
 
         Ok(Some(
@@ -400,19 +421,15 @@ impl FxBarrierOption {
             return Ok(Some(0.0));
         }
 
-        let vol_bump = bumps.vol_bump_decimal;
-        let up = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+        let (vol_bump, (up, market_up), (down, market_down)) = crate::shared::active_vol_scenarios(
+            self,
+            &self.instrument_pricing_overrides,
             market,
             self.vol_surface_id.as_str(),
-            vol_bump,
+            bumps.vol_bump_decimal,
         )?;
-        let down = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-            market,
-            self.vol_surface_id.as_str(),
-            -vol_bump,
-        )?;
-        let pv_up = self.value(&up, as_of)?.amount();
-        let pv_down = self.value(&down, as_of)?.amount();
+        let pv_up = up.value(&market_up, as_of)?.amount();
+        let pv_down = down.value(&market_down, as_of)?.amount();
         let width =
             2.0 * vol_bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
         Ok(Some((pv_up - pv_down) / width))
@@ -450,8 +467,6 @@ impl FxBarrierOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
-
         let t = self.day_count.year_fraction(
             as_of,
             self.expiry,
@@ -461,61 +476,24 @@ impl FxBarrierOption {
             return Ok(Some(0.0));
         }
 
-        let spot_id = self.fx_spot_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "FxBarrierOption vanna requires fx_spot_id for finite-difference spot bumps"
-                    .to_string(),
-            )
-        })?;
-        let spot_scalar = market.get_price(spot_id)?;
-        let current_spot =
-            finstack_quant_valuations_core::metrics::scalar_numeric_value(spot_scalar);
-
-        let spot_bump = current_spot * bumps.spot_bump_decimal;
-        if spot_bump <= 0.0 {
+        let current_spot = crate::fx_barrier_option::pricer::resolve_fx_spot(self, market, as_of)?;
+        if current_spot * bumps.spot_bump_decimal <= 0.0 {
             return Ok(Some(0.0));
         }
-        let vol_bump = bumps.vol_bump_decimal;
 
-        // Delta at vol_up (central diff in spot)
-        let curves_vol_up = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-            market,
-            self.vol_surface_id.as_str(),
-            vol_bump,
-        )?;
-        let curves_up = finstack_quant_valuations_core::metrics::bump_scalar_price(
-            &curves_vol_up,
-            spot_id,
-            bumps.spot_bump_decimal,
-        )?;
-        let curves_dn = finstack_quant_valuations_core::metrics::bump_scalar_price(
-            &curves_vol_up,
-            spot_id,
-            -bumps.spot_bump_decimal,
-        )?;
-        let pv_up = self.value(&curves_up, as_of)?.amount();
-        let pv_dn = self.value(&curves_dn, as_of)?.amount();
-        let delta_vol_up = (pv_up - pv_dn) / (2.0 * spot_bump);
-
-        // Delta at vol_down
-        let curves_vol_dn = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-            market,
-            self.vol_surface_id.as_str(),
-            -vol_bump,
-        )?;
-        let curves_up = finstack_quant_valuations_core::metrics::bump_scalar_price(
-            &curves_vol_dn,
-            spot_id,
-            bumps.spot_bump_decimal,
-        )?;
-        let curves_dn = finstack_quant_valuations_core::metrics::bump_scalar_price(
-            &curves_vol_dn,
-            spot_id,
-            -bumps.spot_bump_decimal,
-        )?;
-        let pv_up = self.value(&curves_up, as_of)?.amount();
-        let pv_dn = self.value(&curves_dn, as_of)?.amount();
-        let delta_vol_dn = (pv_up - pv_dn) / (2.0 * spot_bump);
+        // Spot delta in each vol scenario (central diff in spot).
+        let (vol_bump, (inst_vol_up, market_vol_up), (inst_vol_dn, market_vol_dn)) =
+            crate::shared::active_vol_scenarios(
+                self,
+                &self.instrument_pricing_overrides,
+                market,
+                self.vol_surface_id.as_str(),
+                bumps.vol_bump_decimal,
+            )?;
+        let delta_vol_up =
+            inst_vol_up.spot_delta(&market_vol_up, as_of, current_spot, bumps.spot_bump_decimal)?;
+        let delta_vol_dn =
+            inst_vol_dn.spot_delta(&market_vol_dn, as_of, current_spot, bumps.spot_bump_decimal)?;
 
         // Report vanna per **vol point** on the σ axis (consistent with vega
         // and `MetricId::Vanna`): normalize by the bump width expressed in
@@ -542,19 +520,15 @@ impl FxBarrierOption {
             return Ok(Some(0.0));
         }
 
-        let vol_bump = bumps.vol_bump_decimal;
-        let up = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+        let (vol_bump, (up, market_up), (dn, market_dn)) = crate::shared::active_vol_scenarios(
+            self,
+            &self.instrument_pricing_overrides,
             market,
             self.vol_surface_id.as_str(),
-            vol_bump,
+            bumps.vol_bump_decimal,
         )?;
-        let dn = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-            market,
-            self.vol_surface_id.as_str(),
-            -vol_bump,
-        )?;
-        let pv_up = self.value(&up, as_of)?.amount();
-        let pv_dn = self.value(&dn, as_of)?.amount();
+        let pv_up = up.value(&market_up, as_of)?.amount();
+        let pv_dn = dn.value(&market_dn, as_of)?.amount();
         let width = vol_bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
         Ok(Some((pv_up - 2.0 * base_pv + pv_dn) / (width * width)))
     }

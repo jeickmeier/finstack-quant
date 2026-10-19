@@ -69,21 +69,7 @@ impl BarrierOptionHestonMcPricer {
                 t,
                 "BarrierOption Heston MC discount curve",
             )?;
-        let spot_scalar = market.get_price(&inst.spot_id)?;
-        let spot = match spot_scalar {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => {
-                if m.currency() != inst.currency {
-                    return Err(finstack_quant_core::Error::CurrencyMismatch {
-                        expected: inst.currency,
-                        actual: m.currency(),
-                    });
-                }
-                m.amount()
-            }
-        };
-
-        finstack_quant_core::validation::validate_f64_positive(spot, "BarrierOption Heston spot")?;
+        let spot = super::pricer::resolve_spot(inst, market)?;
         let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
             market,
             inst.div_yield_id.as_ref(),

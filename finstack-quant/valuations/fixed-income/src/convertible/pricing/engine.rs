@@ -130,18 +130,7 @@ fn extract_equity_state(
 ) -> Result<EquityState> {
     // Get spot price, preserving the original scalar variant for type-safe bumping
     let spot_scalar = ctx.get_price(&bond.spot_id)?.clone();
-    let spot = match &spot_scalar {
-        MarketScalar::Price(money) => {
-            if money.currency() != bond.notional.currency() {
-                return Err(Error::CurrencyMismatch {
-                    expected: bond.notional.currency(),
-                    actual: money.currency(),
-                });
-            }
-            money.amount()
-        }
-        MarketScalar::Unitless(value) => *value,
-    };
+    let spot = bond.spot_value(&spot_scalar)?;
 
     let discount_curve = ctx.get_discount(bond.discount_curve_id.as_str())?;
     // Use Act/365F for process time (tree steps, vol lookups, curve DF queries).
@@ -309,18 +298,7 @@ fn resolved_value(
                 df, survival,
             )?;
         let shares_value = if claim.shares > 0.0 {
-            let spot = match market.get_price(&bond.spot_id)? {
-                MarketScalar::Unitless(value) => *value,
-                MarketScalar::Price(value) if value.currency() == bond.notional.currency() => {
-                    value.amount()
-                }
-                MarketScalar::Price(value) => {
-                    return Err(Error::CurrencyMismatch {
-                        expected: bond.notional.currency(),
-                        actual: value.currency(),
-                    })
-                }
-            };
+            let spot = bond.spot_value(market.get_price(&bond.spot_id)?)?;
             let tau =
                 DayCount::Act365F.year_fraction(as_of, claim.delivery_date, Default::default())?;
             claim.shares * spot * (-resolve_dividend_yield(market, bond)? * tau).exp()

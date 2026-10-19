@@ -12,7 +12,6 @@ mod vega;
 
 pub(crate) use bermudan_greeks::{
     BermudanDeltaCalculator, BermudanGammaCalculator, BermudanVegaCalculator,
-    ExpectedExerciseTimeCalculator,
 };
 pub(crate) use delta::DeltaCalculator;
 pub(crate) use gamma::GammaCalculator;
@@ -78,7 +77,16 @@ pub(crate) fn register_bermudan_swaption_metrics(
             // European swaptions. Sharing the `vega` key would silently mix
             // incomparable units in cross-instrument aggregation.
             (HwSigmaVega, BermudanVegaCalculator),
-            (ExpectedExerciseTime, ExpectedExerciseTimeCalculator)
+            // Published by the Hull-White tree pricer from its own exercise
+            // policy (`seed_metric_context`). Models that do not publish it
+            // (LSMC rejects it, LMM has no tree) fail clearly instead of
+            // recalibrating a Hull-White tree under a different model.
+            (
+                ExpectedExerciseTime,
+                finstack_quant_valuations_core::metrics::PricerPublishedMetric::new(
+                    finstack_quant_valuations_core::metrics::MetricId::ExpectedExerciseTime,
+                )
+            )
             // Note: UnifiedDv01Calculator and BucketedDv01 are NOT
             // registered here because BermudanSwaption::value() returns Err.
             // Use BermudanDeltaCalculator for rate sensitivity instead.
