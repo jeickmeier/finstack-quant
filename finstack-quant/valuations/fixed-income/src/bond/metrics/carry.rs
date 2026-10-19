@@ -6,7 +6,9 @@ use crate::Bond;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period;
-use finstack_quant_valuations_core::metrics::{MetricContext, YieldClock};
+use finstack_quant_valuations_core::metrics::{
+    sensitivities::carry_decomposition::YieldClock, MetricContext,
+};
 
 /// Street-convention accretion on the bond's coupon frequency and day count.
 ///
@@ -69,7 +71,8 @@ mod tests {
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::metrics::sensitivities::carry_decomposition::compute_funding_cost;
     use finstack_quant_valuations_core::metrics::{
-        CarryDecompositionCalculator, MetricCalculator, MetricContext, MetricId, YieldClock,
+        sensitivities::carry_decomposition::{CarryDecompositionCalculator, YieldClock},
+        MetricCalculator, MetricContext, MetricId,
     };
     use std::sync::Arc;
     use time::macros::date;
@@ -466,12 +469,13 @@ mod tests {
             .calculate(&mut context)
             .expect("carry decomposition should calculate");
 
-        let rolled = finstack_quant_valuations_core::metrics::calculate_theta_date(
-            as_of,
-            Tenor::monthly(),
-            Some(date!(2026 - 01 - 15)),
-        )
-        .expect("rolled date");
+        let rolled =
+            finstack_quant_valuations_core::metrics::sensitivities::theta::calculate_theta_date(
+                as_of,
+                Tenor::monthly(),
+                Some(date!(2026 - 01 - 15)),
+            )
+            .expect("rolled date");
         let expected_dcf = DayCount::Act365F
             .year_fraction(as_of, rolled, DayCountContext::default())
             .expect("year fraction");

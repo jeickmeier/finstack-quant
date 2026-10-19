@@ -1,7 +1,7 @@
 //! Loader for inflation swap conventions embedded in JSON registries.
 
-use crate::market::conventions::defs::InflationSwapConventions;
 use crate::market::conventions::ids::InflationSwapConventionId;
+use crate::market::conventions::InflationSwapConventions;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
 use finstack_quant_core::Error;
 use finstack_quant_core::HashMap;

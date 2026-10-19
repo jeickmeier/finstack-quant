@@ -8,9 +8,10 @@ use super::oas::oas_decimal_from_quote_overrides;
 use crate::TermLoan;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{
-    quoted_z_spread, Dv01CalculatorConfig, GenericBucketedCs01, GenericParallelCs01,
-    MetricCalculator, MetricContext, UnifiedDv01Calculator, ZSpreadBucketedCs01,
-    ZSpreadParallelCs01,
+    sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs01},
+    sensitivities::cs01_z_spread::{quoted_z_spread, ZSpreadBucketedCs01, ZSpreadParallelCs01},
+    sensitivities::dv01::{Dv01CalculatorConfig, UnifiedDv01Calculator},
+    MetricCalculator, MetricContext,
 };
 use finstack_quant_valuations_core::pricer::ModelKey;
 use std::sync::Arc;

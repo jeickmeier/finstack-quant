@@ -248,47 +248,45 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// Get instrument-owned pricing inputs.
     fn get_instrument_pricing_overrides(
         &self,
-    ) -> Option<&crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
+    ) -> Option<&crate::instruments::InstrumentPricingOverrides> {
         None
     }
 
     /// Get mutable instrument-owned pricing inputs.
     fn get_instrument_pricing_overrides_mut(
         &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
+    ) -> Option<&mut crate::instruments::InstrumentPricingOverrides> {
         None
     }
 
     /// Get metric-only pricing controls.
-    fn get_metric_pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::MetricPricingOverrides> {
+    fn get_metric_pricing_overrides(&self) -> Option<&crate::instruments::MetricPricingOverrides> {
         None
     }
 
     /// Get mutable metric-only pricing controls.
     fn get_metric_pricing_overrides_mut(
         &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::MetricPricingOverrides> {
+    ) -> Option<&mut crate::instruments::MetricPricingOverrides> {
         None
     }
 
     /// Get scenario-only pricing adjustments.
     fn get_scenario_pricing_overrides(
         &self,
-    ) -> Option<&crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
+    ) -> Option<&crate::instruments::ScenarioPricingOverrides> {
         None
     }
 
     /// Get mutable scenario-only pricing adjustments.
     fn get_scenario_pricing_overrides_mut(
         &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
+    ) -> Option<&mut crate::instruments::ScenarioPricingOverrides> {
         None
     }
 
     /// Whether this instrument's pricer consumes
-    /// [`ScenarioPricingOverrides::scenario_spread_shock_bp`](crate::instruments::pricing_overrides::ScenarioPricingOverrides::scenario_spread_shock_bp)
+    /// [`ScenarioPricingOverrides::scenario_spread_shock_bp`](crate::instruments::ScenarioPricingOverrides::scenario_spread_shock_bp)
     /// in its current configuration.
     ///
     /// Scenario engines use this to route instrument-level spread shocks: when

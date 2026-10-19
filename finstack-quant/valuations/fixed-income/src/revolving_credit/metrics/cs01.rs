@@ -22,9 +22,9 @@
 //! exposure. Supply a `credit_curve_id` to obtain hazard-based CS01.
 //!
 //! [`RevolvingCreditPricer`]: crate::revolving_credit::pricing::RevolvingCreditPricer
-//! [`GenericParallelCs01`]: finstack_quant_valuations_core::metrics::GenericParallelCs01
-//! [`ZSpreadParallelCs01`]: finstack_quant_valuations_core::metrics::ZSpreadParallelCs01
-//! [`ZSpreadBucketedCs01`]: finstack_quant_valuations_core::metrics::ZSpreadBucketedCs01
+//! [`GenericParallelCs01`]: finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericParallelCs01
+//! [`ZSpreadParallelCs01`]: finstack_quant_valuations_core::metrics::sensitivities::cs01_z_spread::ZSpreadParallelCs01
+//! [`ZSpreadBucketedCs01`]: finstack_quant_valuations_core::metrics::sensitivities::cs01_z_spread::ZSpreadBucketedCs01
 
 use crate::revolving_credit::cashflow_engine::CashflowEngine;
 use crate::revolving_credit::types::DrawRepaySpec;
@@ -33,7 +33,9 @@ use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::metrics::{ZSpreadCs01, ZSpreadCs01Inputs};
+use finstack_quant_valuations_core::metrics::sensitivities::cs01_z_spread::{
+    ZSpreadCs01, ZSpreadCs01Inputs,
+};
 
 impl ZSpreadCs01 for RevolvingCredit {
     fn z_spread_cs01_inputs(

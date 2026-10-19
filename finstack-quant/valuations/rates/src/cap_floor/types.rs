@@ -9,8 +9,8 @@ use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::{ExerciseStyle, SettlementType};
-use finstack_quant_valuations_core::market::conventions::defs::RateIndexKind;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::market::conventions::RateIndexKind;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 

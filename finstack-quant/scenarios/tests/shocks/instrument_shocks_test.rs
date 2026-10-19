@@ -7,7 +7,7 @@ use finstack_quant_scenarios::{
     ExecutionContext, InstrumentType, OperationSpec, ScenarioEngine, ScenarioSpec,
 };
 use finstack_quant_statements::FinancialModelSpec;
-use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::{Attributes, Bond, Instrument};
 use indexmap::IndexMap;
 use time::Month;

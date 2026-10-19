@@ -186,10 +186,11 @@ pub use common_impl::listed::{
     FutureOptionTerms, ListedDeliveryObligation, ListedFutureSettlement, ListedFutureTerms,
 };
 
-/// Pricing overrides module.
-pub mod pricing_overrides;
+mod pricing_overrides;
+#[doc(hidden)]
+pub use pricing_overrides::resolve_rates_credit_config;
 pub use pricing_overrides::{
-    BondRiskBasis, BumpConfig, InstrumentPricingOverrides, MarketQuoteOverrides,
+    BondRiskBasis, BumpConfig, InstrumentPricingOverrides, MarketQuoteOverrides, MertonMcOverride,
     MetricPricingOverrides, ModelConfig, ScenarioPricingOverrides, ShortRateTreeModel,
-    ThetaDayBasis,
+    ThetaDayBasis, VolSurfaceExtrapolation,
 };

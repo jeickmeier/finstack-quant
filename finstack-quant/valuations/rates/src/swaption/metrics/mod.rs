@@ -33,16 +33,16 @@ pub(crate) fn register_swaption_metrics(
             (Gamma, GammaCalculator),
             (Vega, VegaCalculator),
             (HwSigmaVega, vega::HwSigmaVegaCalculator),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             // Theta is now registered universally in crate::RATES.metrics()
             // Rho bumps ONLY the discount/funding curve (holding the forward swap
             // rate fixed) — this is the correct option rho definition.  Using
             // `parallel_combined()` would also move the forward curve, conflating
             // discounting sensitivity with delta and producing the wrong sign for
             // receiver swaptions and wrong magnitude for payers.
-            (Rho, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_discount_only())),
+            (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_discount_only())),
             (ImpliedVol, ImpliedVolCalculator),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())

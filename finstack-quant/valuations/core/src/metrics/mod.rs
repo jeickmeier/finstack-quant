@@ -74,19 +74,14 @@ pub use sensitivities::config::{
     format_bucket_label, format_key_rate_label, parse_key_rate_label, STANDARD_BUCKETS_YEARS,
     STANDARD_BUCKET_LABELS,
 };
-#[doc(hidden)]
-pub use sensitivities::cross_factor::CrossFactorCalculator;
 pub use sensitivities::cross_factor::CrossFactorPair;
 pub use sensitivities::theta::{collect_cashflows_in_period, collect_period_cash, PeriodCash};
 
-// Family-facing calculators and helpers.
+// Family-facing finite-difference helpers.
 //
-// Instrument families register and compose these; they are not a supported
-// downstream API and stay out of the rendered documentation.
-//
-// These are used across `finstack-quant-valuations` (instrument metric registries, etc.) but are not
-// supported as a stable downstream API. Keep them `pub(crate)` so we can refactor module layout
-// without creating public breakage surface.
+// Instrument families compose these; they are not a supported downstream API
+// and stay out of the rendered documentation. The family-facing calculators
+// live at `metrics::sensitivities::<module>`.
 #[doc(hidden)]
 pub use core::finite_difference::{
     bump_active_volatility, bump_discount_curve_parallel, bump_scalar_price,
@@ -94,32 +89,6 @@ pub use core::finite_difference::{
     replace_scalar_value, scalar_numeric_value, scaled_central_diff_by_width, CORRELATION_BUMP,
     VOL_POINTS_PER_ABSOLUTE_VOL,
 };
-#[doc(hidden)]
-pub use sensitivities::carry_decomposition::{CarryDecompositionCalculator, YieldClock};
-#[doc(hidden)]
-pub use sensitivities::cross_factor::{
-    make_credit_bumper, make_fx_bumper, make_rates_bumper, make_spot_bumper, make_vol_bumper,
-};
-#[doc(hidden)]
-pub use sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs01};
-#[doc(hidden)]
-pub use sensitivities::cs01_z_spread::{
-    quoted_z_spread, ZSpreadBucketedCs01, ZSpreadCs01, ZSpreadCs01Inputs, ZSpreadParallelCs01,
-};
-#[doc(hidden)]
-pub use sensitivities::dv01::{Dv01CalculatorConfig, UnifiedDv01Calculator};
-#[doc(hidden)]
-pub use sensitivities::fd_greeks::{
-    GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVega, GenericFdVolga,
-};
-#[doc(hidden)]
-pub use sensitivities::option_greeks::OptionGreekCalculator;
-#[doc(hidden)]
-pub use sensitivities::rf_component_dv01::{RfComponentDv01Calculator, RfComponentPriced};
-#[doc(hidden)]
-pub use sensitivities::theta::{calculate_theta_date, theta_period};
-#[doc(hidden)]
-pub use sensitivities::vega::KeyRateVega;
 
 // Error helper functions
 

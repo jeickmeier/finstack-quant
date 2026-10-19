@@ -1,7 +1,7 @@
 //! Loader for interest rate future conventions embedded in JSON registries.
 
-use crate::market::conventions::defs::{IrFutureConventions, IrFutureReferencePeriod};
 use crate::market::conventions::ids::IrFutureContractId;
+use crate::market::conventions::{IrFutureConventions, IrFutureReferencePeriod};
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::Error;
 use finstack_quant_core::HashMap;

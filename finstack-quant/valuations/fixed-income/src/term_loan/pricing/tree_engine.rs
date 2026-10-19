@@ -48,7 +48,7 @@ use finstack_quant_models::{NodeState, ShortRateTree, ShortRateTreeConfig, TreeV
 use finstack_quant_valuations_core::instruments::pricing::rates_credit::{
     build_rates_credit_targets, continuous_frp_weight,
 };
-use finstack_quant_valuations_core::instruments::pricing_overrides::resolve_rates_credit_config;
+use finstack_quant_valuations_core::instruments::resolve_rates_credit_config;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError,

@@ -9,11 +9,11 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_test_utils::assert::approx_eq;
-use finstack_quant_valuations::instruments::pricing_overrides::VolSurfaceExtrapolation;
 use finstack_quant_valuations::instruments::rates::irs::{
     FixedLegSpec, FloatLegSpec, InterestRateSwap, PayReceive,
 };
 use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
+use finstack_quant_valuations::instruments::VolSurfaceExtrapolation;
 use finstack_quant_valuations::instruments::{
     Instrument, InstrumentPricingOverrides, OptionType, SettlementType, VolatilityModel,
 };

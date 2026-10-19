@@ -1123,7 +1123,7 @@ mod tests {
 
     #[test]
     fn cds_quote_bp_rejects_legacy_quoted_spread_bp_json() {
-        use finstack_quant_valuations_core::instruments::pricing_overrides::MarketQuoteOverrides;
+        use finstack_quant_valuations_core::instruments::MarketQuoteOverrides;
         let json = r#"{"quoted_spread_bp": 150.0}"#;
         serde_json::from_str::<MarketQuoteOverrides>(json)
             .expect_err("legacy quoted_spread_bp must be rejected");

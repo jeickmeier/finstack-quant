@@ -5,7 +5,7 @@
 //! market by a prior calibration step. It never reads a volatility surface,
 //! performs a fit, or substitutes model defaults.
 
-use crate::instruments::pricing_overrides::ModelConfig;
+use crate::instruments::ModelConfig;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::Result;

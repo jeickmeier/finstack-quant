@@ -1,7 +1,7 @@
 {
   "$defs": {
     "IrFutureContractId": {
-      "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::defs::IrFutureConventions)\nfrom the convention registry.",
+      "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::IrFutureConventions)\nfrom the convention registry.",
       "type": "string"
     },
     "Pillar": {

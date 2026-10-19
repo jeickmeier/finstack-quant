@@ -9,7 +9,7 @@
 //! call and existing pricers can be migrated away from ad-hoc `if let Some(iv)`
 //! blocks.
 
-use crate::instruments::pricing_overrides::MarketQuoteOverrides;
+use crate::instruments::MarketQuoteOverrides;
 use crate::market::resolve_vol_source;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurfaceAxis;

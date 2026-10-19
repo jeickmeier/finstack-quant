@@ -17,9 +17,9 @@ use finstack_quant_valuations_core::instruments::common_impl::helpers::year_frac
 use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
     resolve_volatility, validate_sigma, ResolvedVolatility, VolatilityRequest,
 };
-use finstack_quant_valuations_core::instruments::pricing_overrides::VolSurfaceExtrapolation;
 use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_valuations_core::instruments::VolSurfaceExtrapolation;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 

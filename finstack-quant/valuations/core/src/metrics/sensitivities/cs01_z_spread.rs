@@ -63,7 +63,8 @@ use crate::metrics::sensitivities::cs01_direct_hazard::{
     DirectHazardBucketedCs01, DirectHazardParallelCs01,
 };
 use crate::metrics::{
-    GenericBucketedCs01, GenericParallelCs01, MetricCalculator, MetricContext, MetricId,
+    sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs01},
+    MetricCalculator, MetricContext, MetricId,
 };
 
 /// Cashflow inputs an instrument exposes for z-spread CS01.

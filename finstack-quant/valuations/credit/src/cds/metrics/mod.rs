@@ -113,7 +113,7 @@ pub(crate) fn register_cds_metrics(
             (JumpToDefault, jump_to_default::JumpToDefaultCalculator),
             (DefaultExposure, jump_to_default::DefaultExposureCalculator),
             (Dv01, dv01::CdsDv01Calculator),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (RiskyPv01, RiskyPv01Calculator),
             // Recovery01 (custom metric - recovery rate sensitivity)
             (Recovery01, recovery01::Recovery01Calculator),

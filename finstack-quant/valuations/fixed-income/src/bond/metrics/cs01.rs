@@ -195,7 +195,8 @@ impl MetricCalculator for BondCs01Calculator {
 
         if uses_credit {
             return with_bond_risk_view(context, |ctx| {
-                finstack_quant_valuations_core::metrics::GenericParallelCs01.calculate(ctx)
+                finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericParallelCs01
+                    .calculate(ctx)
             });
         }
 
@@ -264,7 +265,8 @@ impl MetricCalculator for BondBucketedCs01Calculator {
 
         if uses_credit {
             return with_bond_risk_view(context, |ctx| {
-                finstack_quant_valuations_core::metrics::GenericBucketedCs01.calculate(ctx)
+                finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericBucketedCs01
+                    .calculate(ctx)
             });
         }
 

@@ -10,7 +10,8 @@ use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
 use finstack_quant_valuations_core::metrics::{
-    Dv01CalculatorConfig, MetricCalculator, MetricContext, UnifiedDv01Calculator,
+    sensitivities::dv01::{Dv01CalculatorConfig, UnifiedDv01Calculator},
+    MetricCalculator, MetricContext,
 };
 
 /// Cap/floor DV01.

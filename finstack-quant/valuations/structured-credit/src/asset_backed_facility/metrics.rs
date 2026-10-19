@@ -9,7 +9,8 @@ use crate::structured_credit::calculate_equity_metrics;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::metrics::{
-    MetricCalculator, MetricContext, MetricRegistry, ZSpreadCs01, ZSpreadCs01Inputs,
+    sensitivities::cs01_z_spread::{ZSpreadCs01, ZSpreadCs01Inputs},
+    MetricCalculator, MetricContext, MetricRegistry,
 };
 use finstack_quant_valuations_core::pricer::InstrumentType;
 
@@ -138,13 +139,13 @@ pub(crate) fn register_asset_backed_facility_metrics(
         registry: registry,
         instrument: InstrumentType::AssetBackedFacility,
         metrics: [
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-                finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined()
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
+                finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined()
             )),
-            (Cs01, finstack_quant_valuations_core::metrics::ZSpreadParallelCs01::<AssetBackedFacility>::hazard_when_credit_curve()),
-            (BucketedCs01, finstack_quant_valuations_core::metrics::ZSpreadBucketedCs01::<AssetBackedFacility>::hazard_when_credit_curve()),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-                finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate()
+            (Cs01, finstack_quant_valuations_core::metrics::sensitivities::cs01_z_spread::ZSpreadParallelCs01::<AssetBackedFacility>::hazard_when_credit_curve()),
+            (BucketedCs01, finstack_quant_valuations_core::metrics::sensitivities::cs01_z_spread::ZSpreadBucketedCs01::<AssetBackedFacility>::hazard_when_credit_curve()),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
+                finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate()
             )),
             (AbfBorrowingBase, AbfBorrowingBaseCalculator),
             (AbfBorrowingBaseCushion, AbfBorrowingBaseCushionCalculator),
