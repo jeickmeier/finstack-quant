@@ -12,7 +12,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
 use finstack_quant_valuations_core::instruments::common_impl::pricing::{
-    PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
+    FinancingLegFlows, PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
 };
 
 /// Extracts spot price and dividend yield from market data.
@@ -264,12 +264,12 @@ pub(crate) fn pv_total_return_leg(
 
 /// Project both legs with the same period calculations as present value,
 /// netted per payment date and signed by `side` (receive the total return,
-/// pay financing for `Receive`).
+/// pay financing for `Receive`), with the financing-index fixings they project.
 pub(crate) fn net_cashflows(
     trs: &EquityTotalReturnSwap,
     context: &MarketContext,
     as_of: Date,
-) -> Result<Vec<(Date, Money)>> {
+) -> Result<FinancingLegFlows> {
     trs.validate()?;
     let (params, model) = total_return_leg(trs, context, as_of)?;
     let sign = match trs.side {
@@ -282,19 +282,21 @@ pub(crate) fn net_cashflows(
     {
         *flows.entry(date).or_default() += sign * amount.amount();
     }
-    for (date, amount) in TrsEngine::cashflows_financing_leg(
+    let (financing, fixings) = TrsEngine::cashflows_financing_leg_with_fixings(
         &trs.financing_leg,
         &trs.schedule,
         trs.notional,
         context,
         as_of,
-    )? {
+    )?;
+    for (date, amount) in financing {
         *flows.entry(date).or_default() -= sign * amount.amount();
     }
-    flows
+    let flows = flows
         .into_iter()
         .map(|(date, amount)| Ok((date, Money::new(amount, trs.notional.currency())?)))
-        .collect()
+        .collect::<Result<_>>()?;
+    Ok((flows, fixings))
 }
 
 /// Total-return leg inputs and return model shared by PV and cashflow
