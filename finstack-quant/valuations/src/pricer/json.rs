@@ -77,6 +77,30 @@ impl ParsedInstrument {
         Ok(Self { instrument })
     }
 
+    /// Prepare a canonical instrument payload for host pricing without a JSON
+    /// round trip, merging overrides before validation.
+    ///
+    /// Equivalent to [`parse_boxed_instrument_from_json`] on the payload's
+    /// envelope, for bindings that already hold the native instrument.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument` - Owned tagged instrument payload, boxed without
+    ///   validation so `metric_pricing_overrides` can repair stored controls.
+    /// * `metric_pricing_overrides` - Optional JSON object patch with the same
+    ///   merge semantics as [`Self::from_instrument`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for malformed overrides, unsupported controls,
+    /// or invalid instrument state after merging.
+    pub fn from_instrument_json(
+        instrument: InstrumentJson,
+        metric_pricing_overrides: Option<&str>,
+    ) -> finstack_quant_core::Result<Self> {
+        Self::from_instrument(instrument.into_boxed_unchecked()?, metric_pricing_overrides)
+    }
+
     /// Borrow the validated instrument trait object.
     #[must_use]
     pub fn as_instrument(&self) -> &dyn Instrument {
@@ -416,7 +440,7 @@ pub fn parse_boxed_instrument_from_json(
     metric_pricing_overrides: Option<&str>,
 ) -> finstack_quant_core::Result<ParsedInstrument> {
     let envelope = decode_pricing_envelope(instrument_json, metric_pricing_overrides)?;
-    ParsedInstrument::from_instrument(envelope.instrument.into_boxed_unchecked()?, None)
+    ParsedInstrument::from_instrument_json(envelope.instrument, None)
 }
 
 /// Parse a JSON array of canonical instrument envelopes into validated
