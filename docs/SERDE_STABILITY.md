@@ -198,5 +198,6 @@ mise run gen-check
 ```
 
 The full release-facing gate is `mise run all-fmt`, `mise run all-lint`,
-`mise run all-test`, `mise run rust-doc`, `mise run python-doc`, and
-`mise run wasm-doc`.
+`mise run all-test`, `mise run rust-doc`, `mise run python-doc`,
+`mise run wasm-doc`, and the `--doctest` runs of `rust-test`, `python-test`
+and `wasm-test`.

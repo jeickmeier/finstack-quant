@@ -7,7 +7,7 @@
 // included on purpose: a sample that leans on a global the package also names
 // (`Performance`) must fail here, not in a user's editor.
 //
-// This needs no built package. `tests/facade/doc_examples.test.mjs` executes
+// This needs no built package. `tests/docs/doc_examples.test.mjs` executes
 // the same samples against the build.
 import { join } from 'node:path';
 import ts from 'typescript';

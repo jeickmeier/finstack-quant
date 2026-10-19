@@ -110,8 +110,6 @@ depends on an untracked Criterion baseline directory. The
 `doc-check` step verifies the record digest,
 toolchains, and all baseline artifact paths, identities, and hashes without
 running measurements.
-The four-case PR gate (`scripts/pr_benchmarks.py`) is separate and does not use
-materialization-specific metadata or paths.
 
 ## Manual allocation and peak-memory profiling
 

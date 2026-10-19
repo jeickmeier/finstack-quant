@@ -80,11 +80,11 @@ binding is an explicit copy-on-write `with_*` method.
 | Check | Command |
 |-------|---------|
 | Stub completeness | `mise run python-doc` |
-| Stub doctests | `mise run python-doctest` |
+| Stub doctests | `mise run python-test --doctest` |
 | PyO3 placeholder prose | included in `python-doc` |
 
 `python-doc` rejects fabricated generator boilerplate, tautological
 parameter text, and missing `Raises` / “does not raise” notes on every
 public callable (including instance methods, properties, and no-arg
-helpers). `python-doctest` executes `>>>` examples against the compiled
+helpers). `python-test --doctest` executes `>>>` examples against the compiled
 `finstack_quant` package.

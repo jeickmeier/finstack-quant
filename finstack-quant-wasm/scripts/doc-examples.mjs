@@ -3,7 +3,7 @@
 // that document the package.
 //
 // `check-typescript-examples.mjs` type-checks the samples and
-// `tests/facade/doc_examples.test.mjs` executes them. A sample must therefore
+// `tests/docs/doc_examples.test.mjs` executes them. A sample must therefore
 // be a complete program. One convenience: a block with no `import` statement
 // continues from the standard setup, so both gates put `PRELUDE` in front of
 // it. A fence tagged `no-run` (```` ```js no-run ````) is skipped by both

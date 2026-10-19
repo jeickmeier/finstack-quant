@@ -13,7 +13,7 @@ Standards for JavaScript and TypeScript code that uses the finstack-quant-wasm m
 Every `javascript` / `typescript` block in this file is type-checked against
 `index.d.ts` by `finstack-quant-wasm/scripts/check-typescript-examples.mjs`
 (`mise run wasm-doc`) and executed against the built package by
-`finstack-quant-wasm/tests/facade/doc_examples.test.mjs` (`mise run wasm-test`).
+`finstack-quant-wasm/tests/docs/doc_examples.test.mjs` (`mise run wasm-test --doctest`).
 A block with no `import` continues from the standard setup — all namespaces
 imported and `await init()` done.
 

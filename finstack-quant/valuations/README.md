@@ -250,7 +250,7 @@ mise run rust-check-schemas
 ```
 
 Do not run `cargo test` directly — it would also run doc tests, which this
-workspace runs only through `mise run rust-doc`.
+workspace runs only through `mise run rust-test --doctest`.
 
 ## License
 

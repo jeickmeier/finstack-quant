@@ -23,7 +23,7 @@ cargo.binstall_native = true
 # wasm-pack uses this only when it equals the `wasm-bindgen` crate in
 # Cargo.lock; otherwise it downloads its own. Bump it with the lockfile.
 "github:wasm-bindgen/wasm-bindgen" = "0.2.126"
-# `wasm-opt`; matches the ui-gallery CI job.
+# `wasm-opt` for the size-optimized web package (`wasm-pkg`).
 "aqua:WebAssembly/binaryen" = "130"
 uv = "0.10.11"
 # The exact stable toolchain (keep in sync with rust-toolchain.toml), plus
@@ -85,14 +85,23 @@ description = "Lint Rust, Python and WASM and check generated artifacts (check-o
 depends = ["rust-lint", "python-lint", "wasm-lint", "wasm-doc", "gen-check"]
 
 [tasks.all-doc]
-description = "Verify Rust, Python and WASM documentation (the CI docs workflow)"
+# Doc examples run through the test tasks: rust-test, python-test and wasm-test
+# with --doctest.
+description = "Verify Rust, Python and WASM documentation (the release docs gate)"
 depends = ["rust-doc", "python-doc", "wasm-doc"]
 run = "scripts/materialization_bench.sh doc-check"
 
+[tasks.all-audit]
+description = "Audit dependencies: cargo deny, then OSV-Scanner over the Cargo, uv and npm lockfiles"
+run = [
+  { task = "rust-audit" },
+  "osv-scanner scan --lockfile=Cargo.lock --lockfile=uv.lock --lockfile=finstack-quant-wasm/package-lock.json",
+]
+
 [tasks.all-ci]
-description = "Regenerate derived artifacts, then run the CI build.yml checks locally"
+description = "Regenerate derived artifacts, then run the nightly CI checks locally"
 depends = ["gen-write"]
-run = [{ tasks = ["pre-commit-run", "gen-check", "all-test", "rust-audit", "rust-publish-checks"] }]
+run = [{ tasks = ["pre-commit-run", "gen-check", "all-test", "all-audit"] }]
 
 [tasks.all-clean]
 description = "Remove build artifacts and virtualenvs (scripts/clean_workspace.py --help for targeted cleans)"
@@ -117,9 +126,17 @@ run = "cargo build --workspace --exclude finstack-quant-py --exclude finstack-qu
 description = "Run the workspace Rust tests with nextest (use rust-test-crate while iterating)"
 usage = '''
 flag "--slow" help="Run only the ignored (slow) tests"
+flag "--doctest" help="Run only the doctests (cargo test --doc)"
 flag "--coverage" help="Instrument with cargo llvm-cov; writes target/llvm-cov/html and coverage/rust/lcov.info"
 '''
 run = '''
+if [ "${usage_doctest:-false}" = "true" ]; then
+  if [ "${usage_slow:-false}" = "true" ] || [ "${usage_coverage:-false}" = "true" ]; then
+    echo "--doctest cannot be combined with --slow or --coverage" >&2
+    exit 2
+  fi
+  exec cargo test --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --doc --no-fail-fast
+fi
 ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only --no-tests pass"
 if [ "${usage_coverage:-false}" = "true" ]; then
   cargo llvm-cov clean --workspace
@@ -233,12 +250,12 @@ cargo clippy -p "${usage_package?}" --lib --tests --bins --examples $features --
 '''
 
 [tasks.rust-doc]
-description = "Build workspace docs, enforce input docs and run doctests"
+# The doctests run through `rust-test --doctest`.
+description = "Build workspace docs and enforce the input-doc and deprecation contracts"
 run = [
   "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --no-deps",
   "uv run --no-sync python scripts/check_public_api_input_docs.py",
   "uv run --no-sync python scripts/check_deprecated_annotations.py",
-  "cargo test --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --doc --no-fail-fast",
 ]
 
 [tasks.rust-audit]
@@ -382,16 +399,21 @@ run = 'uv run --no-sync maturin develop{% if usage.release %} --release{% endif 
 [tasks.python-test]
 description = "Build the bindings, then run the fast Python tests (--all for the full suite)"
 usage = '''
-flag "--all" help="Run the full suite, slow tests included"
+flag "--all" help="Run the fast and slow tests"
 flag "--slow" help="Run only the slow tests"
+flag "--doctest" help="Run only the .pyi stub and module doctests"
 flag "--coverage" help="Write HTML (target/python-cov) and Cobertura (coverage/python/coverage.xml) reports"
 '''
 run = '''
 set -- -v -n auto
 if [ "${usage_slow:-false}" = "true" ]; then
   set -- "$@" -m slow
-elif [ "${usage_all:-false}" != "true" ]; then
-  set -- "$@" -m "not slow"
+elif [ "${usage_doctest:-false}" = "true" ]; then
+  set -- "$@" -m doctest
+elif [ "${usage_all:-false}" = "true" ]; then
+  set -- "$@" -m "not doctest"
+else
+  set -- "$@" -m "not slow and not doctest"
 fi
 if [ "${usage_coverage:-false}" = "true" ]; then
   mkdir -p coverage/python
@@ -406,10 +428,6 @@ uv run --no-sync pytest "$@"
 description = "Run one test file or node ID against the already built extension"
 usage = 'arg "<test>" help="Pytest file path or node ID"'
 run = 'uv run --no-sync pytest -q "${usage_test?}"'
-
-[tasks.python-doctest]
-description = "Build the bindings, then run the stub and module doctests"
-run = ["mise run python-build", "uv run --no-sync pytest finstack-quant-py/tests/test_stub_doctests.py -q"]
 
 [tasks.python-fmt]
 description = "Format and auto-fix Python (ruff)"
@@ -472,13 +490,19 @@ run = [
 # The wasm-bindgen tests (`wasm-pack test`) and both facade builds use the `dev`
 # profile, so they share one set of wasm32 artifacts.
 description = "Run the wasm-bindgen and Node facade tests and the JSDoc sync check"
-run = [
-  "npm --prefix finstack-quant-wasm run test",
-  { task = "wasm-build" },
-  "wasm-pack build finstack-quant-wasm --target nodejs --dev --out-dir pkg-node",
-  "npm --prefix finstack-quant-wasm run test:facade",
-  "npm --prefix finstack-quant-wasm run docs:check-sync",
-]
+usage = 'flag "--doctest" help="Run only the documented code samples, against the web build"'
+run = '''
+set -e
+if [ "${usage_doctest:-false}" = "true" ]; then
+  mise run wasm-build
+  exec npm --prefix finstack-quant-wasm run test:doc-examples
+fi
+npm --prefix finstack-quant-wasm run test
+mise run wasm-build
+wasm-pack build finstack-quant-wasm --target nodejs --dev --out-dir pkg-node
+npm --prefix finstack-quant-wasm run test:facade
+npm --prefix finstack-quant-wasm run docs:check-sync
+'''
 
 [tasks.wasm-test-built]
 description = "Rerun the Node facade tests and JSDoc sync check against the built packages"

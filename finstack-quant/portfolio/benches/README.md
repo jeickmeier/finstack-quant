@@ -41,10 +41,7 @@ cargo bench -p finstack-quant-portfolio -- --baseline my_baseline
 
 `mise run rust-bench` overrides Criterion sample size and timing via
 `FQ_BENCH_SAMPLE_SIZE`, `FQ_BENCH_WARM_UP_TIME`, `FQ_BENCH_MEASUREMENT_TIME`,
-and `FQ_BENCH_NRESAMPLES`. `portfolio_valuation/250pos` is one of the four fixed
-cases in the PR gate: `python3 -m scripts.pr_benchmarks baseline` on the base
-commit saves a `pr-base` Criterion baseline, and `compare` on the branch fails
-above a 10% median regression.
+and `FQ_BENCH_NRESAMPLES`.
 
 ## Default matrix and opt-in extensions
 

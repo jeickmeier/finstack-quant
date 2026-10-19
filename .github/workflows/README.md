@@ -2,29 +2,26 @@
 
 CI workflows and issue templates for finstack-quant.
 
+There are two workflows. `nightly.yml` is the minimal check set and runs every
+night: lint, the standard fast tests, and audits, with no doctests or slow
+tests. `release.yml` runs when a `vX.Y.Z` tag is pushed. It runs the nightly
+set plus the release-only gates (docs, the `--doctest` and `--slow` test
+variants, publish checks, semver), then builds and publishes the release. Pull requests
+and pushes to `master` trigger nothing; run `mise run all-ci` before merging.
+
 CI does not reimplement the build. Almost every job provisions the pinned
 toolchain with `jdx/mise-action@v4` and then runs a canonical `mise` task, so
 those jobs run exactly the commands you can run locally. Toolchain versions live
 in [`../../mise.toml`](../../mise.toml); nothing here pins a compiler.
 
-Four jobs are deliberately outside that pattern and cannot be reproduced by a
-`mise` task: the two OSV-Scanner jobs (reusable upstream workflows), Semver
-Checks (raw `cargo semver-checks` against `origin/master`), and SonarQube (the
-upstream scan action).
-
 ## Workflows
 
 | File | Triggers | What it runs |
 | --- | --- | --- |
-| `build.yml` | push to `master`; PR opened/synchronize/reopened | The PR gate. Lint, tests on all three surfaces, release build, supply chain, publish checks, semver, four representative benchmarks, and the SonarQube scan. |
-| `benchmarks.yml` | Wednesdays 06:00 UTC; manual | Full Rust Criterion suite and report. |
-| `docs.yml` | push to `master`; Mondays 06:00 UTC; manual | Documentation gates, kept out of `build.yml` so a slow rustdoc build never blocks a PR. |
-| `slow-rust-tests.yml` | Sundays 06:00 UTC; manual | `mise run rust-test --slow` — the `#[ignore]`d suite, 120-minute budget. |
-| `release.yml` | successful `Build` run on `master`; manual with `publish: true` | Builds wheels, sdist, and WASM packages, then cuts a GitHub Release. |
-| `ui-gallery.yml` | PRs touching `finstack-quant-ui/` or the docs-site gallery; manual; called by `registry-publish.yml` | Builds the WASM packages, then runs `ui-check`, `ui-docs-build`, `ui-e2e`, `ui-publish-check`, and the isolated `ui-install` consumer check. |
-| `registry-publish.yml` | manual | Reruns `ui-gallery.yml`, then on `master` deploys the component registry and gallery to GitHub Pages and verifies the published registry from an empty consumer. |
+| `nightly.yml` | daily 06:00 UTC; manual; called by `release.yml` | Lint, the fast tests on all three surfaces, supply-chain audit, and the SonarQube scan. |
+| `release.yml` | push of a `vX.Y.Z` tag | Version metadata check, the nightly set, docs and doctests, the slow Rust and Python suites, publish checks, and semver. If all pass, it builds wheels, sdist and WASM packages, then creates the GitHub Release. |
 
-### build.yml
+### nightly.yml
 
 `prime-cache` is a single-writer job that populates the mise cache; every other
 job reads it with `cache_save: false` to avoid concurrent `actions/cache/save`
@@ -32,62 +29,60 @@ races on the shared `mise.toml`-derived key. Jobs then fan out in parallel:
 
 | Job | Command | Notes |
 | --- | --- | --- |
-| Lint | `mise run pre-commit-run`, then `mise run gen-check` | `SKIP: cargo-deny` — the supply-chain job owns it. Clippy covers lib/bins/tests/examples (`--all-features`), not Criterion benches. |
-| Test Rust | `mise run rust-test --coverage` | The `rust-test` nextest targets under `cargo llvm-cov`; uploads `coverage/rust/lcov.info`. |
-| Rust release build | `mise run rust-build-prod` | Release compile without debug info. |
-| Test Python | `mise run python-test --all --coverage` | maturin dev build, then the full pytest suite with coverage; uploads `coverage/python/coverage.xml`. |
-| Test WASM | `python3 scripts/check_wasm_boundary.py`, then `mise run wasm-test` | Serializer and error-path check, then wasm-bindgen tests plus the Node facade suite. |
-| Supply-chain Security | `mise run rust-audit` | `cargo deny check` — advisories, licenses, bans. |
-| Rust Publish Checks | `mise run rust-publish-checks` | Publish order and first-crate dry run. |
-| OSV-Scanner | reusable workflow | PR-diff scan on pull requests, full scan on push. Covers `Cargo.lock`, `uv.lock`, and `finstack-quant-wasm/package-lock.json`. |
-| Semver Checks | `cargo semver-checks check-release` | PRs only; starts after `prime-cache` alongside lint and tests. Checks `finstack-quant-core`, `finstack-quant-valuations`, `finstack-quant-portfolio` against `origin/master`. |
-| SonarQube | `SonarSource/sonarqube-scan-action` | Scan only, after Test Rust and Test Python. Downloads their coverage artifacts; runs no tests and no clippy (`sonar.rust.clippy.enabled=false`, Lint owns clippy). |
-| Rust Benchmark Regression | `scripts/pr_benchmarks.py` | PRs only; compares four exact cases on base and head with Rust 1.97.1 and thin LTO, and rejects missing or stale outputs. The weekly full suite retains fat LTO. |
+| Lint | `mise run pre-commit-run`, then `mise run gen-check` | `SKIP: cargo-deny`, which the supply-chain job owns. Clippy covers lib/bins/tests/examples (`--all-features`), not Criterion benches. |
+| Test Rust | `mise run rust-test --coverage` | The fast nextest lib and integration targets under `cargo llvm-cov` (no doctests, no `#[ignore]`d tests); uploads `coverage/rust/lcov.info`. |
+| Test Python | `mise run python-test --coverage` | maturin dev build, then the fast pytest suite (`-m 'not slow and not doctest'`) with coverage; uploads `coverage/python/coverage.xml`. |
+| Test WASM | `python3 scripts/check_wasm_boundary.py`, then `mise run wasm-test` | Serializer and error-path check, then wasm-bindgen tests plus the Node facade suite (the documented code samples run under `--doctest`). |
+| Supply-chain Security | `mise run all-audit` | `cargo deny check` (advisories, licenses, bans), then OSV-Scanner over `Cargo.lock`, `uv.lock` and `finstack-quant-wasm/package-lock.json`, filtered by `osv-scanner.toml`. |
+| SonarQube | `SonarSource/sonarqube-scan-action` | `master` only, so it is skipped inside a release run. Scan only: it imports the two coverage artifacts and runs no tests and no clippy (`sonar.rust.clippy.enabled=false`; Lint owns clippy). |
 
 Two details worth knowing before editing:
 
-- The cargo-heavy jobs — Lint, Test Rust, Rust release build, Test
-  Python, Test WASM, Semver Checks, Rust Benchmark Regression — add 10 GB of swap
-  (`pierotofy/set-swap-space`); the workspace has OOM'd linking without it. The
-  light jobs (`prime-cache`, Supply-chain Security, Rust Publish Checks) do not.
-- The semver job compares against `origin/master`, not against the released
-  tag. For a tag baseline locally, use the same command with
-  `--baseline-rev <tag>` (current tags already use the `finstack-quant-*`
-  crate layout, so no checkout rewrite is required).
-
-### docs.yml
-
-- **Rust Documentation** — `mise run rust-doc`: strict `RUSTDOCFLAGS='-D
-  warnings'` build, the public-API input-documentation contract, the
-  deprecation-annotation contract, and workspace doctests. Installs nightly
-  because `cargo public-api` still needs nightly rustdoc JSON.
-- **Python and WASM Documentation** — `mise run python-doc`,
-  `mise run wasm-doc`, and `scripts/materialization_bench.sh doc-check`.
+- The cargo-heavy jobs add 10 GB of swap (`pierotofy/set-swap-space`); the
+  workspace has OOM'd linking without it.
+- `nightly.yml` has no workflow-level `concurrency`. As a called workflow it
+  would share the release run's group and cancel or deadlock it.
 
 ### release.yml
 
-Fires automatically after a successful `Build` on `master`, or manually with
-`publish: true`. Jobs:
+Gates. Everything except `version` starts after `version` passes, in parallel:
 
-- **Wheels** — `PyO3/maturin-action@v1` across linux-x64, linux-arm64,
+| Job | Command | Notes |
+| --- | --- | --- |
+| Version metadata | inline check | The tag equals the `Cargo.toml` workspace version and the `finstack-quant-wasm/package.json` version; `CHANGELOG.md` has a `## [X.Y.Z]` section; `release_notes/RELEASE_NOTES_X.Y.Z.md` exists. |
+| Nightly checks | `uses: ./.github/workflows/nightly.yml` | The whole nightly set (SonarQube skipped). |
+| Documentation | `mise run all-doc`, then `rust-test`, `python-test` and `wasm-test` with `--doctest` | Strict rustdoc, the public-API input-doc and deprecation contracts, the Python and WASM documentation contracts, and the benchmark documents; then the Rust doctests, the Python stub and module doctests, and the WASM documented code samples. Installs nightly for `cargo public-api`. |
+| Test ignored Rust suite | `mise run rust-test --slow` | The `#[ignore]`d suite. |
+| Test slow Python suite | `mise run python-test --slow` | Golden pricing comparisons and Monte Carlo. |
+| Rust Publish Checks | `mise run rust-publish-checks` | Publish order and first-crate dry run. |
+| Semver Checks | `cargo semver-checks check-release` | `finstack-quant-core`, `finstack-quant-valuations`, `finstack-quant-portfolio` against the previous `vX.Y.Z` tag reachable from the release commit. |
+
+The release-only jobs build cold. Nothing on `master` saves a Rust cache for
+them, and a cache saved on a tag is visible only to that tag.
+
+Artifacts, after every gate passes:
+
+- **Wheels**: `PyO3/maturin-action@v1` across linux-x64, linux-arm64,
   macos-arm64, and windows-x64 for CPython 3.12, 3.13, and 3.14. Every wheel
   except linux-arm64 (build-only until a native arm64 runner is selected) is
   installed and smoke-tested with `scripts/smoke_python_wheel.py`.
-- **Source dist** — `maturin sdist`.
-- **WASM / npm** — syncs `package.json` to the workspace version from
-  `Cargo.toml`, builds the `web` and `nodejs` targets, and packs an npm tarball.
-- **Publish** — downloads every artifact and creates a GitHub Release. Automatic
-  runs are timestamped prereleases (`master-YYYYmmdd-HHMMSS`); a manual run with
-  an explicit `tag` input marks the release latest.
+- **Source dist**: `maturin sdist`.
+- **WASM / npm**: `mise run wasm-pkg` (the size-optimized web package and the
+  Node package), then the npm tarball plus one archive per target.
 
-Artifacts are attached to the GitHub Release only. This workflow does not push
-to PyPI or npm.
+**Publish** runs after every artifact builds. It creates the GitHub Release for
+the tag, marked latest, with the release notes file as its body. Artifacts are
+attached to the GitHub Release only; nothing is pushed to crates.io, PyPI, or
+npm.
+
+A failed gate leaves the tag without a release. Fix forward, then delete and
+re-push the tag, or tag the next patch version.
 
 ## Issue templates
 
-[`../ISSUE_TEMPLATE/`](../ISSUE_TEMPLATE/) holds the stock GitHub `bug_report.md`, `feature_request.md`,
-and an unfilled `custom.md`. They are not tailored to this project — the bug
-template still asks for browser and smartphone details.
+[`../ISSUE_TEMPLATE/`](../ISSUE_TEMPLATE/) holds the stock GitHub
+`bug_report.md` and `feature_request.md`. They are not tailored to this
+project; the bug template still asks for browser and smartphone details.
 
 ## Changing CI
 
@@ -95,15 +90,16 @@ Add the command to `mise.toml` first and make it pass locally, then call the
 task from a workflow. Jobs that invoke raw `cargo`/`npm` instead of a `mise`
 task cannot be reproduced locally at all.
 
-The local mirrors are partial, so know what they do and do not cover:
+Local equivalents:
 
-- `mise run all-ci` regenerates derived artifacts first, then covers the Lint,
-  Test Rust, Test Python, Test WASM, Supply-chain Security, and Rust Publish
-  Checks jobs of `build.yml`. It does **not** run the Rust release build,
-  OSV-Scanner, Semver Checks, or PR benchmark comparison. GitHub CI still uses `gen-check` as a
-  non-mutating drift gate so uncommitted generated files fail the Lint job.
-- `mise run all-doc` mirrors `docs.yml`.
-- `slow-rust-tests.yml` is `mise run rust-test --slow`; `release.yml` has no local
-  equivalent.
-- `benchmarks.yml` runs the complete benchmark suite weekly; local scoped
-  benchmark tasks remain available for focused measurements.
+- `mise run all-ci` regenerates derived artifacts first, then runs the nightly
+  Lint, Test, and Supply-chain checks (without coverage). GitHub CI uses
+  `gen-check` as a non-mutating drift gate so uncommitted generated files fail
+  the Lint job.
+- The release gates are `mise run all-doc`; `rust-test`, `python-test` and
+  `wasm-test` with `--doctest`; `rust-test --slow` and `python-test --slow`;
+  `mise run rust-publish-checks`; and `cargo semver-checks check-release
+  --baseline-rev <previous tag>`.
+- Benchmarks are not run in CI. Use `mise run rust-bench` or
+  `mise run rust-bench-crate`, and `scripts/materialization_bench.sh` for the
+  materialization record.

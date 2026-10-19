@@ -161,8 +161,8 @@ cargo nextest run -p finstack-quant-arrow
 RUSTDOCFLAGS='-D warnings' cargo doc -p finstack-quant-arrow --no-deps
 ```
 
-Doctests for this crate run as part of the workspace doc pass (`mise run
-rust-doc`); the project rule is to avoid invoking bare `cargo test`.
+Doctests for this crate run as part of the workspace doctest pass (`mise run
+rust-test --doctest`); the project rule is to avoid invoking bare `cargo test`.
 
 Python host-interop (optional, after `mise run python-build`):
 

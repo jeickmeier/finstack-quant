@@ -41,6 +41,7 @@
     "test:docs-tools": "node --test tests/scripts/typescript_docs.test.mjs",
     "test:browser": "wasm-pack test --chrome --headless",
     "test:facade": "node --test \"tests/facade/**/*.test.mjs\"",
+    "test:doc-examples": "node --test tests/docs/doc_examples.test.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --check \"**/*.{ts,js,json,css,md,mjs,mks}\" index.d.ts",

@@ -108,6 +108,7 @@ markers = [
     "security: security and hardening tests",
     "integration: integration tests",
     "slow: long-running tests (waterfall/valuation) that are opt-in",
+    "doctest: executes the stub and module doctest examples (mise run python-test --doctest only)",
 ]
 
 # Warnings configuration

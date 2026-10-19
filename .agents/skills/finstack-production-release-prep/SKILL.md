@@ -364,13 +364,17 @@ mise run all-ci
 ### 7d. Tag and release
 
 ```bash
-# Create annotated tag
 git tag -a vX.Y.Z -m "Release vX.Y.Z"
 git push origin vX.Y.Z
-
-# Create GitHub release (attaches release notes)
-gh release create vX.Y.Z --title "Finstack vX.Y.Z" --notes-file RELEASE_NOTES_X.Y.Z.md
 ```
+
+Pushing the tag runs `.github/workflows/release.yml`. It requires the tag to
+match the `Cargo.toml` and `finstack-quant-wasm/package.json` versions, a
+`## [X.Y.Z]` section in `CHANGELOG.md` and
+`release_notes/RELEASE_NOTES_X.Y.Z.md`; runs the nightly checks, docs, the
+slow Rust suite, publish checks and semver; then builds the wheels, sdist and
+WASM packages and creates the GitHub release with those notes. Do not run
+`gh release create` by hand.
 
 ### 7e. Post-release
 

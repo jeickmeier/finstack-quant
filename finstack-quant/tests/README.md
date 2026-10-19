@@ -71,7 +71,7 @@ cargo nextest run -p finstack-quant
 ```
 
 Do not invoke `cargo test` directly for the dev loop; it also runs doc tests,
-which the workspace gates separately through `mise run rust-doc`. The doc tests
+which the workspace gates separately through `mise run rust-test --doctest`. The doc tests
 on `finstack_quant::schema` are exercised there.
 
 Schema artifacts themselves are generated from Rust types and checked for drift

@@ -380,7 +380,7 @@ Run from the repository root.
 | Format / autofix | `mise run python-fmt` |
 | Type check (`ty`) | `mise run python-typecheck` |
 | Stub + PyO3 doc completeness | `mise run python-doc` |
-| Stub doctests | `mise run python-doctest` |
+| Stub doctests | `mise run python-test --doctest` |
 | Notebooks | `mise run python-examples` |
 | Benchmarks (release build) | `mise run python-bench` |
 
