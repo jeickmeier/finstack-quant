@@ -4,23 +4,21 @@
 //! facility-specific metrics (utilization rate, available capacity, weighted average
 //! cost, and the draw option cost of stochastic facilities).
 
-pub(crate) mod available_capacity;
 pub(crate) mod cs01;
-pub(crate) mod draw_option_cost;
 pub(crate) mod exposure;
 pub(crate) mod oid_eir;
 pub(crate) mod quotes;
-pub(crate) mod utilization_rate;
 pub(crate) mod weighted_average_cost;
 
-pub(crate) use available_capacity::AvailableCapacityCalculator;
-pub(crate) use draw_option_cost::DrawOptionCostCalculator;
-pub(crate) use utilization_rate::UtilizationRateCalculator;
 pub(crate) use weighted_average_cost::ApproxWeightedAverageCostCalculator;
 
+use crate::revolving_credit::pricing::RevolvingCreditPricer;
+use crate::revolving_credit::types::DrawRepaySpec;
 use crate::RevolvingCredit;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::metrics::MetricCalculator;
+use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
 
 /// Drawn balance on the valuation date: `drawn` is the balance at the
@@ -67,71 +65,84 @@ pub(crate) fn register_revolving_credit_metrics(
             // quote applies to the drawn balance plus accrued).
             (DiscountMargin, quotes::DiscountMarginCalculator),
             (Ytm, quotes::YtmCalculator),
+        ],
+        custom: [
+            ("utilization_rate", UtilizationRateCalculator),
+            ("available_capacity", AvailableCapacityCalculator),
+            ("weighted_average_cost", ApproxWeightedAverageCostCalculator),
+            ("draw_option_cost", DrawOptionCostCalculator),
+            ("all_in_rate", quotes::AllInRateCalculator),
+            ("accrued_interest", quotes::AccruedInterestCalculator),
+            ("price_from_dm", quotes::PriceFromDmCalculator),
+            ("exposure_at_default", exposure::ExposureAtDefaultCalculator),
+            ("expected_loss", exposure::ExpectedLossCalculator),
+            ("oid_eir_amortization", oid_eir::OidEirAmortizationCalculator),
         ]
     }
 
     // Register facility-specific metrics with custom IDs
-    use finstack_quant_valuations_core::metrics::MetricId;
-    use std::sync::Arc;
 
-    registry.register_metric(
-        MetricId::custom("utilization_rate"),
-        Arc::new(UtilizationRateCalculator),
-        &[InstrumentType::RevolvingCredit],
-    )?;
-
-    registry.register_metric(
-        MetricId::custom("available_capacity"),
-        Arc::new(AvailableCapacityCalculator),
-        &[InstrumentType::RevolvingCredit],
-    )?;
-
-    registry.register_metric(
-        MetricId::custom("weighted_average_cost"),
-        Arc::new(ApproxWeightedAverageCostCalculator),
-        &[InstrumentType::RevolvingCredit],
-    )?;
-
-    registry.register_metric(
-        MetricId::custom("draw_option_cost"),
-        Arc::new(DrawOptionCostCalculator),
-        &[InstrumentType::RevolvingCredit],
-    )?;
-
-    registry.register_metric(
-        MetricId::custom("all_in_rate"),
-        Arc::new(quotes::AllInRateCalculator),
-        &[InstrumentType::RevolvingCredit],
-    )?;
-
-    registry.register_metric(
-        MetricId::custom("accrued_interest"),
-        Arc::new(quotes::AccruedInterestCalculator),
-        &[InstrumentType::RevolvingCredit],
-    )?;
-
-    registry.register_metric(
-        MetricId::custom("price_from_dm"),
-        Arc::new(quotes::PriceFromDmCalculator),
-        &[InstrumentType::RevolvingCredit],
-    )?;
-
-    registry.register_metric(
-        MetricId::custom("exposure_at_default"),
-        Arc::new(exposure::ExposureAtDefaultCalculator),
-        &[InstrumentType::RevolvingCredit],
-    )?;
-
-    registry.register_metric(
-        MetricId::custom("expected_loss"),
-        Arc::new(exposure::ExpectedLossCalculator),
-        &[InstrumentType::RevolvingCredit],
-    )?;
-
-    registry.register_metric(
-        MetricId::custom("oid_eir_amortization"),
-        Arc::new(oid_eir::OidEirAmortizationCalculator),
-        &[InstrumentType::RevolvingCredit],
-    )?;
     Ok(())
+}
+
+/// Calculator for available facility capacity (commitment - drawn).
+///
+/// Returns the amount as a float (in the instrument's currency units).
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct AvailableCapacityCalculator;
+
+impl MetricCalculator for AvailableCapacityCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let facility: &RevolvingCredit = context.instrument_as()?;
+        let drawn = drawn_balance_as_of(facility, context.as_of)?;
+        let available = facility
+            .commitment_at(context.as_of)
+            .checked_sub(drawn)?
+            .checked_sub(facility.lc_outstanding_at(context.as_of))?;
+        Ok(available.amount())
+    }
+}
+
+/// Calculator for the Monte Carlo mean draw option cost: the value to the
+/// lender of the facility's simulated draws having been made at the
+/// contractual margin instead of each path's fair spread, anchored to the
+/// margin at the valuation date so only spread changes count (negative when
+/// spreads widen). Deterministic facilities have no simulated draws and
+/// report `0.0`.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct DrawOptionCostCalculator;
+
+impl MetricCalculator for DrawOptionCostCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let facility: &RevolvingCredit = context.instrument_as()?;
+        match &facility.draw_repay_spec {
+            DrawRepaySpec::Deterministic(_) => Ok(0.0),
+            DrawRepaySpec::Stochastic(_) => {
+                let result = RevolvingCreditPricer::price_with_paths(
+                    facility,
+                    &context.curves,
+                    context.as_of,
+                )?;
+                Ok(result.draw_option_cost.mean.amount())
+            }
+        }
+    }
+}
+
+/// Calculator for facility utilization rate (drawn / committed).
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct UtilizationRateCalculator;
+
+impl MetricCalculator for UtilizationRateCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let facility: &RevolvingCredit = context.instrument_as()?;
+        let drawn = drawn_balance_as_of(facility, context.as_of)?.amount();
+        let commitment = facility.commitment_at(context.as_of).amount();
+        let utilization_rate = if commitment > 0.0 {
+            drawn / commitment
+        } else {
+            0.0
+        };
+        Ok(utilization_rate)
+    }
 }
