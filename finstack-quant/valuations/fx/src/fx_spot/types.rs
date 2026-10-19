@@ -515,32 +515,6 @@ impl FxSpot {
         format!("{}{}", self.base_currency, self.quote_currency)
     }
 
-    /// Create an FX spot with T+1 settlement (used for USD/CAD and other same-day pairs).
-    ///
-    /// Per market convention, USD/CAD settles T+1 rather than the standard T+2.
-    /// This convenience method creates an FX spot with the appropriate settlement lag.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use finstack_quant_core::{currency::Currency, types::InstrumentId};
-    /// use finstack_quant_valuations_fx::FxSpot;
-    ///
-    /// // USD/CAD with standard T+1 settlement
-    /// let usd_cad = FxSpot::new_t1(
-    ///     InstrumentId::new("USDCAD"),
-    ///     Currency::USD,
-    ///     Currency::CAD,
-    /// );
-    /// ```
-    pub fn new_t1(
-        id: impl Into<InstrumentId>,
-        base_currency: Currency,
-        quote_currency: Currency,
-    ) -> Self {
-        Self::new(id, base_currency, quote_currency).with_settlement_days(1)
-    }
-
     /// Check if this is a same-region pair that typically settles T+1.
     ///
     /// Returns `true` for pairs like USD/CAD and USD/TRY that conventionally
@@ -869,18 +843,6 @@ mod tests {
     #[test]
     fn test_fx_spot_new_defaults_t1_pairs_to_one_day() {
         let spot = FxSpot::new(InstrumentId::new("USDCAD"), Currency::USD, Currency::CAD);
-        let as_of = date(2025, Month::January, 15); // Wednesday
-        let settle = spot
-            .effective_settlement_date(as_of)
-            .expect("should compute");
-        assert_eq!(settle, date(2025, Month::January, 16)); // Thursday (T+1)
-    }
-
-    #[test]
-    fn test_fx_spot_new_t1() {
-        let spot = FxSpot::new_t1(InstrumentId::new("USDCAD"), Currency::USD, Currency::CAD);
-
-        // Wednesday -> should settle Thursday (T+1 weekdays)
         let as_of = date(2025, Month::January, 15); // Wednesday
         let settle = spot
             .effective_settlement_date(as_of)
