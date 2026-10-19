@@ -207,6 +207,6 @@ Tests live in
 
 ## See also
 
-- [`../../fixed_income/term_loan/README.md`](../../fixed_income/term_loan/README.md) — the usual financing leg
+- [`../../../../fixed-income/src/term_loan/README.md`](../../../../fixed-income/src/term_loan/README.md) — the usual financing leg
 - [`../../README.md`](../../README.md) — instrument module map and how to add one
 - [`INVARIANTS.md`](../../../../../../INVARIANTS.md) — Decimal/f64, determinism and serde invariants

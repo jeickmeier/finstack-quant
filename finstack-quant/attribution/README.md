@@ -98,7 +98,8 @@ attribution/src/
 
 ## Position in the stack
 
-Depends on `finstack-quant-core`, `finstack-quant-cashflows`,
+Depends on `finstack-quant-core`, `finstack-quant-calibration`,
+`finstack-quant-cashflows`, `finstack-quant-factor`,
 `finstack-quant-models`, and `finstack-quant-valuations`. Consumed by
 `finstack-quant-portfolio`, which rolls per-instrument `PnlAttribution` values
 into book-level views, and by `finstack-quant-scenarios`. Re-exported by the
@@ -252,7 +253,7 @@ The authoritative contract, including the full Rust-only inventory, is
 
 - [`finstack-quant-valuations`](../valuations/README.md) — instrument repricing used at T₀ and T₁.
 - [`finstack-quant-cashflows`](../cashflows/README.md) — accrual and carry inputs.
-- [`finstack-quant-models`](../models/README.md) — calibrated credit-factor models consumed via `models::factor::CreditFactorModel`.
+- [`finstack-quant-factor`](../factor/README.md) — calibrated credit-factor models consumed via `models::factor::CreditFactorModel`.
 - [`finstack-quant-portfolio`](../portfolio/README.md) — aggregates per-instrument `PnlAttribution`s into book-level views.
 
 ## Tests and benchmarks

@@ -1925,8 +1925,8 @@ fn golden_credit_factor_model_matches_checked_in_json() {
         panic!(
             "Golden file not found at {golden_path}: {e}\n\
              Bootstrap it by running:\n  \
-             {REGEN_CREDIT_FACTOR_MODEL_GOLDEN_ENV}=1 cargo nextest run -p finstack-quant-models \
-             --test models credit_factor_model_has_exact_canonical_bytes_and_hash"
+             {REGEN_CREDIT_FACTOR_MODEL_GOLDEN_ENV}=1 cargo nextest run -p finstack-quant-factor \
+             --test factor credit_factor_model_has_exact_canonical_bytes_and_hash"
         )
     });
 

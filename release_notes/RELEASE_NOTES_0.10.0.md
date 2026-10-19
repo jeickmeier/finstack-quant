@@ -3,7 +3,7 @@
 **Release Date**: 2026-10-06
 
 **Bump type**: minor (pre-1.0; intentional breaking Rust, Python, WASM, and JSON changes)
-**Status**: Prepared, not yet tagged (`v0.7.0` is the latest git tag; `v0.8.0` and `v0.9.0` were never created)
+**Status**: Not tagged. Superseded by 0.11.0 on this tree. `v0.7.0` is still the latest git tag; `v0.8.0`, `v0.9.0`, and `v0.10.0` were never created.
 
 ## Executive Summary
 

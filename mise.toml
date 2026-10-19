@@ -822,7 +822,7 @@ run = [
     (binary_id(finstack-quant-statements::statements) & test(/schema_contract/)) | \
     (binary_id(finstack-quant-statements-analytics::statements_analytics) & test(/analysis_schema_contract::/)) | \
     (binary_id(finstack-quant-scenarios::scenarios) & test(/schema_contract/)) | \
-    (binary_id(finstack-quant-models::models) & test(/factor_schema_contract/)) | \
+    (binary_id(finstack-quant-factor::factor) & test(/schema_contract::/)) | \
     (binary_id(finstack-quant-models::models) & test(/model_schema_contract::/)) | \
     (binary_id(finstack-quant-valuations::valuations) & test(/schema_parity/)) | \
     (package(finstack-quant-valuations) & kind(lib) & test(/test_instrument_schema_union_parity/)) | \

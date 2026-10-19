@@ -16,7 +16,6 @@ finstack-quant-attribution = { path = "../attribution", version = "0.11.0", defa
 finstack-quant-calibration = { path = "../calibration", version = "0.11.0", default-features = false }
 finstack-quant-cashflows = { path = "../cashflows", version = "0.11.0", default-features = false }
 finstack-quant-margin = { path = "../margin", version = "0.11.0", default-features = false }
-finstack-quant-models = { path = "../models", version = "0.11.0", default-features = false }
 finstack-quant-factor = { path = "../factor", version = "0.11.0", default-features = false }
 finstack-quant-valuations = { path = "../valuations", version = "0.11.0", default-features = false }
 finstack-quant-scenarios = { path = "../scenarios", version = "0.11.0", default-features = false }
@@ -38,7 +37,6 @@ json-schema = [
     "finstack-quant-calibration/json-schema",
     "finstack-quant-cashflows/json-schema",
     "finstack-quant-margin/json-schema",
-    "finstack-quant-models/json-schema",
     "finstack-quant-factor/json-schema",
     "finstack-quant-valuations/json-schema",
     "finstack-quant-scenarios/json-schema",

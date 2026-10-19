@@ -9,8 +9,9 @@ historical replay.
 
 Top of the Rust stack. It depends on `finstack-quant-core`,
 `finstack-quant-valuations`, `finstack-quant-attribution`,
-`finstack-quant-cashflows`, `finstack-quant-models`,
-`finstack-quant-margin`, and `finstack-quant-scenarios`. No other domain crate
+`finstack-quant-calibration`, `finstack-quant-cashflows`,
+`finstack-quant-factor`, `finstack-quant-margin`, and
+`finstack-quant-scenarios`. No other domain crate
 depends on it; only the `finstack-quant` umbrella crate and the Python/WASM
 binding crates do.
 

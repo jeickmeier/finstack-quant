@@ -2,7 +2,17 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-18
+
 Workspace version 0.11.0: the valuations split below removes and moves public Rust items (see the section that follows), so the crates, the Python wheel and the WASM package take a breaking-change version bump.
+
+### Dependencies
+
+#### Removed
+
+- Unused `smallvec`, `thiserror` and `tracing` dependencies from `finstack-quant-valuations`.
+- Unused `rand` and `rand_pcg` dependencies from `finstack-quant-models`.
+- Unused `finstack-quant-models` dependency from `finstack-quant-portfolio`.
 
 ### Factor models are the `finstack-quant-factor` crate
 

@@ -315,9 +315,9 @@ Entries live in [`docs/REFERENCES.md`](../../docs/REFERENCES.md):
 ## Verification
 
 ```bash
-mise run rust-lint-crate -- finstack-quant-models
-mise run rust-test-crate -- finstack-quant-models
-mise run rust-bench-crate -- finstack-quant-models factor_model
+mise run rust-lint-crate -- finstack-quant-factor
+mise run rust-test-crate -- finstack-quant-factor
+mise run rust-bench-crate -- finstack-quant-factor factor_model
 ```
 
 Workspace gates (`mise run rust-lint`, `mise run rust-test`, `mise run rust-doc`

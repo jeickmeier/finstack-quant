@@ -158,12 +158,13 @@ print({"independent_individual_plus_BBB":direct_total,"native_portfolio_plus_BBB
 
 {/* notebook-block notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" cell="credit-independent-analytical" role="build" */}
 ```python exec id=credit-independent-analytical role=build
+from finstack_quant.models.volatility import get_surface_vol
 from _shared.analyst_book import instruments as common_instruments
 # Independent closed-form calculation for the actual common European equity call.
 equity=common_instruments("common")["SPX-CALL"]["instrument"]["spec"]
 tau=(date.fromisoformat(equity["expiry"])-AS_OF).days/365
 spot=float(market.get_price(equity["spot_id"])[0]);q=float(market.get_price(equity["div_yield_id"])[0])
-K=float(equity["strike"]);sigma=market.get_surface(equity["vol_surface_id"]).vol(tau,K)
+K=float(equity["strike"]);sigma=get_surface_vol(market.get_surface(equity["vol_surface_id"]),tau,K)
 discount=market.get_discount(equity["discount_curve_id"]).df(tau);r=-math.log(discount)/tau
 d1=(math.log(spot/K)+(r-q+.5*sigma*sigma)*tau)/(sigma*math.sqrt(tau));d2=d1-sigma*math.sqrt(tau)
 N1=.5*(1+math.erf(d1/math.sqrt(2)));N2=.5*(1+math.erf(d2/math.sqrt(2)))
@@ -217,13 +218,8 @@ rng=np.random.default_rng(2025011508)
 factor_panel=rng.standard_normal((504,8))@np.linalg.cholesky(correlation).T*factor_sd
 frozen_market=json.loads(market.to_json())
 
-def capstone_scenario_value(shock):
-    # Each mutation starts from the same snapshot. Rates are continuous zero/forward
-    # changes, hazards are multiplicative intensity changes, and all PV calls are
-    # explicitly PV-only: this is curve space, not quote-recalibrated CS01.
-    usd,eur,hazard,equity,volatility,fx_move,energy,basis=shock
-    snapshot=deepcopy(frozen_market)
-    for curve in snapshot["curves"]:
+def shock_curves(curves,usd,eur,hazard,energy,basis):
+    for curve in curves:
         if curve["type"]=="discount":
             shift=eur if curve["id"]=="EUR-OIS" else usd
             curve["knot_points"]=[[t,df*math.exp(-shift*t)] for t,df in curve["knot_points"]]
@@ -236,6 +232,14 @@ def capstone_scenario_value(shock):
         elif curve["type"]=="price":
             log_move=energy+(basis if curve["id"]=="WTI-FORWARD" else 0.)
             curve["knot_points"]=[[t,price*math.exp(log_move)] for t,price in curve["knot_points"]]
+
+def capstone_scenario_value(shock):
+    # Each mutation starts from the same snapshot. Rates are continuous zero/forward
+    # changes, hazards are multiplicative intensity changes, and all PV calls are
+    # explicitly PV-only: this is curve space, not quote-recalibrated CS01.
+    usd,eur,hazard,equity,volatility,fx_move,energy,basis=shock
+    snapshot=deepcopy(frozen_market)
+    shock_curves(snapshot["curves"],usd,eur,hazard,energy,basis)
     for surface in snapshot["surfaces"]:
         surface["vols_row_major"]=[value+volatility for value in surface["vols_row_major"]]
     for ticker,price in snapshot["prices"].items():
@@ -271,7 +275,10 @@ manual_q=float(np.quantile(scenario_returns,1-confidence,method="linear"))
 ordered=np.sort(scenario_returns)
 mass=(1-confidence)*len(ordered)
 whole=min(int(np.floor(mass)),len(ordered))
-manual_tail=float(ordered[0] if whole==0 else ordered[:whole].sum()/mass+(0 if whole>=len(ordered) else ordered[whole]*((mass-whole)/mass)))
+tail_mass=ordered[:whole].sum()
+if whole<len(ordered):
+    tail_mass+=ordered[whole]*(mass-whole)
+manual_tail=float(ordered[0] if whole==0 else tail_mass/mass)
 bootstrap_rng=np.random.default_rng(2025011595)
 bootstrap_risk=[]
 for _ in range(500):
@@ -783,12 +790,13 @@ print({"independent_individual_total":direct_total,"native_portfolio_total":comb
 
 {/* notebook-block notebook="08_capstone/end_to_end_volatility_portfolio_workflow.ipynb" cell="vol-independent-analytical" role="build" */}
 ```python exec id=vol-independent-analytical role=build
+from finstack_quant.models.volatility import get_surface_vol
 from _shared.analyst_book import instruments as common_instruments
 # Independent closed-form calculation for the actual common European equity call.
 equity=common_instruments("common")["SPX-CALL"]["instrument"]["spec"]
 tau=(date.fromisoformat(equity["expiry"])-AS_OF).days/365
 spot=float(market.get_price(equity["spot_id"])[0]);q=float(market.get_price(equity["div_yield_id"])[0])
-K=float(equity["strike"]);sigma=market.get_surface(equity["vol_surface_id"]).vol(tau,K)
+K=float(equity["strike"]);sigma=get_surface_vol(market.get_surface(equity["vol_surface_id"]),tau,K)
 discount=market.get_discount(equity["discount_curve_id"]).df(tau);r=-math.log(discount)/tau
 d1=(math.log(spot/K)+(r-q+.5*sigma*sigma)*tau)/(sigma*math.sqrt(tau));d2=d1-sigma*math.sqrt(tau)
 N1=.5*(1+math.erf(d1/math.sqrt(2)));N2=.5*(1+math.erf(d2/math.sqrt(2)))
@@ -856,7 +864,7 @@ def capstone_scenario_value(shock):
         elif curve["type"]=="hazard":
             curve["knot_points"]=[[t,intensity*math.exp(hazard)] for t,intensity in curve["knot_points"]]
             curve.pop("hazard_calibration",None);curve["par_points"]=[]
-        elif curve["type"]=="price":
+        elif curve["type"]=="price" and "spot_price" in curve:
             log_move=energy+(basis if curve["id"]=="WTI-FORWARD" else 0.)
             curve["spot_price"]*=math.exp(log_move)
             curve["knot_points"]=[[t,price*math.exp(log_move)] for t,price in curve["knot_points"]]
@@ -1390,7 +1398,8 @@ whole_clo_positions = sum(
     position["instrument_spec"]["type"] == "structured_credit"
     for position in r["book_input"]["positions"]
 )
-identity_failures = sum((not unique_ids, not has_term_loan, whole_clo_positions != 0))
+identity_conditions = (unique_ids, has_term_loan, whole_clo_positions == 0)
+identity_failures = sum(not ok for ok in identity_conditions)
 identity_passed = identity_failures == 0
 add_check(
     "1 market and identity",
@@ -1438,16 +1447,15 @@ var_loss = float(r["tail_risk"].VaR_loss_USD.iloc[0])
 es_loss = float(r["tail_risk"].ES_loss_USD.iloc[0])
 factor_rows = len(r["factor_risk"])
 factor_variance_residual = abs(float(r["factor_variance_error"]))
-risk_failures = sum(
-    (
-        not risk_values_finite,
-        risk_position_count < len(ids),
-        scenario_count != 504,
-        tail_observations < 25,
-        not (es_loss >= var_loss > 0),
-        factor_rows != 9,
-    )
+risk_conditions = (
+    risk_values_finite,
+    risk_position_count >= len(ids),
+    scenario_count == 504,
+    tail_observations >= 25,
+    es_loss >= var_loss > 0,
+    factor_rows == 9,
 )
+risk_failures = sum(not ok for ok in risk_conditions)
 risk_passed = risk_failures == 0 and factor_variance_residual < 1e-12
 add_check(
     "3 sensitivities, full-repricing VaR/ES and factor variance",
@@ -1512,14 +1520,13 @@ max_irs_exposure = float(r["margin"].IRS_exposure_usd.abs().max())
 max_vm_cashflow = float(
     r["margin"][["VM_post_usd", "VM_collect_usd"]].abs().to_numpy().max()
 )
-margin_failures = sum(
-    (
-        not (r["SIMM"] > 0),
-        not (r["schedule_IM"] > 0),
-        not (max_irs_exposure < 500_000),
-        not (max_vm_cashflow == 0),
-    )
+margin_conditions = (
+    r["SIMM"] > 0,
+    r["schedule_IM"] > 0,
+    max_irs_exposure < 500_000,
+    max_vm_cashflow == 0,
 )
+margin_failures = sum(not ok for ok in margin_conditions)
 margin_passed = margin_failures == 0
 add_check(
     "5 eligible OTC margin and below-MTA VM",
@@ -1547,15 +1554,14 @@ borrower_rows = len(r["borrower"])
 borrower_values_finite = bool(
     np.isfinite(r["borrower"][["actual", "threshold", "headroom"]]).all().all()
 )
-borrower_failures = sum(
-    (
-        not (borrower_balance_residual < 0.01),
-        borrower_rows != 16,
-        not borrower_values_finite,
-        not (ecl_residual < 1e-8),
-        not (r["physical_ECL"] > 0),
-    )
+borrower_conditions = (
+    borrower_balance_residual < 0.01,
+    borrower_rows == 16,
+    borrower_values_finite,
+    ecl_residual < 1e-8,
+    r["physical_ECL"] > 0,
 )
+borrower_failures = sum(not ok for ok in borrower_conditions)
 borrower_passed = borrower_failures == 0
 add_check(
     "6 quarterly covenants and amortizing physical ECL",
@@ -1631,17 +1637,16 @@ conditional_draw_increases = bool(
     > r["expected_draw"].drawn_given_default.iloc[0]
 )
 convertible_regimes = len(r["convert_regimes"])
-report_failures = sum(
-    (
-        not report_contains_recommendation,
-        not report_is_html,
-        not report_contains_total,
-        waterfall_rows != 6,
-        not (first_loss_cdr > 0),
-        not conditional_draw_increases,
-        convertible_regimes != 3,
-    )
+report_conditions = (
+    report_contains_recommendation,
+    report_is_html,
+    report_contains_total,
+    waterfall_rows == 6,
+    first_loss_cdr > 0,
+    conditional_draw_increases,
+    convertible_regimes == 3,
 )
+report_failures = sum(not ok for ok in report_conditions)
 report_passed = report_failures == 0
 add_check(
     "8 reproducible report and credit artifacts",
