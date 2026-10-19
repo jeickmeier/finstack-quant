@@ -26,22 +26,7 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 pub(crate) fn register_cds_index_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::MetricId;
     use finstack_quant_valuations_core::pricer::InstrumentType;
-    use std::sync::Arc;
-
-    registry.register_metric(
-        MetricId::RiskyPv01,
-        Arc::new(simple::RiskyPv01Calculator),
-        &[InstrumentType::CdsIndex],
-    )?;
-
-    // Recovery01 (custom metric - recovery rate sensitivity)
-    registry.register_metric(
-        MetricId::Recovery01,
-        Arc::new(recovery01::Recovery01Calculator),
-        &[InstrumentType::CdsIndex],
-    )?;
 
     // Standard metrics using macro
     finstack_quant_valuations_core::register_metrics! {
@@ -58,6 +43,9 @@ pub(crate) fn register_cds_index_metrics(
             (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
             // Theta is now registered universally in crate::CREDIT.metrics()
             (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (RiskyPv01, simple::RiskyPv01Calculator),
+            // Recovery01 (custom metric - recovery rate sensitivity)
+            (Recovery01, recovery01::Recovery01Calculator),
         ]
     }
     Ok(())
