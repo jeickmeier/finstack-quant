@@ -187,7 +187,10 @@ Removed unused dependencies: `smallvec`, `thiserror`, and `tracing` from
 `finstack-quant-valuations`; `rand` and `rand_pcg` from
 `finstack-quant-models`; `finstack-quant-models` from
 `finstack-quant-portfolio`; direct `rayon` from `finstack-quant-scenarios` and
-`finstack-quant-attribution`.
+`finstack-quant-attribution`. Upgraded `nalgebra` to `0.35` (`simba 0.10.2`) and
+`rust_decimal` to `1.43.0`, eliminating `paste` (`RUSTSEC-2024-0436`) and
+`rkyv` (`RUSTSEC-2026-0235`) from `Cargo.lock` and removing their advisory
+ignores from `deny.toml` and `osv-scanner.toml`.
 
 ## Migration Checklist
 

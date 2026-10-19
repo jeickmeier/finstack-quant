@@ -18,7 +18,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 statrs = { version = "0.18", default-features = false }
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
-nalgebra = { version = "0.34", default-features = false, features = ["std", "serde-serialize"] }
+nalgebra = { version = "0.35", default-features = false, features = ["std", "serde-serialize"] }
 time = { workspace = true }
 schemars = { workspace = true, optional = true }
 thiserror = { workspace = true }
