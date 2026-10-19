@@ -478,32 +478,6 @@ pub fn calculate_tranche_discount_margin(
     as_of: Date,
     market_price_pct: f64,
 ) -> Result<f64> {
-    discount_margin(
-        deal,
-        tranche_id,
-        market,
-        as_of,
-        DmTarget::CleanPct(market_price_pct),
-    )
-}
-
-/// Price target for the discount-margin solve.
-pub(crate) enum DmTarget {
-    /// Clean price, percent of current balance; accrued is added.
-    CleanPct(f64),
-    /// Dirty settlement amount in the tranche currency, accrued included.
-    Dirty(Money),
-}
-
-/// Discount-margin solve shared by the public clean-price entry point and the
-/// tranche-metrics summary, which already holds a dirty target.
-pub(crate) fn discount_margin(
-    deal: &StructuredCredit,
-    tranche_id: &str,
-    market: &MarketContext,
-    as_of: Date,
-    target: DmTarget,
-) -> Result<f64> {
     deal.validate_for_pricing()?;
     let tranche = deal
         .tranches
@@ -532,21 +506,10 @@ pub(crate) fn discount_margin(
         tranche.current_balance.amount(),
         &cashflows,
     )?;
-    let target_pv = match target {
-        DmTarget::CleanPct(pct) => Money::new(
-            quote.clean_target(pct)?,
-            tranche.original_balance.currency(),
-        )?,
-        DmTarget::Dirty(target_pv) => {
-            if target_pv.currency() != tranche.original_balance.currency() {
-                return Err(finstack_quant_core::Error::Validation(
-                    "discount-margin target currency must match the tranche".into(),
-                ));
-            }
-            quote.dirty_target(target_pv.amount())?;
-            target_pv
-        }
-    };
+    let target_pv = Money::new(
+        quote.clean_target(market_price_pct)?,
+        tranche.original_balance.currency(),
+    )?;
     let disc_curve_id = deal.discount_curve_id.as_str();
     let discount_curve = market.get_discount(disc_curve_id)?;
 
@@ -557,13 +520,30 @@ pub(crate) fn discount_margin(
         quote.settlement,
     )?;
 
+    Ok(checked_discount_margin_bp(z_spread_bp)? * 1e-4)
+}
+
+/// Discount margin in basis points from a floater's solved z-spread.
+///
+/// The discount margin of a floating-rate tranche is the z-spread of its
+/// projected flows; this applies the ±5000 bp plausibility bound.
+///
+/// # Arguments
+///
+/// * `z_spread_bp` - Solved additive discount spread of the floater's
+///   projected cashflows, in basis points.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when the spread is non-finite or its magnitude
+/// exceeds 5000 bp.
+pub(crate) fn checked_discount_margin_bp(z_spread_bp: f64) -> Result<f64> {
     if !z_spread_bp.is_finite() || z_spread_bp.abs() > 5000.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Discount margin {z_spread_bp} bp exceeds reasonable bounds (±5000 bp)"
         )));
     }
-
-    Ok(z_spread_bp * 1e-4)
+    Ok(z_spread_bp)
 }
 
 /// Locate the tenor bucket(s) for year fraction `t`, with a triangular weight.

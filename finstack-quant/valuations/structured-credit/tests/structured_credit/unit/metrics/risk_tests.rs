@@ -379,6 +379,33 @@ mod discount_margin_tests {
         );
     }
 
+    /// The tranche summary's discount margin is the standalone DM solve at the
+    /// same clean price, without a second projection of the deal.
+    #[test]
+    fn summary_discount_margin_matches_standalone_solve() {
+        let sc = deal(true);
+        let mkt = market();
+        let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
+        let price = clean_pct(&sc, pv.amount() * 0.97);
+
+        let dm = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), price).unwrap();
+        let summary = calculate_tranche_metrics(&sc, "SR", &mkt, closing(), Some(price)).unwrap();
+        let summary_dm_bp = summary
+            .dm_bp
+            .expect("floating tranche has a discount margin");
+
+        assert!(
+            dm > 0.0,
+            "a cheaper price needs a positive margin, got {dm}"
+        );
+        assert!(
+            (summary_dm_bp - dm * 1e4).abs() < 1e-9,
+            "summary dm {summary_dm_bp} bp must equal the standalone solve {} bp",
+            dm * 1e4
+        );
+        assert_eq!(Some(summary.z_spread_bp), summary.dm_bp);
+    }
+
     #[test]
     fn discount_margin_errors_on_fixed_tranche() {
         let sc = deal(false);

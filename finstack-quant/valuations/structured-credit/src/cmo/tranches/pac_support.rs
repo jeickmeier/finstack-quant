@@ -221,51 +221,6 @@ fn psa_to_smm(speed_multiplier: f64, month: u32) -> f64 {
     clamped_cpr_to_smm(psa_to_cpr(speed_multiplier, month))
 }
 
-/// Allocate principal between PAC and support tranches.
-///
-/// The PAC receives its scheduled amount first; supports absorb the excess
-/// up to their balance. Any leftover is returned unallocated so the waterfall
-/// can cascade it to lower-priority tranches; once *every* non-PAC tranche is
-/// exhausted, the waterfall's broken-structure sweep accelerates the PAC
-/// beyond its schedule (see `execute_waterfall_with_principal_breakdown`).
-///
-/// # Arguments
-///
-/// * `available_principal` - Total principal available
-/// * `pac_balance` - Current PAC balance
-/// * `support_balance` - Current support balance
-/// * `pac_scheduled` - PAC scheduled amount for this period
-///
-/// # Returns
-///
-/// (pac_allocation, support_allocation)
-pub fn allocate_pac_support(
-    available_principal: f64,
-    pac_balance: f64,
-    support_balance: f64,
-    pac_scheduled: f64,
-) -> (f64, f64) {
-    if available_principal <= 0.0 {
-        return (0.0, 0.0);
-    }
-
-    // In every collar regime the PAC is first paid its schedule (balance- and
-    // availability-capped). Below the lower collar the schedule itself may be
-    // unaffordable; the PAC simply receives whatever is available.
-    let pac_alloc = pac_scheduled.min(pac_balance).min(available_principal);
-
-    // Supports absorb the excess up to their remaining balance; any leftover
-    // stays with the caller for lower-priority tranches / the broken-PAC sweep.
-    let support_alloc = (available_principal - pac_alloc)
-        .min(support_balance)
-        .max(0.0);
-
-    // Note: the allocation rule is the same in every collar regime — the
-    // PSA-speed effect is already embedded in the size of the collateral
-    // principal stream.
-    (pac_alloc, support_alloc)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -420,31 +375,6 @@ mod tests {
             (very_seasoned.payments[0].principal - seasoned.payments[0].principal).abs() < 1e-9,
             "post-ramp ages must produce identical schedules"
         );
-    }
-
-    #[test]
-    fn test_pac_support_allocation_within_collar() {
-        // Within collar: PAC gets schedule, support gets excess
-        let (pac, support) = allocate_pac_support(
-            10_000.0, // available
-            50_000.0, // pac balance
-            50_000.0, // support balance
-            5_000.0,  // pac scheduled
-        );
-
-        assert!((pac - 5_000.0).abs() < 1.0);
-        assert!((support - 5_000.0).abs() < 1.0);
-    }
-
-    #[test]
-    fn test_pac_support_allocation_fast_prepay() {
-        // Above collar: PAC gets scheduled first, support absorbs excess
-        let (pac, support) = allocate_pac_support(10_000.0, 50_000.0, 20_000.0, 5_000.0);
-
-        // PAC should get scheduled amount first
-        assert!((pac - 5_000.0).abs() < 1.0);
-        // Support gets remainder
-        assert!((support - 5_000.0).abs() < 1.0);
     }
 
     #[test]
