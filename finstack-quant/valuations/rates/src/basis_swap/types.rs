@@ -34,7 +34,7 @@ use finstack_quant_core::validation;
 use finstack_quant_valuations_core::impl_instrument_base;
 use rust_decimal::Decimal;
 
-use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FloatLegSpec;
+use finstack_quant_valuations_core::instruments::FloatLegSpec;
 
 /// Basis swap instrument that exchanges two floating rate payments with different tenors.
 ///

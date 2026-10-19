@@ -16,8 +16,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::process::lmm::LmmParams;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::SettlementType;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::SettlementType;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -373,7 +373,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
         // Strike and payer/receiver flag
         let strike = swaption.strike_f64()?;
         let is_payer =
-            swaption.option_type == finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType::Call;
+            swaption.option_type == finstack_quant_valuations_core::instruments::OptionType::Call;
         let notional = swaption.notional.amount();
         let currency = swaption.notional.currency();
 

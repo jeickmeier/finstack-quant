@@ -11,12 +11,12 @@ use finstack_quant_core::Error;
 
 use crate::bond::{CallPutSchedule, CashflowSpec};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::convertible::{
+use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
+use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::{
     AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DividendAdjustment,
     PriceTrigger,
 };
-use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
-use finstack_quant_valuations_core::instruments::Attributes;
 
 use super::pricing;
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -948,7 +948,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
 mod tests {
     use super::*;
     use finstack_quant_cashflows::CashflowProvider;
-    use finstack_quant_valuations_core::instruments::common_impl::parameters::convertible::DilutionEvent;
+    use finstack_quant_valuations_core::instruments::DilutionEvent;
     use finstack_quant_valuations_core::instruments::Instrument;
 
     #[test]

@@ -6,7 +6,7 @@
 use crate::cds_option::strike::CdsOptionStrike;
 use crate::cds_option::ProtectionStartConvention;
 use finstack_quant_core::{dates::Date, money::Money};
-use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
+use finstack_quant_valuations_core::instruments::OptionType;
 use finstack_quant_valuations_core::instruments::SettlementType;
 use rust_decimal::Decimal;
 

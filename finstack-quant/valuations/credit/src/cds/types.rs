@@ -67,11 +67,9 @@ use time::macros::date;
 use crate::cds::pricing::CdsPricer;
 use finstack_quant_valuations_core::impl_instrument_base;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
+pub use finstack_quant_valuations_core::instruments::PayReceive;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::{
-    PremiumLegSpec, ProtectionLegSpec,
-};
+pub use finstack_quant_valuations_core::instruments::{PremiumLegSpec, ProtectionLegSpec};
 
 /// Resolve a meta documentation clause (e.g., `IsdaNa`, `IsdaEu`) to its
 /// concrete restructuring variant. Concrete clauses pass through unchanged.

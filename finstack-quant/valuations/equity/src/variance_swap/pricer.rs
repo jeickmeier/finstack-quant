@@ -4,7 +4,7 @@ use crate::variance_swap::VarianceSwap;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::market::OptionType;
+use finstack_quant_valuations_core::instruments::OptionType;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 use finstack_quant_core::{

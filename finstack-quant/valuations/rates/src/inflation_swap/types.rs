@@ -12,8 +12,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_core::validation;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
 use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::PayReceive;
 use rust_decimal::Decimal;
 
 /// Zero-coupon Inflation Swap instrument.

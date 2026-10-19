@@ -16,9 +16,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::CommodityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
+use finstack_quant_valuations_core::instruments::PayReceive;
 
 /// Commodity swap (fixed-for-floating commodity price exchange).
 ///
@@ -473,7 +473,7 @@ mod tests {
     use super::*;
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
-    use finstack_quant_valuations_core::instruments::common_impl::parameters::CommodityUnderlyingParams;
+    use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
     use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 

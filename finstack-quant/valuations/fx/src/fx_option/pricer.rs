@@ -11,7 +11,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::vanilla::{bs_greeks_unchecked, bs_price_unchecked};
-use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
+use finstack_quant_valuations_core::instruments::OptionType;
 
 const STRIKE_ZERO_TOL: f64 = 1e-12;
 

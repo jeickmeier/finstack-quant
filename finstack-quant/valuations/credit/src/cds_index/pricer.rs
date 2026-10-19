@@ -948,7 +948,7 @@ mod tests {
     use finstack_quant_cashflows::primitives::CFKind;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::HazardCurve;
-    use finstack_quant_valuations_core::instruments::common_impl::parameters::CreditParams;
+    use finstack_quant_valuations_core::instruments::CreditParams;
 
     fn sample_market(as_of: Date) -> MarketContext {
         let hazard = HazardCurve::builder("CDX.NA.IG.HAZARD")

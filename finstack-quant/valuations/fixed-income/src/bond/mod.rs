@@ -144,7 +144,7 @@ mod tests {
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::common_impl::parameters::BondConvention;
+    use finstack_quant_valuations_core::instruments::BondConvention;
     use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
     use finstack_quant_valuations_core::instruments::{
         InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,

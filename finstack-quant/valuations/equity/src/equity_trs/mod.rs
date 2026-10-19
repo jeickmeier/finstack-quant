@@ -21,4 +21,4 @@ mod types;
 
 pub use types::{EquityTotalReturnSwap, TrsDividendSettlement};
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
+pub use finstack_quant_valuations_core::instruments::TrsScheduleSpec;

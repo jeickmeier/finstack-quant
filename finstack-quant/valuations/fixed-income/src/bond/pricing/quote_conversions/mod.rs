@@ -19,7 +19,7 @@ pub use annuity::{
     periods_per_year,
 };
 pub use compute::compute_quotes;
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::bond_quote::BondQuoteInput;
+pub use finstack_quant_valuations_core::instruments::BondQuoteInput;
 pub use spread_price::{price_from_dm, price_from_oas, price_from_z_spread};
 pub use types::{BondQuoteSet, YieldCompounding};
 pub use yield_price::{

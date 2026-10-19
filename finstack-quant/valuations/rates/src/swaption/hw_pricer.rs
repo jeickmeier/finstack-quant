@@ -222,7 +222,7 @@ mod tests {
     use super::*;
     use date_support::date;
     use discount_forward_curve_support::flat_discount_with_tenor;
-    use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
+    use finstack_quant_valuations_core::instruments::OptionType;
 
     #[test]
     fn b7_hw_price_is_invariant_to_equivalent_curve_date_clocks() {

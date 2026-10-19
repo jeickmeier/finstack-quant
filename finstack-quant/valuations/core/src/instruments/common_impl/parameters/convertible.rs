@@ -256,9 +256,7 @@ pub enum AntiDilutionPolicy {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_valuations_core::instruments::common_impl::parameters::convertible::{
-///     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
-/// };
+/// use finstack_quant_valuations_core::instruments::{AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment};
 ///
 /// let conversion = ConversionSpec {
 ///     ratio: Some(25.0),

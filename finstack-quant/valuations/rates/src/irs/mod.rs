@@ -104,4 +104,4 @@ pub use types::{
     IrsLegConventions, PayReceive,
 };
 
-pub(crate) use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::simple_average_unsupported;
+pub(crate) use finstack_quant_valuations_core::instruments::simple_average_unsupported;

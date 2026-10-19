@@ -4,8 +4,8 @@ use crate::fx_variance_swap::FxVarianceSwap;
 use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::OptionType;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 use finstack_quant_core::{

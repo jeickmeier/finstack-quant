@@ -43,8 +43,8 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
-use finstack_quant_valuations_core::instruments::common_impl::parameters::FxUnderlyingParams;
 use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::FxUnderlyingParams;
 use finstack_quant_valuations_core::instruments::OptionType;
 // Pricing/greeks live in pricing engine; keep types minimal.
 use finstack_quant_core::money::Money;

@@ -35,8 +35,8 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::common_impl::parameters::CreditParams;
 use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::CreditParams;
 use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType, SettlementType};
 use rust_decimal::Decimal;
 use time::Month;
@@ -456,7 +456,7 @@ impl CdsOption {
             Money::from((10_000_000_i64, Currency::USD)),
         )?;
         let credit_params =
-            finstack_quant_valuations_core::instruments::common_impl::parameters::CreditParams::corporate_standard(
+            finstack_quant_valuations_core::instruments::CreditParams::corporate_standard(
                 "CORP",
                 "CORP-HAZARD",
             );

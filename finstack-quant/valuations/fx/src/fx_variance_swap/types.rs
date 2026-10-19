@@ -13,7 +13,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::Instrument as InstrumentTrait;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::PayReceive;
+pub use finstack_quant_valuations_core::instruments::PayReceive;
 
 fn default_observation_business_day_convention() -> BusinessDayConvention {
     BusinessDayConvention::Following
