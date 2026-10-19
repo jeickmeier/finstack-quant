@@ -182,28 +182,12 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
     fn metrics_equivalent(
         &self,
     ) -> Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument> {
-        use finstack_quant_cashflows::builder::CouponType;
-
         let mut clone = self.clone();
-
-        match &mut clone.cashflow_spec {
-            CashflowSpec::Fixed(ref mut spec) => {
-                spec.coupon_type = CouponType::Cash;
-            }
-            CashflowSpec::Amortizing { ref mut base, .. } => {
-                if let CashflowSpec::Fixed(ref mut spec) = base.as_mut() {
-                    spec.coupon_type = CouponType::Cash;
-                }
-            }
-            _ => {}
-        }
-
-        {
-            clone
-                .instrument_pricing_overrides
-                .model_config
-                .merton_mc_config = None;
-        }
+        clone.cashflow_spec.make_cash_pay();
+        clone
+            .instrument_pricing_overrides
+            .model_config
+            .merton_mc_config = None;
         Box::new(clone)
     }
 
@@ -395,5 +379,77 @@ mod dependency_tests {
             finstack_quant_valuations_core::instruments::Instrument::market_dependencies(&bond)
                 .expect("dependencies");
         assert_eq!(deps.series_ids, vec![expected]);
+    }
+}
+
+#[cfg(test)]
+mod metrics_equivalent_tests {
+    use super::*;
+    use finstack_quant_cashflows::builder::{AmortizationSpec, CouponType};
+    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_valuations_core::instruments::Instrument;
+
+    fn pik_step_up_spec() -> CashflowSpec {
+        let mut spec =
+            CashflowSpec::step_up(0.05, vec![], Tenor::semi_annual(), DayCount::Thirty360)
+                .expect("finite step-up coupon");
+        if let CashflowSpec::StepUp(ref mut s) = spec {
+            s.coupon_type = CouponType::Pik;
+        }
+        spec
+    }
+
+    fn pik_floating_spec() -> CashflowSpec {
+        let bond = Bond::example_floating().expect("floating bond example");
+        let mut spec = bond.cashflow_spec;
+        if let CashflowSpec::Floating(ref mut s) = spec {
+            s.coupon_type = CouponType::Pik;
+        }
+        spec
+    }
+
+    fn coupon_type_of(spec: &CashflowSpec) -> CouponType {
+        match spec {
+            CashflowSpec::Fixed(s) => s.coupon_type,
+            CashflowSpec::Floating(s) => s.coupon_type,
+            CashflowSpec::StepUp(s) => s.coupon_type,
+            CashflowSpec::Amortizing { base, .. } => coupon_type_of(base),
+        }
+    }
+
+    fn metrics_equivalent_coupon_type(spec: CashflowSpec) -> CouponType {
+        let mut bond = Bond::example().expect("bond example");
+        bond.cashflow_spec = spec;
+        assert_eq!(coupon_type_of(&bond.cashflow_spec), CouponType::Pik);
+        let equivalent = bond.metrics_equivalent();
+        let equivalent = equivalent
+            .as_any()
+            .downcast_ref::<Bond>()
+            .expect("metrics equivalent of a bond is a bond");
+        coupon_type_of(&equivalent.cashflow_spec)
+    }
+
+    #[test]
+    fn metrics_equivalent_cashifies_pik_step_up() {
+        assert_eq!(
+            metrics_equivalent_coupon_type(pik_step_up_spec()),
+            CouponType::Cash
+        );
+    }
+
+    #[test]
+    fn metrics_equivalent_cashifies_pik_floating() {
+        assert_eq!(
+            metrics_equivalent_coupon_type(pik_floating_spec()),
+            CouponType::Cash
+        );
+    }
+
+    #[test]
+    fn metrics_equivalent_cashifies_amortizing_pik_step_up_and_floating() {
+        for base in [pik_step_up_spec(), pik_floating_spec()] {
+            let spec = CashflowSpec::amortizing(base, AmortizationSpec::None);
+            assert_eq!(metrics_equivalent_coupon_type(spec), CouponType::Cash);
+        }
     }
 }

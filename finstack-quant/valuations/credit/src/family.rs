@@ -73,3 +73,83 @@ fn credit_derivative_details(
         integration_method: integration_method.map(str::to_string),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_valuations_test_support::date::date;
+    use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
+
+    /// Price `instrument` through the credit registry adapter for `key` against
+    /// a market holding only the `USD-OIS` discount curve (no hazard curve).
+    fn price_without_hazard(
+        instrument: &dyn Instrument,
+        key: PricerKey,
+    ) -> std::result::Result<ValuationResult, PricingError> {
+        let as_of = date(2024, 1, 2);
+        let market =
+            MarketContext::new().insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 10.0));
+        let registry = CREDIT.build_pricers().expect("credit pricers register");
+        registry
+            .get_pricer(key)
+            .expect("credit pricer registered")
+            .price_dyn(instrument, &market, as_of)
+    }
+
+    fn assert_missing_market_data(
+        result: std::result::Result<ValuationResult, PricingError>,
+        instrument_id: &str,
+        model: ModelKey,
+    ) {
+        match result {
+            Err(PricingError::MissingMarketData {
+                missing_id,
+                context,
+            }) => {
+                assert!(
+                    missing_id.contains("CDX.NA.IG.HAZARD") || missing_id.contains("CORP-HAZARD"),
+                    "missing id should name the hazard curve: {missing_id}"
+                );
+                assert_eq!(context.instrument_id.as_deref(), Some(instrument_id));
+                assert_eq!(context.model, Some(model));
+            }
+            other => panic!("expected MissingMarketData for {instrument_id}, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn cds_index_adapter_reports_missing_hazard_curve_as_missing_market_data() {
+        let index = crate::CdsIndex::example().expect("example index");
+        let result = price_without_hazard(
+            &index,
+            PricerKey::new(InstrumentType::CdsIndex, ModelKey::HazardRate),
+        );
+        assert_missing_market_data(result, index.id(), ModelKey::HazardRate);
+    }
+
+    #[test]
+    fn cds_option_adapter_reports_missing_hazard_curve_as_missing_market_data() {
+        let mut option = crate::CdsOption::example().expect("example option");
+        // Quote σ directly so the vol surface is not needed and the hazard
+        // curve is the missing input.
+        option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.3);
+        let result = price_without_hazard(
+            &option,
+            PricerKey::new(InstrumentType::CdsOption, ModelKey::BloombergCdso),
+        );
+        assert_missing_market_data(result, option.id(), ModelKey::BloombergCdso);
+    }
+
+    #[test]
+    fn cds_tranche_adapter_reports_missing_hazard_curve_as_missing_market_data() {
+        let tranche = crate::CdsTranche::example().expect("example tranche");
+        let result = price_without_hazard(
+            &tranche,
+            PricerKey::new(InstrumentType::CdsTranche, ModelKey::HazardRate),
+        );
+        assert_missing_market_data(result, tranche.id(), ModelKey::HazardRate);
+    }
+}

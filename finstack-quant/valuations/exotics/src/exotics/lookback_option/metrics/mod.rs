@@ -3,8 +3,6 @@
 //! Provides full greek coverage for lookback options using finite difference methods.
 //! Delta and Gamma use generic FD calculators.
 
-mod rho;
-
 use finstack_quant_valuations_core::metrics::{MetricId, MetricRegistry};
 use std::sync::Arc;
 
@@ -47,7 +45,8 @@ pub(crate) fn register_lookback_option_metrics(
             instrument: InstrumentType::LookbackOption,
             metrics: [
                 (Vega, finstack_quant_valuations_core::metrics::GenericFdVega::<crate::exotics::lookback_option::LookbackOption>::default()),
-                (Rho, rho::RhoCalculator),
+                // Rho: discount-curve-only central bump, repriced with the requested model.
+                (Rho, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_discount_only())),
                 (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
                 (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
                 // Theta is now registered universally in crate::exotics::EXOTICS.metrics()

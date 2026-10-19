@@ -26,10 +26,9 @@
 //! step shared with cap/floor `HwSigmaVega`.
 
 use crate::swaption::pricing::BermudanSwaptionTreeValuator;
-use crate::swaption::{BermudanSwaption, PreparedHullWhiteModel};
+use crate::swaption::BermudanSwaption;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::Result;
-use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Default bump size for the second-order (gamma) rate shift (10 basis points).
@@ -59,15 +58,13 @@ fn validate_hw_greek_params(kappa: f64, sigma: f64) -> Result<()> {
     Ok(())
 }
 
-/// Hull-White tree settings shared by the Bermudan bump-and-revalue Greeks.
+/// Hull-White parameters shared by the Bermudan bump-and-revalue Greeks.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct HwGreekParams {
     /// Hull-White mean reversion κ (inverse years).
     pub(crate) kappa: f64,
     /// Hull-White short-rate volatility σ (absolute, annual).
     pub(crate) sigma: f64,
-    /// Number of tree steps.
-    pub(crate) tree_steps: usize,
 }
 
 impl HwGreekParams {
@@ -86,11 +83,6 @@ impl HwGreekParams {
         Ok(Self {
             kappa: params.kappa,
             sigma: params.sigma,
-            tree_steps: swaption
-                .instrument_pricing_overrides
-                .model_config
-                .tree_steps
-                .unwrap_or(crate::swaption::BermudanSwaptionPricerConfig::DEFAULT_TREE_STEPS),
         })
     }
 }
@@ -244,40 +236,6 @@ pub(crate) fn expected_exercise_time(valuator: &BermudanSwaptionTreeValuator) ->
         weighted_time / total_exercise_prob
     } else {
         0.0
-    }
-}
-
-/// Calculator for [`finstack_quant_valuations_core::metrics::MetricId::ExpectedExerciseTime`]: the
-/// expected exercise time in years, conditional on exercise.
-#[derive(Debug, Clone, Default)]
-pub(crate) struct ExpectedExerciseTimeCalculator;
-
-impl MetricCalculator for ExpectedExerciseTimeCalculator {
-    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let swaption = context.instrument_as::<BermudanSwaption>()?;
-        let hw = HwGreekParams::resolve(swaption, context)?;
-
-        let disc = context
-            .curves
-            .get_discount(swaption.get_discount_curve_id().as_str())?;
-        let ttm = swaption.time_to_maturity(context.as_of)?;
-
-        if ttm <= 0.0 {
-            return Ok(0.0);
-        }
-
-        validate_hw_greek_params(hw.kappa, hw.sigma)?;
-        let model = PreparedHullWhiteModel::prepare(
-            HullWhiteCalibrationParams::new(hw.kappa, hw.sigma)?,
-            hw.tree_steps,
-            disc.as_ref(),
-            context.as_of,
-            ttm,
-            &swaption.exercise_times(context.as_of)?,
-        )?;
-        let valuator =
-            BermudanSwaptionTreeValuator::new(swaption, &model, disc.as_ref(), context.as_of)?;
-        Ok(expected_exercise_time(&valuator))
     }
 }
 

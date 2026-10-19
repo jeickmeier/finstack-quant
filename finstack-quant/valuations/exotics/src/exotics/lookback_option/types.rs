@@ -323,9 +323,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         use finstack_quant_valuations_core::pricer::Pricer;
 
         let pricer = LookbackOptionAnalyticalPricer::new();
-        let result = pricer
-            .price_dyn(self, market, as_of)
-            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+        let result = pricer.price_dyn(self, market, as_of)?;
         Ok(result.value)
     }
 

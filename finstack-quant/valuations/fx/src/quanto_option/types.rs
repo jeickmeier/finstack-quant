@@ -487,14 +487,20 @@ impl QuantoOption {
             return Ok(Some(0.0));
         }
 
-        let base_pv = self.value(market, as_of)?.amount();
-        let bumped = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+        // Central difference on the equity vol source pricing reads
+        // (implied-vol override, else the equity surface), per vol point.
+        let (vol_bump, (up, market_up), (down, market_down)) = crate::shared::active_vol_scenarios(
+            self,
+            &self.instrument_pricing_overrides,
             market,
             self.vol_surface_id.as_str(),
             bumps.vol_bump_decimal,
         )?;
-        let pv_bumped = self.value(&bumped, as_of)?.amount();
-        Ok(Some((pv_bumped - base_pv) / bumps.vol_bump_decimal / 100.0))
+        let pv_up = up.value(&market_up, as_of)?.amount();
+        let pv_down = down.value(&market_down, as_of)?.amount();
+        let width =
+            2.0 * vol_bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
+        Ok(Some((pv_up - pv_down) / width))
     }
     fn option_theta(
         &self,
@@ -586,47 +592,34 @@ impl QuantoOption {
         if spot_bump <= 0.0 {
             return Ok(Some(0.0));
         }
-        let vol_bump = bumps.vol_bump_decimal;
-
-        // Delta at vol_up
-        let vol_up = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-            market,
-            self.vol_surface_id.as_str(),
-            vol_bump,
-        )?;
-        let up = finstack_quant_valuations_core::metrics::bump_scalar_price(
-            &vol_up,
-            &self.spot_id,
-            bumps.spot_bump_decimal,
-        )?;
-        let dn = finstack_quant_valuations_core::metrics::bump_scalar_price(
-            &vol_up,
-            &self.spot_id,
-            -bumps.spot_bump_decimal,
-        )?;
-        let pv_up = self.value(&up, as_of)?.amount();
-        let pv_dn = self.value(&dn, as_of)?.amount();
-        let delta_up = (pv_up - pv_dn) / (2.0 * spot_bump);
-
-        // Delta at vol_down
-        let vol_dn = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-            market,
-            self.vol_surface_id.as_str(),
-            -vol_bump,
-        )?;
-        let up = finstack_quant_valuations_core::metrics::bump_scalar_price(
-            &vol_dn,
-            &self.spot_id,
-            bumps.spot_bump_decimal,
-        )?;
-        let dn = finstack_quant_valuations_core::metrics::bump_scalar_price(
-            &vol_dn,
-            &self.spot_id,
-            -bumps.spot_bump_decimal,
-        )?;
-        let pv_up = self.value(&up, as_of)?.amount();
-        let pv_dn = self.value(&dn, as_of)?.amount();
-        let delta_dn = (pv_up - pv_dn) / (2.0 * spot_bump);
+        // Spot delta in each equity-vol scenario (central diff in spot).
+        let (vol_bump, (inst_vol_up, market_vol_up), (inst_vol_dn, market_vol_dn)) =
+            crate::shared::active_vol_scenarios(
+                self,
+                &self.instrument_pricing_overrides,
+                market,
+                self.vol_surface_id.as_str(),
+                bumps.vol_bump_decimal,
+            )?;
+        let delta_at = |inst: &Self,
+                        vol_market: &finstack_quant_core::market_data::context::MarketContext|
+         -> finstack_quant_core::Result<f64> {
+            let up = finstack_quant_valuations_core::metrics::bump_scalar_price(
+                vol_market,
+                &self.spot_id,
+                bumps.spot_bump_decimal,
+            )?;
+            let dn = finstack_quant_valuations_core::metrics::bump_scalar_price(
+                vol_market,
+                &self.spot_id,
+                -bumps.spot_bump_decimal,
+            )?;
+            let pv_up = inst.value(&up, as_of)?.amount();
+            let pv_dn = inst.value(&dn, as_of)?.amount();
+            Ok((pv_up - pv_dn) / (2.0 * spot_bump))
+        };
+        let delta_up = delta_at(&inst_vol_up, &market_vol_up)?;
+        let delta_dn = delta_at(&inst_vol_dn, &market_vol_dn)?;
 
         // Report vanna per **vol point** on the σ axis (consistent with vega
         // and `MetricId::Vanna`): normalize by the bump width expressed in
@@ -653,19 +646,15 @@ impl QuantoOption {
             return Ok(Some(0.0));
         }
 
-        let vol_bump = bumps.vol_bump_decimal;
-        let up = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+        let (vol_bump, (up, market_up), (dn, market_dn)) = crate::shared::active_vol_scenarios(
+            self,
+            &self.instrument_pricing_overrides,
             market,
             self.vol_surface_id.as_str(),
-            vol_bump,
+            bumps.vol_bump_decimal,
         )?;
-        let dn = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-            market,
-            self.vol_surface_id.as_str(),
-            -vol_bump,
-        )?;
-        let pv_up = self.value(&up, as_of)?.amount();
-        let pv_dn = self.value(&dn, as_of)?.amount();
+        let pv_up = up.value(&market_up, as_of)?.amount();
+        let pv_dn = dn.value(&market_dn, as_of)?.amount();
         // Report volga per **vol point squared** (consistent with vega and
         // `MetricId::Volga`): normalize by the bump expressed in vol points.
         let width = vol_bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
@@ -736,7 +725,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         let pricer = QuantoOptionAnalyticalPricer::new();
         let result = pricer
             .price_dyn(self, market, as_of)
-            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+            .map_err(finstack_quant_core::Error::from)?;
         Ok(result.value)
     }
 

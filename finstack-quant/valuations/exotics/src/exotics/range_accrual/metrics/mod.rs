@@ -4,8 +4,6 @@
 //! finite difference methods. Delta and Gamma use generic FD calculators.
 //! Includes bucketed DV01 for detailed interest rate risk analysis.
 
-mod rho;
-
 use finstack_quant_valuations_core::metrics::{MetricId, MetricRegistry};
 use std::sync::Arc;
 
@@ -48,7 +46,8 @@ pub(crate) fn register_range_accrual_metrics(
             instrument: InstrumentType::RangeAccrual,
             metrics: [
                 (Vega, finstack_quant_valuations_core::metrics::GenericFdVega::<crate::RangeAccrual>::default()),
-                (Rho, rho::RhoCalculator),
+                // Rho: discount-curve-only central bump, repriced with the requested model.
+                (Rho, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_discount_only())),
                 (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
                 // Theta is now registered universally in crate::exotics::EXOTICS.metrics()
                 (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),

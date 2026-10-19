@@ -178,6 +178,42 @@ fn projected_schedule_contains_premium_and_default_rows() {
         .any(|cf| cf.kind == CFKind::DefaultedNotional));
 }
 
+/// The projected schedule carries exactly the discountable rows' cashflows and
+/// stamps `issue_date` from the settlement (valuation) date that the
+/// projection inputs resolve.
+#[test]
+fn projected_schedule_matches_projection_rows_and_settlement_issue_date() {
+    let tranche = sample_tranche();
+    let market = sample_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let pricer = CdsTranchePricer::new();
+
+    let schedule = pricer
+        .build_projected_schedule(&tranche, &market, as_of)
+        .expect("projected tranche schedule");
+
+    let (_, valuation_date, _, _) = pricer
+        .prepare_projection_inputs(&tranche, &market, as_of)
+        .expect("projection inputs");
+    let expected_flows: Vec<_> = pricer
+        .project_discountable_rows(&tranche, &market, as_of)
+        .expect("projected rows")
+        .into_iter()
+        .map(|row| row.cashflow)
+        .collect();
+
+    assert_eq!(
+        serde_json::to_value(schedule.get_flows()).expect("flows serialize"),
+        serde_json::to_value(&expected_flows).expect("flows serialize")
+    );
+    let schedule_json = serde_json::to_value(&schedule).expect("schedule serializes");
+    assert_eq!(
+        schedule_json["meta"]["issue_date"],
+        serde_json::to_value(tranche.contractual_start_date(valuation_date))
+            .expect("date serializes")
+    );
+}
+
 #[test]
 fn price_matches_discounted_projected_rows() {
     let tranche = sample_tranche();
