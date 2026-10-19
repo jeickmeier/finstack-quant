@@ -305,10 +305,8 @@ fn build_irs(
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount as DC, StubKind, Tenor};
     use finstack_quant_core::decimal::f64_to_decimal;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations::instruments::rates::irs::{
-        FixedLegSpec, FloatLegSpec, PayReceive,
-    };
     use finstack_quant_valuations::instruments::InterestRateSwap;
+    use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
     use rust_decimal::Decimal;
 
     let fixed = FixedLegSpec {

@@ -19,8 +19,8 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_rates::irs::PayReceive;
 use time::macros::date;
 
 /// Build a flat discount curve that handles negative rates

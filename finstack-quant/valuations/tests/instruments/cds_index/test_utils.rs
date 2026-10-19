@@ -9,11 +9,11 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::money::Money;
 pub use finstack_quant_test_utils::assert::{in_range, relative_eq};
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
     CdsIndex, CdsIndexConstituent, CdsIndexParams,
 };
 use finstack_quant_valuations::instruments::CreditParams;
+use finstack_quant_valuations::instruments::PayReceive;
 
 pub const STANDARD_HAZARD_RATE: f64 = 0.015;
 

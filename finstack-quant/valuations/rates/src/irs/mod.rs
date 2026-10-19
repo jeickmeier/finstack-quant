@@ -100,8 +100,5 @@ pub(crate) mod pricer;
 mod types;
 
 pub use types::{
-    ConventionSwapParams, FixedLegSpec, FloatLegSpec, InterestRateSwap, InterestRateSwapBuilder,
-    IrsLegConventions, PayReceive,
+    ConventionSwapParams, InterestRateSwap, InterestRateSwapBuilder, IrsLegConventions,
 };
-
-pub(crate) use finstack_quant_valuations_core::instruments::simple_average_unsupported;

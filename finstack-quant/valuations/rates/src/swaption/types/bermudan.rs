@@ -1,6 +1,6 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
-use crate::irs::{FixedLegSpec, FloatLegSpec, InterestRateSwap, PayReceive};
+use crate::irs::InterestRateSwap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -11,6 +11,7 @@ use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 

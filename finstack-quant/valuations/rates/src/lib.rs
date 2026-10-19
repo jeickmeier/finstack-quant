@@ -46,7 +46,7 @@
 //! ```
 //! use finstack_quant_valuations_rates::InterestRateSwap;
 //! use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};
-//! use finstack_quant_valuations_rates::irs::{PayReceive};
+//! use finstack_quant_valuations_core::instruments::PayReceive;
 //! use finstack_quant_cashflows::builder::FloatingLegCompounding;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};

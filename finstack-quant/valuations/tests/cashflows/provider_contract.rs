@@ -258,7 +258,7 @@ mod bond_contract {
 
 mod irs_contract {
     use super::*;
-    use finstack_quant_valuations::instruments::rates::irs::PayReceive;
+    use finstack_quant_valuations::instruments::PayReceive;
 
     #[test]
     fn usd_swap_pay_fixed_satisfies_contract() {

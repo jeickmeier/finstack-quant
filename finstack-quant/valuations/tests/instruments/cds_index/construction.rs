@@ -11,12 +11,12 @@
 use super::test_utils::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
     CdsIndex, CdsIndexConstituent, CdsIndexParams, IndexPricing,
 };
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 use time::macros::date;
 
 const TEST_NOTIONAL: f64 = 10_000_000.0;

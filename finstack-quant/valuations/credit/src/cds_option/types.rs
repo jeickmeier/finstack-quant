@@ -176,7 +176,7 @@ pub struct CdsOption {
     /// risky annuity for the option's underlying.
     #[serde(default)]
     #[builder(default)]
-    pub underlying_convention: crate::cds::CdsConvention,
+    pub underlying_convention: finstack_quant_valuations_core::market::conventions::CdsConvention,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -507,7 +507,8 @@ impl CdsOption {
             discount_curve_id: discount_curve_id.into(),
             credit_curve_id: credit_params.credit_curve_id.to_owned(),
             vol_surface_id: vol_surface_id.into(),
-            underlying_convention: crate::cds::CdsConvention::default(),
+            underlying_convention:
+                finstack_quant_valuations_core::market::conventions::CdsConvention::default(),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),

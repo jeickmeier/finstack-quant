@@ -582,7 +582,7 @@ pub(super) fn signed_npv(
     upfront_pv: f64,
     clean_accrued: f64,
 ) -> f64 {
-    use crate::cds::PayReceive;
+    use finstack_quant_valuations_core::instruments::PayReceive;
     let mut value = match cds.side {
         PayReceive::Pay => protection_pv - premium_pv - upfront_pv,
         PayReceive::Receive => premium_pv - protection_pv + upfront_pv,
@@ -599,7 +599,7 @@ pub(super) fn signed_npv(
 #[cfg(test)]
 mod cds_hazard_reprice_cache_tests {
     use super::{CdsHazardRepriceCache, CdsPricer, CdsPricerConfig};
-    use crate::cds::{CdsConvention, CdsValuationConvention, CreditDefaultSwap, PayReceive};
+    use crate::cds::CreditDefaultSwap;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -607,6 +607,10 @@ mod cds_hazard_reprice_cache_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_valuations_core::instruments::Instrument;
+    use finstack_quant_valuations_core::instruments::PayReceive;
+    use finstack_quant_valuations_core::market::conventions::{
+        CdsConvention, CdsValuationConvention,
+    };
     use rust_decimal::Decimal;
     use time::macros::date;
 
@@ -731,13 +735,17 @@ mod cds_hazard_reprice_cache_tests {
 mod cds_review_regression_tests {
     use super::{CdsHazardRepriceCache, CdsPricer};
     use crate::cds::pricing::{AccrualDayCountPolicy, CdsPricerConfig};
-    use crate::cds::{CdsConvention, CdsValuationConvention, CreditDefaultSwap, PayReceive};
+    use crate::cds::CreditDefaultSwap;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_valuations_core::instruments::PayReceive;
+    use finstack_quant_valuations_core::market::conventions::{
+        CdsConvention, CdsValuationConvention,
+    };
     use rust_decimal::Decimal;
     use time::macros::date;
 

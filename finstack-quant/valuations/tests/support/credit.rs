@@ -20,14 +20,13 @@ use finstack_quant_core::{
     HashMap,
 };
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::{
-    CdsConvention, CdsValuationConvention, CreditDefaultSwap, PayReceive, PremiumLegSpec,
-    ProtectionLegSpec,
-};
+use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::{
     Attributes, InstrumentPricingOverrides, PricingOptions,
 };
+use finstack_quant_valuations::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+use finstack_quant_valuations::market::conventions::{CdsConvention, CdsValuationConvention};
 use rust_decimal::Decimal;
 use std::sync::Arc;
 

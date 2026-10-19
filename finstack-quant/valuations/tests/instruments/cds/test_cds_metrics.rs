@@ -16,11 +16,10 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IndexId};
-use finstack_quant_valuations::instruments::credit_derivatives::cds::{
-    CdsValuationConvention, CreditDefaultSwap,
-};
+use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
+use finstack_quant_valuations::market::conventions::CdsValuationConvention;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::recalibration::QuoteBump;
 use time::macros::date;
@@ -1194,7 +1193,7 @@ fn test_cdsw_clean_value_uses_first_class_valuation_convention() {
 
     let mut direct_clean_cds = dirty_cds;
     direct_clean_cds.valuation_convention =
-        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsValuationConvention::BloombergCdswClean;
+        finstack_quant_valuations::market::conventions::CdsValuationConvention::BloombergCdswClean;
 
     let clean_value = clean_cds.value_raw(&market, as_of).unwrap();
     let expected_clean = direct_clean_cds.value_raw(&market, as_of).unwrap();
@@ -1212,7 +1211,7 @@ fn test_cdsw_convention_values_premium_leg_with_adjusted_cashflow_accrual_dates(
     let maturity = date!(2026 - 09 - 20);
     let mut cds = create_test_cds(as_of, maturity);
     cds.valuation_convention =
-        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsValuationConvention::BloombergCdswClean;
+        finstack_quant_valuations::market::conventions::CdsValuationConvention::BloombergCdswClean;
 
     let market = MarketContext::new()
         .insert(build_test_discount(0.0, as_of, "USD_OIS"))
@@ -1238,7 +1237,7 @@ fn test_cdsw_par_spread_metric_uses_full_premium_denominator_when_requested() {
 
     let mut cdsw_cds = cds.clone();
     cdsw_cds.valuation_convention =
-        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsValuationConvention::BloombergCdswCleanFullPremium;
+        finstack_quant_valuations::market::conventions::CdsValuationConvention::BloombergCdswCleanFullPremium;
 
     let market = MarketContext::new()
         .insert(build_test_discount(0.035, as_of, "USD_OIS"))
@@ -1609,7 +1608,7 @@ fn recalibrated_metrics_accept_a_concrete_doc_clause_recipe() {
 
 #[test]
 fn recalibrated_metrics_use_the_cds_convention_family() {
-    use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsConvention;
+    use finstack_quant_valuations::market::conventions::CdsConvention;
 
     let as_of = date!(2024 - 03 - 20);
     let maturity = date!(2029 - 03 - 20);

@@ -3,7 +3,7 @@ use finstack_quant_core::{
     money::Money,
     types::{CurveId, InstrumentId},
 };
-use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::rates::irs::{InterestRateSwap};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};

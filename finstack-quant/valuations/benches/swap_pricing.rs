@@ -25,8 +25,9 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::rates::irs::{InterestRateSwap, PayReceive};
+use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
 use finstack_quant_valuations::metrics::MetricId;
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]

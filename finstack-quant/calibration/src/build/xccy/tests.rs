@@ -144,7 +144,7 @@ fn registered_term_forward_override_on_ois_convention_is_rejected() {
 #[cfg(test)]
 mod mtm_reset_builder_tests {
     use super::*;
-    use finstack_quant_valuations_rates::xccy_swap::{NotionalExchange, ResettingSide};
+    use finstack_quant_valuations_core::instruments::{NotionalExchange, ResettingSide};
 
     #[test]
     fn building_g10_pair_produces_mtm_resetting_swap() {
