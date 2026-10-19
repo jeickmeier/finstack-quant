@@ -1,14 +1,16 @@
 //! CDS Index CS01 metric calculators.
 //!
 //! Both calculators report CS01 against the [canonical convention][canonical]:
-//! a parallel 1 bp shock to credit spreads with a symmetric (central) finite
-//! difference `(PV(s + 1bp) − PV(s − 1bp)) / 2`. They differ only in *which*
+//! a parallel shock of the configured `credit_spread_bump_bp` (1 bp by
+//! default) with a symmetric (central) finite difference
+//! `(PV(s + h) − PV(s − h)) / 2h`. They differ only in *which*
 //! spread is shocked and how the index aggregates per-name sensitivity:
 //!
 //! - [`Cs01Calculator`]: parallel CS01 derived from per-name finite differences
 //!   summed over surviving constituents (or computed on the synthetic CDS in
-//!   `SingleCurve` mode). Routed through [`CdsIndex::cs01`]; treats each
-//!   constituent's bump as a parallel par-spread shock.
+//!   `SingleCurve` mode). Same index pricer path as [`CdsIndex::cs01`], at
+//!   the configured bump; treats each constituent's bump as a parallel
+//!   par-spread shock.
 //! - [`CdsIndexBucketedCs01Calculator`]: quote-bucketed par-spread CS01 — the
 //!   bucketed counterpart of [`Cs01Calculator`]. Applies one exact atomic
 //!   `spread_risk_inputs` shock at a time to each mode-aware credit curve,
@@ -38,8 +40,19 @@ pub(crate) struct Cs01Calculator;
 impl MetricCalculator for Cs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let provider = context.recalibration_provider("cs01")?;
+        let bump_bp = sens_config::from_context_or_default(
+            context.get_config(),
+            context.get_metric_pricing_overrides(),
+        )?
+        .credit_spread_bump_bp;
         let idx: &CdsIndex = context.instrument_as()?;
-        idx.cs01(&context.curves, context.as_of, provider.as_ref())
+        crate::cds_index::pricer::CdsIndexPricer::new().cs01(
+            idx,
+            &context.curves,
+            context.as_of,
+            provider.as_ref(),
+            bump_bp,
+        )
     }
 }
 
