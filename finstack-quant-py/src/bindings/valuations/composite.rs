@@ -7,7 +7,7 @@
 
 use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::extract::{extract_instrument_json, extract_market};
+use crate::bindings::extract::{extract_instrument, extract_market};
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::bindings::pandas_utils::{serde_to_py, ColumnSchema};
 use crate::errors::core_to_py;
@@ -150,10 +150,9 @@ impl PyCompositeLegSpec {
     #[new]
     #[pyo3(text_signature = "(instrument_id, instrument, score)")]
     fn new(instrument_id: &str, instrument: &Bound<'_, PyAny>, score: f64) -> PyResult<Self> {
-        let envelope = extract_instrument_json(instrument)?;
-        let instrument =
-            finstack_quant_valuations::pricer::json::parse_instrument_from_json(&envelope)
-                .map_err(core_to_py)?;
+        let instrument = extract_instrument(instrument)?
+            .into_instrument_json()
+            .map_err(core_to_py)?;
         Ok(Self {
             inner: CompositeLegSpec::new(instrument_id, instrument, score),
         })

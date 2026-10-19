@@ -8,7 +8,7 @@
 //! in this module; each wrapper's `to_json` still yields the wire payload,
 //! and `from_json` decodes it back.
 
-use crate::bindings::extract::{extract_instrument_json, extract_market};
+use crate::bindings::extract::{extract_instrument, extract_market};
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
     ColumnSchema,
@@ -39,13 +39,9 @@ fn extract_structured_credit(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
 ) -> PyResult<StructuredCredit> {
-    let instrument_json = extract_instrument_json(instrument)?;
-    py.detach(move || {
-        finstack_quant_valuations::pricer::parse_typed_instrument_json::<StructuredCredit>(
-            &instrument_json,
-        )
-    })
-    .map_err(core_to_py)
+    let instrument = extract_instrument(instrument)?;
+    py.detach(move || StructuredCredit::try_from(instrument.into_instrument_json()?))
+        .map_err(core_to_py)
 }
 
 /// Solve a z-spread-equivalent discount margin for a floating-rate tranche.
