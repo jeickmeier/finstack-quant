@@ -26,6 +26,18 @@
 
 - Unused public structured-credit items: `cmo::tranches::pac_support::allocate_pac_support`, `structured_credit::PaymentMode`, and the constants `MONTHS_PER_YEAR`, `QUARTERLY_PERIODS_PER_YEAR`, `PERCENTAGE_MULTIPLIER`, `MIN_PREPAYMENT_RATE` and the function `pool_balance_cleanup_threshold()` (the simulation reads the threshold from the assumptions registry). `BASIS_POINTS_DIVISOR` stays.
 
+### Valuations metric registration cleanup
+
+#### Changed
+
+- `register_metrics!` takes an optional `custom: [("id", calculator), ...]` list registered under `MetricId::custom`, after the `metrics` list. Metric ids, applicability and values are unchanged.
+- `finstack_quant_valuations_rates::{cms_common, forward_swap_rate, cms_swap::pricer}` are `pub(crate)`; nothing outside the crate used them. `cms_option::pricer` and `cms_option::replication_pricer` stay public.
+
+#### Removed
+
+- `FxSpot::new_t1` (use `FxSpot::new(..).with_settlement_days(1)`), `Ndf::effective_fixing_source` and `Ndf::with_quote_convention` (use the builder's `quote_convention`).
+- `InstrumentPricingOverrides::with_bk_sigma` and `with_bk_mean_reversion`; set `model_config.bk_sigma` / `model_config.bk_mean_reversion` directly.
+
 ## [0.11.0] - 2026-10-18
 
 Workspace version 0.11.0: the valuations split below removes and moves public Rust items (see the section that follows), so the crates, the Python wheel and the WASM package take a breaking-change version bump.
