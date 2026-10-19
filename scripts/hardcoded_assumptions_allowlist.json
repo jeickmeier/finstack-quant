@@ -1868,7 +1868,7 @@
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/credit/src/cds/metrics/expected_loss.rs",
+      "path": "finstack-quant/valuations/credit/src/cds/metrics/mod.rs",
       "category": "credit_assumption",
       "contains": "let lgd = 1.0 - cds.protection.recovery_rate;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
