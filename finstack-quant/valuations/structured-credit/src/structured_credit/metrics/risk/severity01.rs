@@ -1,89 +1,40 @@
 //! Severity01 calculator for StructuredCredit.
 //!
-//! Computes Severity01 (loss severity sensitivity) using finite differences.
 //! Severity01 is the PV change per 1% (0.01 absolute) move in loss severity,
 //! in currency.
 //!
 //! # Formula
 //! ```text
-//! Severity01 = (PV(severity + 1%) - PV(severity - 1%)) / achieved_width × 1%
+//! Severity01 = -Recovery01
 //! ```
-//! Where `achieved_width` is the realized two-sided severity width after
-//! clamping recovery to `[0, 1]` (2% when neither side clamps).
-//!
-//! # Note
-//! Loss Severity = 1 - Recovery Rate (LGD = Loss Given Default)
-//! This metric is related to Recovery01 but measures sensitivity to loss severity
-//! rather than recovery. For constant recovery, Severity01 ≈ -Recovery01.
+//! Loss severity is `1 - recovery rate` (LGD), so a +1% severity move is a
+//! −1% recovery move. Bumping severity reprices the same two recovery-bumped
+//! deals as [`Recovery01`](super::recovery01) with the direction swapped, so
+//! the result is the exact negative of Recovery01, including its clamping of
+//! recovery to `[0, 1]`. The calculator reads the Recovery01 already computed
+//! for the request instead of repricing twice more.
 
-use super::effective_recovery;
-use crate::structured_credit::StructuredCredit;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
-
-/// Standard severity bump: 1% (0.01)
-const SEVERITY_BUMP: f64 = 0.01;
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 
 /// Severity01 calculator for StructuredCredit.
 pub(crate) struct Severity01Calculator;
 
 impl MetricCalculator for Severity01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        // Validate the credit model and normalize the pool once before
-        // bumping `credit_model.recovery_spec.rate`.
-        let instrument = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
-        let as_of = context.as_of;
+        let recovery01 = context
+            .computed
+            .get(&MetricId::Recovery01)
+            .copied()
+            .ok_or_else(|| {
+                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
+                    id: "metric:recovery01".to_string(),
+                })
+            })?;
+        Ok(-recovery01)
+    }
 
-        use finstack_quant_cashflows::builder::RecoveryModelSpec;
-
-        // Loss Severity = 1 - Recovery Rate
-        // So bumping severity up means bumping recovery down, and vice versa.
-        // A severity vector by month of default is bumped entry by entry.
-        let base = &instrument.credit_model.recovery_spec;
-        let bumped = |recovery_delta: f64| -> RecoveryModelSpec {
-            let mut spec = base.clone();
-            spec.rate = (base.rate + recovery_delta).clamp(0.0, 1.0);
-            if let Some(severities) = &base.severity_vector {
-                spec.severity_vector = Some(
-                    severities
-                        .iter()
-                        .map(|severity| (severity - recovery_delta).clamp(0.0, 1.0))
-                        .collect(),
-                );
-            }
-            spec
-        };
-        let recovery_up = bumped(-SEVERITY_BUMP);
-        let recovery_down = bumped(SEVERITY_BUMP);
-
-        // Actual severity bump width after clamping recovery to [0, 1]. Severity
-        // = 1 − recovery, so Δseverity = recovery_down − recovery_up on the
-        // effective (vector-averaged) recovery. Using the nominal 2·bump would
-        // bias the sensitivity when recovery sits within one bump of 0 or 1
-        // and one side clamps.
-        let achieved_bump = effective_recovery(&recovery_down) - effective_recovery(&recovery_up);
-
-        // Calculate up scenario (lower recovery = higher severity)
-        let mut inst_up = instrument.clone();
-        inst_up.credit_model.recovery_spec = recovery_up;
-        let pv_up = super::super::reprice_in_scope(context, &inst_up, as_of)?;
-
-        // Calculate down scenario (higher recovery = lower severity)
-        let mut inst_down = instrument;
-        inst_down.credit_model.recovery_spec = recovery_down;
-        let pv_down = super::super::reprice_in_scope(context, &inst_down, as_of)?;
-
-        // Severity01 = (PV_up - PV_down) / achieved_bump × SEVERITY_BUMP
-        // PV_up is with lower recovery (higher severity)
-        // PV_down is with higher recovery (lower severity)
-        let severity01 = if achieved_bump > 0.0 {
-            (pv_up - pv_down) / achieved_bump * SEVERITY_BUMP
-        } else {
-            0.0
-        };
-
-        Ok(severity01)
+    fn dependencies(&self) -> &[MetricId] {
+        &[MetricId::Recovery01]
     }
 }

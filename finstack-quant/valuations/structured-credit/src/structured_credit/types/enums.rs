@@ -2,9 +2,7 @@
 //!
 //! This module provides all the enumeration types used to classify and categorize
 //! various aspects of structured credit instruments including deal types, asset types,
-//! credit ratings, and payment modes.
-
-use finstack_quant_core::dates::Date;
+//! and credit ratings.
 
 use serde::{Deserialize, Serialize};
 
@@ -171,33 +169,6 @@ pub enum AssetType {
         description: String,
         /// Asset class.
         asset_class: String,
-    },
-}
-
-/// Payment distribution modes
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
-#[non_exhaustive]
-pub enum PaymentMode {
-    /// Normal pro-rata payments to all tranches
-    ProRata,
-    /// Sequential payment (turbo) due to trigger breach
-    Sequential {
-        /// Triggered by.
-        triggered_by: String,
-        /// Trigger date.
-        #[serde(with = "finstack_quant_core::wire::date")]
-        #[cfg_attr(
-            feature = "json-schema",
-            schemars(with = "finstack_quant_core::wire::DateWire")
-        )]
-        trigger_date: Date,
-    },
-    /// Hybrid mode with custom rules
-    Hybrid {
-        /// Description.
-        description: String,
     },
 }
 
