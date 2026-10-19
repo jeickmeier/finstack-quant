@@ -16,10 +16,7 @@ use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
 use finstack_quant_valuations_core::metrics::bump_surface_vol_absolute;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
-use finstack_quant_valuations_core::metrics::{
-    MetricCalculator, MetricContext, MetricId, MetricRegistry,
-};
-use std::sync::Arc;
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 
 /// Register CMS option metrics with the registry.
 pub(crate) fn register_cms_option_metrics(
@@ -37,17 +34,11 @@ pub(crate) fn register_cms_option_metrics(
             (Vanna, VannaCalculator),
             (Volga, VolgaCalculator),
             (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            // Convexity adjustment risk (custom metric)
+            (ConvexityAdjustmentRisk, ConvexityAdjustmentRiskCalculator::<CmsOption>(std::marker::PhantomData)),
         ]
     }
 
-    // Convexity adjustment risk (custom metric)
-    registry.register_metric(
-        MetricId::ConvexityAdjustmentRisk,
-        Arc::new(ConvexityAdjustmentRiskCalculator::<CmsOption>(
-            std::marker::PhantomData,
-        )),
-        &[InstrumentType::CmsOption],
-    )?;
     Ok(())
 }
 

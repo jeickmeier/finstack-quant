@@ -12,16 +12,6 @@ pub(crate) fn register_xccy_swap_metrics(
         make_fx_bumper, make_rates_bumper, CrossFactorCalculator, MetricId,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
-    use std::sync::Arc;
-
-    registry.register_metric(
-        MetricId::CrossGammaFxRates,
-        Arc::new(CrossFactorCalculator::new(
-            make_fx_bumper,
-            make_rates_bumper,
-        )),
-        &[InstrumentType::XccySwap],
-    )?;
 
     // PV change per 1% relative move in the swap's FX pair. A fixed-notional
     // swap carries roughly its foreign notional of FX exposure, so this is a
@@ -45,6 +35,7 @@ pub(crate) fn register_xccy_swap_metrics(
             (Pv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_per_curve()
                 .with_series_id(finstack_quant_valuations_core::metrics::MetricId::Pv01))),
             (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (CrossGammaFxRates, CrossFactorCalculator::new(make_fx_bumper, make_rates_bumper)),
         ]
     };
     Ok(())

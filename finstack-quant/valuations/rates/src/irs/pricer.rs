@@ -279,18 +279,50 @@ pub(crate) fn compute_pv_raw(
     as_of: Date,
 ) -> Result<f64> {
     let disc = context.get_discount(irs.fixed_leg.discount_curve_id.as_ref())?;
-    let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-        context,
-        irs.float_leg.forward_curve_id.as_str(),
-    )
-    .ok();
     let pv_fixed = irs.pv_fixed_leg(disc.as_ref(), as_of)?;
-    let pv_float = match irs.float_leg.compounding {
-        FloatingLegCompounding::Simple => irs.pv_float_leg(context, as_of)?,
-        FloatingLegCompounding::SimpleAverage => return Err(super::simple_average_unsupported()),
+    let pv_float = compute_float_leg_pv(irs, context, as_of)?;
+
+    Ok(match irs.side {
+        PayReceive::Pay => pv_float - pv_fixed,
+        PayReceive::Receive => pv_fixed - pv_float,
+    })
+}
+
+/// Compute the floating-leg PV, dispatching on the leg's compounding.
+///
+/// Simple (term-rate) legs use [`InterestRateSwap::pv_float_leg`]; compounded
+/// RFR legs use [`InterestRateSwap::pv_compounded_float_leg`] with the fixed-leg
+/// discount curve, the floating-leg forward curve (optional for single-curve
+/// OIS, where implied overnight forwards come from the discount curve) and any
+/// historical fixings stored under the forward curve id.
+///
+/// # Arguments
+///
+/// * `irs` - Swap whose floating leg is valued
+/// * `context` - Market data holding the discount/forward curves and fixings
+/// * `as_of` - Valuation date; payments on or before it are excluded
+///
+/// # Errors
+///
+/// Returns an error for `SimpleAverage` legs (unsupported), when a required
+/// curve is missing, or when the leg projection fails.
+pub(crate) fn compute_float_leg_pv(
+    irs: &InterestRateSwap,
+    context: &MarketContext,
+    as_of: Date,
+) -> Result<f64> {
+    match irs.float_leg.compounding {
+        FloatingLegCompounding::Simple => irs.pv_float_leg(context, as_of),
+        FloatingLegCompounding::SimpleAverage => Err(super::simple_average_unsupported()),
         FloatingLegCompounding::CompoundedInArrears { .. }
         | FloatingLegCompounding::CompoundedWithObservationShift { .. }
         | FloatingLegCompounding::CompoundedWithRateCutoff { .. } => {
+            let disc = context.get_discount(irs.fixed_leg.discount_curve_id.as_ref())?;
+            let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
+                context,
+                irs.float_leg.forward_curve_id.as_str(),
+            )
+            .ok();
             let proj = if irs.is_single_curve_ois() {
                 context
                     .get_forward(irs.float_leg.forward_curve_id.as_ref())
@@ -298,14 +330,9 @@ pub(crate) fn compute_pv_raw(
             } else {
                 Some(context.get_forward(irs.float_leg.forward_curve_id.as_ref())?)
             };
-            irs.pv_compounded_float_leg(disc.as_ref(), proj.as_deref(), as_of, fixings)?
+            irs.pv_compounded_float_leg(disc.as_ref(), proj.as_deref(), as_of, fixings)
         }
-    };
-
-    Ok(match irs.side {
-        PayReceive::Pay => pv_float - pv_fixed,
-        PayReceive::Receive => pv_fixed - pv_float,
-    })
+    }
 }
 
 #[cfg(test)]

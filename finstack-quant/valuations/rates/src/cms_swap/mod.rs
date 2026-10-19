@@ -45,7 +45,7 @@
 //!   (2nd ed.). Springer. Chapter 13.7: CMS Products. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
 
 pub(crate) mod metrics;
-pub mod pricer;
+pub(crate) mod pricer;
 pub(crate) mod types;
 
 pub use types::{CmsSwap, FundingLeg, FundingLegSpec, FundingPeriod};
