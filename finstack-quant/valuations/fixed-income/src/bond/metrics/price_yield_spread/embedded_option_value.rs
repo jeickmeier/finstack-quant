@@ -194,12 +194,11 @@ mod tests {
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides {
-                model_config:
-                    finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig {
-                        hw1f_sigma: Some(0.01),
-                        hw1f_mean_reversion: Some(0.03),
-                        ..Default::default()
-                    },
+                model_config: finstack_quant_valuations_core::instruments::ModelConfig {
+                    hw1f_sigma: Some(0.01),
+                    hw1f_mean_reversion: Some(0.03),
+                    ..Default::default()
+                },
                 ..Default::default()
             })
             .call_put_opt(Some(call_put))
@@ -245,12 +244,11 @@ mod tests {
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides {
-                model_config:
-                    finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig {
-                        hw1f_sigma: Some(0.01),
-                        hw1f_mean_reversion: Some(0.03),
-                        ..Default::default()
-                    },
+                model_config: finstack_quant_valuations_core::instruments::ModelConfig {
+                    hw1f_sigma: Some(0.01),
+                    hw1f_mean_reversion: Some(0.03),
+                    ..Default::default()
+                },
                 ..Default::default()
             })
             .call_put_opt(Some(call_put))
@@ -287,12 +285,11 @@ mod tests {
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides {
-                model_config:
-                    finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig {
-                        hw1f_sigma: Some(0.01),
-                        hw1f_mean_reversion: Some(0.03),
-                        ..Default::default()
-                    },
+                model_config: finstack_quant_valuations_core::instruments::ModelConfig {
+                    hw1f_sigma: Some(0.01),
+                    hw1f_mean_reversion: Some(0.03),
+                    ..Default::default()
+                },
                 ..Default::default()
             })
             .call_put_opt(None)

@@ -762,10 +762,9 @@ mod tests {
     struct StubInstrument {
         id: String,
         attrs: Attributes,
-        instrument_pricing_overrides:
-            crate::instruments::pricing_overrides::InstrumentPricingOverrides,
-        metric_pricing_overrides: crate::instruments::pricing_overrides::MetricPricingOverrides,
-        scenario_pricing_overrides: crate::instruments::pricing_overrides::ScenarioPricingOverrides,
+        instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+        metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+        scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     }
 
     crate::impl_empty_cashflow_provider!(

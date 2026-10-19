@@ -14,7 +14,7 @@ use finstack_quant_models::monte_carlo::process::piecewise_gbm::{
     GbmCheckpoint, PiecewiseGbmProcess,
 };
 use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at;
-use finstack_quant_valuations_core::instruments::pricing_overrides::MarketQuoteOverrides;
+use finstack_quant_valuations_core::instruments::MarketQuoteOverrides;
 
 /// Bootstrap the forward-vol / forward-rate GBM for dated schedule points.
 ///

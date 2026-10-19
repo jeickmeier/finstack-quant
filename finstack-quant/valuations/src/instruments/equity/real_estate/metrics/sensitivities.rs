@@ -3,7 +3,7 @@
 //! This is *not* a curve DV01 metric. It is a bump-and-reprice sensitivity to
 //! an appraisal input: the cap rate. The appraisal discount-rate sensitivity is
 //! `real_estate::discount_rate01` (see
-//! [`crate::metrics::RfComponentDv01Calculator`]).
+//! [`crate::metrics::sensitivities::rf_component_dv01::RfComponentDv01Calculator`]).
 //!
 //! **Units**: currency per 1bp cap-rate move,
 //! `(PV(cap + h) − PV(cap − h)) / (2h) × 1bp` with `h = rate_bump_bp` from the

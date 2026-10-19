@@ -635,7 +635,7 @@ impl RevolvingCreditMcRun {
     /// `mc_paths` exceeds the workspace path cap.
     pub fn resolve(
         facility_id: &finstack_quant_core::types::InstrumentId,
-        model_config: &finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig,
+        model_config: &finstack_quant_valuations_core::instruments::ModelConfig,
     ) -> finstack_quant_core::Result<Self> {
         let defaults = &finstack_quant_valuations_core::pricer::defaults::embedded_defaults()?
             .revolving_credit;

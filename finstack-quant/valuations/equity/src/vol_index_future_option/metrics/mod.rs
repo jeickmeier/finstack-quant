@@ -10,10 +10,10 @@ pub(crate) fn register_vol_index_future_option_metrics(
         registry: registry,
         instrument: finstack_quant_valuations_core::pricer::InstrumentType::VolatilityIndexFutureOption,
         metrics: [
-            (Delta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::VolatilityIndexFutureOption>::delta()),
-            (Gamma, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::VolatilityIndexFutureOption>::gamma()),
-            (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::VolatilityIndexFutureOption>::vega()),
-            (Theta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::VolatilityIndexFutureOption>::theta()),
+            (Delta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::VolatilityIndexFutureOption>::delta()),
+            (Gamma, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::VolatilityIndexFutureOption>::gamma()),
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::VolatilityIndexFutureOption>::vega()),
+            (Theta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::VolatilityIndexFutureOption>::theta()),
         ]
     }
     Ok(())

@@ -10,7 +10,7 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 pub(crate) fn register_range_accrual_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::{
+    use finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::{
         GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVolga,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
@@ -20,12 +20,12 @@ pub(crate) fn register_range_accrual_metrics(
             registry: registry,
             instrument: InstrumentType::RangeAccrual,
             metrics: [
-                (Vega, finstack_quant_valuations_core::metrics::GenericFdVega::<crate::RangeAccrual>::default()),
+                (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::RangeAccrual>::default()),
                 // Rho: discount-curve-only central bump, repriced with the requested model.
-                (Rho, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_discount_only())),
-                (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
+                (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_discount_only())),
+                (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
                 // Theta is now registered universally in crate::exotics::EXOTICS.metrics()
-                (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+                (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
                 (Delta, GenericFdDelta::<crate::RangeAccrual>::default()),
                 (Gamma, GenericFdGamma::<crate::RangeAccrual>::default()),
                 (Vanna, GenericFdVanna::<crate::RangeAccrual>::default()),

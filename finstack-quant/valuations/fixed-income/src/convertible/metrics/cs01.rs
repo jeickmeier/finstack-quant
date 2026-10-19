@@ -113,7 +113,7 @@ impl MetricCalculator for Cs01Calculator {
         let bond: &ConvertibleBond = context.instrument_as()?;
         let as_of = context.as_of;
         if bond.credit_curve_id.is_some() {
-            return finstack_quant_valuations_core::metrics::GenericParallelCs01.calculate(context);
+            return finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericParallelCs01.calculate(context);
         }
 
         cs01_setup(bond, context.curves.as_ref())?.cs01(as_of, BumpSpec::parallel_bp)
@@ -168,7 +168,7 @@ impl MetricCalculator for BucketedCs01Calculator {
         let bond: ConvertibleBond = context.instrument_as::<ConvertibleBond>()?.clone();
 
         if bond.credit_curve_id.is_some() {
-            return finstack_quant_valuations_core::metrics::GenericBucketedCs01.calculate(context);
+            return finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericBucketedCs01.calculate(context);
         }
 
         let series_key = bond

@@ -53,8 +53,8 @@ impl MetricCalculator for BondDv01Calculator {
                 .has_price_driver()
                 && !has_options
             {
-                return finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-                    finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined(),
+                return finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
+                    finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined(),
                 )
                 .calculate(context);
             }
@@ -92,16 +92,16 @@ impl MetricCalculator for BondDv01Calculator {
             .market_quotes
             .has_price_driver();
         if !has_price_driver {
-            return finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-                finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined(),
+            return finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
+                finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined(),
             )
             .calculate(context);
         }
 
         if !has_options {
             return super::risk_view::with_bond_risk_view(context, |ctx| {
-                finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-                    finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined(),
+                finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
+                    finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined(),
                 )
                 .calculate(ctx)
             });
@@ -173,8 +173,8 @@ impl MetricCalculator for BondBucketedDv01Calculator {
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         super::risk_view::with_bond_risk_view(context, |ctx| {
-            finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-                finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate(
+            finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
+                finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate(
                 ),
             )
             .calculate(ctx)

@@ -628,7 +628,7 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
-    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
     use finstack_quant_valuations::instruments::{Attributes, Bond};
     use time::macros::date;
 

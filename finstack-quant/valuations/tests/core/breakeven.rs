@@ -12,7 +12,7 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{BreakevenConfig, BreakevenMode, BreakevenTarget};
 use finstack_quant_valuations::metrics::sensitivities::breakeven::BreakevenCalculator;
 use finstack_quant_valuations::metrics::{
-    calculate_theta_date, MetricCalculator, MetricContext, MetricId,
+    sensitivities::theta::calculate_theta_date, MetricCalculator, MetricContext, MetricId,
 };
 use std::sync::Arc;
 use time::macros::date;

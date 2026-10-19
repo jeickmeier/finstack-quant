@@ -19,7 +19,7 @@ pub(crate) fn selected_equity_greek(
     context: &mut MetricContext,
 ) -> Result<f64> {
     use crate::EquityOption;
-    use finstack_quant_valuations_core::metrics::{
+    use finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::{
         GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVega, GenericFdVolga,
     };
 
@@ -46,8 +46,8 @@ pub(crate) fn selected_equity_greek(
         OptionGreekKind::Vanna => GenericFdVanna::<EquityOption>::default().calculate(context),
         OptionGreekKind::Volga => GenericFdVolga::<EquityOption>::default().calculate(context),
         OptionGreekKind::Theta => selected_equity_theta(context),
-        OptionGreekKind::Rho => finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-            finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_discount_only(),
+        OptionGreekKind::Rho => finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
+            finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_discount_only(),
         )
         .calculate(context),
         OptionGreekKind::ForeignRho => Err(finstack_quant_core::Error::Validation(

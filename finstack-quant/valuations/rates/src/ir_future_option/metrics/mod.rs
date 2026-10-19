@@ -20,10 +20,10 @@ pub(crate) fn register_interest_rate_future_option_metrics(
         registry: registry,
         instrument: finstack_quant_valuations_core::pricer::InstrumentType::InterestRateFutureOption,
         metrics: [
-            (Delta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::InterestRateFutureOption>::delta()),
-            (Gamma, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::InterestRateFutureOption>::gamma()),
-            (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::InterestRateFutureOption>::vega()),
-            (Theta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::InterestRateFutureOption>::theta()),
+            (Delta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::InterestRateFutureOption>::delta()),
+            (Gamma, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::InterestRateFutureOption>::gamma()),
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::InterestRateFutureOption>::vega()),
+            (Theta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::InterestRateFutureOption>::theta()),
             (Dv01, InterestRateFutureOptionDv01),
         ]
     }

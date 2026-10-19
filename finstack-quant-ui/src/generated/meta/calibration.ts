@@ -1324,7 +1324,7 @@ export default [
   {
     "path": "#/$defs/d_149952dfbecf32b456eb",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsConventionKey",
-    "description": "Key to look up CDS conventions (Currency + DocClause).\n\nCDS conventions are identified by both currency and documentation clause, as different\nclauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::defs::CdsConventionSpec)\nfrom the convention registry.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};\nuse finstack_quant_core::currency::Currency;\n\nlet key = CdsConventionKey {\n    currency: Currency::USD,\n    doc_clause: CdsDocClause::Cr14,\n};\n```"
+    "description": "Key to look up CDS conventions (Currency + DocClause).\n\nCDS conventions are identified by both currency and documentation clause, as different\nclauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::CdsConventionSpec)\nfrom the convention registry.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};\nuse finstack_quant_core::currency::Currency;\n\nlet key = CdsConventionKey {\n    currency: Currency::USD,\n    doc_clause: CdsDocClause::Cr14,\n};\n```"
   },
   {
     "path": "#/$defs/d_149952dfbecf32b456eb/properties/currency",
@@ -1540,7 +1540,7 @@ export default [
   {
     "path": "#/$defs/d_344d3d76fad0c4b3fff9",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSwapConventionId",
-    "description": "Identifier for Inflation Swap market conventions (e.g., \"USD-CPI\", \"UK-RPI\").\n\nUsed to look up [`InflationSwapConventions`](crate::market::conventions::defs::InflationSwapConventions)\nfrom the convention registry."
+    "description": "Identifier for Inflation Swap market conventions (e.g., \"USD-CPI\", \"UK-RPI\").\n\nUsed to look up [`InflationSwapConventions`](crate::market::conventions::InflationSwapConventions)\nfrom the convention registry."
   },
   {
     "path": "#/$defs/d_34e9aefbe4b62c386fe9",
@@ -5179,7 +5179,7 @@ export default [
   {
     "path": "#/$defs/d_b7ebd05daecf38c26828",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwaptionConventionId",
-    "description": "Identifier for Swaption market conventions (e.g., \"USD\", \"EUR\").\n\nUsed to look up [`SwaptionConventions`](crate::market::conventions::defs::SwaptionConventions)\nfrom the convention registry."
+    "description": "Identifier for Swaption market conventions (e.g., \"USD\", \"EUR\").\n\nUsed to look up [`SwaptionConventions`](crate::market::conventions::SwaptionConventions)\nfrom the convention registry."
   },
   {
     "path": "#/$defs/d_b9d542252670792025d6",
@@ -7683,7 +7683,7 @@ export default [
   {
     "path": "#/$defs/d_f2494b65293b81ee2ea2",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/IrFutureContractId",
-    "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::defs::IrFutureConventions)\nfrom the convention registry."
+    "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::IrFutureConventions)\nfrom the convention registry."
   },
   {
     "path": "#/$defs/d_f6b6b6746b36a7a4a06d",

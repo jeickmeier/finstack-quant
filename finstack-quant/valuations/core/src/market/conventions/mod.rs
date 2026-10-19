@@ -29,8 +29,7 @@
 //! - convention `ids` module for convention identifiers
 
 /// Data structures for conventions.
-#[doc(hidden)]
-pub mod defs;
+mod defs;
 /// Stable identifiers (typed keys).
 pub mod ids;
 

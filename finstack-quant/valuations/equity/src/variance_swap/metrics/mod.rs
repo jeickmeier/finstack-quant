@@ -27,7 +27,7 @@ pub(crate) fn register_variance_swap_metrics(
         metrics: [
             (Vega, VegaCalculator),
             (Dv01, Dv01Calculator),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (VarianceVega, VarianceVegaCalculator),
             (ExpectedVariance, ExpectedVarianceCalculator),
             (RealizedVariance, RealizedVarianceCalculator),

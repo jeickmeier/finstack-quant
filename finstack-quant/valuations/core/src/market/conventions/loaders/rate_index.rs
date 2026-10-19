@@ -1,6 +1,6 @@
 //! Loader for rate index conventions embedded in JSON registries.
 
-use crate::market::conventions::defs::{RateIndexConventions, RateIndexKind};
+use crate::market::conventions::{RateIndexConventions, RateIndexKind};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};

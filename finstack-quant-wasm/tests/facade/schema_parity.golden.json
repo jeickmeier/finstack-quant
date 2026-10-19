@@ -823,7 +823,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 217044
+            "bytes": 217020
           },
           {
             "path": "schemas/calibration/1/calibration_result.schema.json",
@@ -879,42 +879,42 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",
             "type_name": "CdsQuote",
             "kind": "component",
-            "bytes": 9201
+            "bytes": 9195
           },
           {
             "path": "schemas/market/1/cds_tranche_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/cds_tranche_quote.schema.json",
             "type_name": "CdsTrancheQuote",
             "kind": "component",
-            "bytes": 5905
+            "bytes": 5899
           },
           {
             "path": "schemas/market/1/inflation_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/inflation_quote.schema.json",
             "type_name": "InflationQuote",
             "kind": "component",
-            "bytes": 4408
+            "bytes": 4402
           },
           {
             "path": "schemas/market/1/market_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
             "type_name": "MarketQuote",
             "kind": "component",
-            "bytes": 30571
+            "bytes": 30547
           },
           {
             "path": "schemas/market/1/rate_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
             "type_name": "RateQuote",
             "kind": "component",
-            "bytes": 8843
+            "bytes": 8837
           },
           {
             "path": "schemas/market/1/vol_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/vol_quote.schema.json",
             "type_name": "VolQuote",
             "kind": "component",
-            "bytes": 8460
+            "bytes": 8454
           },
           {
             "path": "schemas/market/1/xccy_quote.schema.json",
@@ -3603,7 +3603,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 217044
+            "bytes": 217020
           },
           {
             "domain": "calibration",
@@ -3667,7 +3667,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",
             "type_name": "CdsQuote",
             "kind": "component",
-            "bytes": 9201
+            "bytes": 9195
           },
           {
             "domain": "calibration",
@@ -3675,7 +3675,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/cds_tranche_quote.schema.json",
             "type_name": "CdsTrancheQuote",
             "kind": "component",
-            "bytes": 5905
+            "bytes": 5899
           },
           {
             "domain": "calibration",
@@ -3683,7 +3683,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/inflation_quote.schema.json",
             "type_name": "InflationQuote",
             "kind": "component",
-            "bytes": 4408
+            "bytes": 4402
           },
           {
             "domain": "calibration",
@@ -3691,7 +3691,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
             "type_name": "MarketQuote",
             "kind": "component",
-            "bytes": 30571
+            "bytes": 30547
           },
           {
             "domain": "calibration",
@@ -3699,7 +3699,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
             "type_name": "RateQuote",
             "kind": "component",
-            "bytes": 8843
+            "bytes": 8837
           },
           {
             "domain": "calibration",
@@ -3707,7 +3707,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/vol_quote.schema.json",
             "type_name": "VolQuote",
             "kind": "component",
-            "bytes": 8460
+            "bytes": 8454
           },
           {
             "domain": "calibration",

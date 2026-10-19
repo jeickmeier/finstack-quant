@@ -210,7 +210,7 @@ pub(crate) fn quoted_workout_path(
 pub(crate) fn register_bond_metrics(
     registry: &mut finstack_quant_valuations_core::metrics::MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::{
+    use finstack_quant_valuations_core::metrics::sensitivities::cross_factor::{
         make_credit_bumper, make_rates_bumper, CrossFactorCalculator,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
@@ -242,7 +242,7 @@ pub(crate) fn register_bond_metrics(
             (ASWMarket, AssetSwapMarketCalculator),
 
             (WAL, BondWalCalculator),
-            (CarryTotal, finstack_quant_valuations_core::metrics::CarryDecompositionCalculator::with_clock(carry::BondYieldClock)),
+            (CarryTotal, finstack_quant_valuations_core::metrics::sensitivities::carry_decomposition::CarryDecompositionCalculator::with_clock(carry::BondYieldClock)),
 
             // Theta is now registered universally in crate::FIXED_INCOME.metrics()
 

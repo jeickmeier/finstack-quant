@@ -10,7 +10,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{
-    MetricCalculator, MetricContext, MetricRegistry, RfComponentPriced,
+    sensitivities::rf_component_dv01::RfComponentPriced, MetricCalculator, MetricContext,
+    MetricRegistry,
 };
 
 impl RfComponentPriced for DiscountedCashFlow {
@@ -147,7 +148,7 @@ pub(crate) fn register_dcf_metrics(
             (EquityShares, EquitySharesCalculator),
         ],
         custom: [
-            ("dcf::wacc01", finstack_quant_valuations_core::metrics::RfComponentDv01Calculator::<crate::dcf_equity::DiscountedCashFlow>::new()),
+            ("dcf::wacc01", finstack_quant_valuations_core::metrics::sensitivities::rf_component_dv01::RfComponentDv01Calculator::<crate::dcf_equity::DiscountedCashFlow>::new()),
         ]
     }
     Ok(())

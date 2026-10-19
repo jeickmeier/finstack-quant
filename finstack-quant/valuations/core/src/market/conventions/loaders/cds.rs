@@ -1,8 +1,8 @@
 //! Loader for CDS conventions embedded in JSON registries.
 
 use super::json::{normalize_registry_id, RegistryFile};
-use crate::market::conventions::defs::{CdsConvention, CdsConventionSpec};
 use crate::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+use crate::market::conventions::{CdsConvention, CdsConventionSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::Error;

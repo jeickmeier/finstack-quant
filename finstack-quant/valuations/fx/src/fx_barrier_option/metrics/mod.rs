@@ -15,14 +15,14 @@ pub(crate) fn register_fx_barrier_option_metrics(
         registry: registry,
         instrument: InstrumentType::FxBarrierOption,
         metrics: [
-            (Delta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxBarrierOption>::delta()),
-            (Gamma, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxBarrierOption>::gamma()),
-            (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxBarrierOption>::vega()),
-            (Rho, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxBarrierOption>::rho()),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
-            (Vanna, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxBarrierOption>::vanna()),
-            (Volga, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxBarrierOption>::volga()),
+            (Delta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::FxBarrierOption>::delta()),
+            (Gamma, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::FxBarrierOption>::gamma()),
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::FxBarrierOption>::vega()),
+            (Rho, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::FxBarrierOption>::rho()),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (Vanna, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::FxBarrierOption>::vanna()),
+            (Volga, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::FxBarrierOption>::volga()),
         ]
     }
     Ok(())
