@@ -56,6 +56,9 @@ pub struct CalibratedHazardSpec<'a> {
     pub recovery_rate: f64,
     /// Optional CDS valuation convention for the bootstrap CDS.
     pub cds_valuation_convention: Option<CdsValuationConvention>,
+    /// Documentation clause keying the quotes and stored on the recipe;
+    /// `None` keys the quotes `isda_na` and stores no clause.
+    pub doc_clause: Option<CdsDocClause>,
 }
 
 /// Calibrate a replayable hazard curve from explicit pillar dates and quotes.
@@ -82,7 +85,7 @@ pub fn calibrated_hazard_curve_from_spec(
                 recovery_rate: spec.recovery_rate,
                 convention: CdsConventionKey {
                     currency: Currency::USD,
-                    doc_clause: CdsDocClause::IsdaNa,
+                    doc_clause: spec.doc_clause.unwrap_or(CdsDocClause::IsdaNa),
                 },
             })
         })
@@ -99,7 +102,7 @@ pub fn calibrated_hazard_curve_from_spec(
         method: CalibrationMethod::Bootstrap,
 
         par_interp: ParInterp::Linear,
-        doc_clause: None,
+        doc_clause: spec.doc_clause.map(|clause| clause.as_str().to_string()),
         cds_valuation_convention: spec.cds_valuation_convention,
     });
     let quote_ids = quotes
@@ -191,6 +194,7 @@ pub fn calibrated_hazard_curve_with_pillars(
         pillars: &dated,
         recovery_rate: STANDARD_RECOVERY_SENIOR,
         cds_valuation_convention: None,
+        doc_clause: None,
     })
 }
 

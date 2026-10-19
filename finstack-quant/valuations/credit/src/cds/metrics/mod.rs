@@ -30,23 +30,17 @@ use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
 
+/// Regional documentation family a hazard replay is asserted against: the
+/// family of an explicit meta clause (`isda_eu`, `isda_au`, ...), else the
+/// CDS's own `convention`. Exact restructuring clauses (`cr14`, `xr14`, ...)
+/// carry no family of their own, so they defer to the convention.
 pub(crate) fn market_doc_clause(
     cds: &crate::cds::CreditDefaultSwap,
 ) -> finstack_quant_valuations_core::market::conventions::ids::CdsDocClause {
-    use crate::cds::CdsDocClause as InstrumentClause;
-    use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause as MarketClause;
-
-    match cds.doc_clause_effective() {
-        InstrumentClause::Cr14 | InstrumentClause::Mr14 | InstrumentClause::Xr14 => {
-            MarketClause::IsdaNa
-        }
-        InstrumentClause::Mm14 | InstrumentClause::IsdaEu => MarketClause::IsdaEu,
-        InstrumentClause::IsdaNa => MarketClause::IsdaNa,
-        InstrumentClause::IsdaAs | InstrumentClause::IsdaAu | InstrumentClause::IsdaNz => {
-            MarketClause::IsdaAs
-        }
-        InstrumentClause::Custom => MarketClause::Custom,
-    }
+    cds.doc_clause
+        .and_then(crate::cds::CdsConvention::family_from_doc_clause)
+        .unwrap_or(cds.convention)
+        .as_doc_clause()
 }
 
 pub(crate) fn deal_quote_override(

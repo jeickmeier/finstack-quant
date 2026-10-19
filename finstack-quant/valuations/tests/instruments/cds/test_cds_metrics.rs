@@ -1547,3 +1547,101 @@ fn test_bucketed_dv01_metric() {
         (bucket_sum - dv01).abs()
     );
 }
+
+/// Market whose `CORP` hazard curve is calibrated from quotes keyed by
+/// `doc_clause`, with that clause stored on the replay recipe.
+fn market_with_clause_recipe(as_of: Date, doc_clause: CdsDocClause) -> MarketContext {
+    let source =
+        MarketContext::new().insert(build_quote_calibrated_discount(0.04, as_of, "USD_OIS"));
+    let pillars: Vec<(Date, f64)> = [365, 3 * 365, 5 * 365, 10 * 365]
+        .into_iter()
+        .map(|days| (as_of + time::Duration::days(days), 100.0))
+        .collect();
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_from_spec(
+        crate::instruments::test_support::credit::CalibratedHazardSpec {
+            source_market: &source,
+            base_date: as_of,
+            curve_id: "CORP",
+            entity: "CORP",
+            discount_curve_id: "USD_OIS",
+            pillars: &pillars,
+            recovery_rate: finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR,
+            cds_valuation_convention: None,
+            doc_clause: Some(doc_clause),
+        },
+    )
+    .expect("hazard calibration should succeed");
+    source.insert(hazard)
+}
+
+const RECALIBRATED_METRICS: [MetricId; 5] = [
+    MetricId::Cs01,
+    MetricId::BucketedCs01,
+    MetricId::Dv01,
+    MetricId::Recovery01,
+    MetricId::CsGamma,
+];
+
+#[test]
+fn recalibrated_metrics_accept_a_concrete_doc_clause_recipe() {
+    let as_of = date!(2024 - 03 - 20);
+    let maturity = date!(2029 - 03 - 20);
+    for clause in [CdsDocClause::Cr14, CdsDocClause::Xr14] {
+        let market = market_with_clause_recipe(as_of, clause);
+        let mut cds = create_test_cds(as_of, maturity);
+        cds.doc_clause = Some(clause);
+        let result = cds
+            .price_with_metrics(
+                &market,
+                as_of,
+                &RECALIBRATED_METRICS,
+                crate::instruments::test_support::credit::pricing_options(),
+            )
+            .unwrap_or_else(|err| panic!("{clause:?} recipe: {err}"));
+        for id in &RECALIBRATED_METRICS {
+            assert!(
+                result.measures[id.as_str()].is_finite(),
+                "{clause:?} {id:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn recalibrated_metrics_use_the_cds_convention_family() {
+    use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsConvention;
+
+    let as_of = date!(2024 - 03 - 20);
+    let maturity = date!(2029 - 03 - 20);
+    let market = market_with_clause_recipe(as_of, CdsDocClause::IsdaAs);
+    let mut cds = create_test_cds(as_of, maturity);
+    cds.convention = CdsConvention::IsdaAs;
+    cds.doc_clause = None;
+    let result = cds
+        .price_with_metrics(
+            &market,
+            as_of,
+            &RECALIBRATED_METRICS,
+            crate::instruments::test_support::credit::pricing_options(),
+        )
+        .unwrap_or_else(|err| panic!("isda_as recipe: {err}"));
+    for id in &RECALIBRATED_METRICS {
+        assert!(result.measures[id.as_str()].is_finite(), "{id:?}");
+    }
+
+    // A different regional family is still a conflict.
+    let mut eu = create_test_cds(as_of, maturity);
+    eu.convention = CdsConvention::IsdaEu;
+    let err = eu
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Cs01],
+            crate::instruments::test_support::credit::pricing_options(),
+        )
+        .expect_err("isda_eu against an isda_as recipe");
+    assert!(
+        err.to_string().contains("conflicts with stored clause"),
+        "{err}"
+    );
+}

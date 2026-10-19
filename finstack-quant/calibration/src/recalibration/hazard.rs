@@ -14,12 +14,14 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{HazardCalibrationRecipe, HazardCurve};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
+use finstack_quant_valuations_core::market::conventions::{CdsConvention, ConventionRegistry};
 use finstack_quant_valuations_core::recalibration::{
     DealCdsQuoteOverride, HazardSpreadRiskBucket, QuoteBump,
 };
 use finstack_quant_valuations_credit::cds::CdsValuationConvention;
 #[cfg(test)]
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 
 #[derive(Clone, Copy)]
@@ -403,6 +405,26 @@ fn require_zero_shock_identity(
     Ok(())
 }
 
+/// Whether two documentation clauses name the same regional family for
+/// `currency`. Exact restructuring clauses (`cr14`, `xr14`, ...) take the
+/// currency's primary family, as the convention registry resolves them.
+fn same_doc_clause_family(
+    requested: CdsDocClause,
+    stored: CdsDocClause,
+    currency: finstack_quant_core::currency::Currency,
+) -> finstack_quant_core::Result<bool> {
+    if requested == stored {
+        return Ok(true);
+    }
+    let registry = ConventionRegistry::try_global()?;
+    let family = |clause| {
+        CdsConvention::family_from_doc_clause(clause)
+            .or_else(|| registry.primary_cds_family(currency))
+            .unwrap_or(CdsConvention::IsdaNa)
+    };
+    Ok(family(requested) == family(stored))
+}
+
 fn recalibrate_from_par_spreads(
     request: HazardParRecalibration<'_>,
 ) -> finstack_quant_core::Result<HazardCurve> {
@@ -421,7 +443,9 @@ fn recalibrate_from_par_spreads(
         )));
     }
     if let (Some(requested), Some(stored)) = (request.doc_clause, params.doc_clause.as_deref()) {
-        if stored != requested.as_str() {
+        let stored_clause =
+            CdsDocClause::from_str(stored).map_err(finstack_quant_core::Error::Validation)?;
+        if !same_doc_clause_family(requested, stored_clause, params.currency)? {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "hazard replay documentation clause {requested:?} conflicts with stored clause {stored:?}"
             )));
@@ -578,7 +602,8 @@ pub(crate) fn bump_hazard_spread_risk_input_cached(
 ///   basis point units.
 /// * `discount_id` - Discount curve ID, which must match the stored recipe.
 /// * `doc_clause` - Optional documentation-clause assertion. When supplied, it
-///   must match the stored recipe; `None` uses the stored value.
+///   must name the stored recipe's regional family (exact restructuring
+///   clauses resolve through the recipe currency); `None` skips the check.
 /// * `cds_valuation_convention` - Optional valuation-convention assertion.
 ///   When supplied, it must match the stored recipe; `None` uses the stored value.
 pub fn bump_hazard_spreads(
