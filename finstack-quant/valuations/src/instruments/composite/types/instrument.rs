@@ -684,7 +684,7 @@ impl Instrument for CompositeInstrument {
         Ok(dependencies)
     }
 
-    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

@@ -6,10 +6,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency;
 use finstack_quant_valuations_core::instruments::common_impl::listed::ListedFutureTerms;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::QuantoSpec;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 
 /// Exchange-listed future on an equity, equity index, or fixed-currency quanto index.
@@ -443,7 +443,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for EquityFuture {
         Some(self.terms.settlement_date)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 finstack_quant_valuations_core::impl_empty_cashflow_provider!(

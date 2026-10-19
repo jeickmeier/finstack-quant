@@ -3,8 +3,9 @@
 
 use finstack_quant_valuations_core::metrics::{MetricRegistry, MetricRegistryError};
 use finstack_quant_valuations_core::pricer::{
-    register_generic, Family, InstrumentType, PricerRegistry, PricingError,
+    Family, InstrumentType, PricerRegistry, PricingError,
 };
+use finstack_quant_valuations_core::register_generic;
 
 /// Registration unit for the equity instruments.
 pub static EQUITY: Family = Family::new("equity", register_pricers, register_metrics);

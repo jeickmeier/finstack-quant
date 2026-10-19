@@ -80,7 +80,7 @@ impl CommodityFutureOption {
     }
 }
 
-finstack_quant_valuations_core::instruments::common_impl::listed::impl_future_option_instrument!(
+finstack_quant_valuations_core::impl_future_option_instrument!(
     CommodityFutureOption,
     finstack_quant_valuations_core::pricer::InstrumentType::CommodityFutureOption,
     crate::exotics::EXOTICS

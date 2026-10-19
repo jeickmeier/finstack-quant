@@ -665,10 +665,7 @@ mod tests {
             Ok(crate::instruments::common_impl::dependencies::MarketDependencies::new())
         }
 
-        crate::instruments::common_impl::traits::impl_instrument_base!(
-            InstrumentType::Bond,
-            *crate::pricer::Family::unregistered()
-        );
+        crate::impl_instrument_base!(InstrumentType::Bond, *crate::pricer::Family::unregistered());
 
         fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
             Err(finstack_quant_core::Error::Validation(
@@ -723,10 +720,7 @@ mod tests {
             Ok(crate::instruments::common_impl::dependencies::MarketDependencies::new())
         }
 
-        crate::instruments::common_impl::traits::impl_instrument_base!(
-            InstrumentType::Bond,
-            *crate::pricer::Family::unregistered()
-        );
+        crate::impl_instrument_base!(InstrumentType::Bond, *crate::pricer::Family::unregistered());
 
         fn resolve_pricing_as_of(
             &self,

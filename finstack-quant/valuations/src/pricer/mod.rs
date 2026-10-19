@@ -26,6 +26,8 @@ pub use json::{
 
 use std::sync::Arc;
 
+use finstack_quant_valuations_core::register_generic;
+
 use crate::instruments::credit_derivatives::CREDIT;
 use crate::instruments::equity::EQUITY;
 use crate::instruments::exotics::EXOTICS;

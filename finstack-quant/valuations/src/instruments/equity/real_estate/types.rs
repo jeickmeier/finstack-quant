@@ -1,7 +1,7 @@
 //! Real estate asset valuation types.
 
 use super::pricer;
-use crate::instruments::common_impl::traits::impl_instrument_base;
+use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::pricer::InstrumentType;
 use finstack_quant_core::currency::Currency;
@@ -605,7 +605,7 @@ impl Instrument for RealEstateAsset {
         pricer::compute_pv(self, as_of)
     }
 
-    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    crate::impl_focused_pricing_overrides!();
 }
 impl finstack_quant_cashflows::CashflowScheduleSource for RealEstateAsset {
     fn raw_cashflow_schedule(

@@ -2,8 +2,9 @@
 
 use finstack_quant_valuations_core::metrics::{MetricRegistry, MetricRegistryError};
 use finstack_quant_valuations_core::pricer::{
-    register_generic, Family, InstrumentType, ModelKey, PricerRegistry, PricingError,
+    Family, InstrumentType, ModelKey, PricerRegistry, PricingError,
 };
+use finstack_quant_valuations_core::register_generic;
 
 /// Registration unit for the FX instruments.
 pub static FX: Family = Family::new("fx", register_pricers, register_metrics);

@@ -7,7 +7,7 @@
 
 use super::levered_pricer;
 use super::types::RealEstateAsset;
-use crate::instruments::common_impl::traits::impl_instrument_base;
+use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::{Bond, Repo, RevolvingCredit, TermLoan};
 use crate::pricer::InstrumentType;
@@ -210,7 +210,7 @@ impl Instrument for LeveredRealEstateEquity {
         levered_pricer::compute_pv(self, market, as_of)
     }
 
-    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for LeveredRealEstateEquity {

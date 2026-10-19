@@ -15,7 +15,7 @@ use finstack_quant_core::Result;
 
 use crate::instruments::json_loader::InstrumentJson;
 
-use crate::instruments::common_impl::traits::impl_instrument_base;
+use crate::impl_instrument_base;
 use serde::{Deserialize, Serialize};
 
 /// Type of asset in the basket
@@ -354,7 +354,7 @@ impl Instrument for Basket {
         Money::new(scaled, self.notional.currency())
     }
 
-    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    crate::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.
