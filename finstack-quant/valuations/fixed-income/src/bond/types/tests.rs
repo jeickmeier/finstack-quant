@@ -13,8 +13,8 @@ use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::common_impl::traits::{Attributes, Instrument};
 use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
 use rust_decimal::Decimal;
 use time::Month;
 
@@ -721,7 +721,7 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
 
 #[test]
 fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2028, Month::January, 1).expect("Valid test date");

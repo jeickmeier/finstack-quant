@@ -12,7 +12,7 @@ use super::types::EquityOption;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::expect_inst;
 use finstack_quant_valuations_core::pricer::PricingError;
 
@@ -64,7 +64,7 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonF
     )]
     fn price_dyn(
         &self,
-        instrument: &dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument,
+        instrument: &dyn finstack_quant_valuations_core::instruments::Instrument,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<finstack_quant_valuations_core::results::ValuationResult, PricingError>

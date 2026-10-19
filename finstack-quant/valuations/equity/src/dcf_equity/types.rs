@@ -12,8 +12,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::Error as CoreError;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
-use finstack_quant_valuations_core::instruments::common_impl::traits::{Attributes, Instrument};
+use finstack_quant_valuations_core::instruments::MarketDependencies;
+use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
 use finstack_quant_valuations_core::pricer::InstrumentType;
 
 /// Spread `WACC − g` below which Gordon Growth is near-singular: the terminal

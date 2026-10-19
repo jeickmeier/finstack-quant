@@ -8,7 +8,7 @@ use finstack_quant_core::money::Money;
 #[cfg(test)]
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 
 use serde::{Deserialize, Serialize};
 

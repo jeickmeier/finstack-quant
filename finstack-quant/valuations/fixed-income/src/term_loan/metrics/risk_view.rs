@@ -6,7 +6,7 @@
 
 use super::oas::oas_decimal_from_quote_overrides;
 use crate::TermLoan;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{
     quoted_z_spread, Dv01CalculatorConfig, GenericBucketedCs01, GenericParallelCs01,
     MetricCalculator, MetricContext, UnifiedDv01Calculator, ZSpreadBucketedCs01,

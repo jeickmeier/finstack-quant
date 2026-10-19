@@ -23,7 +23,7 @@
 use crate::bond::metrics::effective::option_risk_bond_and_base_price;
 use crate::bond::pricing::quote_conversions::clear_price_driving_overrides;
 use crate::Bond;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
 use finstack_quant_valuations_core::pricer::ModelKey;
 use std::sync::Arc;

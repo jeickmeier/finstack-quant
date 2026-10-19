@@ -12,9 +12,9 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_margin::types::OtcMarginSpec;
-use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::CreditParams;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::MarketDependencies;
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -548,7 +548,7 @@ impl CdsIndex {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for CdsIndex {
+impl finstack_quant_valuations_core::instruments::Instrument for CdsIndex {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CdsIndex,
         crate::CREDIT

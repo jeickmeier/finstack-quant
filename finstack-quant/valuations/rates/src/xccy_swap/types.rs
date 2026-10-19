@@ -176,7 +176,7 @@ pub struct XccySwap {
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
     /// Attributes for instrument selection and tagging.
-    pub attributes: finstack_quant_valuations_core::instruments::common_impl::traits::Attributes,
+    pub attributes: finstack_quant_valuations_core::instruments::Attributes,
 }
 
 impl XccySwap {
@@ -199,7 +199,7 @@ impl XccySwap {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            attributes: finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::default(),
+            attributes: finstack_quant_valuations_core::instruments::Attributes::default(),
         }
     }
 
@@ -872,7 +872,7 @@ impl XccySwap {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for XccySwap {
+impl finstack_quant_valuations_core::instruments::Instrument for XccySwap {
     fn cashflow_export_terms(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -930,10 +930,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.leg1.leg.discount_curve_id.clone());
         deps.add_discount_curve(self.leg2.leg.discount_curve_id.clone());
         deps.add_forward_curve(self.leg1.leg.forward_curve_id.clone());
@@ -1047,7 +1046,7 @@ mod tests {
     use super::*;
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 
     fn no_fallback_swap() -> XccySwap {

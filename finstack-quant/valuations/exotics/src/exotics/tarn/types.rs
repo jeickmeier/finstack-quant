@@ -5,7 +5,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::validation;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use rust_decimal::Decimal;
 
 /// Target Redemption Note (TARN).
@@ -201,7 +201,7 @@ impl Tarn {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for Tarn {
+impl finstack_quant_valuations_core::instruments::Instrument for Tarn {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Tarn,
         crate::exotics::EXOTICS
@@ -217,15 +217,14 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
         if let Some(vol_surface_id) = &self.vol_surface_id {
             deps.add_volatility_dependency(
-                finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                     vol_surface_id.clone(),
                     None,
                     None,
@@ -308,7 +307,7 @@ mod tests {
 
     #[test]
     fn tarn_instrument_trait() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         let tarn = Tarn::example().expect("example");
         assert_eq!(tarn.id(), "TARN-USD-5Y");
         assert_eq!(
@@ -330,7 +329,7 @@ mod tests {
     #[test]
     fn value_requires_explicit_pricer() {
         use finstack_quant_core::market_data::context::MarketContext;
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         use time::macros::date;
 
         let tarn = Tarn::example().expect("example");

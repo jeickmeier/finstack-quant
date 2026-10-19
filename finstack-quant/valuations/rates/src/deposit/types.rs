@@ -24,7 +24,7 @@ use time::macros::date;
 
 use finstack_quant_core::validation;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 
 /// Simple deposit instrument with optional quoted rate.
 ///
@@ -170,7 +170,7 @@ impl Deposit {
 }
 
 // Explicit Instrument trait implementation (replaces macro for better IDE visibility)
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for Deposit {
+impl finstack_quant_valuations_core::instruments::Instrument for Deposit {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Deposit,
         crate::RATES
@@ -229,10 +229,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         Ok(deps)
     }
@@ -434,7 +433,7 @@ mod tests {
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+    use finstack_quant_valuations_core::instruments::Attributes;
     use time::macros::date;
 
     #[test]

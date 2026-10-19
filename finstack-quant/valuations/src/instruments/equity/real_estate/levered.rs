@@ -8,7 +8,7 @@
 use super::levered_pricer;
 use super::types::RealEstateAsset;
 use crate::impl_instrument_base;
-use crate::instruments::common_impl::traits::{Attributes, Instrument};
+use crate::instruments::{Attributes, Instrument};
 use crate::instruments::{Bond, Repo, RevolvingCredit, TermLoan};
 use crate::pricer::InstrumentType;
 use finstack_quant_core::currency::Currency;
@@ -192,9 +192,7 @@ impl Instrument for LeveredRealEstateEquity {
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        crate::instruments::common_impl::dependencies::MarketDependencies,
-    > {
+    ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
         let mut deps = self.asset.market_dependencies()?;
         for financing in &self.financing {
             deps.merge(financing.as_instrument().market_dependencies()?);

@@ -12,7 +12,7 @@ use crate::structured_credit::{
     AssetPool, BorrowingBaseReport, BorrowingBaseRules, CreditModelConfig, DealFees,
 };
 use finstack_quant_cashflows::builder::RateSpec;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_fixed_income::loan_terms::DrawEvent;
 
 /// Event that ends the revolving period early and turns the facility out

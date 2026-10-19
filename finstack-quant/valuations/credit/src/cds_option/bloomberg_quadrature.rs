@@ -1411,7 +1411,7 @@ mod tests {
         current_factor: f64,
         realized_loss: Option<f64>,
     ) -> CdsOption {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let params = CdsOptionParams::new(
             super::super::strike::CdsOptionStrike::CleanPricePct(

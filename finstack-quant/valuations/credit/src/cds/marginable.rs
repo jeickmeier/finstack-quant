@@ -18,7 +18,7 @@ use finstack_quant_valuations_core::instruments::common_impl::margin::assign_cre
 use finstack_quant_valuations_core::instruments::common_impl::margin::extract_reference_entity;
 use finstack_quant_valuations_core::instruments::common_impl::margin::netting_set_id_from_spec;
 use finstack_quant_valuations_core::instruments::common_impl::margin::repriced_metric;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 
 impl Marginable for CreditDefaultSwap {
     fn id(&self) -> &str {

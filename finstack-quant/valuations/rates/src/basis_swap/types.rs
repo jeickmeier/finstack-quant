@@ -164,7 +164,7 @@ pub struct BasisSwap {
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
     /// Attributes for instrument selection and tagging.
-    pub attributes: finstack_quant_valuations_core::instruments::common_impl::traits::Attributes,
+    pub attributes: finstack_quant_valuations_core::instruments::Attributes,
 }
 
 impl BasisSwap {
@@ -208,7 +208,7 @@ impl BasisSwap {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            attributes: finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::default(),
+            attributes: finstack_quant_valuations_core::instruments::Attributes::default(),
         };
         swap.validate()?;
         Ok(swap)
@@ -794,7 +794,7 @@ impl BasisSwap {
 // Attributable implementation is provided by the impl_instrument! macro
 
 // Use the macro to implement Instrument with pricing
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for BasisSwap {
+impl finstack_quant_valuations_core::instruments::Instrument for BasisSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::BasisSwap,
         crate::RATES
@@ -806,10 +806,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.primary_leg.discount_curve_id.clone());
         deps.add_discount_curve(self.reference_leg.discount_curve_id.clone());
         deps.add_forward_curve(self.primary_leg.forward_curve_id.clone());
@@ -876,7 +875,7 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 
     // Helper function for tests
@@ -1320,7 +1319,7 @@ mod tests {
 
     #[test]
     fn test_par_spread_zeroes_npv() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         use finstack_quant_valuations_core::metrics::MetricId;
 
         let base_date = date(2024, 1, 1);

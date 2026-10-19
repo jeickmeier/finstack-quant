@@ -229,9 +229,7 @@ mod tests {
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::{
-        Attributes, Instrument,
-    };
+    use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
     use std::sync::Arc;
     use time::macros::date;
 

@@ -34,9 +34,9 @@ use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IndexId, InstrumentId, Rate};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
-use finstack_quant_valuations_core::instruments::common_impl::listed::ListedFutureTerms;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::ListedFutureTerms;
+use finstack_quant_valuations_core::instruments::MarketDependencies;
 use time::macros::date;
 
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
@@ -852,9 +852,7 @@ impl InterestRateFuture {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for InterestRateFuture
-{
+impl finstack_quant_valuations_core::instruments::Instrument for InterestRateFuture {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::InterestRateFuture,
         crate::RATES
@@ -888,7 +886,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         deps.add_forward_curve(self.forward_curve_id.clone());
         if let Some(vol_surface_id) = &self.vol_surface_id {
             deps.add_volatility_dependency(
-                finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                     vol_surface_id.clone(),
                     None,
                     None,

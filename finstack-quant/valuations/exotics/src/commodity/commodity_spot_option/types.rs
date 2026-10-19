@@ -12,7 +12,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::{
     CommodityConvention, CommodityUnderlyingParams, OptionMarketParams,
 };
-use finstack_quant_valuations_core::instruments::common_impl::traits::{Attributes, Instrument};
+use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
 use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType, SettlementType};
 
 /// Monte Carlo configuration for commodity option pricing.
@@ -722,10 +722,9 @@ impl Instrument for CommoditySpotOption {
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
         let underlying_id = self
@@ -736,7 +735,7 @@ impl Instrument for CommoditySpotOption {
             deps.add_market_scalar_id(spot_id);
         }
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 underlying_id,
                 Some(self.strike),
@@ -848,12 +847,10 @@ impl Instrument for CommoditySpotOption {
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksProvider
-    for CommoditySpotOption
-{
+impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for CommoditySpotOption {
     fn selected_model_greek(
         &self,
-        kind: finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind,
+        kind: finstack_quant_valuations_core::instruments::OptionGreekKind,
         context: &mut finstack_quant_valuations_core::metrics::MetricContext,
     ) -> finstack_quant_core::Result<Option<f64>> {
         // Once exercise resolves the spot option, every pricing model owns the
@@ -872,13 +869,10 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::OptionGre
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        request: &finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeks,
-    > {
-        let mut greeks =
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeks::default(
-            );
+        request: &finstack_quant_valuations_core::instruments::OptionGreeksRequest,
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::OptionGreeks>
+    {
+        let mut greeks = finstack_quant_valuations_core::instruments::OptionGreeks::default();
         if self.resolved_claim(market, as_of)?.is_some() {
             let delta = if let Some(exercise) = self.exercise.filter(|event| event.date <= as_of) {
                 if exercise.exercised
@@ -919,19 +913,19 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::OptionGre
             return Ok(greeks);
         }
         match request.greek {
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Delta => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Delta => {
                 greeks.delta = self.option_delta(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Gamma => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma => {
                 greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Vega => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Vega => {
                 greeks.vega = self.option_vega(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Vanna => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Vanna => {
                 greeks.vanna = self.option_vanna(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Volga => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Volga => {
                 greeks.volga =
                     self.option_volga(market, as_of, request.require_base_pv()?, request.bumps)?
             }
@@ -945,7 +939,7 @@ impl CommoditySpotOption {
         &self,
         market: &MarketContext,
         as_of: Date,
-        _bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_cdf;
 
@@ -1014,9 +1008,9 @@ impl CommoditySpotOption {
         &self,
         market: &MarketContext,
         as_of: Date,
-        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         if as_of > self.expiry {
             return Ok(Some(0.0));
@@ -1119,7 +1113,7 @@ impl CommoditySpotOption {
         &self,
         market: &MarketContext,
         as_of: Date,
-        _bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_pdf;
 
@@ -1162,7 +1156,7 @@ impl CommoditySpotOption {
         &self,
         market: &MarketContext,
         as_of: Date,
-        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         if as_of > self.expiry {
             return Ok(Some(0.0));
@@ -1277,9 +1271,9 @@ impl CommoditySpotOption {
         market: &MarketContext,
         as_of: Date,
         base_pv: f64,
-        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         if as_of > self.expiry {
             return Ok(Some(0.0));
@@ -1321,7 +1315,7 @@ mod tests {
     use super::*;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
 
     #[test]
     fn test_default_settlement_type_is_cash() {

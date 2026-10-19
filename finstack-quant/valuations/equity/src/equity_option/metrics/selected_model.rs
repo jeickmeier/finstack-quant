@@ -7,7 +7,7 @@
 //! Heston parameter bump or an implicit recalibration.
 
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind;
+use finstack_quant_valuations_core::instruments::OptionGreekKind;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Equity's native provider evaluates Black-Scholes. Other registered models

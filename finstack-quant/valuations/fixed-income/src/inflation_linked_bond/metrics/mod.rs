@@ -14,7 +14,7 @@ use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::constants::numerical::ZERO_TOLERANCE;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
@@ -180,7 +180,7 @@ mod inflation_convexity_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::{InstrumentPricingOverrides, PricingOptions};
     use finstack_quant_valuations_core::metrics::MetricId;
     use time::macros::date;

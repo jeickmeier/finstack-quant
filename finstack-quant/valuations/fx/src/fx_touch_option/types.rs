@@ -6,7 +6,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 
 /// Touch type: one-touch (pays if barrier is hit) or no-touch (pays if not hit).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -221,9 +221,7 @@ impl FxTouchOption {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for FxTouchOption
-{
+impl finstack_quant_valuations_core::instruments::Instrument for FxTouchOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::FxTouchOption,
         crate::FX
@@ -239,14 +237,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.domestic_discount_curve_id.clone());
         deps.add_discount_curve(self.foreign_discount_curve_id.clone());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 None,
                 Some(self.barrier),
@@ -284,9 +281,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         as_of: Date,
         rolled_date: Date,
     ) -> finstack_quant_core::Result<
-        Option<
-            Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument>,
-        >,
+        Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>,
     > {
         if self.observed_barrier_breached.is_some() || as_of > self.expiry {
             return Ok(None);
@@ -314,31 +309,26 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 // Touch options use finite-difference Greeks (barrier discontinuities make
 // analytical Greeks unreliable near the barrier).
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksProvider
-    for FxTouchOption
-{
+impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxTouchOption {
     fn option_greeks(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        request: &finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeks,
-    > {
-        let mut greeks =
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeks::default(
-            );
+        request: &finstack_quant_valuations_core::instruments::OptionGreeksRequest,
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::OptionGreeks>
+    {
+        let mut greeks = finstack_quant_valuations_core::instruments::OptionGreeks::default();
         match request.greek {
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Delta => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Delta => {
                 greeks.delta = self.option_delta(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Gamma => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma => {
                 greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Vega => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Vega => {
                 greeks.vega = self.option_vega(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Rho => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Rho => {
                 greeks.rho_bp = self.option_rho_bp(market, as_of, request.bumps)?
             }
             _ => {}
@@ -351,9 +341,9 @@ impl FxTouchOption {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let t = self.day_count.year_fraction(
             as_of,
@@ -404,9 +394,9 @@ impl FxTouchOption {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let t = self.day_count.year_fraction(
             as_of,
@@ -457,9 +447,9 @@ impl FxTouchOption {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let t = self.day_count.year_fraction(
             as_of,
@@ -518,9 +508,9 @@ impl FxTouchOption {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let t = self.day_count.year_fraction(
             as_of,
@@ -585,9 +575,7 @@ mod tests {
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
-            .attributes(
-                finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::new(),
-            )
+            .attributes(finstack_quant_valuations_core::instruments::Attributes::new())
     }
 
     #[test]
@@ -688,9 +676,7 @@ mod tests {
         use finstack_quant_core::market_data::surfaces::VolSurface;
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
         use finstack_quant_core::money::fx::{FxMatrix, FxQuery, SimpleFxProvider};
-        use finstack_quant_valuations_core::instruments::common_impl::traits::{
-            Instrument, OptionGreeksProvider,
-        };
+        use finstack_quant_valuations_core::instruments::{Instrument, OptionGreeksProvider};
         use std::sync::Arc;
         use time::Month;
 

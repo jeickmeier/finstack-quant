@@ -1,7 +1,7 @@
 //! Metrics for [`LeveredRealEstateEquity`].
 
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::real_estate::LeveredRealEstateEquity;
+use crate::instruments::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::cashflow::xirr_with_daycount;
 use finstack_quant_core::Error as CoreError;

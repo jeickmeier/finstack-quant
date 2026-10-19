@@ -544,14 +544,14 @@ impl finstack_quant_valuations_core::pricer::Pricer for SimpleEquityOptionBlackP
     )]
     fn price_dyn(
         &self,
-        instrument: &dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument,
+        instrument: &dyn finstack_quant_valuations_core::instruments::Instrument,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<
         finstack_quant_valuations_core::results::ValuationResult,
         finstack_quant_valuations_core::pricer::PricingError,
     > {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         // Type-safe downcasting
         let equity_option = expect_inst::<crate::equity_option::EquityOption>(

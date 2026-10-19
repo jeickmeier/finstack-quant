@@ -9,7 +9,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_models::trees::two_factor_rates_credit::{
     RatesCreditCalibrationTargets, RatesCreditConfig,
 };
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
 use rust_decimal::Decimal;
 

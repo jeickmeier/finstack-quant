@@ -22,7 +22,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use rust_decimal::Decimal;
 
 /// CMS (Constant Maturity Swap) swap instrument.
@@ -672,7 +672,7 @@ pub enum FundingLegSpec {
     },
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for CmsSwap {
+impl finstack_quant_valuations_core::instruments::Instrument for CmsSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CmsSwap,
         crate::RATES
@@ -714,14 +714,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 None,
                 None,
@@ -729,7 +728,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         );
         for strike in [self.cms_cap, self.cms_floor].into_iter().flatten() {
             deps.add_volatility_dependency(
-                finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                     self.vol_surface_id.clone(),
                     None,
                     Some(strike),
@@ -1032,7 +1031,7 @@ mod tests {
     /// discount, so that any curve-interpolation details cancel exactly.
     #[test]
     fn cms_leg_flows_reconcile_with_base_value_capped() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let as_of = date(2025, 1, 1);
         let market = recon_market(as_of);
@@ -1082,7 +1081,7 @@ mod tests {
     /// option) causes this test to FAIL.
     #[test]
     fn cms_leg_flows_reconcile_with_base_value_floored() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let as_of = date(2025, 1, 1);
         let market = recon_market(as_of);

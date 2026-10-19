@@ -18,7 +18,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::volatility::{black_call, black_put};
 use finstack_quant_models::volatility::VolSource;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::OptionType;
 use finstack_quant_valuations_core::market::resolve_vol_source;
 use finstack_quant_valuations_core::metrics::MetricId;

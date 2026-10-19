@@ -52,7 +52,7 @@ use crate::term_loan::types::RateSpec;
 use finstack_quant_core::cashflow::npv;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };
@@ -613,9 +613,7 @@ mod tests {
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .oid_eir_opt(None)
             .call_schedule_opt(None)
-            .attributes(
-                finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::new(),
-            )
+            .attributes(finstack_quant_valuations_core::instruments::Attributes::new())
             .build()
             .expect("floating loan for fixing tests")
     }

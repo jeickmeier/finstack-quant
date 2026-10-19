@@ -14,7 +14,7 @@ use crate::dividend01::dividend01_central_diff;
 use crate::equity_trs::EquityTotalReturnSwap;
 use finstack_quant_core::Error;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::bump_scalar_price;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::MetricCalculator;

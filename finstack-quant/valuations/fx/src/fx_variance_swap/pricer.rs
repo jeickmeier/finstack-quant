@@ -5,7 +5,7 @@ use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 use finstack_quant_core::{
@@ -931,7 +931,7 @@ mod tests {
         use finstack_quant_core::market_data::surfaces::VolSurface;
         use finstack_quant_core::math::stats::RealizedVarMethod;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+        use finstack_quant_valuations_core::instruments::Attributes;
 
         let start = date!(2025 - 01 - 06); // Monday
         let maturity = date!(2025 - 06 - 30); // Monday
@@ -1043,7 +1043,7 @@ mod tests {
         use finstack_quant_core::market_data::surfaces::VolSurface;
         use finstack_quant_core::math::stats::RealizedVarMethod;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+        use finstack_quant_valuations_core::instruments::Attributes;
 
         // Three dates:
         //   base_date  = 2025-01-02  (curve anchor)
@@ -1247,7 +1247,7 @@ mod tests {
         use finstack_quant_core::market_data::surfaces::VolSurface;
         use finstack_quant_core::math::stats::RealizedVarMethod;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+        use finstack_quant_valuations_core::instruments::Attributes;
 
         // Curve base date is well before the valuation date (a stale-but-valid
         // curve). `df(t)` is anchored at base_date, so feeding it

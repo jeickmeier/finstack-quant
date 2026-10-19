@@ -6,11 +6,11 @@
 //! - Common helper functions
 //! - Shared data structures and enums
 
-// Core instrument traits and metadata
-pub mod traits;
+// Core instrument traits and metadata (public at `instruments::*`)
+pub(crate) mod traits;
 
-// Unified dependency representation
-pub mod dependencies;
+// Unified dependency representation (public at `instruments::*`)
+pub(crate) mod dependencies;
 
 /// Stable date constants for `example()` constructors. Defined once so all
 /// instrument examples can rotate forward together.
@@ -27,7 +27,8 @@ pub mod example_constants {
 
 // Shared utilities and helper functions
 pub mod helpers;
-pub mod listed;
+// Listed future / future-option terms (public at `instruments::*`)
+pub(crate) mod listed;
 pub mod margin;
 // Shared volatility override/surface resolution.
 pub mod vol_resolution;

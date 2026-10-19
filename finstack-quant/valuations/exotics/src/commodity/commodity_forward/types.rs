@@ -16,7 +16,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::{
     CommodityConvention, CommodityUnderlyingParams,
 };
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::Position;
 
 use finstack_quant_valuations_core::instruments::common_impl::parameters::SettlementType;
@@ -418,9 +418,7 @@ impl CommodityForward {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for CommodityForward
-{
+impl finstack_quant_valuations_core::instruments::Instrument for CommodityForward {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommodityForward,
         crate::exotics::EXOTICS
@@ -432,10 +430,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
         if let Some(spot_id) = self.spot_id.as_deref() {
@@ -534,7 +531,7 @@ mod tests {
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use finstack_quant_valuations_core::instruments::common_impl::parameters::CommodityUnderlyingParams;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 
     fn test_market(as_of: Date) -> MarketContext {
@@ -785,7 +782,7 @@ mod tests {
 
     #[test]
     fn test_commodity_forward_instrument_trait() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let forward = CommodityForward::example().expect("example");
 

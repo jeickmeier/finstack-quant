@@ -25,7 +25,7 @@
 use crate::pe_fund::waterfall::{PeFundWaterfallSpec, PeFundWaterfallTranche};
 use crate::pe_fund::PrivateMarketsFund;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Standard hurdle bump: 1bp (0.0001)

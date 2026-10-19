@@ -53,8 +53,8 @@ use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::FloatingRateSpec;
 pub use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::Attributes;
 
 fn default_settlement_days() -> u32 {
     2
@@ -93,7 +93,7 @@ fn default_settlement_days() -> u32 {
 ///
 /// # Pricing
 ///
-/// Implements [`Instrument::value()`](finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::value)
+/// Implements [`Instrument::value()`](finstack_quant_valuations_core::instruments::Instrument::value)
 /// using deterministic cashflow discounting. PIK interest is capitalized and excluded from PV.
 ///
 /// # Invariants
@@ -833,7 +833,7 @@ impl TermLoan {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for TermLoan {
+impl finstack_quant_valuations_core::instruments::Instrument for TermLoan {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::TermLoan,
         crate::FIXED_INCOME
@@ -845,10 +845,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         if let Some(credit_curve_id) = &self.credit_curve_id {
             deps.add_credit_curve(credit_curve_id.clone());

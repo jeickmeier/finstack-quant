@@ -8,7 +8,7 @@ use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId, PriceId};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_margin::RepoMarginSpec;
 use finstack_quant_valuations_core::contract_specs::embedded_registry;
-use finstack_quant_valuations_core::instruments::common_impl::traits::{Attributes, Instrument};
+use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
 use rust_decimal::Decimal;
 
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -625,10 +625,9 @@ impl Instrument for Repo {
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_market_scalar_id(self.collateral.market_value_id.as_str());
         Ok(deps)

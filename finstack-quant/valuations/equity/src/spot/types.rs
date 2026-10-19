@@ -11,8 +11,8 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::MarketDependencies;
 
 /// Simple equity (spot) instrument.
 ///
@@ -384,7 +384,7 @@ impl Equity {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for Equity {
+impl finstack_quant_valuations_core::instruments::Instrument for Equity {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Equity,
         crate::EQUITY
@@ -513,7 +513,7 @@ mod tests {
         let curves = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         let value = equity.value(&curves, as_of).expect("should succeed");
         assert_eq!(value.amount(), 15_000.0);
         assert_eq!(value.currency(), Currency::USD);
@@ -540,7 +540,7 @@ mod tests {
         let curves = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         let result = equity
             .price_with_metrics(
                 &curves,
@@ -566,7 +566,7 @@ mod lifecycle_tests {
     use finstack_quant_core::market_data::{
         context::MarketContext, term_structures::DiscountCurve,
     };
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 
     fn create_test_equity() -> Equity {

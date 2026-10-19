@@ -15,8 +15,8 @@ use finstack_quant_valuations_core::instruments::common_impl::parameters::conver
     AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DividendAdjustment,
     PriceTrigger,
 };
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
+use finstack_quant_valuations_core::instruments::Attributes;
 
 use super::pricing;
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -696,7 +696,7 @@ impl ConvertibleBond {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
+        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         let spot = self.spot_value(market.get_price(&self.spot_id)?)?;
 
         pricing::calculate_parity(self, spot)
@@ -716,7 +716,7 @@ impl ConvertibleBond {
         market: &finstack_quant_core::market_data::context::MarketContext,
         bond_price: f64,
     ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
+        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         let spot = self.spot_value(market.get_price(&self.spot_id)?)?;
 
         let conversion_value = pricing::compute_conversion_value(self, spot)?;
@@ -766,9 +766,7 @@ impl ConvertibleBond {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for ConvertibleBond
-{
+impl finstack_quant_valuations_core::instruments::Instrument for ConvertibleBond {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Convertible,
         crate::FIXED_INCOME
@@ -784,12 +782,11 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        use finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency;
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        use finstack_quant_valuations_core::instruments::VolatilityDependency;
 
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         if let Some(credit_curve_id) = &self.credit_curve_id {
             deps.add_credit_curve(credit_curve_id.clone());
@@ -846,9 +843,8 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
     fn with_model_params(
         &self,
         params: &ModelParamsSnapshot,
-    ) -> finstack_quant_core::Result<
-        Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument>,
-    > {
+    ) -> finstack_quant_core::Result<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>
+    {
         match params {
             ModelParamsSnapshot::Convertible { conversion_spec } => {
                 let mut modified = self.clone();
@@ -953,7 +949,7 @@ mod tests {
     use super::*;
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_valuations_core::instruments::common_impl::parameters::convertible::DilutionEvent;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
 
     #[test]
     fn parity_and_conversion_premium_reject_foreign_currency_spot() {

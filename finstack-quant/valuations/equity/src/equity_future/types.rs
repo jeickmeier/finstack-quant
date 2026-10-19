@@ -7,10 +7,10 @@ use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency;
-use finstack_quant_valuations_core::instruments::common_impl::listed::ListedFutureTerms;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::QuantoSpec;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::ListedFutureTerms;
+use finstack_quant_valuations_core::instruments::VolatilityDependency;
 
 /// Exchange-listed future on an equity, equity index, or fixed-currency quanto index.
 #[derive(

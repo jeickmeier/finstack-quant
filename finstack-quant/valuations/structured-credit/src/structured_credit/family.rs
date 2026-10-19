@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 
 use super::{StochasticPricingResult, StructuredCredit};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{
     MetricId, MetricRegistry, MetricRegistryError, PricerPublishedMetric,
 };

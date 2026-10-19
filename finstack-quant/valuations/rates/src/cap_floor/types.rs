@@ -7,7 +7,7 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::{ExerciseStyle, SettlementType};
 use finstack_quant_valuations_core::market::conventions::defs::RateIndexKind;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
@@ -733,7 +733,7 @@ fn infer_single_period_frequency(start_date: Date, maturity: Date) -> Tenor {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for CapFloor {
+impl finstack_quant_valuations_core::instruments::Instrument for CapFloor {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CapFloor,
         crate::RATES
@@ -877,16 +877,15 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         if self.overnight_coupon.is_none() || self.forward_curve_id != self.discount_curve_id {
             deps.add_forward_curve(self.forward_curve_id.clone());
         }
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 None,
                 Some(self.strike_f64()?),
@@ -919,7 +918,7 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 
     fn date(year: i32, month: u8, day: u8) -> Date {

@@ -207,7 +207,7 @@ mod tests {
     use time::Month;
 
     use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
 
     fn make_bond_with_quote(notional_usd: f64, quoted_clean_pct: f64) -> ConvertibleBond {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");

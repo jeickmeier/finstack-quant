@@ -14,7 +14,7 @@ use finstack_quant_valuations_core::pricer::expect_inst;
 use finstack_quant_valuations_core::pricer::PricingError;
 
 use crate::bond::Bond;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 
 /// Bond future pricer.
 ///
@@ -380,7 +380,7 @@ impl finstack_quant_valuations_core::pricer::Pricer for BondFuturePricer {
 
     fn price_dyn(
         &self,
-        instrument: &dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument,
+        instrument: &dyn finstack_quant_valuations_core::instruments::Instrument,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<finstack_quant_valuations_core::results::ValuationResult, PricingError>
@@ -1017,9 +1017,7 @@ mod tests {
             }])
             .ctd_bond_id(InstrumentId::new("TEST_BOND"))
             .discount_curve_id(CurveId::new("USD-TREASURY"))
-            .attributes(
-                finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::new(),
-            )
+            .attributes(finstack_quant_valuations_core::instruments::Attributes::new())
             .build()
             .expect("Failed to build test bond future")
     }
@@ -1354,9 +1352,7 @@ mod tests {
             .ctd_bond_id(InstrumentId::new("BOND-B"))
             .ctd_bond(bond_b.clone())
             .discount_curve_id(CurveId::new("USD-TREASURY"))
-            .attributes(
-                finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::new(),
-            )
+            .attributes(finstack_quant_valuations_core::instruments::Attributes::new())
             .build()
             .expect("Valid bond future");
 

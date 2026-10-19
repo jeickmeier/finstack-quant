@@ -51,10 +51,10 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::validation;
 use finstack_quant_models::volatility::VolatilityConvention;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
     resolve_volatility, ResolvedVolatility, VolatilityRequest,
 };
+use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::pricer::ModelKey;
 use rust_decimal::Decimal;
 
@@ -520,9 +520,7 @@ impl InflationCapFloor {
 
 impl InflationCapFloorBuilder {}
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for InflationCapFloor
-{
+impl finstack_quant_valuations_core::instruments::Instrument for InflationCapFloor {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::InflationCapFloor,
         crate::RATES
@@ -538,14 +536,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_inflation_curve(self.inflation_index_id.clone());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 None,
                 Some(self.strike_f64()),
