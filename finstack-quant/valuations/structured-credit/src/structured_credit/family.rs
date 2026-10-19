@@ -76,19 +76,29 @@ impl Pricer for StructuredCreditStochasticPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let structured_credit =
             expect_inst::<StructuredCredit>(instrument, InstrumentType::StructuredCredit)?;
+        let to_pricing_error = |e: finstack_quant_core::Error| {
+            PricingError::from_core(
+                e,
+                PricingErrorContext::from_instrument(structured_credit)
+                    .model(ModelKey::StructuredCreditStochastic),
+            )
+        };
         let stochastic = structured_credit
             .price_stochastic_base(market, as_of)
-            .map_err(|e| {
-                PricingError::from_core(
-                    e,
-                    PricingErrorContext::from_instrument(structured_credit)
-                        .model(ModelKey::StructuredCreditStochastic),
-                )
-            })?;
+            .map_err(to_pricing_error)?;
+        // The registry applies the scenario price shock to the headline value
+        // at the valuation boundary, so the headline stays unshocked here. The
+        // detail payload and its summary measures are shocked once, the same
+        // way `price_stochastic_with_mode` shocks them, so they agree with the
+        // published value.
+        let unshocked_npv = stochastic.npv;
+        let stochastic = structured_credit
+            .apply_stochastic_price_scenario(stochastic)
+            .map_err(to_pricing_error)?;
 
         let measures = stochastic_summary_measures(&stochastic);
         Ok(
-            ValuationResult::stamped(structured_credit.id(), as_of, stochastic.npv)
+            ValuationResult::stamped(structured_credit.id(), as_of, unshocked_npv)
                 .with_measures(measures)
                 .with_details(ValuationDetails::StructuredCreditStochastic(stochastic)),
         )

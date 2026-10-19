@@ -1453,35 +1453,6 @@ fn calculate_payment_amount(
 }
 
 #[cfg(test)]
-mod market_standards_tests {
-    use crate::structured_credit::types::PaymentCalculation;
-    use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{Date, DayCount};
-    use finstack_quant_core::money::Money;
-
-    #[test]
-    fn test_fee_calc_day_count() {
-        let _calc = PaymentCalculation::PercentageOfCollateral {
-            rate: 0.01, // 1%
-            annualized: true,
-            day_count: Some(DayCount::Thirty360),
-            rounding: None,
-        };
-
-        let _start = Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid date");
-        let _end = Date::from_calendar_date(2025, time::Month::April, 1).expect("Valid date"); // 3 months
-        let _pool_bal = Money::from((1_000_000_i64, Currency::USD));
-
-        // 30/360: 3 full months = 90 days. 90/360 = 0.25
-        // Fee = 1M * 1% * 0.25 = 2500
-
-        // We need to mock the context, but calculate_payment_amount is private/internal to pricing/waterfall.rs
-        // However, we can test the logic if we can access it.
-        // Since we can't easily unit test private functions from outside, we'll rely on integration test or add this to pricing/waterfall.rs
-    }
-}
-
-#[cfg(test)]
 mod to_currency_units_tests {
     use super::to_currency_units;
 

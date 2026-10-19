@@ -1476,7 +1476,7 @@ mod tests {
     ///
     /// Structure: a senior sequential SR and a PAC sharing priority 1, with
     /// a PAC schedule so the PAC receives its scheduled amount via
-    /// `allocate_pac_support`. The PAC's collar allocation is, by
+    /// `allocate_principal_to_group`. The PAC's collar allocation is, by
     /// construction, scheduled principal (capped by `pac_scheduled`). Under
     /// the buggy shared counter SR is iterated first and consumes
     /// `remaining_scheduled_principal`, mislabeling the PAC's genuine
@@ -1499,7 +1499,7 @@ mod tests {
         // PAC schedule with a known scheduled amount for period 0.
 
         // Period principal: 6,000 scheduled + 3,000 prepayment = 9,000 total.
-        // Within the collar, `allocate_pac_support` gives the PAC its
+        // Within the collar, `allocate_principal_to_group` gives the PAC its
         // scheduled amount (4,000) and the support SR the remaining 5,000.
         // The PAC's 4,000 is, by construction, scheduled principal.
         let result = execute_waterfall_with_principal_breakdown(

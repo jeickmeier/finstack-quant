@@ -18,7 +18,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     StructuredCreditPricingMode, Tranche, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::{
-    InstrumentEnvelope, InstrumentJson, InstrumentPricingOverrides,
+    InstrumentEnvelope, InstrumentJson, InstrumentPricingOverrides, ScenarioPricingOverrides,
 };
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};
@@ -250,6 +250,36 @@ fn stochastic_json_result_contains_full_tranche_details() {
     assert!(result
         .measures
         .contains_key(&MetricId::custom("tranche_expected_loss::EQ")));
+}
+
+#[test]
+fn registry_scenario_shock_reaches_stochastic_details_and_measures_once() {
+    let market = fixed_market();
+    let baseline = structured_credit(false);
+    let mut shocked = baseline.clone();
+    shocked.scenario_pricing_overrides =
+        ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
+
+    let base_result = stochastic_two_estimators(&baseline, &market);
+    let base = stochastic_details(&base_result);
+    let result = stochastic_two_estimators(&shocked, &market);
+    let details = stochastic_details(&result);
+
+    // The headline is shocked exactly once, and the detail payload agrees with it.
+    assert!((result.value.amount() - base.npv.amount() * 0.90).abs() < 1e-8);
+    assert_eq!(result.value, details.npv);
+    assert!((details.clean_price - base.clean_price * 0.90).abs() < 1e-10);
+    assert!((details.dirty_price - base.dirty_price * 0.90).abs() < 1e-10);
+    assert!((details.pv_std_error - base.pv_std_error * 0.90).abs() < 1e-10);
+    assert_eq!(
+        result.measures[&MetricId::custom("pv_std_error")],
+        details.pv_std_error
+    );
+    for (base_tranche, tranche) in base.tranche_results.iter().zip(&details.tranche_results) {
+        assert!((tranche.npv.amount() - base_tranche.npv.amount() * 0.90).abs() < 1e-8);
+        let key = MetricId::custom(format!("tranche_npv::{}", tranche.tranche_id));
+        assert_eq!(result.measures[&key], tranche.npv.amount());
+    }
 }
 
 #[test]

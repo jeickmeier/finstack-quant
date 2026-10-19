@@ -52,7 +52,7 @@ There is **no `prelude` module** — import the names you need directly.
 | `calculate_tranche_wal`, `_duration`, `_convexity`, `_spread_convexity`, `_z_spread`, `_discount_margin`, `_oas` (+ `OasConfig`, `OasResult`), `_cs01`, `_breakeven_cdr` | Individual tranche analytics, the same functions the Python/WASM `structured_credit_tranche_*` entry points wrap. |
 | `clamped_cpr_to_smm`, `clamped_smm_to_cpr`, `clamped_cdr_to_mdr`, `clamped_mdr_to_cdr`, `psa_to_cpr` | Rate conversions. |
 | `validate_tiers`, `ValidationError` | Waterfall validation. |
-| Constants | Unit conversions and simulation thresholds re-exported at the module root: `MONTHS_PER_YEAR`, `BASIS_POINTS_DIVISOR`, `PERCENTAGE_MULTIPLIER`, `MIN_PREPAYMENT_RATE`, `QUARTERLY_PERIODS_PER_YEAR`, `pool_balance_cleanup_threshold` (the `types` submodule itself is `pub(crate)`). |
+| Constants | `BASIS_POINTS_DIVISOR`, re-exported at the module root (the `types` submodule itself is `pub(crate)`); solver tolerances stay crate-internal. The pool-balance cleanup threshold is read from the embedded assumptions registry. |
 
 ## Module layout
 

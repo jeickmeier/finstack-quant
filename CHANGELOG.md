@@ -12,6 +12,20 @@
 - FX: `FxBarrierOption` and `QuantoOption` vega, vanna and volga bump the implied-volatility override when one is set (they returned 0 or failed). `FxBarrierOption` delta, gamma and vanna work when spot comes from the FX matrix (no `fx_spot_id`). `QuantoOption` vega is a central difference (was one-sided).
 - Exotics: a missing curve on `AsianOption`, `BarrierOption`, `LookbackOption` and `QuantoOption` raises `KeyError` instead of `ValueError`. Lookback and expired-barrier spot reads reject a spot price in another currency. Lookback and range-accrual `Rho` reprice with the requested model (a non-default model previously mixed with the default) and are central discount-curve bumps.
 
+### Structured credit: scenario-shock consistency and dead-code removal
+
+#### Fixed
+
+- Pricing a `StructuredCredit` through the registry with `ModelKey::StructuredCreditStochastic` and a `scenario_price_shock_decimal` now shocks the `ValuationDetails::StructuredCreditStochastic` payload (npv, clean/dirty price, standard error, confidence interval, tranche PVs) and the `pv_std_error` / `tranche_npv::<id>` measures once, as `price_stochastic_with_mode` does. Before, only the headline value was shocked.
+
+#### Changed
+
+- `calculate_tranche_metrics` takes a floating tranche's discount margin from the z-spread it already solved instead of re-running the deal waterfall; the ±5000 bp bound still applies. `Severity01` is computed as `-Recovery01` from the same two repricings (bit-identical to before), so requesting both reprices twice instead of four times.
+
+#### Removed
+
+- Unused public structured-credit items: `cmo::tranches::pac_support::allocate_pac_support`, `structured_credit::PaymentMode`, and the constants `MONTHS_PER_YEAR`, `QUARTERLY_PERIODS_PER_YEAR`, `PERCENTAGE_MULTIPLIER`, `MIN_PREPAYMENT_RATE` and the function `pool_balance_cleanup_threshold()` (the simulation reads the threshold from the assumptions registry). `BASIS_POINTS_DIVISOR` stays.
+
 ## [0.11.0] - 2026-10-18
 
 Workspace version 0.11.0: the valuations split below removes and moves public Rust items (see the section that follows), so the crates, the Python wheel and the WASM package take a breaking-change version bump.
@@ -272,7 +286,6 @@ Workspace version 0.11.0: the valuations split below removes and moves public Ru
 #### Fixed
 
 - Regulatory inputs cannot manufacture fallback charges for unknown buckets or tenors. Published SIMM examples use canonical uppercase tenors, and margin stub exports are checked against the runtime contract.
-
 
 ### Calibration: simpler execution and canonical contracts
 
@@ -3289,7 +3302,6 @@ pinned by a regression test against an independent hand calculation.
   reported. Requesting either on a valuation whose model does not publish it
   (a discounted bond, say) is an error, as is requesting them on an instrument
   type that neither publishes nor calculates them.
-
 
 ### Structured credit: analyst remediation (2026-09-17 plan, Phases A–E)
 

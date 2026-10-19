@@ -567,8 +567,23 @@ fn p7_tranche_bump_metrics_are_per_tranche_and_severity01_is_live() {
     let severity01 = sev.metric(MetricId::Severity01).expect("Severity01");
     let recovery01 = sev.metric(MetricId::Recovery01).expect("Recovery01");
     assert!(
-        (severity01 + recovery01).abs() < recovery01.abs() * 0.05,
-        "Severity01 {severity01:.2} should be about −Recovery01 {recovery01:.2}"
+        recovery01.abs() > 1.0,
+        "Recovery01 must be live, got {recovery01}"
+    );
+    // Severity = 1 − recovery: the two metrics are the same two repricings
+    // with the bump direction swapped, so they are exact negatives.
+    assert_eq!(severity01, -recovery01);
+
+    // Requested alone, at tranche scope, Severity01 still resolves.
+    let eq_sev = low_recovery
+        .value_tranche_with_metrics("EQ", &mkt, close, &[MetricId::Severity01])
+        .expect("EQ severity");
+    let eq_rec = low_recovery
+        .value_tranche_with_metrics("EQ", &mkt, close, &[MetricId::Recovery01])
+        .expect("EQ recovery");
+    assert_eq!(
+        eq_sev.metrics[&MetricId::Severity01],
+        -eq_rec.metrics[&MetricId::Recovery01]
     );
 }
 

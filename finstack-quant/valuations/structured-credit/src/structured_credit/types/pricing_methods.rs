@@ -193,7 +193,9 @@ impl StructuredCredit {
         resolved.run_stochastic_pricer(config, context)
     }
 
-    fn apply_stochastic_price_scenario(
+    /// Scale a stochastic result by the deal's scenario price shock: npv,
+    /// clean/dirty price, standard error, confidence interval and tranche PVs.
+    pub(crate) fn apply_stochastic_price_scenario(
         &self,
         mut result: StochasticPricingResult,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
