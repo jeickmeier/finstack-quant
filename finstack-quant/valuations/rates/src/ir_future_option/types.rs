@@ -3,8 +3,8 @@
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_valuations_core::instruments::common_impl::listed::FutureOptionTerms;
 use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::FutureOptionTerms;
 
 /// Option on an arbitrary interest-rate futures price.
 ///
@@ -113,7 +113,7 @@ impl InterestRateFutureOption {
         })?;
         let delta_channel = self.cash_delta(market, as_of)? * price_change;
         let discount_channel = if self.terms.premium_style
-            == finstack_quant_valuations_core::instruments::common_impl::listed::FutureOptionPremiumStyle::PremiumPaid
+            == finstack_quant_valuations_core::instruments::FutureOptionPremiumStyle::PremiumPaid
             && as_of < self.terms.expiry
         {
             let t = self.terms.day_count.year_fraction(
@@ -140,7 +140,7 @@ finstack_quant_valuations_core::impl_future_option_instrument!(
 mod tests {
     use super::*;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_valuations_core::instruments::common_impl::listed::{
+    use finstack_quant_valuations_core::instruments::{
         FutureOptionPremiumStyle, FutureOptionSettlement,
     };
     use time::macros::date;

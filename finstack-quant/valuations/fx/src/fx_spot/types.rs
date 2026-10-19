@@ -65,7 +65,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 
 /// FX Spot instrument (1 unit of `base` priced in `quote`).
 ///
@@ -536,12 +536,11 @@ impl FxSpot {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for FxSpot {
+impl finstack_quant_valuations_core::instruments::Instrument for FxSpot {
     fn with_bumped_fx_quote(
         &self,
         relative: f64,
-    ) -> Option<Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument>>
-    {
+    ) -> Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>> {
         let mut bumped = self.clone();
         *bumped.quoted_spot.as_mut()? *= 1.0 + relative;
         Some(Box::new(bumped))
@@ -558,10 +557,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         if let Some(discount_curve) = &self.domestic_discount_curve_id {
             deps.add_discount_curve(discount_curve.clone());
         }
@@ -664,7 +662,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 
     fn date(year: i32, month: Month, day: u8) -> Date {

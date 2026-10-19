@@ -1,8 +1,8 @@
 //! General-purpose commodity futures-option instrument.
 
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_valuations_core::instruments::common_impl::listed::FutureOptionTerms;
 use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::FutureOptionTerms;
 
 /// Exchange-listed option on an arbitrary commodity futures contract.
 #[derive(

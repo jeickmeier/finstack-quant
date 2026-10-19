@@ -89,7 +89,7 @@ pub use finstack_quant_cashflows::builder::{
 
 use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use serde::{Deserialize, Serialize};
 
 /// Market conditions that affect prepayment behavior.

@@ -420,7 +420,7 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::macros::date;
 
     fn build_market(as_of: Date) -> MarketContext {
@@ -522,7 +522,7 @@ mod tests {
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+        use finstack_quant_valuations_core::instruments::Attributes;
 
         let as_of = date!(2025 - 01 - 02);
         let maturity = date!(2026 - 01 - 02);
@@ -598,7 +598,7 @@ mod tests {
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+        use finstack_quant_valuations_core::instruments::Attributes;
 
         let as_of = date!(2024 - 07 - 01);
         let start = date!(2025 - 01 - 02); // ~6 months forward (business day)
@@ -746,7 +746,7 @@ mod tests {
         use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+        use finstack_quant_valuations_core::instruments::Attributes;
 
         // Weekend-skipping daily schedule, ~6 months, valued near maturity.
         let start = date!(2025 - 01 - 06); // Monday

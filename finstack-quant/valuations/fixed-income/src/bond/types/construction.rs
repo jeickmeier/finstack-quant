@@ -6,7 +6,7 @@ use finstack_quant_core::dates::{Date, DateExt, DayCount, StubKind};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{Bps, CurveId, InstrumentId, Rate};
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
 use time::macros::date;
 

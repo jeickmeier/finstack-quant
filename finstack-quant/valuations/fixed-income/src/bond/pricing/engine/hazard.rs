@@ -272,8 +272,8 @@ mod tests {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_core::{dates::Date, money::Money};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Attributes;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::pricer::{ModelKey, PricingError};
     use finstack_quant_valuations_core::results::ValuationDetails;
     use time::Month;

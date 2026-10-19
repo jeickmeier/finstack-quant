@@ -11,8 +11,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::listed::ListedFutureTerms;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::ListedFutureTerms;
 
 /// Exchange-listed future on a deliverable currency pair.
 ///

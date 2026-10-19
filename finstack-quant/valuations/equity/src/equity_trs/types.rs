@@ -571,9 +571,7 @@ impl EquityTotalReturnSwap {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for EquityTotalReturnSwap
-{
+impl finstack_quant_valuations_core::instruments::Instrument for EquityTotalReturnSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::EquityTotalReturnSwap,
         crate::EQUITY
@@ -585,10 +583,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.financing_leg.discount_curve_id.clone());
         deps.add_forward_curve(self.financing_leg.forward_curve_id.clone());
         deps.add_market_scalar_id(self.underlying.spot_id.as_str());

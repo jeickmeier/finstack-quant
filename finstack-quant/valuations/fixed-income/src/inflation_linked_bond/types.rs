@@ -12,8 +12,8 @@ use finstack_quant_core::types::CalendarId;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::MarketDependencies;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
@@ -738,9 +738,7 @@ impl InflationLinkedBond {
 }
 
 // Explicit Instrument trait implementation (replaces macro for better IDE visibility)
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for InflationLinkedBond
-{
+impl finstack_quant_valuations_core::instruments::Instrument for InflationLinkedBond {
     fn cashflow_export_terms(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -791,7 +789,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         deps.add_inflation_curve(self.inflation_index_id.clone());
         if let Some(id) = &self.floor_vol_surface_id {
             deps.add_volatility_dependency(
-                finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                     id.clone(),
                     None,
                     Some(1.0),

@@ -15,10 +15,10 @@ use finstack_quant_models::rates::hw1f::curve::{
     initial_short_rate_from_curve, prepare_hw1f_params, Hw1fTermForward, PeriodForwardCoeffs,
 };
 use finstack_quant_models::rates::hw1f::mc::Hw1fMcPricer;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
 use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
     resolve_hw1f_params, Hw1fParamFamily,
 };
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };

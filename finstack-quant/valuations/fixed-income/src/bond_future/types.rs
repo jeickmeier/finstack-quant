@@ -11,9 +11,9 @@ use finstack_quant_valuations_core::contract_specs::{
     repo_annualization_denominator, BondFutureSpecs,
 };
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
-use finstack_quant_valuations_core::instruments::common_impl::listed::ListedFutureTerms;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::ListedFutureTerms;
+use finstack_quant_valuations_core::instruments::MarketDependencies;
 
 mod deliverable_basket_wire {
     use super::DeliverableBond;
@@ -1160,7 +1160,7 @@ mod tests {
 }
 
 // Implement Instrument trait for BondFuture
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for BondFuture {
+impl finstack_quant_valuations_core::instruments::Instrument for BondFuture {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::BondFuture,
         crate::FIXED_INCOME
@@ -1185,7 +1185,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         }
         if let Some(ctd_bond) = &self.ctd_bond {
             deps.merge(
-                finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::market_dependencies(ctd_bond)?,
+                finstack_quant_valuations_core::instruments::Instrument::market_dependencies(
+                    ctd_bond,
+                )?,
             );
         }
         Ok(deps)
@@ -1239,7 +1241,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for BondFuture {
 mod instrument_trait_tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::Position;
     use time::Month;
 
@@ -1273,7 +1275,7 @@ mod instrument_trait_tests {
             .build()
             .expect("Valid bond future");
 
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let instrument: &dyn Instrument = &future;
         let concrete_future: Option<&BondFuture> = instrument.as_any().downcast_ref::<BondFuture>();
@@ -1314,7 +1316,7 @@ mod instrument_trait_tests {
             .build()
             .expect("Valid bond future");
 
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let curves = future
             .market_dependencies()

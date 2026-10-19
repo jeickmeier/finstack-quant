@@ -37,10 +37,10 @@ use finstack_quant_models::rates::hull_white::{
     capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key,
     hw1f_term_caplet_price_from_dfs_with_model, hw_b, HullWhiteCalibrationParams, HullWhiteParams,
 };
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
 use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
     resolve_hw1f_params, Hw1fParamFamily,
 };
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };

@@ -9,7 +9,7 @@ use super::spec_support::{
     convert_amount, validate_history, CompositeLegSpec, CompositeMarketObservation, CompositeState,
     RebalanceRule, WeightingMethod, MIN_ABS_INPUT,
 };
-use crate::instruments::common_impl::dependencies::MarketDependencies;
+use crate::instruments::MarketDependencies;
 use crate::instruments::{
     Attributes, Instrument, InstrumentEnvelope, InstrumentJson, InstrumentPricingOverrides,
     MetricPricingOverrides, PricingOptions, ScenarioPricingOverrides,

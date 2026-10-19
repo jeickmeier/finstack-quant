@@ -5,7 +5,7 @@
 
 use crate::cliquet_option::CliquetOption;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
@@ -97,10 +97,8 @@ mod rho_tests {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::{
-        Attributes, Instrument,
-    };
     use finstack_quant_valuations_core::instruments::MetricPricingOverrides;
+    use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
     use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
     use std::sync::Arc;
     use time::Month;

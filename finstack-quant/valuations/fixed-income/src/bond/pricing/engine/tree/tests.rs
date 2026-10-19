@@ -120,7 +120,7 @@ fn test_bond_valuator_creation() {
 /// Price `bond` on its own tree configuration at `oas_bp`, quote the result
 /// as a clean price, and solve it back through the production OAS metric.
 fn oas_metric_round_trip_bp(bond: &Bond, oas_bp: f64) -> f64 {
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::metrics::MetricId;
 
     let market = create_test_market_context();

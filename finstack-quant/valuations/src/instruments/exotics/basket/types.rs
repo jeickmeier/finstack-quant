@@ -4,7 +4,7 @@
 //! including equities, bonds, ETFs, and other instruments by leveraging existing
 //! pricing infrastructure.
 
-use crate::instruments::common_impl::traits::{Attributes, Instrument};
+use crate::instruments::{Attributes, Instrument};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -328,10 +328,8 @@ impl Instrument for Basket {
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        crate::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+        let mut deps = crate::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         for constituent in &self.constituents {
             match &constituent.reference {

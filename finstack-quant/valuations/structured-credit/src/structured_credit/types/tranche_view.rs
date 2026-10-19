@@ -19,8 +19,8 @@ use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::{Attributes, Instrument};
 use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
+use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
 
 /// A deal plus the identifier of the note the metrics are computed for.
 ///
@@ -125,9 +125,8 @@ impl Instrument for StructuredCreditTranche {
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
         self.deal.market_dependencies()
     }
 

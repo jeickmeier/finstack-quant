@@ -173,9 +173,9 @@ macro_rules! impl_future_option_instrument {
                 &self,
                 market: &finstack_quant_core::market_data::context::MarketContext,
                 as_of: finstack_quant_core::dates::Date,
-                request: &$crate::instruments::common_impl::traits::OptionGreeksRequest,
-            ) -> finstack_quant_core::Result<$crate::instruments::common_impl::traits::OptionGreeks> {
-                use $crate::instruments::common_impl::traits::{OptionGreekKind, OptionGreeks};
+                request: &$crate::instruments::OptionGreeksRequest,
+            ) -> finstack_quant_core::Result<$crate::instruments::OptionGreeks> {
+                use $crate::instruments::{OptionGreekKind, OptionGreeks};
 
                 let mut greeks = OptionGreeks::default();
                 match request.greek {

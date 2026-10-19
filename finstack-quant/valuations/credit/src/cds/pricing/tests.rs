@@ -605,7 +605,7 @@ fn test_full_premium_par_spread_is_below_risky_annuity_par_spread() {
 
 #[test]
 fn test_npv_full_discounts_dated_upfront() {
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
 
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");

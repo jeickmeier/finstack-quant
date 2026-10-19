@@ -12,9 +12,7 @@ use time::macros::date;
 
 use super::pricer;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::{
-    common_impl::traits::Attributes, MarketDependencies,
-};
+use finstack_quant_valuations_core::instruments::{Attributes, MarketDependencies};
 
 pub use finstack_quant_valuations_core::instruments::common_impl::parameters::PayReceive;
 
@@ -526,7 +524,7 @@ impl VarianceSwap {
 }
 
 // Use the macro to implement Instrument with pricing
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for VarianceSwap {
+impl finstack_quant_valuations_core::instruments::Instrument for VarianceSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::VarianceSwap,
         crate::EQUITY
@@ -558,7 +556,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
             deps.add_market_scalar_id(div_yield_id);
         }
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 Some(self.spot_id.clone()),
                 None,

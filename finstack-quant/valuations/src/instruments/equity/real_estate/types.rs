@@ -2,7 +2,7 @@
 
 use super::pricer;
 use crate::impl_instrument_base;
-use crate::instruments::common_impl::traits::{Attributes, Instrument};
+use crate::instruments::{Attributes, Instrument};
 use crate::pricer::InstrumentType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -589,10 +589,8 @@ impl Instrument for RealEstateAsset {
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        crate::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+        let deps = crate::instruments::MarketDependencies::new();
         Ok(deps)
     }
 

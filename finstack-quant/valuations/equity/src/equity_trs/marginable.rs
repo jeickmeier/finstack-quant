@@ -48,7 +48,7 @@ impl Marginable for EquityTotalReturnSwap {
     }
 
     fn mtm_for_vm(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         self.value(market, as_of)
     }
 }

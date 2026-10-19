@@ -19,7 +19,7 @@ use finstack_quant_core::validation;
 use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
@@ -578,9 +578,7 @@ impl InterestRateSwap {
 // Explicit trait implementations for modern instrument style
 // Attributable implementation is provided by the impl_instrument! macro
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for InterestRateSwap
-{
+impl finstack_quant_valuations_core::instruments::Instrument for InterestRateSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Irs,
         crate::RATES
@@ -648,10 +646,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.fixed_leg.discount_curve_id.clone());
         deps.add_discount_curve(self.float_leg.discount_curve_id.clone());
         if !self.is_single_curve_ois() {

@@ -6,7 +6,7 @@ use finstack_quant_core::types::{CurveId, IndexId, InstrumentId, PriceId};
 use finstack_quant_core::validation;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::QuantoSpec;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 
 /// Specifies how the range bounds are interpreted.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -434,13 +434,12 @@ impl RangeAccrualTerms {
     /// # Errors
     ///
     /// Currently infallible; returns `Result` to match
-    /// [`Instrument::market_dependencies`](finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::market_dependencies).
+    /// [`Instrument::market_dependencies`](finstack_quant_valuations_core::instruments::Instrument::market_dependencies).
     pub fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         if let Some(projection_curve) = &self.forward_curve_id {
             deps.add_forward_curve(projection_curve.clone());
@@ -448,7 +447,7 @@ impl RangeAccrualTerms {
         deps.add_market_scalar_id(self.spot_id.as_str());
         for strike in [self.lower_bound, self.upper_bound] {
             deps.add_volatility_dependency(
-                finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                     self.vol_surface_id.clone(),
                     Some(self.spot_id.clone()),
                     Some(strike),
@@ -459,7 +458,7 @@ impl RangeAccrualTerms {
             deps.add_discount_curve(quanto.asset_discount_curve_id.clone());
             deps.add_market_scalar_id(quanto.fx_spot_id.as_str());
             deps.add_volatility_dependency(
-                finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                     quanto.fx_vol_surface_id.clone(),
                     Some(quanto.fx_spot_id.clone()),
                     None,
@@ -505,7 +504,7 @@ impl RangeAccrualTerms {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for RangeAccrual {
+impl finstack_quant_valuations_core::instruments::Instrument for RangeAccrual {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::RangeAccrual,
         crate::exotics::EXOTICS
@@ -521,9 +520,8 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
         self.terms.market_dependencies()
     }
 

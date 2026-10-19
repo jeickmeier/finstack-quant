@@ -17,7 +17,7 @@
 
 use crate::convertible::ConvertibleBond;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Standard conversion bump: 1% (0.01)

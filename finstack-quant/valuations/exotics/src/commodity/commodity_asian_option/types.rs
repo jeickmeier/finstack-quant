@@ -25,7 +25,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::CommodityUnderlyingParams;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::OptionType;
 
 /// Commodity Asian option: option on the arithmetic or geometric average of
@@ -359,9 +359,7 @@ impl CommodityAsianOption {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for CommodityAsianOption
-{
+impl finstack_quant_valuations_core::instruments::Instrument for CommodityAsianOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommodityAsianOption,
         crate::exotics::EXOTICS
@@ -377,14 +375,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 None,
                 Some(self.strike),
@@ -452,7 +449,7 @@ mod tests {
 
     #[test]
     fn validation_rejects_invalid_fixing_schedule_and_scalars() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let mut option = CommodityAsianOption::example().expect("example");
         option.quantity = f64::NAN;

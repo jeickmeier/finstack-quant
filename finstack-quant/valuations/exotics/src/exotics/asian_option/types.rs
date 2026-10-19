@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::OptionType;
 
 pub use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
@@ -233,7 +233,7 @@ impl AsianOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
+        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         use crate::exotics::asian_option::pricer;
         pricer::compute_pv(self, market, as_of)
     }
@@ -324,7 +324,7 @@ impl AsianOption {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for AsianOption {
+impl finstack_quant_valuations_core::instruments::Instrument for AsianOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::AsianOption,
         crate::exotics::EXOTICS
@@ -347,14 +347,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_market_scalar_id(self.spot_id.as_str());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 Some(self.spot_id.clone()),
                 Some(self.strike),
@@ -406,9 +405,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         as_of: finstack_quant_core::dates::Date,
         rolled_date: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<
-        Option<
-            Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument>,
-        >,
+        Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>,
     > {
         let rolled_fixings: Vec<_> = self
             .fixing_dates
@@ -496,7 +493,7 @@ mod tests {
 
     #[test]
     fn validation_rejects_invalid_fixing_schedule_and_notional() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let mut option = AsianOption::example().expect("example");
         option.quantity = 0.0;

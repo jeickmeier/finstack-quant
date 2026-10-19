@@ -43,7 +43,7 @@ fn cache_var_diagnostics(context: &mut MetricContext, result: &VarResult) {
 ///
 /// This calculator integrates Historical VaR into the standard metrics
 /// framework. It requires a `MarketHistory` to be provided at the pricing
-/// boundary (see [`crate::instruments::common_impl::traits::Instrument::price_with_metrics`]).
+/// boundary (see [`crate::instruments::Instrument::price_with_metrics`]).
 ///
 /// # Examples
 ///

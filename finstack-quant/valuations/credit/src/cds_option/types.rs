@@ -36,7 +36,7 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::instruments::common_impl::parameters::CreditParams;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType, SettlementType};
 use rust_decimal::Decimal;
 use time::Month;
@@ -637,7 +637,7 @@ impl CdsOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
+        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         super::metrics::delta::delta(self, market, as_of)
     }
 
@@ -674,7 +674,7 @@ impl CdsOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
+        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         super::metrics::gamma::gamma(self, market, as_of)
     }
 
@@ -686,7 +686,7 @@ impl CdsOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
+        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         super::metrics::vega(self, market, as_of)
     }
 
@@ -700,7 +700,7 @@ impl CdsOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
+        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         super::pricer::theta(self, market, as_of)
     }
 
@@ -714,7 +714,7 @@ impl CdsOption {
         target_price: f64,
         initial_guess: Option<f64>,
     ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
+        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         super::pricer::implied_vol(self, market, as_of, target_price, initial_guess)
     }
 }
@@ -734,7 +734,7 @@ pub(crate) fn prior_cds_roll_on_or_before(date: Date) -> Date {
     Date::from_calendar_date(date.year().saturating_sub(1), Month::December, 20).unwrap_or(date)
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for CdsOption {
+impl finstack_quant_valuations_core::instruments::Instrument for CdsOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CdsOption,
         crate::CREDIT
@@ -747,12 +747,11 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        use finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency;
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        use finstack_quant_valuations_core::instruments::VolatilityDependency;
 
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_credit_curve(self.credit_curve_id.clone());
         deps.add_volatility_dependency(VolatilityDependency::new(
@@ -793,7 +792,7 @@ mod tests {
     use super::*;
     use crate::cds_option::CdsOptionStrike;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::macros::date;
 
     #[test]

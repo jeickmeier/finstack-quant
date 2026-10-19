@@ -17,7 +17,7 @@ use finstack_quant_valuations_core::instruments::common_impl::margin::add_classi
 use finstack_quant_valuations_core::instruments::common_impl::margin::assign_credit_tenor_bucket;
 use finstack_quant_valuations_core::instruments::common_impl::margin::netting_set_id_from_spec;
 use finstack_quant_valuations_core::instruments::common_impl::margin::repriced_metric;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 
 impl Marginable for CdsIndex {
     fn id(&self) -> &str {

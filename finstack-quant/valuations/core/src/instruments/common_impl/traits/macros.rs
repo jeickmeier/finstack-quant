@@ -56,11 +56,11 @@ macro_rules! impl_instrument_base {
             self
         }
 
-        fn attributes(&self) -> &$crate::instruments::common_impl::traits::Attributes {
+        fn attributes(&self) -> &$crate::instruments::Attributes {
             &self.attributes
         }
 
-        fn attributes_mut(&mut self) -> &mut $crate::instruments::common_impl::traits::Attributes {
+        fn attributes_mut(&mut self) -> &mut $crate::instruments::Attributes {
             &mut self.attributes
         }
 

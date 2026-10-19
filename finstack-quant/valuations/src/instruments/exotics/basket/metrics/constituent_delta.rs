@@ -18,9 +18,9 @@
 //! with a synthetic market data price for the bump scenario. This mirrors a direct
 //! price shock without requiring instrument-specific overrides.
 
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::basket::types::{BasketAssetType, ConstituentReference};
 use crate::instruments::exotics::basket::{Basket, BasketConstituent};
+use crate::instruments::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PriceId;

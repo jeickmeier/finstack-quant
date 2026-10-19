@@ -18,7 +18,7 @@ use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{evaluate_fee_tiers, FeeTier, FloatingRateSpec};
 use finstack_quant_core::validation;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use rust_decimal::prelude::ToPrimitive;
 
 /// Revolving credit facility instrument.
@@ -1231,9 +1231,7 @@ impl RevolvingCredit {
 }
 
 // Implement the Instrument trait
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for RevolvingCredit
-{
+impl finstack_quant_valuations_core::instruments::Instrument for RevolvingCredit {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::RevolvingCredit,
         crate::FIXED_INCOME
@@ -1245,10 +1243,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         if let Some(credit_curve_id) = &self.credit_curve_id {
             deps.add_credit_curve(credit_curve_id.clone());

@@ -300,9 +300,7 @@ impl FiIndexTotalReturnSwap {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for FiIndexTotalReturnSwap
-{
+impl finstack_quant_valuations_core::instruments::Instrument for FiIndexTotalReturnSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::FiIndexTotalReturnSwap,
         crate::FIXED_INCOME
@@ -314,10 +312,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.financing_leg.discount_curve_id.clone());
         deps.add_forward_curve(self.financing_leg.forward_curve_id.clone());
         if let Some(yield_id) = &self.underlying.yield_id {

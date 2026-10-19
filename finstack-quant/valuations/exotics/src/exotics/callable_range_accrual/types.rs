@@ -5,7 +5,7 @@ use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::BermudanCallProvision;
 
 /// Callable Range Accrual.
@@ -148,9 +148,7 @@ impl CallableRangeAccrual {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for CallableRangeAccrual
-{
+impl finstack_quant_valuations_core::instruments::Instrument for CallableRangeAccrual {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CallableRangeAccrual,
         crate::exotics::EXOTICS
@@ -166,9 +164,8 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
         self.range_accrual.market_dependencies()
     }
 
@@ -220,7 +217,7 @@ mod tests {
 
     #[test]
     fn instrument_trait() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         let cra = CallableRangeAccrual::example().expect("example");
         assert_eq!(cra.id(), "CALLABLE-RA-SOFR-1Y");
         assert_eq!(
@@ -278,7 +275,7 @@ mod tests {
     #[test]
     fn value_requires_explicit_pricer() {
         use finstack_quant_core::market_data::context::MarketContext;
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         use time::macros::date;
 
         let cra = CallableRangeAccrual::example().expect("example");

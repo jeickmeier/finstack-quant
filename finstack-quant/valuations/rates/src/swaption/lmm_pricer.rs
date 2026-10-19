@@ -17,7 +17,7 @@ use finstack_quant_models::monte_carlo::process::lmm::LmmParams;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::SettlementType;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
