@@ -37,8 +37,8 @@
 //! # Examples
 //!
 //! ```
-//! use finstack_quant_valuations_core::error::{Error, PricingError};
-//! use finstack_quant_valuations_core::pricer::InstrumentType;
+//! use finstack_quant_valuations_core::error::Error;
+//! use finstack_quant_valuations_core::pricer::{InstrumentType, PricingError};
 //!
 //! // Domain errors automatically wrap into the unified type
 //! let pricing_err: Error = PricingError::type_mismatch(
@@ -50,7 +50,7 @@
 //! let core_err: finstack_quant_core::Error = pricing_err.into();
 //! ```
 
-pub use crate::pricer::{PricingError, PricingErrorContext};
+use crate::pricer::PricingError;
 
 /// Unified error type for the valuations crate.
 ///
@@ -109,6 +109,7 @@ impl From<Error> for finstack_quant_core::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pricer::PricingErrorContext;
 
     #[test]
     fn core_error_wraps_into_unified() {

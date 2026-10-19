@@ -69,5 +69,4 @@ pub mod metrics;
 pub mod pricer;
 mod types;
 
-pub use pricer::{generate_cashflows, MbsCashflow};
 pub use types::{AgencyMbsPassthrough, AgencyProgram, PoolType};

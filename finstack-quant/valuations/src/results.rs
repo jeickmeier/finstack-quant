@@ -2,7 +2,7 @@
 //!
 //! Defined in `finstack_quant_valuations_core::results` and re-exported here
 //! unchanged: [`ValuationResult`](finstack_quant_valuations_core::results::ValuationResult),
-//! [`ValuationDetails`](finstack_quant_valuations_core::results::ValuationDetails), [`ResultsMeta`](finstack_quant_valuations_core::results::ResultsMeta),
+//! [`ValuationDetails`](finstack_quant_valuations_core::results::ValuationDetails), [`ResultsMeta`](finstack_quant_core::config::ResultsMeta),
 //! provenance and the row exports.
 //!
 //! # Quick Example
