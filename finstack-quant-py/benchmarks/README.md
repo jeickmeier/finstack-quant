@@ -20,7 +20,8 @@ against a checked-in baseline (portfolio materialization).
 Nothing in this directory is importable public API. `bench_bindings.py` is
 collected by pytest; `materialization_measure.py` is invoked by path with two
 positional arguments (fixture directory, output path) and is only ever run by
-the `python-bench-portfolio-*` tasks.
+the `python`, `python-baseline` and `python-compare` steps of
+`scripts/materialization_bench.sh`.
 
 ## Release build is mandatory
 
@@ -28,9 +29,9 @@ the `python-bench-portfolio-*` tasks.
 debug build are off by an order of magnitude and are not comparable to anything.
 
 `mise run python-bench` handles this — it runs `mise run python-build -- --release`
-(that is, `uv run maturin develop --release`) before invoking pytest. So do
-`python-bench-portfolio`, `python-bench-portfolio-baseline`, and
-`python-bench-portfolio-compare`.
+(that is, `uv run maturin develop --release`) before invoking pytest. So do the
+`python`, `python-baseline` and `python-compare` steps of
+`scripts/materialization_bench.sh`.
 
 The trap is the ordinary test loop: `mise run python-test` builds the *dev*
 extension. If you then run pytest against `bench_bindings.py` by hand, you are
@@ -67,8 +68,8 @@ Uncovered domains: `attribution`, `cashflows`, `covenants`, `factor_model`,
 From the repository root.
 
 ```bash
-mise run python-bench                     # release build, then the whole perf suite
-mise run python-bench-portfolio           # fixtures + release build, then -k Portfolio
+mise run python-bench                    # release build, then the whole perf suite
+scripts/materialization_bench.sh python  # fixtures + release build, then -k Portfolio
 ```
 
 Direct pytest, once a release extension is installed:
@@ -99,7 +100,7 @@ measure `Portfolio.from_materialization` against two deterministic fixtures:
 
 Neither fixture is checked in. Both are regenerated from
 `cargo run --release -p finstack-quant-portfolio --example materialization_fixtures`,
-which `mise run materialization-benchmark-fixtures` wraps. `bench_bindings.py`
+which `scripts/materialization_bench.sh fixtures` wraps. `bench_bindings.py`
 shells out to that same command itself the first time a materialization fixture
 is requested (`_regenerate_materialization_fixtures`, `lru_cache`d), so cargo must
 be on `PATH` even for a pytest-only invocation.
@@ -118,11 +119,11 @@ suite, the CLI, the WASM bench, and the Rust bench:
 
 ## What counts as a regression
 
-Only for materialization, and only through the gate tasks:
+Only for materialization, and only through the gate steps:
 
 ```bash
-mise run python-bench-portfolio-baseline   # establish + seal (refuses if a baseline exists)
-mise run python-bench-portfolio-compare    # fresh measurement vs. the sealed baseline
+scripts/materialization_bench.sh python-baseline  # establish + seal (refuses if a baseline exists)
+scripts/materialization_bench.sh python-compare   # fresh measurement vs. the sealed baseline
 ```
 
 `compare` fails when a case's **median** regresses by more than 10% against
@@ -161,7 +162,7 @@ Benchmarks do not run in PR CI.
 - [`../../benchmarks/MATERIALIZATION_BENCHMARKS.md`](../../benchmarks/MATERIALIZATION_BENCHMARKS.md)
   — fixture definitions, timing boundaries, gates, hardware provenance
 - [`../../scripts/README.md`](../../scripts/README.md) — the baseline, gating,
-  and result-collection scripts behind the tasks above
+  and result-collection scripts behind the steps above
 - [`../../finstack-quant/portfolio/benches/README.md`](../../finstack-quant/portfolio/benches/README.md)
   — the Rust side of the same materialization measurement
 - [`../../finstack-quant-wasm/benchmarks/README.md`](../../finstack-quant-wasm/benchmarks/README.md)

@@ -22,7 +22,7 @@ export async function serveLocalRegistry(root) {
           if (!value.startsWith(`${pkg.name}@`)) return value;
           if (value !== `${pkg.name}@${pkg.version}`)
             throw Error(
-              `${name} pins ${value}, but the local package is ${pkg.version}; run mise run ui-gen and mise run ui-build`,
+              `${name} pins ${value}, but the local package is ${pkg.version}; run npm --prefix finstack-quant-ui run generate and mise run ui-build`,
             );
           return `file:${wasm}`;
         });

@@ -38,8 +38,8 @@ for (const fixture of cases)
     expect(unwrap(await worker.proxy.calibrate(fixture.json))).toEqual(
       native.calibrate(fixture.json),
     );
-    // The CDX base-correlation solve takes ~20 s per run under the wasm-test
-    // profile and this case runs it twice (worker and native).
+    // The CDX base-correlation solve takes ~20 s per run under the dev WASM
+    // build and this case runs it twice (worker and native).
   }, 120000);
 it("retains every structured failure field, including absent and available solver diagnostics", async () => {
   const missing = JSON.parse(cases[0]!.json);

@@ -370,7 +370,7 @@ export async function writeGenerated(files, output, check) {
   }
   if (check && drift.length)
     throw new Error(
-      `Generated UI drift:\n${drift.join("\n")}\nRun mise run ui-gen.`,
+      `Generated UI drift:\n${drift.join("\n")}\nRun npm --prefix finstack-quant-ui run generate.`,
     );
   if (!check) for (const file of drift) await rm(resolve(output, file));
 }
@@ -392,7 +392,9 @@ if (
   const inventory = json(provenance.inventory);
   if (check) {
     if ((await readFile(inventoryPath, "utf8").catch(() => null)) !== inventory)
-      throw new Error("Contract provenance drift; run mise run ui-gen.");
+      throw new Error(
+        "Contract provenance drift; run npm --prefix finstack-quant-ui run generate.",
+      );
   } else await writeFile(inventoryPath, inventory);
   console.log(
     `${process.argv.includes("--check") ? "Checked" : "Generated"} ${files.size} UI contract files.`,

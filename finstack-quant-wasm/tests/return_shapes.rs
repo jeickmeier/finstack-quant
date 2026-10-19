@@ -130,7 +130,7 @@ fn declared(dts: &str, owner: &str, name: &str) -> String {
 /// `json_compatible` serializer instead. The helper itself is the only place
 /// the raw call is legal.
 ///
-/// This is also enforced by `mise run wasm-check-serializer`; keeping it here
+/// This is also enforced by `scripts/check_wasm_boundary.py`; keeping it here
 /// too means a plain `cargo test` catches it.
 #[test]
 fn no_binding_bypasses_the_json_compatible_serializer() {

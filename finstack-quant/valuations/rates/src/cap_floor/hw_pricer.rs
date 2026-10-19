@@ -1405,7 +1405,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "slow: covered by mise rust-test-slow"]
+    #[ignore = "slow: covered by mise run rust-test --slow"]
     fn compounded_sofr_hw_moment_match_agrees_with_seeded_mc() {
         let as_of = date(2024, 12, 2);
         let kappa = 0.05;

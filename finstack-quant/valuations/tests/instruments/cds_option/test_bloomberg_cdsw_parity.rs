@@ -119,7 +119,7 @@ fn build_spot_cds(_as_of: Date) -> CreditDefaultSwap {
 }
 
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn diag_cdx_ig_46_spot_cds_reconciliation() {
     let as_of = date!(2026 - 05 - 07);
     let market = cdx_ig_46_curves(as_of);

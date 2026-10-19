@@ -264,7 +264,7 @@ fn heston_fourier_missing_scalars_error() {
 /// Monte Carlo price must converge to the same Black-Scholes reference as the
 /// Fourier pricer — a cross-model parity that also exercises the MC path.
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn heston_mc_collapses_to_black_scholes() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);

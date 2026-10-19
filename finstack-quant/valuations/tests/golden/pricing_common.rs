@@ -592,7 +592,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "slow: covered by mise goldens-test or mise rust-test-slow"]
+    #[ignore = "slow: covered by mise run rust-test --slow"]
     fn structured_credit_spread_quote_matches_discounted_cashflow_reference() {
         use finstack_quant_core::dates::{DayCount, DayCountContext};
         use time::macros::date;
@@ -660,7 +660,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "slow: covered by mise goldens-test or mise rust-test-slow"]
+    #[ignore = "slow: covered by mise run rust-test --slow"]
     fn structured_credit_dv01_matches_declared_curve_repricing() {
         let fixture = structured_credit_fixture();
         let pricing = fixture.pricing().expect("pricing body");

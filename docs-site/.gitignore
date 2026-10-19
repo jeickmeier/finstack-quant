@@ -10,3 +10,6 @@
 
 # Unmodified upstream shadcn dependencies, installed by ui-docs-install.
 /src/components/ui/
+
+# Rewritten by `next dev` / `next typegen`; Next.js recommends not tracking it.
+/next-env.d.ts

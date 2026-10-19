@@ -41,9 +41,10 @@ cargo bench -p finstack-quant-portfolio -- --baseline my_baseline
 
 `mise run rust-bench` overrides Criterion sample size and timing via
 `FQ_BENCH_SAMPLE_SIZE`, `FQ_BENCH_WARM_UP_TIME`, `FQ_BENCH_MEASUREMENT_TIME`,
-and `FQ_BENCH_NRESAMPLES`. `mise run rust-bench-baseline` and
-`mise run rust-bench-compare` save and diff a `main` baseline; the compare task
-fails above a 10% median regression.
+and `FQ_BENCH_NRESAMPLES`. `portfolio_valuation/250pos` is one of the four fixed
+cases in the PR gate: `python3 -m scripts.pr_benchmarks baseline` on the base
+commit saves a `pr-base` Criterion baseline, and `compare` on the branch fails
+above a 10% median regression.
 
 ## Default matrix and opt-in extensions
 
@@ -106,10 +107,10 @@ Environment variables it reads:
 The release workflow drives it through mise rather than by hand:
 
 ```bash
-mise run materialization-benchmark-fixtures      # regenerate deterministic fixtures
-mise run materialization-rust-bench-compare      # compare against the checked-in baseline
-mise run materialization-rust-bench-baseline     # re-establish the baseline (guarded)
-mise run materialization-benchmark-doc-check     # verify tracked digests and baselines
+scripts/materialization_bench.sh fixtures        # regenerate deterministic fixtures
+scripts/materialization_bench.sh rust-compare    # compare against the checked-in baseline
+scripts/materialization_bench.sh rust-baseline   # re-establish the baseline (guarded)
+scripts/materialization_bench.sh doc-check       # verify tracked digests and baselines
 ```
 
 The tracked record lives in

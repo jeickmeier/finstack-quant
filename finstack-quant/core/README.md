@@ -265,9 +265,10 @@ data files, so editing the CSV alone changes nothing:
 
 `currency_generated.rs` is `include!`d from `src/currency.rs`. `cny_generated.rs`
 and `festivals_generated.rs` are `include!`d from `src/dates/calendar/algo.rs`.
-Regenerate currency and Chinese New Year tables with `mise run core-gen-data`;
-verify them with `mise run core-check-data`. Those tasks are included in
-`gen-write` and `gen-check`. Refresh Dragon Boat and Mid-Autumn tables with
+Regenerate currency and Chinese New Year tables with
+`uv run --no-project python finstack-quant/core/build/generate_reference_data.py`
+(add `--check` to verify); `mise run gen-write` and `mise run gen-check` include
+this step. Refresh Dragon Boat and Mid-Autumn tables with
 `build/gen_lunar_festivals.py`. Maintain the CSV inputs and regenerate the Rust
 tables rather than editing both copies by hand.
 

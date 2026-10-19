@@ -93,75 +93,40 @@ rustc-hash = "2.1"
 arrow = { version = "57", default-features = false }
 
 # Build profiles
+#
+# Three profiles. Cargo's built-in `test` and `bench` profiles inherit `dev`
+# and `release` unchanged.
+#
+# - `dev` (fast): every local build, check and test — `cargo build`, clippy,
+#   nextest, the Python dev extension and the WASM dev package.
+# - `release` (performance): shipped wheels and WASM, and benchmarks.
+# - `release-size` (size): the optimized WASM web package.
+
 [profile.dev]
-# Standard development profile (cargo-llvm-cov will override these for coverage runs)
-incremental = true
-# opt-level 0 keeps `cargo build` off LLVM. opt-level 1 made a cold
-# dev build codegen-bound (valuations 77s, of which 51s was codegen; 141s wall
-# on 18 cores). `profile.test` stays at opt-level 1 so warm test runs stay fast.
-# At opt-level 0 the Python cdylib's __eh_frame exceeds macOS ld's 16 MB
-# compact-unwind limit; finstack-quant-py's build script passes
-# `-Wl,-no_compact_unwind` for Apple dev links.
-opt-level = 0
-debug = 1
-
-[profile.test]
-# Standard test profile
-# Reduced debug level for faster compilation (line info only, no full debug symbols)
-# opt-level 1 keeps clean `rust-test` in the same band as opt-level 0 and cuts a
-# warm rerun from about 136s to 37s on this workspace. The slow compile units
-# are workspace crates (valuations unit tests are ~77s).
-incremental = true
+# opt-level 1 for every crate: warm `rust-test` reruns take about 37 s versus
+# 136 s at opt-level 0, and the Python and WASM dev builds run at usable speed.
+# The cost is a codegen-bound cold build. Line tables only, for backtraces.
 opt-level = 1
-debug = 1
-
-# `*` matches non-workspace crates only, so workspace members stay at opt-level 1.
-# Dependencies compile at opt-level 0. A cold `cargo test --no-run` went from
-# 181s to 167s, and arrow-cast from 13s to 1.6s.
-[profile.test.package."*"]
-opt-level = 0
+debug = "line-tables-only"
 
 [profile.release]
-# Performance-optimized release profile
-# Full LTO + single codegen unit for maximum optimization
-opt-level = 3           # Optimize for speed
-lto = "fat"             # Full link-time optimization (max cross-crate inlining)
-codegen-units = 1       # Single codegen unit for maximum optimization
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+# Local rebuilds reuse the front-end and codegen work of unchanged crates; the
+# fat-LTO step still runs in full. CI sets CARGO_INCREMENTAL=0 (its cache does
+# not restore target/incremental, and sccache refuses incremental builds).
+incremental = true
 # Xcode 27's post-link `strip` emits a misaligned LINKEDIT string pool that dyld
 # refuses to load, so Apple targets strip at link time instead (.cargo/config.toml).
 # `debug = 0` would otherwise default to `strip = "debuginfo"`, which also runs it.
 strip = "none"
 
 [profile.release-size]
-# Size-optimized profile for WASM bundle size
-# Use: cargo build --profile release-size
-# Or: wasm-pack build --profile release-size
+# Built by finstack-quant-wasm/scripts/build-web.mjs (`mise run wasm-pkg`).
 inherits = "release"
-opt-level = "z"         # Optimize for size
-lto = true              # Full link-time optimization
-codegen-units = 1       # Maximum optimization (slower compile, smaller output)
-strip = true            # Strip all symbols
-
-[profile.wasm-test]
-# Facade tests need a real wasm module, not the fat-LTO release profile.
-# `mise run wasm-pkg` and `wasm-build` stay on release / release-size.
-inherits = "release"
-opt-level = 1
-lto = false
-codegen-units = 256
-incremental = true
-debug = 0
-strip = "none"
-
-[profile.bench]
-# Optimized profile for benchmarking
-# Automatically used by `cargo bench`
-inherits = "release"
-opt-level = 3       # Optimize for speed
-lto = "fat"         # Full link-time optimization (matches release)
-debug = 1           # Line info for profiling tools (flamegraph, perf)
-strip = "none"      # REQUIRED: `release` sets strip="symbols", which would otherwise
-                    # win over `debug = 1` and leave bench binaries unprofilable.
+opt-level = "z"
+strip = true
 
 [workspace.metadata.clippy]
 profile = "finstack-strict"

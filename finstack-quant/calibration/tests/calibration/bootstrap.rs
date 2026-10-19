@@ -202,7 +202,7 @@ fn run_hazard_plan(
         .clone()
 }
 
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 #[test]
 fn hazard_curve_calibration_is_deterministic_across_runs() {
     let base_date = Date::from_calendar_date(2025, Month::March, 20).unwrap();

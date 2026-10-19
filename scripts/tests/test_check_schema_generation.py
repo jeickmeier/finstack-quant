@@ -75,7 +75,7 @@ def test_command_executes_the_binary_from_the_bin_dir(tmp_path: Path) -> None:
 
 def test_command_names_the_build_task_when_a_binary_is_missing(tmp_path: Path) -> None:
     """A missing binary fails with the task that builds it."""
-    with pytest.raises(FileNotFoundError, match="rust-build-schema-generators"):
+    with pytest.raises(FileNotFoundError, match="rust-check-schemas"):
         _MODULE.command(_MODULE.GENERATORS[0], tmp_path, "--list")
 
 

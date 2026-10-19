@@ -129,7 +129,7 @@ jobs:
         run: mise run wasm-doc
 
       - name: Check benchmark documents
-        run: mise run materialization-benchmark-doc-check
+        run: scripts/materialization_bench.sh doc-check
 
   registry-gallery:
     if: ${{ inputs.registry_only && !inputs.registry_publish }}

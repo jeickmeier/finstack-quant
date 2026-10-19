@@ -193,8 +193,7 @@ Run:
 
 ```text
 mise run rust-gen-schemas
-mise run rust-check-schemas
-mise run rust-serde-audit
+mise run rust-check-schemas   # includes the serde audit
 mise run gen-check
 ```
 

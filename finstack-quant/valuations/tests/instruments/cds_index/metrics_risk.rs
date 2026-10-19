@@ -289,7 +289,7 @@ fn test_bucketed_cs01_requires_replay_recipe() {
 }
 
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn bucketed_cs01_quote_single_curve_uses_each_off_grid_replay_quote_once() {
     let as_of = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
@@ -353,7 +353,7 @@ fn bucketed_cs01_quote_single_curve_uses_each_off_grid_replay_quote_once() {
 }
 
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
     let as_of = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
@@ -442,7 +442,7 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
 }
 
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn test_bucketed_cs01_reconciles_to_parallel_constituents() {
     // In `Constituents` mode, the bucketed calculator bumps each constituent's
     // replayable quote set one tenor at a time and reprices end-to-end.

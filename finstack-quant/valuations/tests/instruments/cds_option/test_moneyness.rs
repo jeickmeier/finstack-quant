@@ -222,7 +222,7 @@ fn test_moneyness_value_ordering_puts() {
 }
 
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn test_gamma_positive_all_strikes() {
     // Gamma should be positive for all strikes (convexity)
     let as_of = date!(2025 - 01 - 01);

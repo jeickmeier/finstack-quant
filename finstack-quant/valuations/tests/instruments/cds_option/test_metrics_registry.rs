@@ -87,7 +87,7 @@ fn test_metrics_registry_delta() {
 }
 
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn test_metrics_registry_all_greeks() {
     let as_of = date!(2025 - 01 - 01);
     let market = replayable_standard_market(as_of);

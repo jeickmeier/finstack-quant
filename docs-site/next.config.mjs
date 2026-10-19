@@ -11,6 +11,8 @@ export const config = {
   trailingSlash: true,
   images: { unoptimized: true },
   reactStrictMode: true,
+  // `next dev` otherwise writes AGENTS.md and CLAUDE.md into docs-site/.
+  agentRules: false,
 };
 
 export default withMDX(config);

@@ -242,8 +242,8 @@ The calibration envelope entry points (`calibrate`, `validateCalibrationJson`,
 `dryRun`, `dryRunJson`) throw `CalibrationEnvelopeError`, whose `kind` is the Rust execution
 category (`strict_load`, `solver_not_converged`, …) alongside the failing `stage`,
 `step_id`, `solver_diagnostics` and strict-load `diagnostics`. No export throws a bare string:
-`mise run wasm-check-errors` rejects any binding error that bypasses
-`crate::utils::to_js_err`.
+`scripts/check_wasm_boundary.py` (run by `mise run wasm-lint`) rejects any
+binding error that bypasses `crate::utils::to_js_err`.
 
 **Money.** `new core.Money(amount, currency)` takes a finite JavaScript `number`,
 converts it to a Rust `Decimal`, and does **not** round to the currency's minor
@@ -308,8 +308,8 @@ re-exports each crate as a namespace (`import type { calibration } from
 Rust name can appear in several crates. The package root re-exports the envelope
 types the facade signatures use (`CalibrationEnvelope`, `MaterializationReport`,
 ...). Integer fields in these JSON envelopes are `number`. Regenerate with
-`mise run wasm-gen-bindings`; verify without mutating the tree with
-`mise run wasm-check-bindings` (also run by `mise run gen-check`).
+`mise run gen-write`; verify without mutating the tree with
+`mise run gen-check`.
 `npm run test:dts` compiles the published types under `NodeNext` with
 `skipLibCheck: false`, and `tests/facade/contract_types.test.mjs` type-checks real
 runtime outputs against them.
@@ -321,8 +321,7 @@ Import validation metadata from
 `finstack-quant-wasm/contracts/valuation-result.schema.json`; its `int64`/`uint64`
 fields describe host `bigint` values, while JSON export uses integer tokens.
 Monte Carlo counts describe their existing `u32` serialization and remain numbers.
-Regenerate with `mise run wasm-gen-contracts` and check with
-`mise run wasm-check-contracts`; both are included in the binding generation/check tasks.
+`mise run gen-write` regenerates them and `mise run gen-check` checks them.
 
 ## WASM Object Disposal
 
@@ -342,9 +341,9 @@ augment `WasmOwned` with `Disposable`.
 From the repository root:
 
 ```bash
-mise run wasm-build   # web target only -> pkg/
+mise run wasm-build   # development web build (fast dev profile) -> pkg/
 mise run wasm-pkg     # web + node targets, release -> pkg/ and pkg-node/
-mise run wasm-clean   # remove wasm-pack output and wasm32 target artifacts
+python3 scripts/clean_workspace.py --wasm   # remove wasm-pack output and wasm32 artifacts
 ```
 
 Package-local equivalents:
@@ -355,8 +354,11 @@ npm run build:node    # wasm-pack build --target nodejs  --out-dir pkg-node
 npm run bench         # Node micro-benchmarks (requires build:node)
 ```
 
-`wasm-pack`, the `wasm32-unknown-unknown` target, and Node are pinned in
-[`../mise.toml`](../mise.toml); `mise install` provisions them.
+`wasm-pack`, `wasm-bindgen` (matching the `wasm-bindgen` crate in
+`Cargo.lock`), binaryen's `wasm-opt`, the `wasm32-unknown-unknown` target, and
+Node are pinned in [`../mise.toml`](../mise.toml); `mise install` provisions
+them, and wasm-pack uses the pinned `wasm-bindgen` and `wasm-opt` instead of
+downloading its own.
 
 ## Verification
 

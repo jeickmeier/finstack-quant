@@ -878,7 +878,7 @@ mise run rust-lint
 
 The registry JSON is embedded with `include_str!` and parsed at load, so a
 malformed or renamed profile fails the tests above rather than silently
-defaulting. `mise run assumptions-audit` is a *separate* scan: it reports
+defaulting. `python3 scripts/audit_hardcoded_assumptions.py` is a *separate* scan: it reports
 hard-coded assumptions elsewhere in the workspace that should move into a
 registry — it does not validate this file's contents.
 

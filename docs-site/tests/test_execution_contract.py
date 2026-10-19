@@ -2,6 +2,7 @@
 
 import ast
 from copy import deepcopy
+from functools import partial
 import json
 from pathlib import Path
 import shutil
@@ -28,10 +29,27 @@ from run_lesson_snippets import Block, extract_blocks, run_process, validate_out
 
 def test_publication_entrypoint_rebuilds_current_python_extension() -> None:
     """A release build cannot reuse a native extension from an older checkout."""
-    manifest = tomllib.loads((Path(__file__).parents[2] / "mise.toml").read_text())
-    commands = manifest["tasks"]["docs-site-build"]["run"]
-    assert commands.index("mise run python-sync") < commands.index("mise run python-build")
-    assert commands.index("mise run python-build") < commands.index("docs-site/gen/build_site.py")
+    tasks = tomllib.loads((Path(__file__).parents[2] / "mise.toml").read_text())["tasks"]
+    install = json.dumps(tasks["docs-site-install"]["run"])
+    commands = " ".join(tasks["docs-site-build"]["run"])
+    assert tasks["docs-site-build"]["depends"] == ["docs-site-install"]
+    assert "python-sync" in install
+    assert commands.index("mise run python-build --release") < commands.index("docs-site/gen/build_site.py")
+
+
+def test_development_manifest_needs_no_extension_or_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The dev reader's manifest validates structure without loading the extension."""
+    import check_curriculum
+
+    def unavailable() -> dict:
+        raise AssertionError("skip_evidence must not load the extension")
+
+    monkeypatch.setattr(check_curriculum, "runtime_identity", unavailable)
+    read_only = partial(check_curriculum.materialize_lesson, check_only=True)
+    monkeypatch.setattr(check_curriculum, "materialize_lesson", read_only)
+    errors, records = check_curriculum.check(skip_evidence=True)
+    assert errors == []
+    assert len(records) == 33
 
 
 def test_order_and_fresh_exercise_processes() -> None:

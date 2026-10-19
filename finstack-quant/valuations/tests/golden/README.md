@@ -26,14 +26,14 @@ outside the pricing tree, under `data/market_data/sabr/`.
 ## Running
 
 ```bash
-# Rust + Python golden layers, including the ignored walk
-mise run goldens-test
-
-# Same, with the unresolved-metric allowlist disabled
-mise run goldens-test-strict
-
-# Rust layer only
+# Rust layer, including the ignored walk
 cargo nextest run -p finstack-quant-valuations --test valuations golden --run-ignored all
+
+# Python layer
+mise run python-build && uv run --no-sync pytest finstack-quant-py/tests/golden
+
+# Either layer with the unresolved-metric allowlist disabled
+GOLDEN_IGNORE_NON_EXECUTABLE=1 cargo nextest run -p finstack-quant-valuations --test valuations golden --run-ignored all
 
 # One fixture or one subtree
 GOLDEN_FIXTURE_FILTER=usd_sofr_5y \
@@ -160,7 +160,7 @@ The Rust pricing walk implements this in `known_non_executable`,
 Strict mode is enabled only when `GOLDEN_IGNORE_NON_EXECUTABLE` is one of
 `1`, `true`, `yes`, or `on` (case-insensitive, surrounding whitespace ignored).
 Absent, empty, `0`, and `false` do not enable strict mode. Use
-`GOLDEN_IGNORE_NON_EXECUTABLE=1` or `mise run goldens-test-strict` to surface
+`GOLDEN_IGNORE_NON_EXECUTABLE=1` to surface
 every unresolved metric as a normal failure.
 
 ## Native QuantLib fixtures
@@ -171,16 +171,17 @@ hosts two families with different schemas and consumers:
 
 | Family | Output | Regenerate / check |
 | --- | --- | --- |
-| **pricing** | [`data/pricing/quantlib/`](data/pricing/quantlib/) (`finstack_quant.golden/1`) | `mise run goldens-quantlib-generate` / `goldens-quantlib-check` |
-| **attribution** | [`../data/quantlib_parity/`](../data/quantlib_parity/) (T0/T1 + `expected_attribution`) | `mise run goldens-quantlib-attribution-generate` / `goldens-quantlib-attribution-check` |
+| **pricing** | [`data/pricing/quantlib/`](data/pricing/quantlib/) (`finstack_quant.golden/1`) | `uv run python -m scripts.golden.quantlib.generate --family pricing --product all` (`--check` for drift) |
+| **attribution** | [`../data/quantlib_parity/`](../data/quantlib_parity/) (T0/T1 + `expected_attribution`) | `uv run python -m scripts.golden.quantlib.generate --family attribution --product all` (`--check` for drift) |
 
 Attribution fixtures feed valuations external parity and attribution
 decomposition tests; they are not interchangeable with pricing goldens.
 
 ### Pricing family
 
-Regenerate the committed pricing set with `mise run goldens-quantlib-generate`;
-verify committed fixtures have not drifted with `mise run goldens-quantlib-check`.
+Regenerate the committed pricing set with
+`uv run python -m scripts.golden.quantlib.generate --family pricing --product all`; add `--check` to verify
+committed fixtures have not drifted.
 
 | Product | Status | Native QuantLib API |
 | --- | --- | --- |

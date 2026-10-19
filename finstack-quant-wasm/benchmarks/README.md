@@ -93,8 +93,8 @@ row that allocates a large handle at high iteration counts.
 checked-in baseline, and the only part with its own CLI flag:
 
 ```bash
-node benchmarks/bench.mjs --materialization-only    # skip every other row
-mise run wasm-bench-materialization                 # fixtures + build:node + the above
+node benchmarks/bench.mjs --materialization-only  # skip every other row
+scripts/materialization_bench.sh wasm              # fixtures + build:node + the above (from the repo root)
 ```
 
 It shells out to
@@ -123,7 +123,7 @@ the fixture string and an explicitly-sized `InstrumentArtifactCache` exist befor
 the clock starts; the elapsed span covers the binding call and the JavaScript
 result conversion; handle cleanup happens after the stop.
 
-`mise run materialization-benchmark-record` is what actually consumes the raw
+`scripts/materialization_bench.sh record` is what actually consumes the raw
 output — it runs the Rust, Python and WASM measurements, applies both regression
 gates, and writes `benchmarks/materialization/materialization-benchmark-results.json`.
 This script itself applies no gate and always exits 0 on a completed run.

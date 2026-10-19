@@ -64,7 +64,7 @@ fn price_rbergomi_call(
 
 /// An ATM rBergomi call has a positive, sane price.
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn rbergomi_atm_call_is_positive_and_sane() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
@@ -84,7 +84,7 @@ fn rbergomi_atm_call_is_positive_and_sane() {
 /// converge to the closed-form Black-Scholes price — a genuine, non-circular
 /// analytic reference (no golden fixture).
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn rbergomi_small_eta_converges_to_black_scholes() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
@@ -126,7 +126,7 @@ fn rbergomi_small_eta_converges_to_black_scholes() {
 /// undiscounted factor e^{rT} ≈ 10.5% (regression for the missing
 /// `exp(-r*t)` discounting, .
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn rbergomi_nonzero_rate_price_is_discounted() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
@@ -171,7 +171,7 @@ fn rbergomi_nonzero_rate_price_is_discounted() {
 /// The rBergomi pricer is deterministic: pricing the same instrument twice
 /// with the same seed yields a bit-identical PV (INVARIANTS §2).
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn rbergomi_pricing_is_deterministic() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
@@ -193,7 +193,7 @@ fn rbergomi_pricing_is_deterministic() {
 /// the same ballpark — a sanity guard that the RL Volterra generator handles
 /// the full H ∈ (0, ½) range without blowing up.
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn rbergomi_atm_price_stable_across_hurst() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
@@ -401,7 +401,7 @@ fn rbergomi_missing_scalars_error() {
 /// floating-point rounding (same seed, ξ₀ identical up to total-variance
 /// differencing round-off).
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn rbergomi_flat_surface_matches_flat_override() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
@@ -444,7 +444,7 @@ fn rbergomi_flat_surface_matches_flat_override() {
 
 /// The notional scales the rBergomi PV linearly.
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn rbergomi_price_scales_with_notional() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);

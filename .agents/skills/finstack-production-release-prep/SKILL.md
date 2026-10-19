@@ -261,8 +261,8 @@ cargo nextest run --workspace -E 'test(quantlib) | test(parity) | test(golden) |
 # cargo-deny: licenses, advisories, bans, and sources (uses deny.toml)
 cargo deny check
 
-# Security-specific audit
-mise run all-audit
+# Python security audit (bandit)
+uv run --no-sync bandit -r finstack-quant-py -c pyproject.toml
 
 # Lint all components (no auto-fix — must pass clean)
 mise run all-lint
@@ -417,7 +417,7 @@ After completing the audit, produce a release readiness report:
 | `mise run all-ci` | pass/fail |
 | `mise run all-lint` | pass/fail |
 | `cargo deny check` | pass/fail |
-| `mise run all-audit` | pass/fail |
+| `bandit -r finstack-quant-py` | pass/fail |
 | `mise run all-test` | pass/fail |
 | MSRV check | pass/fail |
 | Publish dry-run | pass/fail |

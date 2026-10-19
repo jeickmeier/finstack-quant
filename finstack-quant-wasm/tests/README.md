@@ -68,7 +68,7 @@ numbers are compared against the same inputs the native tests use.
 Run:
 
 ```bash
-npm --prefix finstack-quant-wasm run test     # wasm-pack test --node --profile wasm-test
+npm --prefix finstack-quant-wasm run test     # wasm-pack test --node (dev profile)
 ```
 
 ## Layer 2 — host tests (`dts_contract.rs`, `return_shapes.rs`, `boundary_signatures.rs`)
@@ -170,7 +170,7 @@ them, and never treat a file in there as source.
 `serde_wasm_bindgen::to_value` serializes Rust maps as ES2015 `Map`s. Property
 reads on a `Map` yield `undefined` and `JSON.stringify` drops the contents — a
 silent, total data loss that no type check catches. Bindings must route through
-`crate::utils::to_js_value` instead; `mise run wasm-check-serializer` greps for
+`crate::utils::to_js_value` instead; `scripts/check_wasm_boundary.py` scans for
 the ban, `return_shapes.rs` asserts it, and this file proves it at runtime.
 
 ## Layer 4 — `typescript/` and `scripts/`

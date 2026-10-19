@@ -203,7 +203,9 @@ if (process.argv.includes("--check")) {
       JSON.parse(output),
     )
   )
-    throw new Error("Generated registry drift; run ui-gen");
+    throw new Error(
+      "Generated registry drift; run npm --prefix finstack-quant-ui run generate",
+    );
 } else await writeFile(path, output);
 console.log(
   `${process.argv.includes("--check") ? "Checked" : "Generated"} ${items.length} contract registry items.`,

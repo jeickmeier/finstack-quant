@@ -7,18 +7,21 @@ the browser. Hosting and the unified API-reference rollout remain separate work.
 From the repository root:
 
 ```sh
-mise run wasm-pkg
-mise run ui-sync
-npm --prefix docs-site ci --ignore-scripts
-mise run docs-site-build
+mise run docs-site-install   # dependencies, development WASM, registry, curriculum manifest
+mise run docs-site-dev       # http://localhost:3000
 ```
 
-`docs-site-build` is the release entrypoint. It runs `python-sync` and then
-`python-build --release` before executing any course code, so every result is
-verified against an extension built from the current checkout. It also installs
-the built registry into the docs host, including the public `/r/` files. The
-explicit WASM/dependency preparation above keeps package installation from
-launching an unmeasured native lifecycle build.
+`docs-site-install` works from a fresh clone. It syncs the Python environment,
+builds the WASM package, installs every npm dependency with lifecycle scripts
+disabled (so installation never launches an unmeasured native build), installs
+the built registry into the docs host including the public `/r/` files, and
+writes the curriculum manifest the reader needs. Lessons then render without
+executed output.
+
+`mise run docs-site-build` is the release entrypoint that produces that output.
+It runs `docs-site-install`, then `python-build --release` before executing any
+course code, so every result is verified against an extension built from the
+current checkout.
 
 The publication build executes every displayed Python block, replays each exercise
 solution from a fresh lesson baseline, executes copies of the notebook collection,
@@ -43,8 +46,8 @@ For focused iteration:
 ```sh
 uv run --no-sync python docs-site/gen/run_lesson_snippets.py --lesson 1.1 --require-all
 uv run --no-sync python docs-site/gen/build_labs.py --notebook 01_foundations/core_types_and_money.ipynb
-mise run docs-site-curriculum
-mise run docs-site-test
+uv run --no-sync python docs-site/gen/check_curriculum.py --check-api
+uv run --no-sync pytest -W error docs-site/tests
 mise run docs-site-dev
 ```
 
@@ -139,9 +142,10 @@ source remains in `finstack-quant-ui`; edit it there and reinstall the consumer.
 Import the installed `src/styles/finstack/theme.css` as the shared token authority.
 
 Use `mise run wasm-pkg` first to build the optimized web artifact and the separate
-Node target. Then use `mise run ui-docs-check`, `mise run ui-docs-build`, or
-`mise run ui-install-smoke`. These tasks install the built block with the pinned
-shadcn CLI. The local runner serves registry JSON over HTTP and substitutes only
+Node target. Then use `mise run ui-docs-build` (or, after
+`mise run ui-docs-install`, `npm --prefix docs-site run typecheck` and
+`node finstack-quant-ui/tests/browser/install-smoke.mjs`). These install the
+built block with the pinned shadcn CLI. The local runner serves registry JSON over HTTP and substitutes only
 the unpublished WASM npm dependency with its resolved absolute local package path.
 Dependency lifecycle builds are disabled to preserve the measured artifact.
 The public `/r/` output retains the release dependency declaration.

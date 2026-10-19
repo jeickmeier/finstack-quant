@@ -619,7 +619,7 @@ mod tests {
     ///
     /// Both use `Aᵢ = (√ρ·Z + √(1−ρ)·εᵢ)/√W` (LHP must condition on `M = Z/√W`).
     #[test]
-    #[ignore = "slow: covered by mise rust-test-slow"]
+    #[ignore = "slow: covered by mise run rust-test --slow"]
     fn student_t_lhp_limit_parity() {
         let sim = PerNameCopulaDefault::new(
             &CopulaSpec::StudentT {

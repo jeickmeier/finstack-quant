@@ -54,7 +54,7 @@ time = { workspace = true }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 # Feature pin, not used by the lib. `wasm-bindgen-test` (dev-dependency) enables
 # `num-traits/libm`, and resolver v2 unifies dev-dependency features only when
-# the tests are built. Without this pin the `wasm-pack build --profile wasm-test`
+# the tests are built. Without this pin the `wasm-pack build --dev`
 # facade builds in `mise run wasm-test` resolve `num-traits` without `libm`,
 # get a different metadata hash for it and everything downstream (nalgebra,
 # rust_decimal, every workspace crate), and recompile the graph that
@@ -91,8 +91,13 @@ required-features = ["contract-generation"]
 # pinned Rust 1.97.1 toolchain, which emits SIMD in the optimized module.
 wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int", "--enable-sign-ext", "--enable-mutable-globals", "--enable-simd"]
 
+# Dev builds (`mise run wasm-build`, `wasm-test`) skip wasm-opt and emit the same
+# JS glue as release, so tests exercise the published argument handling.
 [package.metadata.wasm-pack.profile.dev]
-wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int", "--enable-sign-ext", "--enable-mutable-globals", "--enable-simd"]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.dev.wasm-bindgen]
+debug-js-glue = false
 
 [lints]
 workspace = true

@@ -205,7 +205,7 @@ fn lmm_reference_european(
 /// numéraire `P(t,T_N)` carries a spurious `P(T_0,t)` factor (~3% at
 /// `t = 1y` here) and fails this assertion.
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn lmm_single_exercise_matches_numeraire_correct_reference() {
     let params = lmm_params();
     let strike = 0.025; // ITM payer (forwards ≈ 3.0–3.6%)
@@ -267,7 +267,7 @@ fn lmm_single_exercise_matches_numeraire_correct_reference() {
 /// single-date grid, so it does not sample the same paths as the multi-date
 /// Bermudan engine grid — hence a small Monte Carlo slack on the bound.
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn lmm_bermudan_respects_coterminal_lower_bound() {
     let params = lmm_params();
     let strike = 0.025; // ITM payer (forwards ≈ 3.0–3.6%)

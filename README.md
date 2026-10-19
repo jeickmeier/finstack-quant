@@ -177,7 +177,6 @@ fn main() -> finstack_quant::core::Result<()> {
 git clone https://github.com/jeickmeier/finstack-quant.git
 cd finstack-quant
 mise install
-mise run python-setup
 mise run python-sync
 mise run python-build
 uv run python
@@ -365,10 +364,18 @@ mise run python-examples
 [mise](https://mise.jdx.dev/) pins the toolchain in [`mise.toml`](mise.toml): an
 exact stable Rust with `clippy`, `rustfmt`, and the `wasm32-unknown-unknown`
 target, plus nightly (needed only for the rustdoc JSON that `cargo-public-api`
-consumes), Node, `wasm-pack`, `cargo-nextest`, `cargo-llvm-cov`, `cargo-deny`,
-`cargo-public-api`, `maturin`, and `osv-scanner`. `cargo-flamegraph` is not
-installed by default; it has no release binary. Rust 1.97.1 is
-also the minimum supported version declared by every library crate.
+consumes), Node, Python 3.12, uv, `wasm-pack`, `wasm-bindgen`, binaryen
+(`wasm-opt`), Playwright with its headless Chromium, `cargo-nextest`,
+`cargo-llvm-cov`, `cargo-deny`, `cargo-public-api`, `maturin`, and
+`osv-scanner`. `cargo-flamegraph` is not installed by default; it has no release
+binary. Rust 1.97.1 is also the minimum supported version declared by every
+library crate.
+
+Everything installs into your user profile, so no admin rights are needed. The
+`[env]` table in `mise.toml` sets `CARGO_HOME` and `RUSTUP_HOME` to `.cargo` and
+`.rustup` under `$HOME` (`%USERPROFILE%` on Windows), and points `UV_PYTHON` and
+`PYO3_PYTHON` at the mise-installed Python, with `UV_PYTHON_DOWNLOADS=never`.
+Any of these that you already export takes precedence.
 
 ```bash
 # Install mise on macOS or Linux
@@ -378,12 +385,11 @@ curl https://mise.run | sh
 mise install
 ```
 
-Python is not a mise-managed tool here. Install [uv](https://docs.astral.sh/uv/)
-separately, then create the virtualenv and sync dev dependencies:
+Then create the virtualenv from the mise-installed Python and sync dev
+dependencies:
 
 ```bash
-mise run python-setup   # uv venv --python 3.12
-mise run python-sync    # uv sync --group dev
+mise run python-sync    # uv sync --group dev, on the interpreter from UV_PYTHON
 ```
 
 Windows users should run `mise run <task>` from a POSIX shell such as Git Bash,
@@ -394,9 +400,9 @@ are written for POSIX shells.
 
 `mise.toml` defines tasks named `<domain>-<action>`. `all-*` fans out across
 all three languages, `rust-*` / `python-*` / `wasm-*` are per-language, and the
-rest are narrower (`goldens-*`, `wheel-*`, `pre-commit-*`, `materialization-*`,
-`check-*`). `*-fmt` tasks mutate; `*-lint` tasks are check-only. Run
-`mise tasks` for the full list.
+rest are narrower (`gen-*`, `ui-*`, `docs-site-*`, `wheel-*`, `pre-commit-run`).
+`*-fmt` tasks mutate; `*-lint` tasks are check-only. Run `mise tasks` for the
+full list.
 
 | Command | Purpose |
 |---|---|
@@ -412,7 +418,6 @@ rest are narrower (`goldens-*`, `wheel-*`, `pre-commit-*`, `materialization-*`,
 | `mise run rust-lint` | `cargo fmt --check` plus clippy with `-D warnings` across the workspace |
 | `mise run rust-doc` | Build workspace docs, enforce input docs, and run doctests |
 | `mise run rust-bench` | Run Criterion benchmarks with reduced measurement timing |
-| `mise run rust-flamegraph` | Generate a CPU flamegraph (`cargo flamegraph --profile bench`; install once with `mise install cargo:flamegraph`; pass extra args after `--`) |
 | `mise run gen-write` | Regenerate checked-in schemas, fixtures, and TypeScript bindings |
 | `mise run rust-gen-schemas` | Regenerate typed JSON schemas from Rust types |
 | `mise run rust-check-schemas` | Verify JSON schemas match Rust types |
@@ -423,17 +428,18 @@ rest are narrower (`goldens-*`, `wheel-*`, `pre-commit-*`, `materialization-*`,
 | `mise run python-typecheck` | Type-check the Python bindings with `ty` |
 | `mise run python-examples` | Execute every example notebook |
 | `mise run python-bench` | Benchmark the Python bindings against a release build |
-| `mise run wasm-build` | Build the WASM package (web target) |
-| `mise run wasm-pkg` | Build the web and Node WASM packages |
+| `mise run wasm-build` | Build the WASM web package for development (fast profile) |
+| `mise run wasm-pkg` | Build the optimized release web and Node WASM packages |
 | `mise run wasm-test` | Run wasm-bindgen and Node facade tests |
 | `mise run wasm-test-built` | Rerun Node facade tests against the already built WASM package |
 | `mise run ui-fmt` | Format the UI package with Prettier (mutating) |
 | `mise run ui-typecheck` | Type-check the UI package with `tsc` |
 | `mise run ui-test` | Run the UI Vitest suite |
-| `mise run wasm-gen-bindings` | Export TypeScript types from Rust |
-| `mise run goldens-test` | Run the Rust and Python golden-test layers |
-| `mise run rust-test-cov` | `rust-test` suite with HTML and LCOV (`coverage/rust/lcov.info`) coverage reports |
-| `mise run python-test-cov` | Full Python suite with HTML and Cobertura (`coverage/python/coverage.xml`) coverage reports |
+| `mise run docs-site-install` | Install everything the docs site needs, from a fresh clone |
+| `mise run docs-site-dev` | Serve the docs site at http://localhost:3000 |
+| `mise run docs-site-build` | Execute every lesson and notebook, check the evidence, and export the static site |
+| `mise run rust-test --coverage` | `rust-test` with HTML and LCOV (`coverage/rust/lcov.info`) coverage reports; `--slow` runs the ignored tests |
+| `mise run python-test --all --coverage` | Full Python suite with HTML and Cobertura (`coverage/python/coverage.xml`) coverage reports |
 | `mise run wheel-local` | Build a Python wheel for the current platform |
 
 Do not run `cargo test` directly: it pulls in doc tests, which are owned by
@@ -450,15 +456,17 @@ their links are deliberately slow. Use the scoped Rust tasks and the dev-profile
 LTO and 16 codegen units on both base and head to shorten linking; the weekly
 full benchmark suite keeps the release-like profile.
 
-Production release and full-suite benchmark tasks disable incremental codegen
-so inherited shell settings do not override Cargo's release-profile default;
-dev and test builds remain incremental for repeat edits.
+Every profile is incremental, release and bench included: a rebuild reuses the
+front-end and codegen work of unchanged crates, while fat LTO still runs in full
+at link time. CI sets `CARGO_INCREMENTAL=0` because its build cache does not
+restore `target/incremental`. `python3 scripts/clean_workspace.py --incremental`
+reclaims the incremental caches.
 
 Benchmarks are measurement tasks and stay outside `all-test`, nextest,
 `rust-fix`, and `rust-lint`. `rust-fmt` still formats bench sources. PR CI compares four fixed cases; the full suite runs
 weekly. Run `mise run rust-bench` or `mise run rust-bench-crate` to measure locally.
-`mise run python-bench-portfolio` is the materialization-specific Python
-benchmark path; see
+`scripts/materialization_bench.sh` runs the portfolio materialization
+benchmarks in all three languages; see
 [`benchmarks/MATERIALIZATION_BENCHMARKS.md`](benchmarks/MATERIALIZATION_BENCHMARKS.md).
 
 ## Documentation
