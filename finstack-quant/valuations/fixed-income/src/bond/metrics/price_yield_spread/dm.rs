@@ -1,7 +1,7 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use super::z_spread::maturity_scaled_bracket;
-use crate::bond::pricing::quote_conversions::price_from_dm;
+use super::z_spread::{maturity_scaled_bracket, BondZSpreadPricingKernel};
+use crate::bond::pricing::quote_conversions::clear_price_driving_overrides;
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::Bond;
 use finstack_quant_core::math::solver::BrentSolver;
@@ -107,13 +107,18 @@ impl MetricCalculator for DiscountMarginCalculator {
             ));
         }
 
-        // Root-find DM such that PV(dm) - dirty = 0
-        // The public price helper resolves settlement from the valuation date.
+        // Root-find DM such that PV(dm) - dirty = 0. The objective is
+        // `price_from_dm`: the Z-spread kernel on a clone with price-driving
+        // overrides cleared. The kernel (schedule projection, workout path,
+        // discount factors) does not depend on the DM, so build it once.
+        let mut model_bond = bond.clone();
+        clear_price_driving_overrides(&mut model_bond);
+        let kernel = BondZSpreadPricingKernel::new(&model_bond, &context.curves, context.as_of)?;
         let pricing_error: RefCell<Option<finstack_quant_core::Error>> = RefCell::new(None);
         let quote_date = quote_ctx.quote_date;
 
         let objective = |dm: f64| -> f64 {
-            match price_from_dm(bond, &context.curves, context.as_of, dm) {
+            match kernel.price(dm) {
                 Ok(pv) => pv - dirty_currency,
                 Err(e) => {
                     // Capture the first pricing error and map to a large non-zero residual
@@ -218,11 +223,8 @@ mod tests {
         let calc = DiscountMarginCalculator;
         let result = calc.calculate(&mut mctx);
 
-        // With the flat +1e12 residual, the bracket search finds no sign change and
-        // solver.solve() returns Err — the captured missing-curve error is surfaced.
-        // Before the fix, the sign-flipping residual allowed Brent to "converge" to
-        // dm ≈ 0, and the pricing error guard then also returned Err but only after
-        // unnecessary fake convergence; removing either guard would yield Ok(~0.0).
+        // The missing forward curve fails the one-time kernel build, so the
+        // missing-curve error is surfaced before the solver runs.
         assert!(
             result.is_err(),
             "DM solver must return Err when every price_from_dm call fails (missing forward \
