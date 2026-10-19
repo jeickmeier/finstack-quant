@@ -59,10 +59,9 @@ FxDeltaConventionKind, FxOptionBuilder}`,
 `ndf::{NdfQuoteConvention, NdfFixingSource}`. Monte Carlo payoff kernels and
 pricers are crate-private.
 
-Three leaves re-export a shared parameter type under their own path:
-`fx_option::FxUnderlyingParams` and `fx_swap::FxUnderlyingParams`, and
-`fx_variance_swap::PayReceive`. All three name the same types that already exist
-at `instruments::*` — aliases, not FX-specific variants.
+`fx_variance_swap::PayReceive` re-exports the shared `instruments::PayReceive`;
+it is an alias, not an FX-specific variant. `FxUnderlyingParams` lives only at
+`instruments::FxUnderlyingParams`.
 
 Inside a leaf, `metrics/`, `pricer.rs`, `types.rs` and Monte Carlo payoff
 adapters are `pub(crate)` or private; supported items surface through each

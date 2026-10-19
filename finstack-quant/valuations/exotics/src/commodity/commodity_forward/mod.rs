@@ -38,7 +38,6 @@
 mod types;
 
 pub use types::CommodityForward;
-pub use types::SettlementType;
 
 /// Metrics submodule for commodity forward risk measures.
 pub(crate) mod metrics;

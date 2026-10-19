@@ -19,8 +19,7 @@ use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instr
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::instruments::Position;
 
-/// Settlement type for commodity contracts.
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::SettlementType;
+use finstack_quant_valuations_core::instruments::common_impl::parameters::SettlementType;
 
 /// Commodity forward or futures contract.
 ///

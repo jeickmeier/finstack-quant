@@ -23,7 +23,7 @@
 //!
 //! # Metadata Tracking
 //!
-//! [`crate::results::ResultsMeta`] captures important context for audit and reproducibility:
+//! [`ResultsMeta`](finstack_quant_core::config::ResultsMeta) captures important context for audit and reproducibility:
 //! - **Timestamp**: When the valuation was computed
 //! - **Rounding context**: Numeric precision policy applied
 //! - **FX policy**: Currency conversion method (if applicable)
@@ -37,7 +37,7 @@
 //! # See Also
 //!
 //! - [`crate::results::ValuationResult`] for the main result type
-//! - [`crate::results::ResultsMeta`] for execution metadata
+//! - [`ResultsMeta`](finstack_quant_core::config::ResultsMeta) for execution metadata
 //! - [`crate::metrics`] for available metric calculators
 //!
 //! # References
@@ -51,7 +51,6 @@ pub mod structured_credit;
 mod valuation_result;
 
 pub use dataframe::{ValuationLongRow, ValuationRow};
-pub use finstack_quant_core::config::ResultsMeta;
 pub use provenance::{SensitivityBumps, ValuationProvenance};
 pub use valuation_result::{
     CreditDerivativeValuationDetails, FxValuationDetails, MonteCarloValuationDetails,

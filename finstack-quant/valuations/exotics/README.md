@@ -70,10 +70,9 @@ headline type is also re-exported flat at
 
 Reachable only under the family path:
 `commodity_spot_option::{CommodityMcParams,
-CommoditySpotOptionMcPricer}`,
-`commodity_asian_option::CommodityAsianOptionAnalyticalPricer`, and
-`commodity_forward::SettlementType` (a re-export of the shared
-`instruments::SettlementType`, not a commodity-specific type).
+CommoditySpotOptionMcPricer}` and
+`commodity_asian_option::CommodityAsianOptionAnalyticalPricer`. The settlement
+type is the shared `instruments::SettlementType`.
 
 `CommodityUnderlyingParams` — `commodity_type`, `ticker`, `unit`, `currency` —
 is the shared underlying type at `instruments::CommodityUnderlyingParams`, and
