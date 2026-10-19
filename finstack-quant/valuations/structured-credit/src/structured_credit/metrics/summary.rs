@@ -335,19 +335,11 @@ pub fn calculate_tranche_metrics(
         z_spread_bp * 1e-4,
         quote.settlement,
     )?;
-    let dm_bp = if matches!(tranche.coupon, RateSpec::Floating(_)) {
-        Some(
-            super::risk::spreads::discount_margin(
-                projection_deal,
-                tranche_id,
-                market,
-                as_of,
-                super::risk::spreads::DmTarget::Dirty(target_pv),
-            )? / ONE_BASIS_POINT,
-        )
-    } else {
-        None
-    };
+    // The discount margin is the z-spread of a floater's projected flows, solved
+    // above against the same target and settlement.
+    let dm_bp = matches!(tranche.coupon, RateSpec::Floating(_))
+        .then(|| super::risk::spreads::checked_discount_margin_bp(z_spread_bp))
+        .transpose()?;
 
     let call_flows = match deal
         .call_assumption

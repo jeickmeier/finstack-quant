@@ -43,7 +43,7 @@ pub use types::{
     ExcessSpreadSpec, FundingSource, HedgeSwap, IncentiveFeeSpec, InstrumentCollateral,
     InstrumentExerciseOverride, LiquidationSpec, LiveCollateral, LossAllocationPolicy,
     LossRecognition, ManagementFeeType, Metadata, ModificationSpec, PaymentCalculation,
-    PaymentMode, PaymentRecord, PaymentType, PenaltyStep, PoolAsset, PoolStats, PrepaymentPenalty,
+    PaymentRecord, PaymentType, PenaltyStep, PoolAsset, PoolStats, PrepaymentPenalty,
     PutExercisePolicy, Recipient, RecipientType, ReinvestmentAssumptions, ReinvestmentCriteria,
     ReinvestmentPeriod, RepLine, ReserveAccountSpec, ReserveInterestDestination, ReserveTarget,
     RoundingConvention, ShiftMode, ShiftingInterestSpec, ShiftingInterestStep,
@@ -116,7 +116,4 @@ pub use metrics::{
     ZSpreadCalculator,
 };
 
-pub use types::constants::{
-    pool_balance_cleanup_threshold, BASIS_POINTS_DIVISOR, MIN_PREPAYMENT_RATE, MONTHS_PER_YEAR,
-    PERCENTAGE_MULTIPLIER, QUARTERLY_PERIODS_PER_YEAR,
-};
+pub use types::constants::BASIS_POINTS_DIVISOR;

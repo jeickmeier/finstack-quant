@@ -450,7 +450,9 @@ impl PricerRegistry {
 
         // Scenario price adjustments are a valuation-boundary operation. The
         // model kernel remains unshocked; every result and metric context sees
-        // this one adjusted value.
+        // this one adjusted value. A pricer whose detail payload restates the
+        // value (the structured-credit stochastic pricer) returns an unshocked
+        // headline and shocks that payload itself, so the two agree here.
         base_result.value = lifecycle.apply_value(base_result.value).map_err(|error| {
             PricingError::from_core(
                 error,
