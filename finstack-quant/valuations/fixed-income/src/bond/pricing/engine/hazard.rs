@@ -99,8 +99,8 @@ impl HazardBondEngine {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<(Vec<(Date, Money)>, CashFlowSchedule)> {
-        let flows = bond.pricing_dated_cashflows(market, as_of)?;
         let schedule = bond.full_cashflow_schedule(market)?;
+        let flows = bond.pricing_dated_cashflows_from_schedule(&schedule, as_of, as_of)?;
         Ok((flows, schedule))
     }
 
