@@ -9,10 +9,9 @@
 /// registry's universal default. Intentional caller overrides use
 /// [`MetricRegistry::replace_metric`](crate::metrics::MetricRegistry::replace_metric).
 ///
-/// `metrics` entries name a built-in [`MetricId`](crate::metrics::MetricId)
-/// variant; the optional `custom` list takes string ids registered through
-/// [`MetricId::custom`](crate::metrics::MetricId::custom). Every calculator is
-/// wrapped in an `Arc`.
+/// `metrics` entries name a built-in `MetricId` variant; the optional `custom`
+/// list takes string ids registered through `MetricId::custom`. Every
+/// calculator is wrapped in an `Arc`.
 ///
 /// See unit tests and `examples/` for usage.
 #[macro_export]

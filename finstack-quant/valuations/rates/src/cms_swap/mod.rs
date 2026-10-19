@@ -28,7 +28,7 @@
 //! understates the adjustment by roughly 5–10 bp versus full smile-aware
 //! static replication (Andersen & Piterbarg 2010, §16.2). For those trades,
 //! select the **`StaticReplication`** model
-//! ([`CmsSwapReplicationPricer`](crate::cms_swap::pricer::CmsSwapReplicationPricer)): it prices
+//! (`CmsSwapReplicationPricer`): it prices
 //! each coupon's payment-measure expectation with the same exact replication
 //! engine as the [`CmsOption`](crate::cms_option)
 //! `StaticReplication` model, via the model-free parity
