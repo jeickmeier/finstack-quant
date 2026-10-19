@@ -44,6 +44,10 @@ Workspace version 0.11.0: the valuations split below removes and moves public Ru
 
 ### Dependencies
 
+#### Changed
+
+- Upgraded `nalgebra` from `0.34` to `0.35` (`simba` `0.10.2`) and `rust_decimal` from `1.41`/`1.42` to `1.43.0`, removing transitive `paste` (`RUSTSEC-2024-0436`) and optional `rkyv` (`RUSTSEC-2026-0235`) from `Cargo.lock` and dropping both advisory ignores from `deny.toml` and `osv-scanner.toml`.
+
 #### Removed
 
 - Unused `smallvec`, `thiserror` and `tracing` dependencies from `finstack-quant-valuations`.

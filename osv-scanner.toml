@@ -3,17 +3,3 @@
 
 # Ignored advisories. Each entry MUST include a reason and a reviewDate so we
 # can re-check periodically and drop the ignore once upstream fixes land.
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2024-0436"
-reason = "paste crate is unmaintained. Transitive via nalgebra/simba; no safe upgrade path published by the advisory. Mirrored in deny.toml."
-ignoreUntil = 2026-10-19
-
-# Keep this ignore in OSV only — do not mirror into deny.toml.
-# cargo-deny resolves the feature graph and does not encounter unused optional
-# rkyv, so an ignore there fails with advisory-not-detected. OSV scans Cargo.lock
-# and still sees the package entry.
-[[IgnoredVulns]]
-id = "RUSTSEC-2026-0235"
-reason = "rkyv 0.7.46 is an unused optional dependency of rust_decimal (feature not enabled). rust_decimal pins ^0.7.46 and the 0.7 series is unsupported; no lockfile upgrade path until upstream drops it (paupino/rust-decimal#818/#819). Not linked into any workspace binary."
-ignoreUntil = 2026-11-05

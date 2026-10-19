@@ -83,7 +83,7 @@ sha2 = { version = "0.11.0", default-features = false }
 thiserror = "2"
 time = { version = "0.3" }
 indexmap = "2"
-rust_decimal = { version = "1.41.0", features = ["serde-str"] }
+rust_decimal = { version = "1.43.0", features = ["serde-str"] }
 schemars = { version = "1.2", features = ["rust_decimal1", "indexmap2"] }
 rust_decimal_macros = "1.40.0"
 criterion = { version = "0.8" }
