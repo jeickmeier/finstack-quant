@@ -10,6 +10,7 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::math::neumaier_sum;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
+use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
 use finstack_quant_valuations_core::instruments::common_impl::pricing::{
     PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
 };
@@ -257,6 +258,52 @@ pub(crate) fn pv_total_return_leg(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
+    let (params, model) = total_return_leg(trs, context, as_of)?;
+    TrsEngine::pv_total_return_leg_with_model(params, context, as_of, &model)
+}
+
+/// Project both legs with the same period calculations as present value,
+/// netted per payment date and signed by `side` (receive the total return,
+/// pay financing for `Receive`).
+pub(crate) fn net_cashflows(
+    trs: &EquityTotalReturnSwap,
+    context: &MarketContext,
+    as_of: Date,
+) -> Result<Vec<(Date, Money)>> {
+    trs.validate()?;
+    let (params, model) = total_return_leg(trs, context, as_of)?;
+    let sign = match trs.side {
+        PayReceive::Receive => 1.0,
+        PayReceive::Pay => -1.0,
+    };
+    let mut flows = std::collections::BTreeMap::<Date, f64>::new();
+    for (date, amount) in
+        TrsEngine::cashflows_total_return_leg_with_model(params, context, as_of, &model)?
+    {
+        *flows.entry(date).or_default() += sign * amount.amount();
+    }
+    for (date, amount) in TrsEngine::cashflows_financing_leg(
+        &trs.financing_leg,
+        &trs.schedule,
+        trs.notional,
+        context,
+        as_of,
+    )? {
+        *flows.entry(date).or_default() -= sign * amount.amount();
+    }
+    flows
+        .into_iter()
+        .map(|(date, amount)| Ok((date, Money::new(amount, trs.notional.currency())?)))
+        .collect()
+}
+
+/// Total-return leg inputs and return model shared by PV and cashflow
+/// projection.
+fn total_return_leg<'a>(
+    trs: &'a EquityTotalReturnSwap,
+    context: &MarketContext,
+    as_of: Date,
+) -> Result<(TotalReturnLegParams<'a>, EquityReturnModel<'a>)> {
     let (spot, div_yield) = extract_underlying_data(trs, context)?;
     // For an unseasoned trade (as_of on or before the schedule start) today's
     // spot IS the inception level. With continuous dividend yield the level
@@ -299,7 +346,7 @@ pub(crate) fn pv_total_return_leg(
         spot,
         div_yield,
     };
-    TrsEngine::pv_total_return_leg_with_model(params, context, as_of, &model)
+    Ok((params, model))
 }
 
 #[cfg(test)]
