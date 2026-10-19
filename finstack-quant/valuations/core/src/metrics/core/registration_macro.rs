@@ -9,6 +9,10 @@
 /// registry's universal default. Intentional caller overrides use
 /// [`MetricRegistry::replace_metric`](crate::metrics::MetricRegistry::replace_metric).
 ///
+/// `metrics` entries name a built-in `MetricId` variant; the optional `custom`
+/// list takes string ids registered through `MetricId::custom`. Every
+/// calculator is wrapped in an `Arc`.
+///
 /// See unit tests and `examples/` for usage.
 #[macro_export]
 macro_rules! register_metrics {
@@ -18,6 +22,10 @@ macro_rules! register_metrics {
         metrics: [
             $(($metric_id:ident, $calculator:expr)),* $(,)?
         ]
+        $(, custom: [
+            $(($custom_id:literal, $custom_calculator:expr)),* $(,)?
+        ])?
+        $(,)?
     ) => {{
         use $crate::metrics::MetricId;
         use std::sync::Arc;
@@ -29,6 +37,13 @@ macro_rules! register_metrics {
                 &[$instrument],
             )?;
         )*
+        $($(
+            $registry.register_metric(
+                MetricId::custom($custom_id),
+                Arc::new($custom_calculator),
+                &[$instrument],
+            )?;
+        )*)?
     }};
 }
 
@@ -80,11 +95,13 @@ mod tests {
             metrics: [
                 (Accrued, DummyCalculator),
                 (Ytm, DummyCalculator),
-            ]
+            ],
+            custom: [("custom_metric", DummyCalculator)]
         }
 
         assert!(registry.is_applicable(&MetricId::Accrued, InstrumentType::Bond));
         assert!(registry.is_applicable(&MetricId::Ytm, InstrumentType::Bond));
+        assert!(registry.is_applicable(&MetricId::custom("custom_metric"), InstrumentType::Bond));
         Ok(())
     }
 }

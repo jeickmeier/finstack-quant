@@ -1,21 +1,17 @@
 //! FX Spot metrics module.
 //!
-//! Provides metric calculators specific to `FxSpot`, split into focused files
-//! to mirror the repository-wide metrics organization used by more complex
-//! instruments (e.g., `cds`).
+//! Provides metric calculators specific to `FxSpot`.
 //!
-//! Exposed metrics via `MetricId::custom("...")` under the instrument type
-//! "FxSpot":
+//! Exposed metrics under the instrument type "FxSpot":
 //! - `spot_rate`
 //! - `base_amount`
 //! - `inverse_rate`
 //!
 //! Note: Quote amount (PV in quote currency) is available in `ValuationResult.value`.
 
-pub(crate) mod base_amount;
-pub(crate) mod inverse_rate;
-pub(crate) mod spot_rate;
-
+use crate::fx_spot::FxSpot;
+use finstack_quant_valuations_core::metrics::MetricCalculator;
+use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
 
 /// Register all FX Spot metrics with the registry
@@ -46,17 +42,111 @@ pub(crate) fn register_fx_spot_metrics(
         registry: registry,
         instrument: InstrumentType::FxSpot,
         metrics: [
-            (SpotRate, spot_rate::SpotRateCalculator),
-            (BaseAmount, base_amount::BaseAmountCalculator),
-            (InverseRate, inverse_rate::InverseRateCalculator),
+            (SpotRate, SpotRateCalculator),
+            (BaseAmount, BaseAmountCalculator),
+            (InverseRate, InverseRateCalculator),
         ]
     };
     Ok(())
 }
 
+/// Base amount metric for `FxSpot`.
+///
+/// Returns the base notional amount in base currency units.
+fn base_amount(fx: &FxSpot) -> f64 {
+    fx.notional.amount()
+}
+
+/// Returns the base amount (notional) in base currency units.
+///
+/// Returns the base notional amount in base currency units.
+pub struct BaseAmountCalculator;
+
+impl MetricCalculator for BaseAmountCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let fx: &FxSpot = context.instrument_as()?;
+        Ok(base_amount(fx))
+    }
+}
+
+/// Threshold below which an inversion is considered ill-conditioned.
+const INVERSION_FLOOR: f64 = 1e-12;
+
+/// Calculates the inverse of the spot rate (base per quote).
+///
+/// # Errors
+///
+/// Returns a `Validation` error when:
+/// - Base notional magnitude is below `INVERSION_FLOOR`
+/// - Realized spot magnitude is below `INVERSION_FLOOR`
+/// - Either input is non-finite
+///
+/// A silent zero would mask configuration errors (zero notional, zero spot)
+/// in calling code that assumes the inverse is meaningful.
+///
+/// Computes the inverse of the realized spot rate. Errors when inversion
+/// would be numerically unstable rather than silently returning 0.
+pub struct InverseRateCalculator;
+
+impl MetricCalculator for InverseRateCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let fx: &FxSpot = context.instrument_as()?;
+        let base_amt = fx.notional.amount();
+        let pv = context.base_value.amount();
+
+        if !base_amt.is_finite() || base_amt.abs() < INVERSION_FLOOR {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "FxSpot {}: cannot compute inverse rate, base notional is non-finite \
+                 or below {INVERSION_FLOOR:.0e} (got {base_amt})",
+                fx.id
+            )));
+        }
+
+        let spot = pv / base_amt;
+        if !spot.is_finite() || spot.abs() < INVERSION_FLOOR {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "FxSpot {}: cannot compute inverse rate, realized spot is non-finite \
+                 or below {INVERSION_FLOOR:.0e} (got {spot})",
+                fx.id
+            )));
+        }
+        Ok(1.0 / spot)
+    }
+}
+
+/// Epsilon for floating-point near-zero comparisons.
+/// This threshold prevents division by extremely small numbers that would
+/// produce numerically unstable results.
+const EPSILON: f64 = 1e-15;
+
+/// Calculates the FX spot rate as `quote_amount / base_amount`.
+///
+/// Returns an error when the base notional is near-zero because the realized
+/// spot rate is undefined in that case.
+///
+/// Computes the realized spot rate as `quote_amount / base_amount`, where the
+/// `quote_amount` is the instrument PV in quote currency and `base_amount` is
+/// the effective base notional.
+pub struct SpotRateCalculator;
+
+impl MetricCalculator for SpotRateCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let fx: &FxSpot = context.instrument_as()?;
+        let base_amt = fx.notional.amount();
+
+        if base_amt.abs() < EPSILON {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "FxSpot spot_rate is undefined for near-zero base notional ({base_amt})"
+            )));
+        }
+
+        Ok(context.base_value.amount() / base_amt)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::base_amount::BaseAmountCalculator;
+    use super::BaseAmountCalculator;
     use crate::FxSpot;
     use finstack_quant_core::{
         currency::Currency, dates::Date, market_data::context::MarketContext, money::Money,
@@ -125,4 +215,59 @@ mod tests {
     // FxSpot intentionally does not register DV01/BucketedDv01: it has no
     // discount or forward curve dependency. FX risk is exposed through
     // FxDelta and Fx01.
+}
+
+#[cfg(test)]
+mod base_amount_tests {
+    use super::{base_amount, BaseAmountCalculator};
+    use crate::fx_spot::FxSpot;
+    use finstack_quant_core::{
+        currency::Currency, dates::Date, market_data::context::MarketContext, money::Money,
+        types::InstrumentId,
+    };
+    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
+    use std::sync::Arc;
+    use time::Month;
+
+    fn d(year: i32, month: u8, day: u8) -> Date {
+        Date::from_calendar_date(year, Month::try_from(month).expect("should succeed"), day)
+            .expect("should succeed")
+    }
+
+    fn sample_fx() -> FxSpot {
+        FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
+            .with_notional(Money::from((1_250_000_i64, Currency::EUR)))
+            .expect("should succeed")
+            .with_quoted_spot(1.18)
+            .expect("should succeed")
+    }
+
+    #[test]
+    fn helper_returns_base_notional() {
+        let fx = sample_fx();
+        assert!((base_amount(&fx) - 1_250_000.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn calculator_matches_helper() {
+        let fx = sample_fx();
+        let as_of = d(2025, 2, 10);
+        let base_value = fx
+            .value(&MarketContext::new(), as_of)
+            .expect("should succeed");
+        let instrument: Arc<
+            dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument,
+        > = Arc::new(fx);
+        let mut ctx = MetricContext::new(
+            instrument,
+            Arc::new(MarketContext::new()),
+            as_of,
+            base_value,
+            MetricContext::default_config(),
+        );
+        let calc = BaseAmountCalculator;
+        let amount = calc.calculate(&mut ctx).expect("should succeed");
+        assert!((amount - 1_250_000.0).abs() < 1e-6);
+    }
 }

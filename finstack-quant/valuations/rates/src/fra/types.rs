@@ -161,8 +161,6 @@ impl ForwardRateAgreement {
             format!("FRA notional must be positive, got {}", amount)
         })?;
 
-        let _ = self.fixed_rate.as_f64();
-
         if let Some(observed) = self.observed_fixing {
             validation::validate_f64_finite(observed, "FRA observed_fixing")?;
         }
@@ -253,35 +251,23 @@ impl ForwardRateAgreement {
                     .unwrap_or(BusinessDayConvention::ModifiedFollowing);
                 let resolved_cal_id = self.resolved_fixing_calendar_id();
 
-                // Compute base fixing date by subtracting reset_lag_days business days
-                let base_fixing_date = if let Some(cal_id) = resolved_cal_id.as_deref() {
-                    if let Ok(cal) = calendar_by_id_strict(cal_id) {
-                        // Use calendar-aware business day subtraction
-                        self.start_date
-                            .add_business_days(-(self.reset_lag_days), cal)?
-                    } else {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "FRA '{}': fixing calendar '{}' could not be resolved",
-                            self.id, cal_id
-                        )));
-                    }
-                } else {
-                    return Err(finstack_quant_core::Error::Validation(format!(
+                let cal_id = resolved_cal_id.as_deref().ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
                         "FRA '{}': fixing calendar is required to apply business-day reset lag",
                         self.id
-                    )));
-                };
-
-                // Apply business day convention adjustment to the resulting date
-                if let Some(cal_id) = resolved_cal_id.as_deref() {
-                    if let Ok(cal) = calendar_by_id_strict(cal_id) {
-                        adjust(base_fixing_date, business_day_convention, cal)?
-                    } else {
-                        base_fixing_date
-                    }
-                } else {
-                    base_fixing_date
-                }
+                    ))
+                })?;
+                let cal = calendar_by_id_strict(cal_id).map_err(|_| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "FRA '{}': fixing calendar '{}' could not be resolved",
+                        self.id, cal_id
+                    ))
+                })?;
+                // Subtract reset_lag_days business days, then apply the convention.
+                let base_fixing_date = self
+                    .start_date
+                    .add_business_days(-(self.reset_lag_days), cal)?;
+                adjust(base_fixing_date, business_day_convention, cal)?
             }
         };
 
@@ -385,8 +371,6 @@ impl ForwardRateAgreement {
         })
     }
 }
-
-impl ForwardRateAgreementBuilder {}
 
 // Explicit Instrument trait implementation (replaces macro for better IDE visibility)
 impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument

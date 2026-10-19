@@ -687,7 +687,7 @@ impl CdsOption {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        super::metrics::vega::vega(self, market, as_of)
+        super::metrics::vega(self, market, as_of)
     }
 
     /// Bloomberg CDSO θ: change in option premium for a one-calendar-day

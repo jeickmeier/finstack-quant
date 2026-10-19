@@ -28,7 +28,7 @@
 //! understates the adjustment by roughly 5–10 bp versus full smile-aware
 //! static replication (Andersen & Piterbarg 2010, §16.2). For those trades,
 //! select the **`StaticReplication`** model
-//! ([`CmsSwapReplicationPricer`](crate::cms_swap::pricer::CmsSwapReplicationPricer)): it prices
+//! (`CmsSwapReplicationPricer`): it prices
 //! each coupon's payment-measure expectation with the same exact replication
 //! engine as the [`CmsOption`](crate::cms_option)
 //! `StaticReplication` model, via the model-free parity
@@ -45,7 +45,7 @@
 //!   (2nd ed.). Springer. Chapter 13.7: CMS Products. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
 
 pub(crate) mod metrics;
-pub mod pricer;
+pub(crate) mod pricer;
 pub(crate) mod types;
 
 pub use types::{CmsSwap, FundingLeg, FundingLegSpec, FundingPeriod};

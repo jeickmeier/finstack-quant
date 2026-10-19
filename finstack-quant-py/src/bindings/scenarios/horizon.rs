@@ -1,7 +1,7 @@
 //! Python bindings for horizon total return analysis.
 
 use crate::bindings::attribution::PyPnlAttribution;
-use crate::bindings::extract::{extract_instrument_json, extract_market};
+use crate::bindings::extract::{extract_instrument, extract_market};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::{core_to_py, display_to_py, scenarios_to_py};
 use pyo3::prelude::*;
@@ -89,12 +89,9 @@ pub(crate) fn compute_horizon_return<'py>(
 ) -> PyResult<PyHorizonResult> {
     use std::sync::Arc;
 
-    let instrument_json = extract_instrument_json(instrument)?;
-    let boxed = finstack_quant_valuations::pricer::json::parse_boxed_instrument_from_json(
-        &instrument_json,
-        None,
-    )
-    .map_err(core_to_py)?;
+    let boxed = extract_instrument(instrument)?
+        .into_parsed(None)
+        .map_err(core_to_py)?;
     let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> =
         Arc::from(boxed.into_boxed());
 

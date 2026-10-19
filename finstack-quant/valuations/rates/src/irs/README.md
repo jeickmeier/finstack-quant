@@ -30,9 +30,8 @@ irs/
 ├── cashflow.rs    # fixed and floating leg schedule generation
 ├── compounding.rs # FloatingLegCompounding + daily RFR compounding with lookback/shift
 └── metrics/
-    ├── par_rate.rs             # ParRate
+    ├── mod.rs                  # registration + ParRate, leg PVs (PvFixed, PvFloat)
     ├── annuity.rs              # Annuity
-    ├── pv_fixed.rs pv_float.rs # leg PVs
     ├── dv01.rs                 # IrsDv01Calculator
     ├── ir_convexity.rs         # IrConvexity, IrCrossGamma
 ```

@@ -15,10 +15,9 @@ use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::{
-    MetricCalculator, MetricContext, MetricId, MetricRegistry, VOL_POINTS_PER_ABSOLUTE_VOL,
+    MetricCalculator, MetricContext, MetricRegistry, VOL_POINTS_PER_ABSOLUTE_VOL,
 };
 use finstack_quant_valuations_core::pricer::InstrumentType;
-use std::sync::Arc;
 
 /// Delta calculator for one spread leg's forward price.
 struct SpreadDeltaCalculator {
@@ -139,54 +138,21 @@ impl MetricCalculator for SpreadVegaCalculator {
 pub(crate) fn register_commodity_spread_option_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    registry.register_metric(
-        MetricId::Delta,
-        Arc::new(SpreadDeltaCalculator { leg: 1 }),
-        &[InstrumentType::CommoditySpreadOption],
-    )?;
-    registry.register_metric(
-        MetricId::Vega,
-        Arc::new(SpreadVegaCalculator { leg: None }),
-        &[InstrumentType::CommoditySpreadOption],
-    )?;
-    registry.register_metric(
-        MetricId::custom("delta::leg1"),
-        Arc::new(SpreadDeltaCalculator { leg: 1 }),
-        &[InstrumentType::CommoditySpreadOption],
-    )?;
-    registry.register_metric(
-        MetricId::custom("delta::leg2"),
-        Arc::new(SpreadDeltaCalculator { leg: 2 }),
-        &[InstrumentType::CommoditySpreadOption],
-    )?;
-    registry.register_metric(
-        MetricId::custom("vega::leg1"),
-        Arc::new(SpreadVegaCalculator { leg: Some(1) }),
-        &[InstrumentType::CommoditySpreadOption],
-    )?;
-    registry.register_metric(
-        MetricId::custom("vega::leg2"),
-        Arc::new(SpreadVegaCalculator { leg: Some(2) }),
-        &[InstrumentType::CommoditySpreadOption],
-    )?;
-    registry.register_metric(
-        MetricId::Dv01,
-        Arc::new(
-            finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-                finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined(),
-            ),
-        ),
-        &[InstrumentType::CommoditySpreadOption],
-    )?;
-    registry.register_metric(
-        MetricId::BucketedDv01,
-        Arc::new(
-            finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-                finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate(
-                ),
-            ),
-        ),
-        &[InstrumentType::CommoditySpreadOption],
-    )?;
+    finstack_quant_valuations_core::register_metrics! {
+        registry: registry,
+        instrument: InstrumentType::CommoditySpreadOption,
+        metrics: [
+            (Delta, SpreadDeltaCalculator { leg: 1 }),
+            (Vega, SpreadVegaCalculator { leg: None }),
+            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+        ],
+        custom: [
+            ("delta::leg1", SpreadDeltaCalculator { leg: 1 }),
+            ("delta::leg2", SpreadDeltaCalculator { leg: 2 }),
+            ("vega::leg1", SpreadVegaCalculator { leg: Some(1) }),
+            ("vega::leg2", SpreadVegaCalculator { leg: Some(2) }),
+        ]
+    }
     Ok(())
 }

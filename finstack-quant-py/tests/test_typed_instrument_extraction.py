@@ -4,7 +4,8 @@ Pricing entry points clone a typed instance's inner Rust instrument instead of
 serializing it to an envelope and parsing it back. The envelope path is
 unchanged, so each typed call must match the same call on ``to_json()``
 exactly: results, cashflows, VaR, structured-credit metrics, composite legs,
-and error messages.
+statement debt, scenario and horizon runs, portfolio positions, optimization
+candidates, attribution, and error messages.
 """
 
 from __future__ import annotations
@@ -15,11 +16,15 @@ import json
 
 import pytest
 
+from finstack_quant import statements
+from finstack_quant.attribution import attribute_pnl, attribute_pnl_many
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Bps, Rate
+from finstack_quant.portfolio import CandidatePosition, Portfolio
+from finstack_quant.scenarios import OperationSpec, ScenarioSpec, apply_scenario, compute_horizon_return
 from finstack_quant.valuations import composite
 from finstack_quant.valuations.instruments import (
     AssetBackedFacility,
@@ -67,15 +72,15 @@ EXAMPLE_TYPES = [
 ]
 
 
-def _market() -> MarketContext:
+def _market(as_of: datetime.date = AS_OF, df_5y: float = 0.82) -> MarketContext:
     return (
         MarketContext()
-        .insert(DiscountCurve("USD-OIS", AS_OF, [(0.0, 1.0), (1.0, 0.96), (5.0, 0.82), (10.0, 0.67)]))
+        .insert(DiscountCurve("USD-OIS", as_of, [(0.0, 1.0), (1.0, 0.96), (5.0, df_5y), (10.0, 0.67)]))
         .insert(
             ForwardCurve(
                 "USD-SOFR-3M",
                 0.25,
-                AS_OF,
+                as_of,
                 [(0.0, 0.04), (5.0, 0.042), (10.0, 0.045)],
                 day_count="act_360",
             )
@@ -230,3 +235,98 @@ def test_composite_leg_typed_equal_envelope() -> None:
         lambda: composite.CompositeLegSpec("B1", bond.to_json(), 1.0),
     )
     assert kind == "ok"
+
+
+@pytest.mark.parametrize("cls", [Bond, TermLoan, EquityOption], ids=lambda cls: cls.__name__)
+def test_statement_add_debt_typed_equal_envelope(cls: type) -> None:
+    def build(instrument: object) -> object:
+        builder = statements.ModelBuilder("deal")
+        builder.add_debt("DEBT", instrument)
+        builder.periods("2025Q1..Q2", None)
+        builder.value("x", [("2025Q1", 1.0)])
+        return builder.build()
+
+    instrument = cls.example()
+    kind, _ = _assert_same(lambda: build(instrument), lambda: build(instrument.to_json()))
+    # Equity options are not capital-structure debt; the rejection must match too.
+    assert kind == ("ValueError" if cls is EquityOption else "ok")
+
+
+@pytest.mark.parametrize("cls", EXAMPLE_TYPES, ids=lambda cls: cls.__name__)
+def test_scenario_and_horizon_typed_equal_envelope(cls: type) -> None:
+    instrument = cls.example()
+    envelope = instrument.to_json()
+    roll = ScenarioSpec("roll", [OperationSpec.time_roll_forward("1M", roll_mode="calendar_days")])
+    shock = ScenarioSpec("up25", [OperationSpec.curve_parallel_bp("discount", "USD-OIS", 25.0)])
+    _assert_same(
+        lambda: apply_scenario(roll, _market(), AS_OF, instruments=[instrument]),
+        lambda: apply_scenario(roll, _market(), AS_OF, instruments=[envelope]),
+    )
+    _assert_same(
+        lambda: compute_horizon_return(instrument, _market(), AS_OF, shock),
+        lambda: compute_horizon_return(envelope, _market(), AS_OF, shock),
+    )
+
+
+@pytest.mark.parametrize("cls", EXAMPLE_TYPES, ids=lambda cls: cls.__name__)
+def test_portfolio_position_and_candidate_typed_equal_envelope(cls: type) -> None:
+    instrument = cls.example()
+    envelope = instrument.to_json()
+    kind, _ = _assert_same(
+        lambda: Portfolio.builder("book", "USD", AS_OF).position("P1", instrument, 2.0).build(),
+        lambda: Portfolio.builder("book", "USD", AS_OF).position("P1", envelope, 2.0).build(),
+    )
+    assert kind == "ok"
+    kind, _ = _assert_same(
+        lambda: CandidatePosition("C1", "ACME", instrument, max_weight=0.5),
+        lambda: CandidatePosition("C1", "ACME", envelope, max_weight=0.5),
+    )
+    assert kind == "ok"
+
+
+@pytest.mark.parametrize("cls", EXAMPLE_TYPES, ids=lambda cls: cls.__name__)
+def test_attribution_typed_equal_envelope(cls: type) -> None:
+    instrument = cls.example()
+    envelope = instrument.to_json()
+    t1 = datetime.date(2024, 1, 22)
+    market_t1 = _market(t1, df_5y=0.81)
+    _assert_same(
+        lambda: attribute_pnl(instrument, _market(), market_t1, AS_OF, t1, "parallel"),
+        lambda: attribute_pnl(envelope, _market(), market_t1, AS_OF, t1, "parallel"),
+    )
+
+
+def test_attribution_many_typed_equal_envelope() -> None:
+    instruments = [_fixed_bond(), _frn()]
+    t1 = datetime.date(2024, 1, 22)
+    market_t1 = _market(t1, df_5y=0.81)
+    typed = attribute_pnl_many(instruments, _market(), market_t1, AS_OF, t1, "parallel")
+    via_json = attribute_pnl_many([i.to_json() for i in instruments], _market(), market_t1, AS_OF, t1, "parallel")
+    assert typed.equals(via_json)
+
+
+@pytest.mark.parametrize("make", [_fixed_bond, _frn], ids=["fixed", "frn"])
+def test_priced_scenario_horizon_attribution_typed_equal_envelope(make: Callable[[], Bond]) -> None:
+    """Most examples need curves `_market` lacks; these bonds price on it, so results are compared."""
+    bond = make()
+    envelope = bond.to_json()
+    roll = ScenarioSpec("roll", [OperationSpec.time_roll_forward("1M", roll_mode="calendar_days")])
+    shock = ScenarioSpec("up25", [OperationSpec.curve_parallel_bp("discount", "USD-OIS", 25.0)])
+    t1 = datetime.date(2024, 1, 22)
+    market_t1 = _market(t1, df_5y=0.81)
+    for typed, via_json in [
+        (
+            lambda: apply_scenario(roll, _market(), AS_OF, instruments=[bond]),
+            lambda: apply_scenario(roll, _market(), AS_OF, instruments=[envelope]),
+        ),
+        (
+            lambda: compute_horizon_return(bond, _market(), AS_OF, shock),
+            lambda: compute_horizon_return(envelope, _market(), AS_OF, shock),
+        ),
+        (
+            lambda: attribute_pnl(bond, _market(), market_t1, AS_OF, t1, "parallel"),
+            lambda: attribute_pnl(envelope, _market(), market_t1, AS_OF, t1, "parallel"),
+        ),
+    ]:
+        kind, _ = _assert_same(typed, via_json)
+        assert kind == "ok"
