@@ -5,7 +5,7 @@
 //! (historical scenarios for `hvar` / `expected_shortfall`).
 
 use super::PyValuationResult;
-use crate::bindings::extract::{extract_instrument_json, extract_market};
+use crate::bindings::extract::{extract_instrument, extract_market};
 use crate::bindings::module_utils::{py_to_json_string, py_to_serde};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
 use crate::errors::{core_to_py, display_to_py, value_error};
@@ -816,14 +816,9 @@ fn price_instrument(
     explain: bool,
 ) -> PyResult<PyValuationResult> {
     let overrides = metric_pricing_overrides_json(py, metric_pricing_overrides)?;
-    let json = extract_instrument_json(instrument)?;
+    let instrument = extract_instrument(instrument)?;
     let prepared = py
-        .detach(move || {
-            finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
-                &json,
-                overrides.as_deref(),
-            )
-        })
+        .detach(move || instrument.into_parsed(overrides.as_deref()))
         .map_err(core_to_py)?;
     super::instruments::price_prepared(
         py,
@@ -981,11 +976,10 @@ fn cashflow_envelope(
     as_of: &Bound<'_, PyAny>,
     model: &str,
 ) -> PyResult<InstrumentCashflowEnvelope> {
-    let instrument_json = extract_instrument_json(instrument)?;
-    let instrument = py.detach(move || {
-        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(&instrument_json, None)
-            .map_err(core_to_py)
-    })?;
+    let instrument = extract_instrument(instrument)?;
+    let instrument = py
+        .detach(move || instrument.into_parsed(None))
+        .map_err(core_to_py)?;
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
     let model = model.to_owned();

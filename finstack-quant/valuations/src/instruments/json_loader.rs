@@ -659,7 +659,15 @@ impl InstrumentJson {
     }
 
     /// Validate this payload without cloning or consuming its concrete instrument.
-    pub(crate) fn validate_for_pricing(&self) -> Result<()> {
+    ///
+    /// Runs the same domain validation that [`Self::into_boxed`] and the
+    /// envelope loaders apply before pricing.
+    ///
+    /// # Errors
+    ///
+    /// Returns the concrete instrument's validation error when its state is
+    /// not priceable.
+    pub fn validate_for_pricing(&self) -> Result<()> {
         let instrument = with_instrument_json_registry!(instrument_json_as_instrument_match, self);
         instrument.validate_for_pricing()
     }
