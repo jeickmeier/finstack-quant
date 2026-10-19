@@ -530,7 +530,7 @@ impl CapFloor {
                 return Ok(id);
             }
         }
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::default_rate_calendar_id(
+        finstack_quant_valuations_core::instruments::pricing::overnight::default_rate_calendar_id(
             self.notional.currency(),
         )
         .ok_or_else(|| {
@@ -584,7 +584,7 @@ impl CapFloor {
                 .as_deref()
                 .or(self.calendar_id.as_deref());
             let fixing_calendar =
-                finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
+                finstack_quant_valuations_core::instruments::pricing::overnight::resolve_overnight_fixing_calendar(
                     fixing_calendar_id,
                     self.notional.currency(),
                     &format!("CapFloor '{}'", self.id),
@@ -596,7 +596,7 @@ impl CapFloor {
                 .or(terms.fixing_calendar_id.as_deref());
             for period in &mut periods {
                 (period.accrual_start, period.accrual_end) =
-                    finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::adjust_overnight_accrual_boundaries(
+                    finstack_quant_valuations_core::instruments::pricing::overnight::adjust_overnight_accrual_boundaries(
                         period.accrual_start,
                         period.accrual_end,
                         self.business_day_convention,
@@ -615,7 +615,7 @@ impl CapFloor {
                     },
                 )?;
                 period.payment_date =
-                    finstack_quant_valuations_core::instruments::common_impl::pricing::swap_legs::add_payment_delay(
+                    finstack_quant_valuations_core::instruments::pricing::swap_legs::add_payment_delay(
                         period.accrual_end,
                         terms.payment_lag_days,
                         payment_calendar_id,
@@ -639,12 +639,12 @@ impl CapFloor {
             .as_deref()
             .or(self.calendar_id.as_deref());
         let fixing_calendar =
-            finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
+            finstack_quant_valuations_core::instruments::pricing::overnight::resolve_overnight_fixing_calendar(
                 fixing_calendar_id,
                 self.notional.currency(),
                 &format!("CapFloor '{}'", self.id),
             )?;
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::final_overnight_fixing_date(
+        finstack_quant_valuations_core::instruments::pricing::overnight::final_overnight_fixing_date(
             period.accrual_start,
             period.accrual_end,
             &terms.compounding,

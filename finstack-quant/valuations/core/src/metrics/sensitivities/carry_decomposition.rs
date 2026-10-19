@@ -21,7 +21,7 @@
 //! Floating-rate bonds and OIS/term swaps whose horizon crosses a fixing
 //! therefore reprice instead of failing on the unpublished fixing.
 
-use crate::instruments::common_impl::pricing::coupon_period::icma_reference_period;
+use crate::instruments::pricing::coupon_period::icma_reference_period;
 use crate::metrics::sensitivities::theta::{
     calculate_theta_date, collect_period_cash_cached, theta_termination_date,
 };

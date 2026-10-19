@@ -130,17 +130,7 @@
 #[doc(hidden)]
 pub mod common_impl;
 
-/// Shared pricing helpers used by this crate and `finstack-quant-calibration`.
-pub mod pricing {
-    pub use super::common_impl::pricing::heston_market;
-    pub use super::common_impl::pricing::hw1f_params;
-    pub use super::common_impl::pricing::overnight::default_rate_calendar_id;
-    pub use super::common_impl::pricing::overnight_conventions;
-    pub use super::common_impl::pricing::swap_legs;
-    pub use super::common_impl::pricing::term_fixings;
-    #[doc(hidden)]
-    pub use super::common_impl::pricing::GenericInstrumentPricer;
-}
+pub mod pricing;
 
 /// The persisted instrument-envelope contract: schema marker, size cap,
 /// load-error mapping.
@@ -164,7 +154,6 @@ pub use breakeven::{BreakevenConfig, BreakevenMode, BreakevenTarget};
 pub use common_impl::dependencies::{
     FxPair, InstrumentCurves, MarketDependencies, RatesCurveKind, VolatilityDependency,
 };
-pub use common_impl::pricing::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
 pub use common_impl::traits::{
     Attributes, GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
     OptionGreeksRequest, PricingOptions,

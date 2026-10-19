@@ -108,7 +108,7 @@ items surface through each leaf's `pub use`. Genuinely public submodules are
   instrument-derived `t`.
 - **Leg pricing is shared.** `instruments::pricing::swap_legs` owns fixed-leg
   valuation and payment-delay handling. Floating coupons use the canonical
-  cashflow builder; `common_impl::pricing::overnight` supplies compounded-RFR
+  cashflow builder; `instruments::pricing::overnight` supplies compounded-RFR
   projection (lookback, observation shift, cutoff, fixings) for IRS, cap/floor
   and their risk paths. New swap-like legs reuse these kernels.
 - **Rates are `f64`, notionals are `Money`.** Spreads are basis points on the

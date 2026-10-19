@@ -18,7 +18,7 @@ use finstack_quant_core::types::IndexId;
 use finstack_quant_core::validation;
 use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions;
+use finstack_quant_valuations_core::instruments::pricing::overnight_conventions;
 use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 

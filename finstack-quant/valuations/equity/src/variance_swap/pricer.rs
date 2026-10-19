@@ -93,20 +93,20 @@ pub(crate) fn seasoned_expected_variance(
 }
 
 pub(crate) fn observation_dates(inst: &VarianceSwap) -> Result<Vec<Date>> {
-    finstack_quant_valuations_core::instruments::common_impl::pricing::variance_observations::variance_observation_dates(
+    finstack_quant_valuations_core::instruments::pricing::variance_observations::variance_observation_dates(
         inst.start_date,
         inst.maturity,
         inst.observation_frequency,
         inst.observation_business_day_convention,
         inst.observation_end_of_month,
-        finstack_quant_valuations_core::instruments::common_impl::pricing::variance_observations::VarianceCalendar::Single(
+        finstack_quant_valuations_core::instruments::pricing::variance_observations::VarianceCalendar::Single(
             &inst.observation_calendar_id,
         ),
     )
 }
 
 pub(crate) fn annualization_factor(inst: &VarianceSwap) -> f64 {
-    finstack_quant_valuations_core::instruments::common_impl::pricing::variance_observations::annualization_factor(
+    finstack_quant_valuations_core::instruments::pricing::variance_observations::annualization_factor(
         inst.observation_frequency,
         inst.trading_days_per_year,
     )

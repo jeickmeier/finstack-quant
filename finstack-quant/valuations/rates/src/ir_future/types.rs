@@ -433,7 +433,7 @@ impl InterestRateFuture {
         use finstack_quant_core::market_data::fixings::{
             get_fixing_series, require_fixing_value_exact,
         };
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+        use finstack_quant_valuations_core::instruments::pricing::overnight::{
             project_arithmetic_overnight_rate, project_overnight_coupon,
             resolve_overnight_fixing_calendar, OvernightArithmeticProjectionInput,
             OvernightCouponProjectionInput, OvernightProjectionCurve,
@@ -576,7 +576,7 @@ impl InterestRateFuture {
         projected_rate: f64,
     ) -> finstack_quant_core::Result<f64> {
         use finstack_quant_models::rates::hull_white::{hw_b, HullWhiteParams};
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+        use finstack_quant_valuations_core::instruments::pricing::overnight::{
             project_overnight_coupon, resolve_overnight_fixing_calendar,
             OvernightCouponProjectionInput, OvernightProjectionCurve,
         };

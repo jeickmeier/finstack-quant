@@ -1,20 +1,26 @@
 # common_impl — instrument plumbing
 
 **This directory is family-facing, not a supported downstream API.**
-`instruments/mod.rs` declares it `#[macro_use] #[doc(hidden)] pub mod common_impl;`:
-the instrument families (in the umbrella crate `finstack-quant-valuations` and,
-later, in their own crates) reach their shared kernels by path, and the
-supported items are re-exported flat from `instruments::*` or through the public
-sub-namespace `instruments::pricing`. Add items here when two or more
-instruments need them; they are `pub` (hidden from the rendered docs) so a
-family crate can use them. `#[macro_export]` hoists a macro to the crate root
-regardless; see "What escapes to the public API" below.
+`instruments/mod.rs` declares it `#[macro_use] #[doc(hidden)] pub mod common_impl;`.
+Each item has exactly one public path:
+
+- The contract types (`traits/`, `dependencies.rs`, `listed/`, `parameters/`) live
+  in `pub(crate)` modules and are public only through the flat re-exports at
+  `instruments::*`. Family crates import `finstack_quant_valuations_core::instruments::X`.
+- The `#[macro_export]` macros are public only at the crate root
+  (`finstack_quant_valuations_core::impl_instrument_base!`).
+- The family-facing kernels `helpers`, `margin`, `vol_resolution` and
+  `example_constants` stay `pub` (hidden from the rendered docs) under
+  `common_impl::`, their only path.
+- The shared pricing kernels live in the public module `instruments::pricing`
+  (`instruments/pricing/`), not here.
+
+Add items here when two or more instruments need them.
 
 This is the layer every instrument implements against: the `Instrument` trait
 and its boilerplate macros, the shared parameter vocabulary (leg specs,
-underlying params, market conventions), the shared pricing kernels (swap legs,
-overnight compounding, TRS, variance replication), and the validation /
-numeric-serde helpers that keep instrument invariants uniform.
+underlying params, market conventions), and the validation / numeric helpers
+that keep instrument invariants uniform.
 
 ## Layout
 
@@ -25,16 +31,13 @@ numeric-serde helpers that keep instrument invariants uniform.
 | `traits/instrument.rs` | `Instrument` definition — required methods, default methods, and the override contract for each |
 | `traits/macros.rs` | `impl_instrument_base!`, `impl_focused_pricing_overrides!`, `impl_empty_cashflow_provider!` |
 | `traits/pricing_options.rs` | `PricingOptions` — config, market history, model override, registry override, plus the optional recalibration-provider port |
-| `traits/option_greeks.rs` | `OptionGreekKind`, `OptionGreeksRequest`, `OptionGreeks`, `OptionGreeksProvider`, and `impl_equity_exotic_traits!` (a fourth `#[macro_export]` macro, filed here rather than in `traits/macros.rs`) |
+| `traits/option_greeks.rs` | `OptionGreekKind`, `OptionGreeksRequest`, `OptionGreeks`, `OptionGreeksProvider` |
 | `parameters/` | Shared parameter types (see table below) |
-| `pricing/` | Shared pricing kernels (see table below) |
+| `listed/` | Listed future and future-option terms, and `impl_future_option_instrument!` |
 | `dependencies.rs` | `MarketDependencies`, `InstrumentCurves`, `RatesCurveKind`, `FxPair`, `VolatilityDependency` |
 | `margin.rs` | Helpers shared by the instruments' `Marginable` impls: repriced DV01 / CS01 lookups, SIMM tenor buckets, reference-entity parsing, credit-delta classification, netting-set ids |
 | `helpers.rs` | `ValidatedPricingLifecycle`, metric-context construction, `schedule_pv*`, GBM drift schedules, market-scalar lookups, Black-Scholes input collection, inflation-lag resolution |
-| `validation.rs` | Structural invariant checks (`validate_date_range_strict`, `validate_money_gt`, `validate_recovery_rate`, `validate_rate_magnitude`, …) |
-| `numeric.rs` | `decimal_to_f64` plus the serde adapters that reject non-finite / out-of-range `f64` on the wire |
 | `vol_resolution.rs` | `resolve_sigma_at` — the override-then-surface σ lookup precedence |
-| `fx_dates.rs` | `fx_spot_date_for_pair` plus re-exports of the core joint-calendar helpers |
 
 ### `parameters/`
 
@@ -43,72 +46,29 @@ numeric-serde helpers that keep instrument invariants uniform.
 | `legs.rs` | `PayReceive`, `FixedLegSpec`, `FloatLegSpec`, `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`, `TotalReturnLegSpec` |
 | `underlying.rs` | `FxUnderlyingParams`, `EquityUnderlyingParams`, `CommodityUnderlyingParams`, `IndexUnderlyingParams` |
 | `market.rs` | `OptionType`, `ExerciseStyle`, `SettlementType`, `CreditParams` |
-| `conventions.rs` | `BondConvention`, `CommodityConvention` |
-| `quanto.rs` | `QuantoSpec` (validated correlation in `[-1, 1]`) |
+| `conventions.rs` | `BondConvention`, `CommodityConvention`, `NdfQuoteConvention`, `NotionalExchange`, `ResettingSide` |
+| `convertible.rs` | `ConversionSpec`, `ConversionPolicy`, `ConversionEvent`, `AntiDilutionPolicy`, `DividendAdjustment`, `DilutionEvent`, `PriceTrigger` |
+| `merton_mc.rs` | `MertonMcConfig`, `MertonMcCalibrationSpec`, `CalibrationParameter`, `BarrierCrossing`, `PikMode`, `PikSchedule` |
+| `bond_quote.rs` | `BondQuoteInput` |
+| `bermudan_call.rs`, `monitoring.rs`, `quanto.rs`, `volatility.rs` | `BermudanCallProvision`, `Monitoring`, `QuantoSpec` (validated correlation in `[-1, 1]`), `VolatilityModel` |
 | `trs_common.rs` | `TrsScheduleSpec` — shared by equity and fixed-income TRS |
-| `volatility.rs` | `VolatilityModel` plus a re-export of `crate::models::volatility::SABRParameters` |
 
 `OptionMarketParams` is re-exported directly from `finstack-quant-models`, its
 canonical owner.
 
-### `pricing/`
-
-| File | Visibility | Contents |
-|------|-----------|----------|
-| `swap_legs.rs` | `pub` (reachable as `instruments::pricing::swap_legs`) | `pv_fixed_leg`, `add_payment_delay`, `FixedLegParams`, `ANNUITY_EPSILON` |
-| `time.rs` | `pub` | Curve-consistent time mapping: `relative_df_discount_curve`, `relative_df_discounting`, `curve_time`, `rate_between_on_dates`, `rate_period_on_dates` |
-| `variance_replication.rs` | `pub` | `carr_madan_forward_variance` — shared by equity and FX variance swaps |
-| `generic.rs` | private module, `GenericInstrumentPricer` re-exported `#[doc(hidden)]` | Downcasts and calls `Instrument::base_value`; the registry applies scenario shocks around it |
-| `trs.rs` | private module, types re-exported | `TrsEngine`, `TrsReturnModel`, `TotalReturnLegParams`, `PeriodReturnInputs` |
-| `overnight.rs` | hidden `pub` | Compounded overnight-RFR projection: lookback, observation shift, rate cutoff, fixings |
-| `floating_reset_descriptors.rs` | hidden `pub` | Turns future-reset floating coupons into node-coupon descriptors for the rates-credit lattice |
-| `variance_observations.rs` | hidden `pub` | Observation schedules for realized-variance instruments, single or joint FX calendars |
-
 ## What escapes to the public API
 
-Everything below is re-exported by `instruments/mod.rs`; the module paths under
-`common_impl` are not.
+Everything public in `traits/`, `dependencies.rs`, `listed/` and `parameters/`
+is re-exported flat at `instruments::*` (see `instruments/mod.rs`); their module
+paths under `common_impl` are crate-private. A `pub` field whose type lives only
+in one of those modules must have that type added to the flat re-export list in
+the same change.
 
-- Flat at `instruments::*` — `Instrument`, `Attributes`, `PricingOptions`,
-  `OptionGreekKind`, `OptionGreeks`, `OptionGreeksProvider`,
-  `OptionGreeksRequest`; `MarketDependencies`, `InstrumentCurves`,
-  `RatesCurveKind`, `FxPair`, `VolatilityDependency`; `TrsEngine`,
-  `TrsReturnModel`, `TotalReturnLegParams`; `TrsScheduleSpec`;
-  `fx_spot_date_for_pair`; and the `parameters` subset listed in
-  `instruments/mod.rs` (`FixedLegSpec`, `FloatLegSpec`,
-  `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`,
-  `TotalReturnLegSpec`, `PayReceive`,
-  `OptionType`, `ExerciseStyle`, `SettlementType`,
-  `CreditParams`, `OptionMarketParams`,
-  `BondConvention` and the four `*UnderlyingParams`).
-- `instruments::pricing` — glob of `common_impl::pricing`'s public items.
-- `instruments::cashflow_export` is a sibling module, not part of this
-  directory: the per-flow exporter asks each instrument for its
-  `CashflowExportTerms` through the `Instrument` hooks defined in
-  `traits/instrument.rs`.
-- Crate root, via `#[macro_export]` — `impl_instrument_base!`,
-  `impl_focused_pricing_overrides!`, `impl_empty_cashflow_provider!` (all three
-  in `traits/macros.rs`) and `impl_equity_exotic_traits!` (in
-  `traits/option_greeks.rs`; it implements `crate::metrics::HasExpiry` and
-  `HasDayCount` for a type with `expiry` and `day_count` fields). `#[macro_export]`
-  hoists a macro to the crate root regardless of the module's visibility, so all
-  four are public API even though `common_impl` is not. In-crate call sites bring
-  them in with `use crate::impl_instrument_base;`.
-
-Not re-exported, and therefore reachable only by the hidden `common_impl` path: `QuantoSpec`,
-`CommodityConvention`, `parameters::volatility::VolatilityModel`,
-everything in `helpers.rs`, `validation.rs`, `numeric.rs`,
-`vol_resolution.rs`, and the hidden modules under `pricing/`.
-
-Three of those appear in the type of a `pub` field on a public item and are
-therefore visible in rustdoc and in the JSON schema but not nameable by a
-downstream crate: `exotics::RangeAccrualTerms::quanto: Option<QuantoSpec>`,
-`commodity::{CommodityForward, CommoditySpotOption}::convention:
-Option<CommodityConvention>`, and
-`instruments::pricing_overrides::ModelConfig::vol_model:
-Option<VolatilityModel>`. Adding a `pub` field whose type lives only under
-`common_impl` extends that list — export the type from `instruments/mod.rs` in
-the same change, or keep the field private.
+The four `#[macro_export]` macros — `impl_instrument_base!`,
+`impl_focused_pricing_overrides!`, `impl_empty_cashflow_provider!` (all in
+`traits/macros.rs`) and `impl_future_option_instrument!` (in `listed/`) — are
+public at the crate root and nowhere else. In-crate call sites bring them in
+with `use crate::impl_instrument_base;`.
 
 ## The `Instrument` contract
 
@@ -175,7 +135,7 @@ methods.
   `unwrap`/`expect` on user input.
 - **Two clocks.** A pricer that mixes an instrument day count with a curve day
   count must derive the model rate with `helpers::zero_rate_from_df` (so that
-  `exp(-r·t_vol) = df`) or go through `pricing::time`, never divide a
+  `exp(-r·t_vol) = df`) or use the curve's own `df_between_dates`, never divide a
   discount factor's log by an unrelated year fraction.
 - **Volatility precedence.** Surface-driven pricers call
   `vol_resolution::resolve_sigma_at` so the `MarketQuoteOverrides::implied_volatility`
@@ -201,7 +161,7 @@ The parts this directory owns:
    products still return an explicit empty schedule tagged so `Placeholder` and
    `NoResidual` stay distinguishable.
 4. Reuse `parameters/` types instead of inventing a parallel leg or underlying
-   struct, and reuse `pricing/swap_legs` / `pricing/time` instead of open-coding
+   struct, and reuse `instruments::pricing::swap_legs` instead of open-coding
    discounting.
 
 ## Tests

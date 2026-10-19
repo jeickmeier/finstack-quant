@@ -10,7 +10,7 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::math::neumaier_sum;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::{
+use finstack_quant_valuations_core::instruments::pricing::{
     FinancingLegFlows, PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
 };
 use finstack_quant_valuations_core::instruments::PayReceive;

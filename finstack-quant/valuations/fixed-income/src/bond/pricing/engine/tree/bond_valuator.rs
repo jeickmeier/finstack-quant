@@ -10,7 +10,7 @@ use finstack_quant_core::Result;
 use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
 use finstack_quant_models::{NodeState, TreeDiscounting, TreeValuator};
-use finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::continuous_frp_weight;
+use finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight;
 
 /// Bond valuator for tree-based pricing of callable/putable bonds.
 ///

@@ -396,7 +396,7 @@ fn test_rates_credit_default_lowers_price() {
         ..Default::default()
     });
     let low_targets =
-        finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::build_rates_credit_targets(
+        finstack_quant_valuations_core::instruments::pricing::rates_credit::build_rates_credit_targets(
             disc_low.as_ref(),
             low_hc_ref.as_ref(),
             as_of,
@@ -418,7 +418,7 @@ fn test_rates_credit_default_lowers_price() {
         ..Default::default()
     });
     let high_targets =
-        finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::build_rates_credit_targets(
+        finstack_quant_valuations_core::instruments::pricing::rates_credit::build_rates_credit_targets(
             disc_high.as_ref(),
             high_hc_ref.as_ref(),
             as_of,

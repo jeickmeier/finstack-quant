@@ -13,7 +13,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::coupon_period::icma_reference_period;
+use finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period;
 use rust_decimal::prelude::ToPrimitive;
 
 /// Discount factor from yield.

@@ -11,7 +11,7 @@ use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTree
 use finstack_quant_models::trees::short_rate_tree::TreeCalibrationResult;
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
 use finstack_quant_models::{ShortRateTree, ShortRateTreeConfig};
-use finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::build_daily_bond_rates_credit_targets;
+use finstack_quant_valuations_core::instruments::pricing::rates_credit::build_daily_bond_rates_credit_targets;
 use finstack_quant_valuations_core::instruments::pricing_overrides::resolve_rates_credit_config;
 use std::borrow::Cow;
 

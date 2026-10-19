@@ -13,11 +13,11 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+use finstack_quant_valuations_core::instruments::pricing::overnight::{
     adjust_overnight_accrual_boundaries, project_overnight_coupon, OvernightCouponProjectionInput,
     OvernightProjectionCurve,
 };
-use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions;
+use finstack_quant_valuations_core::instruments::pricing::overnight_conventions;
 
 /// Build the canonical accrual/payment periods for a revolving credit facility.
 ///
@@ -374,7 +374,7 @@ pub(super) fn project_revolver_floating_rate(
         .as_deref()
         .or(input.calendar_id);
     let calendar =
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
+        finstack_quant_valuations_core::instruments::pricing::overnight::resolve_overnight_fixing_calendar(
             calendar_id,
             input.currency,
             "RevolvingCredit",
@@ -692,7 +692,7 @@ mod tests {
     fn overnight_index_uses_shared_compounding_engine() {
         use finstack_quant_core::dates::calendar_by_id_strict;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+        use finstack_quant_valuations_core::instruments::pricing::overnight::{
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
         use rust_decimal::Decimal;

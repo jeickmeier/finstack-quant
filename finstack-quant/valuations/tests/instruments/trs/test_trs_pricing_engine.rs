@@ -5,7 +5,7 @@
 use super::test_utils::*;
 use finstack_quant_core::currency::Currency::USD;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::TrsEngine;
+use finstack_quant_valuations::instruments::pricing::TrsEngine;
 
 // Financing Leg PV Tests
 

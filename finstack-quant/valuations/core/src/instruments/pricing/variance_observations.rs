@@ -10,7 +10,12 @@ pub enum VarianceCalendar<'a> {
     /// One named exchange or fixing-publication calendar.
     Single(&'a str),
     /// Joint base/quote currency calendars for FX observations.
-    Joint { base: &'a str, quote: &'a str },
+    Joint {
+        /// Calendar id of the base currency.
+        base: &'a str,
+        /// Calendar id of the quote currency.
+        quote: &'a str,
+    },
 }
 
 struct ResolvedVarianceCalendar(&'static dyn HolidayCalendar);
