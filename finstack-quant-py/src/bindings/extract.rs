@@ -3,12 +3,15 @@
 //! Each helper accepts a `&Bound<'_, PyAny>` and tries two paths:
 //!
 //! 1. **Typed fast path** — cast to the corresponding `#[pyclass]` wrapper
-//!    and borrow the inner Rust type (no clone, no JSON parse).
-//! 2. **Canonical JSON path** — extract a Python `str`, then deserialize the
-//!    same serde contract used by Rust.
+//!    and use the inner Rust value directly: the `*Access` enums borrow it
+//!    (no clone), and [`extract_instrument`] clones it (no JSON).
+//! 2. **Canonical JSON path** — extract a Python `str` (or envelope `dict`),
+//!    then deserialize the same serde contract used by Rust.
 //!
 //! The `*Access` enums wrap both paths behind a `Deref<Target = T>` impl so
 //! pipeline functions can accept `T | str` without branching.
+//! [`extract_instrument_json`] is the exception: it serializes a typed
+//! instrument to envelope text, for Rust APIs that take JSON.
 
 use pyo3::prelude::*;
 
@@ -17,7 +20,9 @@ use crate::bindings::portfolio::types::{PyPortfolio, PyPortfolioValuation};
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::valuations::composite::PyCompositeInstrument;
-use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
+use crate::bindings::valuations::instruments::{
+    serialize_typed_instrument_json, PyBond, PyTermLoan,
+};
 use crate::bindings::valuations::typed_asset_backed_facility::PyAssetBackedFacility;
 use crate::bindings::valuations::typed_credit::{
     PyCdsIndex, PyCdsOption, PyCdsTranche, PyConvertibleBond, PyCreditDefaultSwap,
@@ -28,89 +33,129 @@ use crate::bindings::valuations::typed_rates::{PyCapFloor, PyInterestRateSwap, P
 use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
 use crate::bindings::valuations::typed_structured_credit::PyStructuredCredit;
 use crate::errors::{display_to_py as to_py, portfolio_to_py};
+use finstack_quant_valuations::instruments::InstrumentJson;
+use finstack_quant_valuations::pricer::ParsedInstrument;
 
-// Instrument — typed-or-JSON extraction to a canonical instrument envelope
+// Instrument — typed-or-JSON extraction
 
-/// Extract a canonical instrument envelope from a typed instrument object
-/// (fast path), an envelope `dict`, or a pre-serialized envelope string
-/// (fallback).
+/// A polymorphic instrument argument: a typed instance's native payload, or
+/// canonical envelope JSON text from a `dict` or `str`.
 ///
-/// Typed instances serialize through the same `InstrumentEnvelope` the JSON
-/// loader parses, so downstream pricing observes identical payloads for both
-/// input forms.
+/// The typed arm skips the JSON round trip; the envelope arm parses through
+/// the Rust envelope loader. Both prepare instruments identically: overrides
+/// merge before validation, and validation runs once.
+pub enum InstrumentArg {
+    /// Clone of a typed instance's inner Rust instrument, not yet validated.
+    Typed(Box<InstrumentJson>),
+    /// Canonical `finstack_quant.instrument/1` envelope JSON text.
+    Envelope(String),
+}
+
+impl InstrumentArg {
+    /// Merge optional metric pricing overrides, validate, and box the
+    /// instrument for pricing dispatch.
+    ///
+    /// # Arguments
+    ///
+    /// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON
+    ///   patch merged before validation; `None` keeps stored controls.
+    pub fn into_parsed(
+        self,
+        metric_pricing_overrides: Option<&str>,
+    ) -> finstack_quant_core::Result<ParsedInstrument> {
+        match self {
+            Self::Typed(instrument) => {
+                ParsedInstrument::from_instrument_json(*instrument, metric_pricing_overrides)
+            }
+            Self::Envelope(json) => {
+                finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
+                    &json,
+                    metric_pricing_overrides,
+                )
+            }
+        }
+    }
+
+    /// Validate the instrument and return its tagged payload.
+    pub fn into_instrument_json(self) -> finstack_quant_core::Result<InstrumentJson> {
+        match self {
+            Self::Typed(instrument) => {
+                instrument.validate_for_pricing()?;
+                Ok(*instrument)
+            }
+            Self::Envelope(json) => {
+                finstack_quant_valuations::pricer::json::parse_instrument_from_json(&json)
+            }
+        }
+    }
+}
+
+/// Extract an instrument argument from a typed instrument object, an envelope
+/// `dict`, or a pre-serialized envelope string.
 ///
 /// # Extending this function
 ///
-/// Every typed instrument class added to
-/// `finstack-quant-py/src/bindings/valuations/instruments.rs` is wired in
-/// here by adding exactly **one** cast arm (`obj.cast::<PyNewType>()` ->
-/// `.envelope_json()`), ordered before the final `str` fallback. Nothing else
-/// in the pricing pipeline (`pricing.rs`, `price_instrument`, etc.) needs to
-/// change — callers already accept `instrument_json: &Bound<'_, PyAny>` and
-/// funnel through this one function. Update the fallback error message
-/// below to name each newly landed class so the message stays accurate.
+/// Every typed instrument class is wired in here by adding exactly **one**
+/// cast arm that clones its `inner` into the matching [`InstrumentJson`]
+/// variant, ordered before the final envelope fallback. Update the fallback
+/// error message below to name each newly landed class.
 ///
 /// Currently wired: `Bond`, `TermLoan`, `InterestRateSwap`, `Swaption`,
 /// `CapFloor`, `CreditDefaultSwap`, `CdsIndex`, `FxForward`, `FxOption`,
 /// `CdsTranche`, `CdsOption`, `ConvertibleBond`, `EquityOption`, `StructuredCredit`,
 /// `RevolvingCredit`, `AssetBackedFacility`, `CompositeInstrument`.
-pub fn extract_instrument_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(composite) = obj.cast::<PyCompositeInstrument>() {
-        return composite.borrow().envelope_json();
+pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
+    macro_rules! typed {
+        ($($py:ty => $wrap:expr),+ $(,)?) => {
+            $(
+                if let Ok(typed) = obj.cast::<$py>() {
+                    let inner = typed.borrow().inner.clone();
+                    return Ok(InstrumentArg::Typed(Box::new($wrap(inner))));
+                }
+            )+
+        };
     }
-    if let Ok(bond) = obj.cast::<PyBond>() {
-        return bond.borrow().envelope_json();
-    }
-    if let Ok(loan) = obj.cast::<PyTermLoan>() {
-        return loan.borrow().envelope_json();
-    }
-    if let Ok(facility) = obj.cast::<PyRevolvingCredit>() {
-        return facility.borrow().envelope_json();
-    }
-    if let Ok(facility) = obj.cast::<PyAssetBackedFacility>() {
-        return facility.borrow().envelope_json();
-    }
-    if let Ok(swap) = obj.cast::<PyInterestRateSwap>() {
-        return swap.borrow().envelope_json();
-    }
-    if let Ok(swaption) = obj.cast::<PySwaption>() {
-        return swaption.borrow().envelope_json();
-    }
-    if let Ok(cap_floor) = obj.cast::<PyCapFloor>() {
-        return cap_floor.borrow().envelope_json();
-    }
-    if let Ok(cds) = obj.cast::<PyCreditDefaultSwap>() {
-        return cds.borrow().envelope_json();
-    }
-    if let Ok(cds_index) = obj.cast::<PyCdsIndex>() {
-        return cds_index.borrow().envelope_json();
-    }
-    if let Ok(fx_forward) = obj.cast::<PyFxForward>() {
-        return fx_forward.borrow().envelope_json();
-    }
-    if let Ok(fx_option) = obj.cast::<PyFxOption>() {
-        return fx_option.borrow().envelope_json();
-    }
-    if let Ok(cds_option) = obj.cast::<PyCdsOption>() {
-        return cds_option.borrow().envelope_json();
-    }
-    if let Ok(cds_tranche) = obj.cast::<PyCdsTranche>() {
-        return cds_tranche.borrow().envelope_json();
-    }
-    if let Ok(convertible) = obj.cast::<PyConvertibleBond>() {
-        return convertible.borrow().envelope_json();
-    }
-    if let Ok(equity_option) = obj.cast::<PyEquityOption>() {
-        return equity_option.borrow().envelope_json();
-    }
-    if let Ok(structured_credit) = obj.cast::<PyStructuredCredit>() {
-        return structured_credit.borrow().envelope_json();
-    }
-    envelope_json_text(obj).map_err(|_| {
+    typed!(
+        PyCompositeInstrument => InstrumentJson::from,
+        PyBond => InstrumentJson::Bond,
+        PyTermLoan => InstrumentJson::TermLoan,
+        PyRevolvingCredit => InstrumentJson::RevolvingCredit,
+        PyAssetBackedFacility => |inner| InstrumentJson::AssetBackedFacility(Box::new(inner)),
+        PyInterestRateSwap => InstrumentJson::InterestRateSwap,
+        PySwaption => InstrumentJson::Swaption,
+        PyCapFloor => InstrumentJson::CapFloor,
+        PyCreditDefaultSwap => InstrumentJson::CreditDefaultSwap,
+        PyCdsIndex => InstrumentJson::CdsIndex,
+        PyFxForward => InstrumentJson::FxForward,
+        PyFxOption => InstrumentJson::FxOption,
+        PyCdsOption => InstrumentJson::CdsOption,
+        PyCdsTranche => InstrumentJson::CdsTranche,
+        PyConvertibleBond => InstrumentJson::ConvertibleBond,
+        PyEquityOption => InstrumentJson::EquityOption,
+        PyStructuredCredit => |inner| InstrumentJson::StructuredCredit(Box::new(inner)),
+    );
+    envelope_json_text(obj).map(InstrumentArg::Envelope).map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(
             "expected a canonical instrument envelope (dict or JSON string) or a typed instrument instance",
         )
     })
+}
+
+/// Extract canonical instrument-envelope JSON text from a typed instrument
+/// object, an envelope `dict`, or a pre-serialized envelope string.
+///
+/// Typed instances are serialized to the same `InstrumentEnvelope` the JSON
+/// loader parses. Use this only where the Rust API takes envelope text;
+/// callers that need the instrument itself use [`extract_instrument`], which
+/// skips the serialize-and-parse round trip.
+pub fn extract_instrument_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
+    match extract_instrument(obj)? {
+        InstrumentArg::Typed(instrument) => {
+            let what = instrument.type_tag();
+            serialize_typed_instrument_json(*instrument, what)
+        }
+        InstrumentArg::Envelope(json) => Ok(json),
+    }
 }
 
 /// Canonical instrument-envelope JSON text from an envelope `dict` (as

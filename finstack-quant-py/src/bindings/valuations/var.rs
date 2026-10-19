@@ -7,7 +7,7 @@
 
 use super::instruments::spec_from_py;
 use super::pricing::PyMarketHistory;
-use crate::bindings::extract::{extract_instrument_json, extract_market};
+use crate::bindings::extract::{extract_instrument, extract_market, InstrumentArg};
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_valuations::metrics::risk::{
@@ -119,21 +119,19 @@ fn calculate_var(
     config: Option<&Bound<'_, PyAny>>,
     model: &str,
 ) -> PyResult<PyVarResult> {
-    let envelopes = instruments
+    let instruments = instruments
         .iter()
-        .map(extract_instrument_json)
-        .collect::<PyResult<Vec<String>>>()?;
+        .map(extract_instrument)
+        .collect::<PyResult<Vec<InstrumentArg>>>()?;
     let history = extract_history(py, history)?;
     let config = extract_config(py, config)?;
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let model = model.to_owned();
     py.detach(move || {
-        let parsed = envelopes
-            .iter()
-            .map(|json| {
-                finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(json, None)
-            })
+        let parsed = instruments
+            .into_iter()
+            .map(|instrument| instrument.into_parsed(None))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
         let refs: Vec<_> = parsed.iter().map(|p| p.as_instrument()).collect();
         rust_calculate_var(
