@@ -104,6 +104,7 @@ pub fn replayable_standard_market(as_of: Date) -> MarketContext {
             pillars: &pillars,
             recovery_rate: STANDARD_RECOVERY_SENIOR,
             cds_valuation_convention: None,
+            doc_clause: None,
         },
     )
     .expect("hazard calibration should succeed");
