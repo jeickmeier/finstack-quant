@@ -926,8 +926,6 @@ dependencies = [
  "nalgebra",
  "num-complex",
  "proptest",
- "rand 0.9.5",
- "rand_pcg",
  "rayon",
  "schemars",
  "serde",
@@ -950,7 +948,6 @@ dependencies = [
  "finstack-quant-core",
  "finstack-quant-factor",
  "finstack-quant-margin",
- "finstack-quant-models",
  "finstack-quant-scenarios",
  "finstack-quant-valuations",
  "good_lp",
@@ -1104,12 +1101,9 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "smallvec",
  "strum",
- "thiserror",
  "time",
  "toml",
- "tracing",
 ]
 
 [[package]]

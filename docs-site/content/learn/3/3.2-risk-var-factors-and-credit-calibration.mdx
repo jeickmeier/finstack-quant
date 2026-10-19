@@ -436,7 +436,7 @@ from copy import deepcopy
 dts_config = deepcopy(calibration_config)
 dts_config["bucket_weighting"] = "dts"
 dts_inputs = deepcopy(calibration_inputs)
-dts_inputs["spread_durations"] = {issuer: 5.0 for issuer in as_of_spreads}
+dts_inputs["spread_durations"] = dict.fromkeys(as_of_spreads, 5.0)
 dts_model = CreditCalibrator(dts_config).calibrate(dts_inputs)
 weights_dts = {issuer: 5.0 * spread * 10_000 for issuer, spread in as_of_spreads.items()}
 print("DTS weights (spread-duration years x spread bp):", weights_dts)

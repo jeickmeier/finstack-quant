@@ -99,7 +99,7 @@ def optimize_units(cap,turnover=None):
  return result
 corner=optimize_units(1.)
 constrained=optimize_units(.35,.40)
-print(pd.DataFrame({"expected_annual_profit_per_full_contract_USD":expected_profit,"initial_units":{pid:initial_quantity for pid in position_ids},"corner_units":{pid:initial_quantity*w for pid,w in corner.optimal_weights.items()},"constrained_units":{pid:initial_quantity*w for pid,w in constrained.optimal_weights.items()}}).to_string())
+print(pd.DataFrame({"expected_annual_profit_per_full_contract_USD":expected_profit,"initial_units":dict.fromkeys(position_ids,initial_quantity),"corner_units":{pid:initial_quantity*w for pid,w in corner.optimal_weights.items()},"constrained_units":{pid:initial_quantity*w for pid,w in constrained.optimal_weights.items()}}).to_string())
 print({"corner_objective_usd":corner.objective_value,"constrained_objective_usd":constrained.objective_value,"sum_absolute_quantity_changes":initial_quantity*constrained.turnover,"binding":constrained.binding_constraints()})
 ```
 {/* /notebook-block */}

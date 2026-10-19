@@ -29,12 +29,13 @@ pay for every domain's registration.
 |------------------|------------|
 | `finstack_quant.analytics` | `finstack-quant-analytics` |
 | `finstack_quant.attribution` | `finstack-quant-attribution` |
+| `finstack_quant.calibration` | `finstack-quant-calibration` |
 | `finstack_quant.cashflows` | `finstack-quant-cashflows` |
 | `finstack_quant.core` | `finstack-quant-core` |
 | `finstack_quant.covenants` | `finstack-quant-covenants` |
 | `finstack_quant.features` | `finstack-quant-features` |
 | `finstack_quant.margin` | `finstack-quant-margin` |
-| `finstack_quant.models` (including `.factor`) | `finstack-quant-models` |
+| `finstack_quant.models` (including `.factor`) | `finstack-quant-models`, `finstack-quant-factor` |
 | `finstack_quant.portfolio` | `finstack-quant-portfolio` |
 | `finstack_quant.scenarios` | `finstack-quant-scenarios` |
 | `finstack_quant.statements` | `finstack-quant-statements` |
@@ -46,7 +47,7 @@ Two more names are exported from the package root and are not domain crates:
 - `finstack_quant.schema` — a compiled submodule bound from the umbrella
   crate's own `schema` module. `index()`, `get(selector, profile=...)`,
   `validate(selector, payload)`, `domains()`. It merges the per-domain registries
-  (`domains()` lists the nine that publish schemas) into one domain-labelled
+  (`domains()` lists the ten that publish schemas) into one domain-labelled
   index, so a caller does not have to hard-code the domain list.
 - `finstack_quant.reporting` — a **pure-Python** presentation layer (tear
   sheets, tables, charts, themes) with no Rust counterpart. It is explicitly

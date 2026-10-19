@@ -3,7 +3,7 @@
 Instrument pricing, risk metrics, cashflow projection, and market-structure
 calibration. This is the mid-stack hub of the workspace: it turns market quotes
 into a `MarketContext`, turns instruments plus a `MarketContext` into a
-[`ValuationResult`](src/results/README.md), and exposes the metric calculators
+[`ValuationResult`](core/src/results/README.md), and exposes the metric calculators
 that produce DV01, CS01, Greeks, spreads, and VaR.
 
 ## Where it sits
@@ -14,10 +14,10 @@ Depends on (see [`Cargo.toml`](Cargo.toml)):
 |-------|----------|
 | [`finstack-quant-core`](../core/README.md) | `Money`, `Currency`, dates/day-count, `MarketContext`, curves/surfaces, math, config |
 | [`finstack-quant-cashflows`](../cashflows/README.md) | schedule generation, accrual, the `CashflowProvider` supertrait of `Instrument` |
-| [`finstack-quant-analytics`](../analytics/README.md) | shared statistics and the canonical correlation-matrix helpers |
 | [`finstack-quant-covenants`](../covenants/README.md) | `CovenantReport` attached to `ValuationResult::covenants` |
 | [`finstack-quant-margin`](../margin/README.md) | `Marginable` bridge (`Instrument::as_marginable`) for VM/IM and XVA |
 | [`finstack-quant-models`](../models/README.md) | closed-form/Fourier formulas, SABR, PDE/tree engines, structural credit, correlation, and Monte Carlo |
+| [`finstack-quant-valuations-core`](core/README.md) and the seven family crates | pricing framework (`Instrument`, registries, metrics, results, conventions) and instrument implementations (`rates`, `fixed-income`, `structured-credit`, `credit`, `equity`, `fx`, `exotics`) |
 | `finstack-quant-valuations-macros` | `FinancialBuilder` derive, which generates `Type::builder()` (`macros/`) |
 
 Consumed by [`attribution`](../attribution/README.md),
@@ -93,9 +93,9 @@ split.
 `pricer::InstrumentType` has 71 variants; the JSON registry in
 `instruments/json_loader.rs` covers 70 loadable instrument types. Several
 instruments carry their own README — for example
-[`fixed_income/bond`](src/instruments/fixed_income/bond/README.md),
+[`fixed_income/bond`](fixed-income/src/bond/README.md),
 [`structured_credit`](structured-credit/src/structured_credit/README.md),
-and [`rates/irs`](src/instruments/rates/irs/README.md).
+and [`rates/irs`](rates/src/irs/README.md).
 
 ## Example
 
@@ -142,8 +142,8 @@ fn main() -> finstack_quant_core::Result<()> {
 
 Building a `MarketContext` from raw quotes goes through the calibration engine
 rather than through hand-assembled curves; see
-[`src/calibration/README.md`](src/calibration/README.md) and the runnable
-envelopes in [`examples/market_bootstrap/`](examples/market_bootstrap/README.md).
+[`../calibration/README.md`](../calibration/README.md) and the runnable
+envelopes in [`../calibration/examples/market_bootstrap/`](../calibration/examples/market_bootstrap/README.md).
 
 ## Conventions that bite
 
@@ -157,7 +157,7 @@ throughout. See [INVARIANTS.md §1](../../INVARIANTS.md).
 **Currency safety.** `Money` arithmetic requires matching currencies. Pricers do
 not convert implicitly; when a conversion or cross-currency discounting
 assumption is applied it is stamped in `ResultsMeta::fx_policy_applied` (see
-[`src/results/README.md`](src/results/README.md) for the precedence rules).
+[`core/src/results/README.md`](core/src/results/README.md) for the precedence rules).
 
 **Rate units.** Rates and spreads are decimals unless a field or method name says
 otherwise. Fields and arguments named `*_bp` are basis points. Calibration bump

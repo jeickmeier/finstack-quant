@@ -468,6 +468,7 @@ fn create_stochastic_hazard_callable(
         .expect("floating PIK benchmark bond");
         if let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec {
             spec.coupon_type = CouponType::Pik;
+            spec.rate_spec.index_floor_bp = Some(rust_decimal::Decimal::ZERO);
         }
         bond
     } else {

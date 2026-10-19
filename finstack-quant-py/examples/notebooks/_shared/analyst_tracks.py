@@ -961,8 +961,33 @@ def build_market(stage: str, as_of: date = AS_OF, *, core_stage: str | None = No
             )
         )
         # Issuer hazard curve for the analyst convertible: flat 2.5% intensity,
-        # zero recovery (the zero-recovery risky discount factor is DF_OIS x S).
-        market.insert(HazardCurve("CONVERT-RISKY", as_of, [(1.0, 0.025)], recovery_rate=0.0))
+        # zero recovery (the zero-recovery risky discount factor is DF_OIS x S),
+        # calibrated from a single 5Y zero-recovery CDS quote so quote-space CS01
+        # replays cleanly while preserving the exact 2.5% flat hazard rate.
+        convert_env = common.calibration_envelope("base", as_of)
+        convert_env["plan"]["id"] = "analyst-convert-market"
+        convert_env["plan"]["quote_sets"]["issuer_a_cds_quotes"] = ["ISSUER-A-CDS-5Y"]
+        for step in convert_env["plan"]["steps"]:
+            if step["kind"] == "hazard":
+                step.update({
+                    "id": "CONVERT-RISKY",
+                    "curve_id": "CONVERT-RISKY",
+                    "entity": "CONVERT-ISSUER",
+                    "recovery_rate": 0.0,
+                })
+        convert_env["market_data"] = [
+            quote
+            for quote in convert_env["market_data"]
+            if quote["kind"] != "cds_quote" or quote["id"] == "ISSUER-A-CDS-5Y"
+        ]
+        for quote in convert_env["market_data"]:
+            if quote["kind"] == "cds_quote":
+                quote.update({
+                    "entity": "CONVERT-ISSUER",
+                    "spread_bp": 251.34108361292067,
+                    "recovery_rate": 0.0,
+                })
+        market.insert(calibrate(convert_env).market.get_hazard("CONVERT-RISKY"))
         market.insert(
             DiscountCurve(
                 "CONVERT-LIMIT-DF",

@@ -180,6 +180,7 @@ print(pd.DataFrame(tranche_rows))
 <ExecutedOutput lesson="C4" block="c4-workflow-5" />
 {/* notebook-block notebook="02_pricing/instruments/credit_index_and_options.ipynb" cell="c4-tranche-delta" role="build" */}
 ```python exec id=c4-tranche-delta role=build
+from finstack_quant.models.volatility import get_surface_vol
 one_bp=tracks.credit_calibration_envelope()
 for quote in one_bp["market_data"]:
     if quote["kind"]=="cds_quote":quote["spread_bp"]+=1.
@@ -193,7 +194,7 @@ tranche_delta=(tranche_bumped-tranche_base)/(index_bumped-index_base)
 print({"index_1bp_pnl":index_bumped-index_base,"tranche_1bp_pnl":tranche_bumped-tranche_base,
        "tranche_delta_in_index_units":tranche_delta})
 print(pd.DataFrame([{"expiry_years":t,"spread_strike_decimal":k,
-    "lognormal_spread_vol":market.get_surface("CDX-OPTION-VOL").vol(t,k)}
+    "lognormal_spread_vol":get_surface_vol(market.get_surface("CDX-OPTION-VOL"),t,k)}
     for t in [.25,.5,1.] for k in [.0025,.01,.03]]))
 ```
 {/* /notebook-block */}

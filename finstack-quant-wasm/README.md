@@ -11,10 +11,11 @@ the Rust crate — not here.
 
 ## Where it sits
 
-The crate depends on the 13 domain crates under [`../finstack-quant/`](../finstack-quant)
-(`core`, `analytics`, `attribution`, `cashflows`, `covenants`,
-`features`, `margin`, `models`, `valuations`, `statements`,
-`statements-analytics`, `portfolio`, `scenarios`). No Rust crate depends on this one.
+The crate depends on the domain crates under [`../finstack-quant/`](../finstack-quant)
+(`core`, `analytics`, `attribution`, `calibration`, `cashflows`, `covenants`,
+`factor`, `features`, `margin`, `models`, `valuations`, `statements`,
+`statements-analytics`, `portfolio`, `scenarios`) plus the umbrella crate
+`finstack-quant`. No Rust crate depends on this one.
 
 [`finstack-quant-py`](../finstack-quant-py/README.md) is the sibling binding layer;
 the two are held to the same result-return contract, and their return-shape tests are

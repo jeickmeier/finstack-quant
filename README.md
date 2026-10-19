@@ -53,7 +53,16 @@ finstack-quant/
 │   ├── margin/                   # CSA/VM/IM, SIMM, FRTB-SBA, SA-CCR, XVA
 │   ├── models/                   # analytical, numerical, credit, correlation, stochastic models
 │   ├── factor/                   # multi-asset factor models (umbrella path models::factor)
-│   ├── valuations/               # instruments, pricing, recalibration port, metrics, results
+│   ├── valuations/               # umbrella over core framework + instrument-family crates
+│   │   ├── core/                 # `Instrument` trait, registries, metrics, results, conventions
+│   │   ├── rates/                # interest-rate and inflation instruments
+│   │   ├── fixed-income/         # bonds, loans, agency MBS/TBA/dollar rolls, FI-TRS, futures
+│   │   ├── structured-credit/    # ABS/RMBS/CMBS/CLO deals, agency CMOs, asset-backed facilities
+│   │   ├── credit/               # CDS, CDS indices, tranches, CDS options
+│   │   ├── equity/               # equity spot, options, futures, TRS, variance, DCF, PE funds
+│   │   ├── fx/                   # FX spot, forwards, swaps, NDFs, futures, vanilla/exotic options
+│   │   ├── exotics/              # Asian/barrier/lookback/range-accrual/TARN/snowball + commodities
+│   │   ├── test-support/         # shared dev-only valuation test fixtures
 │   │   └── macros/               # `FinancialBuilder` derive used by valuations
 │   ├── statements/               # statement model graph and period evaluation
 │   ├── statements-analytics/     # DCF, scenario sets, sensitivity, ECL, backtesting
@@ -117,14 +126,15 @@ edges, read off the manifests:
 | Crate | Also depends on |
 |---|---|
 | `analytics`, `cashflows`, `covenants`, `features`, `margin` | nothing else in-workspace |
-| `models` | `analytics`, `cashflows` |
-| `valuations` | `analytics`, `cashflows`, `covenants`, `margin`, `models`, `valuations-macros` |
-| `calibration` | `cashflows`, `models`, `valuations` |
-| `attribution` | `calibration`, `cashflows`, `models`, `valuations` |
+| `models` | `cashflows` |
+| `factor` | `analytics` |
+| `valuations` | `cashflows`, `covenants`, `margin`, `models`, `valuations-core`, `valuations-{rates,fixed-income,structured-credit,credit,equity,fx,exotics}`, `valuations-macros` |
+| `calibration` | `cashflows`, `models`, `valuations-{core,credit,rates}` |
+| `attribution` | `calibration`, `cashflows`, `factor`, `models`, `valuations` |
 | `statements` | `cashflows`, `valuations` |
-| `statements-analytics` | `covenants`, `statements`, `valuations` |
-| `scenarios` | `attribution`, `calibration`, `statements`, `valuations` |
-| `portfolio` | `attribution`, `calibration`, `cashflows`, `margin`, `models`, `scenarios`, `valuations` |
+| `statements-analytics` | `covenants`, `models`, `statements`, `valuations` |
+| `scenarios` | `attribution`, `calibration`, `cashflows`, `models`, `statements`, `valuations` |
+| `portfolio` | `attribution`, `calibration`, `cashflows`, `factor`, `margin`, `scenarios`, `valuations` |
 
 `valuations` is the mid-stack hub and `portfolio` is the top. No Rust crate
 depends on a binding crate, and `core` never depends on `models`.
@@ -311,11 +321,10 @@ The same registry is reachable from Python as `finstack_quant.schema`, with
 and `domains()`. These are the schema wire surface: `index`, `get`, and
 `validate` return JSON strings, and `validate` takes `payload` as a JSON string
 too — pass `json.dumps(payload)`, not a `dict`. Only `domains()` returns a
-Python list. Nine registry domains publish schemas today (`attribution`, `cashflows`,
+Python list. Ten registry domains publish schemas today (`attribution`, `calibration`, `cashflows`,
 `core`, `factor_model`, `margin`, `portfolio`, `scenarios`, `statements`,
-`valuations`). Their Python schema namespaces mirror domain ownership, with the
-factor registry at `finstack_quant.models.factor.schema`; there is no WASM
-schema namespace.
+`valuations`). Their Python and WASM schema namespaces mirror domain ownership, with the
+factor registry at `models.factor.schema`.
 
 Regenerate with `mise run rust-gen-schemas`; check for drift with
 `mise run rust-check-schemas`.
