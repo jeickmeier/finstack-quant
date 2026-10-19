@@ -65,7 +65,7 @@ fn uses_observation_shift_dcf(compounding: FloatingLegCompounding) -> bool {
 
 fn is_irregular_fixed_period(
     period: &SchedulePeriod,
-    fixed: &finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FixedLegSpec,
+    fixed: &finstack_quant_valuations_core::instruments::FixedLegSpec,
     index: usize,
     period_count: usize,
 ) -> Result<bool> {
@@ -791,9 +791,7 @@ mod tests {
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::{
-            FixedLegSpec, FloatLegSpec,
-        };
+        use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};
         use rust_decimal::Decimal;
         use time::Month;
 

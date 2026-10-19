@@ -269,8 +269,7 @@ pub(crate) fn net_cashflows(
         initial_level: trs.initial_level,
     };
     let mut flows = std::collections::BTreeMap::<Date, f64>::new();
-    let sign = if trs.side == finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive
-    {
+    let sign = if trs.side == finstack_quant_valuations_core::instruments::PayReceive::Receive {
         1.0
     } else {
         -1.0

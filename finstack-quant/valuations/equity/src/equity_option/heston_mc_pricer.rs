@@ -74,10 +74,10 @@ impl EquityOptionHestonMcPricer {
 
         if t <= 0.0 {
             let intrinsic = match inst.option_type {
-                finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType::Call => {
+                finstack_quant_valuations_core::instruments::OptionType::Call => {
                     (spot - inst.strike).max(0.0)
                 }
-                finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType::Put => {
+                finstack_quant_valuations_core::instruments::OptionType::Put => {
                     (inst.strike - spot).max(0.0)
                 }
             };
@@ -120,7 +120,7 @@ impl EquityOptionHestonMcPricer {
         let initial_state = [spot, params.v0];
 
         let result = match inst.option_type {
-            finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType::Call => {
+            finstack_quant_valuations_core::instruments::OptionType::Call => {
                 let payoff = EuropeanCall::new(inst.strike, inst.quantity, maturity_step);
                 engine.price(
                     &rng,
@@ -132,7 +132,7 @@ impl EquityOptionHestonMcPricer {
                     discount_factor,
                 )?
             }
-            finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType::Put => {
+            finstack_quant_valuations_core::instruments::OptionType::Put => {
                 let payoff = EuropeanPut::new(inst.strike, inst.quantity, maturity_step);
                 engine.price(
                     &rng,
@@ -228,10 +228,8 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-        ExerciseStyle, OptionType,
-    };
     use finstack_quant_valuations_core::instruments::{Attributes, SettlementType};
+    use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType};
     use time::Month;
 
     fn date(year: i32, month: u8, day: u8) -> Date {

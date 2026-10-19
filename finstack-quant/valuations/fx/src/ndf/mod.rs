@@ -93,7 +93,7 @@
 
 mod types;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::NdfQuoteConvention;
+pub use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
 pub use types::{Ndf, NdfFixingSource};
 
 /// Metrics submodule for NDF risk measures.

@@ -33,8 +33,8 @@ pub mod margin;
 // Shared volatility override/surface resolution.
 pub mod vol_resolution;
 
-// Common parameter types shared across instruments
-pub mod parameters;
+// Common parameter types shared across instruments (public at `instruments::*`)
+pub(crate) mod parameters;
 
 // Common pricing patterns and infrastructure
 pub mod pricing;

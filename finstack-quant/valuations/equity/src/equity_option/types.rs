@@ -66,8 +66,8 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_valuations_core::instruments::common_impl::parameters::underlying::EquityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType, SettlementType};
 use time::macros::date;
 

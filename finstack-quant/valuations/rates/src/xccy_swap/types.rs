@@ -24,11 +24,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FloatLegSpec;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-    NotionalExchange, ResettingSide,
-};
+use finstack_quant_valuations_core::instruments::FloatLegSpec;
 use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::{NotionalExchange, ResettingSide};
 use rust_decimal::Decimal;
 
 /// Threshold for extremely negative forward rates that warrant a warning.

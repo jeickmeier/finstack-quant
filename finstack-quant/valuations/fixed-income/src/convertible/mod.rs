@@ -51,7 +51,7 @@ pub(crate) mod metrics;
 pub(crate) mod pricing;
 mod types;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::convertible::{
+pub use finstack_quant_valuations_core::instruments::{
     AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DilutionEvent,
     DividendAdjustment, PriceTrigger,
 };

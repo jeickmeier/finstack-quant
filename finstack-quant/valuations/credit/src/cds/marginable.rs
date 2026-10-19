@@ -79,8 +79,8 @@ impl Marginable for CreditDefaultSwap {
             * DURATION_APPROXIMATION_FACTOR;
         let cs01 = self.notional.amount().abs() * risky_duration * ONE_BASIS_POINT;
         let signed_cs01 = match self.side {
-            finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay => cs01,
-            finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive => -cs01,
+            finstack_quant_valuations_core::instruments::PayReceive::Pay => cs01,
+            finstack_quant_valuations_core::instruments::PayReceive::Receive => -cs01,
         };
         add_classified_credit_delta(
             &mut sens,

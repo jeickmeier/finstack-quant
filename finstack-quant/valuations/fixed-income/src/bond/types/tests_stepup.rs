@@ -270,7 +270,7 @@ fn bond_price_merton_mc_api() {
         finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid test rate"),
         time::macros::date!(2024 - 01 - 15),
         time::macros::date!(2034 - 01 - 15),
-        finstack_quant_valuations_core::instruments::common_impl::parameters::BondConvention::UsCorporate,
+        finstack_quant_valuations_core::instruments::BondConvention::UsCorporate,
         "USD-OIS",
     )
     .expect("valid corporate bond");

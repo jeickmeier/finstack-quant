@@ -27,8 +27,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::CommodityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::OptionType;
 
 /// Commodity swaption (option on a fixed-for-floating commodity swap).

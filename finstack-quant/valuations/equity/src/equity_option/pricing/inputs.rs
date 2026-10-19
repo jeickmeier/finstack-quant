@@ -6,10 +6,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-    OptionMarketParams, OptionType,
-};
 use finstack_quant_valuations_core::instruments::{ExerciseStyle, SettlementType};
+use finstack_quant_valuations_core::instruments::{OptionMarketParams, OptionType};
 use finstack_quant_valuations_core::pricer::{ModelKey, PricingError, PricingErrorContext};
 
 pub(crate) fn require_european(inst: &EquityOption, model: &str) -> Result<()> {

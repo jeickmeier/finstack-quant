@@ -240,7 +240,7 @@ mod yoy_inflation01_tests {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .lag(InflationLag::None)
             .attributes(finstack_quant_valuations_core::instruments::Attributes::new())
             .build()

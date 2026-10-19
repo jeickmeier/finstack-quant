@@ -171,13 +171,25 @@ pub use common_impl::traits::{
 };
 
 pub use common_impl::parameters::{
-    BermudanCallProvision, BondConvention, CommodityUnderlyingParams, CreditParams,
-    EquityUnderlyingParams, ExerciseStyle, FinancingLegSpec, FixedLegSpec, FloatLegSpec,
-    FxUnderlyingParams, IndexUnderlyingParams, Monitoring, OptionMarketParams, OptionType,
-    PayReceive, PremiumLegSpec, ProtectionLegSpec, QuantoSpec, SettlementType, TotalReturnLegSpec,
+    BermudanCallProvision, BondConvention, CommodityConvention, CommodityUnderlyingParams,
+    CreditParams, EquityUnderlyingParams, ExerciseStyle, FinancingLegSpec, FixedLegSpec,
+    FloatLegSpec, FxUnderlyingParams, IndexUnderlyingParams, Monitoring, NdfQuoteConvention,
+    NotionalExchange, OptionMarketParams, OptionType, PayReceive, PremiumLegSpec,
+    ProtectionLegSpec, QuantoSpec, ResettingSide, SettlementType, TotalReturnLegSpec,
     VolatilityModel,
 };
 
+pub use common_impl::parameters::bond_quote::BondQuoteInput;
+pub use common_impl::parameters::convertible::{
+    AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DilutionEvent,
+    DividendAdjustment, PriceTrigger,
+};
+#[doc(hidden)]
+pub use common_impl::parameters::legs::simple_average_unsupported;
+pub use common_impl::parameters::merton_mc::{
+    BarrierCrossing, CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, PikMode,
+    PikSchedule,
+};
 pub use common_impl::parameters::trs_common::TrsScheduleSpec;
 
 pub use common_impl::listed::{

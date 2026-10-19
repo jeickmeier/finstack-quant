@@ -9,10 +9,10 @@ use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithParams;
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::{
+use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
+use finstack_quant_valuations_core::instruments::{
     CommodityConvention, CommodityUnderlyingParams, OptionMarketParams,
 };
-use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
 use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType, SettlementType};
 
 /// Monte Carlo configuration for commodity option pricing.

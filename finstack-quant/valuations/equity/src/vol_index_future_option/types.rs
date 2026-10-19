@@ -3,10 +3,8 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-    ExerciseStyle, OptionType,
-};
 use finstack_quant_valuations_core::instruments::{Attributes, Position};
+use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType};
 use finstack_quant_valuations_core::instruments::{
     FutureOptionModel, FutureOptionPremiumStyle, FutureOptionSettlement, FutureOptionTerms,
 };

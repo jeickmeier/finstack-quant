@@ -12,10 +12,8 @@ use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::vanilla::{bs_greeks_unchecked, bs_price_unchecked};
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-    OptionMarketParams, OptionType,
-};
 use finstack_quant_valuations_core::instruments::{ExerciseStyle, SettlementType};
+use finstack_quant_valuations_core::instruments::{OptionMarketParams, OptionType};
 use finstack_quant_valuations_core::pricer::expect_inst;
 
 /// Present value using Black–Scholes; result currency is the instrument currency.

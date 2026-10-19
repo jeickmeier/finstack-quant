@@ -53,8 +53,7 @@ pub struct CmsSwap {
     /// Notional amount.
     pub notional: Money,
     /// Pay direction: `Pay` means pay CMS leg, receive funding leg.
-    pub side:
-        finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive,
+    pub side: finstack_quant_valuations_core::instruments::PayReceive,
 
     // ── CMS Leg ──────────────────────────────────────────────────────────
     /// Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based.
@@ -339,7 +338,7 @@ impl CmsSwap {
         notional: Money,
         day_count: DayCount,
         index_id: IndexId,
-        side: finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive,
+        side: finstack_quant_valuations_core::instruments::PayReceive,
         discount_curve_id: impl Into<CurveId>,
         forward_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
@@ -477,7 +476,7 @@ impl CmsSwap {
         CmsSwap::builder()
             .id(InstrumentId::new("CMSSWAP-10Y-USD"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .cms_tenor(Tenor::new(
                 10,
                 finstack_quant_core::dates::TenorUnit::Years,
@@ -537,10 +536,10 @@ impl CmsSwap {
                 1.0,
             )?;
             let signed_amount = match self.side {
-                finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay => {
+                finstack_quant_valuations_core::instruments::PayReceive::Pay => {
                     -coupon_rate * accrual_fraction * self.notional.amount()
                 }
-                finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive => {
+                finstack_quant_valuations_core::instruments::PayReceive::Receive => {
                     coupon_rate * accrual_fraction * self.notional.amount()
                 }
             };
@@ -625,8 +624,8 @@ impl CmsSwap {
             };
             let unsigned = rate * period.accrual_year_fraction * self.notional.amount();
             let signed = match self.side {
-                finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay => unsigned,
-                finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive => -unsigned,
+                finstack_quant_valuations_core::instruments::PayReceive::Pay => unsigned,
+                finstack_quant_valuations_core::instruments::PayReceive::Receive => -unsigned,
             };
             flows.push(
                 CashFlow::new(
@@ -959,7 +958,7 @@ mod tests {
             .id(InstrumentId::new("CMS-RECON"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             // Receive CMS so base_value = pv_cms − pv_funding
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Receive)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )
@@ -1126,7 +1125,7 @@ mod tests {
         let swap = CmsSwap::builder()
             .id(InstrumentId::new("CMS-SEASONED-FLOWS"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Receive)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )
@@ -1186,7 +1185,7 @@ mod tests {
         let swap = CmsSwap::builder()
             .id(InstrumentId::new("CMS-FUNDING-SEASONED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )
@@ -1231,7 +1230,7 @@ mod tests {
         let result = CmsSwap::builder()
             .id(InstrumentId::new("CMSSWAP-BAD-CMS"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )
@@ -1263,7 +1262,7 @@ mod tests {
         let result = CmsSwap::builder()
             .id(InstrumentId::new("CMSSWAP-BAD-FUNDING"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )

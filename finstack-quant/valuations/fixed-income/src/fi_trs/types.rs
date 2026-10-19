@@ -11,11 +11,10 @@ use finstack_quant_core::{
 };
 use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-    legs::FinancingLegSpec, legs::PayReceive, trs_common::TrsScheduleSpec,
-    underlying::IndexUnderlyingParams,
-};
 use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::{
+    FinancingLegSpec, IndexUnderlyingParams, PayReceive, TrsScheduleSpec,
+};
 use rust_decimal::Decimal;
 
 /// Fixed-income index total-return swap priced with a carry analytic.

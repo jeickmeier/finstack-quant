@@ -11,11 +11,10 @@ use finstack_quant_core::{
 };
 use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-    legs::FinancingLegSpec, legs::PayReceive, trs_common::TrsScheduleSpec,
-    underlying::EquityUnderlyingParams,
-};
 use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::{
+    EquityUnderlyingParams, FinancingLegSpec, PayReceive, TrsScheduleSpec,
+};
 use rust_decimal::Decimal;
 use time::macros::date;
 

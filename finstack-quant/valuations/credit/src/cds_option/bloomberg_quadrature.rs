@@ -64,7 +64,7 @@ use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::constants::{bloomberg_cdso, numerical};
-use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
+use finstack_quant_valuations_core::instruments::OptionType;
 use rust_decimal::Decimal;
 
 /// `1/√(2π)` — the standard normal density's normalising constant.
