@@ -13,5 +13,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricing_mtm;
 mod types;
 
-pub use finstack_quant_valuations_core::instruments::{NotionalExchange, ResettingSide};
 pub use types::{XccySwap, XccySwapLeg};

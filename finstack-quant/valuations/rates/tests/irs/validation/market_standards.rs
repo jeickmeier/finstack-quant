@@ -23,11 +23,10 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_rates::irs::{
-    FixedLegSpec, FloatLegSpec, InterestRateSwap, PayReceive,
-};
+use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use time::macros::date;
 
 fn build_flat_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> ForwardCurve {

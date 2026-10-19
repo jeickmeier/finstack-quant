@@ -11,7 +11,7 @@
 //! preset, then chain `with_constituents`, `with_constituents_equal_weight`,
 //! and `with_index_factor` to attach trade state.
 
-use crate::cds::CdsConvention;
+use finstack_quant_valuations_core::market::conventions::CdsConvention;
 
 /// Preset metadata for a well-known CDS index series.
 ///

@@ -40,7 +40,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_credit::cds_tranche::{CdsTranche, CdsTranchePricer, CopulaSpec};
+use finstack_quant_models::correlation::copula::CopulaSpec;
+use finstack_quant_valuations_credit::cds_tranche::{CdsTranche, CdsTranchePricer};
 use std::collections::BTreeMap;
 
 /// Calibrator for Student-t copula degrees of freedom from tranche quotes.

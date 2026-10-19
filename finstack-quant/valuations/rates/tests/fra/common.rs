@@ -10,8 +10,8 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 pub use finstack_quant_test_utils::assert::{approx_eq, in_range};
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
-use finstack_quant_valuations_rates::irs::PayReceive;
 use rust_decimal::Decimal;
 use time::macros::date;
 

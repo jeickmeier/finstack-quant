@@ -131,8 +131,9 @@ mod tests {
 
     #[test]
     fn variation_margin_inherits_clean_upfront_side_and_scenario_policy() {
-        use crate::cds::{CdsValuationConvention, PayReceive};
         use finstack_quant_core::market_data::term_structures::HazardCurve;
+        use finstack_quant_valuations_core::instruments::PayReceive;
+        use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
         let as_of = time::macros::date!(2027 - 02 - 15);
         let mut cds = CreditDefaultSwap::example().expect("CDS");
         let market = MarketContext::new()

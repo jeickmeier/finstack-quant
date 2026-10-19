@@ -18,7 +18,8 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::pricing::swap_legs::add_payment_delay;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_rates::irs::{InterestRateSwap, PayReceive};
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use time::macros::date;
 
 fn build_test_curves() -> MarketContext {

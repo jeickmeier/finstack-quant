@@ -27,10 +27,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::Portfolio;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::{
-    CdsConvention, CdsValuationConvention, CreditDefaultSwap, PayReceive, PremiumLegSpec,
-    ProtectionLegSpec,
-};
+use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
     CdsOption, CdsOptionParams,
 };
@@ -65,6 +62,8 @@ use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType, SettlementType};
+use finstack_quant_valuations::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
+use finstack_quant_valuations::market::conventions::{CdsConvention, CdsValuationConvention};
 use rust_decimal_macros::dec;
 use std::sync::Arc;
 use time::Month;
@@ -763,7 +762,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let swaption_id = format!("SWAPTION_{}", i);
         let expiry = Date::from_calendar_date(2026, Month::July, 1).unwrap();
         let swap_end = Date::from_calendar_date(2030, Month::July, 1).unwrap();
-        let fixed = finstack_quant_valuations::instruments::rates::irs::FixedLegSpec {
+        let fixed = finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
             rate: rust_decimal::Decimal::try_from(0.04).expect("valid literal"),
             frequency: Tenor::semi_annual(),
@@ -777,7 +776,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             payment_lag_days: 0,
             end_of_month: false,
         };
-        let float = finstack_quant_valuations::instruments::rates::irs::FloatLegSpec {
+        let float = finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
             forward_curve_id: finstack_quant_core::types::CurveId::new("USD-SOFR-3M"),
             spread_bp: rust_decimal::Decimal::ZERO,

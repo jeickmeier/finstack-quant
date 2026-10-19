@@ -12,8 +12,9 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_rates::irs::{InterestRateSwap, PayReceive};
+use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use finstack_quant_valuations_test_support::test_helpers::tolerances;
 use time::Month;
 

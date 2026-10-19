@@ -32,8 +32,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result as CoreResult;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fx::FxForward;
-use finstack_quant_valuations::instruments::rates::irs::PayReceive;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 
 fn fixture_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/quantlib_parity")

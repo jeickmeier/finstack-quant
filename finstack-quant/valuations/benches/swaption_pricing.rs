@@ -19,8 +19,8 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::volatility::SabrParameters;
-use finstack_quant_valuations::instruments::rates::irs::{FixedLegSpec, FloatLegSpec};
 use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
+use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
 use finstack_quant_valuations::instruments::{
     Instrument, OptionType, SettlementType, VolatilityModel,
 };
