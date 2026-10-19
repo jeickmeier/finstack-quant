@@ -632,13 +632,15 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
 
     /// Net dated flows of both legs, from the same engine as pricing: the
     /// total-return leg, the financing leg under its `compounding`, signed by
-    /// `side`.
+    /// `side`. The financing-index fixings they project ride in the schedule
+    /// metadata, so a horizon roll (theta) can hold crossed resets.
     fn raw_cashflow_schedule(
         &self,
         context: &MarketContext,
         as_of: Date,
     ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        let flows = crate::equity_trs::pricer::net_cashflows(self, context, as_of)?;
+        let (flows, projected_fixings) =
+            crate::equity_trs::pricer::net_cashflows(self, context, as_of)?;
         Ok(finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
             finstack_quant_cashflows::primitives::CFKind::Fixed,
@@ -648,6 +650,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
                 meta: finstack_quant_cashflows::builder::CashFlowMeta {
                     representation:
                         finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+                    projected_fixings,
                     ..Default::default()
                 },
             },

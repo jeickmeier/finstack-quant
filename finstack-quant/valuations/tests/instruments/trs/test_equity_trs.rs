@@ -640,3 +640,33 @@ fn test_equity_trs_notional_scaling() {
         "NPV should scale linearly with notional",
     );
 }
+
+/// Theta across the first financing reset holds the crossed fixings at their
+/// as-of projection (exported with the cashflow schedule); the market carries
+/// no fixing for the reset window.
+#[test]
+fn test_equity_trs_theta_across_a_financing_reset() {
+    let market = create_market_context();
+    let as_of = as_of_date();
+    for compounding in [
+        finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,
+        finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 0,
+        },
+    ] {
+        let mut trs = TestEquityTrsBuilder::new().initial_level(5000.0).build();
+        assert!(trs.schedule.start > as_of);
+        trs.financing_leg.compounding = compounding;
+        trs.metric_pricing_overrides.theta_period =
+            Some(finstack_quant_core::dates::Tenor::parse("1W").expect("tenor"));
+        let result = trs
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[finstack_quant_valuations::metrics::MetricId::Theta],
+                finstack_quant_valuations::instruments::PricingOptions::default(),
+            )
+            .unwrap_or_else(|err| panic!("{compounding:?} theta across the start reset: {err}"));
+        assert!(result.measures["theta"].is_finite(), "{compounding:?}");
+    }
+}
