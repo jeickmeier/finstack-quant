@@ -17,8 +17,8 @@ use rust_decimal::Decimal;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::validation;
 use finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 
@@ -644,7 +644,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.fixed_leg.end)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 
     fn market_dependencies(
         &self,

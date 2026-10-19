@@ -22,7 +22,7 @@ use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::{
     schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
 };
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
 
 /// Identifier of the synthetic facility note.
@@ -504,7 +504,7 @@ impl Instrument for AssetBackedFacility {
         finstack_quant_core::cashflow::npv(disc.as_ref(), as_of, &flows)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl FacilityProjection {

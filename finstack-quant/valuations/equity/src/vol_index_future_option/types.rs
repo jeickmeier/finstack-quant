@@ -109,7 +109,7 @@ impl VolatilityIndexFutureOption {
     }
 }
 
-finstack_quant_valuations_core::instruments::common_impl::listed::impl_future_option_instrument!(
+finstack_quant_valuations_core::impl_future_option_instrument!(
     VolatilityIndexFutureOption,
     finstack_quant_valuations_core::pricer::InstrumentType::VolatilityIndexFutureOption,
     crate::EQUITY

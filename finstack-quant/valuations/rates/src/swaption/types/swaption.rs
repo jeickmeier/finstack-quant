@@ -12,9 +12,9 @@ use finstack_quant_core::validation;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::volatility::VolatilityConvention;
 use finstack_quant_models::SabrParameters;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
     resolve_volatility, validate_sigma, ResolvedVolatility, VolatilityRequest,
@@ -1108,7 +1108,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.expiry)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.

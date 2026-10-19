@@ -12,9 +12,10 @@ use finstack_quant_valuations_core::metrics::{
     MetricId, MetricRegistry, MetricRegistryError, PricerPublishedMetric,
 };
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, register_generic, Family, InstrumentType, ModelKey, Pricer, PricerKey,
-    PricerRegistry, PricingError, PricingErrorContext,
+    expect_inst, Family, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
+    PricingErrorContext,
 };
+use finstack_quant_valuations_core::register_generic;
 use finstack_quant_valuations_core::results::{ValuationDetails, ValuationResult};
 
 /// Registration unit for the structured-credit instruments.

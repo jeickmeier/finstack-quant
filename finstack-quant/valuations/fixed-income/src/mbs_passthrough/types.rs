@@ -10,7 +10,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PoolId};
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
 use time::Month;
@@ -631,7 +631,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Ok(Some(Box::new(pool)))
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 #[cfg(test)]

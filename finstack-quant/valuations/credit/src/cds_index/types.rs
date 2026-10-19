@@ -23,7 +23,7 @@ use crate::cds::{CdsConvention, CreditDefaultSwap, PayReceive, PremiumLegSpec, P
 
 use super::parameters::CdsIndexParams;
 use super::pricer::CdsIndexPricer;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 
 /// Pricing mode for CDS indices.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -592,7 +592,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.premium_leg.end)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CdsIndex {

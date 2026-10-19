@@ -10,7 +10,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, SifmaSettlementClass};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 
 /// TBA term enumeration (original loan term).
@@ -447,7 +447,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         self.effective_settlement_date().ok()
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 #[cfg(test)]

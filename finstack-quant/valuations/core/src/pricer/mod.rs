@@ -66,5 +66,3 @@ macro_rules! register_generic {
         >::new($inst, $model))?
     };
 }
-
-pub use register_generic;

@@ -5,7 +5,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 
 /// Touch type: one-touch (pays if barrier is hit) or no-touch (pays if not hit).
@@ -308,7 +308,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Ok(Some(Box::new(observed)))
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 // Touch options use finite-difference Greeks (barrier discontinuities make

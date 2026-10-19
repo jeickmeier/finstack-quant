@@ -119,7 +119,7 @@ macro_rules! impl_future_option_instrument {
         }
 
         impl $crate::instruments::Instrument for $ty {
-            $crate::instruments::common_impl::traits::impl_instrument_base!($key, $family);
+            $crate::impl_instrument_base!($key, $family);
 
             fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
                 self.validate()
@@ -165,7 +165,7 @@ macro_rules! impl_future_option_instrument {
             }
 
 
-            $crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+            $crate::impl_focused_pricing_overrides!();
         }
 
         impl $crate::instruments::OptionGreeksProvider for $ty {
@@ -221,5 +221,3 @@ macro_rules! impl_future_option_instrument {
         }
     };
 }
-
-pub use crate::impl_future_option_instrument;

@@ -1,7 +1,7 @@
 //! Trait implementations for Bond (Instrument and Monte Carlo).
 
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 
 use super::definitions::Bond;
 use super::CashflowSpec;
@@ -125,7 +125,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Ok(deps)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 
     fn scenario_spread_shock_supported(&self) -> bool {
         // Mirrors the guards in `base_value`: the shock is exact only for

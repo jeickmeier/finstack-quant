@@ -11,7 +11,7 @@ use finstack_quant_core::{
 use time::macros::date;
 
 use super::pricer;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::{
     common_impl::traits::Attributes, MarketDependencies,
 };
@@ -548,7 +548,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         self.effective_settlement_date().ok()
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();

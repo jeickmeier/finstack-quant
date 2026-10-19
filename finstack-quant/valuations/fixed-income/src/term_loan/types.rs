@@ -52,7 +52,7 @@ use crate::loan_terms::UpfrontFee;
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::FloatingRateSpec;
 pub use finstack_quant_cashflows::builder::RateSpec;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
@@ -906,7 +906,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         }
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for TermLoan {

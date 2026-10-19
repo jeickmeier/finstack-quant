@@ -8,5 +8,3 @@ pub use future_option::{
     FutureOptionTerms,
 };
 pub use terms::{ListedDeliveryObligation, ListedFutureSettlement, ListedFutureTerms};
-
-pub use future_option::impl_future_option_instrument;

@@ -65,7 +65,7 @@ use rust_decimal::Decimal;
 use time::macros::date;
 
 use crate::cds::pricing::CdsPricer;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 
 pub use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
 
@@ -680,7 +680,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.premium_leg.end)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CreditDefaultSwap {

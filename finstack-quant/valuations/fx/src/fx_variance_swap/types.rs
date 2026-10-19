@@ -9,7 +9,7 @@ use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument as InstrumentTrait;
 
@@ -451,7 +451,7 @@ impl InstrumentTrait for FxVarianceSwap {
         pricer::compute_pv(self, context, as_of)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 // FxVarianceSwap uses both domestic and foreign curves for forward construction

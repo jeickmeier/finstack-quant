@@ -11,7 +11,7 @@ use finstack_quant_valuations_core::contract_specs::embedded_registry;
 use finstack_quant_valuations_core::instruments::common_impl::traits::{Attributes, Instrument};
 use rust_decimal::Decimal;
 
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 
 fn repo_specs_id(currency: finstack_quant_core::currency::Currency) -> Result<&'static str> {
     match currency {
@@ -647,7 +647,7 @@ impl Instrument for Repo {
         Some(self.maturity)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 // Do not add explicit Instrument impl; provided by blanket impl.
