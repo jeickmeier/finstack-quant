@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Valuations: verified pricing and risk fixes
+
+#### Fixed
+
+- Rates: the default Black cap/floor pricer and the Hull-White cap/floor pricer now subtract an unsettled premium, as `CapFloor::base_value` does; registry prices were gross before. CMS option `Vanna` no longer errors on seasoned options and uses the ATM vol in the convexity adjustment, as the pricer does. `XccySwap::validate` rejects same-currency legs for every swap, not only MtM-resetting ones. Bermudan `ExpectedExerciseTime` is published by the pricer: under the LMM pricer it now errors instead of silently building a Hull-White tree.
+- Fixed income: `Bond::metrics_equivalent` converts PIK coupons to cash for step-up, floating and amortizing step-up bonds (it handled only fixed), so their spread and yield metrics are on a cash basis. Convertible `parity`, `conversion_premium` and the conversion-value metric reject a spot price quoted in a currency other than the bond's.
+- Credit: the `CdsIndex`, `CdsOption` and `CdsTranche` registry pricers report a missing curve as missing market data (Python `KeyError`) rather than a model failure.
+- FX: `FxBarrierOption` and `QuantoOption` vega, vanna and volga bump the implied-volatility override when one is set (they returned 0 or failed). `FxBarrierOption` delta, gamma and vanna work when spot comes from the FX matrix (no `fx_spot_id`). `QuantoOption` vega is a central difference (was one-sided).
+- Exotics: a missing curve on `AsianOption`, `BarrierOption`, `LookbackOption` and `QuantoOption` raises `KeyError` instead of `ValueError`. Lookback and expired-barrier spot reads reject a spot price in another currency. Lookback and range-accrual `Rho` reprice with the requested model (a non-default model previously mixed with the default) and are central discount-curve bumps.
+
 ## [0.11.0] - 2026-10-18
 
 Workspace version 0.11.0: the valuations split below removes and moves public Rust items (see the section that follows), so the crates, the Python wheel and the WASM package take a breaking-change version bump.
