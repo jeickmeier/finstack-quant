@@ -4,8 +4,7 @@
 //! finite difference methods. Delta and Gamma use generic FD calculators.
 //! Note: Autocallables exhibit discontinuities near autocall barrier levels.
 
-use finstack_quant_valuations_core::metrics::{MetricId, MetricRegistry};
-use std::sync::Arc;
+use finstack_quant_valuations_core::metrics::MetricRegistry;
 
 /// Register autocallable metrics with the registry.
 pub(crate) fn register_autocallable_metrics(
@@ -16,30 +15,6 @@ pub(crate) fn register_autocallable_metrics(
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
 
-    registry.register_metric(
-        MetricId::Delta,
-        Arc::new(GenericFdDelta::<crate::Autocallable>::default()),
-        &[InstrumentType::Autocallable],
-    )?;
-
-    registry.register_metric(
-        MetricId::Gamma,
-        Arc::new(GenericFdGamma::<crate::Autocallable>::default()),
-        &[InstrumentType::Autocallable],
-    )?;
-
-    registry.register_metric(
-        MetricId::Vanna,
-        Arc::new(GenericFdVanna::<crate::Autocallable>::default()),
-        &[InstrumentType::Autocallable],
-    )?;
-
-    registry.register_metric(
-        MetricId::Volga,
-        Arc::new(GenericFdVolga::<crate::Autocallable>::default()),
-        &[InstrumentType::Autocallable],
-    )?;
-
     {
         finstack_quant_valuations_core::register_metrics! {
             registry: registry,
@@ -49,7 +24,11 @@ pub(crate) fn register_autocallable_metrics(
                 (Rho, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
                 (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
                 (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
-                // Theta is now registered universally in crate::EQUITY.metrics()
+                // Theta is now registered universally in crate::EQUITY.metrics(),
+                (Delta, GenericFdDelta::<crate::Autocallable>::default()),
+                (Gamma, GenericFdGamma::<crate::Autocallable>::default()),
+                (Vanna, GenericFdVanna::<crate::Autocallable>::default()),
+                (Volga, GenericFdVolga::<crate::Autocallable>::default()),
             ]
         }
     }
