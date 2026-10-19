@@ -2306,13 +2306,13 @@
       "reason": "Rating scale or WARF API plumbing; rating factors and scales are sourced from the rating-scale registry."
     },
     {
-      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/warf.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/mod.rs",
       "category": "rating_agency",
       "contains": "let rating_factor = asset",
       "reason": "Rating scale or WARF API plumbing; rating factors and scales are sourced from the rating-scale registry."
     },
     {
-      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/warf.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/mod.rs",
       "category": "rating_agency",
       "contains": "weighted_sum += balance * rating_factor;",
       "reason": "Rating scale or WARF API plumbing; rating factors and scales are sourced from the rating-scale registry."

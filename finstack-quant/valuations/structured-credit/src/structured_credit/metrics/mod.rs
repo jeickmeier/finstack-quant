@@ -96,71 +96,7 @@ pub use summary::{
 pub(crate) fn register_structured_credit_metrics(
     registry: &mut finstack_quant_valuations_core::metrics::MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::MetricId;
     use finstack_quant_valuations_core::pricer::InstrumentType;
-    use std::sync::Arc;
-
-    // Model-specific risk metrics (custom metrics)
-    registry.register_metric(
-        MetricId::Recovery01,
-        Arc::new(risk::recovery01::Recovery01Calculator),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    registry.register_metric(
-        MetricId::Prepayment01,
-        Arc::new(risk::prepayment01::Prepayment01Calculator),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    registry.register_metric(
-        MetricId::Default01,
-        Arc::new(risk::default01::Default01Calculator),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    registry.register_metric(
-        MetricId::Severity01,
-        Arc::new(risk::severity01::Severity01Calculator),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    registry.register_metric(
-        MetricId::CloWarf,
-        Arc::new(pool::CloWarfCalculator),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    registry.register_metric(
-        MetricId::CmbsDscr,
-        Arc::new(deal_specific::CmbsDscrCalculator::new()),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    registry.register_metric(
-        MetricId::CloWas,
-        Arc::new(pool::CloWasCalculator),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    registry.register_metric(
-        MetricId::AbsChargeOff,
-        Arc::new(deal_specific::AbsChargeOffCalculator),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    registry.register_metric(
-        MetricId::AbsDelinquency,
-        Arc::new(deal_specific::AbsDelinquencyCalculator),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    registry.register_metric(
-        MetricId::AbsExcessSpread,
-        Arc::new(deal_specific::AbsExcessSpreadCalculator),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    registry.register_metric(
-        MetricId::AbsPaymentRate,
-        Arc::new(deal_specific::AbsPaymentRateCalculator),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    registry.register_metric(
-        MetricId::AbsCreditEnhancement,
-        Arc::new(deal_specific::AbsCreditEnhancementCalculator),
-        &[InstrumentType::StructuredCredit],
-    )?;
 
     finstack_quant_valuations_core::register_metrics! {
         registry: registry,
@@ -189,7 +125,20 @@ pub(crate) fn register_structured_credit_metrics(
             (CDR, pool::CdrCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
-            // Theta is now registered universally in crate::structured_credit::STRUCTURED_CREDIT.metrics()
+            // Theta is now registered universally in crate::structured_credit::STRUCTURED_CREDIT.metrics(),
+            // Model-specific risk metrics (custom metrics)
+            (Recovery01, risk::recovery01::Recovery01Calculator),
+            (Prepayment01, risk::prepayment01::Prepayment01Calculator),
+            (Default01, risk::default01::Default01Calculator),
+            (Severity01, risk::severity01::Severity01Calculator),
+            (CloWarf, pool::CloWarfCalculator),
+            (CmbsDscr, deal_specific::CmbsDscrCalculator::new()),
+            (CloWas, pool::CloWasCalculator),
+            (AbsChargeOff, deal_specific::AbsChargeOffCalculator),
+            (AbsDelinquency, deal_specific::AbsDelinquencyCalculator),
+            (AbsExcessSpread, deal_specific::AbsExcessSpreadCalculator),
+            (AbsPaymentRate, deal_specific::AbsPaymentRateCalculator),
+            (AbsCreditEnhancement, deal_specific::AbsCreditEnhancementCalculator),
         ]
     }
     Ok(())
