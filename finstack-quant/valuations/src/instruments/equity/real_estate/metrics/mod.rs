@@ -47,47 +47,23 @@ pub(crate) fn register_real_estate_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
     use crate::pricer::InstrumentType;
-    use std::sync::Arc;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::discount_rate01"),
-        Arc::new(crate::metrics::RfComponentDv01Calculator::<
-            crate::instruments::RealEstateAsset,
-        >::new()),
-        &[InstrumentType::RealEstateAsset],
-    )?;
 
-    // Custom real estate deal-style metrics.
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::going_in_cap_rate"),
-        Arc::new(cap_rates::GoingInCapRate),
-        &[InstrumentType::RealEstateAsset],
-    )?;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::exit_cap_rate"),
-        Arc::new(cap_rates::ExitCapRate),
-        &[InstrumentType::RealEstateAsset],
-    )?;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::unlevered_irr"),
-        Arc::new(returns::UnleveredIrr),
-        &[InstrumentType::RealEstateAsset],
-    )?;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::unlevered_multiple"),
-        Arc::new(returns::UnleveredMultiple),
-        &[InstrumentType::RealEstateAsset],
-    )?;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::unlevered_cash_on_cash_first"),
-        Arc::new(returns::UnleveredCashOnCashFirst),
-        &[InstrumentType::RealEstateAsset],
-    )?;
+    crate::register_metrics! {
+        registry: registry,
+        instrument: InstrumentType::RealEstateAsset,
+        metrics: [],
+        custom: [
+            ("real_estate::discount_rate01", crate::metrics::RfComponentDv01Calculator::<crate::instruments::RealEstateAsset>::new()),
+            // Custom real estate deal-style metrics.
+            ("real_estate::going_in_cap_rate", cap_rates::GoingInCapRate),
+            ("real_estate::exit_cap_rate", cap_rates::ExitCapRate),
+            ("real_estate::unlevered_irr", returns::UnleveredIrr),
+            ("real_estate::unlevered_multiple", returns::UnleveredMultiple),
+            ("real_estate::unlevered_cash_on_cash_first", returns::UnleveredCashOnCashFirst),
+            ("real_estate::cap_rate01", sensitivities::CapRate01Calculator),
+        ]
+    }
 
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::cap_rate01"),
-        Arc::new(sensitivities::CapRate01Calculator),
-        &[InstrumentType::RealEstateAsset],
-    )?;
     Ok(())
 }
 
@@ -96,7 +72,6 @@ pub(crate) fn register_levered_real_estate_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
     use crate::pricer::InstrumentType;
-    use std::sync::Arc;
 
     crate::register_metrics! {
         registry: registry,
@@ -104,56 +79,19 @@ pub(crate) fn register_levered_real_estate_metrics(
         metrics: [
             (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+        ],
+        custom: [
+            ("real_estate::levered_irr", levered::LeveredIrr),
+            ("real_estate::equity_multiple", levered::EquityMultiple),
+            ("real_estate::ltv", levered::LoanToValue),
+            ("real_estate::ltv_at_origination", levered::LoanToValueAtOrigination),
+            ("real_estate::dscr_min", levered::DscrMin),
+            ("real_estate::dscr_min_interest_only", levered::DscrMinInterestOnly),
+            ("real_estate::debt_payoff_at_exit", levered::DebtPayoffAtExit),
+            ("real_estate::discount_rate01", crate::metrics::RfComponentDv01Calculator::<crate::instruments::LeveredRealEstateEquity>::new()),
+            ("real_estate::cap_rate01", sensitivities::CapRate01Calculator),
         ]
     };
 
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::levered_irr"),
-        Arc::new(levered::LeveredIrr),
-        &[InstrumentType::LeveredRealEstateEquity],
-    )?;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::equity_multiple"),
-        Arc::new(levered::EquityMultiple),
-        &[InstrumentType::LeveredRealEstateEquity],
-    )?;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::ltv"),
-        Arc::new(levered::LoanToValue),
-        &[InstrumentType::LeveredRealEstateEquity],
-    )?;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::ltv_at_origination"),
-        Arc::new(levered::LoanToValueAtOrigination),
-        &[InstrumentType::LeveredRealEstateEquity],
-    )?;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::dscr_min"),
-        Arc::new(levered::DscrMin),
-        &[InstrumentType::LeveredRealEstateEquity],
-    )?;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::dscr_min_interest_only"),
-        Arc::new(levered::DscrMinInterestOnly),
-        &[InstrumentType::LeveredRealEstateEquity],
-    )?;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::debt_payoff_at_exit"),
-        Arc::new(levered::DebtPayoffAtExit),
-        &[InstrumentType::LeveredRealEstateEquity],
-    )?;
-
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::discount_rate01"),
-        Arc::new(crate::metrics::RfComponentDv01Calculator::<
-            crate::instruments::LeveredRealEstateEquity,
-        >::new()),
-        &[InstrumentType::LeveredRealEstateEquity],
-    )?;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::cap_rate01"),
-        Arc::new(sensitivities::CapRate01Calculator),
-        &[InstrumentType::LeveredRealEstateEquity],
-    )?;
     Ok(())
 }
