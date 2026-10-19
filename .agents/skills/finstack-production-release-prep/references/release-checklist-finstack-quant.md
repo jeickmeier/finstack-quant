@@ -8,7 +8,8 @@ Use this as the repo-specific release checklist.
 - Lint: `mise run all-lint`
 - Tests: `mise run all-test`
 - CI-equivalent: `mise run all-ci`
-- Security/audit: `mise run all-audit` plus `cargo deny check` when needed
+- Security/audit: `mise run rust-audit` (cargo deny) plus
+  `uv run --no-sync bandit -r finstack-quant-py -c pyproject.toml`
 
 ## Bindings
 

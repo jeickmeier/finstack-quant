@@ -5,7 +5,7 @@
 //! `finstack_quant.core.currency.USD`.
 //!
 //! Each entry carries its own documentation, which becomes the published
-//! JSDoc; `mise run core-gen-data` rewrites this file from the CSV and the
+//! JSDoc; `mise run gen-write` rewrites this file from the CSV and the
 //! test below fails when the list drifts from `Currency::iter()`.
 
 use crate::api::core::currency::JsCurrency;

@@ -18,8 +18,8 @@ Run with verbose output::
 
 Save and compare a portfolio baseline::
 
-    mise run python-bench-portfolio-baseline
-    mise run python-bench-portfolio-compare
+    scripts/materialization_bench.sh python-baseline
+    scripts/materialization_bench.sh python-compare
 """
 
 from __future__ import annotations

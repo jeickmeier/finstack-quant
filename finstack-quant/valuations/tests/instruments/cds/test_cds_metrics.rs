@@ -415,7 +415,7 @@ fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
 }
 
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn bucketed_cs01_quote_uses_each_off_grid_replay_pillar_once() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2030 - 01 - 01);
@@ -516,7 +516,7 @@ fn deal_quote_override_rejects_non_matching_replay_maturity() {
 }
 
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn test_bucketed_cs01_reconciles_with_parallel_under_cds_convention() {
     let as_of = date!(2026 - 03 - 20);
     let maturity = date!(2031 - 06 - 20);

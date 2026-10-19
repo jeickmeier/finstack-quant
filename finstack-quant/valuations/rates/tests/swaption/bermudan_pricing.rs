@@ -943,7 +943,7 @@ fn test_bermudan_keeps_exercise_right_on_exercise_date() {
 
 /// Independent tree and LSMC algorithms must resolve the same exercise claim.
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn bermudan_lsmc_grid_and_seed_acceptance() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2030, Month::January, 1).unwrap();

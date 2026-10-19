@@ -510,7 +510,7 @@ RUSTDOCFLAGS='-D warnings' cargo doc -p finstack-quant-models --no-deps
 cargo bench -p finstack-quant-models --bench mc_hot_paths
 ```
 
-Workspace gates: `mise run rust-test`, `mise run rust-test-slow` (the
+Workspace gates: `mise run rust-test`, `mise run rust-test --slow` (the
 `#[ignore]`d rough-volatility convergence cases), `mise run rust-lint`,
 `mise run rust-doc`, `mise run rust-bench`. Do not run `cargo test` directly —
 it pulls in doc tests the workspace gates run separately.

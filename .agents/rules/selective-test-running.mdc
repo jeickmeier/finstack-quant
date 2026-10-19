@@ -22,7 +22,6 @@ alwaysApply: true
 | `rust-test-integration` | `mise run rust-test-integration -- finstack-quant-valuations valuations` |
 | `rust-test-filter` | `mise run rust-test-filter -- finstack-quant-core test_bond_pricing` |
 | `rust-bench-crate` | `mise run rust-bench-crate -- finstack-quant-portfolio materialization` |
-| `rust-build-crate` | `mise run rust-build-crate -- finstack-quant-portfolio` |
 
 Add `--all-features` to `rust-lint-crate` / `rust-fix-crate` when touching feature-gated code. Add `--lib` to `rust-lint-crate` to skip integration-test binaries. Add `--slow` to test tasks for ignored tests.
 

@@ -19,7 +19,7 @@ upstream scan action).
 | `build.yml` | push to `master`; PR opened/synchronize/reopened | The PR gate. Lint, tests on all three surfaces, release build, supply chain, publish checks, semver, four representative benchmarks, and the SonarQube scan. |
 | `benchmarks.yml` | Wednesdays 06:00 UTC; manual | Full Rust Criterion suite and report. |
 | `docs.yml` | push to `master`; Mondays 06:00 UTC; manual | Documentation gates, kept out of `build.yml` so a slow rustdoc build never blocks a PR. |
-| `slow-rust-tests.yml` | Sundays 06:00 UTC; manual | `mise run rust-test-slow` — the `#[ignore]`d suite, 120-minute budget. |
+| `slow-rust-tests.yml` | Sundays 06:00 UTC; manual | `mise run rust-test --slow` — the `#[ignore]`d suite, 120-minute budget. |
 | `release.yml` | successful `Build` run on `master`; manual with `publish: true` | Builds wheels, sdist, and WASM packages, then cuts a GitHub Release. |
 | `ui-gallery.yml` | PRs touching `finstack-quant-ui/` or the docs-site gallery; manual; called by `registry-publish.yml` | Builds the WASM packages, then runs `ui-check`, `ui-docs-build`, `ui-e2e`, `ui-publish-check`, and the isolated `ui-install` consumer check. |
 | `registry-publish.yml` | manual | Reruns `ui-gallery.yml`, then on `master` deploys the component registry and gallery to GitHub Pages and verifies the published registry from an empty consumer. |
@@ -33,10 +33,10 @@ races on the shared `mise.toml`-derived key. Jobs then fan out in parallel:
 | Job | Command | Notes |
 | --- | --- | --- |
 | Lint | `mise run pre-commit-run`, then `mise run gen-check` | `SKIP: cargo-deny` — the supply-chain job owns it. Clippy covers lib/bins/tests/examples (`--all-features`), not Criterion benches. |
-| Test Rust | `mise run rust-test-cov` | The `rust-test` nextest targets under `cargo llvm-cov`; uploads `coverage/rust/lcov.info`. |
+| Test Rust | `mise run rust-test --coverage` | The `rust-test` nextest targets under `cargo llvm-cov`; uploads `coverage/rust/lcov.info`. |
 | Rust release build | `mise run rust-build-prod` | Release compile without debug info. |
-| Test Python | `mise run python-test-cov` | maturin dev build, then the full pytest suite with coverage; uploads `coverage/python/coverage.xml`. |
-| Test WASM | `mise run wasm-test` | wasm-bindgen tests plus the Node facade suite. |
+| Test Python | `mise run python-test --all --coverage` | maturin dev build, then the full pytest suite with coverage; uploads `coverage/python/coverage.xml`. |
+| Test WASM | `python3 scripts/check_wasm_boundary.py`, then `mise run wasm-test` | Serializer and error-path check, then wasm-bindgen tests plus the Node facade suite. |
 | Supply-chain Security | `mise run rust-audit` | `cargo deny check` — advisories, licenses, bans. |
 | Rust Publish Checks | `mise run rust-publish-checks` | Publish order and first-crate dry run. |
 | OSV-Scanner | reusable workflow | PR-diff scan on pull requests, full scan on push. Covers `Cargo.lock`, `uv.lock`, and `finstack-quant-wasm/package-lock.json`. |
@@ -62,7 +62,7 @@ Two details worth knowing before editing:
   deprecation-annotation contract, and workspace doctests. Installs nightly
   because `cargo public-api` still needs nightly rustdoc JSON.
 - **Python and WASM Documentation** — `mise run python-doc`,
-  `mise run wasm-doc`, and `mise run materialization-benchmark-doc-check`.
+  `mise run wasm-doc`, and `scripts/materialization_bench.sh doc-check`.
 
 ### release.yml
 
@@ -103,7 +103,7 @@ The local mirrors are partial, so know what they do and do not cover:
   OSV-Scanner, Semver Checks, or PR benchmark comparison. GitHub CI still uses `gen-check` as a
   non-mutating drift gate so uncommitted generated files fail the Lint job.
 - `mise run all-doc` mirrors `docs.yml`.
-- `slow-rust-tests.yml` is `mise run rust-test-slow`; `release.yml` has no local
+- `slow-rust-tests.yml` is `mise run rust-test --slow`; `release.yml` has no local
   equivalent.
 - `benchmarks.yml` runs the complete benchmark suite weekly; local scoped
   benchmark tasks remain available for focused measurements.

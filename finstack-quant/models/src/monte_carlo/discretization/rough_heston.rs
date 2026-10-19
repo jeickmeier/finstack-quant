@@ -606,7 +606,7 @@ mod tests {
 
     /// MC ATM call price vs the (post-B1/M7) rough-Heston Fourier pricer.
     #[test]
-    #[ignore = "slow: covered by mise rust-test-slow"]
+    #[ignore = "slow: covered by mise run rust-test --slow"]
     fn mc_atm_price_matches_fourier_pricer() {
         use super::super::super::rng::philox::PhiloxRng;
         use super::super::super::traits::RandomStream;

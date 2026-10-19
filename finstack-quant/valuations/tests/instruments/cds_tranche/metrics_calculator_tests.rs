@@ -100,7 +100,7 @@ fn test_correlation_delta_metric_via_price_with_metrics() {
     assert!(corr_delta.is_finite(), "Correlation delta should be finite");
 }
 
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 #[test]
 fn test_cs01_metric_via_price_with_metrics() {
     // Arrange
@@ -131,7 +131,7 @@ fn test_cs01_metric_via_price_with_metrics() {
 }
 
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn test_parallel_cs01_reconciles_with_bucketed_cs01() {
     let tranche = mezzanine_tranche();
     let market = replayable_market_context();
@@ -320,7 +320,7 @@ fn test_bucketed_dv01_metric_via_price_with_metrics() {
 
 // ==================== Multiple Metrics Calculation Tests ====================
 
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 #[test]
 fn test_calculate_multiple_metrics_simultaneously() {
     // Arrange
@@ -365,7 +365,7 @@ fn test_calculate_multiple_metrics_simultaneously() {
     assert!(valuation.measures.get("jump_to_default").is_some());
 }
 
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 #[test]
 fn test_all_standard_metrics_calculable() {
     // Arrange
@@ -454,7 +454,7 @@ fn test_metrics_with_missing_credit_index() {
 
 // ==================== Metric Calculation Order Independence ====================
 
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 #[test]
 fn test_metrics_order_independence() {
     // Arrange
@@ -504,7 +504,7 @@ fn test_metrics_order_independence() {
 
 // ==================== Instrument Trait Integration ====================
 
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 #[test]
 fn test_price_with_metrics_returns_pv_and_metrics() {
     // Arrange

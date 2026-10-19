@@ -129,9 +129,8 @@ methodology difference that justifies it.
 
 ## Slow tests
 
-Long-running cases carry `#[ignore = "slow: covered by mise rust-test-slow"]`;
-the golden pricing walk carries
-`#[ignore = "slow: covered by mise goldens-test or mise rust-test-slow"]`. Mark
+Long-running cases, including the golden pricing walk, carry
+`#[ignore = "slow: covered by mise run rust-test --slow"]`. Mark
 a test slow when it is a large property run, a multi-scenario loop, a Monte
 Carlo convergence check, a calibration round-trip, or a vendor-parity sweep.
 
@@ -158,12 +157,11 @@ cargo nextest run -p finstack-quant-valuations --test calibration term_structure
 cargo nextest run -p finstack-quant-valuations --test valuations metrics::metrics::sign_conventions::
 
 # Ignored (slow) tests
-mise run rust-test-slow
+mise run rust-test --slow
 cargo nextest run -p finstack-quant-valuations --test valuations instruments --run-ignored only
 
-# Golden layers (Rust + Python)
-mise run goldens-test
-mise run goldens-test-strict
+# Golden layer, including the ignored walk (see tests/golden/README.md)
+cargo nextest run -p finstack-quant-valuations --test valuations golden --run-ignored all
 ```
 
 Schema and fixture drift is gated separately, because it depends on generated

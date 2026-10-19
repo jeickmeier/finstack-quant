@@ -1,43 +1,43 @@
-# Finstack Quant developer environment & tasks
-# ---------------------------------------
-# Single source of truth for managed tool versions and developer tasks.
-# Run `mise install` once to provision all tools, then `mise run <task>`
-# (or `mise r <task>`) to drive the workflow. `mise tasks` lists everything.
+# Finstack Quant developer environment and tasks.
 #
-# Naming convention: <domain>-<action>  (domains: rust, python, wasm, ui, all)
-#   - `rust-*`, `python-*`, `wasm-*`, `ui-*`  — single-language tasks
-#   - `all-*`                          — aggregates that fan out to rust/python/wasm
-#   - `*-fmt`                          — reformats (Rust) or reformats and auto-fixes (Python, WASM)
-#   - `rust-fix`                       — clippy --fix (mutating; separate from fmt so it does not
-#                                        invalidate the plain clippy cache)
-#   - `*-lint`                         — check-only (CI-safe, no mutation)
+#   mise install          provision every pinned tool below
+#   mise run python-sync  create the virtualenv and install Python dev deps
+#   mise tasks            list every task
+#
+# Tasks are named <domain>-<action>; domains are rust, python, wasm, ui,
+# docs-site and gen, and all-* fans out across rust, python and wasm.
+# *-fmt and *-fix mutate; *-lint and *-check are check-only.
+# Specialised workflows live in scripts/ (materialization benchmarks:
+# scripts/materialization_bench.sh; QuantLib goldens: scripts/golden/quantlib).
 
 [settings]
-# Download GitHub release binaries for `cargo:` tools. Otherwise a cache miss
-# compiles them with `cargo install`. cargo-public-api publishes no release
-# binary, so that one tool still builds from source.
+# Download GitHub release binaries for `cargo:` tools instead of compiling
+# them; cargo-public-api has no release binary and still builds from source.
 cargo.binstall_native = true
 
 [tools]
-# `github:` rather than `aqua:`: the aqua registry resolves wasm-pack to the
-# x86_64 asset on Apple Silicon, which fails with "Bad CPU type"; the github
-# backend picks the aarch64-apple-darwin asset. Listed before `rust` so this
-# binary precedes `$CARGO_HOME/bin` on PATH: a `cargo install`ed wasm-pack must
-# not shadow the pinned one, or local `wasm-test` runs a different version than CI.
+# Listed before `rust` so these precede $CARGO_HOME/bin on PATH: a
+# `cargo install`ed copy must not shadow the pinned one.
+# `github:` because the aqua registry picks the x86_64 asset on Apple Silicon.
 "github:wasm-bindgen/wasm-pack" = "0.15.0"
-# Pin the active toolchain to an exact rustup name. A bare channel can make
-# parallel `cargo:*` installs race to fetch and rename the same download.
-# Nightly is also installed because cargo-public-api (used by
-# `mise run rust-doc`) can only build rustdoc JSON with nightly; see
-# scripts/check_public_api_input_docs.py.
+# wasm-pack uses this only when it equals the `wasm-bindgen` crate in
+# Cargo.lock; otherwise it downloads its own. Bump it with the lockfile.
+"github:wasm-bindgen/wasm-bindgen" = "0.2.126"
+# `wasm-opt`; matches the ui-gallery CI job.
+"aqua:WebAssembly/binaryen" = "130"
+uv = "0.10.11"
+# The exact stable toolchain (keep in sync with rust-toolchain.toml), plus
+# nightly for the rustdoc JSON that cargo-public-api reads in `rust-doc`.
 rust = [
   { version = "1.97.1", components = "clippy,rustfmt", targets = "wasm32-unknown-unknown", profile = "minimal" },
   { version = "nightly", profile = "minimal" },
 ]
-# Tool versions are pinned exactly, not "latest": these are the test runner,
-# the supply-chain gate and the wheel builder, and a floating pin lets CI go
-# red with no code change. Bump deliberately, one tool at a time.
 node = "24"
+python = "3.12.15"
+# Its postinstall puts headless Chromium in the per-user Playwright cache. The
+# browser build is tied to this version: keep it equal to `playwright` in
+# finstack-quant-ui/package.json.
+"npm:playwright" = { version = "1.58.2", postinstall = "playwright install chromium --only-shell" }
 "cargo:cargo-nextest" = "0.9.143"
 "cargo:cargo-llvm-cov" = "0.9.0"
 "cargo:cargo-deny" = "0.20.2"
@@ -47,348 +47,149 @@ node = "24"
 "aqua:google/osv-scanner" = "2.3.5"
 
 [env]
-CARGO_HOME = "{{ env.CARGO_HOME | default(value=env.HOME ~ '/.cargo') }}"
-RUSTUP_HOME = "{{ env.RUSTUP_HOME | default(value=env.HOME ~ '/.rustup') }}"
-# Keep builds on the pinned stable toolchain when mise also provisions
-# nightly for rustdoc JSON. Must match the rust tool version name above.
+# Everything lives in the user's profile (%USERPROFILE% / %LOCALAPPDATA% on
+# Windows, $HOME elsewhere), so nothing needs admin rights. A value you
+# already export wins.
+CARGO_HOME = '{% if env.CARGO_HOME is defined %}{{ env.CARGO_HOME }}{% elif os() == "windows" %}{{ env.USERPROFILE }}\.cargo{% else %}{{ env.HOME }}/.cargo{% endif %}'
+RUSTUP_HOME = '{% if env.RUSTUP_HOME is defined %}{{ env.RUSTUP_HOME }}{% elif os() == "windows" %}{{ env.USERPROFILE }}\.rustup{% else %}{{ env.HOME }}/.rustup{% endif %}'
+# Builds use the pinned stable toolchain, not the nightly installed above.
 RUSTUP_TOOLCHAIN = "1.97.1"
+# uv and PyO3 use the mise-installed Python above (same version), never a
+# system, Microsoft Store or uv-managed one, and uv never downloads its own.
+UV_PYTHON = '{% if env.UV_PYTHON is defined %}{{ env.UV_PYTHON }}{% elif os() == "windows" %}{{ xdg_data_home }}\mise\installs\python\3.12.15\python.exe{% else %}{{ xdg_data_home }}/mise/installs/python/3.12.15/bin/python{% endif %}'
 UV_PYTHON_DOWNLOADS = "{{ env.UV_PYTHON_DOWNLOADS | default(value='never') }}"
+PYO3_PYTHON = '{% if env.PYO3_PYTHON is defined %}{{ env.PYO3_PYTHON }}{% elif os() == "windows" %}{{ xdg_data_home }}\mise\installs\python\3.12.15\python.exe{% else %}{{ xdg_data_home }}/mise/installs/python/3.12.15/bin/python{% endif %}'
 
 # ─────────────────────────────────────────────────────────────────
-# Aggregate (all-*) — fan out across rust + python + wasm
+# Aggregates
 # ─────────────────────────────────────────────────────────────────
 
 [tasks.all]
-description = "Test and lint everything (rust + python + wasm); use all-build for explicit build verification"
+description = "Test and lint everything (rust + python + wasm)"
 run = [{ task = "all-test" }, { task = "all-lint" }]
 
 [tasks.all-build]
-description = "Build Rust workspace, Python bindings, and WASM package"
+description = "Build the Rust workspace, Python bindings and WASM package"
 depends = ["rust-build", "python-build", "wasm-build"]
 
 [tasks.all-test]
 description = "Run all tests (Rust + Python + WASM)"
-run = [
-  { task = "rust-test" },
-  { task = "python-test-all" },
-  { task = "wasm-test" },
-]
-
-[tasks.goldens-test]
-description = "Run golden tests (Rust + Python layers)"
-run = """
-cargo test -p finstack-quant-valuations --test valuations golden -- --include-ignored &&
-mise run python-build &&
-uv run --no-sync pytest finstack-quant-py/tests/golden -v
-"""
-
-[tasks.goldens-test-strict]
-description = "Run golden tests ignoring known_non_executable.json (surface every failure)"
-env = { GOLDEN_IGNORE_NON_EXECUTABLE = "1" }
-run = """
-cargo test -p finstack-quant-valuations --test valuations golden -- --include-ignored &&
-mise run python-build &&
-uv run --no-sync pytest finstack-quant-py/tests/golden -v
-"""
-
-[tasks.goldens-quantlib-generate]
-description = "Regenerate committed native QuantLib pricing golden fixtures"
-run = "uv run python -m scripts.golden.quantlib.generate --family pricing --product all"
-
-[tasks.goldens-quantlib-check]
-description = "Check native QuantLib pricing golden fixtures for generator drift"
-run = "uv run python -m scripts.golden.quantlib.generate --family pricing --product all --check"
-
-[tasks.goldens-quantlib-attribution-generate]
-description = "Regenerate QuantLib T0/T1 + attribution parity fixtures"
-run = "uv run python -m scripts.golden.quantlib.generate --family attribution --product all"
-
-[tasks.goldens-quantlib-attribution-check]
-description = "Check QuantLib attribution parity fixtures for generator drift"
-run = "uv run python -m scripts.golden.quantlib.generate --family attribution --product all --check"
+run = [{ task = "rust-test" }, "mise run python-test --all", { task = "wasm-test" }]
 
 [tasks.all-fmt]
-description = "Format Rust, Python, and WASM; auto-fix Python and WASM (mutating)"
+description = "Format Rust, Python and WASM; auto-fix Python and WASM"
 depends = ["rust-fmt", "python-fmt", "wasm-fmt"]
 
 [tasks.all-lint]
-description = "Lint Rust + Python + WASM (check-only, non-mutating)"
+description = "Lint Rust, Python and WASM and check generated artifacts (check-only)"
 depends = ["rust-lint", "python-lint", "wasm-lint", "wasm-doc", "gen-check"]
 
-[tasks.all-audit]
-description = "Run security audits on Rust + Python"
-depends = ["rust-audit", "python-audit"]
-
-[tasks.assumptions-audit]
-description = "Report hard-coded external assumptions that should move to registries"
-run = "python3 scripts/audit_hardcoded_assumptions.py"
-
-[tasks.all-update]
-description = "Update Rust + Python dependencies"
-depends = ["rust-update", "python-update"]
-
-[tasks.all-clean]
-description = "Remove build artifacts and virtualenvs"
-run = ["cargo clean", '''python3 scripts/clean_workspace.py''']
-
 [tasks.all-doc]
-description = "Verify Rust, Python, and WASM documentation (CI docs job)"
-depends = ["rust-doc", "python-doc", "wasm-doc", "materialization-benchmark-doc-check"]
+description = "Verify Rust, Python and WASM documentation (the CI docs workflow)"
+depends = ["rust-doc", "python-doc", "wasm-doc"]
+run = "scripts/materialization_bench.sh doc-check"
 
 [tasks.all-ci]
-description = "Regenerate derived artifacts, then run CI build.yml checks locally"
+description = "Regenerate derived artifacts, then run the CI build.yml checks locally"
 depends = ["gen-write"]
-run = [{ task = "all-ci-verify" }]
+run = [{ tasks = ["pre-commit-run", "gen-check", "all-test", "rust-audit", "rust-publish-checks"] }]
 
-[tasks.all-ci-verify]
-description = "CI verification suite after derived artifacts are current"
-hide = true
-depends = [
-  "pre-commit-run",
-  "gen-check",
-  "all-test",
-  "rust-audit",
-  "rust-publish-checks",
-]
+[tasks.all-clean]
+description = "Remove build artifacts and virtualenvs (scripts/clean_workspace.py --help for targeted cleans)"
+run = ["cargo clean", "python3 scripts/clean_workspace.py"]
 
 # ─────────────────────────────────────────────────────────────────
 # Rust
 # ─────────────────────────────────────────────────────────────────
+# Whole-workspace tasks exclude finstack-quant-py: its test target links
+# libpython, which plain cargo cannot find. pytest covers the bindings, and
+# rust-lint still type-checks the crate.
 
 [tasks.rust-build]
-description = "Build all core Rust crates (excludes finstack-quant-py, finstack-quant-wasm)"
+description = "Build the Rust library crates"
 run = "cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm"
 
 [tasks.rust-build-prod]
-description = "Release build without debug info"
-env = { RUSTFLAGS = "-C debuginfo=0", CARGO_INCREMENTAL = "0" }
+description = "Release build of the Rust library crates"
 run = "cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --release"
 
-[tasks.rust-test-crate]
-description = "Run lib + integration tests for one crate (preferred during iteration)"
+[tasks.rust-test]
+description = "Run the workspace Rust tests with nextest (use rust-test-crate while iterating)"
 usage = '''
-arg "<package>" help="Cargo package (e.g. finstack-quant-core, finstack-quant-valuations)"
-flag "--slow" help="Include ignored/slow tests"
+flag "--slow" help="Run only the ignored (slow) tests"
+flag "--coverage" help="Instrument with cargo llvm-cov; writes target/llvm-cov/html and coverage/rust/lcov.info"
 '''
 run = '''
-set -e
-pkg="${usage_package?}"
-if [ "${usage_slow:-false}" = "true" ]; then
-  cargo nextest run -p "$pkg" --lib --test '*' --run-ignored only --no-fail-fast
+ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only --no-tests pass"
+if [ "${usage_coverage:-false}" = "true" ]; then
+  cargo llvm-cov clean --workspace
+  run_tests() { cargo llvm-cov nextest --no-report --remap-path-prefix "$@"; }
 else
-  cargo nextest run -p "$pkg" --lib --test '*' --no-fail-fast
+  run_tests() { cargo nextest run "$@"; }
 fi
+run_tests --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' $ignored --no-fail-fast
+run_tests -p finstack-quant-wasm --lib --test dts_contract --test wasm $ignored --no-fail-fast
+if [ "${usage_coverage:-false}" = "true" ]; then
+  mkdir -p coverage/rust
+  exclude='(tests?/|test-support/|target/|\.cargo/|finstack-quant-py/)'
+  cargo llvm-cov report --remap-path-prefix --ignore-filename-regex "$exclude" --lcov --output-path coverage/rust/lcov.info
+  cargo llvm-cov report --remap-path-prefix --ignore-filename-regex "$exclude" --html --output-dir target/llvm-cov
+  echo "Coverage: target/llvm-cov/html/index.html, coverage/rust/lcov.info"
+fi
+'''
+
+[tasks.rust-test-crate]
+description = "Run lib + integration tests for one crate"
+usage = '''
+arg "<package>" help="Cargo package (e.g. finstack-quant-core)"
+flag "--slow" help="Run only the ignored (slow) tests"
+'''
+run = '''
+ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only"
+cargo nextest run -p "${usage_package?}" --lib --test '*' $ignored --no-fail-fast
 '''
 
 [tasks.rust-test-integration]
 description = "Run one integration test binary in a crate"
 usage = '''
 arg "<package>" help="Cargo package (e.g. finstack-quant-valuations)"
-arg "<test>" help="Integration test binary (e.g. valuations, portfolio)"
-flag "--slow" help="Include ignored/slow tests"
+arg "<test>" help="Integration test binary (e.g. valuations)"
+flag "--slow" help="Run only the ignored (slow) tests"
 '''
 run = '''
-set -e
-pkg="${usage_package?}"
-test="${usage_test?}"
-if [ "${usage_slow:-false}" = "true" ]; then
-  cargo nextest run -p "$pkg" --test "$test" --run-ignored only --no-fail-fast
-else
-  cargo nextest run -p "$pkg" --test "$test" --no-fail-fast
-fi
+ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only"
+cargo nextest run -p "${usage_package?}" --test "${usage_test?}" $ignored --no-fail-fast
 '''
 
 [tasks.rust-test-filter]
-description = "Run tests in one crate matching a name filter"
+description = "Run the tests in one crate whose names match a filter"
 usage = '''
 arg "<package>" help="Cargo package (e.g. finstack-quant-core)"
-arg "<filter>" help="Test name substring or exact name (nextest filter)"
-flag "--integration <test>" help="Limit to one integration test binary"
-flag "--lib" help="Limit to library unit tests"
-flag "--slow" help="Include ignored/slow tests"
+arg "<filter>" help="Test name substring or exact name"
+flag "--integration <test>" help="Only this integration test binary"
+flag "--lib" help="Only library unit tests"
+flag "--slow" help="Run only the ignored (slow) tests"
 '''
 run = '''
-set -e
-pkg="${usage_package?}"
-filter="${usage_filter?}"
-if [ "${usage_lib:-false}" = "true" ] && [ -n "${usage_integration:-}" ]; then
+ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only"
+if [ -n "${usage_integration:-}" ] && [ "${usage_lib:-false}" = "true" ]; then
   echo "--lib and --integration are mutually exclusive" >&2
   exit 2
-fi
-if [ -n "${usage_integration:-}" ]; then
-  if [ "${usage_slow:-false}" = "true" ]; then
-    cargo nextest run -p "$pkg" --test "${usage_integration?}" --run-ignored only --no-fail-fast -- "$filter"
-  else
-    cargo nextest run -p "$pkg" --test "${usage_integration?}" --no-fail-fast -- "$filter"
-  fi
+elif [ -n "${usage_integration:-}" ]; then
+  set -- --test "$usage_integration"
 elif [ "${usage_lib:-false}" = "true" ]; then
-  if [ "${usage_slow:-false}" = "true" ]; then
-    cargo nextest run -p "$pkg" --lib --run-ignored only --no-fail-fast -- "$filter"
-  else
-    cargo nextest run -p "$pkg" --lib --no-fail-fast -- "$filter"
-  fi
+  set -- --lib
 else
-  if [ "${usage_slow:-false}" = "true" ]; then
-    cargo nextest run -p "$pkg" --lib --test '*' --run-ignored only --no-fail-fast -- "$filter"
-  else
-    cargo nextest run -p "$pkg" --lib --test '*' --no-fail-fast -- "$filter"
-  fi
+  set -- --lib --test '*'
 fi
+cargo nextest run -p "${usage_package?}" "$@" $ignored --no-fail-fast -- "${usage_filter?}"
 '''
-
-[tasks.rust-build-crate]
-description = "Build one crate and its dependencies"
-usage = '''
-arg "<package>" help="Cargo package (e.g. finstack-quant-portfolio)"
-flag "--release" help="Release profile"
-'''
-run = '''
-set -e
-pkg="${usage_package?}"
-if [ "${usage_release:-false}" = "true" ]; then
-  CARGO_INCREMENTAL=0 cargo build -p "$pkg" --release
-else
-  cargo build -p "$pkg"
-fi
-'''
-
-[tasks.rust-test]
-# Full-workspace pass — reserve for final verification, CI, and pre-commit.
-# During iteration prefer: rust-test-crate, rust-test-integration, rust-test-filter.
-# `--exclude finstack-quant-py` is required, not an oversight: building that crate's
-# test target links against libpython (e.g. `ld: library 'python3.9' not found`), which
-# is not available in a plain `cargo` environment. Binding behavior is exercised
-# against the built extension by pytest via `mise run python-test`; keep Rust
-# `#[test]` modules out of this crate while `[lib] test = false`.
-# Type-checking it is still gated: `rust-lint` runs clippy with `--workspace`, and
-# clippy type-checks without linking, so binding compile errors are caught there.
-# Criterion benches are compiled by `rust-bench` / `rust-bench-crate`, not by
-# fmt or lint. Run those tasks for measurements.
-description = "Run full-workspace Rust tests via cargo-nextest (use rust-test-crate while iterating)"
-run = [
-  "cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' --no-fail-fast",
-  "cargo nextest run -p finstack-quant-wasm --lib --test dts_contract --test wasm --no-fail-fast",
-]
-
-[tasks.rust-doc]
-description = "Build workspace docs, enforce input docs, and run contract doctests"
-# --no-sync on the Python checkers: they are static; plain `uv run` rebuilds PyO3.
-run = [
-  "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --no-deps",
-  "uv run --no-sync python scripts/check_public_api_input_docs.py",
-  "uv run --no-sync python scripts/check_deprecated_annotations.py",
-  "cargo test --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --doc --no-fail-fast",
-]
-
-[tasks.rust-doc-crate]
-description = "Build one crate's docs, enforce input docs, and run its doctests"
-usage = 'arg "<package>" help="Rust package to validate"'
-run = '''
-set -eu
-pkg="${usage_package?}"
-RUSTDOCFLAGS='-D warnings' cargo doc -p "$pkg" --no-deps
-uv run --no-sync python scripts/check_public_api_input_docs.py --package "$pkg"
-cargo test -p "$pkg" --doc --no-fail-fast
-'''
-
-[tasks.rust-test-slow]
-description = "Run Rust tests including ignored/slow ones"
-run = [
-  "cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' --run-ignored only --no-fail-fast",
-  "cargo nextest run -p finstack-quant-wasm --lib --test dts_contract --test wasm --run-ignored only --no-tests pass --no-fail-fast",
-]
-
-[tasks.rust-test-cov]
-# Same nextest targets as `rust-test`, instrumented, so CI runs the suite once
-# and SonarQube imports the LCOV report.
-description = "Run the rust-test suite with coverage; writes HTML and SonarQube LCOV reports"
-run = """
-set -e
-mkdir -p coverage/rust
-cargo llvm-cov clean --workspace
-cargo llvm-cov nextest --no-report --remap-path-prefix \
-  --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm \
-  --lib --test '*' --no-fail-fast
-cargo llvm-cov nextest --no-report --remap-path-prefix \
-  -p finstack-quant-wasm --lib --test dts_contract --test wasm --no-fail-fast
-cargo llvm-cov report --remap-path-prefix \
-  --ignore-filename-regex '(tests?/|test-support/|target/|\\.cargo/|finstack-quant-py/)' \
-  --lcov --output-path coverage/rust/lcov.info
-cargo llvm-cov report --remap-path-prefix \
-  --ignore-filename-regex '(tests?/|test-support/|target/|\\.cargo/|finstack-quant-py/)' \
-  --html --output-dir target/llvm-cov
-echo "HTML report: target/llvm-cov/html/index.html"
-echo "LCOV report: coverage/rust/lcov.info"
-"""
-
-[tasks.rust-lint-crate]
-description = "Lint one crate: fmt check + clippy (preferred during iteration; --lib skips integration tests)"
-usage = '''
-arg "<package>" help="Cargo package (e.g. finstack-quant-valuations, finstack-quant-py)"
-flag "--all-features" help="Enable all crate features for clippy"
-flag "--lib" help="Clippy the library target only"
-'''
-run = '''
-status=0
-pkg="${usage_package?}"
-cargo fmt --all -- --check || status=1
-features=""
-targets="--lib --tests --bins --examples"
-if [ "${usage_all_features:-false}" = "true" ]; then
-  features="--all-features"
-fi
-if [ "${usage_lib:-false}" = "true" ]; then
-  targets="--lib"
-fi
-cargo clippy -p "$pkg" $targets $features --keep-going -- -D warnings || status=1
-exit "$status"
-'''
-
-[tasks.rust-fix-crate]
-description = "Apply clippy --fix for one crate (mutating; skips workspace benches)"
-usage = '''
-arg "<package>" help="Cargo package (e.g. finstack-quant-scenarios)"
-flag "--all-features" help="Enable all crate features for clippy"
-'''
-run = '''
-set -e
-pkg="${usage_package?}"
-if [ "${usage_all_features:-false}" = "true" ]; then
-  cargo clippy -p "$pkg" --lib --tests --bins --examples --all-features --fix --allow-dirty -- -D warnings
-else
-  cargo clippy -p "$pkg" --lib --tests --bins --examples --fix --allow-dirty -- -D warnings
-fi
-'''
-
-[tasks.rust-fmt]
-description = "Format the full workspace with cargo fmt"
-run = "cargo fmt --all"
-
-[tasks.rust-fix]
-# `--workspace` keeps auto-fixes in step with `rust-lint`.
-# Clippy covers lib/bins/tests/examples only — Criterion benches are compiled by
-# `rust-bench`, not by fix or lint. `clippy --fix` rebuilds workspace crates
-# with a different fingerprint than plain clippy, so run it on demand rather
-# than on every format.
-description = "Apply clippy --fix across the workspace (mutating; skips benches)"
-run = "cargo clippy --workspace --lib --bins --tests --examples --all-features --fix --allow-dirty -- -D warnings"
 
 [tasks.rust-lint]
-# Full-workspace pass — matches CI pre-commit (.pre-commit-config.yaml).
-# During iteration prefer: rust-lint-crate (one crate, same target set).
-#
-# `--workspace` is deliberate: a bare `cargo clippy` operates on `default-members`,
-# which omits finstack-quant-py and finstack-quant-wasm. That blind spot let a
-# breaking change land on master with a Python binding that did not compile
-# (a struct gained a field; the binding's struct-literal call site was not updated).
-# `cargo fmt --all` already covered those crates; clippy type-checks the whole
-# workspace (including `--all-features`) so feature-gated code is covered in one
-# pass at commit time.
-# Omit `--benches`: Criterion targets are compiled by `rust-bench`, not lint.
-# Both checks always run. A format failure does not skip clippy, and
-# `--keep-going` keeps linting the rest of the workspace after the first
-# crate error. The task still exits non-zero if either check fails.
-description = "Lint full workspace (use rust-lint-crate while iterating; run before commit/CI; skips benches)"
+# --workspace on purpose: a bare `cargo clippy` uses default-members, which
+# omit the Python and WASM bindings, and once let a binding that no longer
+# compiled reach master. Benches are compiled by rust-bench, not here.
+description = "fmt check + clippy over the whole workspace (use rust-lint-crate while iterating)"
 run = '''
 status=0
 cargo fmt --all -- --check || status=1
@@ -396,417 +197,109 @@ cargo clippy --workspace --lib --bins --tests --examples --all-features --keep-g
 exit "$status"
 '''
 
+[tasks.rust-lint-crate]
+description = "fmt check + clippy for one crate"
+usage = '''
+arg "<package>" help="Cargo package (e.g. finstack-quant-valuations)"
+flag "--all-features" help="Enable all crate features"
+flag "--lib" help="Library target only"
+'''
+run = '''
+status=0
+targets="--lib --tests --bins --examples"; [ "${usage_lib:-false}" = "true" ] && targets="--lib"
+features=""; [ "${usage_all_features:-false}" = "true" ] && features="--all-features"
+cargo fmt --all -- --check || status=1
+cargo clippy -p "${usage_package?}" $targets $features --keep-going -- -D warnings || status=1
+exit "$status"
+'''
+
+[tasks.rust-fmt]
+description = "Format the workspace with cargo fmt"
+run = "cargo fmt --all"
+
+[tasks.rust-fix]
+description = "Apply clippy --fix across the workspace"
+run = "cargo clippy --workspace --lib --bins --tests --examples --all-features --fix --allow-dirty -- -D warnings"
+
+[tasks.rust-fix-crate]
+description = "Apply clippy --fix to one crate"
+usage = '''
+arg "<package>" help="Cargo package (e.g. finstack-quant-scenarios)"
+flag "--all-features" help="Enable all crate features"
+'''
+run = '''
+features=""; [ "${usage_all_features:-false}" = "true" ] && features="--all-features"
+cargo clippy -p "${usage_package?}" --lib --tests --bins --examples $features --fix --allow-dirty -- -D warnings
+'''
+
+[tasks.rust-doc]
+description = "Build workspace docs, enforce input docs and run doctests"
+run = [
+  "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --no-deps",
+  "uv run --no-sync python scripts/check_public_api_input_docs.py",
+  "uv run --no-sync python scripts/check_deprecated_annotations.py",
+  "cargo test --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --doc --no-fail-fast",
+]
+
 [tasks.rust-audit]
-description = "Audit Rust dependencies via cargo-deny"
+description = "Audit Rust dependencies (cargo deny: advisories, licenses, bans)"
 run = "cargo deny check"
 
 [tasks.rust-publish-checks]
-description = "Validate Rust crate publish order and first-crate dry-run"
+description = "Validate crate publish order and dry-run the first crate"
 run = "uv run --no-sync python scripts/cargo_publish_checks.py"
 
-[tasks.rust-update]
-description = "Update Rust dependencies"
-run = "cargo update"
+[tasks.rust-bench]
+description = "Run every Criterion benchmark with reduced timing (FQ_BENCH_* to override)"
+run = "cargo bench --bench '*' -- --sample-size ${FQ_BENCH_SAMPLE_SIZE:-10} --warm-up-time ${FQ_BENCH_WARM_UP_TIME:-1} --measurement-time ${FQ_BENCH_MEASUREMENT_TIME:-1} --nresamples ${FQ_BENCH_NRESAMPLES:-1000} --noplot"
 
-[tasks.rust-clean-incremental]
-description = "Delete Cargo incremental caches without a full cargo clean"
-run = "python3 scripts/clean_workspace.py --incremental"
-
-# ─────────────────────────────────────────────────────────────────
-# Python
-# ─────────────────────────────────────────────────────────────────
-
-[tasks.python-setup]
-description = "Initialize Python virtual environment"
-run = "uv venv --python 3.12 --allow-existing"
-
-[tasks.python-sync]
-description = "Sync Python dev dependencies and expose notebook _shared on the import path"
-run = """
-uv sync --group dev --no-install-project
-uv run --no-sync python scripts/install_notebook_path.py
-"""
-
-[tasks.python-build]
-description = "Build Python bindings in-place (pass --release for optimized build)"
+[tasks.rust-bench-crate]
+description = "Run one Criterion bench in one crate"
 usage = '''
-flag "--release" help="Build with release profile (slower compile, faster runtime)"
+arg "<package>" help="Cargo package (e.g. finstack-quant-portfolio)"
+arg "<bench>" help="Bench target (e.g. materialization)"
 '''
-run = '{% if usage.release %}CARGO_INCREMENTAL=0 {% endif %}uv run --no-sync maturin develop{% if usage.release %} --release{% endif %} && uv run --no-sync python scripts/install_notebook_path.py'
-
-[tasks.materialization-benchmark-fixtures]
-description = "Generate deterministic portfolio materialization benchmark fixtures"
-env = { CARGO_INCREMENTAL = "0" }
-run = "cargo run --release --quiet -p finstack-quant-portfolio --example materialization_fixtures -- target/materialization-benchmarks"
-
-[tasks.python-bench]
-description = "Manually benchmark all Python bindings with an optimized extension"
-run = """
-mise run python-build -- --release
-uv run --no-sync pytest finstack-quant-py/benchmarks/bench_bindings.py -m perf --benchmark-only
-"""
-
-[tasks.python-bench-portfolio]
-description = "Benchmark portfolio Python bindings with an optimized extension"
-run = """
-mise run materialization-benchmark-fixtures
-mise run python-build -- --release
-uv run --no-sync pytest finstack-quant-py/benchmarks/bench_bindings.py \
-  -m perf --benchmark-only -k Portfolio
-"""
-
-[tasks.wasm-bench-materialization]
-description = "Regenerate fixtures, release-build WASM, and benchmark materialization"
-env = { CARGO_INCREMENTAL = "0" }
-run = """
-mise run materialization-benchmark-fixtures
-npm --prefix finstack-quant-wasm run build:node
-npm --prefix finstack-quant-wasm run bench -- --materialization-only
-"""
-
-[tasks.python-bench-portfolio-baseline]
-description = "Explicitly establish immutable Python baseline; set FQ_REPLACE_MATERIALIZATION_BASELINE=1 to replace"
-run = """
-uv run --no-sync pytest scripts/tests/test_check_python_materialization_regressions.py -q
-replace_flag=$(uv run python scripts/materialization_baseline_replace_flag.py)
-uv run python scripts/check_python_materialization_regressions.py guard \
-  --baseline benchmarks/materialization/materialization-python-baseline.json \
-  $replace_flag
-mise run materialization-benchmark-fixtures
-mise run python-build -- --release
-uv run python scripts/check_python_materialization_regressions.py prepare \
-  --fixture-a target/materialization-benchmarks/materialization-a-5000-unique.json \
-  --fixture-b target/materialization-benchmarks/materialization-b-5000-50.json \
-  --output target/materialization-python/baseline-run-metadata.json
-FQ_MATERIALIZATION_P95_SAMPLES=${FQ_MATERIALIZATION_P95_SAMPLES:-100} \
-uv run python finstack-quant-py/benchmarks/materialization_measure.py \
-  target/materialization-benchmarks target/materialization-python/baseline-measurement.json
-uv run python scripts/check_python_materialization_regressions.py establish \
-  --measurement target/materialization-python/baseline-measurement.json \
-  --run-metadata target/materialization-python/baseline-run-metadata.json \
-  --fixture-a target/materialization-benchmarks/materialization-a-5000-unique.json \
-  --fixture-b target/materialization-benchmarks/materialization-b-5000-50.json \
-  --output benchmarks/materialization/materialization-python-baseline.json \
-  --artifact-root target/materialization-python \
-  --baseline-name python-materialization-v1 \
-  $replace_flag
-uv run python scripts/check_python_materialization_regressions.py seal \
-  --baseline benchmarks/materialization/materialization-python-baseline.json \
-  --manifest benchmarks/materialization/materialization-benchmark-baseline.json
-"""
-
-[tasks.python-bench-portfolio-compare]
-description = "Strictly compare fresh release-Python materialization measurements"
-run = """
-uv run --no-sync pytest scripts/tests/test_check_python_materialization_regressions.py -q
-current_output=${FQ_MATERIALIZATION_PYTHON_CURRENT_OUTPUT:-target/materialization-python/current.json}
-result_output=${FQ_MATERIALIZATION_PYTHON_COMPARISON_OUTPUT:-target/materialization-python/comparison.json}
-mise run materialization-benchmark-fixtures
-mise run python-build -- --release
-uv run python scripts/prepare_materialization_criterion_run.py \
-  --baseline benchmarks/materialization/materialization-python-baseline.json \
-  --fixture-a target/materialization-benchmarks/materialization-a-5000-unique.json \
-  --fixture-b target/materialization-benchmarks/materialization-b-5000-50.json \
-  --output target/materialization-python/run-metadata.json
-FQ_MATERIALIZATION_P95_SAMPLES=${FQ_MATERIALIZATION_P95_SAMPLES:-100} \
-uv run python finstack-quant-py/benchmarks/materialization_measure.py \
-  target/materialization-benchmarks "$current_output"
-uv run python scripts/check_python_materialization_regressions.py compare \
-  --baseline benchmarks/materialization/materialization-python-baseline.json \
-  --current "$current_output" \
-  --run-metadata target/materialization-python/run-metadata.json \
-  --fixture-a target/materialization-benchmarks/materialization-a-5000-unique.json \
-  --fixture-b target/materialization-benchmarks/materialization-b-5000-50.json \
-  --artifact-root target/materialization-python \
-  --result-output "$result_output" \
-  --baseline-manifest benchmarks/materialization/materialization-benchmark-baseline.json \
-  --threshold 0.10
-"""
-
-[tasks.python-test]
-description = "Build dev Python bindings, then run fast Python tests"
-run = """
-mise run python-build
-uv run --no-sync pytest -v -n auto -m 'not slow'
-"""
-
-[tasks.python-test-file]
-description = "Run one Python test file or node ID against the already built extension"
-usage = 'arg "<test>" help="Pytest file path or node ID; run python-build after binding changes"'
-run = 'uv run --no-sync pytest -q "${usage_test?}"'
-
-[tasks.python-test-slow]
-description = "Build dev Python bindings, then run slow Python tests"
-run = """
-mise run python-build
-uv run --no-sync pytest -v -n auto -m slow
-"""
-
-[tasks.python-test-all]
-description = "Build dev Python bindings, then run the full Python test suite"
-run = """
-mise run python-build
-uv run --no-sync pytest -v -n auto
-"""
-
-[tasks.python-test-cov]
-description = "Build dev Python bindings, then run Python tests with HTML and SonarQube Cobertura coverage reports"
-run = """
-mkdir -p coverage/python
-mise run python-build
-uv run --no-sync pytest -v -n auto --cov=finstack-quant-py/finstack_quant --cov-report=term-missing --cov-report=html:target/python-cov --cov-report=xml:coverage/python/coverage.xml
-echo "Cobertura report: coverage/python/coverage.xml"
-"""
-
-[tasks.python-fmt]
-description = "Format + auto-fix Python code (ruff format + ruff check --fix, mutating)"
-run = [
-  "uv run --no-sync ruff format .",
-  "uv run --no-sync ruff check . --fix --unsafe-fixes",
-]
-
-[tasks.python-lint]
-description = "Lint Python (ruff format --check + ruff check, check-only)"
-run = [
-  "uv run --no-sync ruff format . --check",
-  "uv run --no-sync ruff check . --no-fix",
-  "uv run --no-sync python scripts/check_python_api_input_docs.py",
-  "uv run --no-sync python scripts/check_pyo3_doc_placeholders.py",
-]
-
-[tasks.python-doc]
-description = "Enforce complete Python IntelliSense documentation"
-run = [
-  "uv run --no-sync pytest scripts/tests/test_check_python_api_input_docs.py scripts/tests/test_check_pyo3_doc_placeholders.py -q",
-  "uv run --no-sync python scripts/check_python_api_input_docs.py",
-  "uv run --no-sync python scripts/check_pyo3_doc_placeholders.py",
-]
-
-[tasks.python-doctest]
-description = "Build Python bindings and run stub/module doctest examples"
-run = """
-mise run python-build
-uv run --no-sync pytest finstack-quant-py/tests/test_stub_doctests.py -q
-"""
-
-[tasks.python-typecheck]
-description = "Type-check Python bindings with ty"
-run = "uv run --no-sync ty check finstack-quant-py/finstack_quant"
-
-[tasks.python-audit]
-description = "Audit Python dependencies via bandit"
-run = "uv run --no-sync bandit -r finstack-quant-py -c pyproject.toml"
-
-[tasks.python-update]
-description = "Update Python dependencies"
-run = "uv lock --upgrade"
-
-[tasks.python-examples]
-description = "Run every Python notebook; fail on skipped cells, errors, runtime warnings, or stderr"
-run = "uv run python finstack-quant-py/examples/notebooks/run_all_notebooks.py"
-
-# ─────────────────────────────────────────────────────────────────
-# WASM
-# ─────────────────────────────────────────────────────────────────
-
-[tasks.wasm-clean]
-description = "Remove wasm-pack output and wasm32 target artifacts"
-run = "python3 scripts/clean_workspace.py --wasm"
-
-[tasks.wasm-build]
-description = "Build WASM package (web target)"
-env = { CARGO_INCREMENTAL = "0" }
-run = "wasm-pack build finstack-quant-wasm --target web"
-
-[tasks.wasm-test]
-description = "Run WASM package tests (wasm-bindgen + Node facade) and the facade JSDoc sync check"
-# Facade builds use profile.wasm-test (opt-level 1, no LTO). Published packages
-# stay on wasm-build / wasm-pkg. The npm `test` script passes `--profile
-# wasm-test` to wasm-pack, which forwards options after its own to the
-# `cargo build --tests` and `cargo test` it runs, so the wasm-bindgen test build
-# and the two facade builds below share one set of wasm32 artifacts instead of
-# compiling the test profile as well. Do not write it after `--`: wasm-pack
-# 0.15 hands everything after `--` to the test harness, which rejects it.
-run = [
-  "npm --prefix finstack-quant-wasm run test",
-  "wasm-pack build finstack-quant-wasm --target web --profile wasm-test --no-opt --out-dir pkg",
-  "wasm-pack build finstack-quant-wasm --target nodejs --profile wasm-test --no-opt --out-dir pkg-node",
-  "npm --prefix finstack-quant-wasm run test:facade",
-  "npm --prefix finstack-quant-wasm run docs:check-sync",
-]
-
-[tasks.wasm-test-built]
-description = "Run Node facade tests and the facade JSDoc sync check against the already built web and Node WASM packages"
-run = [
-  "npm --prefix finstack-quant-wasm run test:facade",
-  "npm --prefix finstack-quant-wasm run docs:check-sync",
-]
-
-[tasks.wasm-fmt]
-description = "Format + auto-fix WASM/TS code (prettier + eslint --fix, mutating)"
-run = [
-  "npm --prefix finstack-quant-wasm run format:fix",
-  "npm --prefix finstack-quant-wasm run lint:fix",
-]
-
-[tasks.wasm-lint]
-description = "Lint WASM/TS code (prettier --check + eslint, check-only)"
-run = [
-  "npm --prefix finstack-quant-wasm run format",
-  "npm --prefix finstack-quant-wasm run lint",
-  "mise run wasm-check-serializer",
-  "mise run wasm-check-errors",
-]
-
-[tasks.wasm-check-serializer]
-description = "Fail if any binding bypasses utils::to_js_value"
-# `serde_wasm_bindgen::to_value` serializes Rust maps as ES2015 `Map`s, which
-# `JSON.stringify` silently drops. `crate::utils::to_js_value` uses the
-# `json_compatible` serializer so maps become plain objects, matching
-# `index.d.ts` and the dicts the Python bindings return. The only legitimate
-# call site is inside the helper itself.
-run = """
-set -eu
-offenders=$(grep -rn 'serde_wasm_bindgen::to_value' finstack-quant-wasm/src \
-  --include='*.rs' | grep -v 'src/utils/mod.rs' || true)
-if [ -n "$offenders" ]; then
-  echo 'Raw serde_wasm_bindgen::to_value is banned outside src/utils/mod.rs.'
-  echo 'It emits ES Maps that JSON.stringify drops; use crate::utils::to_js_value.'
-  echo "$offenders"
-  exit 1
-fi
-echo 'WASM serializer check passed: all JsValue returns route through to_js_value.'
-"""
-
-[tasks.wasm-check-errors]
-description = "Fail if a binding throws a bare string instead of a structured FinstackError"
-# A JS error built from a string (`JsValue::from_str`, `JsValue::from(format!(..))`,
-# `js_sys::Error::new`) has no `name`/`kind`, unlike every error routed through
-# `crate::utils::to_js_err`. Build object keys with `JsValue::from`. Helpers must
-# return a typed Rust error, not `Result<_, String>`; the allowlist below is a
-# ratchet for helpers whose logic later moves into Rust (it only shrinks).
 run = '''
-set -eu
-code() { grep -rnE --include='*.rs' -e "$1" finstack-quant-wasm/src/api | grep -vE '^[^:]+:[0-9]+:[[:space:]]*//' || true; }
-bare=$(code 'JsValue::from_str|js_sys::Error::new|Err\(JsValue::from|JsValue::from\(format!')
-string_errs=$(code '-> Result<[^>]*, String>')
-if [ -n "$bare$string_errs" ]; then
-  echo 'Bindings must throw through crate::utils::to_js_err (structured FinstackError with kind).'
-  if [ -n "$bare" ]; then echo "$bare"; fi
-  if [ -n "$string_errs" ]; then echo "$string_errs"; fi
-  exit 1
-fi
-echo 'WASM error check passed: every binding error is a structured FinstackError.'
+cargo bench -p "${usage_package?}" --bench "${usage_bench?}" -- \
+  --sample-size ${FQ_BENCH_SAMPLE_SIZE:-10} \
+  --warm-up-time ${FQ_BENCH_WARM_UP_TIME:-1} \
+  --measurement-time ${FQ_BENCH_MEASUREMENT_TIME:-1} \
+  --nresamples ${FQ_BENCH_NRESAMPLES:-1000} \
+  --noplot
 '''
 
-[tasks.wasm-doc]
-description = "Enforce complete WASM and TypeScript IntelliSense documentation"
-# --no-sync: pure static checks; plain `uv run` rebuilds the PyO3 extension.
+[tasks.rust-gen-schemas]
+# The rust-test build already holds every gen_* binary, so this reuses it.
+description = "Regenerate the JSON schemas from Rust types"
 run = [
-  "uv run --no-sync python scripts/check_wasm_api_input_docs.py",
-  "npm --prefix finstack-quant-wasm run docs:check",
+  "cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' --no-run",
+  "uv run --no-sync python scripts/check_schema_generation.py --write",
 ]
 
-[tasks.wasm-pkg]
-description = "Build WASM package (web + node targets)"
-env = { CARGO_INCREMENTAL = "0" }
-run = [
-  "node finstack-quant-wasm/scripts/build-web.mjs",
-  "wasm-pack build finstack-quant-wasm --target nodejs --release --out-dir pkg-node",
-  "touch finstack-quant-wasm/pkg/.npmignore finstack-quant-wasm/pkg-node/.npmignore",
-]
-
-[tasks.wasm-gen-contracts]
-description = "Generate the WASM host result schema and every schema-derived TypeScript declaration"
-run = [
-  "cargo run -p finstack-quant-wasm --example generate_contracts --features contract-generation -- --write",
-  "node finstack-quant-wasm/scripts/generate-contract-types.mjs",
-]
-
-[tasks.wasm-check-contracts]
-description = "Check the WASM host result schema and every schema-derived TypeScript declaration"
-run = [
-  "cargo run -p finstack-quant-wasm --example generate_contracts --features contract-generation -- --check",
-  "node finstack-quant-wasm/scripts/generate-contract-types.mjs --check",
-]
-
-[tasks.wasm-gen-bindings]
-description = "Generate TypeScript types from the Rust JSON schemas (writes finstack-quant-wasm/types/)"
-run = [
-  "mise run wasm-gen-contracts",
-  "uv run --no-sync python scripts/sync_generated_ts_index.py",
-]
-
-[tasks.wasm-check-bindings]
-description = "Verify the schema-generated TypeScript types without mutating the workspace"
-run = [
-  "mise run wasm-check-contracts",
-  "uv run --no-sync python scripts/sync_generated_ts_index.py --check",
-]
-
-# ─────────────────────────────────────────────────────────────────
-# Packaging (wheels)
-# ─────────────────────────────────────────────────────────────────
-
-[tasks.wheel-local]
-description = "Build wheel for current platform + Python"
-run = "CARGO_INCREMENTAL=0 uv run maturin build --release -o target/wheels"
-
-[tasks.wheel-all]
-description = "Build wheels for all locally-available Python versions"
-run = "CARGO_INCREMENTAL=0 uv run maturin build --release --find-interpreter -o target/wheels"
-
-# ─────────────────────────────────────────────────────────────────
-# Schemas
-# ─────────────────────────────────────────────────────────────────
-
-[tasks.rust-serde-audit]
-description = "Audit public Rust contract types for serde and JsonSchema coverage"
+[tasks.rust-check-schemas]
+description = "Verify the JSON schemas, serde coverage and schema contracts match the Rust types"
 run = [
   "uv run --no-sync pytest scripts/tests/test_serde_audit.py -q",
   "uv run --no-sync python -m scripts.serde_audit --check",
-]
-
-[tasks.rust-build-schema-generators]
-description = "Build the 14 gen_* schema generator binaries into target/debug"
-# Locally this is `rust-test`'s exact test build with `--no-run`: cargo builds a
-# package's bins whenever it has integration tests, so that build already holds
-# every gen_* binary and is a no-op right after `rust-test`. Any other package
-# selection (`cargo build -p ...`, `cargo run -p X`) resolves a different feature
-# set and recompiles the third-party graph. CI's Lint job has no test build, and a
-# full test-profile build there costs ~14 min, so it builds just the bins with one
-# workspace resolution (the gen_* binaries are the workspace's only bins).
-run = """
-set -eu
-if [ -n "${CI:-}" ]; then
-  cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --bins
-else
-  cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' --no-run
-fi
-"""
-
-[tasks.rust-check-schemas]
-description = "Verify JSON schemas match Rust types"
-run = [
-  "mise run rust-serde-audit",
   "uv run --no-sync pytest scripts/tests/test_check_schema_residue.py -q",
   "uv run --no-sync python scripts/check_schema_residue.py",
-  "mise run rust-build-schema-generators",
-  "uv run --no-sync pytest scripts/tests/test_check_schema_generation.py -q",
-  # Runs the built gen_* binaries directly: registry inventory and stale files,
-  # the $ref graph, and two clean-room trees compared with each other and with
-  # the checked-in bytes.
-  "uv run --no-sync python scripts/check_schema_generation.py",
-  # The schema-contract nextest run below is skipped when `CI` is set: it compiles
-  # the whole workspace in the test profile (14 min on a 4-core runner) to run
-  # 141 tests in 30 s, and the Test Rust job already runs every one of them in
-  # `rust-test-cov` (`--workspace --lib --test '*'`) in the same workflow.
-  # Locally it stays on so `mise run gen-check` is a complete schema gate. It uses
-  # `rust-test`'s package selection, so it reuses the build above.
-  """
-  set -eu
+  # Locally the rust-test build holds every gen_* binary (a no-op right after
+  # rust-test). CI's Lint job has no test build, so it builds only the bins.
+  '''
   if [ -n "${CI:-}" ]; then
-    echo "CI: skipping schema-contract nextest run (covered by rust-test-cov in the Test Rust job)"
+    cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --bins
+  else
+    cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' --no-run
+  fi
+  ''',
+  "uv run --no-sync pytest scripts/tests/test_check_schema_generation.py -q",
+  # Runs the gen_* binaries: inventory, $ref graph, and two clean-room trees
+  # compared with each other and with the checked-in bytes.
+  "uv run --no-sync python scripts/check_schema_generation.py",
+  # Schema-contract tests. Skipped in CI, where `rust-test --coverage` runs them.
+  """
+  if [ -n "${CI:-}" ]; then
+    echo "CI: schema-contract tests run in rust-test --coverage"
     exit 0
   fi
   cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' \
@@ -830,48 +323,38 @@ run = [
   """,
 ]
 
-[tasks.rust-gen-schemas]
-description = "Regenerate typed JSON schemas from Rust types"
-run = [
-  "mise run rust-build-schema-generators",
-  "uv run --no-sync python scripts/check_schema_generation.py --write",
-]
-
-[tasks.core-gen-data]
-description = "Generate core currency and lunar reference tables from maintained CSV data"
-run = "uv run --no-project python finstack-quant/core/build/generate_reference_data.py"
-
-[tasks.core-check-data]
-description = "Verify core generated reference tables match maintained CSV data"
-run = [
-  "uv run --no-sync pytest scripts/tests/test_generate_core_reference_data.py -q",
-  "uv run --no-project python finstack-quant/core/build/generate_reference_data.py --check",
-]
+# ─────────────────────────────────────────────────────────────────
+# Generated artifacts (schemas, reference data, TypeScript bindings)
+# ─────────────────────────────────────────────────────────────────
 
 [tasks.gen-write]
-description = "Regenerate checked-in schemas, fixtures, and TypeScript bindings"
+description = "Regenerate checked-in reference data, schemas and TypeScript bindings"
 run = [
-  { task = "core-gen-data" },
+  "uv run --no-project python finstack-quant/core/build/generate_reference_data.py",
   { task = "rust-gen-schemas" },
-  { task = "wasm-gen-bindings" },
-  { task = "ui-gen" },
+  "cargo run -p finstack-quant-wasm --example generate_contracts --features contract-generation -- --write",
+  "node finstack-quant-wasm/scripts/generate-contract-types.mjs",
+  "uv run --no-sync python scripts/sync_generated_ts_index.py",
+  "npm --prefix finstack-quant-ui run generate",
 ]
 
 [tasks.gen-check]
-description = "Verify schemas and bindings; fail if generated artifacts drift"
+description = "Fail if any generated artifact drifts from its source"
 run = """
 set -eu
 uv run --no-sync pytest scripts/tests/test_generation_digest.py -q
 uv run --no-sync python scripts/generation_digest.py --check-manifest
 before_digest=$(uv run --no-sync python scripts/generation_digest.py)
-mise run core-check-data
+uv run --no-sync pytest scripts/tests/test_generate_core_reference_data.py -q
+uv run --no-project python finstack-quant/core/build/generate_reference_data.py --check
 mise run rust-check-schemas
-mise run wasm-check-bindings
+cargo run -p finstack-quant-wasm --example generate_contracts --features contract-generation -- --check
+node finstack-quant-wasm/scripts/generate-contract-types.mjs --check
+uv run --no-sync python scripts/sync_generated_ts_index.py --check \
+  || (echo 'Generated TypeScript index is out of date'; exit 1)
 npm --prefix finstack-quant-ui run generate -- --check
 uv run --no-sync python scripts/check_generated_instrument_fixtures.py \
   || (echo 'Generated instrument fixtures do not match the registry manifest'; exit 1)
-uv run --no-sync python scripts/sync_generated_ts_index.py --check \
-  || (echo 'Generated TypeScript index is out of date'; exit 1)
 after_digest=$(uv run --no-sync python scripts/generation_digest.py)
 test "$before_digest" = "$after_digest" \
   || (echo "Generated artifacts changed during the check: $before_digest -> $after_digest"; exit 1)
@@ -879,247 +362,163 @@ echo "Generated artifacts are idempotent: sha256:$after_digest"
 """
 
 # ─────────────────────────────────────────────────────────────────
-# Pre-commit / CI supply-chain
+# Python
 # ─────────────────────────────────────────────────────────────────
+# Python tasks use `uv run --no-sync`: a plain `uv run` rebuilds the PyO3
+# extension.
 
-[tasks.pre-commit-install]
-description = "Install pre-commit hooks"
-run = "uv run --no-sync pre-commit install"
-
-[tasks.pre-commit-run]
-description = "Run all pre-commit hooks on the full tree (CI lint job)"
-run = "uv run --no-sync pre-commit run --all-files"
-
-[tasks.pre-commit-update]
-description = "Autoupdate pre-commit hook versions"
-run = "uv run --no-sync pre-commit autoupdate"
-
-[tasks.osv-scan]
-description = "Full OSV lockfile scan (CI push-to-master job; PR CI is diff-only)"
-run = """
-osv-scanner \
-  --lockfile=Cargo.lock \
-  --lockfile=uv.lock \
-  --lockfile=finstack-quant-wasm/package-lock.json
-"""
-
-# ─────────────────────────────────────────────────────────────────
-# Benchmarks (Rust-only)
-# ─────────────────────────────────────────────────────────────────
-
-[tasks.check-loc]
-description = "List source files exceeding the LOC limit (default 1000); -- --ci to exit 1 on violations"
+[tasks.python-sync]
+description = "Create the virtualenv and install Python dev dependencies"
 run = [
-  "uv run --no-sync pytest scripts/tests/test_check_loc.py -q",
-  "uv run --no-sync python scripts/check_loc.py",
+  "uv sync --group dev --no-install-project",
+  "uv run --no-sync python scripts/install_notebook_path.py",
 ]
 
-[tasks.rust-flamegraph]
-description = "Generate a CPU flamegraph using the bench profile (keeps symbols; pass cargo-flamegraph args after --). Install the tool once with `mise install cargo:flamegraph` — it has no release binary, so it is not part of `mise install`. Example: mise run rust-flamegraph -- -p finstack-quant-portfolio --bench materialization --open"
-env = { CARGO_INCREMENTAL = "0" }
-run = "cargo flamegraph --profile bench"
+[tasks.python-build]
+description = "Build the Python bindings in place (--release for an optimized build)"
+usage = 'flag "--release" help="Release profile (slower compile, faster runtime)"'
+run = 'uv run --no-sync maturin develop{% if usage.release %} --release{% endif %} && uv run --no-sync python scripts/install_notebook_path.py'
 
-[tasks.rust-bench-crate]
-description = "Run one Criterion bench in one crate (preferred during iteration)"
-env = { CARGO_INCREMENTAL = "0" }
+[tasks.python-test]
+description = "Build the bindings, then run the fast Python tests (--all for the full suite)"
 usage = '''
-arg "<package>" help="Cargo package (e.g. finstack-quant-valuations, finstack-quant-portfolio)"
-arg "<bench>" help="Bench target name (e.g. bond_pricing, materialization)"
+flag "--all" help="Run the full suite, slow tests included"
+flag "--slow" help="Run only the slow tests"
+flag "--coverage" help="Write HTML (target/python-cov) and Cobertura (coverage/python/coverage.xml) reports"
 '''
 run = '''
-set -e
-cargo bench -p "${usage_package?}" --profile bench --bench "${usage_bench?}" -- \
-  --sample-size ${FQ_BENCH_SAMPLE_SIZE:-10} \
-  --warm-up-time ${FQ_BENCH_WARM_UP_TIME:-1} \
-  --measurement-time ${FQ_BENCH_MEASUREMENT_TIME:-1} \
-  --nresamples ${FQ_BENCH_NRESAMPLES:-1000} \
-  --noplot
+set -- -v -n auto
+if [ "${usage_slow:-false}" = "true" ]; then
+  set -- "$@" -m slow
+elif [ "${usage_all:-false}" != "true" ]; then
+  set -- "$@" -m "not slow"
+fi
+if [ "${usage_coverage:-false}" = "true" ]; then
+  mkdir -p coverage/python
+  set -- "$@" --cov=finstack-quant-py/finstack_quant --cov-report=term-missing \
+    --cov-report=html:target/python-cov --cov-report=xml:coverage/python/coverage.xml
+fi
+mise run python-build
+uv run --no-sync pytest "$@"
 '''
 
-[tasks.rust-bench]
-description = "Run all workspace Rust benchmarks (use rust-bench-crate while iterating)"
-env = { CARGO_INCREMENTAL = "0" }
-run = "cargo bench --profile bench --bench '*' -- --sample-size ${FQ_BENCH_SAMPLE_SIZE:-10} --warm-up-time ${FQ_BENCH_WARM_UP_TIME:-1} --measurement-time ${FQ_BENCH_MEASUREMENT_TIME:-1} --nresamples ${FQ_BENCH_NRESAMPLES:-1000} --noplot"
+[tasks.python-test-file]
+description = "Run one test file or node ID against the already built extension"
+usage = 'arg "<test>" help="Pytest file path or node ID"'
+run = 'uv run --no-sync pytest -q "${usage_test?}"'
 
-[tasks.rust-bench-pr-baseline]
-description = "Measure four PR benchmark cases on the base commit"
-run = "python3 -m scripts.pr_benchmarks baseline"
+[tasks.python-doctest]
+description = "Build the bindings, then run the stub and module doctests"
+run = ["mise run python-build", "uv run --no-sync pytest finstack-quant-py/tests/test_stub_doctests.py -q"]
 
-[tasks.rust-bench-pr-compare]
-description = "Compare four fresh PR benchmark cases against the base commit"
+[tasks.python-fmt]
+description = "Format and auto-fix Python (ruff)"
 run = [
-  "uv run --no-sync pytest scripts/tests/test_pr_benchmarks.py -q",
-  "python3 -m scripts.pr_benchmarks compare",
+  "uv run --no-sync ruff format .",
+  "uv run --no-sync ruff check . --fix --unsafe-fixes",
 ]
 
-[tasks.materialization-benchmark-doc-check]
-description = "Verify tracked benchmark digests, baselines, and toolchains"
-# --no-sync: pure static checks; plain `uv run` rebuilds the PyO3 extension.
-run = """
-uv run --no-sync pytest scripts/tests/test_materialization_baseline_orchestration.py -q
-uv run --no-sync python scripts/sync_materialization_benchmark_digest.py \
-  --artifact benchmarks/materialization/materialization-benchmark-results.json \
-  --document benchmarks/MATERIALIZATION_BENCHMARKS.md --check
-uv run --no-sync python scripts/check_materialization_benchmark_docs.py \
-  --artifact benchmarks/materialization/materialization-benchmark-results.json \
-  --document benchmarks/MATERIALIZATION_BENCHMARKS.md \
-  --baseline-manifest benchmarks/materialization/materialization-benchmark-baseline.json \
-  --rust-baseline benchmarks/materialization/materialization-rust-baseline.json \
-  --python-baseline benchmarks/materialization/materialization-python-baseline.json
-"""
+[tasks.python-lint]
+description = "Lint Python (ruff) and the binding docstrings (check-only)"
+run = [
+  "uv run --no-sync ruff format . --check",
+  "uv run --no-sync ruff check . --no-fix",
+  "uv run --no-sync python scripts/check_python_api_input_docs.py",
+  "uv run --no-sync python scripts/check_pyo3_doc_placeholders.py",
+]
 
-[tasks.materialization-rust-bench-baseline]
-description = "Explicitly establish immutable Rust baseline; set FQ_REPLACE_MATERIALIZATION_BASELINE=1 to replace"
-run = """
-replace_flag=$(uv run python scripts/materialization_baseline_replace_flag.py)
-uv run python scripts/manage_materialization_rust_baseline.py guard \
-  --baseline benchmarks/materialization/materialization-rust-baseline.json \
-  $replace_flag
-mise run materialization-benchmark-fixtures
-uv run python scripts/check_python_materialization_regressions.py prepare \
-  --fixture-a target/materialization-benchmarks/materialization-a-5000-unique.json \
-  --fixture-b target/materialization-benchmarks/materialization-b-5000-50.json \
-  --output target/materialization-criterion/baseline-run-metadata.json
-CARGO_TARGET_DIR=target/materialization-criterion \
-FQ_MATERIALIZATION_CRITERION_DIR="$PWD/target/materialization-criterion/criterion" \
-FQ_MATERIALIZATION_P95_SAMPLES=${FQ_MATERIALIZATION_P95_SAMPLES:-100} \
-cargo bench -p finstack-quant-portfolio --bench materialization -- \
-  --sample-size ${FQ_MATERIALIZATION_P95_SAMPLES:-100} \
-  --warm-up-time 1 --measurement-time 5 --nresamples 1000 --noplot
-uv run python scripts/manage_materialization_rust_baseline.py establish \
-  --criterion-dir target/materialization-criterion/criterion \
-  --run-metadata target/materialization-criterion/baseline-run-metadata.json \
-  --baseline-name materialization-v1 \
-  --fixture-a target/materialization-benchmarks/materialization-a-5000-unique.json \
-  --fixture-b target/materialization-benchmarks/materialization-b-5000-50.json \
-  --output benchmarks/materialization/materialization-rust-baseline.json \
-  $replace_flag
-uv run python scripts/manage_materialization_rust_baseline.py seal \
-  --baseline benchmarks/materialization/materialization-rust-baseline.json \
-  --manifest benchmarks/materialization/materialization-benchmark-baseline.json
-"""
+[tasks.python-typecheck]
+description = "Type-check the Python package with ty"
+run = "uv run --no-sync ty check finstack-quant-py/finstack_quant"
 
-[tasks.materialization-rust-bench-compare]
-description = "Compare exact fresh materialization outputs against the checked-in baseline"
-run = """
-uv run --no-sync pytest scripts/tests/test_check_criterion_regressions.py -q
-mise run materialization-benchmark-fixtures
-uv run python scripts/prepare_materialization_criterion_run.py \
-  --baseline benchmarks/materialization/materialization-rust-baseline.json \
-  --fixture-a target/materialization-benchmarks/materialization-a-5000-unique.json \
-  --fixture-b target/materialization-benchmarks/materialization-b-5000-50.json \
-  --output target/materialization-criterion/run-metadata.json
-CARGO_TARGET_DIR=target/materialization-criterion \
-FQ_MATERIALIZATION_CRITERION_DIR="$PWD/target/materialization-criterion/criterion" \
-FQ_MATERIALIZATION_P95_SAMPLES=${FQ_MATERIALIZATION_P95_SAMPLES:-100} \
-cargo bench -p finstack-quant-portfolio --bench materialization -- \
-  --sample-size ${FQ_MATERIALIZATION_P95_SAMPLES:-100} \
-  --warm-up-time 1 --measurement-time 5 --nresamples 1000 --noplot
-uv run python scripts/check_criterion_regressions.py \
-  --criterion-dir target/materialization-criterion/criterion \
-  --baseline benchmarks/materialization/materialization-rust-baseline.json \
-  --run-metadata target/materialization-criterion/run-metadata.json \
-  --comparison-output target/materialization-criterion/comparison.json \
-  --threshold 0.10
-"""
+[tasks.python-doc]
+description = "Enforce complete Python IntelliSense documentation"
+run = [
+  "uv run --no-sync pytest scripts/tests/test_check_python_api_input_docs.py scripts/tests/test_check_pyo3_doc_placeholders.py -q",
+  "uv run --no-sync python scripts/check_python_api_input_docs.py",
+  "uv run --no-sync python scripts/check_pyo3_doc_placeholders.py",
+]
 
-[tasks.materialization-benchmark-record]
-description = "Regenerate and verify the complete release materialization benchmark record"
-run = """
-uv run --no-sync pytest scripts/tests/test_collect_materialization_results.py -q
-mise run materialization-benchmark-fixtures
-uv run python scripts/manage_materialization_rust_baseline.py verify \
-  --baseline benchmarks/materialization/materialization-rust-baseline.json \
-  --fixture-a target/materialization-benchmarks/materialization-a-5000-unique.json \
-  --fixture-b target/materialization-benchmarks/materialization-b-5000-50.json \
-  --manifest benchmarks/materialization/materialization-benchmark-baseline.json
-uv run python scripts/check_python_materialization_regressions.py verify \
-  --baseline benchmarks/materialization/materialization-python-baseline.json \
-  --fixture-a target/materialization-benchmarks/materialization-a-5000-unique.json \
-  --fixture-b target/materialization-benchmarks/materialization-b-5000-50.json \
-  --manifest benchmarks/materialization/materialization-benchmark-baseline.json
-FQ_MATERIALIZATION_P95_SAMPLES=${FQ_MATERIALIZATION_P95_SAMPLES:-100} \
-FQ_MATERIALIZATION_RAW_OUTPUT="$PWD/target/materialization-results/rust.json" \
-mise run materialization-rust-bench-compare
-FQ_MATERIALIZATION_P95_SAMPLES=${FQ_MATERIALIZATION_P95_SAMPLES:-100} \
-FQ_MATERIALIZATION_PYTHON_CURRENT_OUTPUT=target/materialization-python/current-record.json \
-FQ_MATERIALIZATION_PYTHON_COMPARISON_OUTPUT=target/materialization-python/comparison-record.json \
-mise run python-bench-portfolio-compare
-npm --prefix finstack-quant-wasm run build:node
-FQ_MATERIALIZATION_P95_SAMPLES=${FQ_MATERIALIZATION_P95_SAMPLES:-100} \
-FQ_MATERIALIZATION_RAW_OUTPUT=target/materialization-results/wasm.json \
-npm --prefix finstack-quant-wasm run bench -- --materialization-only
-uv run python scripts/manage_materialization_rust_baseline.py verify \
-  --baseline benchmarks/materialization/materialization-rust-baseline.json \
-  --fixture-a target/materialization-benchmarks/materialization-a-5000-unique.json \
-  --fixture-b target/materialization-benchmarks/materialization-b-5000-50.json \
-  --manifest benchmarks/materialization/materialization-benchmark-baseline.json
-uv run python scripts/collect_materialization_results.py \
-  --rust target/materialization-results/rust.json \
-  --python target/materialization-python/current-record.json \
-  --wasm target/materialization-results/wasm.json \
-  --fixture-a target/materialization-benchmarks/materialization-a-5000-unique.json \
-  --fixture-b target/materialization-benchmarks/materialization-b-5000-50.json \
-  --baseline benchmarks/materialization/materialization-benchmark-baseline.json \
-  --rust-baseline benchmarks/materialization/materialization-rust-baseline.json \
-  --rust-comparison target/materialization-criterion/comparison.json \
-  --python-baseline benchmarks/materialization/materialization-python-baseline.json \
-  --python-comparison target/materialization-python/comparison-record.json \
-  --output benchmarks/materialization/materialization-benchmark-results.json \
-  --command 'mise run materialization-benchmark-record' \
-  --command 'FQ_MATERIALIZATION_P95_SAMPLES=100 FQ_MATERIALIZATION_RAW_OUTPUT=$PWD/target/materialization-results/rust.json mise run materialization-rust-bench-compare' \
-  --command 'FQ_MATERIALIZATION_P95_SAMPLES=100 FQ_MATERIALIZATION_PYTHON_CURRENT_OUTPUT=target/materialization-python/current-record.json FQ_MATERIALIZATION_PYTHON_COMPARISON_OUTPUT=target/materialization-python/comparison-record.json mise run python-bench-portfolio-compare' \
-  --command 'FQ_MATERIALIZATION_P95_SAMPLES=100 FQ_MATERIALIZATION_RAW_OUTPUT=target/materialization-results/wasm.json npm --prefix finstack-quant-wasm run bench -- --materialization-only' \
-  --command 'uv run python scripts/collect_materialization_results.py --rust target/materialization-results/rust.json --python target/materialization-python/current-record.json --wasm target/materialization-results/wasm.json --fixture-a target/materialization-benchmarks/materialization-a-5000-unique.json --fixture-b target/materialization-benchmarks/materialization-b-5000-50.json --baseline benchmarks/materialization/materialization-benchmark-baseline.json --rust-baseline benchmarks/materialization/materialization-rust-baseline.json --rust-comparison target/materialization-criterion/comparison.json --python-baseline benchmarks/materialization/materialization-python-baseline.json --python-comparison target/materialization-python/comparison-record.json --output benchmarks/materialization/materialization-benchmark-results.json'
-uv run python scripts/sync_materialization_benchmark_digest.py \
-  --artifact benchmarks/materialization/materialization-benchmark-results.json \
-  --document benchmarks/MATERIALIZATION_BENCHMARKS.md --write
-mise run materialization-benchmark-doc-check
-"""
-[tasks.docs-site-curriculum]
-description = "Validate analyst curriculum mappings and supported Python imports"
-run = "uv run --no-sync python docs-site/gen/check_curriculum.py --check-api"
+[tasks.python-examples]
+description = "Run every example notebook; fail on errors, warnings or stderr"
+run = "uv run python finstack-quant-py/examples/notebooks/run_all_notebooks.py"
 
-[tasks.docs-site-snippets]
-description = "Execute displayed lesson code with zero runtime warnings or stderr"
-run = "uv run --no-sync python docs-site/gen/run_lesson_snippets.py --require-all"
+[tasks.python-bench]
+description = "Release-build the bindings, then run the Python benchmarks"
+run = [
+  "mise run python-build -- --release",
+  "uv run --no-sync pytest finstack-quant-py/benchmarks/bench_bindings.py -m perf --benchmark-only",
+]
 
-[tasks.docs-site-labs]
-description = "Execute clean copied notebooks with zero runtime warnings or stderr, then export rich labs"
-run = "uv run --no-sync python docs-site/gen/build_labs.py"
+# ─────────────────────────────────────────────────────────────────
+# WASM
+# ─────────────────────────────────────────────────────────────────
 
-[tasks.docs-site-test]
-description = "Test analyst curriculum, strict notebook execution, fixture and runner contracts"
-run = "uv run --no-sync pytest -W error --junitxml=docs-site/.build/release-tests.xml docs-site/tests finstack-quant-py/tests/test_run_all_notebooks.py finstack-quant-py/tests/test_analyst_fixtures.py finstack-quant-py/tests/test_analyst_tracks.py finstack-quant-py/tests/test_analyst_margin.py finstack-quant-py/tests/test_analyst_liquidity.py finstack-quant-py/tests/models/test_analyst_monte_carlo.py"
+[tasks.wasm-build]
+# The fast `dev` profile, shared with wasm-test. wasm-pkg builds the optimized
+# release packages.
+description = "Build the WASM web package for development (wasm-pkg for release)"
+run = "wasm-pack build finstack-quant-wasm --target web --dev --out-dir pkg"
 
-[tasks.docs-site-prerequisites]
-description = "Verify all 33 workflows against current, warning-free executed notebook copies"
-run = "uv run --no-sync python docs-site/gen/verify_prerequisites.py"
+[tasks.wasm-pkg]
+description = "Build the release WASM packages (web + node targets)"
+run = [
+  "node finstack-quant-wasm/scripts/build-web.mjs",
+  "wasm-pack build finstack-quant-wasm --target nodejs --release --out-dir pkg-node",
+  "touch finstack-quant-wasm/pkg/.npmignore finstack-quant-wasm/pkg-node/.npmignore",
+]
 
-[tasks.docs-site-build]
-description = "Build the current Python extension, run the strict analyst publication gate, and build the local site"
-run = """
-mise run python-sync
-mise run python-build --release
-mise run ui-docs-install
-uv run --no-sync python docs-site/gen/build_site.py
-"""
+[tasks.wasm-test]
+# The wasm-bindgen tests (`wasm-pack test`) and both facade builds use the `dev`
+# profile, so they share one set of wasm32 artifacts.
+description = "Run the wasm-bindgen and Node facade tests and the JSDoc sync check"
+run = [
+  "npm --prefix finstack-quant-wasm run test",
+  { task = "wasm-build" },
+  "wasm-pack build finstack-quant-wasm --target nodejs --dev --out-dir pkg-node",
+  "npm --prefix finstack-quant-wasm run test:facade",
+  "npm --prefix finstack-quant-wasm run docs:check-sync",
+]
 
-[tasks.docs-site-dev]
-description = "Open the local analyst documentation development server"
-run = "npm --prefix docs-site run dev"
+[tasks.wasm-test-built]
+description = "Rerun the Node facade tests and JSDoc sync check against the built packages"
+run = [
+  "npm --prefix finstack-quant-wasm run test:facade",
+  "npm --prefix finstack-quant-wasm run docs:check-sync",
+]
 
-# Component registry: independent checks, no Rust/Python/workspace test fan-out.
+[tasks.wasm-fmt]
+description = "Format and auto-fix WASM/TS (prettier + eslint --fix)"
+run = [
+  "npm --prefix finstack-quant-wasm run format:fix",
+  "npm --prefix finstack-quant-wasm run lint:fix",
+]
+
+[tasks.wasm-lint]
+description = "Lint WASM/TS and the binding serializer and error paths (check-only)"
+run = [
+  "npm --prefix finstack-quant-wasm run format",
+  "npm --prefix finstack-quant-wasm run lint",
+  "python3 scripts/check_wasm_boundary.py",
+]
+
+[tasks.wasm-doc]
+description = "Enforce complete WASM and TypeScript IntelliSense documentation"
+run = [
+  "uv run --no-sync python scripts/check_wasm_api_input_docs.py",
+  "npm --prefix finstack-quant-wasm run docs:check",
+]
+
+# ─────────────────────────────────────────────────────────────────
+# Component registry (finstack-quant-ui)
+# ─────────────────────────────────────────────────────────────────
+
 [tasks.ui-sync]
-description = "Install locked component-registry dependencies without lifecycle builds"
+description = "Install the locked component-registry dependencies"
 run = "npm --prefix finstack-quant-ui ci --ignore-scripts"
 
-[tasks.ui-gen]
-description = "Generate offline UI schemas, wire types, metadata, and lazy catalogue"
-run = "npm --prefix finstack-quant-ui run generate"
-
 [tasks.ui-fmt]
-description = "Format + auto-fix UI/TS code (prettier --write, mutating)"
+description = "Format UI/TS code (prettier --write)"
 run = "npm --prefix finstack-quant-ui run format"
 
 [tasks.ui-typecheck]
@@ -1127,57 +526,39 @@ description = "Type-check the UI package with tsc"
 run = "npm --prefix finstack-quant-ui run typecheck"
 
 [tasks.ui-test]
-description = "Run UI Vitest tests"
+description = "Run the UI Vitest tests"
 run = "npm --prefix finstack-quant-ui run test --"
 
 [tasks.ui-check]
-description = "Check component-registry generation drift, types, and focused tests"
+description = "Check registry generation drift, types and focused tests"
 run = "npm --prefix finstack-quant-ui run check"
 
-[tasks.ui-size]
-description = "Enforce the UI raw-byte budget on the optimized WASM package"
-run = "npm --prefix finstack-quant-ui run size"
-
 [tasks.ui-build]
-description = "Build component-registry distribution with the pinned shadcn CLI"
+description = "Build the component-registry distribution"
 run = "npm --prefix finstack-quant-ui run build"
 
+[tasks.ui-e2e]
+description = "Verify gallery screenshots, accessibility and keyboard interactions"
+run = "npm --prefix finstack-quant-ui run e2e --"
+
 [tasks.ui-docs-install]
-description = "Install the built catalogue into the docs consumer using the pinned CLI"
+description = "Install the built registry into docs-site"
 depends = ["ui-build"]
 run = ["node finstack-quant-ui/scripts/gen-gallery.mjs", "node finstack-quant-ui/scripts/install-local.mjs docs-site"]
 
-[tasks.ui-docs-dev]
-description = "Install the registry into docs-site and serve /registry-gallery/ for browser review"
-depends = ["ui-docs-install"]
-run = """
-echo "Registry gallery: http://localhost:3000/registry-gallery/"
-npm --prefix docs-site run dev
-"""
-
-[tasks.ui-docs-check]
-description = "Type-check the installed registry and existing docs host"
-depends = ["ui-docs-install"]
-run = "npm --prefix docs-site run typecheck"
-
 [tasks.ui-docs-build]
-description = "Export registry docs routes and the existing layout without notebook execution"
+description = "Export the registry docs routes (no notebook execution)"
 depends = ["ui-docs-install"]
 run = "node finstack-quant-ui/scripts/build-docs.mjs"
 
-[tasks.ui-install-smoke]
-description = "Production docs and external Next registry installation checks at both deployment paths"
-depends = ["ui-docs-install"]
-run = "node finstack-quant-ui/tests/browser/install-smoke.mjs"
-
-[tasks.ui-e2e]
-description = "Verify served registry gallery screenshots, accessibility and keyboard interactions"
-run = "npm --prefix finstack-quant-ui run e2e --"
-
 [tasks.ui-install]
-description = "Install every registry item in isolation, then verify composed production consumers"
+description = "Install every registry item in isolation, then verify composed consumers"
 depends = ["ui-build"]
-run = ["REGISTRY_INSTALL_COMPLETE=1 node finstack-quant-ui/scripts/install-matrix.mjs", "mise run ui-docs-install", "REGISTRY_INSTALL_COMPOSITION=1 node finstack-quant-ui/tests/browser/install-smoke.mjs"]
+run = [
+  "REGISTRY_INSTALL_COMPLETE=1 node finstack-quant-ui/scripts/install-matrix.mjs",
+  "mise run ui-docs-install",
+  "REGISTRY_INSTALL_COMPOSITION=1 node finstack-quant-ui/tests/browser/install-smoke.mjs",
+]
 
 [tasks.ui-publish-check]
 description = "Verify installed workbench PDF reports and offline figure exports"
@@ -1188,3 +569,54 @@ REGISTRY_INSTALL_ITEMS=pricing-workbench REGISTRY_INSTALL_PUBLISHING=1 node fins
 node finstack-quant-ui/tests/publishing/offline.mjs "$REGISTRY_INSTALL_EVIDENCE"
 uv run --no-project --with pdfplumber==0.11.9 python finstack-quant-ui/tests/publishing/pdf-check.py "$REGISTRY_INSTALL_EVIDENCE"
 """
+
+# ─────────────────────────────────────────────────────────────────
+# Analyst documentation site (docs-site)
+# ─────────────────────────────────────────────────────────────────
+
+[tasks.docs-site-install]
+# Everything `docs-site-dev` needs, from a fresh clone. Lessons render without
+# executed output until `docs-site-build` produces it.
+description = "Install the docs site: dependencies, development WASM, registry and curriculum manifest"
+run = [
+  { tasks = ["python-sync", "ui-sync", "wasm-build"] },
+  "npm --prefix docs-site ci --ignore-scripts",
+  { task = "ui-docs-install" },
+  "uv run --no-sync python docs-site/gen/check_curriculum.py --skip-evidence",
+  "uv run --no-sync python docs-site/gen/build_references.py",
+]
+
+[tasks.docs-site-dev]
+description = "Serve the docs site at http://localhost:3000"
+run = '''
+if [ ! -f docs-site/.build/curriculum.json ] || [ ! -d docs-site/node_modules ]; then
+  echo "The docs site is not installed. Run: mise run docs-site-install" >&2
+  exit 1
+fi
+npm --prefix docs-site run dev
+'''
+
+[tasks.docs-site-build]
+# The release extension is rebuilt so every result comes from the current checkout.
+description = "Publication gate: execute every lesson and notebook, check evidence and links, export the static site"
+depends = ["docs-site-install"]
+run = [
+  "mise run python-build --release",
+  "uv run --no-sync python docs-site/gen/build_site.py",
+]
+
+# ─────────────────────────────────────────────────────────────────
+# Packaging and hooks
+# ─────────────────────────────────────────────────────────────────
+
+[tasks.wheel-local]
+description = "Build a release wheel for the current platform and Python"
+run = "uv run maturin build --release -o target/wheels"
+
+[tasks.wheel-all]
+description = "Build release wheels for every locally available Python"
+run = "uv run maturin build --release --find-interpreter -o target/wheels"
+
+[tasks.pre-commit-run]
+description = "Run every pre-commit hook on the full tree (the CI Lint job)"
+run = "uv run --no-sync pre-commit run --all-files"

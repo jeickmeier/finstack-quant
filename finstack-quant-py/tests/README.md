@@ -34,9 +34,9 @@ instance exactly once, reused by the per-family modules and by
 | Task | Runs |
 |------|------|
 | `mise run python-test` | `pytest -m 'not slow'` — the default dev loop |
-| `mise run python-test-slow` | `pytest -m slow` — goldens and Monte Carlo only |
-| `mise run python-test-all` | the whole suite (what CI runs) |
-| `mise run python-test-cov` | full suite plus HTML coverage in `target/python-cov` |
+| `mise run python-test --slow` | `pytest -m slow` — goldens and Monte Carlo only |
+| `mise run python-test --all` | the whole suite |
+| `mise run python-test --all --coverage` | full suite plus HTML coverage in `target/python-cov` (what CI runs) |
 
 Each of these rebuilds the extension via `mise run python-build` first.
 
@@ -148,20 +148,22 @@ Known unresolved external gaps are allowlisted per metric in
 `../../finstack-quant/valuations/tests/golden/known_non_executable.json`. A
 listed metric that starts passing fails the test as a stale entry. Set
 `GOLDEN_IGNORE_NON_EXECUTABLE=1` to ignore the allowlist and surface every
-failure — that is what `mise run goldens-test-strict` does.
+failure.
 
 Each run writes `target/golden-reports/golden-comparisons.csv` (actual,
 expected, abs/rel diff, tolerance, pass flag) for analyst review.
 
-Run both the Rust and Python golden layers together:
+Run the Python golden layer after building the extension, and the Rust layer
+with nextest:
 
 ```bash
-mise run goldens-test          # Rust golden test + python-build + pytest golden/
-mise run goldens-test-strict   # same, ignoring known_non_executable.json
+mise run python-build && uv run --no-sync pytest finstack-quant-py/tests/golden
+cargo nextest run -p finstack-quant-valuations --test valuations golden --run-ignored all
 ```
 
-Regenerate the QuantLib-sourced fixtures with `mise run goldens-quantlib-generate`
-(`...-check` verifies the committed files against the generator).
+Regenerate the QuantLib-sourced fixtures with
+`uv run python -m scripts.golden.quantlib.generate --family pricing --product all` (`--check` verifies the
+committed files against the generator).
 
 ## `data/` and `fixtures/`
 

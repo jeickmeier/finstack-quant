@@ -36,7 +36,7 @@ The unit tests for these scripts live in [`tests/`](tests/) and run under
 pytest; several `mise` tasks run them immediately before the script itself.
 `tests/test_generate_core_reference_data.py` covers the generator at
 `finstack-quant/core/build/generate_reference_data.py` and is driven by
-`mise run core-check-data`.
+`mise run gen-check`.
 
 ## Documentation contract checkers
 
@@ -60,11 +60,11 @@ match the types and that regeneration is idempotent.
 
 | Script | Purpose | Driven by |
 | --- | --- | --- |
-| `serde_audit/` | Package: audits public Rust contract types for effective `Serialize`/`Deserialize`/`JsonSchema` coverage. A conservative module-aware Rust lexer (`lexer.py`, `resolution.py`, `scanner.py`) resolves modules, re-exports, aliases and `cfg_attr` derives; `registries.py` holds the maintained contract set and reviewed exceptions; `report.py` is the CLI (`--check` fails on missing capabilities or stale exceptions, `--report` lists everything). | `mise run rust-serde-audit` |
+| `serde_audit/` | Package: audits public Rust contract types for effective `Serialize`/`Deserialize`/`JsonSchema` coverage. A conservative module-aware Rust lexer (`lexer.py`, `resolution.py`, `scanner.py`) resolves modules, re-exports, aliases and `cfg_attr` derives; `registries.py` holds the maintained contract set and reviewed exceptions; `report.py` is the CLI (`--check` fails on missing capabilities or stale exceptions, `--report` lists everything). | `mise run rust-check-schemas` |
 | `check_schema_residue.py` | Rejects obsolete or hand-maintained JSON/serde machinery: hand-written schema files, asymmetric optional wire adapters, non-canonical serde enum naming. | `mise run rust-check-schemas` |
-| `check_schema_generation.py` | Runs the built `gen_*` binaries directly (no `cargo run`). By default it checks that the registries own exactly the generated files on disk (missing artifacts, orphaned schemas or instrument fixtures), validates the `$ref` graph across registries, and regenerates the tree twice into temporary directories, comparing the two and the checked-in files byte-for-byte. `--write` regenerates every registry in place. `--bin-dir` overrides the default `target/debug`. | `mise run rust-check-schemas`, `mise run rust-gen-schemas` (after `mise run rust-build-schema-generators`) |
+| `check_schema_generation.py` | Runs the built `gen_*` binaries directly (no `cargo run`). By default it checks that the registries own exactly the generated files on disk (missing artifacts, orphaned schemas or instrument fixtures), validates the `$ref` graph across registries, and regenerates the tree twice into temporary directories, comparing the two and the checked-in files byte-for-byte. `--write` regenerates every registry in place. `--bin-dir` overrides the default `target/debug`. | `mise run rust-check-schemas`, `mise run rust-gen-schemas` |
 | `check_generated_instrument_fixtures.py` | Validates canonical generated instrument fixtures against `finstack-quant/valuations/tests/instruments/coverage_manifest.toml`. | `mise run gen-check` |
-| `sync_generated_ts_index.py` | Writes (or with `--check`, verifies) the barrels for the schema-generated TypeScript types in `finstack-quant-wasm/types/generated/`: one `<crate>/index.ts` per crate and a root `index.ts` that re-exports each crate as a namespace. The per-crate modules themselves come from `finstack-quant-wasm/scripts/generate-contract-types.mjs`. | `mise run wasm-gen-bindings`, `mise run wasm-check-bindings`, `mise run gen-check` |
+| `sync_generated_ts_index.py` | Writes (or with `--check`, verifies) the barrels for the schema-generated TypeScript types in `finstack-quant-wasm/types/generated/`: one `<crate>/index.ts` per crate and a root `index.ts` that re-exports each crate as a namespace. The per-crate modules themselves come from `finstack-quant-wasm/scripts/generate-contract-types.mjs`. | `mise run gen-write`, `mise run gen-check` |
 | `generation_digest.py` | Computes a stable SHA-256 over the generated artifacts named in the manifest. `--check-manifest` verifies that the file list still matches what is on disk; `gen-check` takes the digest before and after the verification pass and fails if it moved, so a "check" that quietly rewrote the workspace is caught. | `mise run gen-check` (`mise run all-ci` writes first via `gen-write`) |
 
 `generated-artifacts.txt` is the manifest of tracked generated files. It covers
@@ -85,14 +85,14 @@ The checked-in baselines live in `../benchmarks/materialization/`.
 
 | Script | Purpose | Driven by |
 | --- | --- | --- |
-| `check_criterion_regressions.py` | Fails when Criterion median estimates regress beyond `--threshold` (0.10 in both compare tasks). Used both in generic discovery mode and in exact-path materialization mode. | `mise run rust-bench-compare`, `mise run materialization-rust-bench-compare` |
-| `prepare_materialization_criterion_run.py` | Writes fresh run provenance (tree revision, combined fixture digest) before a comparison run, so a stale or wrong-revision measurement is rejected rather than compared. | both `*-bench-compare` tasks |
-| `materialization_baseline_replace_flag.py` | Validates the `FQ_REPLACE_MATERIALIZATION_BASELINE` opt-in and emits the replace flag. Baselines are immutable without it. | both `*-bench-baseline` tasks |
-| `manage_materialization_rust_baseline.py` | `guard` / `establish` / `seal` / `verify` subcommands for the Rust baseline JSON. | `mise run materialization-rust-bench-baseline`, `mise run materialization-benchmark-record` |
-| `check_python_materialization_regressions.py` | The Python-side twin: `guard`, `prepare`, `establish`, `seal`, `compare`, `verify`. Rejects wrong revisions, fixture digests, case sets, and stale measurements before applying the median gate. | `mise run python-bench-portfolio-baseline`, `mise run python-bench-portfolio-compare` |
-| `collect_materialization_results.py` | Combines raw Rust/Python/WASM samples into the tracked `materialization-benchmark-results.json` record: percentiles, independent bootstrap intervals, phase counters, environment, and the exact commands used. | `mise run materialization-benchmark-record` |
-| `sync_materialization_benchmark_digest.py` | Writes (`--write`) or verifies (`--check`) the record SHA-256 quoted inside the Markdown document. | `mise run materialization-benchmark-doc-check`, `-record` |
-| `check_materialization_benchmark_docs.py` | Verifies the Markdown toolchain lines, baseline artifact paths, identities, and hashes against the machine artifact — without running any measurement. | `mise run materialization-benchmark-doc-check` |
+| `check_criterion_regressions.py` | Fails when Criterion median estimates regress beyond `--threshold` (0.10), comparing the exact expected materialization paths. `pr_benchmarks.py` imports its median-change helper. | `scripts/materialization_bench.sh rust-compare` |
+| `prepare_materialization_criterion_run.py` | Writes fresh run provenance (tree revision, combined fixture digest) before a comparison run, so a stale or wrong-revision measurement is rejected rather than compared. | `scripts/materialization_bench.sh rust-compare` / `python-compare` |
+| `materialization_baseline_replace_flag.py` | Validates the `FQ_REPLACE_MATERIALIZATION_BASELINE` opt-in and emits the replace flag. Baselines are immutable without it. | `scripts/materialization_bench.sh rust-baseline` / `python-baseline` |
+| `manage_materialization_rust_baseline.py` | `guard` / `establish` / `seal` / `verify` subcommands for the Rust baseline JSON. | `scripts/materialization_bench.sh rust-baseline` / `record` |
+| `check_python_materialization_regressions.py` | The Python-side twin: `guard`, `prepare`, `establish`, `seal`, `compare`, `verify`. Rejects wrong revisions, fixture digests, case sets, and stale measurements before applying the median gate. | `scripts/materialization_bench.sh python-baseline` / `python-compare` |
+| `collect_materialization_results.py` | Combines raw Rust/Python/WASM samples into the tracked `materialization-benchmark-results.json` record: percentiles, independent bootstrap intervals, phase counters, environment, and the exact commands used. | `scripts/materialization_bench.sh record` |
+| `sync_materialization_benchmark_digest.py` | Writes (`--write`) or verifies (`--check`) the record SHA-256 quoted inside the Markdown document. | `scripts/materialization_bench.sh doc-check` / `record` |
+| `check_materialization_benchmark_docs.py` | Verifies the Markdown toolchain lines, baseline artifact paths, identities, and hashes against the machine artifact — without running any measurement. | `scripts/materialization_bench.sh doc-check` |
 
 ## Golden fixtures
 
@@ -112,10 +112,10 @@ Product builders are split by asset class: `bonds.py`, `credit.py`,
 CLI; `--check` reports generator drift instead of writing.
 
 ```bash
-mise run goldens-quantlib-generate              # rewrite pricing fixtures
-mise run goldens-quantlib-check                 # drift check only
-mise run goldens-quantlib-attribution-generate
-mise run goldens-quantlib-attribution-check
+uv run python -m scripts.golden.quantlib.generate --family pricing --product all           # rewrite pricing fixtures
+uv run python -m scripts.golden.quantlib.generate --family pricing --product all --check   # drift check only
+uv run python -m scripts.golden.quantlib.generate --family attribution --product all
+uv run python -m scripts.golden.quantlib.generate --family attribution --product all --check
 ```
 
 QuantLib (`quantlib>=1.41`, Python `dev` dependency group — run
@@ -140,9 +140,9 @@ without a QuantLib install.
 
 | Script | Purpose | Driven by |
 | --- | --- | --- |
-| `check_loc.py` | Lists source files above a line limit (default 1000; positional override). Rust files are counted after stripping `#[test]` functions and `#[cfg(test)]` modules. `--ci` exits 1 on violations. | `mise run check-loc` |
-| `audit_hardcoded_assumptions.py` | Flags source lines carrying market-convention, rating-agency, regulatory, accounting, or product assumptions that belong in a data registry. Reviewed matches live in `hardcoded_assumptions_allowlist.json`. `--format {text,markdown,json}`, `--include-allowed`, `--fail-on-candidates`. | `mise run assumptions-audit` |
-| `clean_workspace.py` | Removes build artifacts, virtualenvs, and caches. `--incremental` drops only Cargo incremental caches; `--wasm` drops only wasm-pack output and wasm32 target artifacts. | `mise run all-clean`, `rust-clean-incremental`, `wasm-clean` |
+| `check_loc.py` | Lists source files above a line limit (default 1000; positional override). Rust files are counted after stripping `#[test]` functions and `#[cfg(test)]` modules. `--ci` exits 1 on violations. | `uv run --no-sync python scripts/check_loc.py` |
+| `audit_hardcoded_assumptions.py` | Flags source lines carrying market-convention, rating-agency, regulatory, accounting, or product assumptions that belong in a data registry. Reviewed matches live in `hardcoded_assumptions_allowlist.json`. `--format {text,markdown,json}`, `--include-allowed`, `--fail-on-candidates`. | `python3 scripts/audit_hardcoded_assumptions.py` |
+| `clean_workspace.py` | Removes build artifacts, virtualenvs, and caches. `--incremental` drops only Cargo incremental caches; `--wasm` drops only wasm-pack output and wasm32 target artifacts. | `mise run all-clean` |
 
 ## Tests
 
@@ -157,12 +157,7 @@ uv run pytest scripts/tests -q                  # all checker tests
 uv run pytest scripts/golden/quantlib/test_generate.py -q   # needs QuantLib
 ```
 
-Tasks that bundle the relevant tests with their checker:
-`mise run check-loc`, `mise run rust-serde-audit`, `mise run rust-check-schemas`,
-`mise run gen-check`, `mise run wasm-check-bindings`, `mise run python-doc`,
-`mise run core-check-data`, `mise run rust-bench-compare`,
-`mise run materialization-rust-bench-compare`,
-`mise run python-bench-portfolio-baseline`,
-`mise run python-bench-portfolio-compare`,
-`mise run materialization-benchmark-doc-check`,
-`mise run materialization-benchmark-record`.
+Tasks and scripts that run the relevant tests before their checker:
+`mise run rust-check-schemas`, `mise run gen-check`, `mise run python-doc`,
+and every step of `scripts/materialization_bench.sh` that compares, seals or
+records.

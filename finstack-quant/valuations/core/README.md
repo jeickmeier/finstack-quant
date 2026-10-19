@@ -53,7 +53,7 @@ assert_eq!(MetricId::Dv01.as_str(), "dv01");
 - `mise run rust-test-crate -- finstack-quant-valuations-core` (unit tests;
   the framework tests that need instruments run in the umbrella's
   `core_framework` integration module)
-- `mise run rust-doc-crate -- finstack-quant-valuations-core`
+- `RUSTDOCFLAGS='-D warnings' cargo doc -p finstack-quant-valuations-core --no-deps`
 
 ## License
 

@@ -969,8 +969,15 @@ def check_evidence(
     return errors
 
 
-def check(site: Path = SITE, check_api: bool = False, require_evidence: bool = False) -> tuple[list[str], list[dict]]:
-    """Validate the authored curriculum and return its frontend projection."""
+def check(
+    site: Path = SITE, check_api: bool = False, require_evidence: bool = False, skip_evidence: bool = False
+) -> tuple[list[str], list[dict]]:
+    """Validate the authored curriculum and return its frontend projection.
+
+    ``skip_evidence`` validates structure only, for the local development reader:
+    published lessons are not checked for executed output and the extension is not
+    loaded. It never stands in for the publication gate.
+    """
     manifest = curriculum_manifest(site)
     records = manifest.get("lesson", [])
     fixture_ids = set(manifest.get("fixtures", []))
@@ -993,7 +1000,7 @@ def check(site: Path = SITE, check_api: bool = False, require_evidence: bool = F
         errors.extend(lab_report_errors(lab_report))
     references = reference_anchors((REPO / "docs" / "REFERENCES.md").read_text())
     fixture_hash = fixture_digest()
-    runtime = runtime_identity()
+    runtime = None if skip_evidence else runtime_identity()
     expected_ids = (
         {f"1.{n}" for n in range(1, 6)}
         | {f"2.{n}" for n in range(1, 9)}
@@ -1030,7 +1037,7 @@ def check(site: Path = SITE, check_api: bool = False, require_evidence: bool = F
                 positions = [body.find(f"<{section}") for section in sections]
                 if min(positions) < 0 or positions != sorted(positions):
                     errors.append(f"{identifier}: missing or out-of-order required lesson sections")
-            if metadata.get("status") == "published" or require_evidence:
+            if (metadata.get("status") == "published" and not skip_evidence) or require_evidence:
                 errors.extend(check_evidence(record, path, blocks, site, lab_evidence, fixture_hash, runtime))
             projected.append({**record, **metadata})
         except (ValueError, TypeError, OSError, KeyError, SyntaxError) as error:
@@ -1042,9 +1049,17 @@ def main() -> int:
     """Validate the manifest and emit the site reader's generated JSON."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check-api", action="store_true")
-    parser.add_argument("--require-evidence", action="store_true")
+    evidence = parser.add_mutually_exclusive_group()
+    evidence.add_argument("--require-evidence", action="store_true")
+    evidence.add_argument(
+        "--skip-evidence",
+        action="store_true",
+        help="write the reader manifest without checking executed output (local dev server only)",
+    )
     args = parser.parse_args()
-    errors, records = check(check_api=args.check_api, require_evidence=args.require_evidence)
+    errors, records = check(
+        check_api=args.check_api, require_evidence=args.require_evidence, skip_evidence=args.skip_evidence
+    )
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1

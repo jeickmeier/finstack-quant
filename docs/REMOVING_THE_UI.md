@@ -8,10 +8,9 @@ after the package is gone, once the seams below are cut.
 Do the steps in order. `gen-check` and two valuations tests read files
 inside the UI tree, so deleting the directory first fails those gates.
 
-The analyst curriculum in `docs-site/` stays. `docs-site-curriculum`,
-`docs-site-snippets`, `docs-site-labs`, and `docs-site-test` do not call
-the registry. The gallery, the registry guide pages, and the
-`ui-docs-install` step inside `docs-site-build` do.
+The analyst curriculum in `docs-site/` stays. Its checks under
+`docs-site/gen/` and `docs-site/tests/` do not call the registry. The gallery, the registry guide pages, and the
+`ui-sync` and `ui-docs-install` steps inside `docs-site-install` do.
 
 ## Move the pricing catalogue
 
@@ -35,7 +34,7 @@ in place until the package directory is deleted.
 
 In `mise.toml`:
 
-- Remove `{ task = "ui-gen" }` from `[tasks.gen-write]`.
+- Remove `npm --prefix finstack-quant-ui run generate` from `[tasks.gen-write]`.
 - Remove `npm --prefix finstack-quant-ui run generate -- --check` from
   `[tasks.gen-check]`.
 
@@ -72,8 +71,8 @@ dependency, then refresh the lockfile without lifecycle scripts:
 npm --prefix docs-site install --ignore-scripts --package-lock-only
 ```
 
-In `mise.toml` `[tasks.docs-site-build]`, remove
-`mise run ui-docs-install`.
+In `mise.toml` `[tasks.docs-site-install]`, remove `"ui-sync"` from the
+parallel group and the `{ task = "ui-docs-install" }` step.
 
 Delete:
 
@@ -95,7 +94,7 @@ Then edit:
 ## Remove tasks and workflows
 
 Delete the `[tasks.ui-*]` block in `mise.toml`, from `ui-sync` through
-`ui-publish-check`, including the comment that introduces it.
+`ui-publish-check`, including the section header that introduces it.
 
 Delete:
 
@@ -139,4 +138,4 @@ mise run gen-check
 ```
 
 `gen-check` is the lint-job gate that used to install and regenerate the
-registry. `docs-site-test` covers the analyst reader.
+registry. `docs-site/tests` covers the analyst reader.

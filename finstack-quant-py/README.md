@@ -372,9 +372,9 @@ Run from the repository root.
 | Check | Command |
 |-------|---------|
 | Fast tests (rebuilds dev extension) | `mise run python-test` |
-| Slow tests only | `mise run python-test-slow` |
-| Full suite | `mise run python-test-all` |
-| Coverage (HTML into `target/python-cov`) | `mise run python-test-cov` |
+| Slow tests only | `mise run python-test --slow` |
+| Full suite | `mise run python-test --all` |
+| Coverage (HTML into `target/python-cov`; combine with the flags above) | `mise run python-test --all --coverage` |
 | Parity only | `uv run pytest finstack-quant-py/tests/parity` |
 | Lint (ruff + doc checkers) | `mise run python-lint` |
 | Format / autofix | `mise run python-fmt` |

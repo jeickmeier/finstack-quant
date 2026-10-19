@@ -142,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "slow: covered by mise rust-test-slow"]
+    #[ignore = "slow: covered by mise run rust-test --slow"]
     fn heston_pde_vs_fourier_atm() {
         let spot: f64 = 100.0;
         let strike = 100.0;
@@ -321,7 +321,7 @@ mod tests {
     /// against Fourier, not a claim that the coarse production mesh delivers
     /// a tight price tolerance in this difficult Feller-violating regime.
     #[test]
-    #[ignore = "slow: covered by mise rust-test-slow"]
+    #[ignore = "slow: covered by mise run rust-test --slow"]
     fn heston_pde_feller_violation_converges_with_variance_refinement() {
         let problem = HestonPde {
             r: 0.03,
@@ -511,7 +511,7 @@ mod tests {
     ///    ranking absolute Fourier errors between schemes would instead
     ///    reward accidental cancellation of time and spatial errors.
     #[test]
-    #[ignore = "slow: covered by mise rust-test-slow"]
+    #[ignore = "slow: covered by mise run rust-test --slow"]
     fn heston_pde_mcs_vs_douglas_high_correlation() {
         let spot: f64 = 100.0;
         let strike = 100.0;
@@ -650,7 +650,7 @@ mod tests {
     /// rho = +0.9 is cheap insurance against a sign-of-rho cross-stencil bug
     /// that a single-sign test would miss.
     #[test]
-    #[ignore = "slow: covered by mise rust-test-slow"]
+    #[ignore = "slow: covered by mise run rust-test --slow"]
     fn heston_pde_mcs_positive_correlation() {
         let spot: f64 = 100.0;
         let strike = 100.0;

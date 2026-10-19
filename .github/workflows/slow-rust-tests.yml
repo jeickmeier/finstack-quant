@@ -46,4 +46,4 @@ jobs:
           shared-key: test-rust-slow
 
       - name: Run ignored and slow Rust tests
-        run: mise run rust-test-slow
+        run: mise run rust-test --slow

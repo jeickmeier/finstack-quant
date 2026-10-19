@@ -7,7 +7,6 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
-import tomllib
 
 import pytest
 
@@ -162,19 +161,20 @@ def test_rust_baseline_verification_is_read_only_and_rejects_manifest_mismatch(
 
 
 def test_record_tasks_consume_checked_in_baselines_and_root_target() -> None:
-    """Record and compare tasks never depend on crate-local or ignored baselines."""
+    """Record and compare steps never depend on crate-local or ignored baselines."""
     root = Path(__file__).parents[2]
-    configuration = tomllib.loads((root / "mise.toml").read_text(encoding="utf-8"))
-    record = configuration["tasks"]["materialization-benchmark-record"]["run"]
-    rust_compare = configuration["tasks"]["materialization-rust-bench-compare"]["run"]
-    python_compare = configuration["tasks"]["python-bench-portfolio-compare"]["run"]
+    script = (root / "scripts" / "materialization_bench.sh").read_text(encoding="utf-8")
+    rust_compare = script.split("rust_compare() {", 1)[1].split("\n}\n", 1)[0]
+    python_compare = script.split("python_compare() {", 1)[1].split("\n}\n", 1)[0]
 
-    assert "finstack-quant/portfolio/target/" not in record + rust_compare
-    assert "--baseline benchmarks/materialization/materialization-rust-baseline.json" in rust_compare
-    assert "--baseline benchmarks/materialization/materialization-python-baseline.json" in python_compare
+    assert "finstack-quant/portfolio/target/" not in script
+    assert "RUST_BASELINE=benchmarks/materialization/materialization-rust-baseline.json" in script
+    assert "PYTHON_BASELINE=benchmarks/materialization/materialization-python-baseline.json" in script
+    assert '--baseline "$RUST_BASELINE"' in rust_compare
+    assert '--baseline "$PYTHON_BASELINE"' in python_compare
     assert "--criterion-dir target/materialization-criterion/criterion" in rust_compare
-    assert 'FQ_MATERIALIZATION_CRITERION_DIR="$PWD/target/materialization-criterion/criterion"' in rust_compare
-    assert "target/materialization-python/baseline.json" not in record + python_compare
+    assert 'FQ_MATERIALIZATION_CRITERION_DIR="$PWD/target/materialization-criterion/criterion"' in script
+    assert "target/materialization-python/baseline.json" not in script
 
 
 def test_documented_toolchains_match_machine_artifact() -> None:

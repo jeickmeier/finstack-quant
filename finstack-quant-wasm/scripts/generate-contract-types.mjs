@@ -324,6 +324,4 @@ for (const url of present.filter((candidate) => !expected.has(candidate.href))) 
   else await rm(url);
 }
 if (stale.length)
-  throw new Error(
-    `Generated contract types drift; run mise run wasm-gen-bindings:\n${stale.join('\n')}`
-  );
+  throw new Error(`Generated contract types drift; run mise run gen-write:\n${stale.join('\n')}`);

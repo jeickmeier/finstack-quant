@@ -49,7 +49,7 @@ struct FixtureOutcome {
 /// Load and validate the shared metric-specific unresolved list.
 ///
 /// Setting `GOLDEN_IGNORE_NON_EXECUTABLE` returns an empty list so every metric
-/// is compared strictly (see `mise goldens-test-strict`).
+/// is compared strictly.
 fn known_non_executable() -> Result<Vec<NonExecutableEntry>, String> {
     if strict_golden_mode_enabled() {
         return Ok(Vec::new());
@@ -207,7 +207,7 @@ fn classify_fixture_run(
 }
 
 #[test]
-#[ignore = "slow: covered by mise goldens-test or mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn golden_pricing_fixtures_from_existing_json_files() {
     let mut paths =
         collect_fixture_paths_under("pricing").expect("pricing fixture discovery should succeed");

@@ -174,13 +174,13 @@ impl JsMoney {
 `IntoJsError`, never from the message text. A wrong argument type is a
 `TypeError` with `kind: "invalid_type"`, thrown by the `utils::input` helpers.
 Never build an error from a string (`JsValue::from_str`, `js_sys::Error::new`):
-it has no `name` or `kind`. `mise run wasm-check-errors` (part of `wasm-lint`)
-rejects that outside `src/utils`.
+it has no `name` or `kind`. `scripts/check_wasm_boundary.py` (part of
+`wasm-lint`) rejects that outside `src/utils`.
 
 ## Returning Values
 
 - Handles (`JsCurrency`, `JsMoney`) for stateful Rust types; plain objects for data types (specs, configs, results).
-- Serialize plain objects only with `crate::utils::to_js_value` (or `to_js_value_with_bigints` for payloads that embed a `ValuationResult`). `serde_wasm_bindgen::to_value` emits ES `Map`s that `JSON.stringify` drops silently; `mise run wasm-check-serializer` (part of `wasm-lint`) rejects it.
+- Serialize plain objects only with `crate::utils::to_js_value` (or `to_js_value_with_bigints` for payloads that embed a `ValuationResult`). `serde_wasm_bindgen::to_value` emits ES `Map`s that `JSON.stringify` drops silently; `scripts/check_wasm_boundary.py` (part of `wasm-lint`) rejects it.
 - Only `*Json`-suffixed exports return JSON text, and each has a typed twin.
 
 ## JS Facade Pattern

@@ -7,7 +7,7 @@ This is a standalone Node 24 package with installable controlled primitives.
 ```sh
 mise run wasm-pkg
 mise run ui-sync
-mise run ui-gen
+npm --prefix finstack-quant-ui run generate
 mise run ui-fmt
 mise run ui-typecheck
 mise run ui-test
@@ -111,8 +111,8 @@ passing `ui-check`.
 
 PR-003 retains an isolated Next production-export fixture using the docs site's
 shared configuration and local dependencies. After `mise run wasm-pkg`, install
-the docs dependencies with `npm --prefix docs-site ci --ignore-scripts`, install
-Chromium with `npm --prefix finstack-quant-ui exec -- playwright install chromium`,
+the docs dependencies with `npm --prefix docs-site ci --ignore-scripts`, make
+sure Playwright's headless Chromium is present (`mise install` provisions it),
 and run `node finstack-quant-ui/tests/browser/run.mjs`. It checks root and
 `/finstack-quant` deployments and removes its temporary app afterward.
 `REGISTRY_SMOKE_DIR` selects a directory for JSON evidence.
@@ -128,12 +128,12 @@ The footprint gate measures all 78 instrument validators and the optimized
 against the 40,000,000-byte limit. Compression does not waive this raw-byte gate.
 
 `mise run wasm-pkg` owns the optimized web build and records raw/optimized/gzip/
-Brotli measurements without a UI-specific limit. `mise run ui-size` checks the
+Brotli measurements without a UI-specific limit. `npm --prefix finstack-quant-ui run size` checks the
 selected artifact hash and enforces the 40,000,000-byte UI budget.
 
 `REGISTRY_MEASURE_FOOTPRINT=1 node finstack-quant-ui/tests/browser/run.mjs` requires `REGISTRY_WASM_PACKAGE` to select the optimized web
 package and matching generated glue, and runs the size gate before browser
-measurements. `REGISTRY_WASM_PACKAGE` also selects the package for `ui-size`; it
+measurements. `REGISTRY_WASM_PACKAGE` also selects the package for `npm run size`; it
 defaults to the repository web package.
 
 ## Registry distribution
@@ -174,7 +174,7 @@ chart wrappers share these properties; numeric text uses `finstack-numeric`.
 Tenant CSS loads after the theme and overrides the same variables.
 
 The single token source includes the Fontsource package versions, selected faces
-and SIL OFL-1.1 licences. `ui-gen` emits CSS and registry metadata; `ui-check`
+and SIL OFL-1.1 licences. `npm run generate` emits CSS and registry metadata; `ui-check`
 checks drift, literal colours/fonts and contrast, including the tenant example.
 `node finstack-quant-ui/tests/browser/theme.mjs` builds and statically serves an installed theme
 fixture, checking actual font loading and the theme/density switches.
@@ -431,8 +431,8 @@ exports `/registry-gallery/` with the production Next build. The generated
 inventory and import harness follow the registry catalogue; `mise run ui-check`
 rejects stale copies. Fixtures preserve their source-file hashes.
 
-For interactive review, `mise run ui-docs-dev` installs the catalogue and starts
-the docs-site Next.js server. Open
+For interactive review, run `mise run ui-docs-install`, then
+`npm --prefix docs-site run dev` to start the docs-site Next.js server. Open
 [http://localhost:3000/registry-gallery/](http://localhost:3000/registry-gallery/)
 once it is ready. If the catalogue is already installed and unchanged, `npm run dev`
 in this package starts the same server.
@@ -461,7 +461,8 @@ publishing have separate gates and evidence.
 
 Registry items pin `finstack-quant-wasm` to the version in
 `finstack-quant-wasm/package.json`; the generators read it from there, so
-`mise run ui-gen` writes that pin into every registry item and a version bump
+`npm --prefix finstack-quant-ui run generate` (part of `mise run gen-write`)
+writes that pin into every registry item and a version bump
 without it fails `mise run ui-check` and `gen-check`. The package is not
 published to npm: the local install tasks serve that exact dependency as a
 `file:` path to the workspace package.
@@ -487,8 +488,9 @@ at the paths in the report. `REGISTRY_INSTALL_CONCURRENCY` accepts 1–4 indepen
 consumers (default 1). A focused diagnostic run can invoke
 `node finstack-quant-ui/scripts/install-matrix.mjs` with
 `REGISTRY_INSTALL_ITEMS=finstack-chart,cashflow-viewer`; its report is explicitly a
-subset and cannot satisfy `ui-install`. The faster `ui-install-smoke` workbench
-check remains available. The dedicated CI `ui-install` job consumes the gallery
+subset and cannot satisfy `ui-install`. The faster workbench check,
+`node finstack-quant-ui/tests/browser/install-smoke.mjs` after
+`mise run ui-docs-install`, remains available. The dedicated CI `ui-install` job consumes the gallery
 job's fresh native packages and runs the complete gate.
 
 ## Printing completed valuations

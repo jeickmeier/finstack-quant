@@ -429,7 +429,7 @@ cargo nextest run -p finstack-quant-valuations --lib -E 'test(/pde::stepper/)'
 cargo nextest run -p finstack-quant-valuations --lib -E 'test(/pde::bridge2d/)'
 
 # The #[ignore]d Fourier convergence anchors.
-mise run rust-test-slow
+mise run rust-test --slow
 
 # Instrument-level tests for both model keys.
 cargo nextest run -p finstack-quant-valuations --test valuations instruments \

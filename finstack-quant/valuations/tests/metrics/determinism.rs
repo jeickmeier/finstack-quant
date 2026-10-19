@@ -268,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "slow: covered by mise rust-test-slow"]
+    #[ignore = "slow: covered by mise run rust-test --slow"]
     fn test_barrier_option_delta_vega_deterministic() {
         let as_of = date!(2024 - 01 - 01);
         let expiry = date!(2025 - 01 - 01);
@@ -346,7 +346,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "slow: covered by mise rust-test-slow"]
+    #[ignore = "slow: covered by mise run rust-test --slow"]
     fn test_autocallable_delta_vega_deterministic() {
         let as_of = date!(2024 - 01 - 01);
         let observation_dates = vec![

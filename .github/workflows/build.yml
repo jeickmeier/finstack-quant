@@ -158,7 +158,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Run Rust lib and integration tests with coverage
-        run: mise run rust-test-cov
+        run: mise run rust-test --coverage
 
       - name: Upload Rust coverage
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
@@ -252,7 +252,7 @@ jobs:
           uv sync --locked --no-build --no-install-project
 
       - name: Build extension and run Python tests with coverage
-        run: mise run python-test-cov
+        run: mise run python-test --all --coverage
 
       - name: Upload Python coverage
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
@@ -307,13 +307,11 @@ jobs:
         run: npm ci --ignore-scripts
         working-directory: finstack-quant-wasm
 
-      # Enforces the project rule that no binding may call
-      # `serde_wasm_bindgen::to_value` directly: the raw serializer emits ES
-      # `Map`s that `JSON.stringify` silently drops. This gate previously
-      # existed only under `mise run wasm-lint`, which CI never invoked, so a
-      # silent-data-loss regression could land with every gate green.
-      - name: Check WASM serializer usage
-        run: mise run wasm-check-serializer
+      # No binding may call `serde_wasm_bindgen::to_value` (its ES `Map`s are
+      # silently dropped by `JSON.stringify`) or throw a string-built error.
+      # The same check runs in `mise run wasm-lint`, which CI does not invoke.
+      - name: Check WASM serializer and error paths
+        run: python3 scripts/check_wasm_boundary.py
 
       - name: Run WASM tests
         run: mise run wasm-test

@@ -54,7 +54,7 @@ sampling, tunable via `FQ_BENCH_SAMPLE_SIZE`, `FQ_BENCH_WARM_UP_TIME`,
 median regression).
 
 The `#[ignore]`d rough-volatility convergence tests are a separate concern from this
-directory; they run under `mise run rust-test-slow`. Model-owned integration
+directory; they run under `mise run rust-test --slow`. Model-owned integration
 tests live under `tests/`, while unit tests run with the crate library tests.
 
 Criterion writes to `target/criterion/<group>/<id>/report/index.html`; the

@@ -30,6 +30,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     env:
       MISE_TASK_RUN_AUTO_INSTALL: "false"
+      # mise.toml points UV_PYTHON at mise's Python, which this job does not
+      # install; use the setup-python interpreter on PATH, as before.
+      UV_PYTHON: ">=3.12"
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_BASE_PATH: /finstack-quant
     outputs:

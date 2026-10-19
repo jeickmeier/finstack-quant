@@ -12,7 +12,7 @@ globs:
   - `mise run rust-lint` (not after every edit — full-workspace clippy is still slow)
   - `mise run rust-test`, `mise run all-lint`, `mise run all-test`
 - For wasm code, run `mise run wasm-lint` after each set of changes (WASM surface is small enough to lint whole).
-- For python code changes, run `mise run python-lint` after each set of changes; run scoped pytest (`uv run pytest path -k filter`) rather than `python-test-all` while iterating.
+- For python code changes, run `mise run python-lint` after each set of changes; run scoped pytest (`uv run pytest path -k filter`) rather than `python-test --all` while iterating.
 - Fix any errors that are present from lints and tests before moving on to next task.
 - If you change the rust library, you will need to rebuild the python and wasm bindings before using in python/wasm. Use `mise run python-build` for python and `mise run wasm-build` for typescript/js/wasm
 - DO NOT OVER-ENGINEER THE SOLUTIONS. AIM FOR SIMPLICITY.

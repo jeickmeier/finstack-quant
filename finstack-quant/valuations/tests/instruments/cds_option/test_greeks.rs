@@ -160,7 +160,7 @@ fn test_delta_moneyness_effect() {
 }
 
 #[test]
-#[ignore = "slow: covered by mise rust-test-slow"]
+#[ignore = "slow: covered by mise run rust-test --slow"]
 fn test_gamma_peaks_atm() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);

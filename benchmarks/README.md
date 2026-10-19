@@ -24,14 +24,14 @@ committed.
 
 Each JSON carries a `schema` field
 (`finstack_quant.materialization_benchmark_results/1` and siblings). These are
-data artifacts written by tooling — edit them only through the tasks below.
+data artifacts written by tooling — edit them only through the steps below.
 
 ## Fixtures are not checked in
 
 Both fixtures are regenerated deterministically before every run:
 
 ```bash
-mise run materialization-benchmark-fixtures
+scripts/materialization_bench.sh fixtures
 ```
 
 That runs `cargo run --release -p finstack-quant-portfolio --example
@@ -49,7 +49,7 @@ not match the sealed baseline is rejected before any comparison.
 One command produces the result set:
 
 ```bash
-mise run materialization-benchmark-record
+scripts/materialization_bench.sh record
 ```
 
 It regenerates fixtures, verifies baseline provenance, runs release Rust,
@@ -57,31 +57,31 @@ Python, and Node/WASM measurements, applies both strict regression gates,
 writes `materialization-benchmark-results.json`, syncs the document digest, and
 re-verifies. It never replaces a baseline, and it never rewrites the sealing
 manifest — `materialization-benchmark-baseline.json` is written by the `seal`
-step of the two baseline tasks below, so the record run only reads it.
+step of the two baseline steps below, so the record run only reads it.
 
 Individual stages:
 
-| Task | Does |
+| Step | Does |
 | --- | --- |
-| `mise run materialization-rust-bench-baseline` | Establishes and seals the Rust baseline. Fails before measuring if one already exists. |
-| `mise run python-bench-portfolio-baseline` | Same for the Python baseline. |
-| `mise run materialization-rust-bench-compare` | Fresh Criterion run compared against the checked-in Rust baseline at a 10% median gate. |
-| `mise run python-bench-portfolio-compare` | Fresh release-Python run compared against the Python baseline at the same gate. |
-| `mise run wasm-bench-materialization` | Regenerates fixtures, builds the Node WASM target, and benchmarks materialization only. |
-| `mise run materialization-benchmark-doc-check` | Verifies the record digest, toolchain lines, and every baseline path/identity/hash — runs no measurement. Part of `all-doc` and the CI Documentation workflow. |
+| `scripts/materialization_bench.sh rust-baseline` | Establishes and seals the Rust baseline. Fails before measuring if one already exists. |
+| `scripts/materialization_bench.sh python-baseline` | Same for the Python baseline. |
+| `scripts/materialization_bench.sh rust-compare` | Fresh Criterion run compared against the checked-in Rust baseline at a 10% median gate. |
+| `scripts/materialization_bench.sh python-compare` | Fresh release-Python run compared against the Python baseline at the same gate. |
+| `scripts/materialization_bench.sh wasm` | Regenerates fixtures, builds the Node WASM target, and benchmarks materialization only. |
+| `scripts/materialization_bench.sh doc-check` | Verifies the record digest, toolchain lines, and every baseline path/identity/hash — runs no measurement. Part of `all-doc` and the CI Documentation workflow. |
 
 Baselines are immutable by design. Replacing one requires the explicit opt-in:
 
 ```bash
-FQ_REPLACE_MATERIALIZATION_BASELINE=1 mise run materialization-rust-bench-baseline
+FQ_REPLACE_MATERIALIZATION_BASELINE=1 scripts/materialization_bench.sh rust-baseline
 ```
 
-`FQ_MATERIALIZATION_P95_SAMPLES` defaults to 100 in every task above and must be
+`FQ_MATERIALIZATION_P95_SAMPLES` defaults to 100 in every step above and must be
 a finite integer of at least 100 for an acceptance record.
 `FQ_MATERIALIZATION_SMOKE=1` lowers that floor to 1; it is a short-run override
 for tests only and must not be used to produce a record.
 
-The scripts behind these tasks — baseline management, provenance capture,
+The scripts behind these steps — baseline management, provenance capture,
 regression gating, and result collection — are documented in
 [`../scripts/README.md`](../scripts/README.md).
 
@@ -91,8 +91,8 @@ Nothing below writes to this directory.
 
 | Where | Harness | Run with |
 | --- | --- | --- |
-| `finstack-quant/{analytics,attribution,cashflows,core,factor-model,monte_carlo,portfolio,scenarios,statements,valuations}/benches/` | Criterion | `mise run rust-bench`; `mise run rust-bench-baseline` / `rust-bench-compare` for a local `main` baseline at a 10% gate |
-| `finstack-quant-py/benchmarks/bench_bindings.py` | pytest-benchmark | `mise run python-bench` (all), `mise run python-bench-portfolio` (portfolio only) |
+| `finstack-quant/{analytics,attribution,cashflows,core,factor-model,monte_carlo,portfolio,scenarios,statements,valuations}/benches/` | Criterion | `mise run rust-bench`, or `mise run rust-bench-crate -- <package> <bench>` for one target; the four-case PR gate is `python3 -m scripts.pr_benchmarks baseline` on the base commit, then `compare`, at a 10% gate |
+| `finstack-quant-py/benchmarks/bench_bindings.py` | pytest-benchmark | `mise run python-bench` (all), `scripts/materialization_bench.sh python` (portfolio only) |
 | `finstack-quant-wasm/benchmarks/bench.mjs` | Node | `npm --prefix finstack-quant-wasm run bench` |
 
 Criterion timing is deliberately short by default; override with

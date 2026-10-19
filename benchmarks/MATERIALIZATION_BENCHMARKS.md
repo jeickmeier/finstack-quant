@@ -71,15 +71,15 @@ FQ_MATERIALIZATION_P95_SAMPLES=100 cargo bench \
   --sample-size 100 --warm-up-time 1 --measurement-time 5 \
   --nresamples 1000 --noplot
 
-FQ_MATERIALIZATION_P95_SAMPLES=100 mise run python-bench-portfolio
+FQ_MATERIALIZATION_P95_SAMPLES=100 scripts/materialization_bench.sh python
 
-FQ_MATERIALIZATION_P95_SAMPLES=100 mise run wasm-bench-materialization
+FQ_MATERIALIZATION_P95_SAMPLES=100 scripts/materialization_bench.sh wasm
 ```
 
 The complete acceptance record has one orchestration command:
 
 ```bash
-FQ_MATERIALIZATION_P95_SAMPLES=100 mise run materialization-benchmark-record
+FQ_MATERIALIZATION_P95_SAMPLES=100 scripts/materialization_bench.sh record
 ```
 
 It regenerates both fixtures, verifies the immutable checked-in Rust and Python
@@ -90,29 +90,28 @@ record, and updates then verifies the Markdown artifact SHA. It never replaces
 a baseline. Acceptance uses at least 100 raw calls per case.
 
 Compact baselines under `benchmarks/materialization/` are created only by
-`materialization-rust-bench-baseline` and
-`python-bench-portfolio-baseline`. Both fail before measurement when the
+the `rust-baseline` and `python-baseline` steps of
+`scripts/materialization_bench.sh`. Both fail before measurement when the
 baseline exists. Intentional replacement requires the explicit
 `FQ_REPLACE_MATERIALIZATION_BASELINE=1` opt-in.
 
 The native cold-A p95 hard gate is strictly below 1,000 ms. Cold A below
 500 ms and warm B below 250 ms are engineering targets. The Python
-`python-bench-portfolio-baseline` / `python-bench-portfolio-compare` tasks use
+`python-baseline` / `python-compare` steps use
 isolated artifacts and reject wrong revisions, fixture digests, case sets,
 paths, and stale or missing current measurements before applying the 10%
 median-regression gate. The complete record stores every Python per-case median
 change, its pass/fail result, and baseline artifact provenance. The focused
-`materialization-rust-bench-baseline` /
-`materialization-rust-bench-compare` tasks use
+`rust-baseline` / `rust-compare` steps use
 `target/materialization-criterion`, require the exact four expected current
 paths, reject stale or unexpected artifacts, and compare against
 `benchmarks/materialization/materialization-rust-baseline.json`. Neither comparison
 depends on an untracked Criterion baseline directory. The
-`materialization-benchmark-doc-check` task verifies the record digest,
+`doc-check` step verifies the record digest,
 toolchains, and all baseline artifact paths, identities, and hashes without
 running measurements.
-The generic `rust-bench-compare` task remains discovery-based and does not
-require materialization-specific metadata or paths.
+The four-case PR gate (`scripts/pr_benchmarks.py`) is separate and does not use
+materialization-specific metadata or paths.
 
 ## Manual allocation and peak-memory profiling
 
@@ -123,7 +122,7 @@ On macOS, capture peak resident memory:
 
 ```bash
 cargo build --release -p finstack-quant-portfolio --example materialization_case
-mise run materialization-benchmark-fixtures
+scripts/materialization_bench.sh fixtures
 /usr/bin/time -l target/release/examples/materialization_case \
   cold target/materialization-benchmarks/materialization-a-5000-unique.json 5000
 ```

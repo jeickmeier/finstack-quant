@@ -22,6 +22,9 @@ jobs:
       CARGO_BUILD_JOBS: "2"
       RUSTUP_TOOLCHAIN: "1.97.1"
       UV_NO_SYNC: "1"
+      # mise.toml points UV_PYTHON at mise's Python, which this job does not
+      # install; use the setup-python interpreter on PATH, as before.
+      UV_PYTHON: ">=3.12"
       UV_PYTHON_DOWNLOADS: never
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
@@ -102,6 +105,9 @@ jobs:
     timeout-minutes: 180
     env:
       MISE_TASK_RUN_AUTO_INSTALL: "false"
+      # mise.toml points UV_PYTHON at mise's Python, which this job does not
+      # install; the docs build in install-smoke uses a runner Python, as before.
+      UV_PYTHON: ">=3.12"
       NEXT_TELEMETRY_DISABLED: "1"
       REGISTRY_INSTALL_CONCURRENCY: "2"
       REGISTRY_INSTALL_EVIDENCE: ${{ github.workspace }}/finstack-quant-ui/test-results/install

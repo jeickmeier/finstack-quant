@@ -25,8 +25,9 @@ This is a dev-only supporting crate, not one of the 14 domain crates:
 
 It is not the only golden harness in the workspace. `finstack-quant-valuations`
 has its own pricing/attribution golden runner under
-[`valuations/tests/golden/`](../valuations/tests/golden/README.md) (driven by
-`mise run goldens-test`), which does not use this crate.
+[`valuations/tests/golden/`](../valuations/tests/golden/README.md) (run with
+`cargo nextest run -p finstack-quant-valuations --test valuations golden --run-ignored all`),
+which does not use this crate.
 
 ## Dependency
 
@@ -239,10 +240,10 @@ document the conventions next to the generator. Two existing patterns:
 - A generator script sitting beside the data, e.g.
   [`gen_vol_golden.py`](../core/tests/golden/data/gen_vol_golden.py), run with
   `uv run --with QuantLib --with mpmath python gen_vol_golden.py`.
-- A workspace task, for the valuations/Python golden layers:
-  `mise run goldens-quantlib-generate` to regenerate and
-  `mise run goldens-quantlib-check` to detect generator drift. Neither touches
-  fixtures loaded through this crate.
+- A workspace generator, for the valuations/Python golden layers:
+  `uv run python -m scripts.golden.quantlib.generate --family pricing --product all` regenerates, and
+  `--check` detects generator drift. Neither touches fixtures loaded through
+  this crate.
 
 When a vendor or library version changes, regenerate, bump
 `reference_source.version` and `generated.at`, and note the rationale in the
