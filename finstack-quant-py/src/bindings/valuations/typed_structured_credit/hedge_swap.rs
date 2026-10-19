@@ -123,6 +123,10 @@ pub(crate) fn hedge_swaps_from_py(
     py: Python<'_>,
     value: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<HedgeSwap>> {
+    if let Ok(json) = value.extract::<std::borrow::Cow<'_, str>>() {
+        return serde_json::from_str(&json)
+            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid hedge_swaps JSON"));
+    }
     if let Ok(items) = value.cast::<pyo3::types::PyList>() {
         let mut hedges = Vec::with_capacity(items.len());
         for item in items.iter() {
