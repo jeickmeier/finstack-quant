@@ -997,6 +997,42 @@ fn discount_margin_and_price_from_dm_round_trip_a_quote() {
     assert!((price - 100.0).abs() < 1e-6, "price {price}");
 }
 
+/// The model target excludes flows paid between the valuation date and
+/// settlement, as the solved flows do: a seasoned facility whose coupon falls
+/// inside a T+5 settlement window still reprices at zero model margin.
+#[test]
+fn model_discount_margin_excludes_flows_inside_the_settlement_window() {
+    // The coupon paid on 2025-01-20 reset on 2024-10-20, before the valuation.
+    let m = flat_consistent_market().insert_series(
+        finstack_quant_core::market_data::scalars::ScalarTimeSeries::new(
+            "FIXING:USD-SOFR-3M",
+            vec![(date!(2024 - 10 - 20), 0.04)],
+            None,
+        )
+        .expect("fixings"),
+    );
+    let mut facility = quote_facility(sofr_plus(300), 10_000_000.0, None, None);
+    facility.issue_date = date!(2024 - 10 - 20);
+    facility.maturity = date!(2028 - 01 - 20);
+    facility.settlement_days = 5;
+    let settlement = facility.settlement_date(AS_OF).expect("settlement");
+    let window_flows = {
+        use finstack_quant_cashflows::CashflowScheduleSource;
+        facility
+            .raw_cashflow_schedule(&m, AS_OF)
+            .expect("schedule")
+            .get_flows()
+            .to_vec()
+    }
+    .into_iter()
+    .filter(|cf| cf.date > AS_OF && cf.date <= settlement)
+    .count();
+    assert!(window_flows > 0, "fixture needs a flow inside the window");
+
+    let dm = quote_metric(&facility, &m, MetricId::DiscountMargin);
+    assert!(dm.abs() < 1e-8, "model dm {dm}");
+}
+
 /// Accrued interest on a seasoned facility is the pro-rata share of the
 /// current period's interest on the facility day count.
 #[test]
