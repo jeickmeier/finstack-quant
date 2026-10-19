@@ -91,10 +91,10 @@ Nothing below writes to this directory.
 
 | Where | Harness | Run with |
 | --- | --- | --- |
-| `finstack-quant/{analytics,attribution,cashflows,core,factor-model,monte_carlo,portfolio,scenarios,statements,valuations}/benches/` | Criterion | `mise run rust-bench`, or `mise run rust-bench-crate -- <package> <bench>` for one target; the four-case PR gate is `python3 -m scripts.pr_benchmarks baseline` on the base commit, then `compare`, at a 10% gate |
+| `finstack-quant/{analytics,attribution,cashflows,core,factor-model,monte_carlo,portfolio,scenarios,statements,valuations}/benches/` | Criterion | `mise run rust-bench`, or `mise run rust-bench-crate -- <package> <bench>` for one target |
 | `finstack-quant-py/benchmarks/bench_bindings.py` | pytest-benchmark | `mise run python-bench` (all), `scripts/materialization_bench.sh python` (portfolio only) |
 | `finstack-quant-wasm/benchmarks/bench.mjs` | Node | `npm --prefix finstack-quant-wasm run bench` |
 
 Criterion timing is deliberately short by default; override with
 `FQ_BENCH_SAMPLE_SIZE`, `FQ_BENCH_WARM_UP_TIME`, `FQ_BENCH_MEASUREMENT_TIME`,
-and `FQ_BENCH_NRESAMPLES`. Benchmarks do not gate PR CI.
+and `FQ_BENCH_NRESAMPLES`. CI does not run benchmarks.

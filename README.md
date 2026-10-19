@@ -412,11 +412,11 @@ full list.
 | `mise run all-fmt` | Format Rust, Python, and WASM; auto-fix Python and WASM (mutating) |
 | `mise run rust-fix` | Apply clippy --fix across the Rust workspace (mutating) |
 | `mise run all-test` | Run Rust, Python, and WASM tests |
-| `mise run all-ci` | Regenerate derived artifacts, then reproduce the CI job set locally |
+| `mise run all-ci` | Regenerate derived artifacts, then reproduce the nightly CI checks locally |
 | `mise run rust-build` | Build the Rust workspace excluding the binding crates |
-| `mise run rust-test` | Run native Rust tests via `cargo nextest` |
+| `mise run rust-test` | Run native Rust tests via `cargo nextest`; `--doctest` runs only the doctests |
 | `mise run rust-lint` | `cargo fmt --check` plus clippy with `-D warnings` across the workspace |
-| `mise run rust-doc` | Build workspace docs, enforce input docs, and run doctests |
+| `mise run rust-doc` | Build workspace docs and enforce input docs |
 | `mise run rust-bench` | Run Criterion benchmarks with reduced measurement timing |
 | `mise run gen-write` | Regenerate checked-in schemas, fixtures, and TypeScript bindings |
 | `mise run rust-gen-schemas` | Regenerate typed JSON schemas from Rust types |
@@ -436,15 +436,15 @@ full list.
 | `mise run ui-typecheck` | Type-check the UI package with `tsc` |
 | `mise run ui-test` | Run the UI Vitest suite |
 | `mise run docs-site-install` | Install everything the docs site needs, from a fresh clone |
-| `mise run docs-site-dev` | Serve the docs site at http://localhost:3000 |
+| `mise run docs-site-dev` | Serve the docs site at <http://localhost:3000> |
 | `mise run docs-site-build` | Execute every lesson and notebook, check the evidence, and export the static site |
 | `mise run rust-test --coverage` | `rust-test` with HTML and LCOV (`coverage/rust/lcov.info`) coverage reports; `--slow` runs the ignored tests |
 | `mise run python-test --all --coverage` | Full Python suite with HTML and Cobertura (`coverage/python/coverage.xml`) coverage reports |
 | `mise run wheel-local` | Build a Python wheel for the current platform |
 
-Do not run `cargo test` directly: it pulls in doc tests, which are owned by
-`mise run rust-doc`. Use `mise run rust-test` (nextest) for unit and integration
-tests.
+Do not run `cargo test` directly: it pulls in doc tests, which run only through
+`mise run rust-test --doctest`. Use `mise run rust-test` (nextest) for unit and
+integration tests.
 
 For repeated binding tests, run `mise run python-build` or `mise run wasm-test`
 after source changes, then use `python-test-file` or `wasm-test-built` while
@@ -452,9 +452,7 @@ iterating on tests. Use `mise run wasm-pkg` when packaging or checking size.
 
 Release and full-suite Criterion builds use fat LTO and one codegen unit, so
 their links are deliberately slow. Use the scoped Rust tasks and the dev-profile
-`python-build` for normal iteration. The four-case PR benchmark gate uses thin
-LTO and 16 codegen units on both base and head to shorten linking; the weekly
-full benchmark suite keeps the release-like profile.
+`python-build` for normal iteration.
 
 Every profile is incremental, release and bench included: a rebuild reuses the
 front-end and codegen work of unchanged crates, while fat LTO still runs in full
@@ -463,8 +461,8 @@ restore `target/incremental`. `python3 scripts/clean_workspace.py --incremental`
 reclaims the incremental caches.
 
 Benchmarks are measurement tasks and stay outside `all-test`, nextest,
-`rust-fix`, and `rust-lint`. `rust-fmt` still formats bench sources. PR CI compares four fixed cases; the full suite runs
-weekly. Run `mise run rust-bench` or `mise run rust-bench-crate` to measure locally.
+`rust-fix`, and `rust-lint`. `rust-fmt` still formats bench sources. CI does not
+run them; use `mise run rust-bench` or `mise run rust-bench-crate` to measure locally.
 `scripts/materialization_bench.sh` runs the portfolio materialization
 benchmarks in all three languages; see
 [`benchmarks/MATERIALIZATION_BENCHMARKS.md`](benchmarks/MATERIALIZATION_BENCHMARKS.md).

@@ -1,49 +1,291 @@
 name: Release
 
+# Pushing a vX.Y.Z tag cuts a numbered release:
+#
+#   1. Gates: the tag matches the version metadata, the nightly check set
+#      (nightly.yml), documentation and every doc example, the slow Rust and
+#      Python suites, crate publish checks, and semver against the previous
+#      release tag.
+#   2. Artifacts, only after every gate passes: wheels, sdist, WASM packages.
+#   3. Publish, only after every artifact builds: a GitHub Release carrying the
+#      artifacts, with release_notes/RELEASE_NOTES_X.Y.Z.md as its body.
+#
+# A failed gate leaves the tag without a release. Fix forward, then delete and
+# re-push the tag (or push the next patch version).
 on:
-  workflow_run:
-    workflows: ["Build"]
-    types: [completed]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Override the release tag. Defaults to a unique timestamped master tag."
-        type: string
-        required: false
-      publish:
-        description: "Publish artifacts"
-        type: boolean
-        default: false
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
 
-# Keep workflow_dispatch publishes and workflow_run auto-releases in separate
-# groups, and never cancel in-progress Release runs. A skipped PR Build echo
-# previously cancelled a healthy multi-platform publish mid-wheel-build
-# (Release #120 killed by #121).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 # Managed toolchain versions are pinned in mise.toml.
-# CI uses jdx/mise-action@v4 to provision them, then runs raw commands.
+# CI uses jdx/mise-action@v4 to provision them, then runs canonical mise tasks.
 
-# A fork pull request from a branch named `master` also completes Build, so
-# every workflow_run job also requires a push to this repository.
+env:
+  UV_PYTHON_DOWNLOADS: never
 
 jobs:
+  # ── Gates ───────────────────────────────────────────────────────
+  version:
+    name: Version metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Check the tag against the version metadata
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cargo_version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')
+          npm_version=$(node -p 'require("./finstack-quant-wasm/package.json").version')
+          status=0
+          if [ "$cargo_version" != "$version" ]; then
+            echo "::error::Cargo.toml workspace version is $cargo_version, tag is $GITHUB_REF_NAME"
+            status=1
+          fi
+          if [ "$npm_version" != "$version" ]; then
+            echo "::error::finstack-quant-wasm/package.json version is $npm_version, tag is $GITHUB_REF_NAME"
+            status=1
+          fi
+          if ! grep -qF "## [$version]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$version]' section"
+            status=1
+          fi
+          if [ ! -f "release_notes/RELEASE_NOTES_$version.md" ]; then
+            echo "::error::release_notes/RELEASE_NOTES_$version.md is missing"
+            status=1
+          fi
+          exit "$status"
+
+  checks:
+    name: Nightly checks
+    needs: version
+    uses: ./.github/workflows/nightly.yml
+
+  # Release-only jobs build cold: nothing on master saves a cache for them, and
+  # caches saved on a tag are visible only to that tag.
+  docs:
+    name: Documentation
+    needs: version
+    runs-on: ubuntu-latest
+    # Rustdoc and the Rust doctests, then the Python extension and the WASM web
+    # package for their doc examples, all cold.
+    timeout-minutes: 150
+
+    env:
+      CARGO_BUILD_JOBS: 4
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
+      # Must include the getrandom cfg: this env replaces crate `.cargo/config.toml`
+      # rustflags rather than appending. `debuginfo=0` avoids the rust-lld
+      # SIGBUS on huge wasm-bindgen describe-export lists (LLVM #195482).
+      CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: "--cfg getrandom_backend=\"wasm_js\" -C debuginfo=0"
+      PYO3_PYTHON: python3
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
+        with:
+          swap-size-gb: 10
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          cache: true
+          cache_save: false
+        env:
+          # rustup download cache is not concurrency-safe under parallel cargo:*.
+          MISE_JOBS: "1"
+
+      # cargo-public-api (scripts/check_public_api_input_docs.py) needs nightly
+      # rustdoc JSON. mise.toml provisions nightly; this step makes the job
+      # self-sufficient when the shared mise cache was primed without it.
+      - name: Ensure nightly for rustdoc JSON
+        run: rustup toolchain install nightly --profile minimal
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Set up Python environment
+        run: |
+          uv venv --python 3.12
+          echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
+          uv sync --locked --no-build --no-install-project
+
+      - name: Install WASM dependencies
+        run: npm ci --ignore-scripts
+        working-directory: finstack-quant-wasm
+
+      # Strict rustdoc, the public-API input-doc and deprecation contracts, the
+      # Python and WASM IntelliSense contracts, and the benchmark documents.
+      - name: Check documentation
+        run: mise run all-doc
+
+      - name: Run Rust doctests
+        run: mise run rust-test --doctest
+
+      - name: Run Python stub and module doctests
+        run: mise run python-test --doctest
+
+      - name: Run WASM documented code samples
+        run: mise run wasm-test --doctest
+
+  slow-rust:
+    name: Test ignored Rust suite
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    env:
+      CARGO_BUILD_JOBS: 4
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
+        with:
+          swap-size-gb: 10
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          cache: true
+          cache_save: false
+        env:
+          # rustup download cache is not concurrency-safe under parallel cargo:*.
+          MISE_JOBS: "1"
+
+      - name: Run ignored and slow Rust tests
+        run: mise run rust-test --slow
+
+  slow-python:
+    name: Test slow Python suite
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      CARGO_BUILD_JOBS: 4
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
+      PYO3_PYTHON: python3
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
+        with:
+          swap-size-gb: 10
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          cache: true
+          cache_save: false
+        env:
+          # rustup download cache is not concurrency-safe under parallel cargo:*.
+          MISE_JOBS: "1"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Set up Python environment
+        run: |
+          uv venv --python 3.12
+          echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
+          uv sync --locked --no-build --no-install-project
+
+      # Golden pricing comparisons and Monte Carlo.
+      - name: Build extension and run slow Python tests
+        run: mise run python-test --slow
+
+  publish-checks:
+    name: Rust Publish Checks
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          cache: true
+          cache_save: false
+        env:
+          # rustup download cache is not concurrency-safe under parallel cargo:*.
+          MISE_JOBS: "1"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Validate Rust crate publish order
+        run: mise run rust-publish-checks
+
+  semver:
+    name: Semver Checks
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      CARGO_BUILD_JOBS: 4
+      RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
+
+    steps:
+      - name: Checkout repository (full history for the baseline tag)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
+        with:
+          swap-size-gb: 10
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          cache: true
+          cache_save: false
+        env:
+          # rustup download cache is not concurrency-safe under parallel cargo:*.
+          MISE_JOBS: "1"
+
+      # The baseline is the newest vX.Y.Z tag reachable from the tagged
+      # commit's parent, i.e. the previous release.
+      - name: Run semver checks against the previous release
+        run: |
+          baseline=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' "${GITHUB_REF_NAME}^")
+          echo "Baseline: $baseline"
+          cargo semver-checks check-release \
+            -p finstack-quant-core \
+            -p finstack-quant-valuations \
+            -p finstack-quant-portfolio \
+            --baseline-rev "$baseline"
+
   # ── Python Wheels ───────────────────────────────────────────────
   build-wheels:
     name: Wheel / ${{ matrix.os }} / py${{ matrix.python }}
-    if: |
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_repository.full_name == github.repository &&
-       github.event.workflow_run.head_branch == 'master') ||
-      (github.event_name == 'workflow_dispatch' &&
-       github.event.inputs.publish == 'true')
+    needs: [checks, docs, slow-rust, slow-python, publish-checks, semver]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ matrix.timeout }}
     strategy:
@@ -75,8 +317,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
       - name: Set HOME for mise on Windows
         if: runner.os == 'Windows'
@@ -133,172 +373,99 @@ jobs:
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: wheel-${{ matrix.os }}-py${{ matrix.python }}
+          name: dist-wheel-${{ matrix.os }}-py${{ matrix.python }}
           path: dist/*.whl
 
   # ── Source Distribution ─────────────────────────────────────────
   build-sdist:
     name: Source dist
-    if: |
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_repository.full_name == github.repository &&
-       github.event.workflow_run.head_branch == 'master') ||
-      (github.event_name == 'workflow_dispatch' &&
-       github.event.inputs.publish == 'true')
+    needs: [checks, docs, slow-rust, slow-python, publish-checks, semver]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
       - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1
         with:
           command: sdist
           args: --out dist
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: sdist
+          name: dist-sdist
           path: dist/*.tar.gz
 
   # ── WASM / npm Package ─────────────────────────────────────────
   build-wasm:
     name: WASM / npm
-    if: |
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_repository.full_name == github.repository &&
-       github.event.workflow_run.head_branch == 'master') ||
-      (github.event_name == 'workflow_dispatch' &&
-       github.event.inputs.publish == 'true')
+    needs: [checks, docs, slow-rust, slow-python, publish-checks, semver]
     runs-on: ubuntu-latest
     timeout-minutes: 50
+    env:
+      # `mise run` would otherwise install every tool in mise.toml, including
+      # the cargo CLIs that build from source; this job needs only the four below.
+      MISE_TASK_RUN_AUTO_INSTALL: "false"
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
       - name: Provision toolchain (mise)
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
-          # wasm-pack and Node package the release. The cargo CLIs and nightly
-          # rustc are not used here.
-          install_args: rust@1.97.1 node aqua:rustwasm/wasm-pack
+          install_args: rust@1.97.1 node github:wasm-bindgen/wasm-pack github:wasm-bindgen/wasm-bindgen aqua:WebAssembly/binaryen
         env:
           # rustup download cache is not concurrency-safe under parallel cargo:*.
           MISE_JOBS: "1"
 
-      - name: Configure npm registry
-        run: echo "registry=https://registry.npmjs.org/" > ~/.npmrc
+      # The size-optimized web package (release-size + wasm-opt) and the
+      # Node package, exactly as built locally.
+      - name: Build release WASM packages
+        run: mise run wasm-pkg
 
-      - name: Sync package.json version from Cargo.toml
+      - name: Package npm tarball and per-target archives
         run: |
-          python3 - <<'PY'
-          import json
-          import tomllib
-          from pathlib import Path
-
-          workspace = tomllib.loads(Path("Cargo.toml").read_text())
-          version = workspace["workspace"]["package"]["version"]
-          package_path = Path("finstack-quant-wasm/package.json")
-          package = json.loads(package_path.read_text())
-          package["version"] = version
-          package_path.write_text(json.dumps(package, indent=2) + "\n")
-          print(f"finstack-quant-wasm package version set to {version}")
-          PY
-
-      - name: Build WASM targets
-        working-directory: finstack-quant-wasm
-        run: |
-          mkdir -p ../dist
-          wasm-pack build --target web --release --out-dir pkg
-          wasm-pack build --target nodejs --release --out-dir pkg-node
-          touch pkg/.npmignore pkg-node/.npmignore
-          tar -czf ../dist/finstack-quant-wasm-web.tar.gz pkg
-          tar -czf ../dist/finstack-quant-wasm-nodejs.tar.gz pkg-node
-
-      - name: Package npm tarball
-        working-directory: finstack-quant-wasm
-        run: |
-          npm pack --ignore-scripts
-          mv finstack-quant-wasm-*.tgz ../dist/
+          mkdir -p dist
+          tar -czf dist/finstack-quant-wasm-web.tar.gz -C finstack-quant-wasm pkg
+          tar -czf dist/finstack-quant-wasm-nodejs.tar.gz -C finstack-quant-wasm pkg-node
+          (cd finstack-quant-wasm && npm pack --ignore-scripts --pack-destination ../dist)
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: wasm-builds
-          path: |
-            dist/finstack-quant-wasm-*.tgz
-            dist/finstack-quant-wasm-web.tar.gz
-            dist/finstack-quant-wasm-nodejs.tar.gz
+          name: dist-wasm
+          path: dist/*
 
   # ── Publish ─────────────────────────────────────────────────────
   publish:
     name: Publish Release
     needs: [build-wheels, build-sdist, build-wasm]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    if: |
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_repository.full_name == github.repository &&
-       github.event.workflow_run.head_branch == 'master') ||
-      (github.event_name == 'workflow_dispatch' &&
-       github.event.inputs.publish == 'true')
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
-      - name: Resolve release metadata
-        id: release
-        env:
-          # workflow_dispatch input. Keep it out of the run script so a tag
-          # cannot break out of the shell (githubactions:S7630).
-          INPUT_TAG: ${{ inputs.tag }}
-        run: |
-          timestamp_tag="master-$(date -u +%Y%m%d-%H%M%S)"
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            echo "tag=${timestamp_tag}" >> "$GITHUB_OUTPUT"
-            echo "target=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-            echo "make_latest=false" >> "$GITHUB_OUTPUT"
-          elif [[ -n "$INPUT_TAG" ]]; then
-            # Newlines in the tag would inject extra GITHUB_OUTPUT keys.
-            if [[ ! "$INPUT_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-              echo "invalid release tag: ${INPUT_TAG}" >&2
-              exit 1
-            fi
-            echo "tag=${INPUT_TAG}" >> "$GITHUB_OUTPUT"
-            echo "target=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-            echo "make_latest=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${timestamp_tag}" >> "$GITHUB_OUTPUT"
-            echo "target=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-            echo "make_latest=false" >> "$GITHUB_OUTPUT"
-          fi
-
+      # `dist-*` only: the nightly checks also upload coverage artifacts.
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
+          pattern: dist-*
           path: dist
           merge-multiple: true
 
       - name: List release artifacts
         run: ls -lhR dist/
 
+      - name: Resolve release notes
+        id: notes
+        run: echo "path=release_notes/RELEASE_NOTES_${GITHUB_REF_NAME#v}.md" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
-          name: ${{ steps.release.outputs.tag }}
-          tag_name: ${{ steps.release.outputs.tag }}
-          target_commitish: ${{ steps.release.outputs.target }}
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body_path: ${{ steps.notes.outputs.path }}
           files: dist/*
           fail_on_unmatched_files: true
-          generate_release_notes: true
           overwrite_files: true
-          prerelease: ${{ steps.release.outputs.prerelease }}
-          make_latest: ${{ steps.release.outputs.make_latest }}
+          prerelease: false
+          make_latest: true

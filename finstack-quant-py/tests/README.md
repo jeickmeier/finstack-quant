@@ -29,14 +29,16 @@ instance exactly once, reused by the per-family modules and by
 ## Fast vs slow
 
 `conftest.py` applies `pytest.mark.slow` to everything under `golden/` and to
-`models/test_monte_carlo.py`. That drives the four task variants:
+`models/test_monte_carlo.py`, and `test_stub_doctests.py` carries
+`pytest.mark.doctest`. That drives the task variants:
 
 | Task | Runs |
 |------|------|
-| `mise run python-test` | `pytest -m 'not slow'` — the default dev loop |
+| `mise run python-test` | `pytest -m 'not slow and not doctest'` — the default dev loop |
 | `mise run python-test --slow` | `pytest -m slow` — goldens and Monte Carlo only |
-| `mise run python-test --all` | the whole suite |
-| `mise run python-test --all --coverage` | full suite plus HTML coverage in `target/python-cov` (what CI runs) |
+| `mise run python-test --all` | `pytest -m 'not doctest'` — fast and slow |
+| `mise run python-test --doctest` | `pytest -m doctest` — the stub and module doctests only |
+| `mise run python-test --coverage` | the default dev loop plus HTML coverage in `target/python-cov` (what nightly CI runs) |
 
 Each of these rebuilds the extension via `mise run python-build` first.
 
@@ -84,8 +86,8 @@ Five modules police the example tree rather than the bindings:
 
 `test_stub_doctests.py` executes the doctest examples embedded in the `.pyi`
 stubs and pure-Python modules against the live extension, via
-`scripts/run_python_stub_doctests.py`. `mise run python-doctest` runs just that
-module.
+`scripts/run_python_stub_doctests.py`. It carries `pytest.mark.doctest`, so only
+`mise run python-test --doctest` runs it.
 
 ## `parity/` — structural parity
 

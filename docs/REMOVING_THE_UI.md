@@ -59,7 +59,7 @@ uv run --no-sync python scripts/generation_digest.py --write-manifest
 manifest paragraph in `scripts/README.md` describes the instrument JSON
 examples and the WASM TypeScript declarations, so it stays accurate.
 
-In `.github/workflows/build.yml`, delete the lint job step
+In `.github/workflows/nightly.yml`, delete the lint job step
 `Install component registry dependencies` (`mise run ui-sync`).
 
 ## Keep the analyst reader, drop the gallery
@@ -91,22 +91,10 @@ Then edit:
 - `docs-site/README.md`: remove the `mise run ui-sync` prerequisite and
   the "Component registry development" section.
 
-## Remove tasks and workflows
+## Remove tasks
 
 Delete the `[tasks.ui-*]` block in `mise.toml`, from `ui-sync` through
 `ui-publish-check`, including the section header that introduces it.
-
-Delete:
-
-- `.github/workflows/ui-gallery.yml`
-- `.github/workflows/registry-publish.yml`
-
-In `.github/workflows/docs.yml`, remove the `registry_publish` and
-`registry_only` workflow inputs, the `registry-gallery` and
-`registry-publish` jobs, and the `if:` guards on `rust-docs` and
-`host-docs` that skip those jobs when a registry input is set.
-
-Update the workflow table in `.github/workflows/README.md`.
 
 ## Delete the package
 

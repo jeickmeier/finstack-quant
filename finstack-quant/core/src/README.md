@@ -77,6 +77,7 @@ Use `mise run rust-lint-crate -- finstack-quant-core` and
 `mise run rust-test-crate -- finstack-quant-core` during iteration. The
 [test guide](../tests/README.md) describes integration wiring; the
 [benchmark guide](../benches/README.md) describes benchmark registration.
-Run `mise run rust-doc` for documentation and doctests and
+Run `mise run rust-doc` for documentation, `mise run rust-test --doctest` for
+doctests, and
 `mise run rust-check-schemas` for the persisted schema contract. The crate
 README's Rust examples are included in doctests by `lib.rs`.

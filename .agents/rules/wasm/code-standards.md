@@ -240,7 +240,7 @@ Rustdoc above `#[wasm_bindgen]` is the source of the published JSDoc: document
 every parameter (`@param`), return (`@returns`) and thrown kind (`@throws`), then
 run `npm --prefix finstack-quant-wasm run docs:sync`. Every `@example` must be
 a complete program: `mise run wasm-doc` type-checks each one against
-`index.d.ts`, and `tests/facade/doc_examples.test.mjs` executes it.
+`index.d.ts`, and `tests/docs/doc_examples.test.mjs` (`mise run wasm-test --doctest`) executes it.
 
 ## Performance Guidelines
 

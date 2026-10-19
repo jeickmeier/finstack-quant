@@ -50,7 +50,7 @@ document each input. These enforce that on each host surface.
 | `check_pyo3_doc_placeholders.py` | Rejects placeholder prose left in public PyO3 runtime doc comments under `finstack-quant-py/src/bindings/`. | `mise run python-lint`, `mise run python-doc` |
 | `check_wasm_api_input_docs.py` | `@param` coverage in the Rust doc comments under `finstack-quant-wasm/src/api/` attached to `#[wasm_bindgen]` exports — the text wasm-bindgen copies into the generated TypeScript declarations. The comment must precede the attribute or it is dropped. The hand-written facade declaration `finstack-quant-wasm/index.d.ts` is checked separately by `npm run docs:check`. | `mise run wasm-doc` |
 | `check_deprecated_annotations.py` | The INVARIANTS.md §7.2 contract: every `#[deprecated]` carries `since = "X.Y.Z"`, a replacement or retention rationale, and a planned removal release. Bare `#[deprecated]` always fails. | `mise run rust-doc` |
-| `run_python_stub_doctests.py` | Extracts `>>>` examples from `.pyi` and module docstrings and executes them against the compiled `finstack_quant` package, since stubs are not importable. | `mise run python-doctest` (via `finstack-quant-py/tests/test_stub_doctests.py`) |
+| `run_python_stub_doctests.py` | Extracts `>>>` examples from `.pyi` and module docstrings and executes them against the compiled `finstack_quant` package, since stubs are not importable. | `mise run python-test --doctest` (via `finstack-quant-py/tests/test_stub_doctests.py`) |
 
 ## Generated artifacts and wire contracts
 
@@ -85,7 +85,7 @@ The checked-in baselines live in `../benchmarks/materialization/`.
 
 | Script | Purpose | Driven by |
 | --- | --- | --- |
-| `check_criterion_regressions.py` | Fails when Criterion median estimates regress beyond `--threshold` (0.10), comparing the exact expected materialization paths. `pr_benchmarks.py` imports its median-change helper. | `scripts/materialization_bench.sh rust-compare` |
+| `check_criterion_regressions.py` | Fails when Criterion median estimates regress beyond `--threshold` (0.10), comparing the exact expected materialization paths. | `scripts/materialization_bench.sh rust-compare` |
 | `prepare_materialization_criterion_run.py` | Writes fresh run provenance (tree revision, combined fixture digest) before a comparison run, so a stale or wrong-revision measurement is rejected rather than compared. | `scripts/materialization_bench.sh rust-compare` / `python-compare` |
 | `materialization_baseline_replace_flag.py` | Validates the `FQ_REPLACE_MATERIALIZATION_BASELINE` opt-in and emits the replace flag. Baselines are immutable without it. | `scripts/materialization_bench.sh rust-baseline` / `python-baseline` |
 | `manage_materialization_rust_baseline.py` | `guard` / `establish` / `seal` / `verify` subcommands for the Rust baseline JSON. | `scripts/materialization_bench.sh rust-baseline` / `record` |

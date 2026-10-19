@@ -128,27 +128,26 @@ The table lists representative suites, not every file: each namespace also has
 twin test), and the `*_audit` / `*_rust_owned` suites pin individual audit
 regressions. `ls facade/` is the full list.
 
-| File                                                       | Asserts                                                                                                                                                                            |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core_namespace.test.mjs`                                  | `Currency`, `Money` (including the lossless `amountDecimal` getter), `FxDeltaVolSurface`, `FxMatrix`, `FxRateResult` getters                                                       |
-| `cashflows.test.mjs`                                       | every exported key is a live function or class, plus an end-to-end build/validate/flows/accrual round trip                                                                         |
-| `covenants.test.mjs`                                       | the covenants namespace                                                                                                                                                            |
-| `cashflows_parity.test.mjs`, `covenants_parity.test.mjs`   | every typed cashflows / covenants entry point, pinned to `golden/*_parity.json`; the Python twins are asserted against the same files                                              |
-| `statements.test.mjs`                                      | statements / statements-analytics results come back as structured objects, matching the Python twins                                                                               |
-| `portfolio.test.mjs`, `portfolio_materialization.test.mjs` | portfolio runtime contract and the materialization API                                                                                                                             |
-| `valuations_instruments.test.mjs`                          | typed `Bond` / `TermLoan`                                                                                                                                                          |
-| `margin_xva.test.mjs`                                      | `computeBilateralXva` through `core.HazardCurve`, against a fixture byte-equivalent to the Rust integration test                                                                   |
-| `return_floor.test.mjs`                                    | `moic` / `moic_to_worst` / `xirr` / `xirr_to_worst` through the JSON-native Bond path                                                                                              |
-| `analytics_period_stats.test.mjs`                          | non-finite ratio round-tripping in `Performance.periodStats`                                                                                                                       |
-| `plain_object_returns.test.mjs`                            | map-returning functions produce plain objects, not ES2015 `Map`s                                                                                                                   |
-| `boundary_input.test.mjs`                                  | wrong argument types throw `TypeError` (`kind: "invalid_type"`) without trapping or leaking; JSON inputs accept objects with unknown-field checks                                  |
-| `core_members.test.mjs`                                    | S20 handle members and JSON round-trips (Rate/Bps, DayCount, Tenor, curves, surfaces, FxRateResult, realized variance); goldens shared with `test_core_members_parity.py`          |
-| `core_rust_owned.test.mjs`                                 | core currency/money/date/curve behaviour owned by Rust; asserts the same values and messages as `finstack-quant-py/tests/test_core_rust_owned.py`                                  |
-| `contract_types.test.mjs`                                  | runtime calibration, materialization and valuation outputs type-check against the schema-generated TypeScript types under NodeNext                                                 |
-| `statements_parity.test.mjs`                               | `Evaluator`, `ModelBuilder`, `Registry` and the statements free-function twins; goldens shared with `test_statements_wasm_parity.py`                                               |
-| `doc_examples.test.mjs`                                    | every runnable `@example` in `../index.d.ts` and every `js`/`ts` block in `../README.md` and `.agents/rules/wasm/javascript-usage-standards.md` executes against the built package |
-| `surface.test.mjs`                                         | the facade export surface equals the checked-in `../facade-surface.json`                                                                                                           |
-| `statements_analytics_parity.test.mjs`                     | `DependencyTracer`, extensions, templates, ECL, DCF and twins; goldens shared with `test_statements_wasm_parity.py`                                                                |
+| File                                                       | Asserts                                                                                                                                                                   |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core_namespace.test.mjs`                                  | `Currency`, `Money` (including the lossless `amountDecimal` getter), `FxDeltaVolSurface`, `FxMatrix`, `FxRateResult` getters                                              |
+| `cashflows.test.mjs`                                       | every exported key is a live function or class, plus an end-to-end build/validate/flows/accrual round trip                                                                |
+| `covenants.test.mjs`                                       | the covenants namespace                                                                                                                                                   |
+| `cashflows_parity.test.mjs`, `covenants_parity.test.mjs`   | every typed cashflows / covenants entry point, pinned to `golden/*_parity.json`; the Python twins are asserted against the same files                                     |
+| `statements.test.mjs`                                      | statements / statements-analytics results come back as structured objects, matching the Python twins                                                                      |
+| `portfolio.test.mjs`, `portfolio_materialization.test.mjs` | portfolio runtime contract and the materialization API                                                                                                                    |
+| `valuations_instruments.test.mjs`                          | typed `Bond` / `TermLoan`                                                                                                                                                 |
+| `margin_xva.test.mjs`                                      | `computeBilateralXva` through `core.HazardCurve`, against a fixture byte-equivalent to the Rust integration test                                                          |
+| `return_floor.test.mjs`                                    | `moic` / `moic_to_worst` / `xirr` / `xirr_to_worst` through the JSON-native Bond path                                                                                     |
+| `analytics_period_stats.test.mjs`                          | non-finite ratio round-tripping in `Performance.periodStats`                                                                                                              |
+| `plain_object_returns.test.mjs`                            | map-returning functions produce plain objects, not ES2015 `Map`s                                                                                                          |
+| `boundary_input.test.mjs`                                  | wrong argument types throw `TypeError` (`kind: "invalid_type"`) without trapping or leaking; JSON inputs accept objects with unknown-field checks                         |
+| `core_members.test.mjs`                                    | S20 handle members and JSON round-trips (Rate/Bps, DayCount, Tenor, curves, surfaces, FxRateResult, realized variance); goldens shared with `test_core_members_parity.py` |
+| `core_rust_owned.test.mjs`                                 | core currency/money/date/curve behaviour owned by Rust; asserts the same values and messages as `finstack-quant-py/tests/test_core_rust_owned.py`                         |
+| `contract_types.test.mjs`                                  | runtime calibration, materialization and valuation outputs type-check against the schema-generated TypeScript types under NodeNext                                        |
+| `statements_parity.test.mjs`                               | `Evaluator`, `ModelBuilder`, `Registry` and the statements free-function twins; goldens shared with `test_statements_wasm_parity.py`                                      |
+| `surface.test.mjs`                                         | the facade export surface equals the checked-in `../facade-surface.json`                                                                                                  |
+| `statements_analytics_parity.test.mjs`                     | `DependencyTracer`, extensions, templates, ECL, DCF and twins; goldens shared with `test_statements_wasm_parity.py`                                                       |
 
 **These need a build.** All of them except `plain_object_returns.test.mjs` load
 the web target from `pkg/finstack_quant_wasm_bg.wasm` (Node has no fetchable
@@ -161,6 +160,12 @@ npm --prefix finstack-quant-wasm run build         # -> pkg/      (web)
 npm --prefix finstack-quant-wasm run build:node    # -> pkg-node/ (node)
 npm --prefix finstack-quant-wasm run test:facade   # node --test tests/facade/**/*.test.mjs
 ```
+
+`docs/doc_examples.test.mjs` executes every runnable `@example` in
+`../index.d.ts` and every `js`/`ts` block in `../README.md` and
+`.agents/rules/wasm/javascript-usage-standards.md` against the web build. It
+sits outside `facade/` so `mise run wasm-test` stays a fast test run;
+`mise run wasm-test --doctest` (`npm run test:doc-examples`) runs it.
 
 `pkg/` and `pkg-node/` are gitignored build output. Never edit anything inside
 them, and never treat a file in there as source.
@@ -202,8 +207,8 @@ the ban, `return_shapes.rs` asserts it, and this file proves it at runtime.
   a consumer can copy — each `@example` in `../index.d.ts` and each `js`/`ts`
   block in `../README.md` and `.agents/rules/wasm/javascript-usage-standards.md`
   — with `tsc` under `strict` against `../index.d.ts`. It needs no build.
-  `facade/doc_examples.test.mjs` (Layer 3) executes the same blocks against the
-  built package. A block with no `import` continues from the standard setup
+  `docs/doc_examples.test.mjs` (`mise run wasm-test --doctest`) executes the same
+  blocks against the built package. A block with no `import` continues from the standard setup
   (every namespace imported, `await init()` done); a fence tagged `no-run` is
   skipped by both and is reserved for a sample of what not to write.
 

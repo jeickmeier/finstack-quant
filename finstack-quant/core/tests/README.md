@@ -66,7 +66,7 @@ mise run rust-test-filter -- finstack-quant-core npv_100_cashflows
 
 Workspace-wide: `mise run rust-test`. Do not invoke a bare `cargo test` — it
 also runs doc tests, which this project keeps to a separate pass
-(`mise run rust-doc`).
+(`mise run rust-test --doctest`).
 
 ## Adding a test
 

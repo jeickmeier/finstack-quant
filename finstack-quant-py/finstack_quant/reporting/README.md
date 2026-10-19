@@ -156,7 +156,7 @@ or `dict` rather than re-parsing a `ValuationResult`.
    `parity_contract.toml`.
 5. Write NumPy-style docstrings with `Parameters` / `Returns` / `Raises` /
    `Examples` on every public callable — `scripts/check_python_api_input_docs.py`
-   scans this directory and `mise run python-doctest` *executes* the examples.
+   scans this directory and `mise run python-test --doctest` *executes* the examples.
 6. Add `tests/test_reporting_<name>.py`.
 
 ## Tests
@@ -177,7 +177,7 @@ and writing it back.
 mise run python-build                                   # required: tests hit the extension
 uv run pytest finstack-quant-py/tests -k reporting -q
 mise run python-lint                                    # ruff + the API-doc checkers
-mise run python-doctest                                 # executes the docstring examples
+mise run python-test --doctest                          # executes the docstring examples
 ```
 
 ## Related

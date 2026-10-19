@@ -7,6 +7,9 @@ from pathlib import Path
 
 import pytest
 
+# Run by `mise run python-test --doctest`; every other python-test mode excludes it.
+pytestmark = pytest.mark.doctest
+
 _SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "run_python_stub_doctests.py"
 _SPEC = importlib.util.spec_from_file_location("run_python_stub_doctests", _SCRIPT_PATH)
 assert _SPEC is not None
