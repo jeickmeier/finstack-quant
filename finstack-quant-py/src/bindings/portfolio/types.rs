@@ -18,7 +18,7 @@ use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::extract_instrument_json;
+use crate::bindings::extract::{extract_instrument, InstrumentArg};
 use crate::bindings::module_utils::{py_to_json_value, py_to_serde};
 use crate::bindings::pandas_utils::{dict_to_dataframe, serde_to_py};
 use crate::errors::{core_to_py, display_to_py, portfolio_to_py, value_error};
@@ -292,6 +292,25 @@ fn unit_label(unit: &PositionUnit) -> PyResult<String> {
     })
 }
 
+/// Build a validated runtime instrument from a typed instrument wrapper or
+/// canonical envelope JSON (`dict` or `str`).
+///
+/// Envelope text keeps the plain serde decode and its error text; a typed
+/// instance is validated and boxed directly.
+pub(crate) fn extract_position_instrument(
+    instrument: &Bound<'_, PyAny>,
+) -> PyResult<Box<dyn finstack_quant_valuations::instruments::Instrument>> {
+    let payload = match extract_instrument(instrument)? {
+        InstrumentArg::Typed(payload) => *payload,
+        InstrumentArg::Envelope(json) => {
+            let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
+                serde_json::from_str(&json).map_err(display_to_py)?;
+            envelope.instrument
+        }
+    };
+    payload.into_boxed().map_err(core_to_py)
+}
+
 /// Parse a position unit from ``None`` (units), a serde name string
 /// (``"units"``, ``"face_value"``, ``"percentage"``, parsed by Rust
 /// ``PositionUnit::from_str``) or a JSON-shaped dict (``{"notional": "USD"}``
@@ -424,10 +443,7 @@ impl PyPortfolioBuilder {
         attributes: Option<&Bound<'py, PyDict>>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let py = slf.py();
-        let envelope_json = extract_instrument_json(instrument)?;
-        let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
-            serde_json::from_str(&envelope_json).map_err(display_to_py)?;
-        let boxed = envelope.into_boxed().map_err(crate::errors::core_to_py)?;
+        let boxed = extract_position_instrument(instrument)?;
         let instrument_id = boxed.id().to_owned();
         let unit = extract_position_unit(py, unit)?;
         let attributes: IndexMap<String, AttributeValue> = match attributes {

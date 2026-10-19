@@ -8,7 +8,7 @@ use crate::bindings::attribution::return_contribution::{
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::extract::{extract_instrument_json, extract_market_ref};
+use crate::bindings::extract::{extract_market_ref, InstrumentArg};
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::errors::{core_to_py, serde_json_to_py};
@@ -22,10 +22,14 @@ use pyo3::prelude::*;
 /// Parse a typed instrument wrapper or canonical envelope JSON into the
 /// instrument payload the attribution spec carries.
 fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentJson> {
-    let json = extract_instrument_json(obj)?;
-    let envelope: InstrumentEnvelope = serde_json::from_str(&json)
-        .map_err(|e| serde_json_to_py(e, "invalid attribution instrument envelope JSON"))?;
-    Ok(envelope.instrument)
+    match crate::bindings::extract::extract_instrument(obj)? {
+        InstrumentArg::Typed(instrument) => Ok(*instrument),
+        InstrumentArg::Envelope(json) => {
+            let envelope: InstrumentEnvelope = serde_json::from_str(&json)
+                .map_err(|e| serde_json_to_py(e, "invalid attribution instrument envelope JSON"))?;
+            Ok(envelope.instrument)
+        }
+    }
 }
 
 /// Shared optional inputs of [`attribute_pnl`] / [`attribute_pnl_many`].

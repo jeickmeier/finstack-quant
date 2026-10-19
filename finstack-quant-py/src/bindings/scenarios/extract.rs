@@ -10,7 +10,7 @@ use finstack_quant_valuations::instruments::Instrument;
 use pyo3::prelude::*;
 
 use crate::bindings::core::config::PyFinstackConfig;
-use crate::bindings::extract::extract_instrument_json;
+use crate::bindings::extract::extract_instrument;
 use crate::errors::{core_to_py, value_error};
 
 /// Extract a [`FinstackConfig`] from a `FinstackConfig` object, a JSON string,
@@ -45,8 +45,8 @@ pub(crate) fn extract_instruments(
     };
     objs.iter()
         .map(|obj| {
-            let json = extract_instrument_json(obj)?;
-            finstack_quant_valuations::pricer::json::parse_boxed_instrument_from_json(&json, None)
+            extract_instrument(obj)?
+                .into_parsed(None)
                 .map(|parsed| parsed.into_boxed())
                 .map_err(core_to_py)
         })
