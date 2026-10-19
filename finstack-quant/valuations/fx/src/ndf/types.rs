@@ -544,15 +544,6 @@ impl Ndf {
         Ok(())
     }
 
-    /// Get the effective fixing source as a string.
-    ///
-    /// Returns the enum display name if `fixing_source` is set.
-    pub fn effective_fixing_source(&self) -> Option<String> {
-        self.fixing_source
-            .as_ref()
-            .map(|fixing_enum| fixing_enum.to_string())
-    }
-
     /// Construct an NDF from trade date and tenor using standard fixing offset.
     ///
     /// # Arguments
@@ -787,12 +778,6 @@ impl Ndf {
         )))
     }
 
-    /// Set the quote convention.
-    pub fn with_quote_convention(mut self, convention: NdfQuoteConvention) -> Self {
-        self.quote_convention = convention;
-        self
-    }
-
     #[inline]
     fn validate_rate(name: &str, rate: f64) -> Result<()> {
         if !rate.is_finite() || rate <= Self::MIN_POSITIVE_RATE {
@@ -996,14 +981,6 @@ mod tests {
             .build()
             .expect("should build");
 
-        assert_eq!(ndf.quote_convention, NdfQuoteConvention::SettlementPerBase);
-    }
-
-    #[test]
-    fn test_ndf_with_quote_convention() {
-        let ndf = Ndf::example()
-            .expect("example")
-            .with_quote_convention(NdfQuoteConvention::SettlementPerBase);
         assert_eq!(ndf.quote_convention, NdfQuoteConvention::SettlementPerBase);
     }
 
@@ -1223,27 +1200,6 @@ mod tests {
             "Error should mention currency mismatch: {}",
             err_msg
         );
-    }
-
-    #[test]
-    fn test_ndf_effective_fixing_source() {
-        // With enum set
-        let ndf_enum = Ndf::builder()
-            .id(InstrumentId::new("USDCNY"))
-            .base_currency(Currency::CNY)
-            .settlement_currency(Currency::USD)
-            .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
-            .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-            .notional(Money::from((10_000_000_i64, Currency::CNY)))
-            .contract_rate(7.25)
-            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
-            .quote_convention(NdfQuoteConvention::BasePerSettlement)
-            .fixing_source_opt(Some(NdfFixingSource::Pboc))
-            .attributes(Attributes::new())
-            .build()
-            .expect("should build");
-
-        assert_eq!(ndf_enum.effective_fixing_source(), Some("pboc".to_string()));
     }
 
     #[test]
