@@ -20,40 +20,12 @@
 //! (`#andersen-piterbarg-xccy-mtm-reset`).
 
 use crate::xccy_swap::types::{initial_principal_sign, XccySwap};
-use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::ResettingSide;
-
-/// Build the shared accrual schedule for both legs of an MtM-resetting XCCY swap.
-///
-/// `XccySwap::validate` aligns the two leg schedules, so both call sites (PV and
-/// cashflow-schedule builders) compute the same periods. This helper centralises
-/// the field-by-field mapping from a leg into `BuildPeriodsParams` so the two
-/// paths can never drift (e.g. one forgetting to disable `adjust_accrual_dates`).
-fn build_xccy_mtm_periods(
-    swap: &XccySwap,
-    leg: &crate::xccy_swap::XccySwapLeg,
-) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
-    let cal_id = swap.resolve_leg_calendar_id(leg)?;
-    build_periods(BuildPeriodsParams {
-        start: leg.leg.start,
-        end: leg.leg.end,
-        frequency: leg.leg.frequency,
-        stub: leg.leg.stub,
-        business_day_convention: leg.leg.business_day_convention,
-        calendar_id: cal_id,
-        end_of_month: leg.leg.end_of_month,
-        day_count: leg.leg.day_count,
-        payment_lag_days: leg.leg.payment_lag_days,
-        reset_lag_days: leg.period_reset_lag(),
-        adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
-    })
-}
 
 fn require_positive_finite(value: f64, id: &str, label: &str) -> Result<()> {
     if !value.is_finite() || value <= 0.0 {
@@ -200,8 +172,10 @@ fn project_mtm_cashflows(
         ))?
         .rate;
 
-    let constant_periods = build_xccy_mtm_periods(swap, constant_leg)?;
-    let resetting_periods = build_xccy_mtm_periods(swap, resetting_leg)?;
+    let constant_periods =
+        swap.leg_build_periods(constant_leg, swap.resolve_leg_calendar_id(constant_leg)?)?;
+    let resetting_periods =
+        swap.leg_build_periods(resetting_leg, swap.resolve_leg_calendar_id(resetting_leg)?)?;
 
     let mut flows: Vec<CashFlow> =
         Vec::with_capacity(constant_periods.len() + resetting_periods.len() * 2 + 4);
@@ -223,7 +197,7 @@ fn project_mtm_cashflows(
         )?;
         n_c / historical_fx
     } else {
-        compute_resetting_notional_and_df_r(
+        compute_resetting_notional(
             n_c,
             spot_x_at_as_of,
             as_of,
@@ -232,7 +206,6 @@ fn project_mtm_cashflows(
             disc_r.as_ref(),
             &swap.id,
         )?
-        .0
     };
 
     // Initial principal exchanges.
@@ -301,7 +274,7 @@ fn project_mtm_cashflows(
             require_positive_finite(historical_fx, swap.id.as_str(), "historical FX reset")?;
             n_c / historical_fx
         } else {
-            compute_resetting_notional_and_df_r(
+            compute_resetting_notional(
                 n_c,
                 spot_x_at_as_of,
                 as_of,
@@ -310,7 +283,6 @@ fn project_mtm_cashflows(
                 disc_r.as_ref(),
                 &swap.id,
             )?
-            .0
         };
 
         if j > 0 {
@@ -423,9 +395,7 @@ pub(crate) fn mtm_cashflow_schedule(
 /// day the curves were calibrated — and would silently bias every intraday
 /// revaluation.
 ///
-/// Returns `(notional, p_r)` so the caller can reuse the resetting-leg DF at `date`
-/// for the rebalancing cashflow without a second curve lookup.
-fn compute_resetting_notional_and_df_r(
+fn compute_resetting_notional(
     n_constant: f64,
     spot_x_at_as_of: f64,
     as_of: Date,
@@ -433,7 +403,7 @@ fn compute_resetting_notional_and_df_r(
     disc_c: &finstack_quant_core::market_data::term_structures::DiscountCurve,
     disc_r: &finstack_quant_core::market_data::term_structures::DiscountCurve,
     swap_id: &finstack_quant_core::types::InstrumentId,
-) -> Result<(f64, f64)> {
+) -> Result<f64> {
     let p_c = disc_c.df_between_dates(as_of, date)?;
     let p_c = require_positive_df(p_c, swap_id, "constant-leg", date)?;
     let p_r = disc_r.df_between_dates(as_of, date)?;
@@ -444,7 +414,7 @@ fn compute_resetting_notional_and_df_r(
             "XccySwap '{swap_id}': non-positive forward FX at date {date}"
         )));
     }
-    Ok((n_constant / x_t, p_r))
+    Ok(n_constant / x_t)
 }
 
 /// Guard that a discount factor is finite and strictly positive; returns the value on success.
@@ -536,10 +506,8 @@ mod tests {
         let p_r = disc_r.df_on_date(date).expect("p_r");
         let expected = n_c / (spot * p_r / p_c);
 
-        let actual =
-            compute_resetting_notional_and_df_r(n_c, spot, base, date, &disc_c, &disc_r, &swap_id)
-                .expect("formula ok")
-                .0;
+        let actual = compute_resetting_notional(n_c, spot, base, date, &disc_c, &disc_r, &swap_id)
+            .expect("formula ok");
         assert!(
             (actual - expected).abs() < 1e-6,
             "got {actual}, expected {expected}"
@@ -602,10 +570,8 @@ mod tests {
         );
         let expected = n_c / forward;
 
-        let actual =
-            compute_resetting_notional_and_df_r(n_c, spot, base, date, &disc_c, &disc_r, &swap_id)
-                .expect("formula ok")
-                .0;
+        let actual = compute_resetting_notional(n_c, spot, base, date, &disc_c, &disc_r, &swap_id)
+            .expect("formula ok");
         assert!(
             (actual - expected).abs() < 1e-6,
             "got {actual}, expected hand-computed {expected}"

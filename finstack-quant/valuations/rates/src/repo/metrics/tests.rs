@@ -58,7 +58,7 @@ fn test_collateral_value_calculator() {
         MetricContext::default_config(),
     );
 
-    let calculator = collateral_value::CollateralValueCalculator;
+    let calculator = CollateralValueCalculator;
     let value = calculator.calculate(&mut context).expect("should succeed");
     assert!((value - 1020.0).abs() < 1e-6);
 }
@@ -75,7 +75,7 @@ fn test_required_collateral_calculator() {
         MetricContext::default_config(),
     );
 
-    let calculator = required_collateral::RequiredCollateralCalculator;
+    let calculator = RequiredCollateralCalculator;
     let value = calculator.calculate(&mut context).expect("should succeed");
     assert!((value - 1_020_408.16).abs() < 1.0);
 }
@@ -92,7 +92,7 @@ fn test_effective_rate_calculator() {
         MetricContext::default_config(),
     );
 
-    let calculator = effective_rate::EffectiveRateCalculator;
+    let calculator = EffectiveRateCalculator;
     let rate = calculator.calculate(&mut context).expect("should succeed");
     assert!((rate - 0.05).abs() < 1e-9);
 }
