@@ -172,19 +172,17 @@ mod tests {
     use std::sync::Arc;
     use time::macros::date;
 
-    /// Issue B regression: when every `price_from_dm` call fails (e.g. missing forward
-    /// curve), the DM solver must surface an error rather than silently returning a
-    /// near-zero DM.
+    /// Issue B regression: when pricing fails (e.g. missing forward curve), the DM
+    /// solver must surface an error rather than silently returning a near-zero DM.
     ///
     /// With the pre-fix residual `1e12 * sign(dm)`, Brent found a fake sign-changing
-    /// bracket straddling `dm = 0` and "converged" to a meaningless DM ≈ 0. The flat
-    /// `+1e12` residual introduced by the fix gives Brent no sign-changing bracket, so
-    /// `solver.solve(...)` returns `Err` and the captured pricing error is surfaced.
+    /// bracket straddling `dm = 0` and "converged" to a meaningless DM ≈ 0. The
+    /// objective now returns a flat `+1e12` residual on a pricing error, and a
+    /// missing curve fails the one-time kernel build before the solver runs.
     ///
     /// This test drives the real `DiscountMarginCalculator::calculate` path: a valid FRN
     /// is constructed with only the discount curve present; the forward/projection curve
-    /// is intentionally omitted so every internal `price_from_dm` call returns a
-    /// missing-curve error.
+    /// is intentionally omitted so pricing returns a missing-curve error.
     #[test]
     fn dm_failure_residual_must_not_change_sign_across_zero() {
         let as_of = date!(2025 - 01 - 01);
