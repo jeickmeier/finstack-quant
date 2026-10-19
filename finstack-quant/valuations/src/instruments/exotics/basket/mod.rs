@@ -135,4 +135,4 @@ pub use types::{
     Basket, BasketAssetType, BasketConstituent, BasketPricingConfig, ConstituentReference,
 };
 
-// Generic pricer implementation is used directly via common_impl::GenericInstrumentPricer
+// Generic pricer implementation is used directly via instruments::pricing::GenericInstrumentPricer

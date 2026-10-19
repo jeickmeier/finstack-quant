@@ -137,14 +137,16 @@ fn build_swap_internal(
     // without one is rejected rather than silently rolled on US holidays.
     let currency = notional.currency();
     let calendar_id =
-        finstack_quant_valuations::instruments::pricing::default_rate_calendar_id(currency)
-            .ok_or_else(|| {
-                crate::error::Error::build(format!(
-                    "swap '{id_str}': no standard rates calendar is defined for {currency}; \
+        finstack_quant_valuations::instruments::pricing::overnight::default_rate_calendar_id(
+            currency,
+        )
+        .ok_or_else(|| {
+            crate::error::Error::build(format!(
+                "swap '{id_str}': no standard rates calendar is defined for {currency}; \
                      add the swap with `add_debt` and explicit leg calendars"
-                ))
-            })?
-            .to_string();
+            ))
+        })?
+        .to_string();
 
     let discount_curve_id = CurveId::new(discount_curve_id);
     let forward_curve_id = CurveId::new(forward_curve_id);

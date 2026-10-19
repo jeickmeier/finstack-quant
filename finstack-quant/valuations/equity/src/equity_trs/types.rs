@@ -523,7 +523,7 @@ impl EquityTotalReturnSwap {
 
     /// Calculates the present value of the financing leg.
     ///
-    /// Delegates to [`TrsEngine::pv_financing_leg`](finstack_quant_valuations_core::instruments::common_impl::pricing::TrsEngine)
+    /// Delegates to [`TrsEngine::pv_financing_leg`](finstack_quant_valuations_core::instruments::pricing::TrsEngine)
     /// — the same engine the par-spread and annuity metrics use — so
     /// `financing.compounding` (term-rate vs SOFR-style overnight-compounded)
     /// is honored and the reported par spread reprices `base_value` to ~0.
@@ -539,7 +539,7 @@ impl EquityTotalReturnSwap {
     /// Present value of the financing leg in the instrument's currency.
     pub fn pv_financing_leg(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         self.validate()?;
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::TrsEngine;
+        use finstack_quant_valuations_core::instruments::pricing::TrsEngine;
         TrsEngine::pv_financing_leg(
             &self.financing_leg,
             &self.schedule,
@@ -559,7 +559,7 @@ impl EquityTotalReturnSwap {
     /// Financing annuity (sum of discounted year fractions × notional).
     pub fn financing_annuity(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         self.validate()?;
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::TrsEngine;
+        use finstack_quant_valuations_core::instruments::pricing::TrsEngine;
         TrsEngine::financing_annuity(
             &self.financing_leg,
             &self.schedule,

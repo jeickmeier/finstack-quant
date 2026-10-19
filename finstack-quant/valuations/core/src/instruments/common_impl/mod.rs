@@ -35,11 +35,3 @@ pub mod vol_resolution;
 
 // Common parameter types shared across instruments (public at `instruments::*`)
 pub(crate) mod parameters;
-
-// Common pricing patterns and infrastructure
-pub mod pricing;
-
-// Enriched per-flow cashflow export with DF/SP/PV columns.
-
-#[doc(hidden)]
-pub use pricing::GenericInstrumentPricer;

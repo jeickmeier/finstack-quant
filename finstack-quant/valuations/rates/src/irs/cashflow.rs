@@ -113,7 +113,7 @@ fn resolve_compounded_fixing_calendar(
         .fixing_calendar_id
         .as_deref()
         .or(float.calendar_id.as_deref());
-    finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
+    finstack_quant_valuations_core::instruments::pricing::overnight::resolve_overnight_fixing_calendar(
         calendar_id,
         irs.notional.currency(),
         &format!("compounded RFR swap '{}'", irs.id),
@@ -161,12 +161,12 @@ pub(crate) fn projected_compounded_float_leg_schedule(
     let cal = resolve_compounded_fixing_calendar(irs)?;
     let projection_curve = match proj {
         Some(forward) => {
-            finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::OvernightProjectionCurve::Forward(
+            finstack_quant_valuations_core::instruments::pricing::overnight::OvernightProjectionCurve::Forward(
                 forward,
             )
         }
         None => {
-            finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::OvernightProjectionCurve::Discount(
+            finstack_quant_valuations_core::instruments::pricing::overnight::OvernightProjectionCurve::Discount(
                 disc,
             )
         }
@@ -186,7 +186,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         // and the observation-shift back-roll can collapse two adjacent steps onto the
         // same date (see `seek_business_day` semantics from a non-business day).
         let (accrual_start, accrual_end) =
-            finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::adjust_overnight_accrual_boundaries(
+            finstack_quant_valuations_core::instruments::pricing::overnight::adjust_overnight_accrual_boundaries(
                 period.accrual_start,
                 period.accrual_end,
                 float.business_day_convention,
@@ -196,8 +196,8 @@ pub(crate) fn projected_compounded_float_leg_schedule(
             continue;
         }
         let projection =
-            finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::project_overnight_coupon(
-                finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::OvernightCouponProjectionInput {
+            finstack_quant_valuations_core::instruments::pricing::overnight::project_overnight_coupon(
+                finstack_quant_valuations_core::instruments::pricing::overnight::OvernightCouponProjectionInput {
                     curve: projection_curve,
                     fixings,
                     fixing_id: float.forward_curve_id.as_str(),
@@ -225,7 +225,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
 
         let spread_bp = float.spread_bp.as_f64();
         let coupon_amount =
-            finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::overnight_coupon_amount(
+            finstack_quant_valuations_core::instruments::pricing::overnight::overnight_coupon_amount(
                 irs.notional.amount(),
                 &projection,
                 spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT,
@@ -413,7 +413,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
                 index_tenor: None,
                 reset_lag_days: float.reset_lag_days,
                 fixing_calendar_id: float.fixing_calendar_id.clone(),
-                compounding: finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::builder_overnight_method(
+                compounding: finstack_quant_valuations_core::instruments::pricing::overnight_conventions::builder_overnight_method(
                     float.compounding,
                 ),
                 overnight_basis: None,

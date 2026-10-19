@@ -252,11 +252,11 @@ impl BasisSwap {
         Self::validate_leg_lags(self.id.as_str(), "reference", &self.reference_leg)?;
         self.resolve_leg_calendar("primary", &self.primary_leg)?;
         self.resolve_leg_calendar("reference", &self.reference_leg)?;
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
+        finstack_quant_valuations_core::instruments::pricing::overnight_conventions::reject_simple_overnight(
             self.primary_leg.forward_curve_id.as_str(),
             &self.primary_leg.compounding,
         )?;
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
+        finstack_quant_valuations_core::instruments::pricing::overnight_conventions::reject_simple_overnight(
             self.reference_leg.forward_curve_id.as_str(),
             &self.reference_leg.compounding,
         )?;
@@ -546,7 +546,7 @@ impl BasisSwap {
         );
         let overnight_calendar = if overnight {
             Some(
-                finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
+                finstack_quant_valuations_core::instruments::pricing::overnight::resolve_overnight_fixing_calendar(
                     Some(leg.fixing_calendar_id.as_deref().unwrap_or(self.resolve_leg_calendar("cashflow", leg)?)),
                     self.notional.currency(),
                     "BasisSwap",
@@ -576,41 +576,40 @@ impl BasisSwap {
                 continue;
             }
             let df = disc.as_ref().df_between_dates(as_of, period.payment_date)?;
-            let year_fraction = if let (Some(calendar), Some(fwd)) =
-                (overnight_calendar, overnight_fwd.as_ref())
-            {
-                use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+            let year_fraction =
+                if let (Some(calendar), Some(fwd)) = (overnight_calendar, overnight_fwd.as_ref()) {
+                    use finstack_quant_valuations_core::instruments::pricing::overnight::{
                         adjust_overnight_accrual_boundaries, project_overnight_coupon,
                         OvernightCouponProjectionInput, OvernightProjectionCurve,
                     };
-                let (accrual_start, accrual_end) = adjust_overnight_accrual_boundaries(
-                    period.accrual_start,
-                    period.accrual_end,
-                    leg.business_day_convention,
-                    calendar,
-                )?;
-                if accrual_end <= accrual_start {
-                    continue;
-                }
-                project_overnight_coupon(OvernightCouponProjectionInput {
-                    curve: OvernightProjectionCurve::Forward(fwd.as_ref()),
-                    fixings: overnight_fixings,
-                    fixing_id: leg.forward_curve_id.as_str(),
-                    as_of,
-                    accrual_start,
-                    accrual_end,
-                    day_count: leg.day_count,
-                    coupon_frequency: Some(leg.frequency),
-                    coupon_period: (accrual_start, accrual_end),
-                    compounding: &leg.compounding,
-                    fixing_calendar: calendar,
-                    compounded_spread: 0.0,
-                    need_observation_exposures: false,
-                })?
-                .accrual_year_fraction
-            } else {
-                period.accrual_year_fraction
-            };
+                    let (accrual_start, accrual_end) = adjust_overnight_accrual_boundaries(
+                        period.accrual_start,
+                        period.accrual_end,
+                        leg.business_day_convention,
+                        calendar,
+                    )?;
+                    if accrual_end <= accrual_start {
+                        continue;
+                    }
+                    project_overnight_coupon(OvernightCouponProjectionInput {
+                        curve: OvernightProjectionCurve::Forward(fwd.as_ref()),
+                        fixings: overnight_fixings,
+                        fixing_id: leg.forward_curve_id.as_str(),
+                        as_of,
+                        accrual_start,
+                        accrual_end,
+                        day_count: leg.day_count,
+                        coupon_frequency: Some(leg.frequency),
+                        coupon_period: (accrual_start, accrual_end),
+                        compounding: &leg.compounding,
+                        fixing_calendar: calendar,
+                        compounded_spread: 0.0,
+                        need_observation_exposures: false,
+                    })?
+                    .accrual_year_fraction
+                } else {
+                    period.accrual_year_fraction
+                };
             annuity += year_fraction * df;
         }
 
@@ -684,14 +683,14 @@ impl BasisSwap {
         as_of: Date,
     ) -> Result<CashFlowSchedule> {
         use finstack_quant_core::cashflow::{CFKind, CashFlow};
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+        use finstack_quant_valuations_core::instruments::pricing::overnight::{
             adjust_overnight_accrual_boundaries, project_overnight_coupon,
             OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
 
         let calendar_id = self.resolve_leg_calendar("cashflow", leg)?;
         let calendar =
-            finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
+            finstack_quant_valuations_core::instruments::pricing::overnight::resolve_overnight_fixing_calendar(
                 Some(leg.fixing_calendar_id.as_deref().unwrap_or(calendar_id)),
                 self.notional.currency(),
                 "BasisSwap",
@@ -757,7 +756,7 @@ impl BasisSwap {
                 }
             }));
             let coupon_amount =
-                finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::overnight_coupon_amount(
+                finstack_quant_valuations_core::instruments::pricing::overnight::overnight_coupon_amount(
                     self.notional.amount(),
                     &projection,
                     spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT,
@@ -1605,7 +1604,7 @@ mod tests {
     fn overnight_rfr_leg_matches_shared_compounding_engine() {
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::dates::calendar_by_id_strict;
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+        use finstack_quant_valuations_core::instruments::pricing::overnight::{
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
 
@@ -1689,7 +1688,7 @@ mod tests {
         .expect("periods");
         let first_period = periods.first().expect("first period");
         let (accrual_start, accrual_end) =
-            finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::adjust_overnight_accrual_boundaries(
+            finstack_quant_valuations_core::instruments::pricing::overnight::adjust_overnight_accrual_boundaries(
                 first_period.accrual_start,
                 first_period.accrual_end,
                 BusinessDayConvention::ModifiedFollowing,
@@ -1724,7 +1723,7 @@ mod tests {
     fn overnight_rfr_honors_distinct_fixing_calendar() {
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::dates::calendar_by_id_strict;
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+        use finstack_quant_valuations_core::instruments::pricing::overnight::{
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
 
@@ -1808,7 +1807,7 @@ mod tests {
         .expect("periods");
         let first_period = periods.first().expect("first period");
         let (accrual_start, accrual_end) =
-            finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::adjust_overnight_accrual_boundaries(
+            finstack_quant_valuations_core::instruments::pricing::overnight::adjust_overnight_accrual_boundaries(
                 first_period.accrual_start,
                 first_period.accrual_end,
                 BusinessDayConvention::ModifiedFollowing,
@@ -1926,16 +1925,16 @@ mod tests {
                 .expect("df");
             schedule_yf += period.accrual_year_fraction * df;
             let (accrual_start, accrual_end) =
-                finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::adjust_overnight_accrual_boundaries(
+                finstack_quant_valuations_core::instruments::pricing::overnight::adjust_overnight_accrual_boundaries(
                     period.accrual_start,
                     period.accrual_end,
                     BusinessDayConvention::ModifiedFollowing,
                     calendar,
                 )
                 .expect("adjust");
-            let projection = finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::project_overnight_coupon(
-                finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::OvernightCouponProjectionInput {
-                    curve: finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::OvernightProjectionCurve::Forward(
+            let projection = finstack_quant_valuations_core::instruments::pricing::overnight::project_overnight_coupon(
+                finstack_quant_valuations_core::instruments::pricing::overnight::OvernightCouponProjectionInput {
+                    curve: finstack_quant_valuations_core::instruments::pricing::overnight::OvernightProjectionCurve::Forward(
                         fwd.as_ref(),
                     ),
                     fixings: None,

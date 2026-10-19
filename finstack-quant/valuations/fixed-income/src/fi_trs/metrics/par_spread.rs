@@ -2,8 +2,8 @@
 
 use crate::fi_trs::FiIndexTotalReturnSwap;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::instruments::common_impl::pricing::swap_legs::ANNUITY_EPSILON;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::TrsEngine;
+use finstack_quant_valuations_core::instruments::pricing::swap_legs::ANNUITY_EPSILON;
+use finstack_quant_valuations_core::instruments::pricing::TrsEngine;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 
 /// Calculates the par spread for a fixed income index TRS under the carry-only return model.

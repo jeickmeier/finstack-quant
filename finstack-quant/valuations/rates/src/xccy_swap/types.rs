@@ -316,11 +316,11 @@ impl XccySwap {
 
         // MtM notional exchanges require aligned contractual start/end dates;
         // coupon schedules remain leg-specific.
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
+        finstack_quant_valuations_core::instruments::pricing::overnight_conventions::reject_simple_overnight(
             self.leg1.leg.forward_curve_id.as_str(),
             &self.leg1.leg.compounding,
         )?;
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
+        finstack_quant_valuations_core::instruments::pricing::overnight_conventions::reject_simple_overnight(
             self.leg2.leg.forward_curve_id.as_str(),
             &self.leg2.leg.compounding,
         )?;
@@ -542,7 +542,7 @@ impl XccySwap {
         projected_fixings: Option<&mut Vec<finstack_quant_cashflows::fixings::ProjectedFixing>>,
     ) -> Result<ProjectedXccyPeriod> {
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+        use finstack_quant_valuations_core::instruments::pricing::overnight::{
             adjust_overnight_accrual_boundaries, project_overnight_coupon,
             OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
@@ -1593,7 +1593,7 @@ mod tests {
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::dates::calendar_by_id_strict;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+        use finstack_quant_valuations_core::instruments::pricing::overnight::{
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
 

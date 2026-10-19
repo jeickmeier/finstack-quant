@@ -806,14 +806,15 @@ fn test_par_spread_annuity_relationship() {
     let annuity = *result.measures.get("financing_annuity").unwrap();
 
     let tr_pv = trs.pv_total_return_leg(&market, as_of).unwrap();
-    let float_pv = finstack_quant_valuations::instruments::TrsEngine::pv_financing_float_only(
-        &trs.financing_leg,
-        &trs.schedule,
-        trs.notional,
-        &market,
-        as_of,
-    )
-    .unwrap();
+    let float_pv =
+        finstack_quant_valuations::instruments::pricing::TrsEngine::pv_financing_float_only(
+            &trs.financing_leg,
+            &trs.schedule,
+            trs.notional,
+            &market,
+            as_of,
+        )
+        .unwrap();
 
     let expected_par = (tr_pv.amount() - float_pv) / annuity * 10000.0;
     approx_eq(

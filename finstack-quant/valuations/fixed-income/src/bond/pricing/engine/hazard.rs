@@ -41,7 +41,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::{
+use finstack_quant_valuations_core::instruments::pricing::rates_credit::{
     build_daily_bond_rates_credit_targets, continuous_frp_weight,
 };
 

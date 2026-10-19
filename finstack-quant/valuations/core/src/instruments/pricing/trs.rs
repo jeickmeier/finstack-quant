@@ -23,7 +23,7 @@
 //!   period ([`ForwardCurve::rate_between_dates`]), correct for a term-rate-financed TRS
 //!   (e.g. 3M Term SOFR) where the period length matches the index tenor.
 //! - `compounded_*` — **daily-compounds** the overnight forward via
-//!   [`crate::instruments::common_impl::pricing::overnight::project_overnight_coupon`]
+//!   [`crate::instruments::pricing::overnight::project_overnight_coupon`]
 //!   with the leg's lookback / observation shift / rate cut-off
 //!   (`compounded_in_arrears` with zero lookback is cleared-OIS style).
 //! - `simple_average` — rejected.
@@ -44,7 +44,7 @@ use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use rust_decimal::prelude::ToPrimitive;
 
-use crate::instruments::common_impl::pricing::overnight::{
+use crate::instruments::pricing::overnight::{
     adjust_overnight_accrual_boundaries, project_overnight_coupon, OvernightCouponProjectionInput,
     OvernightProjectionCurve,
 };
@@ -365,6 +365,30 @@ impl TrsEngine {
         Money::new(pv.total(), currency)
     }
 
+    /// Projects the undiscounted total-return leg cashflows, one per period.
+    ///
+    /// Each period pays `notional × period return` on its payment date, where
+    /// the return comes from `model`. Periods whose payment date is on or
+    /// before `as_of` are omitted; a completed accrual stays in the list until
+    /// its (possibly lagged) payment date.
+    ///
+    /// # Arguments
+    /// * `params` — Total return leg parameters: schedule, notional (sign and
+    ///   currency of every flow), discount curve id and initial index level
+    ///   (defaults to `1.0` when absent)
+    /// * `market` — Market context the return model reads (spot, curves,
+    ///   fixings)
+    /// * `as_of` — Valuation date; flows paying on or before it are excluded
+    /// * `model` — Underlying-specific period return model
+    ///
+    /// # Returns
+    /// `(payment_date, amount)` pairs in schedule order, in the notional's
+    /// currency.
+    ///
+    /// # Errors
+    /// Returns an error when the schedule cannot be built, a payment date
+    /// cannot be resolved, the model fails, or the model returns a non-finite
+    /// period return.
     pub fn cashflows_total_return_leg_with_model(
         params: TotalReturnLegParams,
         market: &MarketContext,
@@ -451,6 +475,30 @@ impl TrsEngine {
         Money::new(pv.total(), currency)
     }
 
+    /// Projects the undiscounted financing leg cashflows, one per period.
+    ///
+    /// Each period pays `notional × (projected rate + spread) × accrual`, with
+    /// the rate projected per the leg's compounding convention (simple term
+    /// rate or daily-compounded overnight, splicing realized fixings from the
+    /// `FIXING:{forward_curve_id}` series for in-progress periods). Amounts are
+    /// unsigned; callers apply the swap side.
+    ///
+    /// # Arguments
+    /// * `financing` — Financing leg specification: forward and discount curve
+    ///   ids, spread in basis points, day count and compounding convention
+    /// * `schedule` — Payment schedule specification (dates, frequency,
+    ///   calendar, payment lag)
+    /// * `notional` — Notional amount; its currency is the currency of every flow
+    /// * `market` — Market context holding the forward curve and fixings
+    /// * `as_of` — Valuation date; flows paying on or before it are excluded
+    ///
+    /// # Returns
+    /// `(payment_date, amount)` pairs in schedule order.
+    ///
+    /// # Errors
+    /// Returns an error when the forward curve is missing, the spread is not
+    /// representable as `f64`, the schedule or a payment date cannot be built,
+    /// or a required fixing for an in-progress period is missing.
     pub fn cashflows_financing_leg(
         financing: &FinancingLegSpec,
         schedule: &TrsScheduleSpec,
@@ -592,7 +640,7 @@ impl TrsEngine {
     ///
     /// Returns an error if a required curve is missing, overnight projection
     /// fails, or the computed annuity is below
-    /// [`crate::instruments::common_impl::pricing::swap_legs::ANNUITY_EPSILON`] (1e-12),
+    /// [`crate::instruments::pricing::swap_legs::ANNUITY_EPSILON`] (1e-12),
     /// which would cause divide-by-zero in downstream par spread calculations.
     /// This typically occurs when:
     /// - All periods have already expired (payment dates before as_of)
@@ -749,7 +797,7 @@ mod tests {
     };
     use crate::instruments::common_impl::parameters::legs::FinancingLegSpec;
     use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
-    use crate::instruments::common_impl::pricing::swap_legs;
+    use crate::instruments::pricing::swap_legs;
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_cashflows::builder::ScheduleParams;
     use finstack_quant_core::currency::Currency;
@@ -1476,7 +1524,7 @@ mod tests {
 
     #[test]
     fn overnight_compounded_matches_shared_overnight_engine() {
-        use crate::instruments::common_impl::pricing::overnight::{
+        use crate::instruments::pricing::overnight::{
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
         use finstack_quant_cashflows::builder::FloatingLegCompounding;

@@ -149,7 +149,7 @@ impl ConvertibleBondValuator {
             };
             let tail_recovery = if cf.kind.is_principal_like() && cf.date > bond.maturity {
                 bond.recovery_rate.unwrap_or(0.0)
-                    * finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::continuous_frp_weight(
+                    * finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight(
                         rf_curve.df_between_dates(bond.maturity, cf.date)?,
                         survival_between(bond.maturity, cf.date)?,
                     )?
@@ -349,7 +349,7 @@ impl ConvertibleBondValuator {
                     .map_or(bond.notional.amount(), |(_, balance)| balance.amount())
                     .max(0.0);
                 let weight =
-                    finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::continuous_frp_weight(
+                    finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight(
                         rf_curve.df_between_dates(left, right)?,
                         survival_between(left, right)?,
                     )?;

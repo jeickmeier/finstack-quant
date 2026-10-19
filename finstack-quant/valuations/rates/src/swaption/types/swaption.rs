@@ -165,7 +165,7 @@ pub(super) fn vanilla_underlier(
         end_of_month: false,
     };
     let compounding =
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::compounding_from_index_id(
+        finstack_quant_valuations_core::instruments::pricing::overnight_conventions::compounding_from_index_id(
             underlier.forward_curve_id.as_str(),
         )
         .ok()

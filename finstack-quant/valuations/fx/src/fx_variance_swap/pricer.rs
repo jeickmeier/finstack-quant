@@ -42,13 +42,13 @@ pub(crate) fn compute_pv(
 }
 
 pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Result<Vec<Date>> {
-    finstack_quant_valuations_core::instruments::common_impl::pricing::variance_observations::variance_observation_dates(
+    finstack_quant_valuations_core::instruments::pricing::variance_observations::variance_observation_dates(
         inst.start_date,
         inst.maturity,
         inst.observation_frequency,
         inst.observation_business_day_convention,
         inst.observation_end_of_month,
-        finstack_quant_valuations_core::instruments::common_impl::pricing::variance_observations::VarianceCalendar::Joint {
+        finstack_quant_valuations_core::instruments::pricing::variance_observations::VarianceCalendar::Joint {
             base: &inst.base_calendar_id,
             quote: &inst.quote_calendar_id,
         },
@@ -56,7 +56,7 @@ pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Result<Vec<Date>> {
 }
 
 pub(crate) fn annualization_factor(inst: &FxVarianceSwap) -> f64 {
-    finstack_quant_valuations_core::instruments::common_impl::pricing::variance_observations::annualization_factor(
+    finstack_quant_valuations_core::instruments::pricing::variance_observations::annualization_factor(
         inst.observation_frequency,
         inst.trading_days_per_year,
     )

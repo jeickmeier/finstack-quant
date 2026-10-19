@@ -928,7 +928,7 @@ mod tests {
         let market = Market::new();
         let mut registry = PricerRegistry::new();
         registry
-            .register(crate::instruments::common_impl::GenericInstrumentPricer::<
+            .register(crate::instruments::pricing::GenericInstrumentPricer::<
                 RawLifecycleInstrument,
             >::discounting(InstrumentType::Bond))
             .expect("unique test pricer registration");

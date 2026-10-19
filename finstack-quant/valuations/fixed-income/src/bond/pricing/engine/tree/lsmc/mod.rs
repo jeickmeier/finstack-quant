@@ -37,8 +37,8 @@ use finstack_quant_models::trees::two_factor_rates_credit::{
     RatesCreditPathCheckpoint, RatesCreditPathState, RatesCreditTree,
 };
 use finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::floating_reset_descriptors::params_from_spec;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::continuous_frp_weight;
+use finstack_quant_valuations_core::instruments::pricing::floating_reset_descriptors::params_from_spec;
+use finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight;
 use rust_decimal::prelude::ToPrimitive;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, BTreeSet};

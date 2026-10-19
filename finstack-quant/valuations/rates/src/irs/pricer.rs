@@ -12,7 +12,7 @@
 //! # Shared Infrastructure
 //!
 //! This module delegates to the shared swap leg pricing infrastructure in
-//! [`finstack_quant_valuations_core::instruments::common_impl::pricing::swap_legs`] for the core pricing logic.
+//! [`finstack_quant_valuations_core::instruments::pricing::swap_legs`] for the core pricing logic.
 //! The shared module provides Bloomberg-validated discount factor calculations
 //! and Kahan summation.
 //!
@@ -339,7 +339,7 @@ pub(crate) fn compute_float_leg_pv(
 mod tests {
     use super::*;
     use crate::irs::cashflow::full_signed_schedule_with_curves;
-    use finstack_quant_valuations_core::instruments::common_impl::pricing::swap_legs::add_payment_delay;
+    use finstack_quant_valuations_core::instruments::pricing::swap_legs::add_payment_delay;
     use finstack_quant_valuations_core::instruments::Instrument;
 
     use finstack_quant_core::currency::Currency;
