@@ -397,15 +397,19 @@ impl CdsIndexPricer {
         })
     }
 
-    /// CS01 (approximate) aggregated by pricing mode.
+    /// CS01 (approximate) aggregated by pricing mode, central difference
+    /// over a parallel `bump_bp` par-spread shock (basis points).
     pub(crate) fn cs01(
         &self,
         index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
         provider: &dyn RecalibrationProvider,
+        bump_bp: f64,
     ) -> Result<f64> {
-        Ok(self.cs01_detailed(index, curves, as_of, provider)?.total)
+        Ok(self
+            .cs01_detailed(index, curves, as_of, provider, bump_bp)?
+            .total)
     }
 
     /// CS01 (approximate) with optional per-constituent breakdown.
@@ -415,9 +419,10 @@ impl CdsIndexPricer {
         curves: &MarketContext,
         as_of: Date,
         provider: &dyn RecalibrationProvider,
+        bump_bp: f64,
     ) -> Result<IndexResult<f64>> {
         self.aggregate_f64_detailed(index, curves, as_of, |_, cds, _, _, _| {
-            self.compute_cds_cs01(cds, curves, as_of, provider)
+            self.compute_cds_cs01(cds, curves, as_of, provider, bump_bp)
         })
     }
 
@@ -427,10 +432,10 @@ impl CdsIndexPricer {
         curves: &MarketContext,
         as_of: Date,
         provider: &dyn RecalibrationProvider,
+        bump_bp: f64,
     ) -> Result<f64> {
         let credit_id = &cds.protection_leg.credit_curve_id;
         let discount_id = &cds.premium_leg.discount_curve_id;
-        let bump_bp = 1.0_f64;
 
         let pricer = CdsPricer::with_config(self.cds_config.clone());
         let hazard = curves.get_hazard(credit_id)?;
