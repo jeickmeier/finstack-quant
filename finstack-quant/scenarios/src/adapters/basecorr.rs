@@ -1,6 +1,7 @@
 //! Base correlation shock adapter.
 //!
-//! Contains helpers for both parallel and bucketed base correlation shocks.
+//! One generator serves both parallel and bucketed base correlation shocks:
+//! a parallel shock is a bucket shock over every detachment point.
 //!
 //! # Clamping Behavior
 //!
@@ -71,28 +72,12 @@ fn bump_warnings(
     warnings
 }
 
-/// Generate effects for a parallel base-correlation shock.
-pub(crate) fn base_corr_parallel_effects(
-    surface_id: &CurveId,
-    points: f64,
-    ctx: &ExecutionContext,
-) -> Vec<ScenarioEffect> {
-    let bump = MarketBump::BaseCorrBucketPts {
-        surface_id: surface_id.clone(),
-        detachments: None,
-        points,
-    };
-    let mut effects = vec![ScenarioEffect::MarketBump(bump)];
-    effects.extend(
-        bump_warnings(ctx, surface_id, None, points)
-            .into_iter()
-            .map(ScenarioEffect::Warning),
-    );
-    effects
-}
-
-/// Generate effects for a bucketed base-correlation shock.
-pub(crate) fn base_corr_bucket_effects(
+/// Generate effects for a base-correlation shock.
+///
+/// `detachment_bp` restricts the shock to those detachment points (basis
+/// points, `300` = 3%); `None` shocks every bucket, which is the parallel
+/// shock.
+pub(crate) fn base_corr_effects(
     surface_id: &CurveId,
     detachment_bp: Option<&[i32]>,
     points: f64,
