@@ -19,7 +19,7 @@ use finstack_quant_cashflows::builder::{
     FloatingCouponReplayState, FloatingRateObservation, OvernightObservationSchedule,
     OvernightRateConstraints,
 };
-use finstack_quant_cashflows::builder::{CouponType, FloatingCouponSpec, FloatingRateFallback};
+use finstack_quant_cashflows::builder::{CouponType, FloatingCouponSpec};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{adjust, Date, DateExt, DayCount, DayCountContext, Duration};
@@ -37,7 +37,6 @@ use finstack_quant_models::trees::two_factor_rates_credit::{
     RatesCreditPathCheckpoint, RatesCreditPathState, RatesCreditTree,
 };
 use finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::floating_reset_descriptors::params_from_spec;
 use finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::continuous_frp_weight;
 use rust_decimal::prelude::ToPrimitive;
 use smallvec::SmallVec;
@@ -391,7 +390,7 @@ fn build_training_checkpoints(
                     })?;
                     checkpoints[boundary_index].push(TrainingCheckpoint {
                         factor: RatesCreditPathCheckpoint::from(factor),
-                        product: cursor.checkpoint(template),
+                        product: cursor.checkpoint(),
                     });
                     boundary_index += 1;
                 }

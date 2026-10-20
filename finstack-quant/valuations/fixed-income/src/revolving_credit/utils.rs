@@ -424,12 +424,11 @@ pub(super) fn project_revolver_floating_rate(
     }
     let index_rate = if daily_constraints {
         let bound = |rate: f64| {
-            let floored = params
-                .index_floor_bp
-                .map_or(rate, |floor| rate.max(floor * 1e-4));
-            params
-                .index_cap_bp
-                .map_or(floored, |cap| floored.min(cap * 1e-4))
+            finstack_quant_cashflows::builder::apply_bp_bounds(
+                rate,
+                params.index_floor_bp,
+                params.index_cap_bp,
+            )
         };
         let factor = projection
             .observation_exposures

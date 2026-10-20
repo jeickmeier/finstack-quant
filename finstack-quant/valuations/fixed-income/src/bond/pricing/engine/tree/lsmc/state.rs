@@ -176,7 +176,7 @@ impl OvernightRateSource {
 
 #[derive(Clone)]
 pub(super) struct OvernightCoupon {
-    pub(super) sources: BTreeMap<(Date, u32), OvernightRateSource>,
+    pub(super) sources: BTreeMap<Date, OvernightRateSource>,
     pub(super) max_history_steps: usize,
 }
 

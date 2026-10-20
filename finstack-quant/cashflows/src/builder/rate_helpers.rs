@@ -26,7 +26,6 @@
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::Result;
-use rust_decimal::prelude::ToPrimitive;
 
 /// Parameters for floating rate projection.
 #[derive(Debug, Clone)]
@@ -70,23 +69,6 @@ impl Default for FloatingRateParams {
 }
 
 impl FloatingRateParams {
-    /// Create params with just spread (most common case).
-    ///
-    /// # Example
-    /// ```rust
-    /// use finstack_quant_cashflows::builder::FloatingRateParams;
-    ///
-    /// let params = FloatingRateParams::with_spread(200.0); // 200 bp spread
-    /// assert_eq!(params.spread_bp, 200.0);
-    /// assert_eq!(params.gearing, 1.0);
-    /// ```
-    pub fn with_spread(spread_bp: f64) -> Self {
-        Self {
-            spread_bp,
-            ..Default::default()
-        }
-    }
-
     /// Validate the floating rate parameters.
     ///
     /// Checks that:
@@ -166,26 +148,9 @@ impl TryFrom<&crate::builder::specs::FloatingRateSpec> for FloatingRateParams {
     /// on `Decimal → f64` conversion failure; a silently dropped constraint
     /// would change coupon economics without notice.
     fn try_from(spec: &crate::builder::specs::FloatingRateSpec) -> Result<Self> {
-        use finstack_quant_core::InputError;
-
         spec.validate()?;
-        let spread_bp = spec
-            .spread_bp
-            .to_f64()
-            .ok_or(finstack_quant_core::Error::Input(
-                InputError::ConversionOverflow,
-            ))?;
-        let gearing = spec
-            .gearing
-            .to_f64()
-            .ok_or(finstack_quant_core::Error::Input(
-                InputError::ConversionOverflow,
-            ))?;
-        if let crate::builder::specs::FloatingRateFallback::FixedRate(rate) = &spec.fallback {
-            let _ = rate.to_f64().ok_or(finstack_quant_core::Error::Input(
-                InputError::ConversionOverflow,
-            ))?;
-        }
+        let spread_bp = spec.spread_bp.as_f64();
+        let gearing = spec.gearing.as_f64();
 
         let params = FloatingRateParams {
             spread_bp,
@@ -219,33 +184,37 @@ impl TryFrom<&crate::builder::specs::FloatingRateSpec> for FloatingRateParams {
 /// ```rust
 /// use finstack_quant_cashflows::builder::{calculate_floating_rate, FloatingRateParams};
 ///
-/// let params = FloatingRateParams::with_spread(200.0); // 200 bp spread
+/// let params = FloatingRateParams {
+///     spread_bp: 200.0, // 200 bp spread
+///     ..Default::default()
+/// };
 /// let rate = calculate_floating_rate(0.03, &params); // 3% index + 2% spread = 5%
 /// assert!((rate - 0.05).abs() < 0.0001);
 /// ```
 pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> f64 {
-    let mut eff_index = index_rate;
-    if let Some(floor) = params.index_floor_bp {
-        eff_index = eff_index.max(floor * 1e-4);
-    }
-    if let Some(cap) = params.index_cap_bp {
-        eff_index = eff_index.min(cap * 1e-4);
-    }
-
-    let mut rate = if params.gearing_includes_spread {
+    let eff_index = apply_bp_bounds(index_rate, params.index_floor_bp, params.index_cap_bp);
+    let rate = if params.gearing_includes_spread {
         (eff_index + params.spread_bp * 1e-4) * params.gearing
     } else {
         (eff_index * params.gearing) + params.spread_bp * 1e-4
     };
+    apply_bp_bounds(rate, params.all_in_floor_bp, params.all_in_cap_bp)
+}
 
-    if let Some(floor) = params.all_in_floor_bp {
-        rate = rate.max(floor * 1e-4);
-    }
-    if let Some(cap) = params.all_in_cap_bp {
-        rate = rate.min(cap * 1e-4);
-    }
-
-    rate
+/// Clamp a decimal rate to optional floor and cap quoted in basis points.
+///
+/// The floor applies first, then the cap, so a cap below the floor wins
+/// (validated specs reject that combination).
+///
+/// # Arguments
+///
+/// * `rate` - Decimal rate (`0.05` = 5%).
+/// * `floor_bp` - Optional lower bound in basis points.
+/// * `cap_bp` - Optional upper bound in basis points.
+#[must_use]
+pub fn apply_bp_bounds(rate: f64, floor_bp: Option<f64>, cap_bp: Option<f64>) -> f64 {
+    let floored = floor_bp.map_or(rate, |floor| rate.max(floor * 1e-4));
+    cap_bp.map_or(floored, |cap| floored.min(cap * 1e-4))
 }
 
 /// Project the all-in floating rate from a resolved forward curve and coupon parameters.
@@ -314,7 +283,10 @@ pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> 
 ///     .build()
 ///     .expect("curve");
 ///
-/// let params = FloatingRateParams::with_spread(200.0); // SOFR + 200 bp
+/// let params = FloatingRateParams {
+///     spread_bp: 200.0, // SOFR + 200 bp
+///     ..Default::default()
+/// };
 /// let accrual = DayCount::Act360.year_fraction(reset, period_end, DayCountContext::default())?;
 /// let rate = project_floating_rate(reset, &fwd, &params, reset, period_end, accrual)?;
 /// # Ok::<(), finstack_quant_core::Error>(())
@@ -336,6 +308,68 @@ pub fn project_floating_rate(
         accrual_year_fraction,
     )?;
     Ok(calculate_floating_rate(index_rate, params))
+}
+
+/// Project the one-day overnight index rate observed on a date.
+///
+/// The forward curve's one-day simple rate from `observation_date` is
+/// re-annualized from the curve clock to the overnight basis
+/// (`1 / day_count_basis` years per day). Observation-day carry weights and
+/// coupon constraints are applied by the caller.
+///
+/// # Arguments
+///
+/// * `fwd` - Overnight forward curve; its day count supplies the curve clock.
+/// * `observation_date` - Fixing date on or after the curve base date.
+/// * `day_count_basis` - Overnight annualization basis in days (360 or 365).
+///
+/// # Errors
+///
+/// Returns a validation error when the one-day interval leaves the supported
+/// date range, the curve or index accrual is not finite and positive, or the
+/// projection is non-finite; day-count errors propagate.
+pub fn project_overnight_rate(
+    fwd: &ForwardCurve,
+    observation_date: Date,
+    day_count_basis: f64,
+) -> Result<f64> {
+    let fwd_base = fwd.base_date();
+    let fwd_day_count = fwd.day_count();
+    let t = if observation_date == fwd_base {
+        0.0
+    } else {
+        fwd_day_count.year_fraction(fwd_base, observation_date, DayCountContext::default())?
+    };
+    let observation_end = observation_date
+        .checked_add(time::Duration::days(1))
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "overnight projection endpoint exceeds the date range for {observation_date}"
+            ))
+        })?;
+    let t_end =
+        fwd_day_count.year_fraction(fwd_base, observation_end, DayCountContext::default())?;
+    // Published fixings already use the contractual index convention. Curve
+    // observations use the curve clock, so convert their annualization.
+    let index_year_fraction = 1.0 / day_count_basis;
+    let curve_year_fraction = t_end - t;
+    if !index_year_fraction.is_finite()
+        || index_year_fraction <= 0.0
+        || !curve_year_fraction.is_finite()
+        || curve_year_fraction <= 0.0
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "overnight projection requires finite positive curve and index accrual fractions"
+                .into(),
+        ));
+    }
+    let rate = fwd.rate_period(t, t_end) * (curve_year_fraction / index_year_fraction);
+    if !rate.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(
+            "overnight projection produced a non-finite index rate".into(),
+        ));
+    }
+    Ok(rate)
 }
 
 /// Project a term-index fixing in the contractual accrual convention.
@@ -462,7 +496,10 @@ mod tests {
         let reset = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
         let market = create_test_market(reset);
 
-        let params = FloatingRateParams::with_spread(200.0); // 200 bp
+        let params = FloatingRateParams {
+            spread_bp: 200.0,
+            ..Default::default()
+        }; // 200 bp
         let rate = project_floating_rate_from_market(reset, "USD-SOFR-3M", &params, &market)
             .expect("Rate projection should succeed in test");
 
@@ -621,7 +658,10 @@ mod tests {
             .build()
             .expect("ForwardCurve builder should succeed with valid test data");
 
-        let params = FloatingRateParams::with_spread(150.0); // 150 bp
+        let params = FloatingRateParams {
+            spread_bp: 150.0,
+            ..Default::default()
+        }; // 150 bp
         let period_end = reset.add_months(3).expect("quarter end");
         let accrual = (period_end - reset).whole_days() as f64 / 360.0;
         let rate = project_floating_rate(reset, &fwd_curve, &params, reset, period_end, accrual)

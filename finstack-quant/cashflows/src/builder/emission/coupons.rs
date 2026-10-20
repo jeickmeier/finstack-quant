@@ -14,17 +14,17 @@ use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
-use tracing::{info, warn};
+use tracing::warn;
 
+use crate::builder::overnight::overnight_day_count_basis;
 use crate::builder::overnight::{OvernightObservationSchedule, OvernightRateConstraints};
 use crate::builder::rate_helpers::{
-    calculate_floating_rate, project_index_rate, FloatingRateParams,
+    apply_bp_bounds, calculate_floating_rate, project_index_rate, project_overnight_rate,
 };
 use crate::builder::{
     CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod, FloatingRateFallback,
     FloatingRateObservation, SchedulePeriod,
 };
-use rust_decimal::prelude::ToPrimitive;
 
 use crate::builder::compiler::{FixedSchedule, FloatSchedule};
 use crate::builder::periods::compute_reset_date;
@@ -146,14 +146,12 @@ fn pre_base_observation_error(obs_date: Date, fwd: &ForwardCurve) -> finstack_qu
 ///   calendar observation interval, with both endpoints on the curve's clock.
 fn observed_overnight_rate(
     obs_date: Date,
-    rate_tenor_days: u32,
-    index_year_fraction: f64,
+    day_count_basis: f64,
     fwd: &ForwardCurve,
     fixings: Option<&ScalarTimeSeries>,
     forward_curve_id: &str,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    let fwd_base = fwd.base_date();
     if obs_date < as_of {
         return match fixings {
             Some(series) => {
@@ -167,49 +165,7 @@ fn observed_overnight_rate(
             return Ok(fixing);
         }
     }
-    let fwd_day_count = fwd.day_count();
-    let t = if obs_date == fwd_base {
-        0.0
-    } else {
-        fwd_day_count.year_fraction(
-            fwd_base,
-            obs_date,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?
-    };
-    let observation_end = obs_date
-        .checked_add(time::Duration::days(i64::from(rate_tenor_days)))
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "overnight projection endpoint exceeds the date range for {obs_date}"
-            ))
-        })?;
-    let t_end = fwd_day_count.year_fraction(
-        fwd_base,
-        observation_end,
-        finstack_quant_core::dates::DayCountContext::default(),
-    )?;
-    // Published fixings above already use the contractual index convention.
-    // Curve observations use the curve clock, so convert their annualization
-    // before applying observation-day carry weights or coupon constraints.
-    let curve_year_fraction = t_end - t;
-    if !index_year_fraction.is_finite()
-        || index_year_fraction <= 0.0
-        || !curve_year_fraction.is_finite()
-        || curve_year_fraction <= 0.0
-    {
-        return Err(finstack_quant_core::Error::Validation(
-            "overnight projection requires finite positive curve and index accrual fractions"
-                .into(),
-        ));
-    }
-    let rate = fwd.rate_period(t, t_end) * (curve_year_fraction / index_year_fraction);
-    if !rate.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(
-            "overnight projection produced a non-finite index rate".into(),
-        ));
-    }
-    Ok(rate)
+    project_overnight_rate(fwd, obs_date, day_count_basis)
 }
 
 /// Prevent a projection fallback from replacing incomplete supplied history.
@@ -254,35 +210,16 @@ fn resolve_floating_rate_fallback(
     spread_bp: f64,
     fallback: &FloatingRateFallback,
 ) -> finstack_quant_core::Result<f64> {
-    match fallback {
-        FloatingRateFallback::Error => Err(error),
-        FloatingRateFallback::SpreadOnly => {
-            warn!(
-                reset_date = %reset_date,
-                spread_bp = %spread_bp,
-                error = %error,
-                "Floating rate unavailable, using fallback (spread-only) rate"
-            );
-            Ok(0.0)
-        }
-        FloatingRateFallback::FixedRate(rate) => {
-            let index_rate = rate.to_f64().ok_or(finstack_quant_core::Error::Input(
-                InputError::ConversionOverflow,
-            ))?;
-            info!(
-                reset_date = %reset_date,
-                fixed_rate = %index_rate,
-                error = %error,
-                "Floating rate unavailable, using fixed index rate"
-            );
-            if !index_rate.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(
-                    "floating-rate fallback did not provide a finite index rate".into(),
-                ));
-            }
-            Ok(index_rate)
-        }
+    if !fallback.is_default() {
+        warn!(
+            reset_date = %reset_date,
+            spread_bp = %spread_bp,
+            ?fallback,
+            error = %error,
+            "Floating rate unavailable, using the configured fallback index rate"
+        );
     }
+    fallback.index_rate(error)
 }
 
 /// Emit fixed coupon cashflows on a specific date.
@@ -551,8 +488,7 @@ fn project_segment_indices(
                 // Carry weights do not change a published one-day index fixing.
                 let rate = observed_overnight_rate(
                     slice.observation_date,
-                    1,
-                    1.0 / *day_count_basis,
+                    *day_count_basis,
                     curve,
                     fixings,
                     forward_curve_id,
@@ -690,27 +626,13 @@ pub(crate) fn emit_float_coupons_on(
                     .rate_spec
                     .overnight_basis
                     .unwrap_or(spec.schedule.day_count);
-                let day_count_basis = match basis {
-                    finstack_quant_core::dates::DayCount::Act360 => 360.0,
-                    finstack_quant_core::dates::DayCount::Act365F => 365.0,
-                    other => {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "overnight compounding requires Act360 or Act365F; got {other:?}"
-                        )));
-                    }
-                };
+                let day_count_basis = overnight_day_count_basis(basis)?;
                 let observations = OvernightObservationSchedule::compile(
                     period.accrual_start,
                     period.accrual_end,
                     method,
                     schedule.fixing_calendar,
                 )?;
-                if observations.observations().is_empty() {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "overnight accrual period [{}, {}) for index '{}' contains no business-day fixings",
-                        period.accrual_start, period.accrual_end, spec.rate_spec.forward_curve_id,
-                    )));
-                }
                 let mut constraints = OvernightRateConstraints {
                     application: spec.rate_spec.overnight_index_constraints,
                     index_floor_bp: params.index_floor_bp,
@@ -794,14 +716,8 @@ pub(crate) fn emit_float_coupons_on(
                         params.spread_bp,
                         &spec.rate_spec.fallback,
                     )?;
-                    let constrained_index = calculate_floating_rate(
-                        index_rate,
-                        &FloatingRateParams {
-                            index_floor_bp: params.index_floor_bp,
-                            index_cap_bp: params.index_cap_bp,
-                            ..Default::default()
-                        },
-                    );
+                    let constrained_index =
+                        apply_bp_bounds(index_rate, params.index_floor_bp, params.index_cap_bp);
                     vec![(constrained_index, index_rate); segments.len()]
                 }
             };
@@ -836,7 +752,7 @@ pub(crate) fn emit_float_coupons_on(
                 .iter()
                 .zip(indices)
                 .map(|(segment, (index_rate, projected_index_rate))| {
-                    compiled.settle_index_rate_for_accrual(
+                    compiled.settle_index_rate(
                         segment.notional.as_f64(),
                         index_rate,
                         projected_index_rate,
@@ -960,8 +876,7 @@ mod tests {
         for (date, expected) in [(past, 0.041), (base, 0.042)] {
             let actual = observed_overnight_rate(
                 date,
-                1,
-                1.0 / 360.0,
+                360.0,
                 &curve,
                 Some(&fixings),
                 "TEST-ON",
@@ -972,8 +887,7 @@ mod tests {
         }
         let projected = observed_overnight_rate(
             future,
-            1,
-            1.0 / 360.0,
+            360.0,
             &curve,
             Some(&fixings),
             "TEST-ON",
@@ -1006,8 +920,7 @@ mod tests {
             .replay(end, 360.0, OvernightRateConstraints::default(), |slice| {
                 observed_overnight_rate(
                     slice.observation_date,
-                    slice.rate_tenor_days,
-                    f64::from(slice.rate_tenor_days) / 360.0,
+                    360.0,
                     &curve,
                     None,
                     "TEST-ON",
@@ -1046,8 +959,7 @@ mod tests {
             .replay(end, 360.0, OvernightRateConstraints::default(), |slice| {
                 observed_overnight_rate(
                     slice.observation_date,
-                    slice.rate_tenor_days,
-                    f64::from(slice.rate_tenor_days) / 360.0,
+                    360.0,
                     &curve,
                     None,
                     "TEST-ON",

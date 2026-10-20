@@ -529,7 +529,7 @@ impl TermLoanValuator {
     /// Build node-coupon descriptors for stochastic future floating resets.
     fn stochastic_node_coupons(&self, market: &MarketContext) -> Result<Vec<NodeCoupon>> {
         use finstack_quant_valuations_core::instruments::common_impl::pricing::floating_reset_descriptors::{
-            build_node_coupons, has_future_pik, params_from_spec, strips_index_constraints,
+            build_node_coupons, has_future_pik,
             NodeCouponBuildInputs,
         };
 
@@ -558,12 +558,14 @@ impl TermLoanValuator {
         build_node_coupons(
             &NodeCouponBuildInputs {
                 schedule,
-                params: params_from_spec(float_spec),
+                params: finstack_quant_cashflows::builder::FloatingRateParams::try_from(
+                    float_spec,
+                )?,
                 grid_origin: self.origin,
                 time_steps: &self.time_steps,
                 day_count: disc.day_count(),
                 discount: disc.as_ref(),
-                strip_index_constraints: strips_index_constraints(float_spec),
+                strip_index_constraints: float_spec.applies_daily_index_bounds(),
             },
             |step| self.outstanding_at(step),
         )

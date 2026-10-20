@@ -67,14 +67,15 @@ pub use floating_replay::{
 };
 pub use orchestrator::CashFlowBuilder;
 pub use overnight::{
-    OvernightObservationSchedule, OvernightObservationSlice, OvernightRateAccumulator,
-    OvernightRateConstraints, OvernightRateReplay,
+    overnight_day_count_basis, OvernightObservationSchedule, OvernightObservationSlice,
+    OvernightRateAccumulator, OvernightRateConstraints, OvernightRateReplay,
 };
 pub use periods::{
     build_periods, build_single_period, period_accrual, BuildPeriodsParams, SchedulePeriod,
 };
 pub use rate_helpers::{
-    calculate_floating_rate, project_floating_rate, project_index_rate, FloatingRateParams,
+    apply_bp_bounds, calculate_floating_rate, project_floating_rate, project_index_rate,
+    project_overnight_rate, FloatingRateParams,
 };
 pub use schedule::{
     merge_cashflow_schedules, weighted_average_life_from_principal, CashFlowMeta, CashFlowSchedule,

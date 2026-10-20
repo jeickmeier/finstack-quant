@@ -259,9 +259,9 @@ impl std::fmt::Display for FloatingLegCompounding {
             Self::SimpleAverage => write!(f, "simple_average"),
             Self::CompoundedInArrears { .. } => write!(f, "compounded_in_arrears"),
             Self::CompoundedWithObservationShift { .. } => {
-                write!(f, "compounded_observation_shift")
+                write!(f, "compounded_with_observation_shift")
             }
-            Self::CompoundedWithRateCutoff { .. } => write!(f, "compounded_rate_cutoff"),
+            Self::CompoundedWithRateCutoff { .. } => write!(f, "compounded_with_rate_cutoff"),
         }
     }
 }
@@ -322,6 +322,27 @@ impl FloatingRateFallback {
     /// when it carries the default value.
     pub fn is_default(&self) -> bool {
         matches!(self, Self::Error)
+    }
+
+    /// Index rate to use when the floating rate cannot be observed or projected.
+    ///
+    /// # Arguments
+    ///
+    /// * `error` - Why the rate is unavailable; returned unchanged under
+    ///   [`Self::Error`].
+    ///
+    /// # Errors
+    ///
+    /// Returns `error` when the policy is [`Self::Error`].
+    pub fn index_rate(
+        &self,
+        error: finstack_quant_core::Error,
+    ) -> finstack_quant_core::Result<f64> {
+        match self {
+            Self::Error => Err(error),
+            Self::SpreadOnly => Ok(0.0),
+            Self::FixedRate(rate) => Ok(rate.as_f64()),
+        }
     }
 }
 
@@ -593,6 +614,18 @@ pub struct FloatingRateSpec {
 }
 
 impl FloatingRateSpec {
+    /// Whether the index floor/cap applies to each overnight observation.
+    ///
+    /// True for overnight compounding with
+    /// [`OvernightIndexConstraintApplication::Daily`]; the period-level rate
+    /// composition must then drop the index bounds, which the observation
+    /// replay has already applied.
+    #[must_use]
+    pub fn applies_daily_index_bounds(&self) -> bool {
+        self.compounding.is_some_and(|method| method.is_overnight())
+            && self.overnight_index_constraints == OvernightIndexConstraintApplication::Daily
+    }
+
     /// Validates the floating rate specification.
     ///
     /// # Validation Rules

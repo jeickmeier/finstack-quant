@@ -17,11 +17,11 @@ impl FloatingCoupon {
                 |slice| {
                     overnight
                         .sources
-                        .get(&(slice.observation_date, slice.rate_tenor_days))
+                        .get(&slice.observation_date)
                         .ok_or_else(|| {
                             Error::internal(format!(
-                                "bond hazard LSMC has no overnight source for {} / {} day(s)",
-                                slice.observation_date, slice.rate_tenor_days
+                                "bond hazard LSMC has no overnight source for {}",
+                                slice.observation_date
                             ))
                         })?
                         .rate(path)
@@ -36,7 +36,7 @@ impl ReplayCursor {
     pub(super) fn new(template: &ReplayTemplate) -> Result<Self> {
         let mut floating = Vec::with_capacity(template.floating.len());
         for coupon in &template.floating {
-            let mut state = coupon.compiled.replay_state();
+            let mut state = FloatingCouponReplayState::default();
             if let Some(rate) = coupon.initial_term_rate {
                 coupon.compiled.observe_term(&mut state, rate)?;
             }
@@ -72,12 +72,12 @@ impl ReplayCursor {
         })
     }
 
-    pub(super) fn checkpoint(&self, template: &ReplayTemplate) -> ProductCheckpoint {
+    pub(super) fn checkpoint(&self) -> ProductCheckpoint {
         let live_floating = self
             .floating
             .iter()
             .enumerate()
-            .filter(|(coupon_id, state)| template.floating[*coupon_id].compiled.is_live(state))
+            .filter(|(_, state)| state.is_live())
             .map(|(coupon_id, state)| LiveFloatingCheckpoint {
                 coupon_id,
                 state: state.clone(),
@@ -110,11 +110,11 @@ impl ReplayCursor {
         coupon.compiled.advance_overnight(state, end, |slice| {
             overnight
                 .sources
-                .get(&(slice.observation_date, slice.rate_tenor_days))
+                .get(&slice.observation_date)
                 .ok_or_else(|| {
                     Error::internal(format!(
-                        "bond hazard LSMC has no overnight source for {} / {} day(s)",
-                        slice.observation_date, slice.rate_tenor_days
+                        "bond hazard LSMC has no overnight source for {}",
+                        slice.observation_date
                     ))
                 })?
                 .rate(path)
@@ -147,7 +147,7 @@ impl ReplayCursor {
         if let Some(date) = template.step_dates.get(step).copied().flatten() {
             for coupon_id in 0..template.floating.len() {
                 let coupon = &template.floating[coupon_id];
-                if coupon.compiled.is_live(&self.floating[coupon_id])
+                if self.floating[coupon_id].is_live()
                     && matches!(coupon.rate_model, FloatingRateModel::Overnight(_))
                 {
                     self.advance_overnight(
@@ -691,7 +691,10 @@ impl ReplayTemplate {
             .transpose()?
             .unwrap_or((0.0, 0.0));
         let params = floating_spec
-            .map(|spec| params_from_spec(&spec.rate_spec))
+            .map(|spec| {
+                finstack_quant_cashflows::builder::FloatingRateParams::try_from(&spec.rate_spec)
+            })
+            .transpose()?
             .unwrap_or_default();
         params.validate()?;
 
@@ -1172,11 +1175,8 @@ impl ReplayTemplate {
             if matches!(&coupon.rate_model, FloatingRateModel::Term(_))
                 && coupon.reset_step <= step
                 && step < coupon.payment_step.max(coupon.effective_end_step)
-                && coupon.compiled.captured_notional(&floating[id]).is_some()
-                && coupon
-                    .compiled
-                    .locked_term_index_rate(&floating[id])
-                    .is_some()
+                && floating[id].notional().is_some()
+                && floating[id].term_index_rate().is_some()
             {
                 let settlement = coupon.compiled.settle(&floating[id])?;
                 if step < coupon.payment_step {
