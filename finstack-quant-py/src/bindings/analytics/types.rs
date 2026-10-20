@@ -5,7 +5,10 @@ use crate::bindings::pandas_utils::{
     dates_to_datetime_index, dict_to_dataframe, labeled_values_to_series,
 };
 use crate::errors::display_to_py;
-use finstack_quant_analytics as fa;
+use finstack_quant_analytics::{
+    BetaResult, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns, MultiFactorResult,
+    PeriodStats, RollingGreeks,
+};
 use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -35,7 +38,7 @@ fn dataframe_repr_html(frame: PyResult<Bound<'_, PyAny>>) -> Option<String> {
 /// Aggregated statistics for grouped periodic returns.
 #[pyclass(name = "PeriodStats", module = "finstack_quant.analytics", frozen)]
 pub struct PyPeriodStats {
-    pub(super) inner: fa::PeriodStats,
+    pub(super) inner: PeriodStats,
 }
 
 #[pymethods]
@@ -222,7 +225,7 @@ const PERIOD_STATS_COLUMNS: &[&str] = &[
 /// Regression beta with confidence interval.
 #[pyclass(name = "BetaResult", module = "finstack_quant.analytics", frozen)]
 pub struct PyBetaResult {
-    pub(super) inner: fa::BetaResult,
+    pub(super) inner: BetaResult,
 }
 
 #[pymethods]
@@ -328,7 +331,7 @@ impl PyBetaResult {
 /// Alpha, beta, and R-squared from a single-index regression.
 #[pyclass(name = "GreeksResult", module = "finstack_quant.analytics", frozen)]
 pub struct PyGreeksResult {
-    pub(super) inner: fa::GreeksResult,
+    pub(super) inner: GreeksResult,
 }
 
 #[pymethods]
@@ -428,7 +431,7 @@ impl PyGreeksResult {
 /// Rolling alpha and beta time series.
 #[pyclass(name = "RollingGreeks", module = "finstack_quant.analytics", frozen)]
 pub struct PyRollingGreeks {
-    pub(super) inner: fa::RollingGreeks,
+    pub(super) inner: RollingGreeks,
 }
 
 #[pymethods]
@@ -508,7 +511,7 @@ impl PyRollingGreeks {
     frozen
 )]
 pub struct PyMultiFactorResult {
-    pub(super) inner: fa::MultiFactorResult,
+    pub(super) inner: MultiFactorResult,
 }
 
 #[pymethods]
@@ -655,7 +658,7 @@ impl PyMultiFactorResult {
 /// A single drawdown episode with timing and depth information.
 #[pyclass(name = "DrawdownEpisode", module = "finstack_quant.analytics", frozen)]
 pub struct PyDrawdownEpisode {
-    pub(super) inner: fa::DrawdownEpisode,
+    pub(super) inner: DrawdownEpisode,
 }
 
 #[pymethods]
@@ -775,7 +778,7 @@ impl PyDrawdownEpisode {
 /// Period-to-date returns for each ticker.
 #[pyclass(name = "LookbackReturns", module = "finstack_quant.analytics", frozen)]
 pub struct PyLookbackReturns {
-    pub(super) inner: fa::LookbackReturns,
+    pub(super) inner: LookbackReturns,
 }
 
 #[pymethods]
@@ -869,7 +872,7 @@ impl PyLookbackReturns {
 /// metric and becomes the DataFrame column name.
 #[pyclass(name = "DatedSeries", module = "finstack_quant.analytics", frozen)]
 pub struct PyDatedSeries {
-    pub(super) inner: fa::DatedSeries,
+    pub(super) inner: DatedSeries,
 }
 
 #[pymethods]

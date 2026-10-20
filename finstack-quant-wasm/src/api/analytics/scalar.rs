@@ -8,7 +8,7 @@
 //! constants.
 
 use crate::utils::input::{js_f64_seq, js_opt_f64};
-use finstack_quant_analytics as fa;
+use finstack_quant_analytics::{DEFAULT_MAR, DEFAULT_PERIODS_PER_YEAR, DEFAULT_RISK_FREE_RATE};
 use wasm_bindgen::prelude::*;
 
 /// Sharpe ratio of one return series (annualized excess mean over
@@ -30,8 +30,8 @@ pub fn sharpe(
     let returns = js_f64_seq(&returns, "returns")?;
     Ok(finstack_quant_analytics::sharpe(
         &returns,
-        rf.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
-        periods_per_year.unwrap_or(fa::DEFAULT_PERIODS_PER_YEAR),
+        rf.unwrap_or(DEFAULT_RISK_FREE_RATE),
+        periods_per_year.unwrap_or(DEFAULT_PERIODS_PER_YEAR),
     ))
 }
 
@@ -53,8 +53,8 @@ pub fn sortino(
     let returns = js_f64_seq(&returns, "returns")?;
     Ok(finstack_quant_analytics::sortino(
         &returns,
-        mar.unwrap_or(fa::DEFAULT_MAR),
-        periods_per_year.unwrap_or(fa::DEFAULT_PERIODS_PER_YEAR),
+        mar.unwrap_or(DEFAULT_MAR),
+        periods_per_year.unwrap_or(DEFAULT_PERIODS_PER_YEAR),
     ))
 }
 
@@ -70,7 +70,7 @@ pub fn volatility(returns: JsValue, periods_per_year: Option<JsValue>) -> Result
     let returns = js_f64_seq(&returns, "returns")?;
     Ok(finstack_quant_analytics::volatility(
         &returns,
-        periods_per_year.unwrap_or(fa::DEFAULT_PERIODS_PER_YEAR),
+        periods_per_year.unwrap_or(DEFAULT_PERIODS_PER_YEAR),
     ))
 }
 
