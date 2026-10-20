@@ -1,6 +1,7 @@
 //! Python bindings for `finstack_quant_core::types`.
 
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::bindings::macros::{label_enum, typed_or_label, wire_methods};
+use crate::errors::core_to_py;
 use finstack_quant_core::types::{Attributes, Bps, CreditRating, Rate};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyKeyError, PyTypeError};
@@ -13,14 +14,6 @@ use std::hash::{Hash, Hasher};
 #[inline]
 fn canonical_f64_bits(value: f64) -> u64 {
     (value + 0.0).to_bits()
-}
-
-fn to_json_impl<T: serde::Serialize>(inner: &T, what: &str) -> PyResult<String> {
-    serde_json::to_string(inner).map_err(|err| serde_json_to_py(err, what))
-}
-
-fn from_json_impl<T: serde::de::DeserializeOwned>(json: &str, what: &str) -> PyResult<T> {
-    serde_json::from_str(json).map_err(|err| serde_json_to_py(err, what))
 }
 
 /// A financial rate expressed as a decimal fraction (``0.05`` is 5% / 500 bp).
@@ -219,25 +212,9 @@ impl PyRate {
     fn __neg__(&self) -> Self {
         Self::from_inner(-self.inner)
     }
-
-    /// Serialize to JSON (the bare decimal number, e.g. ``0.05``).
-    fn to_json(&self) -> PyResult<String> {
-        to_json_impl(&self.inner, "invalid Rate")
-    }
-
-    /// Deserialize from JSON (a bare decimal number).
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        from_json_impl(json, "invalid Rate JSON").map(Self::from_inner)
-    }
-
-    /// Support ``pickle`` via the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
 }
+
+wire_methods!(PyRate, Rate, "Rate");
 
 /// Accept a `Rate` or a `Bps` operand and return it as a `Rate`.
 fn extract_rate_or_basis_points(obj: &Bound<'_, PyAny>) -> PyResult<Rate> {
@@ -427,25 +404,9 @@ impl PyBps {
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
-
-    /// Serialize to JSON (the bare integer basis-point quote, e.g. ``250``).
-    fn to_json(&self) -> PyResult<String> {
-        to_json_impl(&self.inner, "invalid Bps")
-    }
-
-    /// Deserialize from JSON (a bare integer).
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        from_json_impl(json, "invalid Bps JSON").map(Self::from_inner)
-    }
-
-    /// Support ``pickle`` via the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
 }
+
+wire_methods!(PyBps, Bps, "Bps");
 
 /// Standardised credit rating category on the 23-step S&P/Fitch scale.
 ///
@@ -492,124 +453,57 @@ impl PyCreditRating {
     }
 }
 
+label_enum!(PyCreditRating, CreditRating, "CreditRating", {
+    /// AAA / Aaa
+    AAA => AAA,
+    /// AA+ / Aa1
+    AA_PLUS => AAPlus,
+    /// AA / Aa2
+    AA => AA,
+    /// AA- / Aa3
+    AA_MINUS => AAMinus,
+    /// A+ / A1
+    A_PLUS => APlus,
+    /// A / A2
+    A => A,
+    /// A- / A3
+    A_MINUS => AMinus,
+    /// BBB+ / Baa1
+    BBB_PLUS => BBBPlus,
+    /// BBB / Baa2
+    BBB => BBB,
+    /// BBB- / Baa3
+    BBB_MINUS => BBBMinus,
+    /// BB+ / Ba1
+    BB_PLUS => BBPlus,
+    /// BB / Ba2
+    BB => BB,
+    /// BB- / Ba3
+    BB_MINUS => BBMinus,
+    /// B+ / B1
+    B_PLUS => BPlus,
+    /// B / B2
+    B => B,
+    /// B- / B3
+    B_MINUS => BMinus,
+    /// CCC+ / Caa1
+    CCC_PLUS => CCCPlus,
+    /// CCC / Caa2
+    CCC => CCC,
+    /// CCC- / Caa3
+    CCC_MINUS => CCCMinus,
+    /// CC / Ca
+    CC => CC,
+    /// C
+    C => C,
+    /// Default rating.
+    D => D,
+    /// Not rated.
+    NR => NR,
+});
+
 #[pymethods]
 impl PyCreditRating {
-    /// AAA / Aaa
-    #[classattr]
-    const AAA: PyCreditRating = PyCreditRating {
-        inner: CreditRating::AAA,
-    };
-    /// AA+ / Aa1
-    #[classattr]
-    const AA_PLUS: PyCreditRating = PyCreditRating {
-        inner: CreditRating::AAPlus,
-    };
-    /// AA / Aa2
-    #[classattr]
-    const AA: PyCreditRating = PyCreditRating {
-        inner: CreditRating::AA,
-    };
-    /// AA- / Aa3
-    #[classattr]
-    const AA_MINUS: PyCreditRating = PyCreditRating {
-        inner: CreditRating::AAMinus,
-    };
-    /// A+ / A1
-    #[classattr]
-    const A_PLUS: PyCreditRating = PyCreditRating {
-        inner: CreditRating::APlus,
-    };
-    /// A / A2
-    #[classattr]
-    const A: PyCreditRating = PyCreditRating {
-        inner: CreditRating::A,
-    };
-    /// A- / A3
-    #[classattr]
-    const A_MINUS: PyCreditRating = PyCreditRating {
-        inner: CreditRating::AMinus,
-    };
-    /// BBB+ / Baa1
-    #[classattr]
-    const BBB_PLUS: PyCreditRating = PyCreditRating {
-        inner: CreditRating::BBBPlus,
-    };
-    /// BBB / Baa2
-    #[classattr]
-    const BBB: PyCreditRating = PyCreditRating {
-        inner: CreditRating::BBB,
-    };
-    /// BBB- / Baa3
-    #[classattr]
-    const BBB_MINUS: PyCreditRating = PyCreditRating {
-        inner: CreditRating::BBBMinus,
-    };
-    /// BB+ / Ba1
-    #[classattr]
-    const BB_PLUS: PyCreditRating = PyCreditRating {
-        inner: CreditRating::BBPlus,
-    };
-    /// BB / Ba2
-    #[classattr]
-    const BB: PyCreditRating = PyCreditRating {
-        inner: CreditRating::BB,
-    };
-    /// BB- / Ba3
-    #[classattr]
-    const BB_MINUS: PyCreditRating = PyCreditRating {
-        inner: CreditRating::BBMinus,
-    };
-    /// B+ / B1
-    #[classattr]
-    const B_PLUS: PyCreditRating = PyCreditRating {
-        inner: CreditRating::BPlus,
-    };
-    /// B / B2
-    #[classattr]
-    const B: PyCreditRating = PyCreditRating {
-        inner: CreditRating::B,
-    };
-    /// B- / B3
-    #[classattr]
-    const B_MINUS: PyCreditRating = PyCreditRating {
-        inner: CreditRating::BMinus,
-    };
-    /// CCC+ / Caa1
-    #[classattr]
-    const CCC_PLUS: PyCreditRating = PyCreditRating {
-        inner: CreditRating::CCCPlus,
-    };
-    /// CCC / Caa2
-    #[classattr]
-    const CCC: PyCreditRating = PyCreditRating {
-        inner: CreditRating::CCC,
-    };
-    /// CCC- / Caa3
-    #[classattr]
-    const CCC_MINUS: PyCreditRating = PyCreditRating {
-        inner: CreditRating::CCCMinus,
-    };
-    /// CC / Ca
-    #[classattr]
-    const CC: PyCreditRating = PyCreditRating {
-        inner: CreditRating::CC,
-    };
-    /// C
-    #[classattr]
-    const C: PyCreditRating = PyCreditRating {
-        inner: CreditRating::C,
-    };
-    /// Default rating.
-    #[classattr]
-    const D: PyCreditRating = PyCreditRating {
-        inner: CreditRating::D,
-    };
-    /// Not rated.
-    #[classattr]
-    const NR: PyCreditRating = PyCreditRating {
-        inner: CreditRating::NR,
-    };
-
     /// Parse a rating string (case-insensitive, S&P/Fitch or Moody's notation).
     ///
     /// Raises ``ValueError`` if *name* is not a recognised rating.
@@ -624,7 +518,7 @@ impl PyCreditRating {
     /// Canonical rating name in S&P/Fitch notation (e.g. ``"BBB-"``).
     #[getter]
     fn name(&self) -> String {
-        self.inner.to_string()
+        self.label()
     }
 
     /// ``True`` for BBB- and above.
@@ -647,7 +541,6 @@ impl PyCreditRating {
 
     /// Moody's-style label (``"Baa1"`` for BBB+).
     #[pyo3(text_signature = "(self)")]
-    // PyO3 `#[pymethods]` cannot take `self` by value.
     fn to_moodys_string(&self) -> &'static str {
         self.inner.to_moodys_string()
     }
@@ -660,16 +553,6 @@ impl PyCreditRating {
     fn notches_to(&self, other: &Bound<'_, PyAny>) -> PyResult<i32> {
         let rhs = extract_credit_rating(other)?;
         Ok(self.inner.notches_to(rhs))
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        format!("CreditRating({:?})", self.inner.to_string())
-    }
-
-    /// Return ``str(self)``.
-    fn __str__(&self) -> String {
-        self.inner.to_string()
     }
 
     /// Hash consistent with equality between ``CreditRating`` instances.
@@ -694,36 +577,16 @@ impl PyCreditRating {
         }
         Ok(py.NotImplemented())
     }
-
-    /// Serialize to JSON (the quoted S&P/Fitch label, e.g. ``"BBB+"``).
-    fn to_json(&self) -> PyResult<String> {
-        to_json_impl(&self.inner, "invalid CreditRating")
-    }
-
-    /// Deserialize from JSON (a quoted S&P/Fitch label).
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        from_json_impl(json, "invalid CreditRating JSON").map(Self::from_inner)
-    }
-
-    /// Support ``pickle`` via the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
 }
 
-/// Extract a [`CreditRating`] from a `CreditRating` instance or a rating string.
-pub(crate) fn extract_credit_rating(obj: &Bound<'_, PyAny>) -> PyResult<CreditRating> {
-    if let Ok(rating) = obj.extract::<PyRef<'_, PyCreditRating>>() {
-        return Ok(rating.inner);
-    }
-    if let Ok(text) = obj.cast::<PyString>() {
-        return text.to_str()?.parse::<CreditRating>().map_err(core_to_py);
-    }
-    Err(PyTypeError::new_err("expected CreditRating or rating str"))
-}
+wire_methods!(PyCreditRating, CreditRating, "CreditRating", json_only);
+
+typed_or_label!(
+    pub(crate) fn extract_credit_rating -> CreditRating,
+    PyCreditRating,
+    "CreditRating or rating str",
+    |label| label.parse().map_err(core_to_py)
+);
 
 /// User-defined tags and string metadata attached to instruments.
 ///
@@ -857,25 +720,9 @@ impl PyAttributes {
     fn __len__(&self) -> usize {
         self.inner.meta.len()
     }
-
-    /// Serialize to JSON (``{"tags": [...], "meta": {...}}``; empty parts are omitted).
-    fn to_json(&self) -> PyResult<String> {
-        to_json_impl(&self.inner, "invalid Attributes")
-    }
-
-    /// Deserialize from JSON; unknown fields are rejected.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        from_json_impl(json, "invalid Attributes JSON").map(Self::from_inner)
-    }
-
-    /// Support ``pickle`` via the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
 }
+
+wire_methods!(PyAttributes, Attributes, "Attributes");
 
 /// Register the `finstack_quant.core.types` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

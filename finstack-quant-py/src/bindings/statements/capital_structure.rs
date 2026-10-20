@@ -7,6 +7,7 @@
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::extract::{label, parse_label};
 use crate::bindings::macros::wire_methods;
 use crate::errors::statements_to_py;
 use finstack_quant_statements::capital_structure::{
@@ -15,16 +16,6 @@ use finstack_quant_statements::capital_structure::{
 };
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-
-/// Parse the serde name of a [`PaymentPriority`] (e.g. `"fees"`, `"mandatory_prepayment"`).
-fn parse_priority(s: &str) -> PyResult<PaymentPriority> {
-    finstack_quant_core::wire::serde_parse(s).map_err(crate::errors::core_to_py)
-}
-
-/// Serde name of a [`PaymentPriority`]; identical to the `to_json` form.
-fn priority_to_str(p: PaymentPriority) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(&p).map_err(crate::errors::core_to_py)
-}
 
 /// Excess Cash Flow (ECF) sweep specification.
 ///
@@ -494,7 +485,7 @@ impl PyWaterfallSpec {
         if let Some(priority) = priority_of_payments {
             inner.priority_of_payments = priority
                 .into_iter()
-                .map(|s| parse_priority(&s))
+                .map(|s| parse_label::<PaymentPriority>(&s))
                 .collect::<PyResult<Vec<_>>>()?;
         }
         if let Some(node) = available_cash_node {
@@ -535,7 +526,7 @@ impl PyWaterfallSpec {
             .priority_of_payments
             .iter()
             .copied()
-            .map(priority_to_str)
+            .map(|priority| label(&priority))
             .collect()
     }
 

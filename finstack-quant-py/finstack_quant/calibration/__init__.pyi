@@ -4921,7 +4921,7 @@ def calibrate_bermudan_lmm_base_vol(
     >>> from finstack_quant.calibration import calibrate_bermudan_lmm_base_vol
     >>> calibrate_bermudan_lmm_base_vol("{}", "{}", "2025-01-01")
     Traceback (most recent call last):
-    ValueError: ...
+    finstack_quant.portfolio.ContractValidationError: ...
 
     """
 

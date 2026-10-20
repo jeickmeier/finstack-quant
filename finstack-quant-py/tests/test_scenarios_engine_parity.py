@@ -530,7 +530,7 @@ def test_rate_binding_spec_equality_and_validation() -> None:
     binding.validate()
     with pytest.raises(ValueError, match=r"Invalid tenor string"):
         RateBindingSpec("rate", "USD-OIS", "soon").validate()
-    with pytest.raises(ValueError, match="Compounding"):
+    with pytest.raises(ValueError, match="unknown compounding"):
         RateBindingSpec("rate", "USD-OIS", "1Y", compounding="hourly")
 
 

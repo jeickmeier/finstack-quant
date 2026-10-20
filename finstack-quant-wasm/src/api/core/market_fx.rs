@@ -76,7 +76,7 @@ impl JsFxConversionPolicy {
 /// Structured FX lookup result for WASM callers.
 #[wasm_bindgen(js_name = FxRateResult)]
 pub struct JsFxRateResult {
-    inner: RustFxRateResult,
+    pub(crate) inner: RustFxRateResult,
 }
 
 #[wasm_bindgen(js_class = FxRateResult)]

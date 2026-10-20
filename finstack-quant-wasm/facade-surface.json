@@ -716,6 +716,7 @@
       "BaseCorrelationCurve",
       "Bps",
       "BusinessDayConvention",
+      "ConvertedMoney",
       "CreditIndexData",
       "CreditRating",
       "Currency",
@@ -1601,6 +1602,12 @@
       "toJson"
     ],
     "getters": ["fx"]
+  },
+  "core.ConvertedMoney": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "toJson"],
+    "getters": ["amount", "rate"]
   },
   "core.FxConversionPolicy": {
     "kind": "class",

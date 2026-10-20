@@ -5,7 +5,7 @@
 //! as plain objects typed by the schema-generated types of the same names.
 
 use crate::api::core::config::JsFinstackConfig;
-use crate::utils::input::{js_string, json_text};
+use crate::utils::input::{from_js_json, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::rating_scales::{
     embedded_registry as rust_embedded_registry, registry_from_config as rust_registry_from_config,
@@ -93,7 +93,7 @@ impl JsUnknownScalePolicy {
         serde_json::to_string(&self.inner).map_err(to_js_err)
     }
 
-    /// Deserialize from the canonical JSON wire form (Rust `UnknownScalePolicy::from_json`).
+    /// Deserialize from the canonical JSON wire form (the Rust serde representation).
     ///
     /// # Arguments
     ///
@@ -105,9 +105,7 @@ impl JsUnknownScalePolicy {
     /// `validation`) if it is not a quoted policy name.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsUnknownScalePolicy, JsValue> {
-        UnknownScalePolicy::from_json(&js_string(&json, "json")?)
-            .map(Self::wrap)
-            .map_err(to_js_err)
+        from_js_json::<UnknownScalePolicy>(&json, "json").map(Self::wrap)
     }
 
     /// Snake_case name of the policy (same as `name`).

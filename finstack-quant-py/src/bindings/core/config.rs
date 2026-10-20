@@ -3,12 +3,12 @@
 use std::collections::BTreeMap;
 
 use crate::bindings::core::currency::extract_currency;
+use crate::bindings::macros::{label_enum, typed_or_label, wire_methods};
 use crate::bindings::module_utils::py_to_serde;
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_core::config::{FinstackConfig, RoundingMode, ToleranceConfig};
-use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyModule, PyString, PyType};
+use pyo3::types::{PyList, PyModule};
 
 /// Rounding mode for monetary and rate calculations.
 ///
@@ -44,94 +44,33 @@ impl PyRoundingMode {
     }
 }
 
-/// Extract a [`RoundingMode`] from a `RoundingMode` instance or its exact
-/// lowercase name.
-pub(crate) fn extract_rounding_mode(obj: &Bound<'_, PyAny>) -> PyResult<RoundingMode> {
-    if let Ok(mode) = obj.extract::<PyRef<'_, PyRoundingMode>>() {
-        return Ok(mode.inner);
-    }
-    if let Ok(text) = obj.cast::<PyString>() {
-        return text.to_str()?.parse::<RoundingMode>().map_err(core_to_py);
-    }
-    Err(PyTypeError::new_err(
-        "expected RoundingMode or its lowercase name (e.g. 'bankers')",
-    ))
-}
+typed_or_label!(
+    pub(crate) fn extract_rounding_mode -> RoundingMode,
+    PyRoundingMode,
+    "RoundingMode or its lowercase name (e.g. 'bankers')",
+    |label| label.parse().map_err(core_to_py)
+);
+
+label_enum!(PyRoundingMode, RoundingMode, "RoundingMode", from_name, {
+    /// Banker's rounding (ties to even).
+    BANKERS => Bankers,
+    /// Round halves away from zero.
+    AWAY_FROM_ZERO => AwayFromZero,
+    /// Round toward zero (truncate).
+    TOWARD_ZERO => TowardZero,
+    /// Round toward negative infinity.
+    FLOOR => Floor,
+    /// Round toward positive infinity.
+    CEIL => Ceil,
+});
+wire_methods!(PyRoundingMode, RoundingMode, "RoundingMode", json_only);
 
 #[pymethods]
 impl PyRoundingMode {
-    /// Banker's rounding (ties to even).
-    #[classattr]
-    const BANKERS: PyRoundingMode = PyRoundingMode {
-        inner: RoundingMode::Bankers,
-    };
-    /// Round halves away from zero.
-    #[classattr]
-    const AWAY_FROM_ZERO: PyRoundingMode = PyRoundingMode {
-        inner: RoundingMode::AwayFromZero,
-    };
-    /// Round toward zero (truncate).
-    #[classattr]
-    const TOWARD_ZERO: PyRoundingMode = PyRoundingMode {
-        inner: RoundingMode::TowardZero,
-    };
-    /// Round toward negative infinity.
-    #[classattr]
-    const FLOOR: PyRoundingMode = PyRoundingMode {
-        inner: RoundingMode::Floor,
-    };
-    /// Round toward positive infinity.
-    #[classattr]
-    const CEIL: PyRoundingMode = PyRoundingMode {
-        inner: RoundingMode::Ceil,
-    };
-
-    /// Parse a rounding mode from its exact lowercase label (case-sensitive):
-    /// ``"bankers"``, ``"away_from_zero"``, ``"toward_zero"``, ``"floor"``,
-    /// ``"ceil"``. Raises ``ValueError`` otherwise.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, name)")]
-    fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
-        name.parse::<RoundingMode>()
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
     /// Canonical lowercase name (the serde representation), e.g. ``"bankers"``.
     #[getter]
     fn name(&self) -> String {
-        self.inner.to_string()
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        format!("RoundingMode({:?})", self.inner.to_string())
-    }
-
-    /// Return ``str(self)`` — the lowercase name.
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-
-    /// Serialize to JSON (the quoted lowercase name).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "invalid RoundingMode"))
-    }
-
-    /// Deserialize from JSON (a quoted lowercase name).
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid RoundingMode JSON"))
-    }
-
-    /// Support ``pickle`` via the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
+        self.label()
     }
 }
 
@@ -213,28 +152,9 @@ impl PyToleranceConfig {
             self.inner.rate_epsilon, self.inner.generic_epsilon
         )
     }
-
-    /// Serialize to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "invalid ToleranceConfig"))
-    }
-
-    /// Deserialize from JSON; epsilons are validated during deserialization.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid ToleranceConfig JSON"))
-    }
-
-    /// Support ``pickle`` via the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
 }
+
+wire_methods!(PyToleranceConfig, ToleranceConfig, "ToleranceConfig");
 
 /// Top-level library configuration: rounding policy, per-currency scale
 /// overrides, comparison tolerances and versioned extensions.
@@ -268,13 +188,6 @@ impl PyToleranceConfig {
 pub struct PyFinstackConfig {
     /// Underlying Rust configuration.
     pub(crate) inner: FinstackConfig,
-}
-
-impl PyFinstackConfig {
-    /// Build a Python wrapper from a Rust [`FinstackConfig`].
-    pub(crate) fn from_inner(inner: FinstackConfig) -> Self {
-        Self { inner }
-    }
 }
 
 #[pymethods]
@@ -413,39 +326,11 @@ impl PyFinstackConfig {
         py: Python<'py>,
         key: &str,
     ) -> PyResult<Option<Bound<'py, PyAny>>> {
-        let Some(value) = self.inner.extensions.get(key) else {
-            return Ok(None);
-        };
-        let json = serde_json::to_string(value)
-            .map_err(|err| serde_json_to_py(err, "invalid extension JSON"))?;
-        let json_mod = py.import("json")?;
-        json_mod.call_method1("loads", (json,)).map(Some)
-    }
-
-    /// Serialize this config, including extensions, to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "failed to serialize config"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a config from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid FinstackConfig JSON"))
+        self.inner
+            .extensions
+            .get(key)
+            .map(|value| crate::bindings::pandas_utils::serde_to_py(py, value))
+            .transpose()
     }
 
     /// Canonical Rust structural equality (including numeric signed-zero equality).
@@ -467,6 +352,8 @@ impl PyFinstackConfig {
         )
     }
 }
+
+wire_methods!(PyFinstackConfig, FinstackConfig, "FinstackConfig");
 
 /// Register the `finstack_quant.core.config` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

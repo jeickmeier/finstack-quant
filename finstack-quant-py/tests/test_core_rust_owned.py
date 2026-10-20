@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import datetime as dt
+from decimal import Decimal
 import re
 from typing import Any
 
@@ -42,7 +43,7 @@ def _raises_exactly(message: str) -> Any:
     [
         (lambda: Currency(" USD "), " USD "),
         (lambda: Currency("XXX"), "XXX"),
-        (lambda: Money.from_decimal_str("1", " usd "), " usd "),
+        (lambda: Money.from_decimal(Decimal("1"), " usd "), " usd "),
         (lambda: Money(1.0, " usd "), " usd "),
     ],
 )
@@ -51,29 +52,12 @@ def test_one_rust_currency_parser_names_the_code_and_does_not_trim(build: Callab
         build()
 
 
-def test_money_text_amount_is_trimmed_by_the_rust_decimal_parser() -> None:
-    """Rust ``decimal::parse_decimal`` ignores surrounding whitespace; the currency parser does not.
-
-    WASM twin: ``Money text amounts are trimmed by the Rust decimal parser`` in
-    ``finstack-quant-wasm/tests/facade/core_rust_owned.test.mjs``.
-    """
-    assert Money("100.25", "USD").amount_decimal == Money.from_decimal_str("100.25", "USD").amount_decimal
-    for text in (" 100.25 ", "\t100.25\n"):
-        assert Money(text, "USD").to_json() == '{"amount":"100.25","currency":"USD"}'
-        assert Money.from_decimal_str(text, "USD").to_json() == '{"amount":"100.25","currency":"USD"}'
-    for text in ("100 .25", " ", "abc"):
-        with pytest.raises(ValueError, match="decimal value must be exactly representable as Decimal"):
-            Money.from_decimal_str(text, "USD")
-        with pytest.raises(ValueError, match="decimal value must be exactly representable as Decimal"):
-            Money(text, "USD")
-
-
 @pytest.mark.parametrize(
     ("money", "expected"),
     [
         (Money(0, "USD"), '{"amount":"-0","currency":"USD"}'),
-        (Money.from_decimal_str("0.00", "USD"), '{"amount":"-0.00","currency":"USD"}'),
-        (Money.from_decimal_str("1.2500", "USD"), '{"amount":"-1.2500","currency":"USD"}'),
+        (Money.from_decimal(Decimal("0.00"), "USD"), '{"amount":"-0.00","currency":"USD"}'),
+        (Money.from_decimal(Decimal("1.2500"), "USD"), '{"amount":"-1.2500","currency":"USD"}'),
     ],
 )
 def test_negation_is_the_exact_rust_checked_neg(money: Money, expected: str) -> None:
@@ -92,7 +76,7 @@ def test_zero_scalar_division_is_the_rust_validation_error() -> None:
 
 
 def test_format_with_rounding_parses_serde_names_with_rust_default() -> None:
-    m = Money.from_decimal_str("2.345", "USD")
+    m = Money.from_decimal(Decimal("2.345"), "USD")
     assert m.format_with(2) == m.format_with(2, True, None, "bankers")
     with _raises_exactly(
         'Validation error: invalid value "BANKERS": unknown variant `BANKERS`, expected one of '

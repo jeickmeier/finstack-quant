@@ -12,8 +12,8 @@ use std::sync::Arc;
 
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::core::market_data::curves::PyHazardCurve;
+use crate::bindings::core::types::extract_credit_rating;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::extract::extract_credit_rating;
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_object_to_single_row_dataframe, serde_to_py, values_to_series,
 };

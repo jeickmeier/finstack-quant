@@ -254,7 +254,12 @@ fn extract_dated_exposures(
     };
     items
         .iter()
-        .map(|(date, amount)| Ok((py_to_date(date)?, money_from_amount(*amount, currency)?)))
+        .map(|(date, amount)| {
+            Ok((
+                py_to_date(date)?,
+                Money::new(*amount, currency).map_err(core_to_py)?,
+            ))
+        })
         .collect()
 }
 
@@ -307,8 +312,8 @@ impl PyVmCalculator {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyVmResult> {
         let ccy: Currency = currency.parse().map_err(crate::errors::core_to_py)?;
-        let exp = money_from_amount(exposure, ccy)?;
-        let posted = money_from_amount(posted_collateral, ccy)?;
+        let exp = Money::new(exposure, ccy).map_err(core_to_py)?;
+        let posted = Money::new(posted_collateral, ccy).map_err(core_to_py)?;
         let as_of = py_to_date(as_of)?;
         let result = self
             .inner
@@ -357,7 +362,7 @@ impl PyVmCalculator {
         ];
         let currency = self.inner.get_csa().base_currency;
         let exposures = extract_dated_exposures(exposures, currency)?;
-        let initial = money_from_amount(initial_collateral, currency)?;
+        let initial = Money::new(initial_collateral, currency).map_err(core_to_py)?;
         let calls = self
             .inner
             .generate_margin_calls(&exposures, initial)
@@ -613,10 +618,6 @@ impl PyImResult {
         let frame = self.to_dataframe(py).ok()?;
         frame.call_method0("_repr_html_").ok()?.extract().ok()
     }
-}
-
-pub(super) fn money_from_amount(amount: f64, currency: Currency) -> PyResult<Money> {
-    Money::new(amount, currency).map_err(core_to_py)
 }
 
 /// Register calculator classes.

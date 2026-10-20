@@ -2,6 +2,7 @@
 
 use crate::bindings::core::dates::calendar::{extract_business_day_convention, extract_calendar};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::{label_enum, typed_or_label};
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{BusinessDayConvention, HolidayCalendar, Tenor, TenorUnit};
 use pyo3::prelude::*;
@@ -33,74 +34,27 @@ impl PyTenorUnit {
     }
 }
 
-#[pymethods]
-impl PyTenorUnit {
+label_enum!(
+    PyTenorUnit, TenorUnit, "TenorUnit", from_name,
+    label = |unit| unit.designator().to_string(),
+    {
     /// Day unit.
-    #[classattr]
-    const DAYS: PyTenorUnit = PyTenorUnit {
-        inner: TenorUnit::Days,
-    };
+    DAYS => Days,
     /// Week unit.
-    #[classattr]
-    const WEEKS: PyTenorUnit = PyTenorUnit {
-        inner: TenorUnit::Weeks,
-    };
+    WEEKS => Weeks,
     /// Month unit.
-    #[classattr]
-    const MONTHS: PyTenorUnit = PyTenorUnit {
-        inner: TenorUnit::Months,
-    };
+    MONTHS => Months,
     /// Year unit.
-    #[classattr]
-    const YEARS: PyTenorUnit = PyTenorUnit {
-        inner: TenorUnit::Years,
-    };
+    YEARS => Years,
+    }
+);
 
-    /// Parse a single-character tenor unit designator (``D``, ``W``, ``M``, ``Y``),
-    /// case-insensitively.
-    ///
-    /// Raises ``ValueError`` when ``name`` is not exactly one of those letters.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, name)")]
-    fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
-        name.parse::<TenorUnit>()
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
-    /// Support ``pickle`` by reconstructing through ``TenorUnit.from_name``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_name = py.get_type::<Self>().getattr("from_name")?;
-        Ok((from_name, (self.inner.designator().to_string(),)))
-    }
-
-    fn __repr__(&self) -> String {
-        let label = match self.inner {
-            TenorUnit::Days => "DAYS",
-            TenorUnit::Weeks => "WEEKS",
-            TenorUnit::Months => "MONTHS",
-            TenorUnit::Years => "YEARS",
-        };
-        format!("TenorUnit.{label}")
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.designator().to_string()
-    }
-}
-
-/// Extract a [`TenorUnit`] from a ``TenorUnit`` wrapper or a one-letter string.
-fn extract_tenor_unit(obj: &Bound<'_, PyAny>) -> PyResult<TenorUnit> {
-    if let Ok(unit) = obj.extract::<PyRef<'_, PyTenorUnit>>() {
-        return Ok(unit.inner);
-    }
-    if let Ok(s) = obj.extract::<String>() {
-        return PyTenorUnit::from_name(&obj.py().get_type::<PyTenorUnit>(), &s).map(|u| u.inner);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(
-        "expected TenorUnit or a one-letter unit string (D, W, M, Y)",
-    ))
-}
+typed_or_label!(
+    fn extract_tenor_unit -> TenorUnit,
+    PyTenorUnit,
+    "TenorUnit or a one-letter unit string (D, W, M, Y)",
+    |label| label.parse().map_err(core_to_py)
+);
 
 /// A tenor such as ``3M``, ``1Y``, or ``2W``.
 ///
@@ -421,18 +375,12 @@ impl PyTenor {
     }
 }
 
-/// Extract a [`Tenor`] from a [`PyTenor`] or a string.
-pub(crate) fn extract_tenor(obj: &Bound<'_, PyAny>) -> PyResult<Tenor> {
-    if let Ok(t) = obj.extract::<PyRef<'_, PyTenor>>() {
-        return Ok(t.inner);
-    }
-    if let Ok(s) = obj.extract::<String>() {
-        return Tenor::parse(&s).map_err(core_to_py);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(
-        "expected Tenor or str",
-    ))
-}
+typed_or_label!(
+    pub(crate) fn extract_tenor -> Tenor,
+    PyTenor,
+    "Tenor or str",
+    |label| Tenor::parse(label).map_err(core_to_py)
+);
 
 /// Register tenor types on the `finstack_quant.core.dates` module.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

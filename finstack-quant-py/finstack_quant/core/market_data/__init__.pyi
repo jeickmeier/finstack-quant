@@ -34,6 +34,7 @@ from finstack_quant.core.money import Money
 
 __all__ = [
     "BaseCorrelationCurve",
+    "ConvertedMoney",
     "CreditIndexData",
     "DiscountCurve",
     "ForwardCurve",
@@ -4322,6 +4323,130 @@ class FxRateResult:
     def __repr__(self) -> str: ...
     def _repr_html_(self) -> Optional[str]: ...
 
+class ConvertedMoney:
+    """
+    Result of :meth:`MarketContext.convert_money`.
+
+    Immutable value type holding the converted amount and the FX rate lookup
+    it used. ``rate`` is ``None`` when the input was already in the target
+    currency; otherwise its ``triangulated`` flag records whether the rate was
+    derived through a pivot currency, so the applied FX policy can be stamped
+    on downstream results.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import FxMatrix, MarketContext
+    >>> from finstack_quant.core.money import Money
+    >>> fx = FxMatrix()
+    >>> fx.set_quote("EUR", "USD", 1.1)
+    >>> converted = MarketContext().insert_fx(fx).convert_money(Money(10.0, "EUR"), "USD", "2025-01-02")
+    >>> (converted.amount.currency.code, converted.rate.rate)
+    ('USD', 1.1)
+
+    """
+
+    @staticmethod
+    def from_json(json: str) -> ConvertedMoney:
+        """
+        Deserialize a conversion result from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON produced by :meth:`to_json` (strict field names ``amount`` and
+            ``rate``).
+
+        Returns
+        -------
+        ConvertedMoney
+            The reconstructed amount and rate lookup.
+
+        Raises
+        ------
+        ValueError
+            If the JSON is malformed or has unknown or missing fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import ConvertedMoney
+        >>> payload = '{"amount": {"amount": "5", "currency": "USD"}, "rate": null}'
+        >>> ConvertedMoney.from_json(payload).rate is None
+        True
+
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize this result to compact canonical JSON.
+
+        Returns
+        -------
+        str
+            ``{"amount": {...}, "rate": {...} | null}``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    @property
+    def amount(self) -> Money:
+        """
+        Amount in the target currency.
+
+        Returns
+        -------
+        Money
+            The converted amount.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def rate(self) -> Optional[FxRateResult]:
+        """
+        FX rate lookup behind the conversion.
+
+        Returns
+        -------
+        Optional[FxRateResult]
+            The applied rate and its ``triangulated`` flag, or ``None`` for a
+            same-currency input.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        Export as a single-row pandas DataFrame.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns ``amount`` (float), ``currency`` (ISO code), ``rate`` and
+            ``triangulated`` (``None`` for a same-currency input).
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into a pandas object.
+        """
+        ...
+
+    def __eq__(self, other: object) -> bool: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> Optional[str]: ...
+
 class FxQuoteConvention:
     """
     USD quotation style for a market FX pair.
@@ -4639,7 +4764,7 @@ class FxMatrix:
     >>> round(matrix.rate("EUR", "GBP", datetime.date(2025, 1, 1)).rate, 4)
     0.88
     >>> list(matrix.quotes()["base"])
-    ['EUR', 'GBP']
+    ['GBP', 'EUR']
 
     """
 
@@ -6108,7 +6233,7 @@ class MarketContext:
         amount: Money,
         target_currency: Union[Currency, str],
         as_of: DateLike,
-    ) -> Money:
+    ) -> ConvertedMoney:
         """
         Convert a monetary amount into another currency with the attached FX matrix.
 
@@ -6125,13 +6250,28 @@ class MarketContext:
 
         Returns
         -------
-        Money
-            Converted amount in ``target_currency``.
+        ConvertedMoney
+            The converted ``amount`` in ``target_currency`` and the applied FX
+            ``rate`` lookup (``None`` for a same-currency input), so the caller
+            can record whether the rate was triangulated.
 
         Raises
         ------
         KeyError
             If no FX matrix is attached or the pair cannot be resolved.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import FxMatrix, MarketContext
+        >>> from finstack_quant.core.money import Money
+        >>> fx = FxMatrix()
+        >>> fx.set_quote("EUR", "USD", 1.1)
+        >>> ctx = MarketContext().insert_fx(fx)
+        >>> converted = ctx.convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")
+        >>> (round(converted.amount.amount, 6), converted.rate.triangulated)
+        (110.0, False)
+        >>> ctx.convert_money(Money(5.0, "USD"), "USD", "2025-01-02").rate is None
+        True
         """
         ...
 

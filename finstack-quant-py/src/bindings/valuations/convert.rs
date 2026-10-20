@@ -174,52 +174,6 @@ pub(crate) fn bool_repr(value: bool) -> &'static str {
     }
 }
 
-/// Coerce `Currency | str` to a [`Currency`](finstack_quant_core::currency::Currency).
-///
-/// # Arguments
-///
-/// * `obj` - A `finstack_quant.core.currency.Currency` or an ISO-4217 code
-///   such as `"USD"`.
-/// * `what` - Parameter name used in the `TypeError` message.
-pub(crate) fn currency_from_py(
-    obj: &Bound<'_, PyAny>,
-    what: &str,
-) -> PyResult<finstack_quant_core::currency::Currency> {
-    if let Ok(ccy) = obj.cast::<crate::bindings::core::currency::PyCurrency>() {
-        return Ok(ccy.borrow().inner);
-    }
-    if let Ok(code) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        return crate::bindings::module_utils::parse_currency(&code);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(format!(
-        "{what}: expected finstack_quant.core.currency.Currency or an ISO-4217 code, got {}",
-        obj.get_type().name()?
-    )))
-}
-
-/// Coerce `Tenor | str` to a [`Tenor`](finstack_quant_core::dates::Tenor).
-///
-/// # Arguments
-///
-/// * `obj` - A `finstack_quant.core.dates.Tenor` or a tenor string such as
-///   `"3M"` / `"6M"` / `"1Y"`.
-/// * `what` - Parameter name used in the error message.
-pub(crate) fn tenor_from_py(
-    obj: &Bound<'_, PyAny>,
-    what: &str,
-) -> PyResult<finstack_quant_core::dates::Tenor> {
-    if let Ok(tenor) = obj.cast::<crate::bindings::core::dates::tenor::PyTenor>() {
-        return Ok(tenor.borrow().inner);
-    }
-    if let Ok(text) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        return finstack_quant_core::dates::Tenor::parse(&text).map_err(crate::errors::core_to_py);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(format!(
-        "{what}: expected finstack_quant.core.dates.Tenor or a tenor string such as \"3M\", got {}",
-        obj.get_type().name()?
-    )))
-}
-
 /// Parse a business-day-convention name with the Rust `FromStr` (the parser
 /// `adjust` uses), so every Python BDC string argument accepts the same
 /// spellings: serde names and the `MF`/`F`/`P`/`MP`/`NONE` short codes,

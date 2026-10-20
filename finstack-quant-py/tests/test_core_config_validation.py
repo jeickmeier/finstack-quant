@@ -37,7 +37,7 @@ def test_config_maximum_scale_preserves_small_nonzero_money() -> None:
     restored = FinstackConfig.from_json(config.to_json())
     assert restored.ingest_scale("USD") == 28
     assert restored.output_scale("USD") == 28
-    money = Money(Decimal("1e-28"), "USD", config=restored)
+    money = Money.from_decimal(Decimal("1e-28"), "USD", config=restored)
     assert money.amount_decimal == Decimal("1e-28")
 
 

@@ -605,7 +605,10 @@
     ],
     "converted": [
       110.0,
-      "USD"
+      "USD",
+      1.1,
+      false,
+      true
     ],
     "credit_index": 125,
     "curve_ids": [

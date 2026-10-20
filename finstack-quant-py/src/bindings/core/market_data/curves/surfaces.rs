@@ -8,10 +8,11 @@ use pyo3::types::PyDict;
 
 use std::sync::Arc;
 
+use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use pyo3::prelude::*;
 
-use super::helpers::{columns_to_dataframe, impl_arc_serde_pymethods, parse_vol_quote_type};
-use crate::bindings::macros::impl_repr_html_via_dataframe;
+use super::helpers::columns_to_dataframe;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::errors::core_to_py;
 
 enum VolInput {
@@ -114,7 +115,10 @@ impl PyVolSurface {
     /// [90.0, 100.0]
     #[new]
     #[pyo3(signature = (id, expiries, strikes, vols, *, secondary_axis=None, interpolation_mode=None, quote_type=None, displacements=None))]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "keyword-only grid options mirror the Rust VolGridOpts fields"
+    )]
     fn new(
         id: &str,
         expiries: Vec<f64>,
@@ -134,7 +138,7 @@ impl PyVolSurface {
             opts.interpolation_mode = serde_parse(mode).map_err(core_to_py)?;
         }
         if let Some(quote) = quote_type {
-            opts.quote_type = parse_vol_quote_type(quote)?;
+            opts.quote_type = quote.parse::<VolQuoteType>().map_err(core_to_py)?;
         }
         let grid = extract_vol_grid(vols)?;
         let surface = match grid {
@@ -278,7 +282,7 @@ impl PyVolSurface {
     }
 }
 
-impl_arc_serde_pymethods!(PyVolSurface, VolSurface, "VolSurface");
+wire_methods!(PyVolSurface, VolSurface, "VolSurface", arc);
 impl_repr_html_via_dataframe!(PyVolSurface);
 
 /// Delta-quoted FX volatility surface (ATM, 25-delta RR/BF, optional 10-delta wings).
@@ -442,7 +446,12 @@ impl PyFxDeltaVolSurface {
     }
 }
 
-impl_arc_serde_pymethods!(PyFxDeltaVolSurface, FxDeltaVolSurface, "FxDeltaVolSurface");
+wire_methods!(
+    PyFxDeltaVolSurface,
+    FxDeltaVolSurface,
+    "FxDeltaVolSurface",
+    arc
+);
 impl_repr_html_via_dataframe!(PyFxDeltaVolSurface);
 
 /// Calibrated SABR parameters for one vol-cube node.
@@ -538,51 +547,6 @@ impl PySabrParameterData {
         self.inner.shift()
     }
 
-    /// Serialize to canonical JSON (``{"alpha": ..., "beta": ..., "rho": ..., "nu": ..., "shift": ...}``).
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    // PyO3 `#[pymethods]` cannot take `self` by value.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| {
-            crate::errors::value_error(format!("failed to serialize SabrParameterData: {e}"))
-        })
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON produced by ``to_json``.
-    ///
-    /// Returns
-    /// -------
-    /// SabrParameterData
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed or the parameters fail validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<SabrParameterData>(json)
-            .map(Self::from_inner)
-            .map_err(|e| crate::errors::value_error(format!("invalid SabrParameterData JSON: {e}")))
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         let shift = self
             .inner
@@ -598,6 +562,8 @@ impl PySabrParameterData {
         )
     }
 }
+
+wire_methods!(PySabrParameterData, SabrParameterData, "SabrParameterData");
 
 /// Parse one cube node: a ``SabrParameterData`` or a dict in the Rust
 /// ``SabrParameterData`` wire shape (``alpha``, ``beta``, ``rho``, ``nu`` and
@@ -870,5 +836,5 @@ impl PyVolCube {
     }
 }
 
-impl_arc_serde_pymethods!(PyVolCube, VolCube, "VolCube");
+wire_methods!(PyVolCube, VolCube, "VolCube", arc);
 impl_repr_html_via_dataframe!(PyVolCube);

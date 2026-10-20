@@ -114,23 +114,6 @@ impl RatingLevel {
         validate_rating_level(&level, None)?;
         Ok(level)
     }
-
-    /// Deserialize and validate one scorecard rating level from JSON.
-    ///
-    /// `score` and `min_score` are both normalized scores on the inclusive
-    /// 0–100 scale. The level name is a display/lookup label such as `AAA` or
-    /// `Aaa`; a scale's best-to-worst ordering is validated by
-    /// [`ScorecardScale::from_json`], not by this individual-level parser.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Validation`] if the JSON is malformed, unknown fields
-    /// violate the schema, the name is blank, or either score is non-finite or
-    /// outside the inclusive 0–100 range.
-    pub fn from_json(json: &str) -> Result<Self> {
-        serde_json::from_str(json)
-            .map_err(|err| Error::Validation(format!("invalid rating level JSON: {err}")))
-    }
 }
 
 impl ScorecardScale {
@@ -161,27 +144,6 @@ impl ScorecardScale {
         };
         validate_scorecard_scale(&scale, &scale.scale_name)?;
         Ok(scale)
-    }
-
-    /// Deserialize and validate one best-to-worst scorecard scale from JSON.
-    ///
-    /// The first rating is the strongest grade. Both `score` and `min_score`
-    /// must strictly descend through the list because scorecard classification
-    /// uses the first qualifying threshold. A scale is intentionally distinct
-    /// from a migration-matrix rating state set.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Validation`] if the JSON is malformed, the rating list
-    /// is empty, a level is invalid or duplicated, or the score/minimum-score
-    /// order is not strictly best-to-worst.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - JSON text encoding the object; unknown fields follow the type's serde policy
-    pub fn from_json(json: &str) -> Result<Self> {
-        serde_json::from_str(json)
-            .map_err(|err| Error::Validation(format!("invalid scorecard scale JSON: {err}")))
     }
 
     /// Export the rating levels in best-to-worst order as a [`TableEnvelope`](crate::table::TableEnvelope)
@@ -238,25 +200,6 @@ impl std::str::FromStr for UnknownScalePolicy {
     /// Parses the serde label, ignoring surrounding whitespace and ASCII case.
     fn from_str(s: &str) -> crate::Result<Self> {
         crate::wire::serde_parse(&s.trim().to_ascii_lowercase())
-    }
-}
-
-impl UnknownScalePolicy {
-    /// Deserialize the policy applied to an unknown scorecard-scale name.
-    ///
-    /// The policy governs [`RatingScaleRegistry::rating_scale`]: `Error`
-    /// rejects an unknown name, while the two fallback variants return the
-    /// registry's configured default scale, `WarnAndFallback` with a `tracing`
-    /// warning.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Validation`] if `json` is not one of the serde
-    /// snake-case enum representations: `"error"`, `"fallback_to_default"`,
-    /// or `"warn_and_fallback"`.
-    pub fn from_json(json: &str) -> Result<Self> {
-        serde_json::from_str(json)
-            .map_err(|err| Error::Validation(format!("invalid unknown scale policy JSON: {err}")))
     }
 }
 
@@ -716,8 +659,9 @@ mod tests {
     #[test]
     fn rating_level_from_json_rejects_out_of_range_score() {
         let json = r#"{"name":"BB","score":150.0,"min_score":50.0}"#;
-        let err = RatingLevel::from_json(json).expect_err("score out of range must be rejected");
-        assert!(matches!(err, Error::Validation(_)));
+        let err = serde_json::from_str::<RatingLevel>(json)
+            .expect_err("score out of range must be rejected");
+        assert!(err.to_string().contains("score"), "{err}");
     }
 
     #[test]
@@ -729,8 +673,8 @@ mod tests {
             {"name":"AAA","score":100.0,"min_score":95.0},
             {"name":"BBB","score":60.0,"min_score":55.0}
         ]}"#;
-        let err = ScorecardScale::from_json(json).expect_err("shuffled scale must be rejected");
-        assert!(matches!(err, Error::Validation(_)));
+        let err = serde_json::from_str::<ScorecardScale>(json)
+            .expect_err("shuffled scale must be rejected");
         assert!(err.to_string().contains("not ordered best-to-worst"));
     }
 
@@ -740,7 +684,8 @@ mod tests {
             {"name":"AAA","score":100.0,"min_score":95.0},
             {"name":"AA","score":90.0,"min_score":95.0}
         ]}"#;
-        let err = ScorecardScale::from_json(json).expect_err("tied min_score must be rejected");
+        let err = serde_json::from_str::<ScorecardScale>(json)
+            .expect_err("tied min_score must be rejected");
         assert!(err.to_string().contains("min_score"));
     }
 
@@ -751,14 +696,16 @@ mod tests {
             {"name":"AA","score":90.0,"min_score":85.0},
             {"name":"A","score":75.0,"min_score":70.0}
         ]}"#;
-        let scale = ScorecardScale::from_json(json).expect("descending scale should validate");
+        let scale =
+            serde_json::from_str::<ScorecardScale>(json).expect("descending scale should validate");
         assert_eq!(scale.ratings.len(), 3);
     }
 
     #[test]
     fn scorecard_scale_from_json_rejects_empty_ratings() {
         let json = r#"{"scale_name":"Test","ratings":[]}"#;
-        let err = ScorecardScale::from_json(json).expect_err("empty ratings must be rejected");
-        assert!(matches!(err, Error::Validation(_)));
+        let err = serde_json::from_str::<ScorecardScale>(json)
+            .expect_err("empty ratings must be rejected");
+        assert!(err.to_string().contains("rating"), "{err}");
     }
 }

@@ -79,7 +79,8 @@ use super::{
 /// Outcome of [`MarketContext::convert_money`]: the converted amount and the
 /// FX rate it used, so callers can stamp the applied policy (including whether
 /// the rate was triangulated). `rate` is `None` when no conversion was needed.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConvertedMoney {
     /// The amount in the target currency.
     pub amount: Money,

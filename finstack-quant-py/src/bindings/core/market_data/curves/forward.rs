@@ -4,15 +4,14 @@ use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
 use std::sync::Arc;
 
+use finstack_quant_core::math::interp::ExtrapolationPolicy;
+use finstack_quant_core::math::interp::InterpStyle;
 use pyo3::prelude::*;
 
-use super::helpers::{
-    columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods, parse_extrapolation,
-    parse_interp_style, TimePoint,
-};
+use super::helpers::{columns_to_dataframe, extract_time_point, TimePoint};
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::impl_repr_html_via_dataframe;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::errors::core_to_py;
 
 /// Forward rate curve for a floating-rate index with a fixed tenor.
@@ -43,12 +42,6 @@ impl PyForwardCurve {
     /// Build from an existing `Arc<ForwardCurve>`.
     pub(crate) fn from_inner(inner: Arc<ForwardCurve>) -> Self {
         Self { inner }
-    }
-
-    fn wrap(curve: ForwardCurve) -> Self {
-        Self {
-            inner: Arc::new(curve),
-        }
     }
 }
 
@@ -116,10 +109,14 @@ impl PyForwardCurve {
             .knots(knots)
             .projection_grid_opt(projection_grid);
         if let Some(interp) = interp {
-            builder = builder.interp(parse_interp_style(interp)?);
+            builder = builder.interp(interp.parse::<InterpStyle>().map_err(core_to_py)?);
         }
         if let Some(extrapolation) = extrapolation {
-            builder = builder.extrapolation(parse_extrapolation(extrapolation)?);
+            builder = builder.extrapolation(
+                extrapolation
+                    .parse::<ExtrapolationPolicy>()
+                    .map_err(core_to_py)?,
+            );
         }
         if let Some(day_count) = day_count {
             builder = builder.day_count(extract_day_count(day_count)?);
@@ -128,7 +125,10 @@ impl PyForwardCurve {
             builder = builder.reset_lag(reset_lag);
         }
 
-        builder.build().map(Self::wrap).map_err(core_to_py)
+        builder
+            .build()
+            .map(|curve| Self::from_inner(Arc::new(curve)))
+            .map_err(core_to_py)
     }
 
     /// Construct a flat forward curve quoting ``rate`` at every maturity.
@@ -162,7 +162,7 @@ impl PyForwardCurve {
     #[pyo3(text_signature = "(id, tenor, base_date, rate)")]
     fn flat(id: &str, tenor: f64, base_date: &Bound<'_, PyAny>, rate: f64) -> PyResult<Self> {
         ForwardCurve::flat(id, tenor, py_to_date(base_date)?, rate)
-            .map(Self::wrap)
+            .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(core_to_py)
     }
 
@@ -373,5 +373,5 @@ impl PyForwardCurve {
     }
 }
 
-impl_arc_serde_pymethods!(PyForwardCurve, ForwardCurve, "ForwardCurve");
+wire_methods!(PyForwardCurve, ForwardCurve, "ForwardCurve", arc);
 impl_repr_html_via_dataframe!(PyForwardCurve);

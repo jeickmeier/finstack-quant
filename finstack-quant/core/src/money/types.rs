@@ -104,7 +104,8 @@ impl FormatOpts {
     /// * `show_currency` - Whether to prepend the ISO-4217 currency code.
     /// * `group` - Optional single-character thousands separator (e.g.
     ///   `Some(',')`); `None` disables grouping.
-    /// * `rounding` - Rounding mode applied to the displayed value.
+    /// * `rounding` - Rounding mode applied to the displayed value; `None`
+    ///   selects [`RoundingMode::default`] (bankers).
     ///
     /// # Returns
     ///
@@ -120,18 +121,19 @@ impl FormatOpts {
     /// use finstack_quant_core::money::FormatOpts;
     /// use finstack_quant_core::config::RoundingMode;
     ///
-    /// let opts = FormatOpts::new(Some(2), true, Some(","), RoundingMode::Bankers)
+    /// let opts = FormatOpts::new(Some(2), true, Some(","), Some(RoundingMode::Bankers))
     ///     .expect("bounded precision");
     /// assert_eq!(opts.decimals, Some(2));
     /// assert_eq!(opts.group, Some(','));
-    /// assert!(FormatOpts::new(None, true, Some(", "), RoundingMode::Bankers).is_err());
+    /// assert!(FormatOpts::new(None, true, Some(", "), None).is_err());
     /// ```
     pub fn new(
         decimals: Option<usize>,
         show_currency: bool,
         group: Option<&str>,
-        rounding: RoundingMode,
+        rounding: Option<RoundingMode>,
     ) -> Result<Self, Error> {
+        let rounding = rounding.unwrap_or_default();
         if decimals.is_some_and(|precision| precision > Self::MAX_DECIMALS) {
             return Err(Error::Validation(format!(
                 "formatting precision exceeds {}",
@@ -1036,7 +1038,7 @@ mod tests {
         assert_eq!(tiny.amount_decimal(), rust_decimal::Decimal::new(1, 27));
         assert_eq!(
             tiny.format_with(
-                FormatOpts::new(Some(28), false, None, RoundingMode::Bankers)
+                FormatOpts::new(Some(28), false, None, Some(RoundingMode::Bankers))
                     .expect("bounded opts")
             ),
             "0.0000000000000000000000000010"
@@ -1045,7 +1047,7 @@ mod tests {
         assert_eq!(reduced.amount_decimal(), rust_decimal::Decimal::new(2, 28));
         assert_eq!(
             reduced.format_with(
-                FormatOpts::new(Some(28), false, None, RoundingMode::Bankers)
+                FormatOpts::new(Some(28), false, None, Some(RoundingMode::Bankers))
                     .expect("bounded opts")
             ),
             "0.0000000000000000000000000002"
@@ -1081,18 +1083,18 @@ mod tests {
             Some(FormatOpts::MAX_DECIMALS),
             true,
             None,
-            RoundingMode::Bankers
+            Some(RoundingMode::Bankers)
         )
         .is_ok());
         let result = FormatOpts::new(
             Some(FormatOpts::MAX_DECIMALS + 1),
             true,
             None,
-            RoundingMode::Bankers,
+            Some(RoundingMode::Bankers),
         );
         assert!(matches!(result, Err(Error::Validation(_))));
         assert!(
-            FormatOpts::new(None, true, Some(","), RoundingMode::Bankers)
+            FormatOpts::new(None, true, Some(","), Some(RoundingMode::Bankers))
                 .expect("unbounded precision")
                 .decimals
                 .is_none()
@@ -1130,7 +1132,7 @@ mod tests {
         for (amount, expected, mode, name) in vectors.iter().copied() {
             let money =
                 Money::from_decimal_str(amount, Currency::USD).expect("exact vector amount");
-            let opts = FormatOpts::new(Some(2), true, Some(","), mode)
+            let opts = FormatOpts::new(Some(2), true, Some(","), Some(mode))
                 .expect("bounded formatting options");
             assert_eq!(money.format_with(opts), expected, "{name} {amount}");
             assert_eq!(

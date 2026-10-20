@@ -9,15 +9,15 @@ use crate::api::core::market_curves::{
     JsBaseCorrelationCurve, JsCreditIndexData, JsInflationCurve, JsPriceCurve,
 };
 use crate::api::core::market_data::{JsDiscountCurve, JsForwardCurve, JsHazardCurve};
-use crate::api::core::market_fx::JsFxMatrix;
+use crate::api::core::market_fx::{JsFxMatrix, JsFxRateResult};
 use crate::api::core::market_scalars::{JsInflationIndex, JsScalarTimeSeries};
 use crate::api::core::money::JsMoney;
 use crate::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube, JsVolSurface};
-use crate::utils::input::{js_f64, js_int, js_opt_string, js_string, json_text};
+use crate::utils::input::{from_js_json, js_f64, js_int, js_opt_string, js_string, json_text};
 use crate::utils::{contract_to_js_err, parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::context::{ConvertedMoney, MarketContext};
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
@@ -595,7 +595,10 @@ impl JsMarketContext {
     ///   in it is returned unchanged.
     /// * `as_of` - ISO-8601 date of the FX rate lookup.
     ///
-    /// @returns The converted `Money` in `targetCurrency`.
+    /// @returns A `ConvertedMoney` holding the converted `amount` in
+    /// `targetCurrency` and the applied FX `rate` lookup (`undefined` for a
+    /// same-currency input), whose `triangulated` flag records a pivot-derived
+    /// rate.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `not_found`) if no FX matrix is attached or the pair has no rate, or
     /// kind `validation` for a malformed date.
@@ -605,13 +608,11 @@ impl JsMarketContext {
         amount: &JsMoney,
         target_currency: &JsCurrency,
         as_of: JsValue,
-    ) -> Result<JsMoney, JsValue> {
+    ) -> Result<JsConvertedMoney, JsValue> {
         let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
         self.inner
             .convert_money(amount.inner, target_currency.inner, as_of)
-            .map(|converted| JsMoney {
-                inner: converted.amount,
-            })
+            .map(|inner| JsConvertedMoney { inner })
             .map_err(to_js_err)
     }
 
@@ -703,5 +704,76 @@ impl JsMarketContext {
         Self {
             inner: Arc::new(inner),
         }
+    }
+}
+
+/// Result of `MarketContext.convertMoney` (Rust `ConvertedMoney`): the
+/// converted amount and the FX rate lookup it used.
+///
+/// `rate` is `undefined` when the input was already in the target currency;
+/// otherwise its `triangulated` flag records whether the rate was derived
+/// through a pivot currency. Instances come from `MarketContext.convertMoney`
+/// or `ConvertedMoney.fromJson`.
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const fx = new core.FxMatrix();
+/// fx.setQuote("EUR", "USD", 1.1);
+/// const market = new core.MarketContext();
+/// market.insertFx(fx);
+/// const usd = new core.Currency("USD");
+/// const converted = market.convertMoney(new core.Money(100, new core.Currency("EUR")), usd, "2025-01-02");
+/// converted.rate?.triangulated; // false
+/// ```
+#[wasm_bindgen(js_name = ConvertedMoney)]
+pub struct JsConvertedMoney {
+    inner: ConvertedMoney,
+}
+
+#[wasm_bindgen(js_class = ConvertedMoney)]
+impl JsConvertedMoney {
+    /// The amount in the target currency.
+    ///
+    /// @returns The converted `Money`.
+    #[wasm_bindgen(getter, js_name = amount)]
+    pub fn amount(&self) -> JsMoney {
+        JsMoney {
+            inner: self.inner.amount,
+        }
+    }
+
+    /// The FX rate lookup behind the conversion.
+    ///
+    /// @returns The applied `FxRateResult`, or `undefined` for a same-currency input.
+    #[wasm_bindgen(getter, js_name = rate)]
+    pub fn rate(&self) -> Option<JsFxRateResult> {
+        self.inner
+            .rate
+            .clone()
+            .map(|inner| JsFxRateResult { inner })
+    }
+
+    /// Serialize to the canonical JSON wire form shared with Python `ConvertedMoney.to_json`.
+    ///
+    /// @returns Compact JSON text with `amount` and `rate`.
+    /// @throws If serialization fails (not expected for a valid result).
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&self.inner).map_err(to_js_err)
+    }
+
+    /// Deserialize from the canonical JSON wire form produced by `toJson`.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Canonical ConvertedMoney JSON text or plain object; unknown fields are rejected.
+    ///
+    /// @returns The parsed `ConvertedMoney`.
+    /// @throws `FinstackError` (kind `validation`) if `json` is malformed or has unknown or missing fields.
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(json: JsValue) -> Result<JsConvertedMoney, JsValue> {
+        from_js_json::<ConvertedMoney>(&json, "json").map(|inner| JsConvertedMoney { inner })
     }
 }

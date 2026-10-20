@@ -414,9 +414,15 @@ const CASES = {
     credit_index: market().getCreditIndex('CDX-IG-43').numConstituents,
     fx_rate: market().fxRequired().rate('EUR', 'USD', '2025-01-02').rate,
     converted: [
-      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').amount,
-      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').currency
-        .code,
+      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').amount
+        .amount,
+      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').amount
+        .currency.code,
+      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').rate.rate,
+      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').rate
+        .triangulated,
+      market().convertMoney(money(100.0, 'USD'), new core.Currency('USD'), '2025-01-02').rate ===
+        undefined,
     ],
     rolled_base_date: market().rollForward(30).getDiscount('USD-OIS').baseDate,
     round_trip: core.MarketContext.fromJson(market().toJson()).toJson() === market().toJson(),

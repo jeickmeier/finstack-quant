@@ -184,6 +184,7 @@ export const core = {
   ScalarTimeSeries: wasm.ScalarTimeSeries,
   InflationIndex: wasm.InflationIndex,
   MarketContext: wasm.MarketContext,
+  ConvertedMoney: wasm.ConvertedMoney,
   FxConversionPolicy: wasm.FxConversionPolicy,
   FxRateResult: wasm.FxRateResult,
   FxMatrix: wasm.FxMatrix,

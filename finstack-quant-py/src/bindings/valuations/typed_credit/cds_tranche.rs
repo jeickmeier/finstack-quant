@@ -19,7 +19,6 @@ use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 use super::super::convert::{
     attributes_from_py, bdc_from_py, bps_from_py, builder_repr, date_repr, dated_money_from_py,
     day_count_from_py, enum_to_py_string, float_repr, money_from_py, money_repr, money_to_py,
-    tenor_from_py,
 };
 use super::super::instruments::{
     enum_from_str, serialize_typed_instrument_json, stub_kind_from_py,
@@ -877,7 +876,7 @@ impl PyCdsTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let tenor = tenor_from_py(value, "frequency")?;
+        let tenor = crate::bindings::core::dates::tenor::extract_tenor(value)?;
         builder_set!(
             slf,
             frequency,

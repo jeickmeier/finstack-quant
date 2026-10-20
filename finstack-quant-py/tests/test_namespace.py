@@ -67,8 +67,8 @@ class TestCoreNamespace:
         """Market data parent exports should match the parity contract."""
         from finstack_quant.core import market_data
 
-        expected = CONTRACT["crates"]["core"]["market_data"]["public"]
-        assert market_data.__all__ == expected
+        expected = CONTRACT["crates"]["core"]["module_symbols"]["market_data"]["public"]
+        assert set(market_data.__all__) == set(expected)
         for name in expected:
             assert hasattr(market_data, name)
         assert not hasattr(market_data, "check_butterfly")

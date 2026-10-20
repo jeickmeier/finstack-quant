@@ -414,8 +414,11 @@ CASES: dict[str, Callable[[], Any]] = {
         "credit_index": _market().get_credit_index("CDX-IG-43").num_constituents,
         "fx_rate": _market().fx_required().rate("EUR", "USD", "2025-01-02").rate,
         "converted": [
-            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount,
-            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").currency.code,
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount.amount,
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount.currency.code,
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").rate.rate,
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").rate.triangulated,
+            _market().convert_money(Money(100.0, "USD"), "USD", "2025-01-02").rate is None,
         ],
         "rolled_base_date": _iso(_market().roll_forward(30).get_discount("USD-OIS").base_date),
         "round_trip": json.loads(MarketContext.from_json(_market().to_json()).to_json())

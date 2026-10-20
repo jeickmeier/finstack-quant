@@ -179,7 +179,7 @@ def test_calculate_rejects_collateral_for_an_unknown_csa() -> None:
     portfolio = _unmargined_portfolio()
     aggregator = PortfolioMarginAggregator.from_portfolio(portfolio)
     with pytest.raises(ValueError, match="Unknown IM collateral CSA"):
-        aggregator.calculate(portfolio, _market(), AS_OF, current_im_collateral={"NO-SUCH-CSA": Money("1", "USD")})
+        aggregator.calculate(portfolio, _market(), AS_OF, current_im_collateral={"NO-SUCH-CSA": Money(1.0, "USD")})
     with pytest.raises(TypeError):
         aggregator.calculate(portfolio, _market(), 20250115)
 

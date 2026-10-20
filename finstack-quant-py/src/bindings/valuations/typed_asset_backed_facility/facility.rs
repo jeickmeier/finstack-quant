@@ -12,7 +12,7 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{
-    attributes_from_py, bool_repr, day_count_from_py, money_from_py, money_to_py, tenor_from_py,
+    attributes_from_py, bool_repr, day_count_from_py, money_from_py, money_to_py,
 };
 use crate::bindings::valuations::instruments::serialize_typed_instrument_json;
 use crate::bindings::valuations::typed_macros::{
@@ -940,7 +940,7 @@ impl PyAssetBackedFacilityBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let tenor = tenor_from_py(value, "frequency")?;
+        let tenor = crate::bindings::core::dates::tenor::extract_tenor(value)?;
         builder_set!(slf, |b: FacilityBuilderInner| b.frequency(tenor))
     }
 

@@ -19,7 +19,7 @@
     },
     {
       "path": "finstack-quant-wasm/index.d.ts",
-      "sha256": "b26eec843a4b97db2e034cdad582939729fb3869808ff927179b25575ed76f33"
+      "sha256": "d0aa40ca2828c549f2cec2287f55a58d63ac4f84a451172ede505e948bb1221d"
     },
     {
       "path": "finstack-quant-wasm/src/utils/mod.rs",

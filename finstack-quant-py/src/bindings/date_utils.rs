@@ -7,7 +7,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
-use crate::errors::{display_to_py, value_error};
+use crate::errors::value_error;
 
 /// Convert a Python date-like object or ISO-8601 string to a Rust [`finstack_quant_core::dates::Date`].
 ///
@@ -35,8 +35,7 @@ pub(crate) fn py_to_date(obj: &Bound<'_, PyAny>) -> PyResult<finstack_quant_core
     let year: i32 = obj.getattr("year")?.extract()?;
     let month: u8 = obj.getattr("month")?.extract()?;
     let day: u8 = obj.getattr("day")?.extract()?;
-    finstack_quant_core::dates::Date::from_calendar_date(year, month_from_u8(month)?, day)
-        .map_err(display_to_py)
+    date_from_ymd(year, month, day)
 }
 
 /// Convert a Rust [`finstack_quant_core::dates::Date`] to a Python `datetime.date`.

@@ -3893,6 +3893,61 @@ export interface FxRateResultConstructor {
 }
 
 /**
+ * Result of `MarketContext.convertMoney` (Rust `ConvertedMoney`): the
+ * converted amount and the FX rate lookup it used.
+ */
+export interface ConvertedMoney extends WasmOwned {
+  /**
+   * The amount in the target currency.
+   * @returns The converted `Money`.
+   */
+  readonly amount: Money;
+  /**
+   * The FX rate lookup behind the conversion; `undefined` for a same-currency input.
+   * @returns The applied `FxRateResult`, or `undefined` for a same-currency input.
+   */
+  readonly rate: FxRateResult | undefined;
+  /**
+   * Serialize to the canonical JSON wire form shared with Python `ConvertedMoney.to_json`.
+   *
+   * @returns Compact JSON text with `amount` and `rate`.
+   * @throws If serialization fails (not expected for a valid result).
+   */
+  toJson(): string;
+}
+
+/**
+ * `ConvertedMoney` has no public constructor; instances come from
+ * `MarketContext.convertMoney` or `ConvertedMoney.fromJson`.
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const fx = new core.FxMatrix();
+ * fx.setQuote("EUR", "USD", 1.1);
+ * const market = new core.MarketContext();
+ * market.insertFx(fx);
+ * const usd = new core.Currency("USD");
+ * const converted = market.convertMoney(new core.Money(100, new core.Currency("EUR")), usd, "2025-01-02");
+ * console.log(converted.amount.amount, converted.rate?.triangulated);
+ * ```
+ */
+export interface ConvertedMoneyConstructor {
+  /**
+   * JavaScript prototype of `ConvertedMoney`; instances come from `MarketContext.convertMoney`, not `new`.
+   */
+  readonly prototype: ConvertedMoney;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - Canonical ConvertedMoney JSON text or plain object; unknown fields are rejected.
+   * @returns The parsed `ConvertedMoney`.
+   * @throws `FinstackError` (kind `validation`) if `json` is malformed or has unknown or missing fields.
+   */
+  fromJson(json: JsonInput): ConvertedMoney;
+}
+
+/**
  * Foreign-exchange rate matrix for currency conversion.
  */
 export interface FxMatrix extends WasmOwned {
@@ -4427,10 +4482,10 @@ export interface MarketContext extends WasmOwned {
    * @param amount - Monetary amount to convert.
    * @param targetCurrency - Destination `Currency` object; an amount already in it is returned unchanged.
    * @param asOf - ISO-8601 date of the FX rate lookup.
-   * @returns The converted `Money` in `targetCurrency`.
+   * @returns A `ConvertedMoney` holding the converted `amount` in `targetCurrency` and the applied FX `rate` lookup (`undefined` for a same-currency input), whose `triangulated` flag records a pivot-derived rate.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `not_found`) if no FX matrix is attached or the pair has no rate, or kind `validation` for a malformed date.
    */
-  convertMoney(amount: Money, targetCurrency: Currency, asOf: string): Money;
+  convertMoney(amount: Money, targetCurrency: Currency, asOf: string): ConvertedMoney;
   /**
    * Whether any market data is stored under an id (Rust `MarketContext::contains`).
    *
@@ -7990,6 +8045,10 @@ export interface CoreNamespace {
    * Parsed market-context handle for reuse across `*WithMarket` calls.
    */
   MarketContext: MarketContextConstructor;
+  /**
+   * Result of `MarketContext.convertMoney`: converted amount plus the applied FX rate.
+   */
+  ConvertedMoney: ConvertedMoneyConstructor;
   /**
    * FX conversion timing-policy constructor.
    */

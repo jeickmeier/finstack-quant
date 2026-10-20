@@ -232,10 +232,10 @@ impl JsMoney {
         let group = js_opt_string(group.as_ref(), "group")?;
         let rounding = js_opt_string(rounding.as_ref(), "rounding")?;
         let decimals: Option<usize> = js_opt_uint(Some(&decimals), "decimals")?;
-        let rounding = match rounding {
-            Some(mode) => mode.parse::<RoundingMode>().map_err(to_js_err)?,
-            None => RoundingMode::default(),
-        };
+        let rounding = rounding
+            .map(|mode| mode.parse::<RoundingMode>())
+            .transpose()
+            .map_err(to_js_err)?;
         let opts = FormatOpts::new(
             decimals,
             show_currency.unwrap_or(true),

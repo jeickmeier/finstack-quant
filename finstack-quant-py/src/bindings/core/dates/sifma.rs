@@ -8,6 +8,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::label_enum;
 use crate::errors::core_to_py;
 
 /// Public names registered by this module.
@@ -42,29 +43,19 @@ pub struct PySifmaSettlementClass {
     inner: SifmaSettlementClass,
 }
 
+label_enum!(PySifmaSettlementClass, SifmaSettlementClass, "SifmaSettlementClass", {
+    /// Class A: 30-year conventional (FNMA/FHLMC) and UMBS pools.
+    A => A,
+    /// Class B: 15-year conventional pools.
+    B => B,
+    /// Class C: 30-year GNMA pools.
+    C => C,
+    /// Class D: balloon, ARM and other non-standard programs.
+    D => D,
+});
+
 #[pymethods]
 impl PySifmaSettlementClass {
-    /// Class A: 30-year conventional (FNMA/FHLMC) and UMBS pools.
-    #[classattr]
-    const A: Self = Self {
-        inner: SifmaSettlementClass::A,
-    };
-    /// Class B: 15-year conventional pools.
-    #[classattr]
-    const B: Self = Self {
-        inner: SifmaSettlementClass::B,
-    };
-    /// Class C: 30-year GNMA pools.
-    #[classattr]
-    const C: Self = Self {
-        inner: SifmaSettlementClass::C,
-    };
-    /// Class D: balloon, ARM and other non-standard programs.
-    #[classattr]
-    const D: Self = Self {
-        inner: SifmaSettlementClass::D,
-    };
-
     /// Infer the settlement class from an agency label and original term in years.
     ///
     /// Parameters
@@ -90,10 +81,6 @@ impl PySifmaSettlementClass {
         Self {
             inner: SifmaSettlementClass::from_agency_term(agency, term_years),
         }
-    }
-
-    fn __repr__(&self) -> String {
-        format!("SifmaSettlementClass.{:?}", self.inner)
     }
 }
 

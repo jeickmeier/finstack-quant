@@ -1,5 +1,6 @@
 //! Python bindings for `finstack_quant_core::math::stats`.
 
+use crate::bindings::extract::parse_label;
 use finstack_quant_core::math::stats::{self, RealizedVarMethod};
 use numpy::PyReadonlyArray1;
 use pyo3::prelude::*;
@@ -279,10 +280,6 @@ fn log_returns(py: Python<'_>, prices: &Bound<'_, PyAny>) -> PyResult<Vec<f64>> 
     Ok(py.detach(|| stats::log_returns(&prices)))
 }
 
-fn parse_method(method: &str) -> PyResult<RealizedVarMethod> {
-    finstack_quant_core::wire::serde_parse(method).map_err(core_to_py)
-}
-
 /// Annualized realized variance of a close price series (mean of squared log
 /// returns, no mean subtraction, times ``annualization_factor``).
 ///
@@ -349,7 +346,7 @@ fn realized_variance_ohlc(
     let high = extract_series(high)?;
     let low = extract_series(low)?;
     let close = extract_series(close)?;
-    let method = method.map(parse_method).transpose()?;
+    let method = method.map(parse_label::<RealizedVarMethod>).transpose()?;
     py.detach(|| {
         stats::realized_variance_ohlc(&open, &high, &low, &close, method, annualization_factor)
     })

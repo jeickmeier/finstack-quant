@@ -2,20 +2,22 @@
 
 use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::{label_enum, typed_or_label, wire_methods};
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
     days_30_360, days_30e_360_isda, DayCount, DayCountContext, DayCountContextState,
     Thirty360Convention,
 };
 use pyo3::prelude::*;
-use pyo3::types::{PyModule, PyType};
+use pyo3::types::PyModule;
 
 /// Day-count convention for year-fraction calculations.
 ///
 /// Immutable, hashable enum-style type with a class attribute per supported
 /// convention. ``str()`` gives the canonical snake_case name
-/// (``"act_360"``), which ``from_name`` parses strictly and ``parse``
-/// leniently (``"ACT/360"``, ``"Act/Act ICMA"``).
+/// (``"act_360"``), which ``from_name`` parses along with term-sheet
+/// spellings (``"ACT/360"``, ``"Act/Act ICMA"``): case, spaces, ``/`` and
+/// ``-`` are normalised.
 ///
 /// Examples
 /// --------
@@ -23,7 +25,7 @@ use pyo3::types::{PyModule, PyType};
 /// >>> from finstack_quant.core.dates import DayCount
 /// >>> DayCount.ACT_360.year_fraction(datetime.date(2024, 1, 1), datetime.date(2024, 7, 1))
 /// 0.5055555555555555
-/// >>> DayCount.parse("ACT/ACT ICMA") == DayCount.ACT_ACT_ISMA
+/// >>> DayCount.from_name("ACT/ACT ICMA") == DayCount.ACT_ACT_ISMA
 /// True
 #[pyclass(
     name = "DayCount",
@@ -46,18 +48,12 @@ impl PyDayCount {
     }
 }
 
-/// Extract a [`DayCount`] from a ``DayCount`` wrapper or a (lenient) name string.
-pub(crate) fn extract_day_count(obj: &Bound<'_, PyAny>) -> PyResult<DayCount> {
-    if let Ok(day_count) = obj.extract::<PyRef<'_, PyDayCount>>() {
-        return Ok(day_count.inner);
-    }
-    if let Ok(s) = obj.extract::<String>() {
-        return s.parse::<DayCount>().map_err(core_to_py);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(
-        "expected DayCount or str",
-    ))
-}
+typed_or_label!(
+    pub(crate) fn extract_day_count -> DayCount,
+    PyDayCount,
+    "DayCount or str",
+    |label| label.parse().map_err(core_to_py)
+);
 
 /// Resolve the optional ``ctx`` argument of a year-fraction call.
 fn resolve_context(ctx: Option<&PyDayCountContext>) -> PyResult<DayCountContext<'static>> {
@@ -67,110 +63,50 @@ fn resolve_context(ctx: Option<&PyDayCountContext>) -> PyResult<DayCountContext<
     }
 }
 
-#[pymethods]
-impl PyDayCount {
+label_enum!(PyDayCount, DayCount, "DayCount", from_name, {
     /// One unit per nonempty contractual accrual period; empty periods return zero.
-    #[classattr]
-    const ONE_ONE: PyDayCount = PyDayCount {
-        inner: DayCount::OneOne,
-    };
-
+    ONE_ONE => OneOne,
     /// Actual/360 (money market).
-    #[classattr]
-    const ACT_360: PyDayCount = PyDayCount {
-        inner: DayCount::Act360,
-    };
+    ACT_360 => Act360,
     /// Actual/365 Fixed.
-    #[classattr]
-    const ACT_365F: PyDayCount = PyDayCount {
-        inner: DayCount::Act365F,
-    };
+    ACT_365F => Act365F,
     /// Actual/365L (ICMA Rule 251). Annual periods (or periods without a
     /// supplied frequency) use denominator 366 exactly when February 29 falls
     /// in ``(start, end]``; non-annual periods use 366 exactly when the end
     /// date's year is a leap year. Otherwise the denominator is 365. This is
     /// explicitly not ACT/ACT AFB, which uses sub-period splitting.
-    #[classattr]
-    const ACT_365L: PyDayCount = PyDayCount {
-        inner: DayCount::Act365L,
-    };
+    ACT_365L => Act365L,
     /// NL/365 (Actual/365 No Leap): actual days excluding every February 29
     /// in ``(start, end]``, divided by 365.
-    #[classattr]
-    const NL_365: PyDayCount = PyDayCount {
-        inner: DayCount::Nl365,
-    };
+    NL_365 => Nl365,
     /// 30/360 US (Bond Basis).
-    #[classattr]
-    const THIRTY_360: PyDayCount = PyDayCount {
-        inner: DayCount::Thirty360,
-    };
+    THIRTY_360 => Thirty360,
     /// 30E/360 (Eurobond Basis).
-    #[classattr]
-    const THIRTY_E_360: PyDayCount = PyDayCount {
-        inner: DayCount::ThirtyE360,
-    };
+    THIRTY_E_360 => ThirtyE360,
     /// 30E/360 ISDA.
-    #[classattr]
-    const THIRTY_E_360_ISDA: PyDayCount = PyDayCount {
-        inner: DayCount::ThirtyE360Isda,
-    };
+    THIRTY_E_360_ISDA => ThirtyE360Isda,
     /// Actual/Actual (ISDA).
-    #[classattr]
-    const ACT_ACT: PyDayCount = PyDayCount {
-        inner: DayCount::ActAct,
-    };
+    ACT_ACT => ActAct,
     /// Actual/Actual (ICMA/ISMA).
-    #[classattr]
-    const ACT_ACT_ISMA: PyDayCount = PyDayCount {
-        inner: DayCount::ActActIsma,
-    };
+    ACT_ACT_ISMA => ActActIsma,
     /// Actual/Actual AFB (Actual/Actual Euro).
     ///
     /// Walks whole years backwards from the end date (QuantLib
     /// ``ActualActual::AFB``). A year-step landing on 28 February of a leap
     /// year is bumped to 29 February. The residual uses denominator 366 if
     /// 29 February lies in ``[start, residual_end)``, else 365.
-    #[classattr]
-    const ACT_ACT_AFB: PyDayCount = PyDayCount {
-        inner: DayCount::ActActAfb,
-    };
+    ACT_ACT_AFB => ActActAfb,
     /// 30/360 Italian.
     ///
     /// Day 31 becomes 30, and any February day after the 27th becomes 30
     /// (QuantLib ``Thirty360::Italian``). Distinct from US SIA and 30E/360.
-    #[classattr]
-    const THIRTY_360_IT: PyDayCount = PyDayCount {
-        inner: DayCount::Thirty360It,
-    };
+    THIRTY_360_IT => Thirty360It,
     /// Business/252 (Brazilian market convention).
-    #[classattr]
-    const BUS_252: PyDayCount = PyDayCount {
-        inner: DayCount::Bus252,
-    };
+    BUS_252 => Bus252,
+});
 
-    /// Parse a day-count convention from its canonical name (strict).
-    ///
-    /// Parameters
-    /// ----------
-    /// name : str
-    ///     Exact snake_case identifier such as ``"act_360"``,
-    ///     ``"act_act_isma"``, ``"30e_360_isda"`` or ``"nl_365"``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If no spelling matches; the message lists the canonical names.
-    ///     Case, spaces, ``/`` and ``-`` are normalised, so term-sheet
-    ///     spellings such as ``"ACT/360"`` or ``"Act/Act ICMA"`` are accepted.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, name)")]
-    fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
-        name.parse::<DayCount>()
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
+#[pymethods]
+impl PyDayCount {
     /// Compute the year fraction between two dates under this convention.
     ///
     /// Parameters
@@ -230,20 +166,6 @@ impl PyDayCount {
         self.inner
             .signed_year_fraction(s, e, context)
             .map_err(core_to_py)
-    }
-
-    /// Support ``pickle`` by reconstructing through ``from_name``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_name = py.get_type::<Self>().getattr("from_name")?;
-        Ok((from_name, (self.inner.to_string(),)))
-    }
-
-    fn __repr__(&self) -> String {
-        format!("DayCount('{}')", self.inner)
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
     }
 }
 
@@ -379,27 +301,6 @@ impl PyDayCountContext {
         self.inner.end_is_termination_date
     }
 
-    /// Serialize to the canonical JSON wire form (strict field names).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "cannot serialize DayCountContext"))
-    }
-
-    /// Deserialize from canonical JSON; raises ``ValueError`` on malformed input.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<DayCountContextState>(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid DayCountContext JSON"))
-    }
-
-    /// Support ``pickle`` through the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         let state = &self.inner;
         let calendar_id = match &state.calendar_id {
@@ -428,6 +329,8 @@ impl PyDayCountContext {
     }
 }
 
+wire_methods!(PyDayCountContext, DayCountContextState, "DayCountContext");
+
 /// 30/360 sub-convention (US SIA / Bond Basis, ISDA, European, Italian).
 ///
 /// Immutable, hashable enum-style type used by ``days_30_360``. ``str()``
@@ -452,70 +355,23 @@ pub struct PyThirty360Convention {
     pub(crate) inner: Thirty360Convention,
 }
 
-/// Extract a [`Thirty360Convention`] from a wrapper or its snake_case name.
-fn extract_thirty360(obj: &Bound<'_, PyAny>) -> PyResult<Thirty360Convention> {
-    if let Ok(c) = obj.extract::<PyRef<'_, PyThirty360Convention>>() {
-        return Ok(c.inner);
-    }
-    if let Ok(s) = obj.extract::<String>() {
-        return s.parse().map_err(core_to_py);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(
-        "expected Thirty360Convention or str",
-    ))
-}
+typed_or_label!(
+    fn extract_thirty360 -> Thirty360Convention,
+    PyThirty360Convention,
+    "Thirty360Convention or str",
+    |label| label.parse().map_err(core_to_py)
+);
 
-#[pymethods]
-impl PyThirty360Convention {
+label_enum!(PyThirty360Convention, Thirty360Convention, "Thirty360Convention", from_name, {
     /// US 30/360 SIA / Bond Basis convention.
-    #[classattr]
-    const US_SIA: PyThirty360Convention = PyThirty360Convention {
-        inner: Thirty360Convention::UsSia,
-    };
+    US_SIA => UsSia,
     /// 30/360 ISDA convention.
-    #[classattr]
-    const ISDA: PyThirty360Convention = PyThirty360Convention {
-        inner: Thirty360Convention::Isda,
-    };
+    ISDA => Isda,
     /// European 30E/360 convention.
-    #[classattr]
-    const EUROPEAN: PyThirty360Convention = PyThirty360Convention {
-        inner: Thirty360Convention::European,
-    };
+    EUROPEAN => European,
     /// 30/360 Italian convention.
-    #[classattr]
-    const ITALIAN: PyThirty360Convention = PyThirty360Convention {
-        inner: Thirty360Convention::Italian,
-    };
-
-    /// Parse from the snake_case name (``"us_sia"``, ``"isda"``, ``"european"``, ``"italian"``),
-    /// case-insensitively. Raises ``ValueError`` for anything else.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, name)")]
-    fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
-        name.parse().map(|inner| Self { inner }).map_err(core_to_py)
-    }
-
-    /// Support ``pickle`` by reconstructing through ``from_name``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_name = py.get_type::<Self>().getattr("from_name")?;
-        Ok((from_name, (self.inner.to_string(),)))
-    }
-
-    fn __repr__(&self) -> String {
-        let label = match self.inner {
-            Thirty360Convention::UsSia => "US_SIA",
-            Thirty360Convention::Isda => "ISDA",
-            Thirty360Convention::European => "EUROPEAN",
-            Thirty360Convention::Italian => "ITALIAN",
-        };
-        format!("Thirty360Convention.{label}")
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-}
+    ITALIAN => Italian,
+});
 
 /// 30/360 day count between ``start`` (inclusive) and ``end`` (exclusive).
 ///

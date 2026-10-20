@@ -3,10 +3,11 @@
 use std::sync::Arc;
 
 use finstack_quant_core::market_data::surfaces::VolCubeExpirySlice;
+use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use pyo3::prelude::*;
 
-use super::helpers::{columns_to_dataframe, impl_arc_serde_pymethods, parse_vol_quote_type};
-use crate::bindings::macros::impl_repr_html_via_dataframe;
+use super::helpers::columns_to_dataframe;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::errors::core_to_py;
 
 /// Volatility grid at one fixed option expiry, indexed by tenor and strike.
@@ -72,7 +73,7 @@ impl PyVolCubeExpirySlice {
             &tenors,
             &strikes,
             &vols,
-            parse_vol_quote_type(quote_type)?,
+            quote_type.parse::<VolQuoteType>().map_err(core_to_py)?,
             displacements.as_deref(),
         )
         .map(|slice| Self::from_inner(Arc::new(slice)))
@@ -158,9 +159,10 @@ impl PyVolCubeExpirySlice {
     }
 }
 
-impl_arc_serde_pymethods!(
+wire_methods!(
     PyVolCubeExpirySlice,
     VolCubeExpirySlice,
-    "VolCubeExpirySlice"
+    "VolCubeExpirySlice",
+    arc
 );
 impl_repr_html_via_dataframe!(PyVolCubeExpirySlice);
