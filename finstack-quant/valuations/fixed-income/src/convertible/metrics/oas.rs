@@ -19,8 +19,6 @@
 //! Returned in **decimal** (e.g., 0.01 = 100bp), consistent with other spread
 //! metrics in the library.
 
-use std::cell::Cell;
-
 use crate::convertible::pricing::{
     calculate_accrued_interest, price_convertible_bond, settlement_dirty_price,
 };
@@ -71,20 +69,6 @@ impl MetricCalculator for OasCalculator {
         // converge" failures driven by NaN objective values.
         let _ = price_convertible_bond(bond, base_market, as_of)?;
 
-        // Capture the first pricing error from inside the closure so that if the
-        // solver bails we can report the underlying cause rather than a generic
-        // bracket failure. We keep the *first* error: subsequent failures don't
-        // overwrite it. `Cell::take` returns the existing value (clearing it),
-        // and `Option::or` keeps the first `Some` while preferring it over a
-        // later `Some(e)`. Naively using `if take().is_none() { set(Some(e)) }`
-        // would lose the captured error on the second failure (take clears it,
-        // is_none() is false, no re-set).
-        let captured_err: Cell<Option<finstack_quant_core::Error>> = Cell::new(None);
-        let record_err = |e: finstack_quant_core::Error| {
-            let prev = captured_err.take();
-            captured_err.set(prev.or(Some(e)));
-        };
-
         // Shift the issuer hazard curve when available (affects the cash/debt
         // component, default recovery and survival-conditioned equity drift).
         // Adjust the discount curve when no credit
@@ -109,23 +93,21 @@ impl MetricCalculator for OasCalculator {
                 None => bump_discount_curve_parallel(base_market, curve_to_bump, spread_bp),
             }
         };
-        let objective = |spread: f64| -> f64 {
-            let bumped = match shifted_market(spread) {
-                Ok(m) => m,
-                Err(e) => {
-                    record_err(e);
-                    return f64::NAN;
-                }
-            };
-            match price_convertible_bond(bond, &bumped, as_of)
-                .and_then(|pv| settlement_dirty_price(bond, &bumped, as_of, pv.amount()))
-            {
-                Ok(dirty) => dirty - target_dirty,
-                Err(e) => {
-                    record_err(e);
-                    f64::NAN
-                }
-            }
+        // A pricing failure inside the objective aborts the solve; it is
+        // reported as the cause rather than as a generic bracket failure.
+        let objective = |spread: f64| -> finstack_quant_core::Result<f64> {
+            shifted_market(spread)
+                .and_then(|bumped| {
+                    let pv = price_convertible_bond(bond, &bumped, as_of)?;
+                    settlement_dirty_price(bond, &bumped, as_of, pv.amount())
+                })
+                .map(|dirty| dirty - target_dirty)
+                .map_err(|inner| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "Convertible OAS solver failed because pricing failed inside the \
+                         objective: {inner}"
+                    ))
+                })
         };
 
         // Lower bound: the most negative spread the shifted curve admits.
@@ -160,18 +142,12 @@ impl MetricCalculator for OasCalculator {
             .bracket_bounds(lower_spread, 0.50); // Curve-policy floor to +5000bp in decimal
 
         let price_tolerance = 1e-10 * target_dirty.abs().max(1.0);
-        if objective(0.0).abs() <= price_tolerance {
+        if objective(0.0)?.abs() <= price_tolerance {
             return Ok(0.0);
         }
-        match solver.solve(objective, 0.0) {
+        match solver.solve_fallible(objective, 0.0) {
             Ok(oas) => Ok(oas),
             Err(mut solver_err) => {
-                if let Some(inner) = captured_err.take() {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Convertible OAS solver failed because pricing failed inside the \
-                         objective: {inner}"
-                    )));
-                }
                 if let finstack_quant_core::Error::Input(
                     finstack_quant_core::InputError::SolverConvergenceFailed { reason, .. },
                 ) = &mut solver_err
@@ -497,36 +473,5 @@ mod tests {
             let solved = super::OasCalculator.calculate(&mut ctx).unwrap();
             assert!((solved - expected_spread).abs() < 1e-8, "{solved}");
         }
-    }
-
-    /// Regression test for the Cell-based error capture pattern.
-    ///
-    /// An earlier version used `if captured_err.take().is_none() { set(Some(e)) }`
-    /// which clears the captured value on the second call (take consumes the
-    /// existing Some, is_none() is false on the just-cleared Cell, no re-set
-    /// happens). The fix is `take().or(Some(e))` so the first error is always
-    /// retained across N failures.
-    #[test]
-    fn record_err_keeps_first_error_across_multiple_failures() {
-        use std::cell::Cell;
-
-        let captured_err: Cell<Option<finstack_quant_core::Error>> = Cell::new(None);
-        let record_err = |e: finstack_quant_core::Error| {
-            let prev = captured_err.take();
-            captured_err.set(prev.or(Some(e)));
-        };
-
-        // Simulate the solver objective firing three errors in sequence.
-        record_err(finstack_quant_core::Error::Validation("first".into()));
-        record_err(finstack_quant_core::Error::Validation("second".into()));
-        record_err(finstack_quant_core::Error::Validation("third".into()));
-
-        let captured = captured_err.take();
-        assert!(captured.is_some(), "first error should be retained");
-        let msg = captured.map(|e| e.to_string()).unwrap_or_default();
-        assert!(
-            msg.contains("first"),
-            "expected first error to be preserved, got: {msg}"
-        );
     }
 }

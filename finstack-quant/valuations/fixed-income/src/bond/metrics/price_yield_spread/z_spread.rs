@@ -7,7 +7,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::z_spread_discount_factor;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
-use std::cell::RefCell;
 
 /// Z-spread solver tolerance on the spread axis (decimal, not bp).
 ///
@@ -178,89 +177,87 @@ impl BondZSpreadPricingKernel {
 
 impl MetricCalculator for ZSpreadCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        // Get bond and compute quote-date context
         let bond: &Bond = context.instrument_as()?;
-
-        // Compute quote-date context (settlement date and accrued at settlement)
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
+        let target = quote_date_dirty_target(bond, context, &quote_ctx)?;
 
-        // Determine dirty market value in currency at quote_date
-        let target_value_currency: f64 = if let Some(clean_px) = bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_clean_price_pct
-        {
-            // Use accrued at quote_date for dirty price calculation
-            quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount())
-        } else {
-            // Fallback: forward-value the model PV (at `as_of`) to the
-            // quote/settlement date, matching the YTM fallback. The kernel
-            // discounts from `quote_date`, so an un-carried PV target would
-            // bias the solved spread by the settlement-period carry.
-            crate::bond::pricing::settlement::model_dirty_at_quote_date(
-                bond,
-                &context.curves,
-                context.as_of,
-                quote_ctx.quote_date,
-                context.base_value.amount(),
-            )?
-        };
-
-        // Build the same quote-date/workout-path repricing kernel used by
+        // The same quote-date/workout-path repricing kernel used by
         // price_from_z_spread and bond spread duration.
-        let pricing_kernel =
-            BondZSpreadPricingKernel::new(bond, context.curves.as_ref(), context.as_of)?;
-        let quote_date = pricing_kernel.quote_date;
-
-        // Capture the first z-spread pricing error encountered inside the
-        // objective so a bad-curve-data failure is surfaced as the real cause
-        // rather than an opaque `SolverConvergenceFailed`.
-        let pricing_error: RefCell<Option<finstack_quant_core::Error>> = RefCell::new(None);
-
-        // Objective: PV_z(z) - target_value_currency = 0
-        //
-        // When `z_spread_discount_factor` returns `Err` (non-positive DF or
-        // non-positive compounding denominator), we capture the first error and
-        // return a large positive residual (+1e12) so Brent can report a
-        // convergence failure instead of silently propagating NaN/Inf values
-        // into the PV accumulator.
-        let objective = |z: f64| -> f64 {
-            match pricing_kernel.price(z) {
-                Ok(pv) => pv - target_value_currency,
-                Err(e) => {
-                    let mut slot = pricing_error.borrow_mut();
-                    if slot.is_none() {
-                        *slot = Some(e);
-                    }
-                    drop(slot);
-                    // Large positive residual: price diverges to +∞ when the
-                    // spread is extremely negative (below the compounding
-                    // floor). This keeps the residual monotone and prevents
-                    // Brent from manufacturing a fake sign-changing bracket.
-                    1e12
-                }
-            }
-        };
-
-        // Solve using Brent with a maturity-aware bracket and production-grade
-        // tolerance. Initial guess is 0.0 (0 bp).
-        let bracket = maturity_scaled_bracket(
+        let kernel = BondZSpreadPricingKernel::new(bond, context.curves.as_ref(), context.as_of)?;
+        solve_kernel_spread(
             bond,
-            quote_date,
+            &kernel,
+            target,
+            kernel.quote_date,
             Z_SPREAD_BASE_BRACKET_BP,
             Z_SPREAD_MAX_BRACKET_BP,
-        )?;
-        let solver = BrentSolver::new()
-            .tolerance(Z_SPREAD_TOLERANCE)
-            .initial_bracket_size(Some(bracket));
-        let z = solver.solve(objective, 0.0)?;
-
-        // Surface any pricing error that occurred inside the objective instead
-        // of returning a potentially meaningless spread.
-        if let Some(err) = pricing_error.into_inner() {
-            return Err(err);
-        }
-
-        Ok(z)
+            Z_SPREAD_TOLERANCE,
+        )
     }
+}
+
+/// Dirty target value in currency at the quote/settlement date.
+///
+/// Uses the quoted clean price (percent of par) plus accrued at the quote
+/// date; without a quote, forward-values the model PV at `as_of` to the quote
+/// date, matching the YTM fallback, because the spread kernels discount from
+/// the quote date and an un-carried PV target would bias the solved spread by
+/// the settlement-period carry.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose quoted clean price and notional set the target.
+/// * `context` - Metric context supplying curves, `as_of` and the base model PV.
+/// * `quote_ctx` - Quote-date context (settlement date and accrued there).
+pub(crate) fn quote_date_dirty_target(
+    bond: &Bond,
+    context: &MetricContext,
+    quote_ctx: &QuoteDateContext,
+) -> finstack_quant_core::Result<f64> {
+    match bond
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct
+    {
+        Some(clean_px) => Ok(quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount())),
+        None => crate::bond::pricing::settlement::model_dirty_at_quote_date(
+            bond,
+            &context.curves,
+            context.as_of,
+            quote_ctx.quote_date,
+            context.base_value.amount(),
+        ),
+    }
+}
+
+/// Solve `kernel.price(s) = target` for the additive spread `s` (decimal).
+///
+/// Brent starts at `0.0` with a maturity-aware initial bracket (see
+/// [`maturity_scaled_bracket`]). A kernel pricing failure (a non-positive
+/// discount factor or compounding denominator at a deeply negative spread)
+/// aborts the solve and is returned as-is rather than steering the bracket.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose maturity scales the initial bracket.
+/// * `kernel` - Spread repricing kernel; its PV is decreasing in the spread.
+/// * `target` - Dirty target value in currency at the kernel's quote date.
+/// * `bracket_from` - Date from which the bracket's maturity horizon is measured.
+/// * `base_bracket_bp` - Bracket half-width in basis points at zero horizon.
+/// * `max_bracket_bp` - Cap on the scaled bracket half-width, in basis points.
+/// * `tolerance` - Brent tolerance on the spread axis (decimal).
+pub(crate) fn solve_kernel_spread(
+    bond: &Bond,
+    kernel: &BondZSpreadPricingKernel,
+    target: f64,
+    bracket_from: Date,
+    base_bracket_bp: f64,
+    max_bracket_bp: f64,
+    tolerance: f64,
+) -> finstack_quant_core::Result<f64> {
+    let bracket = maturity_scaled_bracket(bond, bracket_from, base_bracket_bp, max_bracket_bp)?;
+    BrentSolver::new()
+        .tolerance(tolerance)
+        .initial_bracket_size(Some(bracket))
+        .solve_fallible(|z| Ok(kernel.price(z)? - target), 0.0)
 }
