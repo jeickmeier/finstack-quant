@@ -105,11 +105,3 @@ pub mod credit {
 /// denominator for annualizing daily equity and FX option statistics (realized vol,
 /// Sharpe ratio, theta decay, etc.).
 pub const TRADING_DAYS_PER_YEAR: f64 = time::BUSINESS_DAYS_PER_YEAR_US;
-
-/// Default day-count denominator for per-day theta in the closed-form Greeks.
-///
-/// Re-exported from `finstack_quant_models::closed_form`, which owns it next to
-/// `bs_greeks` (ACT/365; pass [`TRADING_DAYS_PER_YEAR`] (252) instead for
-/// business-day-scaled theta). Both host bindings' `theta_days_per_year`
-/// parameters default to that one constant.
-pub use finstack_quant_models::closed_form::DEFAULT_THETA_DAYS_PER_YEAR;

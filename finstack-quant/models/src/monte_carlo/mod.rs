@@ -32,11 +32,13 @@
 //! # Module map
 //!
 //! - Models and simulation inputs: [`rng`], [`process`], and [`discretization`].
-//! - Engine contracts and execution: [`traits`], [`TimeGrid`], [`engine`], and
+//! - Engine contracts and execution: [`traits`],
+//!   [`TimeGrid`](finstack_quant_core::math::time_grid::TimeGrid), [`engine`], and
 //!   [`engine_fractional`].
 //! - Products and analytics: [`payoff`], [`pricer`], [`barriers`], [`greeks`], and
 //!   [`variance_reduction`].
-//! - Results and diagnostics: [`estimate`], [`OnlineStats`], [`paths`], and [`results`].
+//! - Results and diagnostics: [`estimate`],
+//!   [`OnlineStats`](finstack_quant_core::math::stats::OnlineStats), [`paths`], and [`results`].
 //! - Runtime defaults and reproducibility: [`registry`] and [`seed`].
 //!
 //! # Conventions
@@ -104,10 +106,6 @@ pub mod variance_reduction;
 
 #[cfg(test)]
 mod mc_process_params_serialization;
-
-pub use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats};
-pub use finstack_quant_core::math::time_grid::TimeGrid;
-pub use traits::RandomStream;
 
 /// Reject a non-finite or non-positive volatility before a convenience pricer runs.
 ///

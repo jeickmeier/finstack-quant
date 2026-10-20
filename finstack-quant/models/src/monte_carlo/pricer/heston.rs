@@ -33,9 +33,9 @@ use crate::monte_carlo::process::heston::HestonProcess;
 use crate::monte_carlo::registry;
 use crate::monte_carlo::results::MoneyEstimate;
 use crate::monte_carlo::rng::philox::PhiloxRng;
-use crate::monte_carlo::TimeGrid;
 use finstack_quant_core::cashflow::flat_discount_factor;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::Result;
 
 /// Price a European option under Heston stochastic volatility by Monte Carlo.

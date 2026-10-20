@@ -142,8 +142,7 @@ pub fn decompose_factor_risk(
     let covariance_json: &str = &json_text(&covariance_json, "covarianceJson")?;
     let wire: finstack_quant_portfolio::sensitivity::SensitivityMatrixJson =
         serde_json::from_str(sensitivities_json).map_err(to_js_err)?;
-    let matrix = finstack_quant_portfolio::sensitivity::SensitivityMatrix::try_from(wire)
-        .map_err(to_js_err)?;
+    let matrix = finstack_quant_factor::SensitivityMatrix::try_from(wire).map_err(to_js_err)?;
     let covariance: finstack_quant_factor::FactorCovarianceMatrix =
         serde_json::from_str(covariance_json).map_err(to_js_err)?;
     // `js_opt_wire`: the unit variants are bare wire strings (`"variance"`),

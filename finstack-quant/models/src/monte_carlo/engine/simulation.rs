@@ -125,7 +125,7 @@ fn draw_uniform_if_needed<R: RandomStream, F: Payoff>(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_path_loop<R, P, D, F>(
     rng: &mut R,
-    time_grid: &crate::monte_carlo::TimeGrid,
+    time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
     process: &P,
     disc: &D,
     initial_state: &[f64],

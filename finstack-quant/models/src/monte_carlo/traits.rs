@@ -700,7 +700,7 @@ pub trait StochasticProcess: Send + Sync {
     /// process's discretization cannot integrate within one interval.
     fn validate_time_grid(
         &self,
-        time_grid: &crate::monte_carlo::TimeGrid,
+        time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
     ) -> finstack_quant_core::Result<()> {
         let _ = time_grid;
         Ok(())
@@ -799,7 +799,12 @@ pub trait Discretization<P: StochasticProcess + ?Sized>: Send + Sync {
     /// fast path guarded by an exact `dt` match and fall back to direct
     /// computation otherwise, so results remain bit-identical regardless of
     /// whether `prepare` ran. The default is a no-op.
-    fn prepare(&mut self, _process: &P, _time_grid: &crate::monte_carlo::TimeGrid) {}
+    fn prepare(
+        &mut self,
+        _process: &P,
+        _time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
+    ) {
+    }
 
     /// Workspace size required for intermediate calculations.
     fn work_size(&self, process: &P) -> usize {
@@ -836,7 +841,7 @@ pub trait Discretization<P: StochasticProcess + ?Sized>: Send + Sync {
     ///
     /// Schemes that preallocate step-indexed kernel tables (such as
     /// `RoughHestonHybrid`) return `Some(num_steps)` so the engine can reject a
-    /// mismatched [`crate::monte_carlo::TimeGrid`] before stepping.
+    /// mismatched [`finstack_quant_core::math::time_grid::TimeGrid`] before stepping.
     fn expected_num_steps(&self) -> Option<usize> {
         None
     }

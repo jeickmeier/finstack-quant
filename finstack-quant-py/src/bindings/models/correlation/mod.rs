@@ -12,11 +12,13 @@ use crate::errors::{core_to_py, correlation_to_py, value_error};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule, PyType};
 
+use finstack_quant_core::math::linalg::{self, cholesky_correlation};
+use finstack_quant_core::math::probability::{self, CorrelatedBernoulli};
 use finstack_quant_models::correlation::CreditExposure;
 use finstack_quant_models::correlation::{
-    self as corr, Copula, CopulaSpec, CorrelatedBernoulli, LatentFactorKind, LatentFactorSpec,
-    LatentMultiFactor, LatentSingleFactor, LatentTwoFactor, PortfolioLossConfig,
-    PortfolioLossResult, RecoveryModel, RecoverySpec, TrancheLossStatistics,
+    self as corr, Copula, CopulaSpec, LatentFactorKind, LatentFactorSpec, LatentMultiFactor,
+    LatentSingleFactor, LatentTwoFactor, PortfolioLossConfig, PortfolioLossResult, RecoveryModel,
+    RecoverySpec, TrancheLossStatistics,
 };
 
 /// Copula model specification for configuration and deferred construction.
@@ -1385,7 +1387,7 @@ fn extract_square_matrix(
 #[pyfunction]
 #[pyo3(text_signature = "(p1, p2)")]
 fn correlation_bounds(p1: f64, p2: f64) -> PyResult<(f64, f64)> {
-    corr::correlation_bounds(p1, p2).map_err(core_to_py)
+    probability::correlation_bounds(p1, p2).map_err(core_to_py)
 }
 
 /// Joint probabilities for two correlated Bernoulli variables.
@@ -1395,7 +1397,7 @@ fn correlation_bounds(p1: f64, p2: f64) -> PyResult<(f64, f64)> {
 #[pyfunction]
 #[pyo3(text_signature = "(p1, p2, correlation)")]
 fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> PyResult<(f64, f64, f64, f64)> {
-    corr::joint_probabilities(p1, p2, correlation).map_err(core_to_py)
+    probability::joint_probabilities(p1, p2, correlation).map_err(core_to_py)
 }
 
 /// Validate a correlation matrix.
@@ -1416,7 +1418,7 @@ fn validate_correlation_matrix(
     n: usize,
 ) -> PyResult<()> {
     let matrix = extract_square_matrix(py, matrix, n)?;
-    py.detach(|| corr::validate_correlation_matrix(&matrix, n))
+    py.detach(|| linalg::validate_correlation_matrix(&matrix, n))
         .map_err(|err| correlation_to_py(corr::Error::from(err)))
 }
 
@@ -1480,12 +1482,12 @@ fn nearest_correlation(
     let matrix = extract_square_matrix(py, matrix, n)?;
     // Single source of truth for the defaults: the Rust
     // `NearestCorrelationOpts::default()` (max_iter = 200, tol = 1e-10).
-    let defaults = corr::NearestCorrelationOpts::default();
-    let opts = corr::NearestCorrelationOpts {
+    let defaults = linalg::NearestCorrelationOpts::default();
+    let opts = linalg::NearestCorrelationOpts {
         max_iter: max_iter.unwrap_or(defaults.max_iter),
         tol: tol.unwrap_or(defaults.tol),
     };
-    py.detach(|| corr::nearest_correlation(&matrix, n, opts))
+    py.detach(|| linalg::nearest_correlation(&matrix, n, opts))
         .map_err(|err| correlation_to_py(corr::Error::from(err)))
 }
 
@@ -1512,8 +1514,8 @@ fn nearest_correlation(
 #[pyo3(text_signature = "(matrix, n)")]
 fn cholesky_decompose(py: Python<'_>, matrix: &Bound<'_, PyAny>, n: usize) -> PyResult<Vec<f64>> {
     let matrix = extract_square_matrix(py, matrix, n)?;
-    py.detach(|| corr::cholesky_decompose(&matrix, n).map(|f| f.factor_matrix().to_vec()))
-        .map_err(correlation_to_py)
+    py.detach(|| cholesky_correlation(&matrix, n).map(|f| f.factor_matrix().to_vec()))
+        .map_err(|e| correlation_to_py(corr::Error::from(e)))
 }
 
 /// Register the `correlation` submodule on the parent module.

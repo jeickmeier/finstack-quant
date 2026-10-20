@@ -8,7 +8,7 @@
 //! to capture. Every HW1F Monte Carlo pricer must therefore accumulate the
 //! pathwise `B(t)` and discount with it (or with ratios of it).
 
-use crate::monte_carlo::TimeGrid;
+use finstack_quant_core::math::time_grid::TimeGrid;
 
 /// One-step trapezoidal bank-account growth factor over `[t, t + dt]`.
 ///

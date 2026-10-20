@@ -940,7 +940,7 @@ mod tests {
             PathDependentPricer, PathDependentPricerConfig,
         };
         use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
-        use crate::monte_carlo::TimeGrid;
+        use finstack_quant_core::math::time_grid::TimeGrid;
         // For zero log drift, the reflection principle gives
         // max(log(S/S0)) ~ |N(0, sigma² T)|. Integrating its density yields
         // E[max(S)] = 2 S0 exp(sigma² T/2) Phi(sigma sqrt(T)).

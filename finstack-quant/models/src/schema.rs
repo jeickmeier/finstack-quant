@@ -32,7 +32,7 @@ use crate::{
     credit::RatingFactorTable, credit::SimulatedPaths, credit::ToggleExerciseModel,
     fourier::characteristic_function::BlackScholesCf,
     fourier::characteristic_function::MertonJumpCf,
-    fourier::characteristic_function::VarianceGammaCf, fourier::CosConfig,
+    fourier::characteristic_function::VarianceGammaCf, fourier::cos::CosConfig,
     liquidity::AlmgrenChrissModel, liquidity::ExecutionTrajectory, liquidity::ImpactEstimate,
     liquidity::KyleLambdaModel, liquidity::LiquidityTier, liquidity::LvarBangiaScalar,
     liquidity::TradeParams, monte_carlo::estimate::Estimate, monte_carlo::greeks::lrm::LrmGreeks,

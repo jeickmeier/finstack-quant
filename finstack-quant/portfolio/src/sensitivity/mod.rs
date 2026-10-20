@@ -25,7 +25,6 @@ mod traits;
 
 pub(crate) use delta_engine::mapping_to_market_bumps;
 pub use delta_engine::DeltaBasedEngine;
-pub use finstack_quant_factor::SensitivityMatrix;
 pub use json::{
     compute_factor_sensitivities_from_json, compute_pnl_profiles_from_json, SensitivityMatrixJson,
     DEFAULT_PNL_SCENARIO_POINTS,

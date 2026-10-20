@@ -33,7 +33,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-use finstack_quant_models::monte_carlo::RandomStream;
+use finstack_quant_models::monte_carlo::traits::RandomStream;
 use finstack_quant_valuations_core::instruments::Instrument;
 use serde::{Deserialize, Serialize};
 

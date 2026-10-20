@@ -49,29 +49,6 @@ use finstack_quant_core::math::linalg::{
     CorrelationFactor,
 };
 
-/// Perform Cholesky decomposition of a correlation matrix using diagonal pivoting.
-/// Returns a [`CorrelationFactor`] that holds the lower triangular factor in the
-/// **original variable ordering** and exposes the effective numerical rank. The
-/// pivoted algorithm handles near-singular and positive-semidefinite matrices
-/// gracefully rather than rejecting them with an absolute threshold.
-///
-/// # Arguments
-/// * `matrix` - Flattened row-major correlation/covariance matrix
-/// * `n` - Matrix dimension
-///
-/// # Returns
-/// [`CorrelationFactor`] with unpermuted lower-triangular L, or error if the matrix
-/// is indefinite.
-///
-/// # Errors
-/// Returns [`crate::correlation::Error`] preserving the canonical core
-/// [`finstack_quant_core::math::linalg::CholeskyError`] when the flattened
-/// matrix shape is wrong, an entry is non-finite, or the matrix is not positive
-/// semidefinite.
-pub fn cholesky_decompose(matrix: &[f64], n: usize) -> Result<CorrelationFactor> {
-    cholesky_correlation(matrix, n).map_err(Error::from)
-}
-
 /// Closed enum over the concrete factor models for correlated behavior.
 ///
 /// Replaces a former `FactorModel` trait object: the set of factor models is
@@ -291,7 +268,7 @@ impl LatentFactorSpec {
     ///
     /// Returns [`crate::correlation::Error`] if a multi-factor specification
     /// contains an invalid volatility vector or correlation matrix. Call
-    /// [`crate::correlation::nearest_correlation`] explicitly before
+    /// [`finstack_quant_core::math::linalg::nearest_correlation`] explicitly before
     /// construction when projection is part of the caller's policy.
     pub fn build(&self) -> Result<LatentFactorKind> {
         Ok(match self {
@@ -669,7 +646,7 @@ impl LatentMultiFactor {
 
         validate_correlation_matrix(&correlations, n)?;
 
-        let cholesky = cholesky_decompose(&correlations, n)?;
+        let cholesky = cholesky_correlation(&correlations, n)?;
 
         Ok(Self {
             num_factors: n,
@@ -937,14 +914,14 @@ mod tests {
     fn test_validate_not_psd_reports_cholesky_failure_row() {
         let corr = vec![1.0, 0.9, 0.9, 0.9, 1.0, -0.5, 0.9, -0.5, 1.0];
         let result = validate_correlation_matrix(&corr, 3);
-        let cholesky_result = cholesky_decompose(&corr, 3);
+        let cholesky_result = cholesky_correlation(&corr, 3);
 
         match (result, cholesky_result) {
             (
                 Err(MatrixError::NotPositiveSemiDefinite { row: validate_row }),
-                Err(Error::Cholesky(CholeskyError::NotPositiveDefinite {
+                Err(CholeskyError::NotPositiveDefinite {
                     row: cholesky_row, ..
-                })),
+                }),
             ) => assert_eq!(validate_row, cholesky_row),
             other => panic!("expected matching PSD errors, got {:?}", other),
         }
@@ -961,25 +938,25 @@ mod tests {
 
     #[test]
     fn test_cholesky_dimension_mismatch_preserves_expected_and_actual() {
-        let err = cholesky_decompose(&[1.0, 0.0, 0.0], 2)
+        let err = cholesky_correlation(&[1.0, 0.0, 0.0], 2)
             .expect_err("non-square flattened input should be rejected");
 
         assert!(matches!(
             err,
-            Error::Cholesky(CholeskyError::DimensionMismatch {
+            CholeskyError::DimensionMismatch {
                 expected: 2,
                 actual: 3,
-            })
+            }
         ));
     }
 
     #[test]
     fn test_cholesky_indefinite_matrix_preserves_failure_row_and_diagonal() {
-        let err = cholesky_decompose(&[1.0, 0.9, 0.0, 0.9, 1.0, 0.9, 0.0, 0.9, 1.0], 3)
+        let err = cholesky_correlation(&[1.0, 0.9, 0.0, 0.9, 1.0, 0.9, 0.0, 0.9, 1.0], 3)
             .expect_err("indefinite matrix should be rejected");
 
         match err {
-            Error::Cholesky(CholeskyError::NotPositiveDefinite { diag, row }) => {
+            CholeskyError::NotPositiveDefinite { diag, row } => {
                 assert_eq!(row, 1);
                 assert!(
                     (diag + 0.62).abs() < 1e-12,
@@ -992,23 +969,23 @@ mod tests {
 
     #[test]
     fn test_cholesky_non_finite_input_preserves_location_and_value() {
-        let err = cholesky_decompose(&[1.0, 0.0, f64::INFINITY, 1.0], 2)
+        let err = cholesky_correlation(&[1.0, 0.0, f64::INFINITY, 1.0], 2)
             .expect_err("non-finite matrix entry should be rejected");
 
         assert!(matches!(
             err,
-            Error::Cholesky(CholeskyError::NonFiniteInput {
+            CholeskyError::NonFiniteInput {
                 value,
                 row: 1,
                 col: 0,
-            }) if value == f64::INFINITY
+            } if value == f64::INFINITY
         ));
     }
 
     #[test]
     fn test_cholesky_identity() {
         let identity = vec![1.0, 0.0, 0.0, 1.0];
-        let f = cholesky_decompose(&identity, 2).expect("identity matrix should decompose");
+        let f = cholesky_correlation(&identity, 2).expect("identity matrix should decompose");
         let l = f.factor_matrix();
 
         // Identity is its own Cholesky factor
@@ -1022,7 +999,7 @@ mod tests {
     fn test_cholesky_2x2() {
         // [[1, 0.6], [0.6, 1]]
         let corr = vec![1.0, 0.6, 0.6, 1.0];
-        let f = cholesky_decompose(&corr, 2).expect("2x2 correlation matrix should decompose");
+        let f = cholesky_correlation(&corr, 2).expect("2x2 correlation matrix should decompose");
 
         // Verify L * L^T = original (pivoting may produce different but valid factor).
         let l = f.factor_matrix();
@@ -1046,7 +1023,7 @@ mod tests {
     #[test]
     fn test_cholesky_reconstructs_original() {
         let corr = vec![1.0, 0.5, 0.3, 0.5, 1.0, 0.4, 0.3, 0.4, 1.0];
-        let f = cholesky_decompose(&corr, 3).expect("3x3 correlation matrix should decompose");
+        let f = cholesky_correlation(&corr, 3).expect("3x3 correlation matrix should decompose");
         let l = f.factor_matrix();
 
         // Verify L * L^T = original

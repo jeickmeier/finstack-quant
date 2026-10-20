@@ -1,8 +1,8 @@
 //! Shared contractual barrier monitoring and simulation observation grid.
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_models::monte_carlo::payoff::barrier::BarrierMonitoring as McBarrierMonitoring;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
-use finstack_quant_models::monte_carlo::TimeGrid;
 
 /// Contractual barrier-monitoring convention.
 #[derive(PartialEq, Eq, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]

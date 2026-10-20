@@ -11,22 +11,12 @@
 //! - [`crate::correlation::recovery`]: Recovery rate models (constant, market-correlated)
 //! - [`crate::correlation::latent_factor`]: Factor models for correlated behavior
 //!
-//! Joint probability utilities ([`crate::correlation::CorrelatedBernoulli`],
-//! [`crate::correlation::correlation_bounds`],
-//! [`crate::correlation::joint_probabilities`]) are re-exported from
-//! [`finstack_quant_core::math::probability`].
-//!
-//! Matrix-validation helpers (`validate_correlation_matrix`,
-//! `nearest_correlation`, `NearestCorrelationOpts`) are re-exported from
-//! [`finstack_quant_core::math::linalg`]. [`Error`] / [`Result`] are
-//! models-owned: they wrap core matrix failures and add credit-domain
-//! variants (volatilities, recovery, Student-t df).
-//!
-//! # Utilities
-//!
-//! - [`crate::correlation::validate_correlation_matrix`]: Validate correlation matrices
-//! - [`crate::correlation::cholesky_decompose`]: Cholesky decomposition for correlated factor generation
-//! - [`crate::correlation::correlation_bounds`]: Fréchet-Hoeffding bounds for correlated Bernoulli
+//! Joint probability utilities (`CorrelatedBernoulli`, `correlation_bounds`,
+//! `joint_probabilities`) live in [`finstack_quant_core::math::probability`];
+//! matrix helpers (`validate_correlation_matrix`, `nearest_correlation`,
+//! `cholesky_correlation`) live in [`finstack_quant_core::math::linalg`].
+//! [`Error`] / [`Result`] are models-owned: they wrap core matrix failures and
+//! add credit-domain variants (volatilities, recovery, Student-t df).
 //!
 //! # Conventions
 //!
@@ -55,15 +45,8 @@ pub use copula::{
     RandomFactorLoadingCopula, StudentTCopula,
 };
 pub use error::{Error, Result};
-pub use finstack_quant_core::math::linalg::{
-    nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts,
-};
-pub use finstack_quant_core::math::probability::{
-    correlation_bounds, joint_probabilities, CorrelatedBernoulli,
-};
 pub use latent_factor::{
-    cholesky_decompose, LatentFactorKind, LatentFactorSpec, LatentMultiFactor, LatentSingleFactor,
-    LatentTwoFactor,
+    LatentFactorKind, LatentFactorSpec, LatentMultiFactor, LatentSingleFactor, LatentTwoFactor,
 };
 pub use portfolio_loss::{
     simulate_portfolio_loss, simulate_portfolio_loss_with_recovery, CreditExposure,

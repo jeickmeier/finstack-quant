@@ -31,8 +31,8 @@ use crate::monte_carlo::engine::{run_path_loop, McEngine, NoiseHook};
 #[cfg(test)]
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::{Discretization, Payoff, RandomStream, StochasticProcess};
-use crate::monte_carlo::TimeGrid;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::{Error, Result};
 
 /// Simulate a single Monte Carlo path with fractional noise injection.

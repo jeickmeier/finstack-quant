@@ -27,7 +27,7 @@ use finstack_quant_models::monte_carlo::variance_reduction::control_variate::app
 /// Exact simulation grid and one event index for every future fixing.
 /// Repeated indices retain contractual observations sharing a model time.
 pub(super) struct FixingGrid {
-    pub(super) time_grid: finstack_quant_models::monte_carlo::TimeGrid,
+    pub(super) time_grid: finstack_quant_core::math::time_grid::TimeGrid,
     pub(super) fixing_steps: Vec<usize>,
 }
 
@@ -54,7 +54,7 @@ pub(super) fn map_fixings_to_steps(
         .filter(|&&date| date > as_of)
         .map(|&date| day_count.year_fraction(as_of, date, DayCountContext::default()))
         .collect::<finstack_quant_core::Result<Vec<_>>>()?;
-    let time_grid = finstack_quant_models::monte_carlo::TimeGrid::uniform_with_required_times(
+    let time_grid = finstack_quant_core::math::time_grid::TimeGrid::uniform_with_required_times(
         t,
         base_num_steps.max(1) as f64 / t,
         base_num_steps.max(1),

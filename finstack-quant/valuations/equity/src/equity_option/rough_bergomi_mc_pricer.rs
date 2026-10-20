@@ -179,7 +179,7 @@ fn build_xi0_from_surface(
 fn simulate_rbergomi<F: finstack_quant_models::monte_carlo::traits::Payoff>(
     num_paths: usize,
     rng: &mut finstack_quant_models::monte_carlo::rng::philox::PhiloxRng,
-    time_grid: &finstack_quant_models::monte_carlo::TimeGrid,
+    time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
     process: &finstack_quant_models::monte_carlo::process::rough_bergomi::RoughBergomiProcess,
     disc: &finstack_quant_models::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler,
     initial_state: &[f64],
@@ -189,11 +189,11 @@ fn simulate_rbergomi<F: finstack_quant_models::monte_carlo::traits::Payoff>(
     num_steps: usize,
     err_ctx: finstack_quant_valuations_core::pricer::PricingErrorContext,
 ) -> std::result::Result<(f64, f64), PricingError> {
+    use finstack_quant_core::math::stats::OnlineStats;
     use finstack_quant_models::monte_carlo::rng::fbm::FractionalNoiseGenerator;
     use finstack_quant_models::monte_carlo::traits::{
         Discretization, RandomStream, StochasticProcess,
     };
-    use finstack_quant_models::monte_carlo::OnlineStats;
 
     let num_factors = process.num_factors();
     let work_size = disc.work_size(process);
@@ -402,7 +402,7 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughBergomi
                 params,
             );
 
-        let time_grid = finstack_quant_models::monte_carlo::TimeGrid::uniform(t, self.num_steps)
+        let time_grid = finstack_quant_core::math::time_grid::TimeGrid::uniform(t, self.num_steps)
             .map_err(|e| {
                 finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
             })?;

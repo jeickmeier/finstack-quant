@@ -1095,7 +1095,7 @@ pub enum BondRiskBasis {
 #[serde(rename_all = "snake_case")]
 pub enum ThetaDayBasis {
     /// Calendar-day theta: annual theta divided by
-    /// [`crate::constants::DEFAULT_THETA_DAYS_PER_YEAR`] (365).
+    /// [`finstack_quant_models::closed_form::DEFAULT_THETA_DAYS_PER_YEAR`] (365).
     #[default]
     #[serde(rename = "calendar_365")]
     Calendar365,
@@ -1110,7 +1110,7 @@ impl ThetaDayBasis {
     #[must_use]
     pub const fn days_per_year(self) -> f64 {
         match self {
-            Self::Calendar365 => crate::constants::DEFAULT_THETA_DAYS_PER_YEAR,
+            Self::Calendar365 => finstack_quant_models::closed_form::DEFAULT_THETA_DAYS_PER_YEAR,
             Self::Trading252 => crate::constants::TRADING_DAYS_PER_YEAR,
         }
     }
