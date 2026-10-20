@@ -552,7 +552,7 @@ test('computeHorizonReturn returns the Rust summary and matches Python', () => {
   assert.deepEqual(explicit.summary, result.summary);
   assert.throws(
     () => scenarios.computeHorizonReturn(DEPOSIT, OIS_MARKET, AS_OF, HOLD_1M_UP_25, 'bogus'),
-    (error) => error.kind === 'validation' && /Unknown attribution method/.test(error.message)
+    (error) => error.kind === 'validation' && /unknown variant `bogus`/.test(error.message)
   );
   assert.throws(
     () =>
