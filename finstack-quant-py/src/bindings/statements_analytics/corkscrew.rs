@@ -1,6 +1,6 @@
 //! Python bindings for the corkscrew (roll-forward / articulation) extension.
 //!
-//! Wraps [`finstack_quant_statements_analytics::extensions::corkscrew`] types:
+//! Wraps [`finstack_quant_statements_analytics::extensions`] types:
 //!
 //! - [`PyAccountType`] — asset / liability / equity classifier (serialized as the snake_case rust enum).
 //! - [`PyCorkscrewAccount`] — single account definition (balance node + change nodes).
@@ -14,7 +14,7 @@ use crate::bindings::pandas_utils::{
     ColumnSchema,
 };
 use crate::errors::display_to_py;
-use finstack_quant_statements_analytics::extensions::corkscrew as rust_corkscrew;
+use finstack_quant_statements_analytics::extensions as rust_corkscrew;
 use pyo3::prelude::*;
 
 /// Column schema for [`PyCorkscrewReport::to_validations_dataframe`].

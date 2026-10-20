@@ -32867,7 +32867,7 @@ export interface StatementsNamespace {
   /**
    * Normalize a target metric by applying an adjustment catalog period by period.
    *
-   * Twin of Python `normalize` (Rust `NormalizationEngine::normalize`).
+   * Twin of Python `normalize` (Rust `adjustments::normalize`).
    * @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
    * @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
    * @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped) and the final value.
@@ -32894,7 +32894,7 @@ export interface StatementsNamespace {
    * Write normalized values back into statement results as a node.
    *
    * Twin of Python `merge_into_results` (Rust
-   * `NormalizationEngine::merge_into_results`). Each period's `final_value`
+   * `adjustments::merge_into_results`). Each period's `final_value`
    * becomes node `outputNodeId` with the shared unit (and currency for monetary
    * values), replacing any existing node of that name across all periods. The
    * attached check report is cleared because it describes the values before the

@@ -4,9 +4,8 @@
 //! adjusted EBITDA from statement results plus an explicit catalog of
 //! add-backs, caps, and normalization policies.
 //!
-//! Start with [`crate::adjustments::types::NormalizationConfig`] to define the
-//! adjustment policy and [`crate::adjustments::engine::NormalizationEngine`] to
-//! execute it.
+//! Start with [`NormalizationConfig`] to define the adjustment policy and
+//! [`normalize`] to execute it.
 //!
 //! ## Conventions
 //!
@@ -18,5 +17,11 @@
 //!   adjustments so downstream reporting can explain the bridge from reported to
 //!   adjusted values.
 
-pub mod engine;
-pub mod types;
+mod engine;
+mod types;
+
+pub use engine::{merge_into_results, normalize};
+pub use types::{
+    Adjustment, AdjustmentCap, AdjustmentValue, AppliedAdjustment, CapBaseMode,
+    NormalizationConfig, NormalizationResult,
+};

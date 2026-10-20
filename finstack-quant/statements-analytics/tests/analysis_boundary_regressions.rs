@@ -6,7 +6,7 @@ use finstack_quant_statements::{
     types::{AmountOrScalar, FinancialModelSpec},
 };
 use finstack_quant_statements_analytics::analysis::*;
-use finstack_quant_statements_analytics::extensions::{corkscrew::*, scorecards::*};
+use finstack_quant_statements_analytics::extensions::*;
 
 fn monetary_model(currency: Currency) -> FinancialModelSpec {
     ModelBuilder::new("money")

@@ -36,7 +36,7 @@ mod dag;
 mod engine;
 pub(crate) mod export;
 mod forecast_eval;
-pub mod formula;
+pub(crate) mod formula;
 mod formula_aggregates;
 mod formula_dispatch;
 mod formula_ewm;
@@ -52,6 +52,7 @@ pub use cashflow_export::{node_to_dated_schedule, PeriodDateConvention};
 pub use context::EvaluationContext;
 pub use dag::{evaluate_order, DependencyGraph};
 pub use engine::{Evaluator, PreparedEvaluation};
+pub use formula::evaluate_formula;
 pub use monte_carlo::{MonteCarloConfig, MonteCarloResults, PercentileSeries};
 pub use period_history::PeriodHistory;
 pub use results::{

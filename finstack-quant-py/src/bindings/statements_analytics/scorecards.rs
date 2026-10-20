@@ -1,6 +1,6 @@
 //! Python bindings for the credit scorecard extension.
 //!
-//! Wraps [`finstack_quant_statements_analytics::extensions::scorecards`] types:
+//! Wraps [`finstack_quant_statements_analytics::extensions`] types:
 //!
 //! - [`PyScorecardMetric`] — single metric definition (name, formula, weight, thresholds).
 //! - [`PyScorecardConfig`] — full scorecard configuration (rating scale, metrics, optional minimum rating).
@@ -15,7 +15,7 @@ use crate::bindings::pandas_utils::{
     ColumnSchema,
 };
 use crate::errors::display_to_py;
-use finstack_quant_statements_analytics::extensions::scorecards as rust_scorecards;
+use finstack_quant_statements_analytics::extensions as rust_scorecards;
 use pyo3::prelude::*;
 
 /// Column schema for [`PyScorecardReport::to_metric_scores_dataframe`].

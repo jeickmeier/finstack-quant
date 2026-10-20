@@ -11,7 +11,7 @@ use finstack_quant_core::schema::{
     externalize_schema_definitions, ExternalSchemaDefinition, SchemaArtifact,
 };
 use finstack_quant_core::Result;
-use finstack_quant_statements::adjustments::types::NormalizationConfig;
+use finstack_quant_statements::adjustments::NormalizationConfig;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::FinancialModelSpec;
 use finstack_quant_valuations::instruments::InstrumentJson;
@@ -58,23 +58,23 @@ pub fn package_schema(schema: &mut Value) -> Result<()> {
 }
 
 use crate::{
-    analysis::checks::CapexReconciliation, analysis::checks::CoverageFloorCheck,
-    analysis::checks::DepreciationReconciliation, analysis::checks::DividendReconciliation,
-    analysis::checks::EffectiveTaxRateCheck, analysis::checks::FcfSignCheck,
-    analysis::checks::GrowthRateConsistency, analysis::checks::InterestExpenseReconciliation,
-    analysis::checks::LeverageRangeCheck, analysis::checks::LiquidityRunwayCheck,
-    analysis::checks::TrendCheck, analysis::checks::WorkingCapitalConsistency,
-    analysis::BridgeChart, analysis::CeclConfig, analysis::CeclResult, analysis::CorporateAnalysis,
-    analysis::CorporateAnalysisOptions, analysis::CreditAssessment, analysis::DcfOptions,
-    analysis::DcfSensitivityResult, analysis::DependencyTree, analysis::EclConfig,
-    analysis::EclRequest, analysis::EclStageRequest, analysis::Explanation, analysis::Exposure,
-    analysis::ForecastMetrics, analysis::GoalSeekResult, analysis::LboConfig, analysis::LboResult,
-    analysis::PeerFilter, analysis::PeerSet, analysis::PeerStats, analysis::PortfolioEclResult,
+    analysis::BridgeChart, analysis::CapexReconciliation, analysis::CeclConfig,
+    analysis::CeclResult, analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions,
+    analysis::CoverageFloorCheck, analysis::CreditAssessment, analysis::DcfOptions,
+    analysis::DcfSensitivityResult, analysis::DependencyTree, analysis::DepreciationReconciliation,
+    analysis::DividendReconciliation, analysis::EclConfig, analysis::EclRequest,
+    analysis::EclStageRequest, analysis::EffectiveTaxRateCheck, analysis::Explanation,
+    analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
+    analysis::GoalSeekResult, analysis::GrowthRateConsistency,
+    analysis::InterestExpenseReconciliation, analysis::LboConfig, analysis::LboResult,
+    analysis::LeverageRangeCheck, analysis::LiquidityRunwayCheck, analysis::PeerFilter,
+    analysis::PeerSet, analysis::PeerStats, analysis::PortfolioEclResult,
     analysis::ProvisionWaterfall, analysis::RatingPdMap, analysis::RegressionResult,
     analysis::RelativeValueResult, analysis::ScenarioDiff, analysis::ScenarioResults,
     analysis::ScenarioSet, analysis::ScoringDimension, analysis::SensitivityResult,
-    analysis::VarianceConfig, extensions::CorkscrewConfig, extensions::CorkscrewReport,
-    extensions::ScorecardConfig, extensions::ScorecardReport, templates::real_estate::LeaseSpec,
+    analysis::TrendCheck, analysis::VarianceConfig, analysis::WorkingCapitalConsistency,
+    extensions::CorkscrewConfig, extensions::CorkscrewReport, extensions::ScorecardConfig,
+    extensions::ScorecardReport, templates::real_estate::LeaseSpec,
     templates::real_estate::ManagementFeeSpec, templates::real_estate::PropertyTemplateNodes,
 };
 

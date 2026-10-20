@@ -67,7 +67,6 @@
 //! - **forecast**: Deterministic and statistical forecast methods (growth, seasonal, Monte Carlo)
 //! - **registry**: Dynamic metric registry with namespace management and built-in `fin.*` metrics
 //! - **checks**: Financial-statement consistency checks framework
-//! - **formula**: Public formula helpers for identifier extraction and qualification
 //! - **schema**: Checked-in JSON Schema artifacts for persisted statement contracts
 //!
 //! ## Analytics
@@ -92,9 +91,7 @@ pub mod error;
 /// Evaluation engine for metric graphs.
 pub mod evaluator;
 /// Forecast methods and time-series drivers.
-pub mod forecast;
-/// Public formula helper functions for identifier extraction and qualification.
-pub mod formula;
+pub(crate) mod forecast;
 /// Convenient re-exports for common statement types.
 pub mod prelude;
 /// Metric registry and namespace management.

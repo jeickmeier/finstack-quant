@@ -4676,7 +4676,7 @@ def merge_into_results(
 ) -> StatementResult:
     """Write normalized values back into statement results as a node.
 
-    Wraps Rust ``NormalizationEngine::merge_into_results``: each period's
+    Wraps Rust ``adjustments::merge_into_results``: each period's
     ``final_value`` becomes node ``output_node_id`` with the shared unit (and
     currency for monetary values), replacing any existing node of that name
     across all periods. The attached check report is cleared because it

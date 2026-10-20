@@ -76,7 +76,7 @@
 //! # }
 //! ```
 
-pub use finstack_quant_core::rating_scales::{RatingLevel, ScorecardScale};
+use finstack_quant_core::rating_scales::ScorecardScale;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::Result;
@@ -512,7 +512,7 @@ impl CreditScorecardExtension {
         };
         let mut eval_context = context.clone();
 
-        let value = finstack_quant_statements::evaluator::formula::evaluate_formula(
+        let value = finstack_quant_statements::evaluator::evaluate_formula(
             &expr,
             &mut eval_context,
             Some(metric.name.as_str()),

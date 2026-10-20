@@ -9,8 +9,7 @@ use crate::utils::input::{
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_statements::adjustments::engine::NormalizationEngine;
-use finstack_quant_statements::adjustments::types::{
+use finstack_quant_statements::adjustments::{
     Adjustment, NormalizationConfig, NormalizationResult,
 };
 use finstack_quant_statements::checks::{BuiltinCheckSpec, CheckConfig};
@@ -416,12 +415,12 @@ pub fn validate_normalization_config_json(json: JsValue) -> Result<String, JsVal
 fn normalized(results: &JsValue, config: &JsValue) -> Result<Vec<NormalizationResult>, JsValue> {
     let results: StatementResult = from_js_json(results, "results")?;
     let config: NormalizationConfig = from_js_json(config, "config")?;
-    NormalizationEngine::normalize(&results, &config).map_err(to_js_err)
+    finstack_quant_statements::adjustments::normalize(&results, &config).map_err(to_js_err)
 }
 
 /// Normalize a target metric by applying an adjustment catalog period by period.
 ///
-/// Twin of Python `normalize` (Rust `NormalizationEngine::normalize`).
+/// Twin of Python `normalize` (Rust `adjustments::normalize`).
 /// @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
 /// @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
 /// @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped) and the final value.
@@ -456,7 +455,7 @@ pub fn normalize_json(results: JsValue, config: JsValue) -> Result<String, JsVal
 /// Write normalized values back into statement results as a node.
 ///
 /// Twin of Python `merge_into_results` (Rust
-/// `NormalizationEngine::merge_into_results`). Each period's `final_value`
+/// `adjustments::merge_into_results`). Each period's `final_value`
 /// becomes node `outputNodeId` with the shared unit (and currency for monetary
 /// values), replacing any existing node of that name across all periods. The
 /// attached check report is cleared because it describes the values before the
@@ -480,7 +479,7 @@ pub fn merge_into_results(
     let mut results: StatementResult = from_js_json(&results, "results")?;
     let normalization_results: Vec<NormalizationResult> =
         from_js_json(&normalization_results, "normalizationResults")?;
-    NormalizationEngine::merge_into_results(
+    finstack_quant_statements::adjustments::merge_into_results(
         &mut results,
         &normalization_results,
         &js_string(&output_node_id, "outputNodeId")?,

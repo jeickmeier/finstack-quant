@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::get_node_value;
+use crate::checks::helpers::get_node_value;
 use crate::checks::{Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Severity};
 use crate::types::NodeId;
 use crate::Result;

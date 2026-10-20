@@ -5,10 +5,11 @@
 //! - DCF corporate valuation and the orchestrated analysis pipeline
 //! - Covenant forecasting and credit coverage metrics
 //! - Scenario sets, sensitivity sweeps, and variance
-//! - **[`crate::analysis::introspection`]** — Dependency tracing and formula explanation
-//! - **[`crate::analysis::reports`]** — Formatted P&L summaries and credit assessment reports
-//! - **[`mod@crate::analysis::goal_seek`]** — Root-finding for target metric values
-//! - **[`crate::analysis::backtesting`]** — Forecast accuracy metrics
+//! - Dependency tracing and formula explanation ([`DependencyTracer`], [`FormulaExplainer`])
+//! - Formatted P&L summaries and credit assessment reports ([`PLSummaryReport`])
+//! - Root-finding for target metric values ([`goal_seek()`])
+//! - Forecast accuracy metrics ([`backtest_forecast`])
+//! - Domain-level validation checks ([`three_statement_checks`] and the check types)
 //! - Expected credit loss (IFRS 9 staging, CECL, portfolio aggregation)
 //!
 //! ## Where To Start
@@ -39,17 +40,16 @@ pub(crate) mod scenarios;
 
 mod units;
 
-/// Domain-level validation checks (reconciliation, consistency, credit).
-pub mod checks;
+mod checks;
 
 pub(crate) mod ecl;
 
 pub(crate) mod comps;
 
-pub mod backtesting;
-pub mod goal_seek;
-pub mod introspection;
-pub mod reports;
+mod backtesting;
+mod goal_seek;
+mod introspection;
+mod reports;
 
 pub use backtesting::{backtest_forecast, ForecastMetrics};
 pub use credit::{
@@ -67,8 +67,8 @@ pub use reports::{
 pub use scenarios::{
     generate_tornado_entries, BridgeChart, BridgeStep, ParameterSpec, ScenarioDefinition,
     ScenarioDiff, ScenarioResults, ScenarioSet, SensitivityAnalyzer, SensitivityConfig,
-    SensitivityMode, SensitivityResult, TornadoEntry, VarianceAnalyzer, VarianceConfig,
-    VarianceReport, VarianceRow,
+    SensitivityMode, SensitivityResult, SensitivityScenario, TornadoEntry, VarianceAnalyzer,
+    VarianceConfig, VarianceReport, VarianceRow,
 };
 pub use valuation::{
     dcf_sensitivity, evaluate_dcf_with_market, evaluate_lbo, run_corporate_analysis, wacc,
@@ -78,8 +78,11 @@ pub use valuation::{
 };
 
 pub use checks::{
-    credit_underwriting_checks, lbo_model_checks, three_statement_checks, CheckReportRenderer,
-    CreditMapping, ThreeStatementMapping, TrendDirection,
+    credit_underwriting_checks, lbo_model_checks, three_statement_checks, CapexReconciliation,
+    CheckReportRenderer, CoverageFloorCheck, CreditMapping, DepreciationReconciliation,
+    DividendReconciliation, EffectiveTaxRateCheck, FcfSignCheck, GrowthRateConsistency,
+    InterestExpenseReconciliation, LeverageRangeCheck, LiquidityRunwayCheck, ThreeStatementMapping,
+    TrendCheck, TrendDirection, WorkingCapitalConsistency,
 };
 
 pub use ecl::{

@@ -3,7 +3,7 @@
 use super::evaluator::PyStatementResult;
 use crate::bindings::macros::wire_methods;
 use crate::errors::{serde_json_to_py, statements_to_py, value_error};
-use finstack_quant_statements::adjustments::types::{
+use finstack_quant_statements::adjustments::{
     Adjustment, AdjustmentValue, AppliedAdjustment, CapBaseMode, NormalizationConfig,
     NormalizationResult,
 };
@@ -512,11 +512,8 @@ fn normalize(
     config: &PyNormalizationConfig,
 ) -> PyResult<Vec<PyNormalizationResult>> {
     let norm_results =
-        finstack_quant_statements::adjustments::engine::NormalizationEngine::normalize(
-            &results.inner,
-            &config.inner,
-        )
-        .map_err(statements_to_py)?;
+        finstack_quant_statements::adjustments::normalize(&results.inner, &config.inner)
+            .map_err(statements_to_py)?;
 
     Ok(norm_results
         .into_iter()
@@ -532,18 +529,15 @@ fn normalize(
 #[pyo3(text_signature = "(results, config)")]
 fn normalize_json(results: &PyStatementResult, config: &PyNormalizationConfig) -> PyResult<String> {
     let norm_results =
-        finstack_quant_statements::adjustments::engine::NormalizationEngine::normalize(
-            &results.inner,
-            &config.inner,
-        )
-        .map_err(statements_to_py)?;
+        finstack_quant_statements::adjustments::normalize(&results.inner, &config.inner)
+            .map_err(statements_to_py)?;
     serde_json::to_string(&norm_results)
         .map_err(|e| serde_json_to_py(e, "failed to serialize normalization results"))
 }
 
 /// Write normalized values back into statement results as a node.
 ///
-/// Wraps Rust ``NormalizationEngine::merge_into_results``: the normalization
+/// Wraps Rust ``adjustments::merge_into_results``: the normalization
 /// results' ``final_value`` per period become node ``output_node_id`` with the
 /// shared unit (and currency for monetary values), replacing any existing node
 /// of that name across all periods. The attached check report is cleared
@@ -596,7 +590,7 @@ fn merge_into_results(
         .map(|result| result.inner.clone())
         .collect();
     let mut inner = results.inner.clone();
-    finstack_quant_statements::adjustments::engine::NormalizationEngine::merge_into_results(
+    finstack_quant_statements::adjustments::merge_into_results(
         &mut inner,
         &normalization_results,
         output_node_id,

@@ -75,9 +75,9 @@
 //! - Metric files in `finstack-quant/statements/data/metrics/`
 
 pub(crate) mod builtins;
-pub mod dynamic;
+pub(crate) mod dynamic;
 pub(crate) mod schema;
 pub(crate) mod validation;
 
-pub use dynamic::Registry;
+pub use dynamic::{Registry, StoredMetric};
 pub use schema::{MetricDefinition, MetricRegistry, UnitType};

@@ -29,8 +29,7 @@ fn credit_reports_and_checks_reject_mixed_currency_ratios() {
     use finstack_quant_statements::checks::{Check, CheckContext};
     use finstack_quant_statements::evaluator::Evaluator;
     use finstack_quant_statements_analytics::analysis::{
-        checks::{CoverageFloorCheck, LeverageRangeCheck},
-        CreditAssessment,
+        CoverageFloorCheck, CreditAssessment, LeverageRangeCheck,
     };
     let period = PeriodId::annual(2025);
     let model = ModelBuilder::new("mixed credit units")
@@ -85,9 +84,7 @@ fn credit_reports_and_checks_reject_mixed_currency_ratios() {
 fn credit_checks_reject_overflowing_ratios() {
     use finstack_quant_statements::checks::{Check, CheckContext};
     use finstack_quant_statements::evaluator::Evaluator;
-    use finstack_quant_statements_analytics::analysis::checks::{
-        CoverageFloorCheck, LeverageRangeCheck,
-    };
+    use finstack_quant_statements_analytics::analysis::{CoverageFloorCheck, LeverageRangeCheck};
     let period = PeriodId::annual(2025);
     let model = ModelBuilder::new("overflowing credit ratio")
         .periods("2025..2025", None)
@@ -168,7 +165,7 @@ fn working_capital_rejects_currency_change_without_metadata() {
     use finstack_quant_core::{currency::Currency, money::Money};
     use finstack_quant_statements::checks::{Check, CheckContext};
     use finstack_quant_statements::evaluator::Evaluator;
-    use finstack_quant_statements_analytics::analysis::checks::WorkingCapitalConsistency;
+    use finstack_quant_statements_analytics::analysis::WorkingCapitalConsistency;
     let first = PeriodId::quarter(2025, 1).unwrap();
     let second = PeriodId::quarter(2025, 2).unwrap();
     let model = ModelBuilder::new("changed working capital currency")

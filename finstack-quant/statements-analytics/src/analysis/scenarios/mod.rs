@@ -19,7 +19,8 @@ pub(crate) mod variance;
 pub use scenario_set::{ScenarioDefinition, ScenarioDiff, ScenarioResults, ScenarioSet};
 pub use sensitivity::{generate_tornado_entries, SensitivityAnalyzer};
 pub use types::{
-    ParameterSpec, SensitivityConfig, SensitivityMode, SensitivityResult, TornadoEntry,
+    ParameterSpec, SensitivityConfig, SensitivityMode, SensitivityResult, SensitivityScenario,
+    TornadoEntry,
 };
 pub use variance::{
     BridgeChart, BridgeStep, VarianceAnalyzer, VarianceConfig, VarianceReport, VarianceRow,

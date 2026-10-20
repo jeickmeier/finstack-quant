@@ -8,7 +8,7 @@ use finstack_quant_core::contract::ContractDescriptor;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Month, PeriodId};
 use finstack_quant_core::money::Money;
-use finstack_quant_statements::adjustments::types::CapBaseMode;
+use finstack_quant_statements::adjustments::CapBaseMode;
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
 use finstack_quant_statements::checks::{
     CheckCategory, CheckFinding, CheckReport, CheckResult, CheckSummary, Materiality, Severity,

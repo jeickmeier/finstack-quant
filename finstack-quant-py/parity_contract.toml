@@ -1266,8 +1266,6 @@ checks           = { python = "finstack_quant.statements.checks",            sta
 dsl              = { python = "finstack_quant.statements.dsl",               status = "missing", note = "Bindings are currently exported from finstack_quant.statements root" }
 error            = { python = "finstack_quant.statements.error",             status = "missing" }
 evaluator        = { python = "finstack_quant.statements.evaluator",         status = "missing", note = "Bindings are currently exported from finstack_quant.statements root. Evaluator::prepare / evaluate_prepared are Rust-only performance seams; hosts use evaluate / evaluate_with_market" }
-forecast         = { python = "finstack_quant.statements.forecast",          status = "missing", note = "Bindings are currently exported from finstack_quant.statements root" }
-formula          = { python = "finstack_quant.statements.formula",           status = "missing", note = "Formula identifier-extraction helpers; Rust-only, consumed internally by the analytics introspection tools" }
 prelude          = { python = "finstack_quant.statements.prelude",           status = "missing" }
 registry         = { python = "finstack_quant.statements.registry",          status = "missing", note = "Bindings are currently exported from finstack_quant.statements root" }
 schema           = { python = "finstack_quant.statements.schema",            status = "exists", note = "Compiled-in JSON Schema accessors; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }

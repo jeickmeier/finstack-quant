@@ -602,7 +602,7 @@ impl<'a> FormulaExplainer<'a> {
         }
 
         // Otherwise list each referenced component once, without an operation.
-        let identifiers = finstack_quant_statements::formula::extract_all_identifiers(formula)?;
+        let identifiers = finstack_quant_statements::dsl::extract_all_identifiers(formula)?;
         Ok(identifiers
             .into_iter()
             .filter_map(|component| {

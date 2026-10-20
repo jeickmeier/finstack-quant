@@ -98,7 +98,7 @@ pub(crate) fn replace_standalone_identifier(
 ///
 /// ```
 /// // Low-level helper; prefer higher-level APIs when possible.
-/// use finstack_quant_statements::formula::extract_all_identifiers;
+/// use finstack_quant_statements::dsl::extract_all_identifiers;
 /// ```
 ///
 /// Function names and numeric literals are not identifiers. Unlike direct

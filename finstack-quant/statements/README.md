@@ -52,13 +52,11 @@ exclusive end date.
 | `builder` | `ModelBuilder` (type-state: `NeedPeriods` → `Ready`), `MixedNodeBuilder`, `validate_node_id` |
 | `types` | `FinancialModelSpec`, `NodeSpec`, `NodeId`, `NodeType`, `NodeValueType`, `AmountOrScalar`, `ForecastSpec`, `ForecastMethod`, `CapitalStructureSpec` |
 | `evaluator` | `Evaluator`, `StatementResult`, `PreparedEvaluation`, `EvaluationContext`, `DependencyGraph`, `evaluate_order`, `MonteCarloConfig`/`MonteCarloResults`, `node_to_dated_schedule` |
-| `dsl` | `parse_formula`, `compile`, `parse_and_compile`, `StmtExpr`, `BinOp`, `UnaryOp` |
-| `forecast` | Deterministic and statistical projection methods driven by `ForecastSpec` |
+| `dsl` | `parse_formula`, `compile`, `parse_and_compile`, `extract_all_identifiers`, `StmtExpr`, `BinOp`, `UnaryOp` |
 | `registry` | `Registry`, `MetricRegistry`, `MetricDefinition`, `UnitType` — the `fin.*` built-in catalog and user namespaces |
 | `capital_structure` | `WaterfallSpec`, `EcfSweepSpec`, `PikToggleSpec`, `CapitalStructureCashflows`, `CashflowBreakdown`, `CapitalStructureState`, `PrincipalClaim`, `execute_waterfall`, `calculate_period_flows` |
 | `checks` | `CheckSuite`, `CheckSuiteSpec`, `Check`, `CheckReport`, `FormulaCheckSpec`, and the `builtins` implementations |
-| `adjustments` | `engine::NormalizationEngine`; `types::NormalizationConfig`/`Adjustment`/`AdjustmentValue`/`AdjustmentCap`. This module has no root re-exports — name the submodule |
-| `formula` | `extract_all_identifiers` — the curated helper boundary shared with the analytics crate |
+| `adjustments` | `normalize`, `merge_into_results`, `NormalizationConfig`, `Adjustment`, `AdjustmentValue`, `AdjustmentCap` |
 | `schema` | `financial_model_spec_schema`, `statement_result_schema`, `normalization_config_schema` |
 | `error` | `Error`, `Result`; both are also re-exported at the crate root |
 | `prelude` | The `builder`, `checks`, `error`, and `types` surfaces, the headline `evaluator` items (`Evaluator`, `NumericMode`, `PreparedEvaluation`, `StatementResult`), `registry::Registry`, and core `Money`, `Currency`, `Date`, `PeriodId`, `Tenor` |
@@ -244,14 +242,14 @@ are in the analytics crate.
 
 ## Adjustments
 
-`NormalizationEngine::normalize(&result, &config)` computes an adjusted metric
+`adjustments::normalize(&result, &config)` computes an adjusted metric
 (typically adjusted EBITDA) from a reported node plus an explicit catalog of
 add-backs. Each `Adjustment` carries an `AdjustmentValue` (fixed per-period
 amounts or a percentage of another node) and an optional `AdjustmentCap`. The
 returned `Vec<NormalizationResult>` keeps both the adjusted total (`final_value`)
 and the per-adjustment audit trail (`adjustments: Vec<AppliedAdjustment>`), so
 the reported-to-adjusted bridge stays explainable.
-`NormalizationEngine::merge_into_results(&mut result, &normalized, "adj_ebitda")`
+`adjustments::merge_into_results(&mut result, &normalized, "adj_ebitda")`
 folds the adjusted series back into a `StatementResult` as a new node.
 
 ## Results and export

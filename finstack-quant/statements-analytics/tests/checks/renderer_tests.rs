@@ -7,7 +7,7 @@ use finstack_quant_statements::checks::{
     CheckCategory, CheckFinding, CheckReport, CheckResult, CheckSummary, Materiality, Severity,
 };
 use finstack_quant_statements::types::NodeId;
-use finstack_quant_statements_analytics::analysis::checks::CheckReportRenderer;
+use finstack_quant_statements_analytics::analysis::CheckReportRenderer;
 
 fn sample_report() -> CheckReport {
     let error_result = CheckResult {

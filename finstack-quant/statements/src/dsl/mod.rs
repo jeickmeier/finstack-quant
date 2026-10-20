@@ -74,10 +74,11 @@
 //! # }
 //! ```
 
-pub mod ast;
-pub mod compiler;
-pub mod parser;
+pub(crate) mod ast;
+pub(crate) mod compiler;
+mod parser;
 
+pub use crate::utils::formula::extract_all_identifiers;
 pub use ast::{BinOp, StmtExpr, UnaryOp};
 pub use compiler::compile;
 pub use parser::parse_formula;
