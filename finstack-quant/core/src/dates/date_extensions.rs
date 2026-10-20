@@ -4,31 +4,14 @@
 //! for common financial operations like weekend checking, quarter calculation,
 //! and business day arithmetic. All methods are allocation-free.
 
-#![allow(clippy::wrong_self_convention)]
-
 use crate::dates::calendar::business_days::{
     adjustment_failed, seek_business_day, BusinessDayConvention, MAX_BUSINESS_DAY_SEARCH_DAYS,
 };
 use crate::dates::periods::FiscalConfig;
 use time::{Date, Duration, Month};
 
-const MONTHS_BY_INDEX: [Month; 12] = [
-    Month::January,
-    Month::February,
-    Month::March,
-    Month::April,
-    Month::May,
-    Month::June,
-    Month::July,
-    Month::August,
-    Month::September,
-    Month::October,
-    Month::November,
-    Month::December,
-];
-
 /// Convenience extensions for [`time::Date`].
-pub trait DateExt: Sized {
+pub trait DateExt: Copy {
     /// Returns true if the date falls on a weekend (**Saturday** or **Sunday**).
     fn is_weekend(self) -> bool;
 
@@ -160,7 +143,10 @@ pub trait DateExt: Sized {
 
 impl DateExt for Date {
     fn is_weekend(self) -> bool {
-        crate::dates::WeekendRule::SaturdaySunday.is_weekend(self.weekday())
+        matches!(
+            self.weekday(),
+            time::Weekday::Saturday | time::Weekday::Sunday
+        )
     }
 
     fn quarter(self) -> u8 {
@@ -207,7 +193,7 @@ impl DateExt for Date {
         let total_months = i64::from(year) * 12 + (month as i64 - 1) + i64::from(months);
         let new_year = total_months.div_euclid(12) as i32;
         let new_month_idx = total_months.rem_euclid(12);
-        let new_month = MONTHS_BY_INDEX[new_month_idx as usize];
+        let new_month = Month::January.nth_next(new_month_idx as u8);
 
         let days_in_new_month = new_month.length(new_year);
         let new_day = self.day().min(days_in_new_month);

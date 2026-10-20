@@ -28,7 +28,8 @@
 //! # }
 //! ```
 
-use crate::dates::{canonical_calendar_id, HolidayCalendar, WeekendRule};
+use super::business_days::joint_members;
+use crate::dates::{DateExt, HolidayCalendar};
 use time::Date;
 
 /// A lightweight view combining several holiday calendars (union semantics).
@@ -61,19 +62,18 @@ impl HolidayCalendar for CompositeCalendar<'_> {
     }
 
     /// A date is a business day only if it is one on **all** sub-calendars,
-    /// so each member's weekend rule (e.g. Friday/Saturday Middle East
-    /// calendars) is respected.
+    /// so each member's own `is_business_day` (weekends included) is respected.
     ///
-    /// An empty calendar list falls back to the Saturday/Sunday weekend rule.
+    /// An empty calendar list treats Saturday and Sunday as the only closed days.
     fn is_business_day(&self, date: Date) -> bool {
         if self.calendars.is_empty() {
-            return !WeekendRule::SaturdaySunday.is_weekend(date.weekday());
+            return !date.is_weekend();
         }
         self.calendars.iter().all(|c| c.is_business_day(date))
     }
 
     fn calendar_id(&self) -> Option<String> {
-        let mut member_ids = self
+        let member_ids = self
             .calendars
             .iter()
             .map(|calendar| calendar.calendar_id())
@@ -81,9 +81,7 @@ impl HolidayCalendar for CompositeCalendar<'_> {
         if member_ids.is_empty() {
             return None;
         }
-        member_ids.sort_unstable();
-        member_ids.dedup();
-        canonical_calendar_id(&member_ids.join("+")).ok()
+        Some(joint_members(&member_ids.join("+")).join("+"))
     }
 }
 
@@ -114,41 +112,6 @@ mod tests {
         assert!(GBLO.is_holiday(d2));
         assert!(!TARGET2.is_holiday(d2));
         assert!(cal_union.is_holiday(d2));
-    }
-
-    #[test]
-    fn composite_respects_subcalendar_weekend_rules() {
-        use crate::dates::calendar::types::{Calendar, WeekendRule};
-
-        // Friday/Saturday weekend calendar (e.g. Middle East), no holiday rules.
-        const FRI_SAT: Calendar = Calendar::new("fri_sat", "Fri/Sat weekend", false, &[])
-            .with_weekend_rule(WeekendRule::FridaySaturday);
-        let gb = GBLO;
-        let calendars = [
-            &FRI_SAT as &dyn HolidayCalendar,
-            &gb as &dyn HolidayCalendar,
-        ];
-
-        let cal_union = CompositeCalendar::new(&calendars);
-
-        // Friday 2025-06-06: weekend for FRI_SAT, business day for GBLO.
-        let friday = Date::from_calendar_date(2025, Month::June, 6).expect("Valid test date");
-        assert_eq!(friday.weekday(), time::Weekday::Friday);
-        assert!(!FRI_SAT.is_business_day(friday));
-        assert!(GBLO.is_business_day(friday));
-
-        // Business day only if ALL sub-calendars are open → closed.
-        assert!(!cal_union.is_business_day(friday));
-
-        // Sunday 2025-06-08: weekend for GBLO, business day for FRI_SAT.
-        let sunday = Date::from_calendar_date(2025, Month::June, 8).expect("Valid test date");
-        assert!(FRI_SAT.is_business_day(sunday));
-        assert!(!GBLO.is_business_day(sunday));
-        assert!(!cal_union.is_business_day(sunday));
-
-        // Wednesday 2025-06-04: business day everywhere.
-        let wednesday = Date::from_calendar_date(2025, Month::June, 4).expect("Valid test date");
-        assert!(cal_union.is_business_day(wednesday));
     }
 
     #[test]

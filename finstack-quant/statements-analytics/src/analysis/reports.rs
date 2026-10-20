@@ -301,9 +301,7 @@ pub(crate) fn trailing_sum_at(
         PeriodKind::Weekly => return None,
         PeriodKind::Daily if at.is_fiscal() => return None,
         PeriodKind::Daily => {
-            let end = finstack_quant_core::dates::Date::from_ordinal_date(at.year(), at.index())
-                .ok()?
-                .checked_add(time::Duration::days(1))?;
+            let (_, end) = at.bounds().ok()?;
             let year = end.year().checked_sub(1)?;
             let start =
                 finstack_quant_core::dates::Date::from_calendar_date(year, end.month(), end.day())
@@ -328,7 +326,7 @@ pub(crate) fn trailing_sum_at(
         }
         total += value;
         if index + 1 < count {
-            period = period.prev().ok()?;
+            period = period.shift(-1).ok()?;
         }
     }
     total.is_finite().then_some(total)

@@ -186,10 +186,10 @@ static DRAGON_BOAT_DATES_MAP: phf::Map<i32, (u8, u8)> = phf::phf_map! {
     2150i32 => (5, 31),
 };
 
-/// Get the Dragon Boat Festival date for a supported year.
+/// Dragon Boat Festival date in `year`, or `None` outside 1970-2150.
 #[inline]
-pub(crate) fn dragon_boat_date_for_year(year: i32) -> Option<(u8, u8)> {
-    DRAGON_BOAT_DATES_MAP.get(&year).copied()
+pub(crate) fn dragon_boat_date(year: i32) -> Option<Date> {
+    tabulated_date(year, &DRAGON_BOAT_DATES_MAP)
 }
 
 /// Mid-Autumn Festival dates as (month, day), indexed by Gregorian year.
@@ -377,10 +377,10 @@ static MID_AUTUMN_DATES_MAP: phf::Map<i32, (u8, u8)> = phf::phf_map! {
     2150i32 => (10, 5),
 };
 
-/// Get the Mid-Autumn Festival date for a supported year.
+/// Mid-Autumn Festival date in `year`, or `None` outside 1970-2150.
 #[inline]
-pub(crate) fn mid_autumn_date_for_year(year: i32) -> Option<(u8, u8)> {
-    MID_AUTUMN_DATES_MAP.get(&year).copied()
+pub(crate) fn mid_autumn_date(year: i32) -> Option<Date> {
+    tabulated_date(year, &MID_AUTUMN_DATES_MAP)
 }
 
 /// Buddha's Birthday dates as (month, day), indexed by Gregorian year.
@@ -568,10 +568,10 @@ static BUDDHAS_BIRTHDAY_DATES_MAP: phf::Map<i32, (u8, u8)> = phf::phf_map! {
     2150i32 => (5, 4),
 };
 
-/// Get the Buddha's Birthday date for a supported year.
+/// Buddha's Birthday date in `year`, or `None` outside 1970-2150.
 #[inline]
-pub(crate) fn buddhas_birthday_date_for_year(year: i32) -> Option<(u8, u8)> {
-    BUDDHAS_BIRTHDAY_DATES_MAP.get(&year).copied()
+pub(crate) fn buddhas_birthday_date(year: i32) -> Option<Date> {
+    tabulated_date(year, &BUDDHAS_BIRTHDAY_DATES_MAP)
 }
 
 /// Chung Yeung Festival dates as (month, day), indexed by Gregorian year.
@@ -759,10 +759,10 @@ static CHUNG_YEUNG_DATES_MAP: phf::Map<i32, (u8, u8)> = phf::phf_map! {
     2150i32 => (10, 28),
 };
 
-/// Get the Chung Yeung Festival date for a supported year.
+/// Chung Yeung Festival date in `year`, or `None` outside 1970-2150.
 #[inline]
-pub(crate) fn chung_yeung_date_for_year(year: i32) -> Option<(u8, u8)> {
-    CHUNG_YEUNG_DATES_MAP.get(&year).copied()
+pub(crate) fn chung_yeung_date(year: i32) -> Option<Date> {
+    tabulated_date(year, &CHUNG_YEUNG_DATES_MAP)
 }
 
 /// Ching Ming Festival dates as (month, day), indexed by Gregorian year.
@@ -950,10 +950,10 @@ static QING_MING_DATES_MAP: phf::Map<i32, (u8, u8)> = phf::phf_map! {
     2150i32 => (4, 5),
 };
 
-/// Get the Ching Ming Festival date for a supported year.
+/// Ching Ming Festival date in `year`, or `None` outside 1970-2150.
 #[inline]
-pub(crate) fn qing_ming_date_for_year(year: i32) -> Option<(u8, u8)> {
-    QING_MING_DATES_MAP.get(&year).copied()
+pub(crate) fn qing_ming_date(year: i32) -> Option<Date> {
+    tabulated_date(year, &QING_MING_DATES_MAP)
 }
 
 /// Japanese Vernal Equinox dates as (month, day), indexed by Gregorian year.
@@ -1141,10 +1141,10 @@ static VERNAL_EQUINOX_JP_DATES_MAP: phf::Map<i32, (u8, u8)> = phf::phf_map! {
     2150i32 => (3, 21),
 };
 
-/// Get the Japanese Vernal Equinox date for a supported year.
+/// Japanese Vernal Equinox date in `year`, or `None` outside 1970-2150.
 #[inline]
-pub(crate) fn vernal_equinox_jp_date_for_year(year: i32) -> Option<(u8, u8)> {
-    VERNAL_EQUINOX_JP_DATES_MAP.get(&year).copied()
+pub(crate) fn vernal_equinox_jp_date(year: i32) -> Option<Date> {
+    tabulated_date(year, &VERNAL_EQUINOX_JP_DATES_MAP)
 }
 
 /// Japanese Autumnal Equinox dates as (month, day), indexed by Gregorian year.
@@ -1332,8 +1332,8 @@ static AUTUMNAL_EQUINOX_JP_DATES_MAP: phf::Map<i32, (u8, u8)> = phf::phf_map! {
     2150i32 => (9, 23),
 };
 
-/// Get the Japanese Autumnal Equinox date for a supported year.
+/// Japanese Autumnal Equinox date in `year`, or `None` outside 1970-2150.
 #[inline]
-pub(crate) fn autumnal_equinox_jp_date_for_year(year: i32) -> Option<(u8, u8)> {
-    AUTUMNAL_EQUINOX_JP_DATES_MAP.get(&year).copied()
+pub(crate) fn autumnal_equinox_jp_date(year: i32) -> Option<Date> {
+    tabulated_date(year, &AUTUMNAL_EQUINOX_JP_DATES_MAP)
 }

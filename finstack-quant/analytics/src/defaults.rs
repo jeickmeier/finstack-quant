@@ -11,8 +11,8 @@ use crate::dates::PeriodKind;
 /// [`crate::sortino`] and [`crate::volatility`] when the caller omits it.
 ///
 /// The daily trading-day convention: equal to
-/// `PeriodKind::Daily.annualization_factor()` (252).
-pub const DEFAULT_PERIODS_PER_YEAR: f64 = PeriodKind::Daily.annualization_factor();
+/// `PeriodKind::Daily.periods_per_year()` (252).
+pub const DEFAULT_PERIODS_PER_YEAR: f64 = PeriodKind::Daily.periods_per_year() as f64;
 
 /// Annualized risk-free rate (decimal) used when a Sharpe-style, Treynor,
 /// M-squared, Jensen-alpha or total-return regression call omits it.
@@ -61,7 +61,7 @@ mod tests {
     fn periods_per_year_matches_daily_annualization() {
         assert_eq!(
             DEFAULT_PERIODS_PER_YEAR,
-            PeriodKind::Daily.annualization_factor()
+            f64::from(PeriodKind::Daily.periods_per_year())
         );
         assert_eq!(DEFAULT_PERIODS_PER_YEAR, 252.0);
     }

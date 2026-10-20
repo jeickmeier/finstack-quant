@@ -97,10 +97,11 @@
 //!
 //! ## Calendar Types
 //!
-//! - **Exchange calendars**: NYSE, LSE, TSE, HKEX, etc.
-//! - **Settlement calendars**: TARGET (Eurozone), USGS (US Government Securities)
-//! - **Central bank calendars**: Federal Reserve, ECB, BOE, BOJ
-//! - **Country calendars**: Nationwide holidays (US, UK, JP, etc.)
+//! - **Exchange calendars**: `nyse`, `jpx`, `hkex`, `tsx`, `cme`, `eurex`, etc.
+//! - **Settlement calendars**: `target2` (Eurozone), `usny` (Federal Reserve
+//!   Bank of New York), `sifma` (US bond market), `sofr`
+//! - **Country calendars**: banking holidays such as `gblo` (London), `jpto`
+//!   (Tokyo) and `defr` (Frankfurt); see [`available_calendars`] for the full list
 
 // Time constants – canonical "days per year" values
 
@@ -153,15 +154,13 @@ pub mod fx;
 pub use tenor::{Tenor, TenorUnit};
 
 pub use imm::{
-    estimated_sifma_settlement_date_for_class, imm_option_expiry, is_cds_date, is_imm_date,
-    next_cds_date, next_imm, next_imm_option_expiry, next_semiannual_cds_maturity,
-    next_sifma_settlement, next_third_friday, prev_cds_date, prev_cds_semiannual_roll,
-    sifma_settlement_date, sifma_settlement_date_for_class, third_friday, third_wednesday,
-    SifmaSettlementClass,
+    estimated_sifma_settlement_date, imm_option_expiry, is_cds_date, is_imm_date, next_cds_date,
+    next_imm, next_imm_option_expiry, next_semiannual_cds_maturity, next_sifma_settlement,
+    next_third_friday, prev_cds_date, prev_cds_semiannual_roll, sifma_settlement_date,
+    third_friday, third_wednesday, SifmaSettlementClass,
 };
 
 mod calendar;
-pub use calendar::types::WeekendRule;
 
 mod periods;
 pub use periods::{

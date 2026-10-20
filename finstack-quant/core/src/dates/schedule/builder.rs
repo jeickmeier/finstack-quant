@@ -347,16 +347,11 @@ impl<'a> ScheduleBuilder<'a> {
     /// warning instead of propagating errors. Always check [`Schedule::has_warnings()`]
     /// when using graceful mode to detect potential pricing issues.
     ///
-    /// Under [`ScheduleErrorPolicy::Strict`] the build **fails closed on
-    /// warnings**: a schedule that would carry any [`ScheduleWarning`] is
-    /// rejected with a validation error instead of being returned.
-    ///
     /// # Errors
     ///
     /// Returns an error if:
     /// - Start date is after end date (and graceful mode is disabled)
     /// - Calendar lookup fails under [`ScheduleErrorPolicy::Strict`]
-    /// - Any warning is produced under [`ScheduleErrorPolicy::Strict`]
     /// - EOM is combined with a day/week tenor or an IMM/CDS IMM rule
     pub fn build(self) -> crate::Result<Schedule> {
         if self.spec.end_of_month

@@ -115,8 +115,8 @@ impl BuilderInternal {
             StubKind::ShortFront => self.gen_short_front(),
             StubKind::LongFront => self.gen_long_front(),
             StubKind::LongBack => self.gen_long_back(),
-            StubKind::None => self.gen_regular(),
-            StubKind::ShortBack => self.gen_short_back(),
+            StubKind::None => self.gen_forward(true),
+            StubKind::ShortBack => self.gen_forward(false),
         }
     }
 
@@ -189,20 +189,10 @@ impl BuilderInternal {
     // contractual and are emitted verbatim (QuantLib-style); snapping them
     // (the previous behavior) silently moved the effective date and maturity.
 
-    /// Forward roll grid from `start` that must land exactly on `end`.
-    ///
-    /// Alignment is against the actual roll grid, including EOM; a
+    /// Forward roll grid from `start`, closed by `end`; with `aligned`
+    /// (`StubKind::None`), a grid that overshoots or runs out before `end` is
+    /// an error. Alignment is against the actual roll grid, including EOM; a
     /// contractual maturity between grid points needs an explicit stub.
-    pub(super) fn gen_regular(self) -> crate::Result<Vec<Date>> {
-        self.gen_forward(true)
-    }
-
-    pub(super) fn gen_short_back(self) -> crate::Result<Vec<Date>> {
-        self.gen_forward(false)
-    }
-
-    /// Forward roll grid from `start`, closed by `end`; with `aligned`, a
-    /// grid that overshoots or runs out before `end` is an error.
     fn gen_forward(self, aligned: bool) -> crate::Result<Vec<Date>> {
         let mut buf: Buffer = Buffer::new();
         buf.push(self.start);

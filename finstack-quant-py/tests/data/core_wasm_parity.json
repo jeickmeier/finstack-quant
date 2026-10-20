@@ -185,7 +185,7 @@
     ]
   ],
   "end_of_month": "2024-02-29",
-  "estimated_sifma_settlement_date_for_class": "2031-03-20",
+  "estimated_sifma_settlement_date": "2031-03-20",
   "finite_count": 2,
   "finstack_config": {
     "extensions": {
@@ -888,7 +888,7 @@
     "2026-01-20"
   ],
   "sifma_settlement_date": "2027-03-11",
-  "sifma_settlement_date_for_class": "2026-01-20",
+  "sifma_settlement_date_class_b": "2026-01-20",
   "sifma_settlement_date_uncovered": null,
   "stats_empty_is_nan": [
     true,

@@ -8,8 +8,8 @@ use crate::api::core::periods::JsFiscalConfig;
 use crate::utils::input::{js_epoch_days, js_int, js_string};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::{
-    calendar_by_id_strict, days_since_epoch as rust_days_since_epoch,
-    resolve_calendar as rust_resolve_calendar, BusinessDayConvention, DateExt, HolidayCalendar,
+    calendar_by_id_strict, days_since_epoch as rust_days_since_epoch, BusinessDayConvention,
+    DateExt, HolidayCalendar,
 };
 use wasm_bindgen::prelude::*;
 
@@ -215,8 +215,8 @@ impl JsHolidayCalendar {
 
     /// Calendar metadata, or `undefined` for union calendars.
     ///
-    /// A plain `CalendarMetadata` object with `id`, `name`,
-    /// `ignore_weekends` and `weekend_rule`.
+    /// A plain `CalendarMetadata` object with `id`, `name` and
+    /// `ignore_weekends`.
     #[wasm_bindgen(getter, js_name = metadata)]
     pub fn metadata(&self) -> Result<JsValue, JsValue> {
         match self.calendar.metadata() {
@@ -244,7 +244,7 @@ impl JsHolidayCalendar {
 /// Resolve a calendar code argument.
 fn calendar_arg(value: &JsValue, label: &str) -> Result<&'static dyn HolidayCalendar, JsValue> {
     let code = js_string(value, label)?;
-    rust_resolve_calendar(Some(&code)).map_err(to_js_err)
+    calendar_by_id_strict(&code).map_err(to_js_err)
 }
 
 /// Convert an ISO-8601 date to epoch days (Rust `days_since_epoch`).

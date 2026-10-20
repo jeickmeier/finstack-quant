@@ -225,8 +225,7 @@ mod tests {
             }
 
             fn is_business_day(&self, date: Date) -> bool {
-                !crate::dates::WeekendRule::SaturdaySunday.is_weekend(date.weekday())
-                    && !self.is_holiday(date)
+                !crate::dates::DateExt::is_weekend(date) && !self.is_holiday(date)
             }
         }
 

@@ -4623,10 +4623,6 @@ export interface CalendarMetadata {
    * Whether weekends are ignored when classifying holidays.
    */
   ignore_weekends: boolean;
-  /**
-   * Weekend convention of the calendar, such as `"saturday_sunday"`.
-   */
-  weekend_rule: string;
 }
 
 /**
@@ -4650,8 +4646,8 @@ export interface HolidayCalendar extends WasmOwned {
   /**
    * Calendar metadata, or `undefined` for union calendars.
    *
-   * A plain `CalendarMetadata` object with `id`, `name`,
-   * `ignore_weekends` and `weekend_rule`.
+   * A plain `CalendarMetadata` object with `id`, `name` and
+   * `ignore_weekends`.
    */
   readonly metadata: CalendarMetadata | undefined;
   /**
@@ -4739,10 +4735,6 @@ export interface PeriodKind extends WasmOwned {
    * Number of periods per year (daily uses the 252 trading-day convention).
    */
   readonly periodsPerYear: number;
-  /**
-   * Factor that scales per-period statistics to annual ones (`periodsPerYear` as a float).
-   */
-  readonly annualizationFactor: number;
   /**
    * Observation date one frequency step before `first` (Rust
    * `PeriodKind::prior_observation_date`).
@@ -4835,8 +4827,8 @@ export interface PeriodKindConstructor {
  * await init();
  * const q1 = core.PeriodId.quarter(2025, 1);
  * q1.code; // "2025Q1"
- * q1.next().code; // "2025Q2"
- * core.PeriodId.parse("2025M12").next().code; // "2026M01"
+ * q1.shift(1).code; // "2025Q2"
+ * core.PeriodId.parse("2025M12").shift(1).code; // "2026M01"
  * ```
  */
 export interface PeriodId extends WasmOwned {
@@ -4861,19 +4853,13 @@ export interface PeriodId extends WasmOwned {
    */
   readonly isFiscal: boolean;
   /**
-   * Step forward to the next period (Rust `PeriodId::next`).
+   * Move by a signed number of periods of the same kind and calendar (Rust `PeriodId::shift`).
    *
-   * @returns The following `PeriodId`, rolling the year where needed.
-   * @throws `FinstackError` (kind `validation`) when the year would overflow, or for a fiscal daily identifier at day 365, whose next day depends on the fiscal calendar (use `nextFiscal`).
+   * @param periods - Whole number of periods to move; negative moves back and `0` returns the identifier unchanged.
+   * @returns The `PeriodId` `periods` steps away, rolling the year where needed.
+   * @throws `TypeError` (kind `invalid_type`) when `periods` is not a whole number; `FinstackError` (kind `validation`) when the year would overflow, or for a fiscal daily identifier that would leave days `1..=365`, whose length depends on the fiscal calendar (use `nextFiscal` / `prevFiscal`).
    */
-  next(): PeriodId;
-  /**
-   * Step back to the previous period (Rust `PeriodId::prev`).
-   *
-   * @returns The preceding `PeriodId`, rolling the year where needed.
-   * @throws `FinstackError` (kind `validation`) when the year would overflow, or for a fiscal daily identifier at day 1, whose previous day depends on the fiscal calendar (use `prevFiscal`).
-   */
-  prev(): PeriodId;
+  shift(periods: number): PeriodId;
   /**
    * Step forward to the next fiscal period (Rust `PeriodId::next_fiscal`).
    *
@@ -4907,8 +4893,8 @@ export interface PeriodId extends WasmOwned {
  * await init();
  * const q1 = core.PeriodId.quarter(2025, 1);
  * q1.code; // "2025Q1"
- * q1.next().code; // "2025Q2"
- * core.PeriodId.parse("2025M12").next().code; // "2026M01"
+ * q1.shift(1).code; // "2025Q2"
+ * core.PeriodId.parse("2025M12").shift(1).code; // "2026M01"
  * ```
  */
 export interface PeriodIdConstructor {
@@ -5148,7 +5134,6 @@ export interface ScheduleErrorPolicy extends WasmOwned {
    * Canonical snake_case name of the policy.
    *
    * @returns The name accepted by `fromName` and the JSON wire format.
-   * @throws If the label cannot be produced (not expected).
    */
   toString(): string;
 }
@@ -5190,7 +5175,7 @@ export interface ScheduleErrorPolicyConstructor {
   /**
    * Parse a policy name (the Rust serde label).
    *
-   * @param name - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`.
+   * @param name - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`, in any ASCII case.
    * @returns The matching `ScheduleErrorPolicy`.
    * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no policy matches.
    */
@@ -5399,7 +5384,7 @@ export interface ScheduleBuilder extends WasmOwned {
   /**
    * Set the policy for recoverable construction errors.
    *
-   * @param policy - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`.
+   * @param policy - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`, in any ASCII case.
    * @returns This builder, updated in place.
    * @throws `TypeError` if `policy` is not a string; `FinstackError` (kind `validation`) if no policy matches.
    */
@@ -5456,7 +5441,7 @@ export interface ScheduleBuilderConstructor {
  * await init();
  * const cls = core.SifmaSettlementClass.fromAgencyTerm("FNMA", 15);
  * cls.toString(); // "b"
- * core.sifmaSettlementDateForClass(1, 2026, cls); // epoch days, or undefined
+ * core.sifmaSettlementDate(1, 2026, cls); // epoch days, or undefined
  * ```
  */
 export interface SifmaSettlementClass extends WasmOwned {
@@ -5464,7 +5449,6 @@ export interface SifmaSettlementClass extends WasmOwned {
    * Lower-case class letter (`"a"` through `"d"`), the JSON wire label.
    *
    * @returns The class label.
-   * @throws If the label cannot be produced (not expected).
    */
   toString(): string;
 }
@@ -5480,7 +5464,7 @@ export interface SifmaSettlementClass extends WasmOwned {
  * await init();
  * const cls = core.SifmaSettlementClass.fromAgencyTerm("FNMA", 15);
  * cls.toString(); // "b"
- * core.sifmaSettlementDateForClass(1, 2026, cls); // epoch days, or undefined
+ * core.sifmaSettlementDate(1, 2026, cls); // epoch days, or undefined
  * ```
  */
 export interface SifmaSettlementClassConstructor {
@@ -5540,7 +5524,6 @@ export interface Thirty360Convention extends WasmOwned {
    * Canonical snake_case name of the variant.
    *
    * @returns The name accepted by `fromName` and `days30360`.
-   * @throws If the label cannot be produced (not expected).
    */
   toString(): string;
 }
@@ -5588,7 +5571,7 @@ export interface Thirty360ConventionConstructor {
   /**
    * Parse a variant name (the Rust serde label).
    *
-   * @param name - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`.
+   * @param name - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`, in any ASCII case.
    * @returns The matching `Thirty360Convention`.
    * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no variant matches.
    */
@@ -5603,14 +5586,14 @@ export interface Thirty360ConventionConstructor {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * core.TenorUnit.months().toString(); // "M"
- * core.TenorUnit.fromChar("y").toString(); // "Y"
+ * core.TenorUnit.fromName("y").toString(); // "Y"
  * ```
  */
 export interface TenorUnit extends WasmOwned {
   /**
    * One-letter unit code: `"D"`, `"W"`, `"M"` or `"Y"`.
    *
-   * @returns The designator accepted by `fromChar` and used in tenor text.
+   * @returns The designator accepted by `fromName` and used in tenor text.
    */
   toString(): string;
 }
@@ -5623,7 +5606,7 @@ export interface TenorUnit extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * core.TenorUnit.months().toString(); // "M"
- * core.TenorUnit.fromChar("y").toString(); // "Y"
+ * core.TenorUnit.fromName("y").toString(); // "Y"
  * ```
  */
 export interface TenorUnitConstructor {
@@ -5656,13 +5639,13 @@ export interface TenorUnitConstructor {
    */
   years(): TenorUnit;
   /**
-   * Parse a one-letter unit code (Rust `TenorUnit::from_char`).
+   * Parse a one-letter unit code (Rust `TenorUnit::from_str`).
    *
-   * @param ch - Exactly one character: `D`, `W`, `M` or `Y`, in either case.
+   * @param name - Exactly one character: `D`, `W`, `M` or `Y`, in either case.
    * @returns The matching `TenorUnit`.
-   * @throws `TypeError` (kind `invalid_type`) if `ch` is not a string; `FinstackError` (kind `validation`) if it is not exactly one of the four unit letters.
+   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if it is not exactly one of the four unit letters.
    */
-  fromChar(ch: string): TenorUnit;
+  fromName(name: string): TenorUnit;
 }
 
 /**
@@ -5935,7 +5918,6 @@ export interface UnknownScalePolicy extends WasmOwned {
    * Snake_case name of the policy (same as `name`).
    *
    * @returns The name accepted by `fromName`.
-   * @throws If the label cannot be produced (not expected).
    */
   toString(): string;
 }
@@ -5977,7 +5959,7 @@ export interface UnknownScalePolicyConstructor {
   /**
    * Parse a policy name (the Rust serde label).
    *
-   * @param name - Policy name: `"error"`, `"fallback_to_default"` or `"warn_and_fallback"`.
+   * @param name - Policy name: `"error"`, `"fallback_to_default"` or `"warn_and_fallback"`, in any ASCII case.
    * @returns The matching `UnknownScalePolicy`.
    * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no policy matches.
    */
@@ -8360,7 +8342,7 @@ export interface CoreNamespace {
    *
    * @param start - Inclusive accrual start as days since 1970-01-01.
    * @param end - Exclusive accrual end as days since 1970-01-01; an earlier end gives a negative count rather than an error.
-   * @param convention - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`.
+   * @param convention - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`, in any ASCII case.
    * @returns The 30/360 day count.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an unknown variant or a date outside the supported range.
    */
@@ -8586,35 +8568,29 @@ export interface CoreNamespace {
    */
   nextThirdFriday(date: number): number;
   /**
-   * Published SIFMA class A settlement date of a month (Rust `sifma_settlement_date`).
-   *
-   * @param month - Settlement month number, `1` through `12`.
-   * @param year - Settlement year.
-   * @returns The published date as epoch days, or `undefined` when the month is outside the embedded SIFMA calendar (dates are never approximated).
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
-   */
-  sifmaSettlementDate(month: number, year: number): number | undefined;
-  /**
    * Published SIFMA settlement date of a month for one class (Rust
-   * `sifma_settlement_date_for_class`).
+   * `sifma_settlement_date`).
+   *
+   * The published facade makes `settlementClass` optional: an omitted class is
+   * the Rust default `SifmaSettlementClass::default()` (Class A).
    *
    * @param month - Settlement month number, `1` through `12`.
    * @param year - Settlement year.
    * @param settlementClass - Agency-MBS settlement class whose date is requested.
-   * @returns The published date as epoch days, or `undefined` when that month and class are outside the embedded SIFMA calendar.
+   * @returns The published date as epoch days, or `undefined` when that month and class are outside the embedded SIFMA calendar (dates are never approximated).
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
    */
-  sifmaSettlementDateForClass(
+  sifmaSettlementDate(
     month: number,
     year: number,
-    settlementClass: SifmaSettlementClass
+    settlementClass?: SifmaSettlementClass | null
   ): number | undefined;
   /**
    * Projection-only estimate of a SIFMA settlement date (Rust
-   * `estimated_sifma_settlement_date_for_class`).
+   * `estimated_sifma_settlement_date`).
    *
    * The estimate counts business days of the month on the SIFMA calendar; use
-   * `sifmaSettlementDateForClass` for published dates.
+   * `sifmaSettlementDate` for published dates.
    *
    * @param month - Settlement month number, `1` through `12`.
    * @param year - Settlement year.
@@ -8622,7 +8598,7 @@ export interface CoreNamespace {
    * @returns The estimated settlement date as epoch days.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
    */
-  estimatedSifmaSettlementDateForClass(
+  estimatedSifmaSettlementDate(
     month: number,
     year: number,
     settlementClass: SifmaSettlementClass

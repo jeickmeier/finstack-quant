@@ -301,17 +301,13 @@ impl AgencyTba {
         let month = time::Month::try_from(self.settlement_month)
             .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
         let class = self.effective_settlement_class();
-        finstack_quant_core::dates::sifma_settlement_date_for_class(
-            month,
-            self.settlement_year,
-            class,
-        )
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "No published SIFMA settlement date for {:02}/{} and class {:?}",
-                self.settlement_month, self.settlement_year, class
-            ))
-        })
+        finstack_quant_core::dates::sifma_settlement_date(month, self.settlement_year, class)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "No published SIFMA settlement date for {:02}/{} and class {:?}",
+                    self.settlement_month, self.settlement_year, class
+                ))
+            })
     }
 
     /// Effective settlement class (explicit or inferred from agency + term).

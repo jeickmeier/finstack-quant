@@ -47,13 +47,14 @@ class UnknownScalePolicy:
     @classmethod
     def from_name(cls, name: str) -> UnknownScalePolicy:
         """
-        Parse a policy from its exact lowercase snake_case name (case-sensitive).
+        Parse a policy from its snake_case name, case-insensitively.
 
         Parameters
         ----------
         name : str
-            Exactly one of ``"error"``, ``"fallback_to_default"``, or
-            ``"warn_and_fallback"``; ``"ERROR"`` is rejected.
+            One of ``"error"``, ``"fallback_to_default"``, or
+            ``"warn_and_fallback"``, in any ASCII case; surrounding whitespace
+            is ignored.
 
         Returns
         -------

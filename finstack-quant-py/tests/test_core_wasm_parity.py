@@ -190,13 +190,9 @@ CASES: dict[str, Callable[[], Any]] = {
     # --- dates: SIFMA ------------------------------------------------------
     "sifma_settlement_date": lambda: _iso(dates.sifma_settlement_date(3, 2027)),
     "sifma_settlement_date_uncovered": lambda: _iso(dates.sifma_settlement_date(3, 1990)),
-    "sifma_settlement_date_for_class": lambda: _iso(
-        dates.sifma_settlement_date_for_class(1, 2026, dates.SifmaSettlementClass.B)
-    ),
-    "estimated_sifma_settlement_date_for_class": lambda: _iso(
-        dates.estimated_sifma_settlement_date_for_class(
-            3, 2031, dates.SifmaSettlementClass.from_agency_term("GNMA", 30)
-        )
+    "sifma_settlement_date_class_b": lambda: _iso(dates.sifma_settlement_date(1, 2026, dates.SifmaSettlementClass.B)),
+    "estimated_sifma_settlement_date": lambda: _iso(
+        dates.estimated_sifma_settlement_date(3, 2031, dates.SifmaSettlementClass.from_agency_term("GNMA", 30))
     ),
     "next_sifma_settlement": lambda: _iso(dates.next_sifma_settlement("2027-03-16")),
     # --- dates: DateExt, calendars, day counts ---------------------------------
@@ -222,8 +218,8 @@ CASES: dict[str, Callable[[], Any]] = {
     },
     # --- dates: periods and schedules -------------------------------------------
     "period_id": lambda: [
-        dates.PeriodId.parse("2025M12").next().code,
-        dates.PeriodId.quarter(2025, 1).prev().code,
+        dates.PeriodId.parse("2025M12").shift(1).code,
+        dates.PeriodId.quarter(2025, 1).shift(-1).code,
         dates.PeriodId.parse("FY2025Q4").next_fiscal(US_FEDERAL).code,
         dates.PeriodId.week(2025, 5).kind.periods_per_year,
     ],

@@ -643,17 +643,17 @@ impl DayCount {
     }
 
     /// Canonical snake_case names accepted by [`FromStr`](std::str::FromStr),
-    /// in declaration order.
-    pub const NAMES: &'static [&'static str] = &[
+    /// in declaration order (the `FromStr` error lists them).
+    const NAMES: &'static [&'static str] = &[
         "one_one",
         "act_360",
         "act_365f",
         "act_365l",
-        "nl_365",
         "30_360",
         "30e_360",
         "30e_360_isda",
         "30_360_it",
+        "nl_365",
         "act_act",
         "act_act_isma",
         "act_act_afb",
@@ -662,23 +662,9 @@ impl DayCount {
 }
 
 impl std::fmt::Display for DayCount {
+    /// Writes the serde label (`act_360`, `30e_360_isda`, ...).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let label = match self {
-            DayCount::OneOne => "one_one",
-            DayCount::Act360 => "act_360",
-            DayCount::Act365F => "act_365f",
-            DayCount::Act365L => "act_365l",
-            DayCount::Nl365 => "nl_365",
-            DayCount::Thirty360 => "30_360",
-            DayCount::ThirtyE360 => "30e_360",
-            DayCount::ThirtyE360Isda => "30e_360_isda",
-            DayCount::Thirty360It => "30_360_it",
-            DayCount::ActAct => "act_act",
-            DayCount::ActActIsma => "act_act_isma",
-            DayCount::ActActAfb => "act_act_afb",
-            DayCount::Bus252 => "bus_252",
-        };
-        f.write_str(label)
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
@@ -712,25 +698,12 @@ impl std::str::FromStr for DayCount {
             "30_360_it" | "30_360_italian" => "30_360_it",
             other => other,
         };
-        match canonical {
-            "one_one" => Ok(Self::OneOne),
-            "act_360" => Ok(Self::Act360),
-            "act_365f" => Ok(Self::Act365F),
-            "act_365l" => Ok(Self::Act365L),
-            "nl_365" => Ok(Self::Nl365),
-            "30_360" => Ok(Self::Thirty360),
-            "30e_360" => Ok(Self::ThirtyE360),
-            "30e_360_isda" => Ok(Self::ThirtyE360Isda),
-            "30_360_it" => Ok(Self::Thirty360It),
-            "act_act" => Ok(Self::ActAct),
-            "act_act_isma" => Ok(Self::ActActIsma),
-            "act_act_afb" => Ok(Self::ActActAfb),
-            "bus_252" => Ok(Self::Bus252),
-            _ => Err(crate::Error::Validation(format!(
+        crate::wire::serde_parse(canonical).map_err(|_| {
+            crate::Error::Validation(format!(
                 "unknown day-count convention: '{s}'; expected one of {}",
                 Self::NAMES.join(", ")
-            ))),
-        }
+            ))
+        })
     }
 }
 

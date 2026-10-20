@@ -195,14 +195,9 @@ pub enum StubKind {
 }
 
 impl std::fmt::Display for StubKind {
+    /// Writes the serde label (`none`, `short_front`, ...).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            StubKind::None => write!(f, "none"),
-            StubKind::ShortFront => write!(f, "short_front"),
-            StubKind::ShortBack => write!(f, "short_back"),
-            StubKind::LongFront => write!(f, "long_front"),
-            StubKind::LongBack => write!(f, "long_back"),
-        }
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
@@ -287,6 +282,22 @@ pub enum ScheduleErrorPolicy {
     MissingCalendarWarning,
     /// Return an empty schedule with a warning instead of propagating build errors.
     GracefulEmpty,
+}
+
+impl std::fmt::Display for ScheduleErrorPolicy {
+    /// Writes the serde label (`strict`, `missing_calendar_warning`, `graceful_empty`).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
+    }
+}
+
+impl std::str::FromStr for ScheduleErrorPolicy {
+    type Err = crate::Error;
+
+    /// Parses the serde label, ignoring surrounding whitespace and ASCII case.
+    fn from_str(s: &str) -> crate::Result<Self> {
+        crate::wire::serde_parse(&s.trim().to_ascii_lowercase())
+    }
 }
 
 impl std::fmt::Display for ScheduleWarning {

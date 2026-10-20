@@ -452,19 +452,13 @@ pub struct PyThirty360Convention {
     pub(crate) inner: Thirty360Convention,
 }
 
-impl PyThirty360Convention {
-    fn label(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_label(&self.inner).map_err(core_to_py)
-    }
-}
-
 /// Extract a [`Thirty360Convention`] from a wrapper or its snake_case name.
 fn extract_thirty360(obj: &Bound<'_, PyAny>) -> PyResult<Thirty360Convention> {
     if let Ok(c) = obj.extract::<PyRef<'_, PyThirty360Convention>>() {
         return Ok(c.inner);
     }
     if let Ok(s) = obj.extract::<String>() {
-        return finstack_quant_core::wire::serde_parse(&s.to_ascii_lowercase()).map_err(core_to_py);
+        return s.parse().map_err(core_to_py);
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
         "expected Thirty360Convention or str",
@@ -499,15 +493,13 @@ impl PyThirty360Convention {
     #[classmethod]
     #[pyo3(text_signature = "(cls, name)")]
     fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
-        finstack_quant_core::wire::serde_parse(&name.to_ascii_lowercase())
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
+        name.parse().map(|inner| Self { inner }).map_err(core_to_py)
     }
 
     /// Support ``pickle`` by reconstructing through ``from_name``.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_name = py.get_type::<Self>().getattr("from_name")?;
-        Ok((from_name, (self.label()?,)))
+        Ok((from_name, (self.inner.to_string(),)))
     }
 
     fn __repr__(&self) -> String {
@@ -520,8 +512,8 @@ impl PyThirty360Convention {
         format!("Thirty360Convention.{label}")
     }
 
-    fn __str__(&self) -> PyResult<String> {
-        self.label()
+    fn __str__(&self) -> String {
+        self.inner.to_string()
     }
 }
 

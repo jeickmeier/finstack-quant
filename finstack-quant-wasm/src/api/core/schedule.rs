@@ -10,7 +10,6 @@ use finstack_quant_core::dates::{
     days_since_epoch, BusinessDayConvention, Date, Schedule, ScheduleErrorPolicy, ScheduleSpec,
     StubKind, Tenor,
 };
-use finstack_quant_core::wire::{serde_label, serde_parse};
 use wasm_bindgen::prelude::*;
 
 /// Stub convention: where an irregular first or last accrual period goes.
@@ -156,14 +155,15 @@ impl JsScheduleErrorPolicy {
     /// # Arguments
     ///
     /// * `name` - Policy name: `"strict"`, `"missing_calendar_warning"` or
-    ///   `"graceful_empty"`.
+    ///   `"graceful_empty"`, in any ASCII case.
     ///
     /// @returns The matching `ScheduleErrorPolicy`.
     /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
     /// `FinstackError` (kind `validation`) if no policy matches.
     #[wasm_bindgen(js_name = fromName)]
     pub fn from_name(name: JsValue) -> Result<JsScheduleErrorPolicy, JsValue> {
-        serde_parse(&js_string(&name, "name")?)
+        js_string(&name, "name")?
+            .parse()
             .map(Self::wrap)
             .map_err(to_js_err)
     }
@@ -171,10 +171,10 @@ impl JsScheduleErrorPolicy {
     /// Canonical snake_case name of the policy.
     ///
     /// @returns The name accepted by `fromName` and the JSON wire format.
-    /// @throws If the label cannot be produced (not expected).
     #[wasm_bindgen(js_name = toString)]
-    pub fn to_string(&self) -> Result<String, JsValue> {
-        serde_label(&self.inner).map_err(to_js_err)
+    #[allow(clippy::inherent_to_string)]
+    pub fn to_string(&self) -> String {
+        self.inner.to_string()
     }
 }
 
@@ -478,14 +478,14 @@ impl JsScheduleBuilder {
     /// # Arguments
     ///
     /// * `policy` - Policy name: `"strict"`, `"missing_calendar_warning"` or
-    ///   `"graceful_empty"`.
+    ///   `"graceful_empty"`, in any ASCII case.
     ///
     /// @returns This builder, updated in place.
     /// @throws `TypeError` if `policy` is not a string; `FinstackError` (kind
     /// `validation`) if no policy matches.
     #[wasm_bindgen(js_name = errorPolicy)]
     pub fn error_policy(&mut self, policy: JsValue) -> Result<(), JsValue> {
-        self.spec.error_policy = serde_parse(&js_string(&policy, "policy")?).map_err(to_js_err)?;
+        self.spec.error_policy = js_string(&policy, "policy")?.parse().map_err(to_js_err)?;
         Ok(())
     }
 

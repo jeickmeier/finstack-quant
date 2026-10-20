@@ -23,9 +23,9 @@
 //! Standard market calendars included:
 //! - **TARGET2**: European Central Bank / SEPA
 //! - **NYSE**: New York Stock Exchange
-//! - **GBLO**: London Stock Exchange
+//! - **GBLO**: United Kingdom (London) bank holidays
 //! - **USNY**: US Federal Reserve (New York)
-//! - **JPTO**: Tokyo Stock Exchange
+//! - **JPTO**: Japan (Tokyo) bank holidays
 //!
 //! # Standards References
 //!
@@ -85,12 +85,12 @@ pub(crate) fn seek_business_day<C: HolidayCalendar + ?Sized>(
 /// 1. Return `true` from [`is_holiday`](Self::is_holiday) for market-specific
 ///    non-working days (exchanges closed, bank holidays)
 /// 2. Implement [`is_business_day`](Self::is_business_day) as "not a weekend
-///    under the market's [`WeekendRule`](crate::dates::WeekendRule) and not a holiday"
+///    under the market's weekend convention and not a holiday"
 ///
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{HolidayCalendar, WeekendRule};
+/// use finstack_quant_core::dates::{DateExt, HolidayCalendar};
 /// use time::Date;
 ///
 /// struct CustomCalendar;
@@ -102,7 +102,7 @@ pub(crate) fn seek_business_day<C: HolidayCalendar + ?Sized>(
 ///     }
 ///
 ///     fn is_business_day(&self, date: Date) -> bool {
-///         !WeekendRule::SaturdaySunday.is_weekend(date.weekday()) && !self.is_holiday(date)
+///         !date.is_weekend() && !self.is_holiday(date)
 ///     }
 /// }
 ///
@@ -124,9 +124,10 @@ pub trait HolidayCalendar: Send + Sync {
     /// Returns `true` if the `date` is a business day according to the
     /// calendar (i.e. not weekend and not holiday).
     ///
-    /// Each calendar applies its own weekend rule here (see
-    /// [`WeekendRule`](crate::dates::WeekendRule)); it is independent of how the
-    /// calendar labels weekends in [`Self::is_holiday`].
+    /// Each calendar applies its own weekend convention here (every built-in
+    /// calendar closes on Saturday and Sunday, see
+    /// [`DateExt::is_weekend`](crate::dates::DateExt::is_weekend)); it is
+    /// independent of how the calendar labels weekends in [`Self::is_holiday`].
     ///
     /// # Arguments
     ///
@@ -143,15 +144,7 @@ pub trait HolidayCalendar: Send + Sync {
     /// * `start` - First date included in the count.
     /// * `end` - Boundary date excluded from the count.
     fn count_business_days(&self, start: Date, end: Date) -> i32 {
-        let mut count = 0_i32;
-        let mut current = start;
-        while current < end {
-            if self.is_business_day(current) {
-                count += 1;
-            }
-            current += Duration::days(1);
-        }
-        count
+        count_business_days_by_scan(self, start, end)
     }
 
     /// Optional human-friendly metadata for the calendar.
@@ -192,6 +185,24 @@ impl<T: HolidayCalendar + ?Sized> HolidayCalendar for &T {
     }
 }
 
+/// Business days in `[start, end)` by testing each date with
+/// [`HolidayCalendar::is_business_day`]; zero when `start >= end`.
+pub(super) fn count_business_days_by_scan<C: HolidayCalendar + ?Sized>(
+    calendar: &C,
+    start: Date,
+    end: Date,
+) -> i32 {
+    let mut count = 0_i32;
+    let mut current = start;
+    while current < end {
+        if calendar.is_business_day(current) {
+            count += 1;
+        }
+        current += Duration::days(1);
+    }
+    count
+}
+
 /// Basic metadata describing a holiday calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -203,8 +214,6 @@ pub struct CalendarMetadata {
     pub name: &'static str,
     /// Whether weekends are ignored when classifying holidays.
     pub ignore_weekends: bool,
-    /// Weekend convention used by this calendar for business-day logic.
-    pub weekend_rule: super::types::WeekendRule,
 }
 
 /// Business day adjustment conventions per ISDA standards.
@@ -374,7 +383,7 @@ pub fn adjust<C: HolidayCalendar + ?Sized>(
     conv: BusinessDayConvention,
     cal: &C,
 ) -> Result<Date, Error> {
-    if conv == BusinessDayConvention::Unadjusted || cal.is_business_day(date) {
+    if cal.is_business_day(date) {
         return Ok(date);
     }
     let seek = |step: i32| seek_business_day(date, step, MAX_BUSINESS_DAY_SEARCH_DAYS, cal);
@@ -489,7 +498,7 @@ pub(crate) fn canonical_calendar_id(id: &str) -> crate::Result<String> {
 }
 
 /// Members of a `+`-joined calendar id: trimmed, lower-cased, sorted, de-duplicated.
-fn joint_members(id: &str) -> Vec<String> {
+pub(super) fn joint_members(id: &str) -> Vec<String> {
     let mut parts: Vec<String> = id
         .split('+')
         .map(|p| p.trim().to_ascii_lowercase())
@@ -587,8 +596,9 @@ pub fn resolve_calendar(cal_id: Option<&str>) -> crate::Result<&'static dyn Holi
 /// Resolve the joint calendar of a currency pair.
 ///
 /// Both ids present resolve to the interned union calendar (`"base+quote"`,
-/// a business day only when both members are); one id combines that
-/// calendar with [`super::WEEKENDS_ONLY`]; none resolves to weekends only.
+/// a business day only when both members are); one id resolves to that
+/// calendar alone (every built-in calendar already closes on weekends); none
+/// resolves to weekends only.
 /// Step and adjust on the result with [`crate::dates::DateExt::add_business_days`]
 /// and [`adjust`]; the USD-aware market spot rule lives in
 /// [`crate::dates::fx::fx_spot_date`].
@@ -607,9 +617,7 @@ pub fn resolve_joint_calendar(
 ) -> crate::Result<&'static dyn HolidayCalendar> {
     match (base_cal_id, quote_cal_id) {
         (None, None) => Ok(&super::WEEKENDS_ONLY),
-        (Some(id), None) | (None, Some(id)) => {
-            calendar_by_id_strict(&format!("{id}+weekends_only"))
-        }
+        (Some(id), None) | (None, Some(id)) => calendar_by_id_strict(id),
         (Some(base), Some(quote)) => calendar_by_id_strict(&format!("{base}+{quote}")),
     }
 }

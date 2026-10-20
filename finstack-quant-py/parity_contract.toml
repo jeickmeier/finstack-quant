@@ -137,15 +137,15 @@ public = [
     "add_business_days", "add_months", "add_weekdays", "end_of_month", "fiscal_year",
     "is_weekend", "months_until", "quarter",
     "StubKind", "ScheduleErrorPolicy", "Schedule", "ScheduleBuilder",
-    "SifmaSettlementClass", "sifma_settlement_date", "sifma_settlement_date_for_class",
-    "estimated_sifma_settlement_date_for_class", "next_sifma_settlement",
+    "SifmaSettlementClass", "sifma_settlement_date", "estimated_sifma_settlement_date",
+    "next_sifma_settlement",
     "third_wednesday", "third_friday", "next_imm", "is_imm_date", "is_cds_date",
     "next_cds_date", "prev_cds_date", "prev_cds_semiannual_roll",
     "next_semiannual_cds_maturity", "imm_option_expiry", "next_imm_option_expiry",
     "next_third_friday",
     "create_date", "days_since_epoch", "date_from_epoch_days",
 ]
-note = "DayCountContext is the sole owned host context; it stores Rust DayCountContextState and resolves the borrowed Rust context during calculation. Rust DayCountContextState is not a separate host class. Subset scope: the Rust dates::fx submodule (FX spot-lag/settlement date logic) remains Rust-only; calendar construction (rules, generated calendars, composites) is crate-private in Rust, and hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec wrap the serde ScheduleSpec; ScheduleSpec.new supplies canonical Rust builder defaults. Rust-only: DateExt::add_days (checked calendar-day arithmetic shared by Rust curve rolls and tenor/schedule generation; hosts use named financial date shifts or MarketContext.roll_forward), PeriodId::shift (signed multi-period stepping; hosts expose next/prev), PeriodId::from_date (calendar bucket construction from an already validated Rust Date), ScheduleWarning as a type (Python exposes Schedule.warnings as list[dict] with kind/message)."
+note = "DayCountContext is the sole owned host context; it stores Rust DayCountContextState and resolves the borrowed Rust context during calculation. Rust DayCountContextState is not a separate host class. Subset scope: the Rust dates::fx submodule (FX spot-lag/settlement date logic) remains Rust-only; calendar construction (rules, generated calendars, composites) is crate-private in Rust, and hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec wrap the serde ScheduleSpec; ScheduleSpec.new supplies canonical Rust builder defaults. Rust-only: DateExt::add_days (checked calendar-day arithmetic shared by Rust curve rolls and tenor/schedule generation; hosts use named financial date shifts or MarketContext.roll_forward), PeriodId::from_date (calendar bucket construction from an already validated Rust Date), ScheduleWarning as a type (Python exposes Schedule.warnings as list[dict] with kind/message)."
 
 [crates.core.module_symbols.market_data]
 python_package = "finstack_quant.core.market_data"

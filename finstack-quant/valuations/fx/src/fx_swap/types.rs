@@ -253,11 +253,11 @@ impl FxSwap {
         business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
-        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date_for_pair};
+        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date};
         // CLS-consistent spot roll: a US holiday on an intermediate day does not
         // delay a USD pair's spot date (FX spot convention
         // finding).
-        let near_date = fx_spot_date_for_pair(
+        let near_date = fx_spot_date(
             trade_date,
             settlement_days,
             base_currency,

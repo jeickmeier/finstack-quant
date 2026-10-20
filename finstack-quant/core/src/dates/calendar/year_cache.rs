@@ -9,8 +9,9 @@ use std::sync::{OnceLock, RwLock};
 use time::{Date, Duration};
 
 use super::algo::{BASE_YEAR, END_YEAR};
-use super::business_days::HolidayCalendar;
+use super::business_days::count_business_days_by_scan;
 use super::types::Calendar;
+use crate::dates::DateExt;
 use crate::{recover_lock, FxHashMap};
 
 /// 366-day holiday mask plus inclusive business-day prefix sums for one year.
@@ -31,7 +32,6 @@ struct YearKey {
     id: &'static str,
     year: i32,
     ignore_weekends: bool,
-    weekend_rule: super::types::WeekendRule,
     /// Static rule slice identity (`as_ptr` / `len`), not a raw pointer (Send+Sync).
     rules_addr: usize,
     rules_len: usize,
@@ -86,7 +86,7 @@ fn materialize(cal: &Calendar, year: i32) -> YearBits {
         if is_hol {
             set_holiday_bit(&mut holiday, ordinal);
         }
-        if !cal.weekend_rule.is_weekend(date.weekday()) && !is_hol {
+        if !date.is_weekend() && !is_hol {
             bd = bd.saturating_add(1);
         }
         bd_prefix[usize::from(ordinal)] = bd;
@@ -104,7 +104,6 @@ fn year_bits(cal: &Calendar, year: i32) -> YearBits {
         id: cal.id,
         year,
         ignore_weekends: cal.ignore_weekends,
-        weekend_rule: cal.weekend_rule,
         rules_addr: cal.rules.as_ptr() as usize,
         rules_len: cal.rules.len(),
     };
@@ -127,18 +126,6 @@ pub(super) fn is_holiday_cached(cal: &Calendar, date: Date) -> bool {
     year_bits(cal, date.year()).is_holiday(date.ordinal())
 }
 
-fn count_by_scan(cal: &Calendar, start: Date, end: Date) -> i32 {
-    let mut count = 0_i32;
-    let mut current = start;
-    while current < end {
-        if cal.is_business_day(current) {
-            count += 1;
-        }
-        current += Duration::days(1);
-    }
-    count
-}
-
 /// Business days in `[start, end)` using per-year prefix sums when the
 /// half-open interval lies inside the cache year range.
 pub(super) fn count_business_days_cached(cal: &Calendar, start: Date, end: Date) -> i32 {
@@ -147,7 +134,7 @@ pub(super) fn count_business_days_cached(cal: &Calendar, start: Date, end: Date)
     }
     let last = end - Duration::days(1);
     if start.year() < BASE_YEAR || last.year() > END_YEAR {
-        return count_by_scan(cal, start, end);
+        return count_business_days_by_scan(cal, start, end);
     }
 
     let mut total = 0_i32;
@@ -177,7 +164,7 @@ mod tests {
     use crate::dates::calendar::rule::Rule;
     use crate::dates::calendar::types::Calendar;
     use crate::dates::calendar::{BSE, CNBE, NYSE, TARGET2};
-    use crate::dates::{HolidayCalendar, WeekendRule};
+    use crate::dates::HolidayCalendar;
     use time::Month;
 
     fn date(year: i32, month: Month, day: u8) -> Date {
@@ -226,8 +213,8 @@ mod tests {
                         cal.id,
                         d
                     );
-                    let expected_public_holiday = rule_holiday
-                        && !(cal.ignore_weekends && cal.weekend_rule.is_weekend(d.weekday()));
+                    let expected_public_holiday =
+                        rule_holiday && !(cal.ignore_weekends && d.is_weekend());
                     assert_eq!(
                         cal.is_holiday(d),
                         expected_public_holiday,
@@ -237,7 +224,7 @@ mod tests {
                     );
                     assert_eq!(
                         cal.is_business_day(d),
-                        !cal.weekend_rule.is_weekend(d.weekday()) && !rule_holiday,
+                        !d.is_weekend() && !rule_holiday,
                         "{} {} business-day bit must match weekend + rule scan",
                         cal.id,
                         d
@@ -301,21 +288,5 @@ mod tests {
         assert!(!is_holiday_cached(&cal_july4, jan1));
         assert!(!is_holiday_cached(&cal_jan1, july4));
         assert!(is_holiday_cached(&cal_july4, july4));
-    }
-
-    #[test]
-    fn friday_saturday_cached_count_matches_default_scan() {
-        let cal = Calendar::new("me_prefix", "Middle East prefix", true, &[])
-            .with_weekend_rule(WeekendRule::FridaySaturday);
-        let friday = date(2025, Month::January, 3);
-        let next_friday = date(2025, Month::January, 10);
-        // Fri/Sat weekend: Sun–Thu are business days → 5 days in [Fri, next Fri).
-        assert_eq!(cal.count_business_days(friday, next_friday), 5);
-        assert_cached_count_matches_default_scan(
-            "Friday/Saturday weekend",
-            &cal,
-            friday,
-            next_friday,
-        );
     }
 }

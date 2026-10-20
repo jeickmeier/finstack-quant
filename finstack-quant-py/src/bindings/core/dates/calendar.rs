@@ -3,16 +3,11 @@
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
-    adjust, available_calendars, calendar_by_id_strict, resolve_calendar, BusinessDayConvention,
-    CalendarMetadata, HolidayCalendar, WeekendRule,
+    adjust, available_calendars, calendar_by_id_strict, BusinessDayConvention, CalendarMetadata,
+    HolidayCalendar,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
-
-/// Serde name of a [`WeekendRule`] (the stable snake_case wire form).
-fn weekend_rule_str(rule: WeekendRule) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(&rule).map_err(crate::errors::core_to_py)
-}
 
 /// Business-day adjustment convention (ISDA 2006 Definitions §4.12).
 ///
@@ -134,7 +129,7 @@ pub(crate) fn extract_calendar(obj: &Bound<'_, PyAny>) -> PyResult<&'static dyn 
         return Ok(cal.cal);
     }
     if let Ok(code) = obj.extract::<String>() {
-        return resolve_calendar(Some(&code)).map_err(core_to_py);
+        return calendar_by_id_strict(&code).map_err(core_to_py);
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
         "expected HolidayCalendar or str calendar code",
@@ -147,8 +142,8 @@ pub(crate) fn extract_calendar(obj: &Bound<'_, PyAny>) -> PyResult<&'static dyn 
 /// --------
 /// >>> from finstack_quant.core.dates import HolidayCalendar
 /// >>> meta = HolidayCalendar("usny").metadata
-/// >>> (meta.id, meta.weekend_rule)
-/// ('usny', 'saturday_sunday')
+/// >>> (meta.id, meta.ignore_weekends)
+/// ('usny', False)
 #[pyclass(
     name = "CalendarMetadata",
     module = "finstack_quant.core.dates",
@@ -187,13 +182,6 @@ impl PyCalendarMetadata {
     #[getter]
     fn ignore_weekends(&self) -> bool {
         self.inner.ignore_weekends
-    }
-
-    /// Weekend convention used by this calendar as a snake_case string
-    /// (e.g. ``"saturday_sunday"``, ``"friday_saturday"``, ``"friday_only"``, ``"none"``).
-    #[getter]
-    fn weekend_rule(&self) -> PyResult<String> {
-        weekend_rule_str(self.inner.weekend_rule)
     }
 
     fn __repr__(&self) -> String {

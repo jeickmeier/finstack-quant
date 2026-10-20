@@ -11,7 +11,7 @@ use pyo3::types::{PyModule, PyType};
 ///
 /// Immutable, hashable enum-style type. ``str()`` gives the single-letter
 /// designator (``"D"``, ``"W"``, ``"M"``, ``"Y"``) accepted by
-/// ``TenorUnit.from_char`` and ``Tenor``.
+/// ``TenorUnit.from_name`` and ``Tenor``.
 #[pyclass(
     name = "TenorUnit",
     module = "finstack_quant.core.dates",
@@ -59,19 +59,19 @@ impl PyTenorUnit {
     /// Parse a single-character tenor unit designator (``D``, ``W``, ``M``, ``Y``),
     /// case-insensitively.
     ///
-    /// Raises ``ValueError`` when ``ch`` is not exactly one of those letters.
+    /// Raises ``ValueError`` when ``name`` is not exactly one of those letters.
     #[classmethod]
-    #[pyo3(text_signature = "(cls, ch)")]
-    fn from_char(_cls: &Bound<'_, PyType>, ch: &str) -> PyResult<Self> {
-        ch.parse::<TenorUnit>()
+    #[pyo3(text_signature = "(cls, name)")]
+    fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
+        name.parse::<TenorUnit>()
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
 
-    /// Support ``pickle`` by reconstructing through ``TenorUnit.from_char``.
+    /// Support ``pickle`` by reconstructing through ``TenorUnit.from_name``.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_char = py.get_type::<Self>().getattr("from_char")?;
-        Ok((from_char, (self.inner.designator().to_string(),)))
+        let from_name = py.get_type::<Self>().getattr("from_name")?;
+        Ok((from_name, (self.inner.designator().to_string(),)))
     }
 
     fn __repr__(&self) -> String {
@@ -95,7 +95,7 @@ fn extract_tenor_unit(obj: &Bound<'_, PyAny>) -> PyResult<TenorUnit> {
         return Ok(unit.inner);
     }
     if let Ok(s) = obj.extract::<String>() {
-        return PyTenorUnit::from_char(&obj.py().get_type::<PyTenorUnit>(), &s).map(|u| u.inner);
+        return PyTenorUnit::from_name(&obj.py().get_type::<PyTenorUnit>(), &s).map(|u| u.inner);
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
         "expected TenorUnit or a one-letter unit string (D, W, M, Y)",

@@ -59,8 +59,7 @@ __all__ = [
     # SIFMA settlements
     "SifmaSettlementClass",
     "sifma_settlement_date",
-    "sifma_settlement_date_for_class",
-    "estimated_sifma_settlement_date_for_class",
+    "estimated_sifma_settlement_date",
     "next_sifma_settlement",
     # IMM, CDS rolls, and listed-option expiries
     "third_wednesday",
@@ -141,42 +140,11 @@ class SifmaSettlementClass:
         """
         ...
 
-def sifma_settlement_date(month: int, year: int) -> datetime.date | None:
-    """
-    Return the published SIFMA settlement date for a month when available.
-
-    Parameters
-    ----------
-    month : int
-        Delivery month number from ``1`` through ``12``.
-    year : int
-        Four-digit delivery calendar year.
-
-    Returns
-    -------
-    datetime.date or None
-        Published settlement date, or ``None`` when the month is not listed.
-
-    Raises
-    ------
-    ValueError
-        If *month* is outside ``1`` through ``12``.
-
-    Examples
-    --------
-    >>> import datetime
-    >>> from finstack_quant.core.dates import sifma_settlement_date
-    >>> sifma_settlement_date(1, 2026)
-    datetime.date(2026, 1, 14)
-
-    """
-    ...
-
-def sifma_settlement_date_for_class(
-    month: int, year: int, settlement_class: SifmaSettlementClass
+def sifma_settlement_date(
+    month: int, year: int, settlement_class: SifmaSettlementClass | None = None
 ) -> datetime.date | None:
     """
-    Return the SIFMA settlement date for a specified delivery class.
+    Return the published SIFMA settlement date for a delivery month and class.
 
     Parameters
     ----------
@@ -184,8 +152,9 @@ def sifma_settlement_date_for_class(
         Delivery month number from ``1`` through ``12``.
     year : int
         Four-digit delivery calendar year.
-    settlement_class : SifmaSettlementClass
+    settlement_class : SifmaSettlementClass, optional
         Good-delivery class inferred from the agency/program and mortgage term.
+        ``None`` uses the Rust default, Class A (conventional 30-year UMBS).
 
     Returns
     -------
@@ -202,21 +171,21 @@ def sifma_settlement_date_for_class(
     Examples
     --------
     >>> import datetime
-    >>> from finstack_quant.core.dates import sifma_settlement_date_for_class, SifmaSettlementClass
-    >>> sifma_settlement_date_for_class(1, 2026, SifmaSettlementClass.B)
+    >>> from finstack_quant.core.dates import sifma_settlement_date, SifmaSettlementClass
+    >>> sifma_settlement_date(1, 2026)
+    datetime.date(2026, 1, 14)
+    >>> sifma_settlement_date(1, 2026, SifmaSettlementClass.B)
     datetime.date(2026, 1, 20)
 
     """
     ...
 
-def estimated_sifma_settlement_date_for_class(
-    month: int, year: int, settlement_class: SifmaSettlementClass
-) -> datetime.date:
+def estimated_sifma_settlement_date(month: int, year: int, settlement_class: SifmaSettlementClass) -> datetime.date:
     """
     Estimate a class-specific SIFMA settlement date for projections.
 
     This uses the holiday-calendar business-day anchor even when a published
-    settlement exists; use ``sifma_settlement_date_for_class`` for operational dates.
+    settlement exists; use ``sifma_settlement_date`` for operational dates.
 
     Parameters
     ----------
@@ -241,8 +210,8 @@ def estimated_sifma_settlement_date_for_class(
     Examples
     --------
     >>> import datetime
-    >>> from finstack_quant.core.dates import estimated_sifma_settlement_date_for_class, SifmaSettlementClass
-    >>> estimated_sifma_settlement_date_for_class(1, 2030, SifmaSettlementClass.C)
+    >>> from finstack_quant.core.dates import estimated_sifma_settlement_date, SifmaSettlementClass
+    >>> estimated_sifma_settlement_date(1, 2030, SifmaSettlementClass.C)
     datetime.date(2030, 1, 22)
 
     """
@@ -838,7 +807,7 @@ class TenorUnit:
     Examples
     --------
     >>> from finstack_quant.core.dates import TenorUnit
-    >>> (str(TenorUnit.MONTHS), TenorUnit.from_char("M") == TenorUnit.MONTHS)
+    >>> (str(TenorUnit.MONTHS), TenorUnit.from_name("M") == TenorUnit.MONTHS)
     ('M', True)
 
     """
@@ -853,14 +822,14 @@ class TenorUnit:
     """Year unit."""
 
     @classmethod
-    def from_char(cls, ch: str) -> TenorUnit:
+    def from_name(cls, name: str) -> TenorUnit:
         """
         Parse a single-character tenor unit designator.
 
         Parameters
         ----------
-        ch : str
-            One of ``'D'``, ``'W'``, ``'M'``, ``'Y'`` (case-sensitive).
+        name : str
+            One of ``'D'``, ``'W'``, ``'M'``, ``'Y'`` (case-insensitive).
 
         Returns
         -------
@@ -872,12 +841,12 @@ class TenorUnit:
         Raises
         ------
         ValueError
-            If *ch* is not a valid unit designator.
+            If *name* is not a valid unit designator.
 
         Examples
         --------
         >>> from finstack_quant.core.dates import TenorUnit
-        >>> TenorUnit.from_char("W") == TenorUnit.WEEKS
+        >>> TenorUnit.from_name("W") == TenorUnit.WEEKS
         True
 
         """
@@ -1508,22 +1477,6 @@ class PeriodKind:
         """
         ...
 
-    @property
-    def annualization_factor(self) -> float:
-        """
-        Annualization factor for this frequency.
-
-        Returns
-        -------
-        float
-            Annualization factor for this frequency.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
     def prior_observation_date(self, first: datetime.date | str) -> datetime.date:
         """
         Observation date one period before *first*.
@@ -1571,7 +1524,7 @@ class PeriodId:
     Examples
     --------
     >>> from finstack_quant.core.dates import PeriodId
-    >>> (PeriodId.parse("2025Q2").code, PeriodId.parse("2025Q2").next().code)
+    >>> (PeriodId.parse("2025Q2").code, PeriodId.parse("2025Q2").shift(1).code)
     ('2025Q2', '2025Q3')
 
     """
@@ -1869,45 +1822,39 @@ class PeriodId:
         """
         ...
 
-    def next(self) -> PeriodId:
+    def shift(self, periods: int) -> PeriodId:
         """
-        Next period in sequence.
+        Move by a signed number of periods of the same frequency and calendar.
+
+        Parameters
+        ----------
+        periods : int
+            Number of periods to move; negative moves back and ``0`` returns
+            the identifier unchanged.
 
         Returns
         -------
         PeriodId
 
-            Following period of the same frequency and calendar, with year
-            rollover. Fiscal weeks roll after week 53.
+            Period ``periods`` steps away, with year rollover. Gregorian daily
+            and weekly ids move by 1 or 7 calendar days; fiscal weeks roll
+            after week 53.
 
         Raises
         ------
         ValueError
-            If the next period's year is out of range, or a fiscal daily
-            identifier is at day 365 (the fiscal year's length depends on its
-            calendar; use :meth:`next_fiscal` with an explicit
-            :class:`FiscalConfig`).
-        """
-        ...
+            If the result's year is out of range, or a fiscal daily identifier
+            would leave days ``1..=365`` (the fiscal year's length depends on
+            its calendar; use :meth:`next_fiscal` / :meth:`prev_fiscal` with an
+            explicit :class:`FiscalConfig`).
 
-    def prev(self) -> PeriodId:
-        """
-        Previous period in sequence.
-
-        Returns
-        -------
-        PeriodId
-
-            Preceding period of the same frequency and calendar, with year
-            rollover.
-
-        Raises
-        ------
-        ValueError
-            If the previous period's year is out of range, or a fiscal daily
-            identifier is at day 1 (the prior fiscal year's length depends on
-            its calendar; use :meth:`prev_fiscal` with an explicit
-            :class:`FiscalConfig`).
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import PeriodId
+        >>> PeriodId.quarter(2025, 4).shift(1).code
+        '2026Q1'
+        >>> PeriodId.quarter(2025, 1).shift(-1).code
+        '2024Q4'
         """
         ...
 
@@ -2618,23 +2565,6 @@ class CalendarMetadata:
         -------
         bool
             Whether weekends are ignored for this calendar.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def weekend_rule(self) -> str:
-        """
-        Weekend convention as a snake_case name.
-
-        Returns
-        -------
-        str
-            One of ``"saturday_sunday"``, ``"friday_saturday"``,
-            ``"friday_only"``, or ``"none"``.
 
         Notes
         -----

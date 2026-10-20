@@ -311,7 +311,7 @@ impl FxSpot {
     ///   applied from this date; an explicit `settlement_date` is only
     ///   business-day-adjusted and ignores `as_of`.
     pub fn effective_settlement_date(&self, as_of: Date) -> Result<Date> {
-        use finstack_quant_core::dates::fx::fx_spot_date_for_pair;
+        use finstack_quant_core::dates::fx::fx_spot_date;
         use finstack_quant_core::dates::{adjust, resolve_joint_calendar};
 
         // Check if we should use joint calendar logic
@@ -338,7 +338,7 @@ impl FxSpot {
                 )
             });
 
-            fx_spot_date_for_pair(
+            fx_spot_date(
                 as_of,
                 settlement_days,
                 self.base_currency,

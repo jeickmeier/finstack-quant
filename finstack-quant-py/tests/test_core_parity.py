@@ -24,7 +24,6 @@ from finstack_quant.core.dates import (
     available_calendars,
     build_periods,
     sifma_settlement_date,
-    sifma_settlement_date_for_class,
 )
 from finstack_quant.core.market_data import (
     BaseCorrelationCurve,
@@ -309,11 +308,6 @@ class TestDayCountParity:
         with pytest.raises(Exception, match="coupon period start must be before end"):
             DayCountContext(coupon_period=(date(2025, 7, 1), date(2025, 1, 1)))
 
-    def test_calendar_metadata_exposes_weekend_rule(self) -> None:
-        metadata = HolidayCalendar("usny").metadata
-        assert metadata is not None
-        assert metadata.weekend_rule == "saturday_sunday"
-
     def test_act_act_afb_and_thirty_360_it(self) -> None:
         """New AFB and Italian conventions parse and match QuantLib formulas."""
         assert DayCount.from_name("act_act_afb") == DayCount.ACT_ACT_AFB
@@ -422,7 +416,7 @@ def test_sifma_settlement_classes_and_default() -> None:
     assert SifmaSettlementClass.from_agency_term("GNMA", 30) == SifmaSettlementClass.C
     assert SifmaSettlementClass.from_agency_term("FNMA", 15) == SifmaSettlementClass.B
     assert sifma_settlement_date(1, 2026) == date(2026, 1, 14)
-    assert sifma_settlement_date_for_class(1, 2026, SifmaSettlementClass.B) == date(2026, 1, 20)
+    assert sifma_settlement_date(1, 2026, SifmaSettlementClass.B) == date(2026, 1, 20)
 
 
 class TestDiscountCurveParity:

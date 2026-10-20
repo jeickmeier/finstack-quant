@@ -62,15 +62,9 @@ pub enum PeriodKind {
 }
 
 impl fmt::Display for PeriodKind {
+    /// Writes the serde label (`daily`, `semi_annual`, ...).
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            PeriodKind::Daily => f.write_str("daily"),
-            PeriodKind::Weekly => f.write_str("weekly"),
-            PeriodKind::Monthly => f.write_str("monthly"),
-            PeriodKind::Quarterly => f.write_str("quarterly"),
-            PeriodKind::SemiAnnual => f.write_str("semi_annual"),
-            PeriodKind::Annual => f.write_str("annual"),
-        }
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| fmt::Error)?)
     }
 }
 
@@ -112,14 +106,6 @@ impl PeriodKind {
             PeriodKind::SemiAnnual => 2,
             PeriodKind::Annual => 1,
         }
-    }
-
-    /// Annualization factor for this frequency.
-    ///
-    /// Used to scale per-period statistics to annual equivalents.
-    /// For all variants this equals `periods_per_year()` cast to `f64`.
-    pub const fn annualization_factor(self) -> f64 {
-        self.periods_per_year() as f64
     }
 
     /// Observation date immediately before `first` at this frequency.
@@ -360,50 +346,35 @@ impl PeriodId {
         self.fiscal
     }
 
-    /// Step forward to the next period.
+    /// Inclusive start and exclusive end date of a Gregorian period.
     ///
-    /// # Example
-    /// ```
-    /// use finstack_quant_core::dates::PeriodId;
-    ///
-    /// let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    /// let q2 = q1.next().expect("Next period should exist");
-    /// assert_eq!(q2, PeriodId::quarter(2025, 2).expect("valid period fixture"));
-    ///
-    /// let q4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
-    /// let next_q1 = q4.next().expect("Next period should exist");
-    /// assert_eq!(next_q1, PeriodId::quarter(2026, 1).expect("valid period fixture"));
-    /// ```
+    /// Daily ids cover one calendar day, weekly ids one ISO 8601 week (Monday
+    /// to the next Monday), and monthly to annual ids their calendar months.
+    /// Fiscal ids need their [`FiscalConfig`]; bound them with
+    /// [`build_fiscal_periods`].
     ///
     /// # Errors
     ///
-    /// Same as [`Self::shift`] with `periods = 1`; a fiscal daily identifier
-    /// at its year's day 365 needs [`Self::next_fiscal`].
-    pub fn next(self) -> crate::Result<Self> {
-        self.shift(1)
-    }
-
-    /// Step backward to the previous period.
+    /// Returns `Error::Validation` for a fiscal identifier, or when the period
+    /// or its exclusive end is outside the supported date range.
     ///
     /// # Example
     /// ```
-    /// use finstack_quant_core::dates::PeriodId;
+    /// use finstack_quant_core::dates::{create_date, PeriodId};
+    /// use time::Month;
     ///
-    /// let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-    /// let q1 = q2.prev().expect("Previous period should exist");
-    /// assert_eq!(q1, PeriodId::quarter(2025, 1).expect("valid period fixture"));
-    ///
-    /// let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    /// let prev_q4 = q1.prev().expect("Previous period should exist");
-    /// assert_eq!(prev_q4, PeriodId::quarter(2024, 4).expect("valid period fixture"));
+    /// let (start, end) = PeriodId::quarter(2025, 2)?.bounds()?;
+    /// assert_eq!(start, create_date(2025, Month::April, 1)?);
+    /// assert_eq!(end, create_date(2025, Month::July, 1)?);
+    /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// Same as [`Self::shift`] with `periods = -1`; a fiscal daily identifier
-    /// at its year's first day needs [`Self::prev_fiscal`].
-    pub fn prev(self) -> crate::Result<Self> {
-        self.shift(-1)
+    pub fn bounds(self) -> crate::Result<(Date, Date)> {
+        if self.fiscal {
+            return Err(crate::Error::Validation(format!(
+                "fiscal period {self} needs its FiscalConfig to be bounded; use build_fiscal_periods"
+            )));
+        }
+        PeriodCalendar::Gregorian.bounds(self.year, self.kind, self.index)
     }
 
     /// Move by a whole number of periods of the same kind and calendar.
@@ -513,7 +484,7 @@ impl PeriodId {
 
     /// Step forward using the capacity of the supplied fiscal calendar.
     ///
-    /// Unlike [`Self::next`], this can step fiscal daily identifiers across a
+    /// Unlike [`Self::shift`], this can step fiscal daily identifiers across a
     /// fiscal-year end, whose length (365 or 366 days) depends on `config`.
     /// The result is always marked fiscal.
     ///
@@ -873,7 +844,7 @@ impl Ord for PeriodId {
         let self_bounds = PeriodCalendar::Gregorian.bounds(self.year, self.kind, self.index);
         let other_bounds = PeriodCalendar::Gregorian.bounds(other.year, other.kind, other.index);
 
-        // Malformed PeriodId still needs a total ordering.
+        // Years outside the supported date range still need a total ordering.
         let (Ok((self_start, self_end)), Ok((other_start, other_end))) =
             (self_bounds, other_bounds)
         else {

@@ -225,6 +225,22 @@ pub enum UnknownScalePolicy {
     WarnAndFallback,
 }
 
+impl std::fmt::Display for UnknownScalePolicy {
+    /// Writes the serde label (`error`, `fallback_to_default`, `warn_and_fallback`).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
+    }
+}
+
+impl std::str::FromStr for UnknownScalePolicy {
+    type Err = crate::Error;
+
+    /// Parses the serde label, ignoring surrounding whitespace and ASCII case.
+    fn from_str(s: &str) -> crate::Result<Self> {
+        crate::wire::serde_parse(&s.trim().to_ascii_lowercase())
+    }
+}
+
 impl UnknownScalePolicy {
     /// Deserialize the policy applied to an unknown scorecard-scale name.
     ///
@@ -557,6 +573,19 @@ struct RatingScaleEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unknown_scale_policy_label_round_trips_and_parses_leniently() {
+        assert_eq!(
+            UnknownScalePolicy::FallbackToDefault.to_string(),
+            "fallback_to_default"
+        );
+        assert_eq!(
+            " WARN_AND_FALLBACK ".parse::<UnknownScalePolicy>().unwrap(),
+            UnknownScalePolicy::WarnAndFallback
+        );
+        assert!("fallback".parse::<UnknownScalePolicy>().is_err());
+    }
 
     #[test]
     fn embedded_registry_preserves_scorecard_policy() {

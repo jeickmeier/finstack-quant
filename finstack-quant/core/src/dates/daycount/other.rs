@@ -45,7 +45,7 @@ pub(super) fn year_fraction_act_365l(
     );
 
     let leap = if annual {
-        interval_contains_feb_29(coupon_start, coupon_end)
+        count_feb_29_in_interval(coupon_start, coupon_end) > 0
     } else {
         time::util::is_leap_year(coupon_end.year())
     };
@@ -67,12 +67,6 @@ fn count_feb_29_in_interval(start: Date, end: Date) -> i64 {
         }
     }
     leap_days
-}
-
-/// Check if February 29 falls in the interval `(start, end]` (exclusive of
-/// start, inclusive of end) per ICMA Rule 251.
-fn interval_contains_feb_29(start: Date, end: Date) -> bool {
-    count_feb_29_in_interval(start, end) > 0
 }
 
 // NL/365 helper

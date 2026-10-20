@@ -81,35 +81,9 @@ pub enum TenorUnit {
 }
 
 impl TenorUnit {
-    /// Parse a single character unit code.
-    ///
-    /// # Arguments
-    /// * `c` - Unit character: 'D', 'W', 'M', or 'Y' (case-insensitive)
-    ///
-    /// # Returns
-    /// The parsed `TenorUnit` or an error if the character is invalid.
-    ///
-    /// # Errors
-    ///
-    /// Returns `InputError::InvalidTenor` unless `c` is `D`, `W`, `M`, or `Y`,
-    /// case-insensitively.
-    pub fn from_char(c: char) -> crate::Result<Self> {
-        match c.to_ascii_uppercase() {
-            'D' => Ok(Self::Days),
-            'W' => Ok(Self::Weeks),
-            'M' => Ok(Self::Months),
-            'Y' => Ok(Self::Years),
-            _ => Err(InputError::InvalidTenor {
-                tenor: c.to_string(),
-                reason: "unknown unit; expected D, W, M, or Y".to_string(),
-            }
-            .into()),
-        }
-    }
-
     /// Single-character unit code: `'D'`, `'W'`, `'M'` or `'Y'`.
     ///
-    /// The inverse of `TenorUnit::from_char` and the unit suffix of the
+    /// The inverse of `TenorUnit`'s `FromStr` and the unit suffix of the
     /// tenor's `Display` form (`"3M"`).
     #[must_use]
     pub const fn designator(self) -> char {
@@ -125,10 +99,24 @@ impl TenorUnit {
 impl std::str::FromStr for TenorUnit {
     type Err = crate::Error;
 
+    /// Parses one unit character, `D`, `W`, `M` or `Y`, case-insensitively.
+    ///
+    /// An unknown character is `InputError::InvalidTenor`; anything other
+    /// than exactly one character is `Error::Validation`.
     fn from_str(s: &str) -> crate::Result<Self> {
         let mut chars = s.chars();
         match (chars.next(), chars.next()) {
-            (Some(c), None) => Self::from_char(c),
+            (Some(c), None) => match c.to_ascii_uppercase() {
+                'D' => Ok(Self::Days),
+                'W' => Ok(Self::Weeks),
+                'M' => Ok(Self::Months),
+                'Y' => Ok(Self::Years),
+                _ => Err(InputError::InvalidTenor {
+                    tenor: c.to_string(),
+                    reason: "unknown unit; expected D, W, M, or Y".to_string(),
+                }
+                .into()),
+            },
             _ => Err(crate::Error::Validation(format!(
                 "expected a single unit character D, W, M or Y, got {s:?}"
             ))),
@@ -790,14 +778,20 @@ mod tests {
     use time::Month;
 
     #[test]
-    fn unit_designator_round_trips_from_char() {
+    fn unit_designator_round_trips_from_str() {
         for unit in [
             TenorUnit::Days,
             TenorUnit::Weeks,
             TenorUnit::Months,
             TenorUnit::Years,
         ] {
-            assert_eq!(TenorUnit::from_char(unit.designator()).expect("unit"), unit);
+            assert_eq!(
+                unit.designator()
+                    .to_string()
+                    .parse::<TenorUnit>()
+                    .expect("unit"),
+                unit
+            );
         }
         assert_eq!(Tenor::parse("3M").expect("3M").unit().designator(), 'M');
     }

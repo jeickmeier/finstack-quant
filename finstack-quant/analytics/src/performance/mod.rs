@@ -941,7 +941,7 @@ impl Performance {
     }
 
     fn ann(&self) -> f64 {
-        self.frequency.annualization_factor()
+        f64::from(self.frequency.periods_per_year())
     }
 
     /// Map a per-ticker closure over all tickers in column order.

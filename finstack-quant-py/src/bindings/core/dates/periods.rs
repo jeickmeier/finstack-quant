@@ -90,12 +90,6 @@ impl PyPeriodKind {
         self.inner.periods_per_year()
     }
 
-    /// Annualization factor for this frequency.
-    #[getter]
-    fn annualization_factor(&self) -> f64 {
-        self.inner.annualization_factor()
-    }
-
     /// Observation date one period before ``first``.
     ///
     /// Daily and weekly step back 1 and 7 calendar days; monthly, quarterly,
@@ -276,14 +270,16 @@ impl PyPeriodId {
         self.inner.is_fiscal()
     }
 
-    /// Next period of the same kind and calendar (fiscal daily ids at day 365 need ``next_fiscal``).
-    fn next(&self) -> PyResult<Self> {
-        self.inner.next().map(Self::from_inner).map_err(core_to_py)
-    }
-
-    /// Previous period of the same kind and calendar (fiscal daily ids at day 1 need ``prev_fiscal``).
-    fn prev(&self) -> PyResult<Self> {
-        self.inner.prev().map(Self::from_inner).map_err(core_to_py)
+    /// Move by ``periods`` periods of the same kind and calendar (negative moves back).
+    ///
+    /// Fiscal daily ids can only move within days ``1..=365``; use
+    /// ``next_fiscal`` / ``prev_fiscal`` to cross a fiscal-year end.
+    #[pyo3(text_signature = "(self, periods)")]
+    fn shift(&self, periods: i32) -> PyResult<Self> {
+        self.inner
+            .shift(periods)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Next period using fiscal-year week/day capacity.

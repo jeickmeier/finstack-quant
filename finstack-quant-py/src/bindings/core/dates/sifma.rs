@@ -1,8 +1,8 @@
 //! Python bindings for published and estimated SIFMA settlement dates.
 
 use finstack_quant_core::dates::{
-    estimated_sifma_settlement_date_for_class, next_sifma_settlement, sifma_settlement_date,
-    sifma_settlement_date_for_class, SifmaSettlementClass,
+    estimated_sifma_settlement_date, next_sifma_settlement, sifma_settlement_date,
+    SifmaSettlementClass,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
@@ -14,8 +14,7 @@ use crate::errors::core_to_py;
 pub const EXPORTS: &[&str] = &[
     "SifmaSettlementClass",
     "sifma_settlement_date",
-    "sifma_settlement_date_for_class",
-    "estimated_sifma_settlement_date_for_class",
+    "estimated_sifma_settlement_date",
     "next_sifma_settlement",
 ];
 
@@ -98,7 +97,7 @@ impl PySifmaSettlementClass {
     }
 }
 
-/// Published SIFMA settlement date for a delivery month.
+/// Published SIFMA settlement date for a delivery month and settlement class.
 ///
 /// Parameters
 /// ----------
@@ -106,64 +105,36 @@ impl PySifmaSettlementClass {
 ///     Delivery month, 1-12.
 /// year : int
 ///     Delivery year.
+/// settlement_class : SifmaSettlementClass, optional
+///     Class whose calendar applies (classes settle on different days of the
+///     same delivery month). ``None`` uses the Rust default, Class A
+///     (conventional 30-year UMBS).
 ///
 /// Returns
 /// -------
 /// datetime.date | None
 ///     The published date, or ``None`` when SIFMA has not published one for
-///     that month. Use :func:`estimated_sifma_settlement_date_for_class` when
+///     that month and class. Use :func:`estimated_sifma_settlement_date` when
 ///     an estimate is acceptable.
 ///
 /// Raises
 /// ------
 /// ValueError
 ///     If ``month`` is outside 1-12.
-#[pyfunction(name = "sifma_settlement_date")]
-#[pyo3(text_signature = "(month, year)")]
+#[pyfunction(name = "sifma_settlement_date", signature = (month, year, settlement_class = None))]
+#[pyo3(text_signature = "(month, year, settlement_class=None)")]
 fn py_sifma_settlement_date<'py>(
     py: Python<'py>,
     month: u8,
     year: i32,
+    settlement_class: Option<PyRef<'_, PySifmaSettlementClass>>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
-    sifma_settlement_date(crate::bindings::date_utils::month_from_u8(month)?, year)
-        .map(|date| date_to_py(py, date))
-        .transpose()
-}
-
-/// Published SIFMA settlement date for one settlement class.
-///
-/// Parameters
-/// ----------
-/// month : int
-///     Delivery month, 1-12.
-/// year : int
-///     Delivery year.
-/// settlement_class : SifmaSettlementClass
-///     Class whose calendar applies (classes settle on different days of the
-///     same delivery month).
-///
-/// Returns
-/// -------
-/// datetime.date | None
-///     The published date, or ``None`` when SIFMA has not published one for
-///     that month and class.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``month`` is outside 1-12.
-#[pyfunction(name = "sifma_settlement_date_for_class")]
-#[pyo3(text_signature = "(month, year, settlement_class)")]
-fn py_sifma_settlement_date_for_class<'py>(
-    py: Python<'py>,
-    month: u8,
-    year: i32,
-    settlement_class: PyRef<'_, PySifmaSettlementClass>,
-) -> PyResult<Option<Bound<'py, PyAny>>> {
-    sifma_settlement_date_for_class(
+    sifma_settlement_date(
         crate::bindings::date_utils::month_from_u8(month)?,
         year,
-        settlement_class.inner,
+        settlement_class
+            .map(|class| class.inner)
+            .unwrap_or_default(),
     )
     .map(|date| date_to_py(py, date))
     .transpose()
@@ -172,7 +143,7 @@ fn py_sifma_settlement_date_for_class<'py>(
 /// Estimated SIFMA settlement date for one settlement class.
 ///
 /// Projects the class-specific business-day anchor using the SIFMA holiday
-/// calendar. Use :func:`sifma_settlement_date_for_class` for published
+/// calendar. Use :func:`sifma_settlement_date` for published
 /// operational settlement dates.
 ///
 /// Parameters
@@ -194,9 +165,9 @@ fn py_sifma_settlement_date_for_class<'py>(
 /// ValueError
 ///     If ``month`` is outside 1-12, the year or selected date is outside
 ///     Python years 1-9999, or the month has too few business days.
-#[pyfunction(name = "estimated_sifma_settlement_date_for_class")]
+#[pyfunction(name = "estimated_sifma_settlement_date")]
 #[pyo3(text_signature = "(month, year, settlement_class)")]
-fn py_estimated_sifma_settlement_date_for_class<'py>(
+fn py_estimated_sifma_settlement_date<'py>(
     py: Python<'py>,
     month: u8,
     year: i32,
@@ -204,7 +175,7 @@ fn py_estimated_sifma_settlement_date_for_class<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     date_to_py(
         py,
-        estimated_sifma_settlement_date_for_class(
+        estimated_sifma_settlement_date(
             crate::bindings::date_utils::month_from_u8(month)?,
             year,
             settlement_class.inner,
@@ -238,11 +209,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PySifmaSettlementClass>()?;
     module.add_function(wrap_pyfunction!(py_sifma_settlement_date, module)?)?;
     module.add_function(wrap_pyfunction!(
-        py_sifma_settlement_date_for_class,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        py_estimated_sifma_settlement_date_for_class,
+        py_estimated_sifma_settlement_date,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(py_next_sifma_settlement, module)?)?;

@@ -350,7 +350,7 @@ impl RealizedVarMethod {
 /// [`PeriodKind::Daily`](crate::dates::PeriodKind::Daily) observations, i.e.
 /// 252 trading days per year.
 fn default_annualization_factor() -> f64 {
-    crate::dates::PeriodKind::Daily.annualization_factor()
+    f64::from(crate::dates::PeriodKind::Daily.periods_per_year())
 }
 
 /// Calculate log returns from a price series.
@@ -468,7 +468,7 @@ pub fn quantile(data: &mut [f64], p: f64) -> f64 {
 /// * `annualization_factor` - Observations per year used to annualize the
 ///   per-period variance (for example `252.0` for daily closes); must be
 ///   finite and positive. `None` selects the daily convention,
-///   `PeriodKind::Daily.annualization_factor()` (252).
+///   `PeriodKind::Daily.periods_per_year()` (252).
 ///
 /// # Errors
 ///
@@ -523,7 +523,7 @@ pub fn realized_variance(prices: &[f64], annualization_factor: Option<f64>) -> c
 /// * `annualization_factor` - Bars per year used to annualize the per-bar
 ///   variance (for example `252.0` for daily bars); must be finite and
 ///   positive. `None` selects the daily convention,
-///   `PeriodKind::Daily.annualization_factor()` (252).
+///   `PeriodKind::Daily.periods_per_year()` (252).
 ///
 /// # Errors
 ///
@@ -1637,7 +1637,7 @@ mod tests {
         let high = [102.0, 103.0, 102.5, 103.5];
         let low = [99.0, 100.2, 99.9, 101.0];
         let close = [101.0, 102.0, 101.5, 103.0];
-        let daily = crate::dates::PeriodKind::Daily.annualization_factor();
+        let daily = f64::from(crate::dates::PeriodKind::Daily.periods_per_year());
         assert_eq!(daily, 252.0);
 
         assert_eq!(

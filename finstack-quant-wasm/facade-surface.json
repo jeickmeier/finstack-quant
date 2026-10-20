@@ -777,7 +777,7 @@
       "embeddedRegistry",
       "endOfMonth",
       "erf",
-      "estimatedSifmaSettlementDateForClass",
+      "estimatedSifmaSettlementDate",
       "finiteCount",
       "finiteMaxOrNan",
       "finiteMinOrNan",
@@ -825,7 +825,6 @@
       "sampleVarianceOrNan",
       "schema",
       "sifmaSettlementDate",
-      "sifmaSettlementDateForClass",
       "singularThreshold",
       "standardNormalInvCdf",
       "studentTCdf",
@@ -1213,7 +1212,7 @@
   },
   "core.TenorUnit": {
     "kind": "class",
-    "statics": ["days", "fromChar", "months", "weeks", "years"],
+    "statics": ["days", "fromName", "months", "weeks", "years"],
     "methods": ["free", "toString"],
     "getters": []
   },
@@ -1280,12 +1279,12 @@
     "kind": "class",
     "statics": ["annual", "daily", "fromName", "monthly", "quarterly", "semiAnnual", "weekly"],
     "methods": ["free", "priorObservationDate", "toString"],
-    "getters": ["annualizationFactor", "periodsPerYear"]
+    "getters": ["periodsPerYear"]
   },
   "core.PeriodId": {
     "kind": "class",
     "statics": ["annual", "day", "half", "month", "parse", "quarter", "week"],
-    "methods": ["free", "next", "nextFiscal", "prev", "prevFiscal", "toString"],
+    "methods": ["free", "nextFiscal", "prevFiscal", "shift", "toString"],
     "getters": ["code", "index", "isFiscal", "kind", "year"]
   },
   "core.FiscalConfig": {
@@ -1382,10 +1381,7 @@
   "core.sifmaSettlementDate": {
     "kind": "function"
   },
-  "core.sifmaSettlementDateForClass": {
-    "kind": "function"
-  },
-  "core.estimatedSifmaSettlementDateForClass": {
+  "core.estimatedSifmaSettlementDate": {
     "kind": "function"
   },
   "core.nextSifmaSettlement": {

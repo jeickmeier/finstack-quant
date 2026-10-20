@@ -164,11 +164,11 @@ const CASES = {
   // --- dates: SIFMA ---------------------------------------------------------------
   sifma_settlement_date: () => iso(core.sifmaSettlementDate(3, 2027)),
   sifma_settlement_date_uncovered: () => iso(core.sifmaSettlementDate(3, 1990)),
-  sifma_settlement_date_for_class: () =>
-    iso(core.sifmaSettlementDateForClass(1, 2026, core.SifmaSettlementClass.b())),
-  estimated_sifma_settlement_date_for_class: () =>
+  sifma_settlement_date_class_b: () =>
+    iso(core.sifmaSettlementDate(1, 2026, core.SifmaSettlementClass.b())),
+  estimated_sifma_settlement_date: () =>
     iso(
-      core.estimatedSifmaSettlementDateForClass(
+      core.estimatedSifmaSettlementDate(
         3,
         2031,
         core.SifmaSettlementClass.fromAgencyTerm('GNMA', 30)
@@ -203,8 +203,8 @@ const CASES = {
   }),
   // --- dates: periods and schedules ---------------------------------------------
   period_id: () => [
-    core.PeriodId.parse('2025M12').next().code,
-    core.PeriodId.quarter(2025, 1).prev().code,
+    core.PeriodId.parse('2025M12').shift(1).code,
+    core.PeriodId.quarter(2025, 1).shift(-1).code,
     core.PeriodId.parse('FY2025Q4').nextFiscal(usFederal).code,
     core.PeriodId.week(2025, 5).kind.periodsPerYear,
   ],
@@ -555,8 +555,8 @@ test('enum classes expose every Rust variant and round-trip their names', () => 
     ['days', 'weeks', 'months', 'years'].map((unit) => core.TenorUnit[unit]().toString()),
     ['D', 'W', 'M', 'Y']
   );
-  assert.equal(core.TenorUnit.fromChar('y').toString(), 'Y');
-  assert.throws(() => core.TenorUnit.fromChar('MM'), kind('validation'));
+  assert.equal(core.TenorUnit.fromName('y').toString(), 'Y');
+  assert.throws(() => core.TenorUnit.fromName('MM'), kind('validation'));
   assert.deepEqual(
     ['a', 'b', 'c', 'd'].map((cls) => core.SifmaSettlementClass[cls]().toString()),
     ['a', 'b', 'c', 'd']

@@ -10,7 +10,6 @@ use finstack_quant_core::dates::{
     self as rust_dates, days_since_epoch, Date, SifmaSettlementClass, TenorUnit,
     Thirty360Convention,
 };
-use finstack_quant_core::wire::{serde_label, serde_parse};
 use time::Month;
 use wasm_bindgen::prelude::*;
 
@@ -235,7 +234,7 @@ pub fn next_third_friday(date: JsValue) -> Result<i32, JsValue> {
 /// await init();
 /// const cls = core.SifmaSettlementClass.fromAgencyTerm("FNMA", 15);
 /// cls.toString(); // "b"
-/// core.sifmaSettlementDateForClass(1, 2026, cls); // epoch days, or undefined
+/// core.sifmaSettlementDate(1, 2026, cls); // epoch days, or undefined
 /// ```
 #[wasm_bindgen(js_name = SifmaSettlementClass)]
 #[derive(Clone, Copy, Debug)]
@@ -311,32 +310,18 @@ impl JsSifmaSettlementClass {
     /// Lower-case class letter (`"a"` through `"d"`), the JSON wire label.
     ///
     /// @returns The class label.
-    /// @throws If the label cannot be produced (not expected).
     #[wasm_bindgen(js_name = toString)]
-    pub fn to_string(&self) -> Result<String, JsValue> {
-        serde_label(&self.inner).map_err(to_js_err)
+    #[allow(clippy::inherent_to_string)]
+    pub fn to_string(&self) -> String {
+        self.inner.to_string()
     }
 }
 
-/// Published SIFMA class A settlement date of a month (Rust `sifma_settlement_date`).
-///
-/// # Arguments
-///
-/// * `month` - Settlement month number, `1` through `12`.
-/// * `year` - Settlement year.
-///
-/// @returns The published date as epoch days, or `undefined` when the month
-/// is outside the embedded SIFMA calendar (dates are never approximated).
-/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) if `month` is outside `1..=12`.
-#[wasm_bindgen(js_name = sifmaSettlementDate)]
-pub fn sifma_settlement_date(month: JsValue, year: JsValue) -> Result<Option<i32>, JsValue> {
-    let (month, year) = month_year(&month, &year)?;
-    Ok(rust_dates::sifma_settlement_date(month, year).map(days_since_epoch))
-}
-
 /// Published SIFMA settlement date of a month for one class (Rust
-/// `sifma_settlement_date_for_class`).
+/// `sifma_settlement_date`).
+///
+/// The published facade makes `settlement_class` optional: an omitted class is
+/// the Rust default `SifmaSettlementClass::default()` (Class A).
 ///
 /// # Arguments
 ///
@@ -345,27 +330,55 @@ pub fn sifma_settlement_date(month: JsValue, year: JsValue) -> Result<Option<i32
 /// * `settlement_class` - Agency-MBS settlement class whose date is requested.
 ///
 /// @returns The published date as epoch days, or `undefined` when that month
-/// and class are outside the embedded SIFMA calendar.
+/// and class are outside the embedded SIFMA calendar (dates are never
+/// approximated).
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if `month` is outside `1..=12`.
-#[wasm_bindgen(js_name = sifmaSettlementDateForClass)]
-pub fn sifma_settlement_date_for_class(
+#[wasm_bindgen(js_name = sifmaSettlementDate)]
+pub fn sifma_settlement_date(
     month: JsValue,
     year: JsValue,
     settlement_class: &JsSifmaSettlementClass,
 ) -> Result<Option<i32>, JsValue> {
     let (month, year) = month_year(&month, &year)?;
     Ok(
-        rust_dates::sifma_settlement_date_for_class(month, year, settlement_class.inner)
+        rust_dates::sifma_settlement_date(month, year, settlement_class.inner)
+            .map(days_since_epoch),
+    )
+}
+
+/// Published SIFMA settlement date of a month for the Rust default class
+/// (`SifmaSettlementClass::default()`, Class A).
+///
+/// Raw-package implementation of `sifmaSettlementDate(month, year)` without a
+/// class; the published facade folds it into `sifmaSettlementDate`.
+///
+/// # Arguments
+///
+/// * `month` - Settlement month number, `1` through `12`.
+/// * `year` - Settlement year.
+///
+/// @returns The published date as epoch days, or `undefined` when the month
+/// is outside the embedded SIFMA calendar.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+/// `validation`) if `month` is outside `1..=12`.
+#[wasm_bindgen(js_name = sifmaSettlementDateDefaultClass)]
+pub fn sifma_settlement_date_default_class(
+    month: JsValue,
+    year: JsValue,
+) -> Result<Option<i32>, JsValue> {
+    let (month, year) = month_year(&month, &year)?;
+    Ok(
+        rust_dates::sifma_settlement_date(month, year, SifmaSettlementClass::default())
             .map(days_since_epoch),
     )
 }
 
 /// Projection-only estimate of a SIFMA settlement date (Rust
-/// `estimated_sifma_settlement_date_for_class`).
+/// `estimated_sifma_settlement_date`).
 ///
 /// The estimate counts business days of the month on the SIFMA calendar; use
-/// `sifmaSettlementDateForClass` for published dates.
+/// `sifmaSettlementDate` for published dates.
 ///
 /// # Arguments
 ///
@@ -378,14 +391,14 @@ pub fn sifma_settlement_date_for_class(
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if `month` is outside `1..=12` or `year` is outside the
 /// supported date range.
-#[wasm_bindgen(js_name = estimatedSifmaSettlementDateForClass)]
-pub fn estimated_sifma_settlement_date_for_class(
+#[wasm_bindgen(js_name = estimatedSifmaSettlementDate)]
+pub fn estimated_sifma_settlement_date(
     month: JsValue,
     year: JsValue,
     settlement_class: &JsSifmaSettlementClass,
 ) -> Result<i32, JsValue> {
     let (month, year) = month_year(&month, &year)?;
-    rust_dates::estimated_sifma_settlement_date_for_class(month, year, settlement_class.inner)
+    rust_dates::estimated_sifma_settlement_date(month, year, settlement_class.inner)
         .map(days_since_epoch)
         .map_err(to_js_err)
 }
@@ -467,14 +480,15 @@ impl JsThirty360Convention {
     /// # Arguments
     ///
     /// * `name` - Variant name: `"us_sia"`, `"isda"`, `"european"` or
-    ///   `"italian"`.
+    ///   `"italian"`, in any ASCII case.
     ///
     /// @returns The matching `Thirty360Convention`.
     /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
     /// `FinstackError` (kind `validation`) if no variant matches.
     #[wasm_bindgen(js_name = fromName)]
     pub fn from_name(name: JsValue) -> Result<JsThirty360Convention, JsValue> {
-        serde_parse(&js_string(&name, "name")?)
+        js_string(&name, "name")?
+            .parse()
             .map(Self::wrap)
             .map_err(to_js_err)
     }
@@ -482,10 +496,10 @@ impl JsThirty360Convention {
     /// Canonical snake_case name of the variant.
     ///
     /// @returns The name accepted by `fromName` and `days30360`.
-    /// @throws If the label cannot be produced (not expected).
     #[wasm_bindgen(js_name = toString)]
-    pub fn to_string(&self) -> Result<String, JsValue> {
-        serde_label(&self.inner).map_err(to_js_err)
+    #[allow(clippy::inherent_to_string)]
+    pub fn to_string(&self) -> String {
+        self.inner.to_string()
     }
 }
 
@@ -497,15 +511,16 @@ impl JsThirty360Convention {
 /// * `end` - Exclusive accrual end as days since 1970-01-01; an earlier end
 ///   gives a negative count rather than an error.
 /// * `convention` - Variant name: `"us_sia"`, `"isda"`, `"european"` or
-///   `"italian"`.
+///   `"italian"`, in any ASCII case.
 ///
 /// @returns The 30/360 day count.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) for an unknown variant or a date outside the supported range.
 #[wasm_bindgen(js_name = days30360)]
 pub fn days_30_360(start: JsValue, end: JsValue, convention: JsValue) -> Result<i32, JsValue> {
-    let convention: Thirty360Convention =
-        serde_parse(&js_string(&convention, "convention")?).map_err(to_js_err)?;
+    let convention: Thirty360Convention = js_string(&convention, "convention")?
+        .parse()
+        .map_err(to_js_err)?;
     Ok(rust_dates::days_30_360(
         js_epoch_days(&start, "start")?,
         js_epoch_days(&end, "end")?,
@@ -546,7 +561,7 @@ pub fn days_30e_360_isda(
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// core.TenorUnit.months().toString(); // "M"
-/// core.TenorUnit.fromChar("y").toString(); // "Y"
+/// core.TenorUnit.fromName("y").toString(); // "Y"
 /// ```
 #[wasm_bindgen(js_name = TenorUnit)]
 #[derive(Clone, Copy, Debug)]
@@ -594,25 +609,25 @@ impl JsTenorUnit {
         Self::wrap(TenorUnit::Years)
     }
 
-    /// Parse a one-letter unit code (Rust `TenorUnit::from_char`).
+    /// Parse a one-letter unit code (Rust `TenorUnit::from_str`).
     ///
     /// # Arguments
     ///
-    /// * `ch` - Exactly one character: `D`, `W`, `M` or `Y`, in either case.
+    /// * `name` - Exactly one character: `D`, `W`, `M` or `Y`, in either case.
     ///
     /// @returns The matching `TenorUnit`.
-    /// @throws `TypeError` (kind `invalid_type`) if `ch` is not a string;
+    /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
     /// `FinstackError` (kind `validation`) if it is not exactly one of the
     /// four unit letters.
-    #[wasm_bindgen(js_name = fromChar)]
-    pub fn from_char(ch: JsValue) -> Result<JsTenorUnit, JsValue> {
-        let text = js_string(&ch, "ch")?;
+    #[wasm_bindgen(js_name = fromName)]
+    pub fn from_name(name: JsValue) -> Result<JsTenorUnit, JsValue> {
+        let text = js_string(&name, "name")?;
         text.parse::<TenorUnit>().map(Self::wrap).map_err(to_js_err)
     }
 
     /// One-letter unit code: `"D"`, `"W"`, `"M"` or `"Y"`.
     ///
-    /// @returns The designator accepted by `fromChar` and used in tenor text.
+    /// @returns The designator accepted by `fromName` and used in tenor text.
     #[wasm_bindgen(js_name = toString)]
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {

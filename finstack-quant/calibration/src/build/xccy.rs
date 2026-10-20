@@ -3,7 +3,7 @@
 use crate::build::BuildCtx;
 use crate::quotes::ids::Pillar;
 use crate::quotes::xccy::XccyQuote;
-use finstack_quant_core::dates::fx::fx_spot_date_for_pair;
+use finstack_quant_core::dates::fx::fx_spot_date;
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::dates::{adjust, resolve_joint_calendar};
 use finstack_quant_core::money::Money;
@@ -61,7 +61,7 @@ pub(crate) fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result
     // CLS-consistent spot roll: a US holiday on an intermediate day does
     // not delay a USD pair's spot date (2026-06-09 core quant review,
     // FX spot finding).
-    let spot = fx_spot_date_for_pair(
+    let spot = fx_spot_date(
         ctx.as_of(),
         conv.settlement_days,
         conv.base_currency,

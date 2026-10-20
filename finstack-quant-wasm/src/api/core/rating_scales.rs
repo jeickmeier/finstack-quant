@@ -11,7 +11,6 @@ use finstack_quant_core::rating_scales::{
     embedded_registry as rust_embedded_registry, registry_from_config as rust_registry_from_config,
     RatingScaleRegistry, UnknownScalePolicy, RATING_SCALES_EXTENSION_KEY,
 };
-use finstack_quant_core::wire::{serde_label, serde_parse};
 use wasm_bindgen::prelude::*;
 
 /// What a registry does when asked for a rating scale it does not know.
@@ -66,22 +65,23 @@ impl JsUnknownScalePolicy {
     /// # Arguments
     ///
     /// * `name` - Policy name: `"error"`, `"fallback_to_default"` or
-    ///   `"warn_and_fallback"`.
+    ///   `"warn_and_fallback"`, in any ASCII case.
     ///
     /// @returns The matching `UnknownScalePolicy`.
     /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
     /// `FinstackError` (kind `validation`) if no policy matches.
     #[wasm_bindgen(js_name = fromName)]
     pub fn from_name(name: JsValue) -> Result<JsUnknownScalePolicy, JsValue> {
-        serde_parse(&js_string(&name, "name")?)
+        js_string(&name, "name")?
+            .parse()
             .map(Self::wrap)
             .map_err(to_js_err)
     }
 
     /// Snake_case name of the policy, such as `"fallback_to_default"`.
     #[wasm_bindgen(getter, js_name = name)]
-    pub fn name(&self) -> Result<String, JsValue> {
-        serde_label(&self.inner).map_err(to_js_err)
+    pub fn name(&self) -> String {
+        self.inner.to_string()
     }
 
     /// Serialize to the canonical JSON wire form (a quoted snake_case name).
@@ -113,10 +113,10 @@ impl JsUnknownScalePolicy {
     /// Snake_case name of the policy (same as `name`).
     ///
     /// @returns The name accepted by `fromName`.
-    /// @throws If the label cannot be produced (not expected).
     #[wasm_bindgen(js_name = toString)]
-    pub fn to_string(&self) -> Result<String, JsValue> {
-        serde_label(&self.inner).map_err(to_js_err)
+    #[allow(clippy::inherent_to_string)]
+    pub fn to_string(&self) -> String {
+        self.inner.to_string()
     }
 }
 

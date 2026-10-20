@@ -99,6 +99,16 @@ chain(wasm.ScheduleBuilder, [
   'errorPolicy',
 ]);
 
+// `sifmaSettlementDate(month, year, settlementClass?)`: wasm-bindgen cannot
+// take an optional borrowed handle, so an omitted class runs the raw
+// `sifmaSettlementDateDefaultClass`, which applies the Rust default
+// (`SifmaSettlementClass::default()`, Class A).
+function sifmaSettlementDate(month, year, settlementClass = undefined) {
+  return settlementClass === undefined || settlementClass === null
+    ? wasm.sifmaSettlementDateDefaultClass(month, year)
+    : wasm.sifmaSettlementDate(month, year, settlementClass);
+}
+
 export const core = {
   Currency: wasm.Currency,
   Money: wasm.Money,
@@ -157,9 +167,8 @@ export const core = {
   nextImmOptionExpiry: wasm.nextImmOptionExpiry,
   nextThirdFriday: wasm.nextThirdFriday,
   SifmaSettlementClass: wasm.SifmaSettlementClass,
-  sifmaSettlementDate: wasm.sifmaSettlementDate,
-  sifmaSettlementDateForClass: wasm.sifmaSettlementDateForClass,
-  estimatedSifmaSettlementDateForClass: wasm.estimatedSifmaSettlementDateForClass,
+  sifmaSettlementDate,
+  estimatedSifmaSettlementDate: wasm.estimatedSifmaSettlementDate,
   nextSifmaSettlement: wasm.nextSifmaSettlement,
   DiscountCurve: wasm.DiscountCurve,
   HazardCurve: wasm.HazardCurve,

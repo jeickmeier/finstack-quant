@@ -111,12 +111,6 @@ impl JsPeriodKind {
         self.inner.periods_per_year()
     }
 
-    /// Factor that scales per-period statistics to annual ones (`periodsPerYear` as a float).
-    #[wasm_bindgen(getter, js_name = annualizationFactor)]
-    pub fn annualization_factor(&self) -> f64 {
-        self.inner.annualization_factor()
-    }
-
     /// Observation date one frequency step before `first` (Rust
     /// `PeriodKind::prior_observation_date`).
     ///
@@ -322,26 +316,24 @@ impl JsPeriodId {
         self.inner.is_fiscal()
     }
 
-    /// Step forward to the next period (Rust `PeriodId::next`).
+    /// Move by a signed number of periods of the same kind and calendar
+    /// (Rust `PeriodId::shift`).
     ///
-    /// @returns The following `PeriodId`, rolling the year where needed.
-    /// @throws `FinstackError` (kind `validation`) when the year would
-    /// overflow, or for a fiscal daily identifier at day 365, whose next day
-    /// depends on the fiscal calendar (use `nextFiscal`).
-    #[wasm_bindgen(js_name = next)]
-    pub fn next(&self) -> Result<JsPeriodId, JsValue> {
-        self.inner.next().map(Self::wrap).map_err(to_js_err)
-    }
-
-    /// Step back to the previous period (Rust `PeriodId::prev`).
+    /// # Arguments
     ///
-    /// @returns The preceding `PeriodId`, rolling the year where needed.
-    /// @throws `FinstackError` (kind `validation`) when the year would
-    /// overflow, or for a fiscal daily identifier at day 1, whose previous day
-    /// depends on the fiscal calendar (use `prevFiscal`).
-    #[wasm_bindgen(js_name = prev)]
-    pub fn prev(&self) -> Result<JsPeriodId, JsValue> {
-        self.inner.prev().map(Self::wrap).map_err(to_js_err)
+    /// * `periods` - Whole number of periods to move; negative moves back and
+    ///   `0` returns the identifier unchanged.
+    ///
+    /// @returns The `PeriodId` `periods` steps away, rolling the year where needed.
+    /// @throws `TypeError` (kind `invalid_type`) when `periods` is not a whole
+    /// number; `FinstackError` (kind `validation`) when the year would
+    /// overflow, or for a fiscal daily identifier that would leave days
+    /// `1..=365`, whose length depends on the fiscal calendar (use
+    /// `nextFiscal` / `prevFiscal`).
+    #[wasm_bindgen(js_name = shift)]
+    pub fn shift(&self, periods: JsValue) -> Result<JsPeriodId, JsValue> {
+        let periods: i32 = crate::utils::input::js_int(&periods, "periods")?;
+        self.inner.shift(periods).map(Self::wrap).map_err(to_js_err)
     }
 
     /// Step forward to the next fiscal period (Rust `PeriodId::next_fiscal`).
