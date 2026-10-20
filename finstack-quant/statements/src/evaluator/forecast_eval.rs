@@ -122,12 +122,12 @@ pub(crate) fn evaluate_forecast(
                             .extend(z_map);
                         series
                     } else {
-                        let series = forecast::apply_forecast_seeded(
+                        let series = forecast::apply_forecast(
                             forecast_spec,
                             base_value,
                             &forecast_periods,
-                            offset,
                             node_spec.node_id.as_str(),
+                            Some(offset),
                         )?;
                         record_independent_z_scores_for_mc(
                             forecast_spec.method,
@@ -141,20 +141,20 @@ pub(crate) fn evaluate_forecast(
                         series
                     }
                 }
-                _ => forecast::apply_forecast_seeded(
+                _ => forecast::apply_forecast(
                     forecast_spec,
                     base_value,
                     &forecast_periods,
-                    offset,
                     node_spec.node_id.as_str(),
+                    Some(offset),
                 )?,
             },
-            None => forecast::apply_forecast_seeded(
+            None => forecast::apply_forecast(
                 forecast_spec,
                 base_value,
                 &forecast_periods,
-                offset,
                 node_spec.node_id.as_str(),
+                Some(offset),
             )?,
         };
         // Bounds are applied after Z-score recording so correlation shocks
