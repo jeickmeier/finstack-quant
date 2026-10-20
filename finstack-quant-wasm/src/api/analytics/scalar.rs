@@ -15,22 +15,22 @@ use wasm_bindgen::prelude::*;
 /// annualized sample volatility; the same kernel as `Performance.sharpe`).
 ///
 /// @param returns - Per-period simple decimal returns in date order.
-/// @param rf - Annualized risk-free rate as a decimal (`0.02` for 2%); defaults to `0`.
+/// @param riskFreeRate - Annualized risk-free rate as a decimal (`0.02` for 2%); defaults to `0`.
 /// @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
 /// @returns The Sharpe ratio; `±Infinity` when volatility is zero with a non-zero excess return, `NaN` for fewer than two observations, non-finite inputs, or an invalid `periodsPerYear`.
 /// @throws Error - Rejects a `returns` value that is not a numeric array.
 #[wasm_bindgen(js_name = sharpe)]
 pub fn sharpe(
     returns: JsValue,
-    rf: Option<JsValue>,
+    risk_free_rate: Option<JsValue>,
     periods_per_year: Option<JsValue>,
 ) -> Result<f64, JsValue> {
-    let rf = js_opt_f64(rf.as_ref(), "rf")?;
+    let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
     let periods_per_year = js_opt_f64(periods_per_year.as_ref(), "periodsPerYear")?;
     let returns = js_f64_seq(&returns, "returns")?;
     Ok(finstack_quant_analytics::sharpe(
         &returns,
-        rf.unwrap_or(DEFAULT_RISK_FREE_RATE),
+        risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE),
         periods_per_year.unwrap_or(DEFAULT_PERIODS_PER_YEAR),
     ))
 }

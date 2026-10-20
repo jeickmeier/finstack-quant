@@ -33,7 +33,7 @@ def test_invalid_scalar_inputs_preserve_undefined_risk(invalid: float) -> None:
     assert math.isnan(max_drawdown([invalid, -0.2]))
     assert math.isnan(sortino([invalid, 0.01]))
     assert math.isnan(sortino([0.0, 0.0], mar=invalid))
-    assert math.isnan(sharpe([0.0, 0.0], rf=invalid))
+    assert math.isnan(sharpe([0.0, 0.0], risk_free_rate=invalid))
 
 
 def test_singleton_sharpe_agrees_with_panel_and_rolling() -> None:

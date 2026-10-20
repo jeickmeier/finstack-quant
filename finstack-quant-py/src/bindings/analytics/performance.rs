@@ -1337,7 +1337,7 @@ wire_methods!(PyPerformance, Performance, "Performance");
 /// ----------
 /// returns : sequence of float | numpy.ndarray | pandas.Series
 ///     Per-period simple decimal returns (``0.01`` is +1%) in date order.
-/// rf : float, default 0.0
+/// risk_free_rate : float, default 0.0
 ///     Annualized risk-free rate as a decimal (``0.02`` for 2%),
 ///     geometrically decompounded to the observation frequency.
 /// periods_per_year : float, default 252
@@ -1361,12 +1361,12 @@ wire_methods!(PyPerformance, Performance, "Performance");
 /// >>> round(sharpe([0.01, -0.02, 0.015, 0.003], 0.0, 252), 4)
 /// 2.0034
 #[pyfunction]
-#[pyo3(signature = (returns, rf = DEFAULT_RISK_FREE_RATE, periods_per_year = DEFAULT_PERIODS_PER_YEAR))]
-fn sharpe(returns: &Bound<'_, PyAny>, rf: f64, periods_per_year: f64) -> PyResult<f64> {
+#[pyo3(signature = (returns, risk_free_rate = DEFAULT_RISK_FREE_RATE, periods_per_year = DEFAULT_PERIODS_PER_YEAR))]
+fn sharpe(returns: &Bound<'_, PyAny>, risk_free_rate: f64, periods_per_year: f64) -> PyResult<f64> {
     let returns = extract_f64_vec(returns, "returns")?;
     Ok(finstack_quant_analytics::sharpe(
         &returns,
-        rf,
+        risk_free_rate,
         periods_per_year,
     ))
 }
