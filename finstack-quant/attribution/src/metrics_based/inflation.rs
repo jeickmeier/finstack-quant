@@ -1,5 +1,5 @@
 use super::context::MetricsContext;
-use super::shifts::{inflation_source_abs_shift_bp, note_twist};
+use super::shifts::{average_over, inflation_source_abs_shift_bp, note_twist};
 use super::{push_first_order_step, push_second_order_step};
 use crate::helpers::FactorWorking;
 use crate::{MoveUnit, PnlAttribution};
@@ -16,29 +16,25 @@ pub(super) fn apply(
         // Restrict the shift to the instrument's declared inflation sources.
         let curve_ids = &inputs.market_deps.curves.inflation_curves;
 
-        let mut total_shift = 0.0;
-        let mut curve_count = 0;
         let mut measurement_failed = false;
-
-        for curve_id in curve_ids {
-            match measure_inflation_source_shift(
-                curve_id.as_str(),
-                inputs.market_t0,
-                inputs.market_t1,
-            ) {
-                Ok(shift_bp) => {
-                    total_shift += shift_bp;
-                    curve_count += 1;
+        let (avg_shift, _) =
+            average_over(curve_ids, |curve_id| {
+                match measure_inflation_source_shift(
+                    curve_id.as_str(),
+                    inputs.market_t0,
+                    inputs.market_t1,
+                ) {
+                    Ok(shift_bp) => Some(shift_bp),
+                    Err(err) => {
+                        measurement_failed = true;
+                        attribution.meta.notes.push(format!(
+                            "Inflation attribution could not measure declared source '{}': {err}",
+                            curve_id.as_str()
+                        ));
+                        None
+                    }
                 }
-                Err(err) => {
-                    measurement_failed = true;
-                    attribution.meta.notes.push(format!(
-                        "Inflation attribution could not measure declared source '{}': {err}",
-                        curve_id.as_str()
-                    ));
-                }
-            }
-        }
+            });
 
         if measurement_failed || curve_ids.is_empty() {
             *non_finite_detected = true;
@@ -50,11 +46,7 @@ pub(super) fn apply(
             }
         }
 
-        let avg_shift = if curve_count > 0 {
-            total_shift / curve_count as f64
-        } else {
-            0.0
-        };
+        let avg_shift = avg_shift.unwrap_or(0.0);
         let inflation_amount = inflation01 * avg_shift;
         push_first_order_step(
             attribution,
