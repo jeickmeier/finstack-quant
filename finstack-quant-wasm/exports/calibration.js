@@ -66,7 +66,6 @@ export const calibration = {
   calibrateHullWhiteToSwaptions: wasm.calibrateHullWhiteToSwaptions,
   calibrateHullWhiteToCapFloors,
   bootstrapHullWhiteSigmaScheduleToCapFloors,
-  hullWhiteParamsSigmaAt: wasm.hullWhiteParamsSigmaAt,
   validateSurface: wasm.validateSurface,
   validateSurfaceWithForwards: wasm.validateSurfaceWithForwards,
   validateCalendarSpread: wasm.validateCalendarSpread,

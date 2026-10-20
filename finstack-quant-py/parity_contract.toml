@@ -715,7 +715,7 @@ status = "exists"
 
 [crates.calibration.modules]
 schema = { python = "finstack_quant.calibration.schema", status = "exists", note = "Registry-backed index/get/validate over calibration envelopes and raw market-quote schemas; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
-hull_white = { python = "finstack_quant.calibration.hull_white", status = "exists", note = "Scalar and piecewise-sigma Hull-White fits to swaption and cap/floor quotes, with SwaptionQuote / CapFloorQuote / HullWhiteCalibrationParams / HullWhiteParams / CapFloorCalibrationConfig / PiecewiseSigmaCalibrationConfig. Both hosts call the curve-input Rust entry points (calibrate_hull_white_to_swaptions, calibrate_hull_white_to_cap_floors, bootstrap_hull_white_sigma_schedule_to_cap_floors), which adapt a DiscountCurve to the model clock; the closure-input solvers (`*_with_fn`) stay Rust-only. WASM binds the three functions on the calibration namespace with the quote, config and parameter types as plain objects, returns the (params, report) tuple as a two-element array, and exposes HullWhiteParams.sigma_at as hullWhiteParamsSigmaAt." }
+hull_white = { python = "finstack_quant.calibration.hull_white", status = "exists", note = "Scalar and piecewise-sigma Hull-White fits to swaption and cap/floor quotes, with SwaptionQuote / CapFloorQuote / HullWhiteCalibrationParams / CapFloorCalibrationConfig / PiecewiseSigmaCalibrationConfig. Both hosts call the curve-input Rust entry points (calibrate_hull_white_to_swaptions, calibrate_hull_white_to_cap_floors, bootstrap_hull_white_sigma_schedule_to_cap_floors), which adapt a DiscountCurve to the model clock; the closure-input solvers (`*_with_fn`) stay Rust-only. WASM binds the three functions on the calibration namespace with the quote, config and parameter types as plain objects, returns the (params, report) tuple as a two-element array. The piecewise bootstrap returns finstack_quant.models.rates.hull_white.HullWhiteParams (one Python class for the Rust type; WASM returns its plain-object wire form)." }
 
 [crates.calibration.symbols]
 public = [
@@ -1897,7 +1897,7 @@ types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "Cal
 
 [parity.modules."finstack_quant.calibration.hull_white"]
 js = "calibration"
-types = { CapFloorCalibrationConfig = "CapFloorCalibrationConfig", CapFloorQuote = "CapFloorQuote", HullWhiteCalibrationParams = "HullWhiteCalibrationParams", HullWhiteParams = "HullWhiteParams", PiecewiseSigmaCalibrationConfig = "PiecewiseSigmaCalibrationConfig", SwaptionQuote = "SwaptionQuote" }
+types = { CapFloorCalibrationConfig = "CapFloorCalibrationConfig", CapFloorQuote = "CapFloorQuote", HullWhiteCalibrationParams = "HullWhiteCalibrationParams", PiecewiseSigmaCalibrationConfig = "PiecewiseSigmaCalibrationConfig", SwaptionQuote = "SwaptionQuote" }
 
 [parity.modules."finstack_quant.calibration.schema"]
 js = "calibration.schema"
@@ -2169,7 +2169,6 @@ cdsQuoteParSpread = "free-function twin of Python CdsQuote.par_spread (Rust CdsQ
 cdsQuoteUpfront = "free-function twin of Python CdsQuote.upfront (Rust CdsQuote::upfront; member rename)"
 inflationQuoteInflationSwap = "free-function twin of Python InflationQuote.inflation_swap (Rust InflationQuote::inflation_swap; member rename)"
 inflationQuoteYoyInflationSwap = "free-function twin of Python InflationQuote.yoy_inflation_swap (Rust InflationQuote::yoy_inflation_swap; member rename)"
-hullWhiteParamsSigmaAt = "free-function twin of Python HullWhiteParams.sigma_at (Rust HullWhiteParams::volatility value_at; member rename)"
 rateBoundsEmergingMarkets = "free-function twin of Python RateBounds.emerging_markets (Rust RateBounds::emerging_markets; member rename)"
 rateBoundsForCurrency = "free-function twin of Python RateBounds.for_currency (Rust RateBounds::for_currency; member rename)"
 rateQuoteDeposit = "free-function twin of Python RateQuote.deposit (Rust RateQuote::deposit; member rename)"
@@ -2765,9 +2764,6 @@ renames = { inflation_swap = { js = "calibration.inflationQuoteInflationSwap", r
 
 [parity.members."finstack_quant.calibration.RateBounds"]
 renames = { emerging_markets = { js = "calibration.rateBoundsEmergingMarkets", reason = "WASM rate bounds are plain objects; the Rust RateBounds::emerging_markets constructor is a free function returning the object" }, for_currency = { js = "calibration.rateBoundsForCurrency", reason = "WASM rate bounds are plain objects; the Rust RateBounds::for_currency constructor is a free function returning the object" } }
-
-[parity.members."finstack_quant.calibration.hull_white.HullWhiteParams"]
-renames = { sigma_at = { js = "calibration.hullWhiteParamsSigmaAt", reason = "WASM Hull-White parameters are plain objects; the piecewise sigma lookup (Rust HullWhiteParams::volatility value_at) is a free function taking the object" } }
 
 [parity.members."finstack_quant.calibration.RateQuote"]
 renames = { deposit = { js = "calibration.rateQuoteDeposit", reason = "WASM quotes are plain objects; the constructor is a free function returning the RateQuote object (Rust RateQuote::deposit)" }, fra = { js = "calibration.rateQuoteFra", reason = "WASM quotes are plain objects; the constructor is a free function returning the RateQuote object (Rust RateQuote::fra)" }, futures = { js = "calibration.rateQuoteFutures", reason = "WASM quotes are plain objects; the constructor is a free function returning the RateQuote object (Rust RateQuote::futures)" }, swap = { js = "calibration.rateQuoteSwap", reason = "WASM quotes are plain objects; the constructor is a free function returning the RateQuote object (Rust RateQuote::swap)" } }

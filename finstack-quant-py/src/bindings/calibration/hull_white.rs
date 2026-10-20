@@ -3,13 +3,14 @@
 use super::report::PyCalibrationReport;
 use crate::bindings::core::market_data::curves::PyDiscountCurve;
 use crate::bindings::macros::wire_methods;
+use crate::bindings::models::rates::hull_white::PyHullWhiteParams;
 use crate::errors::{core_to_py, value_error};
 use finstack_quant_calibration::hull_white::{
     self as rust_hw, CapFloorCalibrationConfig, CapFloorQuote, PiecewiseSigmaCalibrationConfig,
     SwaptionQuote,
 };
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_models::rates::hull_white::{HullWhiteCalibrationParams, HullWhiteParams};
+use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use std::sync::Arc;
@@ -293,68 +294,6 @@ wire_methods!(
     HullWhiteCalibrationParams,
     "HullWhiteCalibrationParams"
 );
-
-/// Hull-White parameters with a piecewise-constant sigma term structure.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.calibration.hull_white import HullWhiteParams
-/// >>> p = HullWhiteParams.from_json('{"kappa": 0.03, "volatility": {"times": [0.0, 1.0], "values": [0.01, 0.012]}}')
-/// >>> (p.kappa, p.times, p.values)
-/// (0.03, [0.0, 1.0], [0.01, 0.012])
-#[pyclass(
-    name = "HullWhiteParams",
-    module = "finstack_quant.calibration.hull_white",
-    frozen,
-    skip_from_py_object,
-    eq
-)]
-#[derive(Clone, PartialEq)]
-pub struct PyHullWhiteParams {
-    pub(crate) inner: HullWhiteParams,
-}
-
-#[pymethods]
-impl PyHullWhiteParams {
-    /// Mean-reversion speed.
-    #[getter]
-    fn kappa(&self) -> f64 {
-        self.inner.kappa
-    }
-
-    /// Increasing sigma segment start times in model years, beginning at zero.
-    #[getter]
-    fn times(&self) -> Vec<f64> {
-        self.inner.volatility.times().to_vec()
-    }
-
-    /// Sigma on each interval.
-    #[getter]
-    fn values(&self) -> Vec<f64> {
-        self.inner.volatility.values().to_vec()
-    }
-
-    /// Sigma applying at ``time`` (years).
-    ///
-    /// Parameters
-    /// ----------
-    /// time : float
-    ///     Year fraction at which the piecewise sigma is read.
-    #[pyo3(text_signature = "($self, time)")]
-    fn sigma_at(&self, time: f64) -> f64 {
-        self.inner.volatility.value_at(time)
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "HullWhiteParams(kappa={}, intervals={})",
-            self.inner.kappa,
-            self.inner.volatility.times().len()
-        )
-    }
-}
-
-wire_methods!(PyHullWhiteParams, HullWhiteParams, "HullWhiteParams");
 
 /// Settings for scalar Hull-White calibration to cap/floor quotes.
 ///
@@ -741,7 +680,7 @@ fn calibrate_hull_white_to_cap_floors(
 ///
 /// Returns
 /// -------
-/// tuple[HullWhiteParams, CalibrationReport]
+/// tuple[finstack_quant.models.rates.hull_white.HullWhiteParams, CalibrationReport]
 ///     Piecewise parameters and the fit report.
 ///
 /// Raises
@@ -781,7 +720,7 @@ fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
         })
         .map_err(core_to_py)?;
     Ok((
-        PyHullWhiteParams { inner: params },
+        PyHullWhiteParams::from_inner(params),
         PyCalibrationReport::from_inner(report),
     ))
 }
@@ -793,7 +732,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCapFloorCalibrationConfig>()?;
     m.add_class::<PyCapFloorQuote>()?;
     m.add_class::<PyHullWhiteCalibrationParams>()?;
-    m.add_class::<PyHullWhiteParams>()?;
     m.add_class::<PyPiecewiseSigmaCalibrationConfig>()?;
     m.add_class::<PySwaptionQuote>()?;
     m.add_function(pyo3::wrap_pyfunction!(
@@ -816,7 +754,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "CapFloorCalibrationConfig",
                 "CapFloorQuote",
                 "HullWhiteCalibrationParams",
-                "HullWhiteParams",
                 "PiecewiseSigmaCalibrationConfig",
                 "SwaptionQuote",
                 "bootstrap_hull_white_sigma_schedule_to_cap_floors",

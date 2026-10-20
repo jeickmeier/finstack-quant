@@ -30878,17 +30878,6 @@ export interface CalibrationNamespace {
     forward?: DiscountCurve | null
   ): [generated.models.HullWhiteParams, generated.calibration.CalibrationReport];
   /**
-   * Short-rate volatility of a piecewise Hull-White parameter set at a model time.
-   *
-   * Free-function twin of Python `HullWhiteParams.sigma_at` (Rust
-   * `HullWhiteParams::volatility` read with `PiecewiseConstantCurve::value_at`).
-   * @param params - `HullWhiteParams` object (or JSON): `kappa` and the piecewise `volatility` schedule (`times`, `values`).
-   * @param time - Year fraction at which the left-continuous piecewise sigma is read.
-   * @returns Sigma applying at `time`, in absolute rate units per square-root year.
-   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `params` is not a valid `HullWhiteParams` object.
-   */
-  hullWhiteParamsSigmaAt(params: generated.models.HullWhiteParams | string, time: number): number;
-  /**
    * Build a zero-coupon inflation swap quote.
    *
    * Free-function twin of Python `InflationQuote.inflation_swap` (Rust `InflationQuote::inflation_swap`).
