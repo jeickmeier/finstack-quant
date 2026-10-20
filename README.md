@@ -479,7 +479,7 @@ benchmarks in all three languages; see
 | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Persisted-contract matrix, strict loaders, generated schemas |
 | [`docs/SERDE_STABILITY.md`](docs/SERDE_STABILITY.md) | Wire-format and schema-version policy |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history, including breaking changes |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development setup, principles, binding-change checklist |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development setup, principles, binding-change checklist, branching, pull requests, releases |
 | [`.github/workflows/README.md`](.github/workflows/README.md) | CI workflows, jobs, and their local `mise` equivalents |
 | [`AGENTS.md`](AGENTS.md) | Repository operating rules for automated contributors |
 | [`.agents/rules/`](.agents/rules/) | Rust, Python, and WASM code, testing, and documentation standards |

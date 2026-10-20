@@ -1,0 +1,38 @@
+name: PR
+
+# Runs the nightly check set (nightly.yml) unchanged on every pull request into
+# master. Running it unchanged, coverage included, keeps each job's build
+# identical to master's, so the caches master saves apply; the SonarQube scan
+# is master-only and skipped. `PR gate` is the one status check the master
+# ruleset requires, so jobs in nightly.yml can change without editing the
+# ruleset.
+on:
+  pull_request:
+    branches: [master]
+
+# A new push to a pull request cancels that pull request's run in progress.
+# nightly.yml has no concurrency of its own (see its header); the caller owns it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Nightly checks
+    uses: ./.github/workflows/nightly.yml
+
+  # A required check that is skipped counts as passing, so this job must not be
+  # skipped when a check fails: it runs unless the run was cancelled, and fails
+  # unless every check passed.
+  gate:
+    name: PR gate
+    needs: checks
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every check to pass
+        run: test "${{ needs.checks.result }}" = success

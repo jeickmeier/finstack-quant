@@ -1,0 +1,5 @@
+# Code owners are requested for review automatically on pull requests that
+# touch their paths; the last matching line wins. GitHub never requests the
+# author, so with one maintainer this file has no effect. Split it by area when
+# a second maintainer joins (see "Maintainers and Review" in CONTRIBUTING.md).
+* @jeickmeier
