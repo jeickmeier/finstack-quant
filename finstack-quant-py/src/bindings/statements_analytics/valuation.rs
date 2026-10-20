@@ -1177,8 +1177,8 @@ impl PyCorporateAnalysis {
 ///     ``equity_bridge`` / ``valuation_discounts`` (serde dicts or the typed
 ///     ``EquityBridge`` / ``ValuationDiscounts``), ``exit_multiple_metric_node``
 ///     (statement monetary flow node whose complete trailing-year sum replaces
-///     ``terminal_metric`` on an exit-multiple terminal), ``discount_curve_id``
-///     and the sensitivity knobs. Unknown keys raise ``ValueError``. ``None``
+///     ``terminal_metric`` on an exit-multiple terminal) and the sensitivity
+///     knobs. Unknown keys raise ``ValueError``. ``None``
 ///     uses every default.
 /// market : MarketContext | str | None
 ///     Market context used for statement evaluation (capital-structure curve
@@ -1297,10 +1297,8 @@ fn evaluate_dcf<'py>(
 ///     ``{"relative": 0.10}``), ``mid_year_convention`` (``False``),
 ///     ``exit_multiple_metric_node`` (statement monetary flow node supplying
 ///     the complete trailing-year terminal metric), ``equity_bridge``,
-///     ``shares_outstanding``, ``valuation_discounts`` and
-///     ``discount_curve_id``. Unknown keys raise ``ValueError``.
-/// market : MarketContext | str | None
-///     Market context for statement evaluation (not WACC discounting).
+///     ``shares_outstanding`` and ``valuation_discounts``. Unknown keys raise
+///     ``ValueError``.
 ///
 /// Returns
 /// -------
@@ -1336,9 +1334,7 @@ fn evaluate_dcf<'py>(
     ufcf_node=DEFAULT_UFCF_NODE,
     net_debt_override=None,
     options=None,
-    market=None,
 ))]
-#[allow(clippy::too_many_arguments)]
 fn dcf_sensitivity<'py>(
     py: Python<'py>,
     model: &Bound<'py, PyAny>,
@@ -1347,13 +1343,11 @@ fn dcf_sensitivity<'py>(
     ufcf_node: &str,
     net_debt_override: Option<f64>,
     options: Option<&Bound<'py, PyAny>>,
-    market: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyDcfSensitivityResult> {
     let model = extract_model_ref(model)?.into_owned();
     let terminal_value = extract_terminal_value(py, terminal_value)?;
     let ufcf_node = ufcf_node.to_owned();
     let options = extract_dcf_options(py, options)?;
-    let market = extract_market_opt(py, market)?;
 
     let inner = py
         .detach(move || {
@@ -1364,7 +1358,6 @@ fn dcf_sensitivity<'py>(
                 &ufcf_node,
                 net_debt_override,
                 &options,
-                market.as_ref(),
             )
         })
         .map_err(statements_to_py)?;

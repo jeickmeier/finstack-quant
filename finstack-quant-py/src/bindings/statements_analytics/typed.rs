@@ -23,14 +23,13 @@ use pyo3::types::PyDict;
 type SensitivityParameterInput = (String, String, f64, Vec<f64>);
 
 /// Column schema for [`PyVarianceReport::to_dataframe`].
-const VARIANCE_ROW_COLUMNS: [ColumnSchema<'static>; 7] = [
+const VARIANCE_ROW_COLUMNS: [ColumnSchema<'static>; 6] = [
     ("period", "str"),
     ("metric", "str"),
     ("baseline", "float64"),
     ("comparison", "float64"),
     ("abs_var", "float64"),
     ("pct_var", "float64"),
-    ("driver_contribution", "object"),
 ];
 
 /// Column schema for the fixed part of [`PySensitivityResult::to_dataframe`];
@@ -930,18 +929,6 @@ impl PyVarianceRow {
         self.inner.pct_var
     }
 
-    /// Driver attribution ``{driver_node: contribution}`` computed by the
-    /// variance analyzer, in the driver's own units; empty when the config
-    /// declared no drivers.
-    #[getter]
-    fn driver_contribution(&self) -> std::collections::BTreeMap<String, f64> {
-        self.inner
-            .driver_contribution
-            .iter()
-            .map(|(k, v)| (k.clone(), *v))
-            .collect()
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -1011,16 +998,13 @@ impl PyVarianceReport {
     /// Export the variance rows as a pandas ``DataFrame``.
     ///
     /// Columns: ``period``, ``metric``, ``baseline``, ``comparison``,
-    /// ``abs_var``, ``pct_var``, ``driver_contribution``. One row per
+    /// ``abs_var``, ``pct_var``. One row per
     /// (metric, period) pair, in report order; an empty report still carries
     /// the full column schema.
     ///
     /// ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own
     /// units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is
-    /// ``NaN`` where the baseline is effectively zero;
-    /// ``driver_contribution`` is the ``{driver: contribution}`` dict of
-    /// ``VarianceRow.driver_contribution`` (an object column, empty dict when
-    /// no drivers were declared). The scenario labels are report metadata
+    /// ``NaN`` where the baseline is effectively zero. The scenario labels are report metadata
     /// (``baseline_label`` / ``comparison_label``) and are not repeated per row.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows: Vec<serde_json::Value> = self
@@ -1038,7 +1022,6 @@ impl PyVarianceReport {
                     // skips a `None`) so the column exists even when every
                     // baseline is zero.
                     "pct_var": row.pct_var,
-                    "driver_contribution": row.driver_contribution,
                 })
             })
             .collect();

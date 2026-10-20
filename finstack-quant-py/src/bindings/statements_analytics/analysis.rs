@@ -196,7 +196,7 @@ fn generate_tornado_entries(
 /// Returns
 /// -------
 /// VarianceReport
-///     Per-metric, per-period rows including ``driver_contribution``.
+///     Per-metric, per-period variance rows.
 ///
 /// Raises
 /// ------

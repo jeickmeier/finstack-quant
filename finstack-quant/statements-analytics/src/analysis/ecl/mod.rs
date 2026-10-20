@@ -8,8 +8,6 @@
 //!   integration with probability-weighted macro scenarios
 //! - **CECL variant** ([`crate::analysis::ecl::cecl`]) -- US GAAP ASC 326 lifetime ECL with
 //!   reasonable-and-supportable forecast and historical reversion
-//! - **Portfolio aggregation** ([`crate::analysis::ecl::portfolio`]) -- stage breakdown, segment
-//!   analysis, migration matrices, and provision waterfall
 //!
 //! # Quick Start
 //!
@@ -67,7 +65,6 @@
 pub(crate) mod cecl;
 pub(crate) mod engine;
 pub(crate) mod policy;
-pub(crate) mod portfolio;
 pub(crate) mod request;
 pub(crate) mod staging;
 pub(crate) mod types;
@@ -81,11 +78,9 @@ pub use staging::{classify_stage_from_curves, StageResult, StagingConfig, Stagin
 
 pub use engine::{
     compute_ecl_from_curve, compute_ecl_weighted_from_curves, EclBucket, EclConfig,
-    EclConfigBuilder, EclResult, ExposureEclResult, LgdType, MacroScenario, WeightedEclResult,
+    EclConfigBuilder, EclResult, LgdType, MacroScenario, WeightedEclResult,
 };
 
-pub use request::{classify_stage, compute_ecl, compute_ecl_weighted, EclRequest, EclStageRequest};
+pub use request::{classify_stage, compute_ecl, compute_ecl_weighted};
 
 pub use cecl::{CeclConfig, CeclEngine, CeclMethodology, CeclResult, ReversionMethod};
-
-pub use portfolio::{compute_waterfall, PortfolioEclResult, ProvisionWaterfall};

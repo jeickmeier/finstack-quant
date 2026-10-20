@@ -1091,7 +1091,7 @@ fn statements_analytics_dts_matches_runtime_exports() {
     // Rust `DcfOptions` document, not a hand-picked subset of scalars.
     assert!(contains_ignoring_ws(
         &dts,
-        "dcfSensitivity(modelJson: JsonInput, wacc: number, terminalValueJson: JsonInput, ufcfNode?: string | null, netDebtOverride?: number | null, optionsJson?: JsonInput | null, marketJson?: JsonInput | null): DcfSensitivityResult;",
+        "dcfSensitivity(modelJson: JsonInput, wacc: number, terminalValueJson: JsonInput, ufcfNode?: string | null, netDebtOverride?: number | null, optionsJson?: JsonInput | null): DcfSensitivityResult;",
     ));
     // evaluateLbo takes the Rust `LboConfig` (check mappings included) and
     // returns its check report.

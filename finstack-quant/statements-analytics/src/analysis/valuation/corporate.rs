@@ -10,7 +10,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::types::InstrumentId;
 use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
 use finstack_quant_statements::types::{FinancialModelSpec, NodeValueType};
@@ -204,17 +204,6 @@ pub struct DcfOptions {
     /// e.g. `Relative(0.10)` for ±10% of the base multiple. Absolute
     /// bumps are clamped at zero on the downside.
     pub exit_multiple_bump: ExitMultipleBump,
-    /// Explicit discount curve id stamped on the DCF instrument (default:
-    /// `None`).
-    ///
-    /// The curve is used for *risk attribution only* — all DCF components
-    /// (explicit flows, terminal value, equity) always discount at the
-    /// WACC on a single consistent basis. When `None`, a model-scoped
-    /// placeholder id (`"{model_id}-DCF-WACC"`) is used instead of the
-    /// conventional `"{CCY}-DISCOUNT"` name, so a market context that
-    /// happens to contain a curve with the conventional name cannot be
-    /// mistaken for the discounting basis.
-    pub discount_curve_id: Option<CurveId>,
     /// Statement flow node whose complete trailing calendar year supplies the
     /// [`TerminalValueSpec::ExitMultiple`] metric (default: `None`).
     ///
@@ -237,7 +226,6 @@ impl Default for DcfOptions {
             wacc_denominator_epsilon: 0.005,
             max_stable_growth_rate: 0.05,
             exit_multiple_bump: ExitMultipleBump::default(),
-            discount_curve_id: None,
             exit_multiple_metric_node: None,
         }
     }
@@ -268,7 +256,6 @@ impl Default for ExitMultipleBump {
 pub(crate) struct DcfEvalContext<'a> {
     pub(crate) net_debt_override: Option<f64>,
     pub(crate) options: &'a DcfOptions,
-    pub(crate) market: Option<&'a MarketContext>,
 }
 
 /// Evaluate a financial model using DCF methodology with optional market context.
@@ -384,10 +371,9 @@ pub fn evaluate_dcf(
     let context = DcfEvalContext {
         net_debt_override,
         options,
-        market,
     };
     let mut evaluator = Evaluator::new();
-    let results = match (context.market, as_of) {
+    let results = match (market, as_of) {
         (Some(market), Some(as_of)) => evaluator.evaluate_with_market(model, market, as_of)?,
         (Some(_), None) => {
             return Err(finstack_quant_statements::error::Error::Eval(
@@ -496,8 +482,6 @@ pub struct DcfSensitivityResult {
 ///   underlying DCF still requires either the override or balance-sheet nodes
 /// * `options` - Supplies the shock sizes and the denominator epsilon, and is
 ///   applied unchanged to every shocked re-run
-/// * `market` - Optional market context used when the DCF instrument references
-///   discount curves
 ///
 /// # Returns
 ///
@@ -525,9 +509,7 @@ pub struct DcfSensitivityResult {
 ///     TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 },
 ///     "ufcf",
 ///     Some(0.0),
-///     &DcfOptions::default(),
-///     None,
-/// )?;
+///     &DcfOptions::default())?;
 ///
 /// // Entries are ranked by absolute swing, widest first.
 /// assert!(!tornado.entries.is_empty());
@@ -550,7 +532,6 @@ pub fn dcf_sensitivity(
     ufcf_node: &str,
     net_debt_override: Option<f64>,
     options: &DcfOptions,
-    market: Option<&MarketContext>,
 ) -> Result<DcfSensitivityResult> {
     let currency = extract_currency_from_model(model)?;
 
@@ -561,7 +542,6 @@ pub fn dcf_sensitivity(
     let context = DcfEvalContext {
         net_debt_override,
         options,
-        market,
     };
 
     let enterprise_value = |terminal: TerminalValueSpec, discount_rate: f64| -> Result<f64> {
@@ -1005,13 +985,8 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         equity_bridge_from_model(model, results, net_debt_period)?
     };
 
-    // The discount curve id is risk-attribution metadata only: the DCF
-    // pricer always discounts every component (explicit flows, terminal
-    // value, equity) at the WACC. The conventional "{CCY}-DISCOUNT" name
-    // is no longer synthesized by default — callers opt in via
-    // `DcfOptions::discount_curve_id`; otherwise a model-scoped
-    // placeholder keeps the instrument id-complete without colliding
-    // with any market curve.
+    // The DCF pricer discounts every component (explicit flows, terminal
+    // value, equity) at the WACC; it reads no market curve.
     let mut builder = DiscountedCashFlow::builder()
         .id(InstrumentId::new(format!("{}-DCF", model.id)))
         .currency(currency)
@@ -1035,10 +1010,8 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         .build()
         .map_err(|e| finstack_quant_statements::error::Error::Eval(e.to_string()))?;
 
-    let default_market = MarketContext::default();
-    let market_ref = context.market.unwrap_or(&default_market);
     let equity_value = dcf
-        .value(market_ref, valuation_date)
+        .value(&MarketContext::default(), valuation_date)
         .map_err(|e| finstack_quant_statements::error::Error::Eval(e.to_string()))?;
 
     let pv_explicit = dcf.calculate_pv_explicit_flows();
@@ -1571,7 +1544,6 @@ mod tests {
             "ufcf",
             Some(0.0),
             &DcfOptions::default(),
-            None,
         )
         .expect("sensitivity runs");
 
@@ -1629,7 +1601,6 @@ mod tests {
             "ufcf",
             Some(0.0),
             &options,
-            None,
         )
         .expect("sensitivity runs");
 
@@ -1668,7 +1639,6 @@ mod tests {
             "ufcf",
             Some(0.0),
             &DcfOptions::default(),
-            None,
         )
         .expect("sensitivity runs");
 

@@ -105,7 +105,7 @@ a submodule.
 | Variance | `run_variance`, `variance_bridge`, `VarianceConfig`, `VarianceReport`, `VarianceRow`, `BridgeChart`, `BridgeStep` |
 | Credit | `compute_credit_context`, `CreditContextMetrics`, `forecast_breaches`, `StatementsAdapter` |
 | Checks | `three_statement_checks`, `credit_underwriting_checks`, `lbo_model_checks`, `ThreeStatementMapping`, `CreditMapping`, `FormulaCheckSpec`, `render_check_report_text`, `render_check_report_html`, plus reconciliation / consistency / credit check types |
-| ECL | `EclConfig`, `EclConfigBuilder`, `CeclEngine`, `CeclConfig`, `classify_stage`, `compute_ecl`, `compute_ecl_weighted`, `classify_stage_from_curves`, `compute_ecl_from_curve`, `compute_ecl_weighted_from_curves`, `StagingConfig`, `PdTermStructure`, `PortfolioEclResult`, `ProvisionWaterfall`, `compute_waterfall` |
+| ECL | `EclConfig`, `EclConfigBuilder`, `CeclEngine`, `CeclConfig`, `classify_stage`, `compute_ecl`, `compute_ecl_weighted`, `classify_stage_from_curves`, `compute_ecl_from_curve`, `compute_ecl_weighted_from_curves`, `StagingConfig`, `PdTermStructure` |
 | Comps | `PeerSet`, `PeerFilter`, `PeerStats`, `compute_peer_multiples`, `compute_multiple`, `regression_fair_value`, `score_relative_value`, `percentile_rank`, `z_score` |
 | Goal seek | `goal_seek` |
 | Backtesting | `backtest_forecast`, `ForecastMetrics` |
@@ -162,8 +162,8 @@ chart of accounts: `three_statement_checks(ThreeStatementMapping)`,
 `Evaluator::with_checks`.
 
 **ECL.** IFRS 9 staging (`classify_stage` from scalar PDs, `classify_stage_from_curves` from PD term structures, `StagingConfig`, `StagingTrigger`), measurement (`compute_ecl` / `compute_ecl_weighted` from cumulative-PD schedules, `compute_ecl_from_curve` / `compute_ecl_weighted_from_curves` with an `EclConfig`)
-and CECL (`CeclEngine`, `CeclMethodology`), with single-exposure, weighted, and
-portfolio aggregation paths plus a `ProvisionWaterfall`. Stage 2/3 DPD
+and CECL (`CeclEngine`, `CeclMethodology`), with single-exposure and weighted
+paths. Stage 2/3 DPD
 backstops fire at `days_past_due >= 30` / `>= 90` (bank / CECL alignment);
 the display contract is `dpd_stage2 (dpd=30 >= 30)` /
 `dpd_stage3 (dpd=90 >= 90)`. `Exposure` priced EAD is

@@ -40,7 +40,7 @@ use finstack_quant_core::{Error, Result};
 use finstack_quant_models::credit::lgd::DownturnLgd;
 use serde::{Deserialize, Serialize};
 
-use super::staging::{StageResult, StagingConfig};
+use super::staging::StagingConfig;
 use super::types::{Exposure, PdTermStructure, Stage};
 
 // Macro scenario
@@ -454,24 +454,6 @@ pub struct WeightedEclResult {
     pub meta: finstack_quant_core::config::ResultsMeta,
 }
 
-/// Combined staging + ECL result for one exposure.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct ExposureEclResult {
-    /// Stage classification result with audit trail.
-    pub stage_result: StageResult,
-    /// Probability-weighted ECL result.
-    pub ecl_result: WeightedEclResult,
-    /// Reporting-date EAD of the exposure (copied from [`Exposure::ead`]).
-    /// Used by portfolio aggregation; defaults to 0.0 when deserializing
-    /// results produced before this field existed.
-    #[serde(default)]
-    pub ead: f64,
-    /// Audit stamp: numeric mode, rounding context, and FX policy in force.
-    #[serde(default)]
-    pub meta: finstack_quant_core::config::ResultsMeta,
-}
-
 // Core computation (stateless)
 
 /// Effective LGD after applying the configured [`LgdType`] to the base LGD
@@ -847,7 +829,7 @@ pub(super) fn validate_finite_ecl(ecl: f64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::ecl::staging::classify_stage_from_curves;
+    use crate::analysis::ecl::staging::{classify_stage_from_curves, StageResult};
     use crate::analysis::ecl::types::{QualitativeFlags, RawPdCurve};
 
     struct Staged {

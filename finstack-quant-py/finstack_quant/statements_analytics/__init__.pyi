@@ -10175,22 +10175,19 @@ class VarianceReport:
         Export the variance rows as a pandas ``DataFrame``.
 
         Columns: ``period``, ``metric``, ``baseline``, ``comparison``,
-        ``abs_var``, ``pct_var``, ``driver_contribution``. One row per
+        ``abs_var``, ``pct_var``. One row per
         (metric, period) pair, in report order; an empty report still carries
         the full column schema.
 
         ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own
         units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is
-        ``NaN`` where the baseline is effectively zero;
-        ``driver_contribution`` is the ``{driver: contribution}`` dict of
-        ``VarianceRow.driver_contribution`` (an object column, empty dict when
-        no drivers were declared). The scenario labels are report metadata
+        ``NaN`` where the baseline is effectively zero. The scenario labels are report metadata
         (``baseline_label`` / ``comparison_label``) and are not repeated per row.
 
         Returns
         -------
         pd.DataFrame
-            Export the variance rows as a pandas ``DataFrame``. Columns: ``period``, ``metric``, ``baseline``, ``comparison``, ``abs_var``, ``pct_var``, ``driver_contribution``. One row per (metric, period) pair, in report order; an empty report still carries the full column schema. ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is ``NaN`` where the baseline is effectively zero; ``driver_contribution`` is the ``{driver: contribution}`` dict of ``VarianceRow.driver_contribution`` (an object column, empty dict when no drivers were declared). The scenario labels are report metadata (``baseline_label`` / ``comparison_label``) and are not repeated per row.
+            Export the variance rows as a pandas ``DataFrame``. Columns: ``period``, ``metric``, ``baseline``, ``comparison``, ``abs_var``, ``pct_var``. One row per (metric, period) pair, in report order; an empty report still carries the full column schema. ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is ``NaN`` where the baseline is effectively zero. The scenario labels are report metadata (``baseline_label`` / ``comparison_label``) and are not repeated per row.
 
         Raises
         ------
@@ -10285,20 +10282,6 @@ class VarianceRow:
                 -------
                 float | None
                     Percentage variance ``abs_var / baseline`` as a decimal fraction (``0.1`` = +10%). ``None`` when the baseline is effectively zero, where a ratio would be undefined rather than zero; fall back to ``abs_var`` in that case.
-        """
-    @property
-    def driver_contribution(self) -> Any:
-        """
-                Driver attribution ``{driver_node: contribution}`` computed by the
-        variance analyzer, in the driver's own units; empty when the config
-        declared no drivers.
-
-                This property does not raise.
-
-                Returns
-                -------
-                Any
-                    Driver attribution ``{driver_node: contribution}`` computed by the variance analyzer, in the driver's own units; empty when the config declared no drivers.
         """
 
 class WeightedEclResult:
@@ -10722,7 +10705,6 @@ def dcf_sensitivity(
     ufcf_node: str = "ufcf",
     net_debt_override: float | None = None,
     options: Mapping[str, Any] | str | None = None,
-    market: Any | None = None,
 ) -> DcfSensitivityResult:
     """Rank the headline DCF assumptions by enterprise-value impact.
 
@@ -10760,11 +10742,9 @@ def dcf_sensitivity(
         ``{"relative": 0.10}``), ``mid_year_convention`` (``False``),
         ``exit_multiple_metric_node`` (statement monetary flow node supplying
         the complete trailing-year terminal metric), ``equity_bridge``,
-        ``shares_outstanding``, ``valuation_discounts`` and
-        ``discount_curve_id``. Typed ``EquityBridge`` / ``ValuationDiscounts``
-        values may sit in place of their dicts. ``None`` uses every default.
-    market : MarketContext | str | None
-        Market context for statement evaluation (not WACC discounting).
+        ``shares_outstanding`` and ``valuation_discounts``. Typed
+        ``EquityBridge`` / ``ValuationDiscounts`` values may sit in place of
+        their dicts. ``None`` uses every default.
 
     Returns
     -------
@@ -10842,8 +10822,7 @@ def evaluate_dcf(
         ``exit_multiple_metric_node`` (statement monetary flow node whose
         complete trailing-year sum replaces ``terminal_metric`` on an
         exit-multiple terminal; actual period boundaries must cover one
-        complete contiguous calendar year), ``discount_curve_id`` and the
-        sensitivity knobs. ``None`` uses every default.
+        complete contiguous calendar year) and the sensitivity knobs. ``None`` uses every default.
     market : MarketContext | str | None
         Market context used for statement evaluation (capital-structure curve
         lookups); DCF discounting stays WACC-only. Requires ``as_of``.
@@ -11697,7 +11676,7 @@ def run_variance(base: Any, comparison: Any, config: Any) -> VarianceReport:
     Returns
     -------
     VarianceReport
-        Per-metric, per-period rows including ``driver_contribution``.
+        Per-metric, per-period variance rows.
 
     Raises
     ------

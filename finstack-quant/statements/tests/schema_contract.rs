@@ -332,25 +332,6 @@ fn capital_structure_warning_uses_typed_canonical_values() {
 }
 
 #[test]
-fn nan_warning_uses_canonical_acronym_spelling() {
-    let warning = EvalWarning::NaNPropagated {
-        node_id: "ratio".to_string(),
-        period: PeriodId::quarter(2025, 1).expect("valid period fixture"),
-    };
-    let value = serde_json::to_value(warning).expect("serialize NaN warning");
-    assert!(value.get("nan_propagated").is_some());
-
-    // schema-rejection-test
-    assert!(serde_json::from_value::<EvalWarning>(json!({
-        "na_n_propagated": {
-            "node_id": "ratio",
-            "period": "2025Q1"
-        }
-    }))
-    .is_err());
-}
-
-#[test]
 fn checked_in_schemas_have_stable_metadata() {
     let model = financial_model_spec_schema().expect("financial model schema parses");
     let result = statement_result_schema().expect("statement result schema parses");

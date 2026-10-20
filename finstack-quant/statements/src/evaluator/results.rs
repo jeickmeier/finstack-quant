@@ -505,15 +505,6 @@ pub enum EvalWarning {
         #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
         period: PeriodId,
     },
-    /// NaN value bubbled up to a node result
-    #[serde(rename = "nan_propagated")]
-    NaNPropagated {
-        /// Identifier of the node that produced the NaN value.
-        node_id: String,
-        /// Period in which the warning occurred.
-        #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
-        period: PeriodId,
-    },
     /// Non-finite value (NaN, Inf, -Inf) detected when storing a node result.
     ///
     /// This warning is emitted by the finiteness validation pipeline so that

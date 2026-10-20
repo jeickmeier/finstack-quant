@@ -457,6 +457,19 @@ export type DownturnMethod =
  */
 export type LgdType = "point_in_time" | "through_the_cycle" | "downturn";
 /**
+ * Rounding modes supported by the library.
+ *
+ * The variants mirror the most common conventions found in pricing engines.
+ */
+export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
+/**
+ * Finite JSON number that is strictly greater than zero.
+ *
+ * This type is used by serde field adapters so runtime deserialization and
+ * generated schemas enforce the same positive-number contract.
+ */
+export type PositiveF64Wire = number;
+/**
  * IFRS 9 impairment stage for a credit exposure.
  *
  * Under IFRS 9, financial instruments are classified into three stages that
@@ -471,19 +484,6 @@ export type LgdType = "point_in_time" | "through_the_cycle" | "downturn";
  * IFRS 9 Financial Instruments, Section 5.5 -- Impairment. `docs/REFERENCES.md#ifrs-9-impairment`
  */
 export type Stage = "stage1" | "stage2" | "stage3";
-/**
- * Rounding modes supported by the library.
- *
- * The variants mirror the most common conventions found in pricing engines.
- */
-export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
-/**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type PositiveF64Wire = number;
 /**
  * An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,
  * otherwise one of the strings `"inf"`, `"-inf"` or `"nan"`.
@@ -522,6 +522,86 @@ export type ForecastMethod =
  * - **Mixed**: Value OR Forecast OR Formula (precedence: Value > Forecast > Formula)
  */
 export type NodeType = "value" | "calculated" | "mixed";
+/**
+ * Convention that determines how `growth_rate` compounds in a lease.
+ *
+ * - `AnnualEscalator` (default): `growth_rate` is applied once per
+ *   **lease-start anniversary**, measured in model periods (every
+ *   `periods_per_year()` periods from the segment start). Matches Argus /
+ *   NCREIF annual bumps: rent is flat within a lease year and steps on the
+ *   anniversary. The bump counter resets at each rent step.
+ * - `PerPeriod`: `growth_rate` is applied every model period. Must be set
+ *   explicitly; omitted / defaulted values are never per-period.
+ */
+export type LeaseGrowthConvention = "per_period" | "annual_escalator";
+/**
+ * Basis for management fee calculation.
+ */
+export type ManagementFeeBase = "egi" | "effective_rent";
+/**
+ * Identifies which metric to extract from CompanyMetrics.
+ */
+export type MetricExtractor =
+  | {
+      named: string;
+    }
+  | {
+      multiple: Multiple;
+    }
+  | {
+      custom: string;
+    };
+/**
+ * Valuation multiple.
+ *
+ * Enterprise value multiples use EV as the numerator. Equity multiples
+ * use market capitalization or share price. Credit multiples use spread
+ * or yield as the numerator and a fundamental metric as denominator.
+ */
+export type Multiple =
+  | "ev_ebitda"
+  | "ev_revenue"
+  | "ev_ebit"
+  | "ev_fcf"
+  | "pe"
+  | "pb"
+  | "ptbv"
+  | "p_fcf"
+  | "dividend_yield"
+  | "spread_per_turn"
+  | "yield_per_coverage";
+/**
+ * Time basis for computing a valuation multiple.
+ */
+export type PeriodBasis =
+  | "ltm"
+  | "ntm"
+  | {
+      custom: string;
+    };
+/**
+ * Rich/cheap sign convention for a scoring dimension's Y metric.
+ *
+ * Determines how a higher-than-peers Y value maps onto the composite
+ * score (positive = cheap). Spread- and yield-like metrics are cheap
+ * when high ([`HigherIsCheap`](Self::HigherIsCheap)); valuation
+ * multiples (P/E, EV/EBITDA) are rich when high
+ * ([`HigherIsRich`](Self::HigherIsRich)).
+ *
+ * The direction is applied consistently to both the regression-residual
+ * path and the univariate z-score path. The default,
+ * `HigherIsCheap`, matches the historical regression-path convention
+ * (positive residual = actual spread above fitted fair spread = cheap).
+ */
+export type ScoreDirection = "higher_is_cheap" | "higher_is_rich";
+/**
+ * Status of a scorecard run.
+ */
+export type ScorecardStatus = "success" | "failed";
+/**
+ * Sensitivity analysis mode.
+ */
+export type SensitivityMode = "diagonal" | "full_grid" | "tornado";
 /**
  * Reason for stage assignment (audit trail).
  *
@@ -608,86 +688,6 @@ export type StagingTrigger =
       };
     }
   | "no_trigger";
-/**
- * Convention that determines how `growth_rate` compounds in a lease.
- *
- * - `AnnualEscalator` (default): `growth_rate` is applied once per
- *   **lease-start anniversary**, measured in model periods (every
- *   `periods_per_year()` periods from the segment start). Matches Argus /
- *   NCREIF annual bumps: rent is flat within a lease year and steps on the
- *   anniversary. The bump counter resets at each rent step.
- * - `PerPeriod`: `growth_rate` is applied every model period. Must be set
- *   explicitly; omitted / defaulted values are never per-period.
- */
-export type LeaseGrowthConvention = "per_period" | "annual_escalator";
-/**
- * Basis for management fee calculation.
- */
-export type ManagementFeeBase = "egi" | "effective_rent";
-/**
- * Identifies which metric to extract from CompanyMetrics.
- */
-export type MetricExtractor =
-  | {
-      named: string;
-    }
-  | {
-      multiple: Multiple;
-    }
-  | {
-      custom: string;
-    };
-/**
- * Valuation multiple.
- *
- * Enterprise value multiples use EV as the numerator. Equity multiples
- * use market capitalization or share price. Credit multiples use spread
- * or yield as the numerator and a fundamental metric as denominator.
- */
-export type Multiple =
-  | "ev_ebitda"
-  | "ev_revenue"
-  | "ev_ebit"
-  | "ev_fcf"
-  | "pe"
-  | "pb"
-  | "ptbv"
-  | "p_fcf"
-  | "dividend_yield"
-  | "spread_per_turn"
-  | "yield_per_coverage";
-/**
- * Time basis for computing a valuation multiple.
- */
-export type PeriodBasis =
-  | "ltm"
-  | "ntm"
-  | {
-      custom: string;
-    };
-/**
- * Rich/cheap sign convention for a scoring dimension's Y metric.
- *
- * Determines how a higher-than-peers Y value maps onto the composite
- * score (positive = cheap). Spread- and yield-like metrics are cheap
- * when high ([`HigherIsCheap`](Self::HigherIsCheap)); valuation
- * multiples (P/E, EV/EBITDA) are rich when high
- * ([`HigherIsRich`](Self::HigherIsRich)).
- *
- * The direction is applied consistently to both the regression-residual
- * path and the univariate z-score path. The default,
- * `HigherIsCheap`, matches the historical regression-path convention
- * (positive residual = actual spread above fitted fair spread = cheap).
- */
-export type ScoreDirection = "higher_is_cheap" | "higher_is_rich";
-/**
- * Status of a scorecard run.
- */
-export type ScorecardStatus = "success" | "failed";
-/**
- * Sensitivity analysis mode.
- */
-export type SensitivityMode = "diagonal" | "full_grid" | "tornado";
 /**
  * Direction in which a metric should ideally move.
  */
@@ -2003,19 +2003,6 @@ export interface CreditMapping {
  */
 export interface DcfOptions {
   /**
-   * Explicit discount curve id stamped on the DCF instrument (default:
-   * `None`).
-   *
-   * The curve is used for *risk attribution only* — all DCF components
-   * (explicit flows, terminal value, equity) always discount at the
-   * WACC on a single consistent basis. When `None`, a model-scoped
-   * placeholder id (`"{model_id}-DCF-WACC"`) is used instead of the
-   * conventional `"{CCY}-DISCOUNT"` name, so a market context that
-   * happens to contain a curve with the conventional name cannot be
-   * mistaken for the discounting basis.
-   */
-  discount_curve_id?: Id | null;
-  /**
    * Structured equity bridge; when `Some` it is used as-is and the model's
    * debt/cash (and any net-debt override) are not consulted.
    */
@@ -2446,55 +2433,6 @@ export interface StagingConfig {
   stage3_qualitative_triggers_enabled: boolean;
 }
 /**
- * Inputs for probability-weighted ECL from cumulative-PD schedules.
- */
-export interface EclRequest {
-  /**
-   * Optional ECL integration-bucket width in years; `None` uses the
-   * canonical IFRS 9 policy default.
-   */
-  bucket_width_years?: number | null;
-  /**
-   * Exposure at default in the exposure's base currency.
-   */
-  ead: number;
-  /**
-   * Optional exposure-at-default profile represented as
-   * `(time_years, ead)` knots.
-   */
-  ead_schedule?: [unknown, unknown][] | null;
-  /**
-   * Annual effective interest rate as a decimal used for discounting.
-   */
-  eir: number;
-  /**
-   * Stable identifier copied into the calculation result.
-   */
-  exposure_id: string;
-  /**
-   * Loss given default as a decimal probability in `[0, 1]`.
-   */
-  lgd: number;
-  /**
-   * Remaining contractual or behavioural maturity in years.
-   */
-  remaining_maturity_years: number;
-  /**
-   * Probability-weighted scenarios represented as `(weight, schedule)`;
-   * each schedule contains `(time_years, cumulative_pd)` knots.
-   */
-  scenarios: [unknown, unknown][];
-  /**
-   * Assigned IFRS 9 stage controlling the 12-month or lifetime horizon.
-   */
-  stage: Stage;
-  /**
-   * Optional Stage 3 expected-recovery horizon in years; `None` uses the
-   * canonical IFRS 9 ECL default.
-   */
-  stage3_time_to_recovery_years?: number | null;
-}
-/**
  * ECL result for a single exposure under a single scenario.
  */
 export interface EclResult {
@@ -2617,53 +2555,6 @@ export interface ToleranceConfig {
    * Used when comparing interest rates, yields, and other small ratios.
    */
   rate_epsilon?: PositiveF64Wire;
-}
-/**
- * Inputs for the simplified IFRS 9 stage-classification workflow.
- */
-export interface EclStageRequest {
-  /**
-   * Current remaining-lifetime probability of default as a decimal in
-   * `[0, 1]`, measured from the reporting date.
-   */
-  current_pd: number;
-  /**
-   * Current days past due; `None` applies the performing-exposure default
-   * of zero days.
-   */
-  days_past_due?: number | null;
-  /**
-   * Whether to apply the canonical Stage 2 days-past-due backstop; `None`
-   * enables the backstop.
-   */
-  dpd_stage2_trigger?: boolean | null;
-  /**
-   * Whether to apply the canonical Stage 3 days-past-due backstop; `None`
-   * enables the backstop.
-   */
-  dpd_stage3_trigger?: boolean | null;
-  /**
-   * Stable identifier used to label the classified exposure.
-   */
-  exposure_id: string;
-  /**
-   * Initial-recognition expected PD for the same remaining window as
-   * `current_pd`, conditional on survival to the reporting date, as a
-   * decimal in `[0, 1]`. The caller aligns the original risk estimate to
-   * this window; the full original contractual-lifetime PD is not suitable
-   * for an aged exposure.
-   */
-  origination_pd: number;
-  /**
-   * Optional absolute lifetime-PD increase that triggers Stage 2; `None`
-   * uses the default IFRS 9 staging-policy threshold.
-   */
-  pd_delta_absolute?: number | null;
-  /**
-   * Remaining contractual or behavioural maturity in years, used as the
-   * lifetime-PD comparison horizon subject to the canonical SICR cap.
-   */
-  remaining_maturity_years: number;
 }
 /**
  * Verifies that the effective tax rate (tax expense / pretax income) falls within an expected range.
@@ -2923,74 +2814,6 @@ export interface QualitativeFlags {
    * On internal watchlist.
    */
   watchlist: boolean;
-  [k: string]: unknown;
-}
-/**
- * Combined staging + ECL result for one exposure.
- */
-export interface ExposureEclResult {
-  /**
-   * Reporting-date EAD of the exposure (copied from [`Exposure::ead`]).
-   * Used by portfolio aggregation; defaults to 0.0 when deserializing
-   * results produced before this field existed.
-   */
-  ead?: number;
-  /**
-   * Probability-weighted ECL result.
-   */
-  ecl_result: WeightedEclResult;
-  /**
-   * Audit stamp: numeric mode, rounding context, and FX policy in force.
-   */
-  meta?: ResultsMeta;
-  /**
-   * Stage classification result with audit trail.
-   */
-  stage_result: StageResult;
-  [k: string]: unknown;
-}
-/**
- * Probability-weighted ECL result across scenarios.
- */
-export interface WeightedEclResult {
-  /**
-   * Probability-weighted ECL.
-   */
-  ecl: number;
-  /**
-   * Exposure identifier.
-   */
-  exposure_id: string;
-  /**
-   * Audit stamp: numeric mode, rounding context, and FX policy in force.
-   */
-  meta?: ResultsMeta;
-  /**
-   * Per-scenario breakdown: (scenario_id, weight, result).
-   */
-  scenario_breakdown: [unknown, unknown, unknown][];
-  /**
-   * Assigned IFRS 9 stage.
-   */
-  stage: Stage;
-  [k: string]: unknown;
-}
-/**
- * Result of stage classification with audit trail.
- */
-export interface StageResult {
-  /**
-   * Whether the exposure was cured from a higher stage.
-   */
-  cured: boolean;
-  /**
-   * Assigned stage.
-   */
-  stage: Stage;
-  /**
-   * Which trigger(s) caused the classification.
-   */
-  triggers: StagingTrigger[];
   [k: string]: unknown;
 }
 /**
@@ -3719,61 +3542,6 @@ export interface PeerStats {
   [k: string]: unknown;
 }
 /**
- * Portfolio-level ECL result with stage migration and segment breakdown.
- */
-export interface PortfolioEclResult {
-  /**
-   * Exposure count by stage.
-   */
-  count_by_stage: {
-    [k: string]: number;
-  };
-  /**
-   * EAD by stage (total outstanding balance per stage).
-   */
-  ead_by_stage: {
-    [k: string]: number;
-  };
-  /**
-   * ECL by segment (product, geography, rating, etc.).
-   */
-  ecl_by_segment: {
-    [k: string]: number;
-  };
-  /**
-   * ECL by stage.
-   */
-  ecl_by_stage: {
-    [k: string]: number;
-  };
-  /**
-   * Per-exposure results.
-   */
-  exposure_results: ExposureEclResult[];
-  /**
-   * Stage migration matrix: previous_stage -> current_stage -> count.
-   * Only populated for exposures that have a `previous_stage`.
-   */
-  migration_matrix: {
-    [k: string]: {
-      [k: string]: number;
-    };
-  };
-  /**
-   * Total ECL across all exposures.
-   */
-  total_ecl: number;
-  /**
-   * Exposure ids in `exposure_results` that could not be matched against
-   * the exposure slice passed to
-   * [`PortfolioEclResult::from_results_with_exposures`]. Unmatched
-   * results still contribute their ECL and EAD to the stage totals, but
-   * carry no segment or migration data.
-   */
-  unmatched_exposure_ids?: string[];
-  [k: string]: unknown;
-}
-/**
  * Standard node ids for a full property operating statement template.
  */
 export interface PropertyTemplateNodes {
@@ -3834,51 +3602,6 @@ export interface RentRollOutputNodes {
    * Total vacancy loss (includes occupancy and renewal probability effects).
    */
   vacancy_loss_node: string;
-}
-/**
- * Provision movement waterfall between two reporting dates.
- */
-export interface ProvisionWaterfall {
-  /**
-   * Closing ECL balance.
-   */
-  closing: number;
-  /**
-   * Cured back to Stage 1 (net ECL release) — both Stage 2 → 1 and
-   * Stage 3 → 1.
-   */
-  cured_to_stage1: number;
-  /**
-   * Partial cure Stage 3 → Stage 2 (net ECL change, typically a
-   * release as Stage 3 lifetime ECL is de-recognised, partly offset
-   * by Stage 2 lifetime ECL).
-   */
-  cured_to_stage2: number;
-  /**
-   * Derecognitions (maturities, repayments, sales).
-   */
-  derecognitions: number;
-  /**
-   * New originations (new exposures added this period).
-   */
-  new_originations: number;
-  /**
-   * Opening ECL balance (previous period closing).
-   */
-  opening: number;
-  /**
-   * Model/parameter changes (remeasurement, i.e., the residual).
-   */
-  remeasurement: number;
-  /**
-   * Transfers to Stage 2 (net ECL change from stage upgrades).
-   */
-  transfers_to_stage2: number;
-  /**
-   * Transfers to Stage 3 (net ECL change from stage downgrades).
-   */
-  transfers_to_stage3: number;
-  [k: string]: unknown;
 }
 /**
  * Rating-keyed map of cumulative PD curves.
@@ -4102,16 +3825,6 @@ export interface VarianceRow {
    */
   comparison: number;
   /**
-   * Optional driver breakdown: `driver → contribution` in the same units
-   * as the underlying metric.
-   *
-   * This is populated by bridge decomposition helpers and can be rendered
-   * as a "bridge" column in reports.
-   */
-  driver_contribution?: {
-    [k: string]: number;
-  };
-  /**
    * Metric / node identifier (e.g. `"revenue"`).
    */
   metric: string;
@@ -4316,6 +4029,24 @@ export interface SensitivityScenario {
   [k: string]: unknown;
 }
 /**
+ * IFRS 9 stage classification with its ordered trigger audit trail.
+ */
+export interface StageResult {
+  /**
+   * Whether the exposure was cured from a higher stage.
+   */
+  cured: boolean;
+  /**
+   * Assigned stage.
+   */
+  stage: Stage;
+  /**
+   * Which trigger(s) caused the classification.
+   */
+  triggers: StagingTrigger[];
+  [k: string]: unknown;
+}
+/**
  * Flags a metric that has been deteriorating for `lookback_periods` consecutive periods.
  */
 export interface TrendCheck {
@@ -4357,6 +4088,32 @@ export interface VarianceConfig {
    * Periods to include in the variance report.
    */
   periods: PeriodId[];
+}
+/**
+ * Probability-weighted ECL across macro scenarios with the per-scenario audit trail.
+ */
+export interface WeightedEclResult {
+  /**
+   * Probability-weighted ECL.
+   */
+  ecl: number;
+  /**
+   * Exposure identifier.
+   */
+  exposure_id: string;
+  /**
+   * Audit stamp: numeric mode, rounding context, and FX policy in force.
+   */
+  meta?: ResultsMeta;
+  /**
+   * Per-scenario breakdown: (scenario_id, weight, result).
+   */
+  scenario_breakdown: [unknown, unknown, unknown][];
+  /**
+   * Assigned IFRS 9 stage.
+   */
+  stage: Stage;
+  [k: string]: unknown;
 }
 /**
  * Verifies that the change in working capital on the cash flow statement equals the negative delta of net working capital on the balance sheet.

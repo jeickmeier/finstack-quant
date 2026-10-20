@@ -88,12 +88,11 @@ pub use checks::{
 
 pub use ecl::{
     classify_stage, classify_stage_from_curves, compute_ecl, compute_ecl_from_curve,
-    compute_ecl_weighted, compute_ecl_weighted_from_curves, compute_waterfall, CeclConfig,
-    CeclEngine, CeclMethodology, CeclResult, EclBucket, EclConfig, EclConfigBuilder, EclRequest,
-    EclResult, EclStageRequest, Exposure, ExposureEclResult, LgdType, MacroScenario,
-    PdTermStructure, PortfolioEclResult, ProvisionWaterfall, QualitativeFlags, RatingPdMap,
-    RawPdCurve, ReversionMethod, Stage, StageResult, StagingConfig, StagingTrigger,
-    WeightedEclResult, DEFAULT_REVOLVER_CCF,
+    compute_ecl_weighted, compute_ecl_weighted_from_curves, CeclConfig, CeclEngine,
+    CeclMethodology, CeclResult, EclBucket, EclConfig, EclConfigBuilder, EclResult, Exposure,
+    LgdType, MacroScenario, PdTermStructure, QualitativeFlags, RatingPdMap, RawPdCurve,
+    ReversionMethod, Stage, StageResult, StagingConfig, StagingTrigger, WeightedEclResult,
+    DEFAULT_REVOLVER_CCF,
 };
 
 pub use comps::{

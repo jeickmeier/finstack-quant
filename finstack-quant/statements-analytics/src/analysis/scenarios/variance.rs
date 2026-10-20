@@ -47,7 +47,6 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::StatementResult;
-use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for variance analysis between two `StatementResult`.
@@ -130,14 +129,6 @@ pub struct VarianceRow {
     /// absolute variance.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pct_var: Option<f64>,
-
-    /// Optional driver breakdown: `driver → contribution` in the same units
-    /// as the underlying metric.
-    ///
-    /// This is populated by bridge decomposition helpers and can be rendered
-    /// as a "bridge" column in reports.
-    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    pub driver_contribution: IndexMap<String, f64>,
 }
 
 /// Full variance report between a baseline and comparison.
@@ -351,7 +342,6 @@ impl<'a> VarianceAnalyzer<'a> {
                     comparison,
                     abs_var,
                     pct_var,
-                    driver_contribution: IndexMap::new(),
                 });
             }
         }

@@ -310,7 +310,7 @@ pub fn generate_tornado_entries(
 ///
 /// # Errors
 ///
-/// Rejects malformed model, terminal-value, options, or market JSON (an
+/// Rejects malformed model, terminal-value or options JSON (an
 /// unknown options key included), model-evaluation failures, a missing UFCF
 /// series or model currency, inconsistent WACC or terminal-value assumptions,
 /// a missing or incomplete exit-multiple metric node, missing bridge inputs,
@@ -320,8 +320,7 @@ pub fn generate_tornado_entries(
 /// @param terminal_value_json - Terminal-value spec JSON selecting whether growth or the exit multiple is shocked.
 /// @param ufcf_node - Node identifier holding monetary unlevered free cash flow in model currency for the forecast periods; omitted uses the canonical "ufcf" node. Gordon Growth / H-Model terminal cash flow requires a complete contiguous calendar year at the forecast end.
 /// @param net_debt_override - Optional net debt in model currency; otherwise requires debt and cash in that currency from a period ending on or before valuation.
-/// @param options_json - Optional Rust `DcfOptions` JSON; every field is optional and a missing one takes its default: `mid_year_convention` (false), `wacc_sensitivity_bump` (0.01 = +/-100 bp), `wacc_denominator_epsilon` (0.005), `max_stable_growth_rate` (0.05), `exit_multiple_bump` (`{"absolute": 1.0}` turns or `{"relative": 0.10}`), `exit_multiple_metric_node` (flow node whose complete trailing year supplies the exit-multiple metric), `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `discount_curve_id`. Unknown keys are rejected.
-/// @param market_json - Optional canonical market-context JSON used for statement evaluation, not WACC discounting.
+/// @param options_json - Optional Rust `DcfOptions` JSON; every field is optional and a missing one takes its default: `mid_year_convention` (false), `wacc_sensitivity_bump` (0.01 = +/-100 bp), `wacc_denominator_epsilon` (0.005), `max_stable_growth_rate` (0.05), `exit_multiple_bump` (`{"absolute": 1.0}` turns or `{"relative": 0.10}`), `exit_multiple_metric_node` (flow node whose complete trailing year supplies the exit-multiple metric), `equity_bridge`, `shares_outstanding`, `valuation_discounts`. Unknown keys are rejected.
 #[wasm_bindgen(js_name = dcfSensitivity)]
 pub fn dcf_sensitivity(
     model_json: JsValue,
@@ -330,7 +329,6 @@ pub fn dcf_sensitivity(
     ufcf_node: Option<JsValue>,
     net_debt_override: Option<JsValue>,
     options_json: Option<JsValue>,
-    market_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let wacc = js_f64(&wacc, "wacc")?;
     let net_debt_override = js_opt_f64(net_debt_override.as_ref(), "netDebtOverride")?;
@@ -340,7 +338,6 @@ pub fn dcf_sensitivity(
     let terminal_value_json: &str = &json_text(&terminal_value_json, "terminalValueJson")?;
     let ufcf_node = js_opt_string(ufcf_node.as_ref(), "ufcfNode")?;
     let options_json = opt_json_text(options_json.as_ref(), "optionsJson")?;
-    let market_json = opt_json_text(market_json.as_ref(), "marketJson")?;
 
     let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let terminal_value: finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec =
@@ -349,9 +346,6 @@ pub fn dcf_sensitivity(
         .map(|json| serde_json::from_str(&json).map_err(to_js_err))
         .transpose()?
         .unwrap_or_default();
-    let market: Option<finstack_quant_core::market_data::context::MarketContext> = market_json
-        .map(|json| serde_json::from_str(&json).map_err(to_js_err))
-        .transpose()?;
 
     let result = finstack_quant_statements_analytics::analysis::dcf_sensitivity(
         &model,
@@ -360,7 +354,6 @@ pub fn dcf_sensitivity(
         ufcf_node.as_deref().unwrap_or(DEFAULT_UFCF_NODE),
         net_debt_override,
         &options,
-        market.as_ref(),
     )
     .map_err(to_js_err)?;
 

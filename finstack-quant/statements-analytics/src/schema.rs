@@ -62,20 +62,19 @@ use crate::{
     analysis::CeclResult, analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions,
     analysis::CoverageFloorCheck, analysis::CreditAssessment, analysis::DcfOptions,
     analysis::DcfSensitivityResult, analysis::DependencyTree, analysis::DepreciationReconciliation,
-    analysis::DividendReconciliation, analysis::EclConfig, analysis::EclRequest,
-    analysis::EclStageRequest, analysis::EffectiveTaxRateCheck, analysis::Explanation,
-    analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
+    analysis::DividendReconciliation, analysis::EclConfig, analysis::EffectiveTaxRateCheck,
+    analysis::Explanation, analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
     analysis::GoalSeekResult, analysis::GrowthRateConsistency,
     analysis::InterestExpenseReconciliation, analysis::LboConfig, analysis::LboResult,
     analysis::LeverageRangeCheck, analysis::LiquidityRunwayCheck, analysis::PeerFilter,
-    analysis::PeerSet, analysis::PeerStats, analysis::PortfolioEclResult,
-    analysis::ProvisionWaterfall, analysis::RatingPdMap, analysis::RegressionResult,
+    analysis::PeerSet, analysis::PeerStats, analysis::RatingPdMap, analysis::RegressionResult,
     analysis::RelativeValueResult, analysis::ScenarioDiff, analysis::ScenarioResults,
     analysis::ScenarioSet, analysis::ScoringDimension, analysis::SensitivityResult,
-    analysis::TrendCheck, analysis::VarianceConfig, analysis::WorkingCapitalConsistency,
-    extensions::CorkscrewConfig, extensions::CorkscrewReport, extensions::ScorecardConfig,
-    extensions::ScorecardReport, templates::real_estate::LeaseSpec,
-    templates::real_estate::ManagementFeeSpec, templates::real_estate::PropertyTemplateNodes,
+    analysis::StageResult, analysis::TrendCheck, analysis::VarianceConfig,
+    analysis::WeightedEclResult, analysis::WorkingCapitalConsistency, extensions::CorkscrewConfig,
+    extensions::CorkscrewReport, extensions::ScorecardConfig, extensions::ScorecardReport,
+    templates::real_estate::LeaseSpec, templates::real_estate::ManagementFeeSpec,
+    templates::real_estate::PropertyTemplateNodes,
 };
 
 /// The crate's complete schema registry.
@@ -206,22 +205,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "ecl_config",
         Input,
         "Configuration for ECL calculation."
-    )
-    .with_packager(package_schema),
-    finstack_quant_core::schema_artifact!(
-        EclRequest,
-        "statements_analytics",
-        "ecl_request",
-        Input,
-        "Inputs for probability-weighted ECL from cumulative-PD schedules."
-    )
-    .with_packager(package_schema),
-    finstack_quant_core::schema_artifact!(
-        EclStageRequest,
-        "statements_analytics",
-        "ecl_stage_request",
-        Input,
-        "Inputs for the simplified IFRS 9 stage-classification workflow."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(
@@ -361,27 +344,11 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(
-        PortfolioEclResult,
-        "statements_analytics",
-        "portfolio_ecl_result",
-        Output,
-        "Portfolio-level ECL result with stage migration and segment breakdown."
-    )
-    .with_packager(package_schema),
-    finstack_quant_core::schema_artifact!(
         PropertyTemplateNodes,
         "statements_analytics",
         "property_template_nodes",
         Output,
         "Standard node ids for a full property operating statement template."
-    )
-    .with_packager(package_schema),
-    finstack_quant_core::schema_artifact!(
-        ProvisionWaterfall,
-        "statements_analytics",
-        "provision_waterfall",
-        Component,
-        "Provision movement waterfall between two reporting dates."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(
@@ -465,6 +432,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(
+        StageResult,
+        "statements_analytics",
+        "stage_result",
+        Output,
+        "IFRS 9 stage classification with its ordered trigger audit trail."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
         TrendCheck,
         "statements_analytics",
         "trend_check",
@@ -478,6 +453,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "variance_config",
         Input,
         "Configuration for variance analysis between two `StatementResult`."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        WeightedEclResult,
+        "statements_analytics",
+        "weighted_ecl_result",
+        Output,
+        "Probability-weighted ECL across macro scenarios with the per-scenario audit trail."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(
