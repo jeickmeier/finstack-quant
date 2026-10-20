@@ -136,8 +136,6 @@ impl MetricGroup {
                 MetricId::Dividend01,
                 MetricId::Inflation01,
                 MetricId::Conversion01,
-                MetricId::CollateralHaircut01,
-                MetricId::CollateralPrice01,
                 MetricId::ConvexityAdjustmentRisk,
             ],
             Self::Greeks => &[

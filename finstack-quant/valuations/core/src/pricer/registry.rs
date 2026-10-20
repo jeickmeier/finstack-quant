@@ -566,8 +566,7 @@ fn valuation_provenance(
 /// policy stamp, they are joined with ` | ` so the audit trail records every
 /// policy that fed into the valuation. Single-stamp results return the
 /// policy verbatim.
-#[doc(hidden)]
-pub fn stamp_results_meta(
+pub(crate) fn stamp_results_meta(
     cfg: &FinstackConfig,
     instrument: &dyn Instrument,
     market: &finstack_quant_core::market_data::context::MarketContext,

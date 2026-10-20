@@ -124,10 +124,7 @@ pub(crate) mod pricer;
 pub(crate) mod pricing;
 pub(crate) mod types;
 
-pub use bermudan::{
-    BermudanPricingMethod, BermudanSwaptionPricer, BermudanSwaptionPricerConfig,
-    PreparedHullWhiteModel,
-};
+pub use bermudan::{BermudanSwaptionPricer, BermudanSwaptionPricerConfig, PreparedHullWhiteModel};
 pub use pricer::{SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer};
 pub use pricing::BermudanSwaptionTreeValuator;
 pub use types::{

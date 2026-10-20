@@ -510,17 +510,6 @@ impl MetricContext {
             .and_then(|value| value.downcast_ref::<T>())
     }
 
-    /// Mutably borrow the family cache of type `T`, if any.
-    ///
-    /// # Returns
-    ///
-    /// The stored value when a cache of exactly type `T` was set.
-    pub fn ext_mut<T: Any + Send + Sync>(&mut self) -> Option<&mut T> {
-        self.extensions
-            .get_mut(&TypeId::of::<T>())
-            .and_then(|value| value.downcast_mut::<T>())
-    }
-
     /// Store `value` as the family cache of type `T`, replacing any previous
     /// value of that type.
     ///
@@ -581,23 +570,6 @@ impl MetricContext {
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         self.pricing_dispatch.price_raw(instrument, market, as_of)
-    }
-
-    /// Return the instrument's signed canonical cashflows, computing and
-    /// caching them on first access.
-    ///
-    /// Many metric calculators (YTM, YTC, YTW, DM, all-in-rate, embedded option
-    /// value, OID-EIR, …) all need the same cashflow schedule. Without this
-    /// cache, evaluating N metrics on a long DDTL reruns the cashflow builder
-    /// N times. Subsequent calls return the cached vector.
-    pub fn cashflows_cached(&mut self) -> finstack_quant_core::Result<&Vec<(Date, Money)>> {
-        if self.cashflows.is_none() {
-            let flows = self.instrument.dated_cashflows(&self.curves, self.as_of)?;
-            self.cashflows = Some(flows);
-        }
-        self.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::Validation("cashflows were not cached".to_string())
-        })
     }
 
     /// Return the instrument's canonical cashflow schedule flows with CFKind metadata.

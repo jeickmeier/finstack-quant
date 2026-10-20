@@ -7,4 +7,4 @@ pub use future_option::{
     FutureOptionExercise, FutureOptionModel, FutureOptionPremiumStyle, FutureOptionSettlement,
     FutureOptionTerms,
 };
-pub use terms::{ListedDeliveryObligation, ListedFutureSettlement, ListedFutureTerms};
+pub use terms::{ListedFutureSettlement, ListedFutureTerms};

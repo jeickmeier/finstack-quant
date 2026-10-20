@@ -37,36 +37,12 @@ use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 
 /// Pricing method for Bermudan swaptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum BermudanPricingMethod {
+pub(crate) enum BermudanPricingMethod {
     /// Hull-White trinomial tree (industry standard, faster)
     #[default]
     HullWhiteTree,
     /// Longstaff-Schwartz Monte Carlo (more flexible)
     Lsmc,
-}
-
-impl std::fmt::Display for BermudanPricingMethod {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BermudanPricingMethod::HullWhiteTree => write!(f, "hull_white_tree"),
-            BermudanPricingMethod::Lsmc => write!(f, "lsmc"),
-        }
-    }
-}
-
-impl std::str::FromStr for BermudanPricingMethod {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "hull_white_tree" => Ok(Self::HullWhiteTree),
-            "lsmc" => Ok(Self::Lsmc),
-            _ => Err(format!(
-                "Unknown Bermudan pricing method: '{}'. Valid: hull_white_tree, lsmc",
-                s
-            )),
-        }
-    }
 }
 
 /// Opaque Hull-White tree prepared from already-fitted model parameters.
@@ -181,9 +157,7 @@ impl PreparedHullWhiteModel {
 /// # Example
 ///
 /// ```text
-/// use finstack_quant_valuations_rates::swaption::{
-///     BermudanSwaptionPricer, BermudanPricingMethod,
-/// };
+/// use finstack_quant_valuations_rates::swaption::BermudanSwaptionPricer;
 ///
 /// // Create tree-based pricer with default parameters
 /// let pricer = BermudanSwaptionPricer::tree();

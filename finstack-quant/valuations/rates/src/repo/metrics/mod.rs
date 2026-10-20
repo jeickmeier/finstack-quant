@@ -16,8 +16,6 @@
 //! - Accrued interest (currency amount)
 
 mod accrued_interest;
-mod collateral_price01;
-mod haircut01;
 mod implied_collateral_return;
 
 use finstack_quant_core::Result;
@@ -51,8 +49,6 @@ pub(crate) fn register_repo_metrics(
             (ImpliedCollateralReturn, implied_collateral_return::ImpliedCollateralReturnCalculator),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             // Repo-specific risk metrics (custom metrics)
-            (CollateralHaircut01, haircut01::Haircut01Calculator),
-            (CollateralPrice01, collateral_price01::CollateralPrice01Calculator),
         ]
     };
     Ok(())

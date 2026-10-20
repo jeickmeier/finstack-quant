@@ -211,7 +211,6 @@ fn test_swaption_example_and_builder_helpers() {
 
 #[test]
 fn test_bermudan_swaption_schedule_and_conversion() {
-    let as_of = date!(2024 - 01 - 01);
     let swap_start = date!(2025 - 01 - 01);
     let swap_end = date!(2030 - 01 - 01);
     let first_ex = date!(2026 - 01 - 01);
@@ -235,29 +234,11 @@ fn test_bermudan_swaption_schedule_and_conversion() {
     )
     .expect("valid literal strike");
 
-    let (payment_dates, accruals) = swaption.build_swap_schedule().unwrap();
-    assert_eq!(payment_dates.len(), accruals.len());
-    assert!(!payment_dates.is_empty());
-
-    let payment_times = swaption.payment_times(as_of).unwrap();
-    assert_eq!(payment_times.len(), payment_dates.len());
-
     let euro = swaption.to_european().unwrap();
     assert_eq!(euro.expiry, first_ex);
     assert_eq!(euro.get_underlying_start_date(), first_ex);
     assert_eq!(euro.get_underlying_maturity(), swap_end);
     assert_eq!(euro.vol_model, VolatilityModel::Black);
-
-    let market = create_flat_market(as_of, 0.03, 0.2);
-    let disc = market.get_discount("USD_OIS").unwrap();
-    let annuity_early = swaption
-        .remaining_annuity(disc.as_ref(), as_of, first_ex)
-        .unwrap();
-    let later_ex = date!(2027 - 01 - 01);
-    let annuity_late = swaption
-        .remaining_annuity(disc.as_ref(), as_of, later_ex)
-        .unwrap();
-    assert!(annuity_early > annuity_late);
 }
 
 #[test]
@@ -296,13 +277,7 @@ fn test_bermudan_builder_helpers_and_time_accessors() {
         berm.first_exercise(),
         schedule.exercise_dates.first().copied()
     );
-    assert_eq!(
-        berm.last_exercise(),
-        schedule.exercise_dates.last().copied()
-    );
-    assert!(berm.time_to_first_exercise(as_of).unwrap() > 0.0);
-    assert!(berm.time_to_maturity(as_of).unwrap() > berm.time_to_first_exercise(as_of).unwrap());
+    assert!(berm.time_to_maturity(as_of).unwrap() > 0.0);
     assert_eq!(berm.settlement, SettlementType::Cash);
     assert_eq!(berm.get_fixed_frequency(), Tenor::annual());
-    assert_eq!(berm.get_float_frequency(), Tenor::semi_annual());
 }

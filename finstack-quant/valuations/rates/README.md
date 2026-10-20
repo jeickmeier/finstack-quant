@@ -72,7 +72,7 @@ actually reach for: the builders (`CapFloorBuilder`,
 `YoYInflationSwapBuilder`, `InflationCapFloorBuilder`), `CapFloorVolType`,
 `OvernightCouponConvention`, `OvernightSpreadCompounding`,
 `swaption::{BermudanSchedule, BermudanType, CashSettlementMethod,
-BermudanPricingMethod, BermudanSwaptionPricer, BermudanSwaptionTreeValuator,
+BermudanSwaptionPricer, BermudanSwaptionTreeValuator,
 SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer}`, `xccy_swap::XccySwapLeg`,
 `cms_swap::{FundingLeg, FundingLegSpec}` and `ir_future::FutureContractSpecs`.
 `NotionalExchange` and `ResettingSide` are valuations-core types at

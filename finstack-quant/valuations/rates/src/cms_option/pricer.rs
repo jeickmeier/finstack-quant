@@ -278,72 +278,30 @@ pub(crate) fn compute_pv(inst: &CmsOption, curves: &MarketContext, as_of: Date) 
     pricer.price_internal(inst, curves, as_of)
 }
 
-/// Compute convexity adjustment for CMS rate using Hagan (2003) methodology.
+/// First-order CMS convexity adjustment (Hagan 2003) using the actual
+/// reference-swap fixed payment frequency and payment delay.
 ///
-/// The convexity adjustment accounts for the measure change from the annuity
-/// measure (where the forward swap rate is a martingale) to the payment measure
-/// (where the CMS rate is a martingale).
-///
-/// # Formula
-///
-/// The CMS-adjusted forward is `E^{T_pay}[S] = F + CA`. To first order in the
-/// swap-rate variance, the Hagan (2003) standard-model adjustment is:
+/// The adjustment accounts for the measure change from the annuity measure
+/// (where the forward swap rate is a martingale) to the payment measure (where
+/// the CMS rate is a martingale). The CMS-adjusted forward is
+/// `E^{T_pay}[S] = F + CA`; to first order in the swap-rate variance:
 ///
 /// ```text
 /// CA ≈ (g'(F) / g(F)) · Var^A[S] ≈ (g'(F) / g(F)) · F² · σ² · T
 /// ```
 ///
-/// where `g(k) = (1+k/m)^(-m*delay) / A_par(k)` is the Radon-Nikodym derivative between the
-/// payment measure and the annuity measure. The zero-delay convenience function
-/// assumes payment at reference-swap start. For actual coupon dates use
-/// [`convexity_adjustment_with_frequency`], including the payment-bond sensitivity
-/// `-m*delay/(m+F)` as well as `-A_par'(F)/A_par(F)`.
-///
-/// The earlier `0.5·σ²T·G(S)` form with `G(S) = swap_tenor/(1+S·tenor)²` was
-/// dimensionally wrong: `G(S)` carries units of *years*, so the result was not
-/// a rate and was oversized by one-to-two orders of magnitude.
-///
-/// This convenience function assumes semiannual fixed coupons (`m = 2`)
-/// and payment at reference-swap start. It does not infer a market convention.
-/// Callers needing the resolved frequency and actual payment delay should use
-/// [`convexity_adjustment_with_frequency`]. For higher-order effects use
-/// the static-replication pricer (`replication_pricer`,
-/// `ModelKey::StaticReplication`), which captures convexity to all orders.
-///
-/// # Arguments
-///
-/// * `volatility` - Swap rate volatility (annualized, decimal form e.g. 0.20 for 20%)
-/// * `time_to_fixing` - Time to fixing date in years
-/// * `swap_tenor` - Tenor of the underlying CMS swap in years (e.g., 10.0 for 10Y)
-/// * `forward_rate` - Current forward swap rate (decimal form e.g. 0.03 for 3%)
-///
-/// # Returns
-///
-/// Convexity adjustment to add to the forward swap rate (decimal form).
+/// where `g(k) = (1+k/m)^(-m*delay) / A_par(k)` is the Radon-Nikodym derivative
+/// between the payment measure and the annuity measure, so the adjustment
+/// carries the payment-bond sensitivity `-m*delay/(m+F)` as well as
+/// `-A_par'(F)/A_par(F)`. For higher-order effects use the static-replication
+/// pricer (`replication_pricer`, `ModelKey::StaticReplication`), which captures
+/// convexity to all orders.
 ///
 /// # References
 ///
 /// - Hagan, P. S. (2003). "Convexity Conundrums: Pricing CMS Swaps, Caps, and Floors."
 ///   Wilmott Magazine, March, 38-44. `docs/REFERENCES.md#hagan-2003-cms-convexity`
 /// - Andersen, L. B., & Piterbarg, V. V. (2010). *Interest Rate Modeling*, Vol. 3, §16.2. `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
-pub fn convexity_adjustment(
-    volatility: f64,
-    time_to_fixing: f64,
-    swap_tenor: f64,
-    forward_rate: f64,
-) -> f64 {
-    convexity_adjustment_with_frequency(
-        volatility,
-        time_to_fixing,
-        swap_tenor,
-        forward_rate,
-        2.0,
-        0.0,
-    )
-}
-
-/// First-order CMS convexity adjustment using the actual reference-swap fixed
-/// payment frequency.
 ///
 /// # Arguments
 ///

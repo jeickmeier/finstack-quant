@@ -11,5 +11,5 @@ mod var_calculator;
 
 pub use hvar::{GenericExpectedShortfall, GenericHVar};
 pub use market_history::{MarketHistory, MarketScenario, RiskFactorShift};
-pub use risk_factors::{extract_risk_factors, RiskFactorType};
+pub use risk_factors::RiskFactorType;
 pub use var_calculator::{calculate_var, VarConfig, VarMethod, VarResult};

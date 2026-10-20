@@ -605,7 +605,9 @@ mod tests {
         // The day after the last exercise date: the right is still live on
         // the date itself.
         let as_of = option
-            .last_exercise()
+            .exercise_schedule
+            .exercise_dates
+            .last()
             .expect("exercise date")
             .next_day()
             .expect("next day");

@@ -133,12 +133,6 @@ impl MetricId {
     /// Conversion ratio/price sensitivity per 1% change
     pub const Conversion01: Self = Self(Cow::Borrowed("conversion01"));
 
-    /// Collateral haircut sensitivity per basis point
-    pub const CollateralHaircut01: Self = Self(Cow::Borrowed("collateral_haircut01"));
-
-    /// Collateral price sensitivity per 1% change
-    pub const CollateralPrice01: Self = Self(Cow::Borrowed("collateral_price01"));
-
     /// NAV sensitivity per 1% change (private markets funds)
     pub const Nav01: Self = Self(Cow::Borrowed("nav01"));
 

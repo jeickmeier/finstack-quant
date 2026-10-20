@@ -20,8 +20,6 @@ mod generic_pricer;
 mod hvar;
 #[path = "core/registry.rs"]
 mod registry;
-#[path = "core/risk_factors.rs"]
-mod risk_factors;
 #[path = "core/theta.rs"]
 mod theta;
 #[path = "core/var_calculator.rs"]
