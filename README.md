@@ -373,8 +373,10 @@ library crate.
 
 Everything installs into your user profile, so no admin rights are needed. The
 `[env]` table in `mise.toml` sets `CARGO_HOME` and `RUSTUP_HOME` to `.cargo` and
-`.rustup` under `$HOME` (`%USERPROFILE%` on Windows), and points `UV_PYTHON` and
-`PYO3_PYTHON` at the mise-installed Python, with `UV_PYTHON_DOWNLOADS=never`.
+`.rustup` under `$HOME` (`%USERPROFILE%` on Windows) and points `PYO3_PYTHON`
+at the mise-installed Python. uv gets `UV_PYTHON=3.12.15`,
+`UV_PYTHON_PREFERENCE=only-system` and `UV_PYTHON_DOWNLOADS=never`, so it takes
+mise's interpreter from `PATH` and still installs into an active virtualenv.
 Any of these that you already export takes precedence.
 
 ```bash
@@ -389,7 +391,7 @@ Then create the virtualenv from the mise-installed Python and sync dev
 dependencies:
 
 ```bash
-mise run python-sync    # uv sync --group dev, on the interpreter from UV_PYTHON
+mise run python-sync    # uv sync --group dev, on the mise-installed Python
 ```
 
 Windows users should run `mise run <task>` from a POSIX shell such as Git Bash,
