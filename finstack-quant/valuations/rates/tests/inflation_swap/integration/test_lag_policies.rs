@@ -6,7 +6,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_rates::inflation_swap::InflationSwapBuilder;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations_test_support::inflation::*;
 use rust_decimal::Decimal;
 use time::Month;
@@ -33,7 +33,7 @@ fn test_lag_override_vs_index_lag() {
         .insert_inflation_index(index);
 
     // Swap with no lag override (uses index 3M lag)
-    let swap_idx_lag = InflationSwapBuilder::new()
+    let swap_idx_lag = InflationSwap::builder()
         .id("ZCINF-LAG-IDX".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -48,7 +48,7 @@ fn test_lag_override_vs_index_lag() {
         .unwrap();
 
     // Swap with 0 lag override
-    let swap_no_lag = InflationSwapBuilder::new()
+    let swap_no_lag = InflationSwap::builder()
         .id("ZCINF-LAG-0".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -93,7 +93,7 @@ fn test_different_lag_durations() {
 
     let mut pvs = Vec::new();
     for lag_months in &[0, 1, 2, 3, 6] {
-        let swap = InflationSwapBuilder::new()
+        let swap = InflationSwap::builder()
             .id("ZCINF-LAG-VAR".into())
             .notional(standard_notional())
             .start_date(as_of)
@@ -140,7 +140,7 @@ fn test_lag_in_days_vs_months() {
         .insert_inflation_index(index);
 
     // 3 months ≈ 90 days
-    let swap_3m = InflationSwapBuilder::new()
+    let swap_3m = InflationSwap::builder()
         .id("ZCINF-LAG-3M".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -155,7 +155,7 @@ fn test_lag_in_days_vs_months() {
         .build()
         .unwrap();
 
-    let swap_90d = InflationSwapBuilder::new()
+    let swap_90d = InflationSwap::builder()
         .id("ZCINF-LAG-90D".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -194,7 +194,7 @@ fn test_historical_observation_requires_fixing_or_explicit_contract_base() {
     // Context without inflation index
     let ctx = MarketContext::new().insert(disc).insert(infl_curve);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-NO-IDX".into())
         .notional(standard_notional())
         .start_date(as_of)

@@ -53,29 +53,16 @@ pub struct FxFutureOption {
 }
 
 impl FxFutureOption {
-    /// Construct an FX futures option from arbitrary caller-supplied terms.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Stable instrument identifier.
-    /// * `terms` - Complete futures-option economics; no exchange root or contract definition is implied.
-    pub fn new(
-        id: impl Into<InstrumentId>,
-        terms: FutureOptionTerms,
-    ) -> finstack_quant_core::Result<Self> {
-        Self::builder().id(id.into()).terms(terms).build()
-    }
-
     /// Create a neutral schema and serialization example.
     pub fn example() -> finstack_quant_core::Result<Self> {
         Ok(Self {
             instrument_pricing_overrides:
                 finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
                     .with_implied_volatility(0.20),
-            ..Self::new(
-                InstrumentId::new("FX-FUTURE-OPTION-EXAMPLE"),
-                FutureOptionTerms::example()?,
-            )?
+            ..Self::builder()
+                .id(InstrumentId::new("FX-FUTURE-OPTION-EXAMPLE"))
+                .terms(FutureOptionTerms::example()?)
+                .build()?
         })
     }
 }

@@ -111,7 +111,7 @@ mod tests {
                 Money::from((2_000_000_i64, Currency::USD)),
             ),
         ];
-        PrivateMarketsFund::new("PMF-M13", Currency::USD, spec, events)
+        PrivateMarketsFund::new("PMF-M13", Currency::USD, spec, events).expect("valid fund")
     }
 
     #[test]

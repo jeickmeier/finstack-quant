@@ -169,8 +169,7 @@ fn test_currency_mismatch_error() {
         ), // Different currency
     ];
 
-    let pe = PrivateMarketsFund::new("TEST", Currency::USD, spec, mixed_currency_events);
-    let result = pe.run_waterfall();
+    let result = PrivateMarketsFund::new("TEST", Currency::USD, spec, mixed_currency_events);
 
     assert!(result.is_err(), "Should error on currency mismatch");
     if let Err(finstack_quant_core::Error::CurrencyMismatch { expected, actual }) = result {
@@ -346,7 +345,8 @@ fn test_ledger_export_formats() {
 #[test]
 fn test_lp_cashflows_via_ledger() {
     let (spec, events) = simple_2x_scenario();
-    let pe = PrivateMarketsFund::new("TEST_FUND", test_currency(), spec, events);
+    let pe =
+        PrivateMarketsFund::new("TEST_FUND", test_currency(), spec, events).expect("valid fund");
 
     let ledger = pe.run_waterfall().unwrap();
     let lp_flows = ledger.lp_cashflows().expect("valid lp_cashflows fixture");

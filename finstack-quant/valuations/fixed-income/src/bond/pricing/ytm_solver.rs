@@ -320,14 +320,8 @@ mod tests {
         ] {
             for mut cashflow_spec in [
                 CashflowSpec::fixed(0.05, frequency, DayCount::Act365L).expect("fixed spec"),
-                CashflowSpec::floating_with_reset_lag(
-                    "ACT365L-FWD",
-                    100.0,
-                    frequency,
-                    DayCount::Act365L,
-                    0,
-                )
-                .expect("floating spec"),
+                CashflowSpec::floating("ACT365L-FWD", 100.0, frequency, DayCount::Act365L, Some(0))
+                    .expect("floating spec"),
             ] {
                 match &mut cashflow_spec {
                     CashflowSpec::Fixed(spec) => {

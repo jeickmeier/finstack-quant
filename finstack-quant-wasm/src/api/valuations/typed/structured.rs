@@ -746,7 +746,7 @@ impl JsTrancheBuilder {
     pub(crate) fn new() -> Self {
         Self {
             inner: super::Staged::new(
-                finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheBuilder::new(),
+                finstack_quant_valuations::instruments::fixed_income::structured_credit::Tranche::builder(),
             ),
         }
     }

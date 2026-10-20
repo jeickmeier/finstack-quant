@@ -375,8 +375,9 @@ pub struct TrancheBuilder {
 }
 
 impl TrancheBuilder {
-    /// Create new tranche builder
-    pub fn new() -> Self {
+    /// Empty builder with the tranche defaults (quarterly, Act/360); reached
+    /// through [`Tranche::builder`].
+    fn new() -> Self {
         Self {
             id: None,
             attach_pct: None,
@@ -638,12 +639,6 @@ impl TrancheBuilder {
         }
 
         Ok(tranche)
-    }
-}
-
-impl Default for TrancheBuilder {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

@@ -58,19 +58,6 @@ pub struct VolatilityIndexFutureOption {
 }
 
 impl VolatilityIndexFutureOption {
-    /// Construct a volatility-index futures option from arbitrary caller-supplied terms.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Stable instrument identifier.
-    /// * `terms` - Complete futures-option economics; no exchange root or contract definition is implied.
-    pub fn new(
-        id: impl Into<InstrumentId>,
-        terms: FutureOptionTerms,
-    ) -> finstack_quant_core::Result<Self> {
-        Self::builder().id(id.into()).terms(terms).build()
-    }
-
     /// Create a VSTOXX futures-option example for schema and serialization output.
     pub fn example() -> finstack_quant_core::Result<Self> {
         use time::macros::date;
@@ -102,7 +89,10 @@ impl VolatilityIndexFutureOption {
             instrument_pricing_overrides:
                 finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
                     .with_implied_volatility(0.50),
-            ..Self::new(InstrumentId::new("VSTOXX-FUTURE-OPTION-EXAMPLE"), terms)?
+            ..Self::builder()
+                .id(InstrumentId::new("VSTOXX-FUTURE-OPTION-EXAMPLE"))
+                .terms(terms)
+                .build()?
         })
     }
 }

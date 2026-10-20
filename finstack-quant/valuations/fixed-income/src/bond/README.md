@@ -126,9 +126,9 @@ Notes that bite:
   `maturity`, `cashflow_spec`, `discount_curve_id`.
 - Every `Option<T>` field gets two setters: `.call_put(schedule)` takes the
   inner value, `.call_put_opt(Some(schedule))` takes the `Option`.
-- `CashflowSpec::fixed` / `fixed_rate` return `Result` (the coupon must be a
-  finite `Decimal`). `CashflowSpec::floating_bp` takes a typed `Bps` and does
-  not.
+- `CashflowSpec::fixed` and `CashflowSpec::floating` return `Result` (the
+  coupon or margin must be a finite `Decimal`); `floating`'s `reset_lag_days`
+  is `None` for the rate-index registry default.
 - `Bond::fixed` / `with_convention` / `zero_coupon` / `floating` all return
   `Result<Bond>` and run `validate()` before returning.
 

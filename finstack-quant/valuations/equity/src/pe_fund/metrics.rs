@@ -359,7 +359,8 @@ mod tests {
             ),
         ];
 
-        let pe = PrivateMarketsFund::new("TEST", test_currency(), spec, events);
+        let pe =
+            PrivateMarketsFund::new("TEST", test_currency(), spec, events).expect("valid fund");
 
         let curves = finstack_quant_core::market_data::context::MarketContext::new();
         // Fully realized fund: holder-view residual value is ~0, so the net
@@ -413,7 +414,8 @@ mod tests {
             ),
         ];
 
-        let pe = PrivateMarketsFund::new("TEST", test_currency(), spec, events);
+        let pe =
+            PrivateMarketsFund::new("TEST", test_currency(), spec, events).expect("valid fund");
 
         let curves = finstack_quant_core::market_data::context::MarketContext::new();
         // base_value ≈ 0 for a fully realized fund under holder-view PV.

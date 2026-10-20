@@ -4,7 +4,7 @@ use super::fixtures::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::rates::repo::{Repo, RepoBuilder, RepoType};
+use finstack_quant_valuations::instruments::rates::repo::{Repo, RepoType};
 use finstack_quant_valuations::instruments::Attributes;
 use rust_decimal::Decimal;
 
@@ -90,7 +90,7 @@ fn test_open_repo_factory() {
 fn test_builder_with_all_fields() {
     let collateral = treasury_collateral();
 
-    let repo = RepoBuilder::new()
+    let repo = Repo::builder()
         .id("REPO_FULL".into())
         .cash_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
@@ -136,7 +136,7 @@ fn test_builder_with_all_fields() {
 fn test_builder_minimal_fields() {
     let collateral = treasury_collateral();
 
-    let repo = RepoBuilder::new()
+    let repo = Repo::builder()
         .id("MINIMAL".into())
         .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
@@ -162,7 +162,7 @@ fn test_builder_minimal_fields() {
 
 #[test]
 fn test_builder_missing_required_field_fails() {
-    let result = RepoBuilder::new()
+    let result = Repo::builder()
         .id("INCOMPLETE".into())
         .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         // Missing collateral, rate, dates, etc.
@@ -175,7 +175,7 @@ fn test_builder_missing_required_field_fails() {
 fn test_validation_maturity_before_start() {
     let collateral = treasury_collateral();
 
-    let result = RepoBuilder::new()
+    let result = Repo::builder()
         .id("INVALID_DATES".into())
         .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
@@ -193,7 +193,7 @@ fn test_validation_same_day_maturity() {
     let collateral = treasury_collateral();
     let same_date = date(2025, 1, 15);
 
-    let result = RepoBuilder::new()
+    let result = Repo::builder()
         .id("SAME_DAY".into())
         .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
@@ -210,7 +210,7 @@ fn test_validation_same_day_maturity() {
 fn test_validation_negative_rate() {
     let collateral = treasury_collateral();
 
-    let result = RepoBuilder::new()
+    let result = Repo::builder()
         .id("NEGATIVE_RATE".into())
         .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
@@ -227,7 +227,7 @@ fn test_validation_negative_rate() {
 fn test_validation_negative_haircut() {
     let collateral = treasury_collateral();
 
-    let result = RepoBuilder::new()
+    let result = Repo::builder()
         .id("NEGATIVE_HAIRCUT".into())
         .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
@@ -245,7 +245,7 @@ fn test_validation_negative_haircut() {
 fn test_validation_zero_or_negative_cash() {
     let collateral = treasury_collateral();
 
-    let result = RepoBuilder::new()
+    let result = Repo::builder()
         .id("ZERO_CASH".into())
         .cash_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
@@ -311,7 +311,7 @@ fn test_repo_type_from_str() {
 fn test_attributes_tagging() {
     let collateral = treasury_collateral();
 
-    let repo = RepoBuilder::new()
+    let repo = Repo::builder()
         .id("TAGGED".into())
         .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)

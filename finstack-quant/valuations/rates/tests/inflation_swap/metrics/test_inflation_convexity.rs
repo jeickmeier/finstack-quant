@@ -6,7 +6,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_rates::inflation_swap::InflationSwapBuilder;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations_test_support::inflation::*;
 use rust_decimal::Decimal;
 use time::Month;
@@ -21,7 +21,7 @@ fn test_inflation_convexity_par_swap_nonzero() {
     let ctx = standard_market(as_of, 0.02, 0.04);
 
     // First, get the par rate
-    let temp_swap = InflationSwapBuilder::new()
+    let temp_swap = InflationSwap::builder()
         .id("ZCINF-CONV-PAR-TEMP".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -38,7 +38,7 @@ fn test_inflation_convexity_par_swap_nonzero() {
     let par_rate = temp_swap.par_rate(&ctx, as_of).unwrap();
 
     // Create a swap at par rate (should have ~zero PV)
-    let par_swap = InflationSwapBuilder::new()
+    let par_swap = InflationSwap::builder()
         .id("ZCINF-CONV-PAR".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -97,7 +97,7 @@ fn test_inflation_convexity_finite_and_nonzero() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-CONV-CHECK".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -146,7 +146,7 @@ fn test_inflation_convexity_varies_with_maturity() {
     let mut convexities = Vec::new();
     for years in &[2, 5, 10] {
         let maturity = Date::from_calendar_date(2025 + years, Month::January, 1).unwrap();
-        let swap = InflationSwapBuilder::new()
+        let swap = InflationSwap::builder()
             .id("ZCINF-CONV-MAT".into())
             .notional(standard_notional())
             .start_date(as_of)
@@ -208,7 +208,7 @@ fn test_inflation_convexity_scales_with_notional() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap1 = InflationSwapBuilder::new()
+    let swap1 = InflationSwap::builder()
         .id("ZCINF-CONV-N1".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -222,7 +222,7 @@ fn test_inflation_convexity_scales_with_notional() {
         .build()
         .unwrap();
 
-    let swap2 = InflationSwapBuilder::new()
+    let swap2 = InflationSwap::builder()
         .id("ZCINF-CONV-N2".into())
         .notional(large_notional())
         .start_date(as_of)
@@ -284,7 +284,7 @@ fn test_inflation_convexity_finite_for_edge_cases() {
         let ctx = standard_market(as_of, infl_rate, disc_rate);
         let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-        let swap = InflationSwapBuilder::new()
+        let swap = InflationSwap::builder()
             .id("ZCINF-CONV-EDGE".into())
             .notional(standard_notional())
             .start_date(as_of)

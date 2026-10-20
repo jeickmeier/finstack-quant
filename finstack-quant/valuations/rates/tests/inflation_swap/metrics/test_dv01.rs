@@ -4,7 +4,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_rates::inflation_swap::InflationSwapBuilder;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations_test_support::inflation::*;
 use rust_decimal::Decimal;
 use time::Month;
@@ -16,7 +16,7 @@ fn test_dv01_positive_for_positive_pv_swap() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-DV01-1".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -58,7 +58,7 @@ fn test_dv01_scales_with_time_to_maturity() {
     let mut dv01s = Vec::new();
     for years in &[1, 2, 5, 10] {
         let maturity = Date::from_calendar_date(2025 + years, Month::January, 1).unwrap();
-        let swap = InflationSwapBuilder::new()
+        let swap = InflationSwap::builder()
             .id("ZCINF-DV01-MAT".into())
             .notional(standard_notional())
             .start_date(as_of)
@@ -103,7 +103,7 @@ fn test_dv01_scales_with_notional() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap1 = InflationSwapBuilder::new()
+    let swap1 = InflationSwap::builder()
         .id("ZCINF-DV01-N1".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -117,7 +117,7 @@ fn test_dv01_scales_with_notional() {
         .build()
         .unwrap();
 
-    let swap2 = InflationSwapBuilder::new()
+    let swap2 = InflationSwap::builder()
         .id("ZCINF-DV01-N2".into())
         .notional(large_notional())
         .start_date(as_of)
@@ -169,7 +169,7 @@ fn test_dv01_zero_for_matured_swap() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-DV01-MAT0".into())
         .notional(standard_notional())
         .start_date(Date::from_calendar_date(2015, Month::January, 1).unwrap())
@@ -205,7 +205,7 @@ fn test_dv01_reasonable_magnitude() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-DV01-MAG".into())
         .notional(standard_notional())
         .start_date(as_of)

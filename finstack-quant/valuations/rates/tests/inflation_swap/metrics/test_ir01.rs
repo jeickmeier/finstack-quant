@@ -8,7 +8,7 @@ use rust_decimal::Decimal;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_rates::inflation_swap::InflationSwapBuilder;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use time::Month;
 
 #[test]
@@ -18,7 +18,7 @@ fn test_ir01_finite_difference_validation() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-IR01-FD".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -85,7 +85,7 @@ fn test_ir01_sign_pay_fixed() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-IR01-SIGN1".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -121,7 +121,7 @@ fn test_ir01_sign_receive_fixed() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-IR01-SIGN2".into())
         .notional(standard_notional())
         .start_date(as_of)

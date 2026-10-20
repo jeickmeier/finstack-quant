@@ -18,9 +18,7 @@ use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond:
     DeflationProtection, IndexationMethod, InflationLinkedBond,
 };
 use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationCapFloor;
-use finstack_quant_valuations::instruments::rates::inflation_swap::{
-    InflationSwap, InflationSwapBuilder,
-};
+use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
@@ -113,7 +111,7 @@ fn standard_notional() -> Money {
 }
 
 fn inflation_swap(as_of: Date, maturity: Date, id: &str) -> InflationSwap {
-    InflationSwapBuilder::new()
+    InflationSwap::builder()
         .id(id.into())
         .notional(standard_notional())
         .start_date(as_of)

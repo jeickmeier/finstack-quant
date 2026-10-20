@@ -35,7 +35,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::equity::equity_option::{
-    EquityOption, EquityOptionParams,
+    EquityOption, EquityOptionMarketData, EquityOptionParams,
 };
 use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
@@ -57,7 +57,6 @@ use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMeth
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::Equity;
-use finstack_quant_valuations::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations::instruments::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };
@@ -615,15 +614,14 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         )
         .with_exercise_style(ExerciseStyle::European)
         .with_settlement(SettlementType::Cash);
-        let underlying_params = EquityUnderlyingParams::new("AAPL", "EQUITY-SPOT", Currency::USD)
-            .with_div_yield_id("EQUITY-DIVYIELD");
-        let option = EquityOption::new(
+        let option = EquityOption::european_with_market_data(
             option_id.clone(),
-            &option_params,
-            &underlying_params,
-            "USD-OIS",
-            "EQUITY-VOL",
-        );
+            "AAPL",
+            option_params,
+            EquityOptionMarketData::new("USD-OIS", "EQUITY-SPOT", "EQUITY-VOL")
+                .with_div_yield_id("EQUITY-DIVYIELD"),
+        )
+        .unwrap();
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(

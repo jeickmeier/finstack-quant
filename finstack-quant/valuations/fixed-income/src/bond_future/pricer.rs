@@ -744,6 +744,7 @@ mod tests {
             50.0,
             Tenor::quarterly(),
             DayCount::Act360,
+            None,
         )
         .expect("finite test rate");
 

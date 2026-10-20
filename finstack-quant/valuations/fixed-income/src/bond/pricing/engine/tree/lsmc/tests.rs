@@ -133,12 +133,12 @@ fn stochastic_test_bond(as_of: Date, maturity: Date) -> Bond {
 fn term_pik_test_bond(as_of: Date, maturity: Date) -> Bond {
     let mut bond = stochastic_test_bond(as_of, maturity);
     bond.id = "LSMC_TERM_PIK".into();
-    bond.cashflow_spec = CashflowSpec::floating_with_reset_lag(
+    bond.cashflow_spec = CashflowSpec::floating(
         CurveId::new("USD-SOFR-3M"),
         200.0,
         Tenor::semi_annual(),
         DayCount::Act360,
-        2,
+        Some(2),
     )
     .expect("term floating specification");
     let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
@@ -154,12 +154,12 @@ fn term_pik_test_bond(as_of: Date, maturity: Date) -> Bond {
 fn overnight_pik_test_bond(as_of: Date, maturity: Date) -> Bond {
     let mut bond = stochastic_test_bond(as_of, maturity);
     bond.id = "LSMC_OVERNIGHT_PIK".into();
-    bond.cashflow_spec = CashflowSpec::floating_with_reset_lag(
+    bond.cashflow_spec = CashflowSpec::floating(
         CurveId::new("USD-SOFR"),
         200.0,
         Tenor::quarterly(),
         DayCount::Act360,
-        0,
+        Some(0),
     )
     .expect("overnight floating specification");
     let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
@@ -404,12 +404,12 @@ fn term_act365l_balance_segments_replay_the_full_coupon_leap_denominator() {
     let market = stochastic_test_market(as_of);
     let tree = stochastic_test_tree(92);
     let mut bond = stochastic_test_bond(as_of, maturity);
-    bond.cashflow_spec = CashflowSpec::floating_with_reset_lag(
+    bond.cashflow_spec = CashflowSpec::floating(
         CurveId::new("USD-SOFR-3M"),
         200.0,
         Tenor::quarterly(),
         DayCount::Act365L,
-        0,
+        Some(0),
     )
     .expect("term floating specification");
     bond.cashflow_spec = CashflowSpec::amortizing(

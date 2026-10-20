@@ -67,7 +67,6 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations_core::instruments::Attributes;
-use finstack_quant_valuations_core::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType, SettlementType};
 use time::macros::date;
 
@@ -439,39 +438,6 @@ impl EquityOption {
             EquityOptionMarketData::new("USD-OIS", "EQUITY-SPOT", "EQUITY-VOL")
                 .with_div_yield_id("EQUITY-DIVYIELD"),
         )
-    }
-
-    /// Create a new equity option using parameter structs
-    pub fn new(
-        id: impl Into<InstrumentId>,
-        option_params: &EquityOptionParams,
-        underlying_params: &EquityUnderlyingParams,
-        discount_curve_id: impl Into<CurveId>,
-        vol_surface_id: impl Into<CurveId>,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            underlying_ticker: underlying_params.ticker.clone(),
-            strike: option_params.strike,
-            option_type: option_params.option_type,
-            exercise_style: option_params.exercise_style,
-            expiry: option_params.expiry,
-            quantity: option_params.quantity,
-            currency: option_params.currency,
-            day_count: finstack_quant_core::dates::DayCount::Act365F,
-            settlement: option_params.settlement,
-            exercise: None,
-            discount_curve_id: discount_curve_id.into(),
-            spot_id: underlying_params.spot_id.clone(),
-            vol_surface_id: vol_surface_id.into(),
-            div_yield_id: underlying_params.div_yield_id.clone(),
-            discrete_dividends: Vec::new(),
-            exercise_dates: None,
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            attributes: Attributes::new(),
-        }
     }
 
     /// Calculate Greeks for this equity option

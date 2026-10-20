@@ -89,14 +89,28 @@ pub struct PrivateMarketsFund {
 }
 
 impl PrivateMarketsFund {
-    /// Create a new private markets fund instrument.
+    /// Create a validated private markets fund instrument.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Stable instrument identifier.
+    /// * `currency` - Fund currency; every event amount must be in it.
+    /// * `waterfall_spec` - Distribution waterfall the events are allocated
+    ///   through.
+    /// * `events` - Dated contributions, distributions and proceeds
+    ///   (non-negative amounts).
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Instrument::validate_invariants`] error: an invalid
+    /// waterfall, an event in another currency, or a negative event amount.
     pub fn new(
         id: impl Into<InstrumentId>,
         currency: Currency,
         waterfall_spec: PeFundWaterfallSpec,
         events: Vec<FundEvent>,
-    ) -> Self {
-        Self {
+    ) -> finstack_quant_core::Result<Self> {
+        let fund = Self {
             id: id.into(),
             currency,
             waterfall_spec,
@@ -107,7 +121,9 @@ impl PrivateMarketsFund {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
-        }
+        };
+        fund.validate_invariants()?;
+        Ok(fund)
     }
 
     /// Create a canonical example private markets fund with a simple waterfall and events.
@@ -147,7 +163,7 @@ impl PrivateMarketsFund {
             Currency::USD,
             spec,
             events,
-        )
+        )?
         .with_discount_curve_id("USD-OIS"))
     }
     /// Set the discount curve for NAV present-value calculations.

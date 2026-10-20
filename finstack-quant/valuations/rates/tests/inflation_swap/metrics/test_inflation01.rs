@@ -8,7 +8,7 @@ use rust_decimal::Decimal;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_rates::inflation_swap::InflationSwapBuilder;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use time::Month;
 
 #[test]
@@ -18,7 +18,7 @@ fn test_inflation01_finite_difference_validation() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-INFL01-FD".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -75,7 +75,7 @@ fn test_inflation01_sign_pay_fixed() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-INFL01-SIGN1".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -117,7 +117,7 @@ fn test_inflation01_sign_receive_fixed() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-INFL01-SIGN2".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -158,7 +158,7 @@ fn test_inflation01_scales_with_maturity() {
     let mut infl01s = Vec::new();
     for years in &[1, 2, 5, 10] {
         let maturity = Date::from_calendar_date(2025 + years, Month::January, 1).unwrap();
-        let swap = InflationSwapBuilder::new()
+        let swap = InflationSwap::builder()
             .id("ZCINF-INFL01-MAT".into())
             .notional(standard_notional())
             .start_date(as_of)
@@ -201,7 +201,7 @@ fn test_inflation01_scales_with_notional() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap1 = InflationSwapBuilder::new()
+    let swap1 = InflationSwap::builder()
         .id("ZCINF-INFL01-N1".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -215,7 +215,7 @@ fn test_inflation01_scales_with_notional() {
         .build()
         .unwrap();
 
-    let swap2 = InflationSwapBuilder::new()
+    let swap2 = InflationSwap::builder()
         .id("ZCINF-INFL01-N2".into())
         .notional(large_notional())
         .start_date(as_of)
