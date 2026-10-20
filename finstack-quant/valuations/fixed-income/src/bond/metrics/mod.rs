@@ -87,6 +87,47 @@ type BondCashflowPath = Vec<(Date, Money)>;
 /// Yield-to-worst at the quoted price, its cashflow path and the quote date.
 pub(crate) type QuotedWorkoutPath = (f64, BondCashflowPath, Date);
 
+/// Pricing model the metric request selected, else the bond's default model.
+pub(crate) fn active_model(
+    context: &finstack_quant_valuations_core::metrics::MetricContext,
+    bond: &crate::bond::Bond,
+) -> finstack_quant_valuations_core::pricer::ModelKey {
+    context
+        .pricing_model()
+        .unwrap_or_else(|| bond.default_pricing_model())
+}
+
+/// `bond` with its price-driving quotes replaced by a quoted OAS (decimal).
+pub(crate) fn oas_pinned(mut bond: crate::bond::Bond, oas: f64) -> crate::bond::Bond {
+    crate::bond::pricing::quote_conversions::clear_price_driving_overrides(&mut bond);
+    bond.instrument_pricing_overrides.market_quotes.quoted_oas = Some(oas);
+    bond
+}
+
+/// `bond` with its price-driving quotes replaced by a quoted Z-spread (decimal).
+pub(crate) fn z_pinned(mut bond: crate::bond::Bond, z_spread: f64) -> crate::bond::Bond {
+    crate::bond::pricing::quote_conversions::clear_price_driving_overrides(&mut bond);
+    bond.instrument_pricing_overrides
+        .market_quotes
+        .quoted_z_spread = Some(z_spread);
+    bond
+}
+
+/// Reprice `bond` at `as_of` through the context's dispatch when the request
+/// selected a model, else through `model` directly on the bond.
+pub(crate) fn reprice_selected(
+    context: &finstack_quant_valuations_core::metrics::MetricContext,
+    bond: &crate::bond::Bond,
+    model: finstack_quant_valuations_core::pricer::ModelKey,
+    as_of: Date,
+) -> finstack_quant_core::Result<f64> {
+    if context.pricing_model().is_some() {
+        context.reprice_instrument_raw(bond, context.curves.as_ref(), as_of)
+    } else {
+        bond.price_for_model_raw(model, context.curves.as_ref(), as_of)
+    }
+}
+
 pub(crate) fn bond_risk_basis(
     context: &finstack_quant_valuations_core::metrics::MetricContext,
 ) -> finstack_quant_valuations_core::instruments::BondRiskBasis {

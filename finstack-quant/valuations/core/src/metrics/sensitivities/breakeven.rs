@@ -33,13 +33,7 @@ impl MetricCalculator for BreakevenCalculator {
             }
         }
 
-        let carry_total = context
-            .computed
-            .get(&MetricId::CarryTotal)
-            .copied()
-            .ok_or_else(|| finstack_quant_core::InputError::NotFound {
-                id: "metric:carry_total".into(),
-            })?;
+        let carry_total = context.computed_metric(&MetricId::CarryTotal)?;
 
         let sensitivity_id = config.target.sensitivity_metric();
         let sensitivity = context

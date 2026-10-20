@@ -16,11 +16,7 @@ impl MetricCalculator for CdsTrancheCs01Calculator {
         let tranche = context.instrument_as::<CdsTranche>()?.clone();
         let index = context.curves.get_credit_index(&tranche.credit_index_id)?;
         let hazards = active_hazards(&index);
-        let bump = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?
-        .credit_spread_bump_bp;
+        let bump = sens_config::resolve(context)?.credit_spread_bump_bp;
         let provider = context.recalibration_provider("cs01")?;
         let dispatch = context.clone_pricer_dispatch();
         let revalue = |market: &finstack_quant_core::market_data::context::MarketContext| {
@@ -69,11 +65,7 @@ impl MetricCalculator for CdsTrancheBucketedCs01Calculator {
         let tranche = context.instrument_as::<CdsTranche>()?.clone();
         let index = context.curves.get_credit_index(&tranche.credit_index_id)?;
         let hazards = active_hazards(&index);
-        let bump = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?
-        .credit_spread_bump_bp;
+        let bump = sens_config::resolve(context)?.credit_spread_bump_bp;
         let request = Cs01Request::generic(bump, tranche.discount_curve_id.clone());
         let instrument = Arc::clone(&context.instrument);
         let dispatch = context.clone_pricer_dispatch();

@@ -79,14 +79,8 @@ pub(crate) fn option_risk_bond_and_base_price(
     bond: &Bond,
     context: &MetricContext,
 ) -> Result<(Bond, f64)> {
-    use crate::bond::pricing::quote_conversions::clear_price_driving_overrides;
-    let mut risk_bond = bond.clone();
     if let Some(oas) = bond.instrument_pricing_overrides.market_quotes.quoted_oas {
-        clear_price_driving_overrides(&mut risk_bond);
-        risk_bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_oas = Some(oas);
+        let risk_bond = super::oas_pinned(bond.clone(), oas);
         let base =
             context.reprice_instrument_raw(&risk_bond, context.curves.as_ref(), context.as_of)?;
         return Ok((risk_bond, base));
@@ -97,6 +91,7 @@ pub(crate) fn option_risk_bond_and_base_price(
         .market_quotes
         .has_price_driver()
     {
+        let risk_bond = bond.clone();
         let base =
             context.reprice_instrument_raw(&risk_bond, context.curves.as_ref(), context.as_of)?;
         return Ok((risk_bond, base));
@@ -114,11 +109,7 @@ pub(crate) fn option_risk_bond_and_base_price(
             })?,
     };
 
-    clear_price_driving_overrides(&mut risk_bond);
-    risk_bond
-        .instrument_pricing_overrides
-        .market_quotes
-        .quoted_oas = Some(oas_decimal);
+    let risk_bond = super::oas_pinned(bond.clone(), oas_decimal);
     let base =
         context.reprice_instrument_raw(&risk_bond, context.curves.as_ref(), context.as_of)?;
     Ok((risk_bond, base))

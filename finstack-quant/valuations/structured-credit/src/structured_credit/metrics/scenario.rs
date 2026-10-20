@@ -96,18 +96,7 @@ pub fn scenario_table(
     deal.validate_for_pricing()?;
     let deal = deal.resolved_for_pricing()?;
     // Prices are per CURRENT face (the factor-adjusted quote basis).
-    let current_balance = deal
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: format!("tranche:{tranche_id}"),
-            })
-        })?
-        .current_balance
-        .amount();
+    let current_balance = deal.tranches.require(tranche_id)?.current_balance.amount();
 
     // Cap grid size before allocating: each cell clones and reprices the deal.
     // Use checked mul so a huge product cannot wrap on wasm32 `usize`.

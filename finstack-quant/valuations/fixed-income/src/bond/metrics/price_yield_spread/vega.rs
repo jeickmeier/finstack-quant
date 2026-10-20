@@ -1,10 +1,10 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
+use super::embedded_option_value::{holder_option_value, resolve_oas_decimal};
 use crate::bond::pricing::engine::tree::{bond_tree_config, TreeModelChoice};
-use crate::bond::pricing::quote_conversions::clear_price_driving_overrides;
 use crate::bond::Bond;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
-use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::pricer::ModelKey;
 
 #[derive(Debug, Clone, Default)]
@@ -12,13 +12,6 @@ pub(crate) struct BondVegaCalculator;
 
 fn has_embedded_options(bond: &Bond) -> bool {
     bond.return_floor.is_some() || bond.call_put.as_ref().is_some_and(|cp| cp.has_options())
-}
-
-fn resolve_oas_decimal(bond: &Bond, context: &MetricContext) -> finstack_quant_core::Result<f64> {
-    if let Some(oas) = context.computed.get(&MetricId::Oas) {
-        return Ok(*oas);
-    }
-    Ok(super::oas::oas_decimal_from_quote_overrides(bond, context)?.unwrap_or(0.0))
 }
 
 /// The short-rate volatility input the selected bond model reads.
@@ -84,24 +77,13 @@ fn holder_option_value_at_vol(
         ShortRateSigma::BlackDermanToy => model_config.bdt_sigma = Some(volatility),
         ShortRateSigma::BlackKarasinski => model_config.bk_sigma = Some(volatility),
     }
-    clear_price_driving_overrides(&mut bumped);
-    bumped.instrument_pricing_overrides.market_quotes.quoted_oas = Some(oas_decimal);
-    let price_with_options = if context.pricing_model().is_some() {
-        context.reprice_instrument_raw(&bumped, context.curves.as_ref(), context.as_of)?
-    } else {
-        bumped.price_for_model_raw(model, context.curves.as_ref(), context.as_of)?
-    };
-    // Remove only the exercise rights. Keep the bumped rate volatility and
-    // every credit-model input so this is the straight-bond value under the
-    // same stochastic rates-credit process.
-    bumped.call_put = None;
-    bumped.return_floor = None;
-    let price_straight = if context.pricing_model().is_some() {
-        context.reprice_instrument_raw(&bumped, context.curves.as_ref(), context.as_of)?
-    } else {
-        bumped.price_for_model_raw(model, context.curves.as_ref(), context.as_of)?
-    };
-    Ok(price_with_options - price_straight)
+    // The straight leg keeps the bumped rate volatility and every credit-model
+    // input, so it is valued under the same stochastic rates-credit process.
+    holder_option_value(
+        context,
+        crate::bond::metrics::oas_pinned(bumped, oas_decimal),
+        model,
+    )
 }
 
 impl MetricCalculator for BondVegaCalculator {
@@ -111,9 +93,7 @@ impl MetricCalculator for BondVegaCalculator {
             return Ok(0.0);
         }
 
-        let model = context
-            .pricing_model()
-            .unwrap_or_else(|| bond.default_pricing_model());
+        let model = crate::bond::metrics::active_model(context, bond);
         if !matches!(model, ModelKey::Tree | ModelKey::RatesCredit) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "bond vega requires model 'tree' or 'rates_credit'; selected '{}'",
@@ -121,10 +101,7 @@ impl MetricCalculator for BondVegaCalculator {
             )));
         }
 
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
         let bump = defaults.vol_bump_decimal;
         let (channel, base_vol) = short_rate_sigma(bond, context, model)?;
         let down_vol = (base_vol - bump).max(1e-8);

@@ -50,20 +50,38 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-use crate::bond::pricing::quote_conversions::clear_price_driving_overrides;
+use crate::bond::metrics::reprice_selected;
 use crate::bond::Bond;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_valuations_core::pricer::ModelKey;
 
-fn price_bond_with_context_model(
-    context: &MetricContext,
+/// OAS (decimal) the option-value measures pin: the computed `Oas` metric,
+/// else the OAS solved from the bond's quote, else zero.
+pub(super) fn resolve_oas_decimal(
     bond: &Bond,
-    model: finstack_quant_valuations_core::pricer::ModelKey,
+    context: &MetricContext,
 ) -> finstack_quant_core::Result<f64> {
-    if context.pricing_model().is_some() {
-        context.reprice_instrument_raw(bond, context.curves.as_ref(), context.as_of)
-    } else {
-        bond.price_for_model_raw(model, context.curves.as_ref(), context.as_of)
+    if let Some(oas) = context.computed.get(&MetricId::Oas) {
+        return Ok(*oas);
     }
+    Ok(super::oas::oas_decimal_from_quote_overrides(bond, context)?.unwrap_or(0.0))
+}
+
+/// Holder value of the exercise rights of an OAS-pinned bond: its price minus
+/// the price of the same bond with the call/put schedule and return floor
+/// removed, both under `model` at the context date.
+pub(super) fn holder_option_value(
+    context: &MetricContext,
+    mut bond: Bond,
+    model: ModelKey,
+) -> finstack_quant_core::Result<f64> {
+    let price_with_options = reprice_selected(context, &bond, model, context.as_of)?;
+    // Remove only the exercise rights; every model input stays, so this is the
+    // straight-bond value under the same process.
+    bond.call_put = None;
+    bond.return_floor = None;
+    let price_straight = reprice_selected(context, &bond, model, context.as_of)?;
+    Ok(price_with_options - price_straight)
 }
 
 /// Calculates the embedded option value for callable, putable, and
@@ -103,33 +121,13 @@ impl MetricCalculator for EmbeddedOptionValueCalculator {
             return Ok(0.0);
         }
 
-        let oas_decimal = if let Some(oas) = context.computed.get(&MetricId::Oas) {
-            *oas
-        } else {
-            super::oas::oas_decimal_from_quote_overrides(&bond, context)?.unwrap_or(0.0)
-        };
-
-        let model = context
-            .pricing_model()
-            .unwrap_or_else(|| bond.default_pricing_model());
-        let mut optioned_bond = bond.clone();
-        clear_price_driving_overrides(&mut optioned_bond);
-        optioned_bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_oas = Some(oas_decimal);
-        let price_with_options = price_bond_with_context_model(context, &optioned_bond, model)?;
-        let mut straight_bond = bond;
-        straight_bond.call_put = None;
-        straight_bond.return_floor = None;
-        clear_price_driving_overrides(&mut straight_bond);
-        straight_bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_oas = Some(oas_decimal);
-        let price_straight = price_bond_with_context_model(context, &straight_bond, model)?;
-
-        Ok(price_with_options - price_straight)
+        let oas_decimal = resolve_oas_decimal(&bond, context)?;
+        let model = crate::bond::metrics::active_model(context, &bond);
+        holder_option_value(
+            context,
+            crate::bond::metrics::oas_pinned(bond, oas_decimal),
+            model,
+        )
     }
 }
 

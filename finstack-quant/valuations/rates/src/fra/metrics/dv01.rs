@@ -36,11 +36,7 @@ impl MetricCalculator for FraRateCurveDv01Calculator {
             return generic_fallback(context);
         }
 
-        let bump_bp = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?
-        .rate_bump_bp;
+        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
 
         let discount_id = &fra.discount_curve_id;
         let forward_id = &fra.forward_curve_id;

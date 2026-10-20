@@ -9,9 +9,9 @@ use crate::structured_credit::types::{
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
+use finstack_quant_core::Error;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
-use finstack_quant_core::{Error, InputError};
 
 use serde::{Deserialize, Serialize};
 
@@ -56,16 +56,7 @@ fn borrowing_base_test(spec: &CoverageTestSpec, context: &TestContext) -> Result
                 "borrowing-base test {test_id} needs coverage_rules.borrowing_base"
             ))
         })?;
-    let tranche = context
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            Error::from(InputError::NotFound {
-                id: format!("tranche:{}", tranche_id),
-            })
-        })?;
+    let tranche = context.tranches.require(tranche_id)?;
     let tranche_balance = context
         .tranche_balances
         .and_then(|b| b.get(tranche.id.as_str()))
@@ -127,16 +118,7 @@ fn oc_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
         spec.tranche_id.as_str(),
         spec.trigger_level,
     );
-    let tranche = context
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            Error::from(InputError::NotFound {
-                id: format!("tranche:{}", tranche_id),
-            })
-        })?;
+    let tranche = context.tranches.require(tranche_id)?;
 
     // Coverage tests use live tranche balances when available.
     let tranche_balance = context
@@ -236,16 +218,7 @@ fn ic_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
         spec.tranche_id.as_str(),
         spec.trigger_level,
     );
-    let tranche = context
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            Error::from(InputError::NotFound {
-                id: format!("tranche:{}", tranche_id),
-            })
-        })?;
+    let tranche = context.tranches.require(tranche_id)?;
 
     // Coverage tests use live tranche balances when available.
     let tranche_bal = context

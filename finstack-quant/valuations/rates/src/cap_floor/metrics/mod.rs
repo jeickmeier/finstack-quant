@@ -118,11 +118,7 @@ impl MetricCalculator for ForwardPv01Calculator {
         // A projection curve distinct from discounting must exist to be bumped.
         context.curves.get_forward(&option.forward_curve_id)?;
 
-        let bump_bp = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?
-        .rate_bump_bp;
+        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
         let reprice = |bp: f64| -> Result<f64> {
             let bumped = context.curves.bump([MarketBump::Curve {
                 id: option.forward_curve_id.clone(),

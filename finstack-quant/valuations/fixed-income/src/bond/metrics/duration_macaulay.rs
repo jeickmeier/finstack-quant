@@ -2,8 +2,6 @@
 //!
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
-use finstack_quant_core::dates::Date;
-use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::constants::numerical::ZERO_TOLERANCE;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::borrow::Cow;
@@ -34,22 +32,10 @@ impl MetricCalculator for MacaulayDurationCalculator {
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let workout = super::context_workout_path(context)?;
-        let ytm = context
-            .computed
-            .get(&MetricId::Ytm)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:Ytm".to_string(),
-                })
-            })?;
+        let ytm = context.computed_metric(&MetricId::Ytm)?;
 
         // YTM dependency ensures cashflows are already built and cached
-        let flows: &Vec<(Date, Money)> = context.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "context.cashflows".to_string(),
-            })
-        })?;
+        let flows = context.require_cashflows()?;
 
         let bond: &Bond = context.instrument_as()?;
 
@@ -59,7 +45,7 @@ impl MetricCalculator for MacaulayDurationCalculator {
             if let Some((workout_yield, workout_flows, workout_quote_date)) = workout {
                 (workout_yield, Cow::Owned(workout_flows), workout_quote_date)
             } else {
-                (ytm, Cow::Borrowed(flows.as_slice()), quote_ctx.quote_date)
+                (ytm, Cow::Borrowed(flows), quote_ctx.quote_date)
             };
 
         // Calculate price from flows using quote_date to ensure consistency with YTM

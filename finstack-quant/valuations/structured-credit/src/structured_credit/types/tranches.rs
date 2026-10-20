@@ -686,6 +686,29 @@ impl TrancheStructure {
         self.currency
     }
 
+    /// Look up a tranche by its identifier.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranche_id` - Tranche identifier (`Tranche::id`) to find; matched
+    ///   exactly and case-sensitively.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::InputError::NotFound`] with id
+    /// `tranche:<tranche_id>` when no tranche in the structure has that id.
+    pub fn require(&self, tranche_id: &str) -> finstack_quant_core::Result<&Tranche> {
+        self.tranches
+            .iter()
+            .find(|t| t.id.as_str() == tranche_id)
+            .ok_or_else(|| {
+                finstack_quant_core::InputError::NotFound {
+                    id: format!("tranche:{tranche_id}"),
+                }
+                .into()
+            })
+    }
+
     /// Total original balance of all tranches combined.
     ///
     /// # Errors

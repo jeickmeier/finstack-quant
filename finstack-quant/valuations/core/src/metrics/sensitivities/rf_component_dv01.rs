@@ -51,10 +51,7 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
         let bump_bp = defaults.rate_bump_bp;
         let delta = bump_bp / 10_000.0;
         let market = context.curves.as_ref();

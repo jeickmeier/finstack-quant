@@ -132,22 +132,10 @@ impl YtmCalculator {
 
 impl MetricCalculator for YtmCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let dirty_price = context
-            .computed
-            .get(&MetricId::DirtyPrice)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:DirtyPrice".to_string(),
-                })
-            })?;
+        let dirty_price = context.computed_metric(&MetricId::DirtyPrice)?;
 
         let quote = super::super::quote::SettlementQuote::from_context(context)?;
-        let flows = context.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "context.cashflows".to_string(),
-            })
-        })?;
+        let flows = context.require_cashflows()?;
 
         // Convert price points back to currency using original notional.
         let notional = crate::structured_credit::metrics::pricing::prices::quote_notional(context)?;

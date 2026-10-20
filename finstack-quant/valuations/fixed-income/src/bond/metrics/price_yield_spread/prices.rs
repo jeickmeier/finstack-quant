@@ -24,9 +24,7 @@ impl MetricCalculator for DirtyPriceCalculator {
             bond,
             &context.curves,
             context.as_of,
-            context
-                .pricing_model()
-                .unwrap_or_else(|| bond.default_pricing_model()),
+            crate::bond::metrics::active_model(context, bond),
             Some(&pricing_dispatch),
         )? {
             return Ok(dirty);
@@ -62,9 +60,7 @@ impl MetricCalculator for CleanPriceCalculator {
             bond,
             &context.curves,
             context.as_of,
-            context
-                .pricing_model()
-                .unwrap_or_else(|| bond.default_pricing_model()),
+            crate::bond::metrics::active_model(context, bond),
             Some(&pricing_dispatch),
         )? {
             dirty
@@ -77,15 +73,7 @@ impl MetricCalculator for CleanPriceCalculator {
                 context.base_value.amount(),
             )?
         };
-        let accrued = context
-            .computed
-            .get(&MetricId::Accrued)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:Accrued".to_string(),
-                })
-            })?;
+        let accrued = context.computed_metric(&MetricId::Accrued)?;
         debug_assert!(
             (accrued - quote_ctx.accrued_at_quote_date).abs() < 1e-10,
             "accrued dependency must share the settlement quote date"

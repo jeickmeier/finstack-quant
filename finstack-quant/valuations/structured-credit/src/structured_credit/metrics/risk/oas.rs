@@ -137,16 +137,7 @@ pub fn calculate_tranche_oas(
 ) -> Result<OasResult> {
     deal.validate_for_pricing()?;
     let disc = market.get_discount(deal.discount_curve_id.as_str())?;
-    let tranche = deal
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: format!("tranche:{tranche_id}"),
-            })
-        })?;
+    let tranche = deal.tranches.require(tranche_id)?;
     // Prices are per CURRENT face (the factor-adjusted quote basis).
     let current_balance = tranche.current_balance.amount();
     let base_cashflows = (deal).tranche_cashflows(tranche_id, market, as_of)?;

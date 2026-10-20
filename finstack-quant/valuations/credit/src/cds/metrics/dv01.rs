@@ -77,10 +77,7 @@ impl CdsDv01Calculator {
 impl MetricCalculator for CdsDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let cds: CreditDefaultSwap = context.instrument_as::<CreditDefaultSwap>()?.clone();
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
         let bump_bp = defaults.rate_bump_bp;
         if bump_bp.abs() <= 1e-10 {
             return Ok(0.0);
