@@ -1528,6 +1528,22 @@ class CashFlowSchedule:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Pickle support via the JSON wire form (``from_json``, ``(to_json(),)``).
+
+        Returns
+        -------
+        tuple
+            ``(from_json, (json,))`` reconstructor pair.
+
+        Raises
+        ------
+        ValueError
+            If the schedule holds a non-finite float that JSON cannot carry.
+        """
+        ...
+
     def to_dataframe(self, outstanding: bool = False) -> pd.DataFrame:
         """
         Flows as a pandas DataFrame.

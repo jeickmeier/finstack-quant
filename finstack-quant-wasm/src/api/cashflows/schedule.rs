@@ -6,12 +6,13 @@
 //! values typed by the generated `cashflows` TypeScript declarations.
 
 use crate::api::core::market_context::JsMarketContext;
-use crate::utils::input::{js_f64, js_f64_seq, js_string, json_text};
+use crate::utils::input::{js_f64, js_f64_seq, js_string};
 use crate::utils::wire::{js_date, js_opt_wire, js_wire};
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::{
-    merge_cashflow_schedules, CashFlowBuilder, CashFlowMeta, CashFlowSchedule,
-    CashflowRepresentation, CouponType, FixedCouponSpec, FloatingCouponSpec, Notional,
+    merge_cashflow_schedules as rust_merge_cashflow_schedules, CashFlowBuilder, CashFlowMeta,
+    CashFlowSchedule, CashflowRepresentation, CouponType, FixedCouponSpec, FloatingCouponSpec,
+    Notional,
 };
 use finstack_quant_cashflows::{CashflowScheduleBuildSpec, DatedFlowJson, ScheduleBuildOpts};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
@@ -30,7 +31,7 @@ fn dated_flows_wire(flows: Vec<(Date, Money)>) -> Result<JsValue, JsValue> {
     to_js_value(
         &flows
             .into_iter()
-            .map(|(date, amount)| DatedFlowJson { date, amount })
+            .map(DatedFlowJson::from)
             .collect::<Vec<_>>(),
     )
 }
@@ -39,7 +40,7 @@ fn dated_flows_wire(flows: Vec<(Date, Money)>) -> Result<JsValue, JsValue> {
 pub(crate) fn dated_flows_arg(value: &JsValue, label: &str) -> Result<Vec<(Date, Money)>, JsValue> {
     Ok(js_wire::<Vec<DatedFlowJson>>(value, label)?
         .into_iter()
-        .map(|flow| (flow.date, flow.amount))
+        .map(Into::into)
         .collect())
 }
 
@@ -111,9 +112,7 @@ impl JsCashFlowSchedule {
     /// @throws If `json` is neither a string nor a plain object (kind `invalid_type`) or does not match the schedule schema (kind `validation`).
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsCashFlowSchedule, JsValue> {
-        serde_json::from_str(&json_text(&json, "json")?)
-            .map(Self::from_inner)
-            .map_err(to_js_err)
+        crate::utils::input::from_js_json::<CashFlowSchedule>(&json, "json").map(Self::from_inner)
     }
 
     /// Serialize the schedule to canonical JSON.
@@ -759,14 +758,16 @@ pub(crate) fn schedules_arg(
 /// @returns The merged `CashFlowSchedule` handle.
 /// @throws If `schedules` is not an array (kind `invalid_type`) or an argument does not match its wire type (kind `validation`).
 #[wasm_bindgen(js_name = mergeCashflowSchedules)]
-pub fn merge_cashflow_schedules_js(
+pub fn merge_cashflow_schedules(
     schedules: JsValue,
     notional: JsValue,
     day_count: JsValue,
 ) -> Result<JsCashFlowSchedule, JsValue> {
-    Ok(JsCashFlowSchedule::from_inner(merge_cashflow_schedules(
-        schedules_arg(&schedules, "schedules")?,
-        js_wire::<Notional>(&notional, "notional")?,
-        js_wire::<DayCount>(&day_count, "dayCount")?,
-    )))
+    Ok(JsCashFlowSchedule::from_inner(
+        rust_merge_cashflow_schedules(
+            schedules_arg(&schedules, "schedules")?,
+            js_wire::<Notional>(&notional, "notional")?,
+            js_wire::<DayCount>(&day_count, "dayCount")?,
+        ),
+    ))
 }

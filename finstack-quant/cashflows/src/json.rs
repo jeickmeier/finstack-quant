@@ -227,6 +227,18 @@ pub struct DatedFlowJson {
     pub amount: Money,
 }
 
+impl From<crate::DatedFlow> for DatedFlowJson {
+    fn from((date, amount): crate::DatedFlow) -> Self {
+        Self { date, amount }
+    }
+}
+
+impl From<DatedFlowJson> for crate::DatedFlow {
+    fn from(flow: DatedFlowJson) -> Self {
+        (flow.date, flow.amount)
+    }
+}
+
 impl CashflowScheduleBuildSpec {
     /// Build a canonical cashflow schedule.
     ///
@@ -520,7 +532,7 @@ pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
     let flows: Vec<DatedFlowJson> = schedule
         .dated_flows()?
         .into_iter()
-        .map(|(date, amount)| DatedFlowJson { date, amount })
+        .map(DatedFlowJson::from)
         .collect();
     serialize_json(&flows, "dated flows")
 }

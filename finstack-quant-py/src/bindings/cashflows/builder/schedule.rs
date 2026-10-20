@@ -1,7 +1,8 @@
 //! Python bindings for `finstack_quant_cashflows::builder` schedule types.
 
 use finstack_quant_cashflows::builder::{
-    merge_cashflow_schedules, CashFlowMeta, CashFlowSchedule, CashflowRepresentation,
+    merge_cashflow_schedules as rust_merge_cashflow_schedules, CashFlowMeta, CashFlowSchedule,
+    CashflowRepresentation,
 };
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::money::Money;
@@ -741,14 +742,14 @@ impl PyCashFlowSchedule {
 /// -------
 /// CashFlowSchedule
 ///     Combined schedule with all rows in canonical order.
-#[pyfunction(name = "merge_cashflow_schedules")]
+#[pyfunction]
 #[pyo3(text_signature = "(schedules, notional, day_count)")]
-pub(crate) fn py_merge_cashflow_schedules(
+pub(crate) fn merge_cashflow_schedules(
     schedules: Vec<PyRef<'_, PyCashFlowSchedule>>,
     notional: PyRef<'_, PyNotional>,
     day_count: PyRef<'_, PyDayCount>,
 ) -> PyCashFlowSchedule {
-    let inner = merge_cashflow_schedules(
+    let inner = rust_merge_cashflow_schedules(
         schedules.iter().map(|s| s.inner.clone()),
         notional.inner.clone(),
         day_count.inner,

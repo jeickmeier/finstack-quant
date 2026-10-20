@@ -13771,7 +13771,7 @@ export interface CashFlowSchedule extends WasmOwned {
    * @throws If a curve is missing from `market` (kind `not_found`), or an argument is malformed or a discount factor cannot be computed (kind `invalid_type` or `validation`).
    */
   pvByPeriod(
-    periods: readonly generated.statements.Period[],
+    periods: readonly generated.core.Period[],
     market: MarketContext,
     discCurveId: string,
     base: string,
@@ -14393,7 +14393,7 @@ export interface CashflowsNamespace {
    */
   aggregateByPeriod(
     flows: readonly DatedFlowJson[],
-    periods: readonly generated.statements.Period[]
+    periods: readonly generated.core.Period[]
   ): generated.cashflows.PeriodAggregation;
 
   /**
@@ -14432,12 +14432,12 @@ export interface CashflowsNamespace {
    * Materialize the reset observations crossed by a realized-forward market roll.
    *
    * Every projected fixing recorded in the schedules' metadata with a date in
-   * `(oldDate, newDate]` is written into a copy of the market as an observed
+   * `[oldDate, newDate]` is written into a copy of the market as an observed
    * fixing; existing observations take precedence and are kept unchanged.
    *
    * @param market - `MarketContext` handle of the pre-roll market; it is not modified.
    * @param schedules - Schedules projected on `market` at `oldDate`: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
-   * @param oldDate - ISO-8601 exclusive start of the fixing window.
+   * @param oldDate - ISO-8601 inclusive start of the fixing window: same-day projections become observed.
    * @param newDate - ISO-8601 inclusive end of the window; must be on or after `oldDate`.
    * @returns A new `MarketContext` handle with the crossed fixings materialized; release it with free().
    * @throws If the window runs backward, a fixing-series identifier is malformed, a crossed projection is unavailable or non-finite, or two schedules project the same index and date differently (kind `validation`).
@@ -14452,8 +14452,8 @@ export interface CashflowsNamespace {
   /**
    * Parse a cashflow kind label into its `CFKind` wire string.
    *
-   * Matching is exact (Rust `CFKind::from_str`): the label is the snake_case
-   * wire string itself, as used by the `kind` field of a `CashFlow`.
+   * Parsed by Rust `CFKind::from_str`: the snake_case wire string, ASCII case
+   * ignored, plus the aliases `"coupon"` and `"principal"`.
    *
    * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
    * @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.

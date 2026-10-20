@@ -1,9 +1,10 @@
 //! WASM bindings for the `finstack-quant-cashflows` crate.
 //!
 //! This module holds the JSON-first bridge (`*Json` functions and the
-//! schedule-JSON analytics). The typed surface lives in the submodules: the
-//! `CashFlowSchedule` / `CashFlowBuilder` / `AccrualIndex` handles, and free
-//! functions over wire-shaped spec, primitive and aggregation values.
+//! schedule-JSON analytics) and the prepayment/default rate conversions. The
+//! typed surface lives in the submodules: the `CashFlowSchedule` /
+//! `CashFlowBuilder` / `AccrualIndex` handles, and free functions over
+//! wire-shaped spec, primitive and aggregation values.
 
 pub mod accrual;
 pub mod aggregation;
