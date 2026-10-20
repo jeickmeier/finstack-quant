@@ -6,8 +6,7 @@ name: Nightly
 # `--slow`, and release.yml runs those variants. Every job runs a
 # canonical mise task, so a failure reproduces locally with the same command
 # (`mise run all-ci` runs the set). release.yml calls this workflow as the base
-# gate for a tagged release, and pr.yml calls it with `skip-coverage` for every
-# pull request.
+# gate for a tagged release, and pr.yml calls it for every pull request.
 #
 # No workflow-level `concurrency`: as a called workflow it would share the
 # caller's group and cancel or deadlock the release run.
@@ -16,13 +15,6 @@ on:
     - cron: "0 6 * * *"
   workflow_dispatch:
   workflow_call:
-    inputs:
-      # Named as an opt-out so scheduled and manual runs, where `inputs` is
-      # empty, keep coverage. Coverage only feeds the SonarQube scan on master.
-      skip-coverage:
-        description: Run the Rust and Python tests without coverage instrumentation.
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -173,7 +165,7 @@ jobs:
         run: mise run gen-check
 
   # ============================================
-  # Test Rust — cargo nextest with coverage for SonarQube (none with skip-coverage)
+  # Test Rust — cargo nextest with coverage for SonarQube
   # ============================================
   test-rust:
     name: Test Rust
@@ -214,15 +206,9 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Run Rust lib and integration tests with coverage
-        if: ${{ !inputs.skip-coverage }}
         run: mise run rust-test --coverage
 
-      - name: Run Rust lib and integration tests
-        if: ${{ inputs.skip-coverage }}
-        run: mise run rust-test
-
       - name: Upload Rust coverage
-        if: ${{ !inputs.skip-coverage }}
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: coverage-rust
@@ -232,7 +218,6 @@ jobs:
 
   # ============================================
   # Test Python — maturin build + the fast pytest suite with coverage for SonarQube
-  # (none with skip-coverage)
   # ============================================
   test-python:
     name: Test Python
@@ -281,15 +266,9 @@ jobs:
           uv sync --locked --no-build --no-install-project
 
       - name: Build extension and run fast Python tests with coverage
-        if: ${{ !inputs.skip-coverage }}
         run: mise run python-test --coverage
 
-      - name: Build extension and run fast Python tests
-        if: ${{ inputs.skip-coverage }}
-        run: mise run python-test
-
       - name: Upload Python coverage
-        if: ${{ !inputs.skip-coverage }}
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: coverage-python
