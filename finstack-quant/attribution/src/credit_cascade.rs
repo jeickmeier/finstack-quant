@@ -24,7 +24,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::diff::{measure_par_spread_shift, TenorSamplingMethod};
 use finstack_quant_core::market_data::scalars::MarketScalar;
@@ -581,26 +580,17 @@ pub(crate) fn build_credit_factor_attribution(
     use super::credit_factor::credit_factor_model_id;
     use crate::{CreditFactorAttribution, LevelPnl};
 
-    if step_pnls.len() != cascade.steps.len() {
-        tracing::warn!(
-            issuer_id = %cascade.issuer_id,
-            step_pnls = step_pnls.len(),
-            steps = cascade.steps.len(),
-            "credit cascade step P&L count does not match planned steps; \
-             the shorter length is used and the detail sum may not reconcile"
-        );
-    }
-    debug_assert_eq!(step_pnls.len(), cascade.steps.len());
-    let ccy = step_pnls
-        .first()
-        .map(|m| m.currency())
-        .unwrap_or(Currency::USD);
-    if step_pnls.is_empty() {
-        tracing::warn!(
-            issuer_id = %cascade.issuer_id,
-            "credit cascade produced no step P&Ls; emitting an all-zero detail (USD)"
-        );
-    }
+    let ccy = match step_pnls.first() {
+        Some(first) if step_pnls.len() == cascade.steps.len() => first.currency(),
+        _ => {
+            return Err(finstack_quant_core::Error::Internal(format!(
+                "credit cascade for issuer '{}' produced {} step P&Ls for {} planned steps",
+                cascade.issuer_id,
+                step_pnls.len(),
+                cascade.steps.len()
+            )))
+        }
+    };
 
     let issuer_row = model
         .issuer_betas

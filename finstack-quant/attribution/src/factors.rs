@@ -105,7 +105,7 @@ use std::sync::Arc;
 /// // Restore FX and volatility surfaces together
 /// let fx_vol = MarketRestoreFlags::FX | MarketRestoreFlags::VOL;
 /// ```
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MarketRestoreFlags(u16);
 
 impl MarketRestoreFlags {
@@ -204,24 +204,6 @@ impl std::ops::BitOr for MarketRestoreFlags {
     #[inline]
     fn bitor(self, rhs: Self) -> Self::Output {
         Self(self.0 | rhs.0)
-    }
-}
-
-impl std::ops::BitAnd for MarketRestoreFlags {
-    type Output = Self;
-
-    #[inline]
-    fn bitand(self, rhs: Self) -> Self::Output {
-        Self(self.0 & rhs.0)
-    }
-}
-
-impl std::ops::Not for MarketRestoreFlags {
-    type Output = Self;
-
-    #[inline]
-    fn not(self) -> Self::Output {
-        Self(!self.0 & Self::ALL_BITS)
     }
 }
 

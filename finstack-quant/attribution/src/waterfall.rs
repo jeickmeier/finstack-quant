@@ -85,16 +85,11 @@ pub fn default_waterfall_order() -> Vec<AttributionFactor> {
 ///
 /// # Arguments
 ///
-/// * `instrument` - Instrument to attribute
-/// * `market_t0` - Market context at T₀
-/// * `market_t1` - Market context at T₁
-/// * `as_of_t0` - Valuation date at T₀
-/// * `as_of_t1` - Valuation date at T₁
-/// * `config` - Finstack configuration
-/// * `factor_order` - Ordered list of factors to apply
-/// * `strict_validation` - If true, propagate errors instead of soft failures
-/// * `model_params_t0` - Optional opening model-parameter snapshot used to
-///   isolate parameter P&L; `None` omits that source detail.
+/// * `request` - Instrument, T₀ and T₁ markets and dates, configuration and
+///   the optional overrides on [`AttributionRequest`]; `strict_validation`
+///   propagates factor failures instead of recording soft warnings.
+/// * `factor_order` - Ordered list of factors to apply, beginning with
+///   [`AttributionFactor::Carry`].
 ///
 /// # Returns
 ///

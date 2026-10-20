@@ -203,27 +203,6 @@ fn test_market_restore_flags_union() {
 }
 
 #[test]
-fn test_market_restore_flags_intersection() {
-    let rates = MarketRestoreFlags::RATES;
-    let discount_hazard = MarketRestoreFlags::DISCOUNT | MarketRestoreFlags::HAZARD;
-
-    let intersection = rates & discount_hazard;
-    assert!(intersection.contains(MarketRestoreFlags::DISCOUNT));
-    assert!(!intersection.contains(MarketRestoreFlags::FORWARD));
-    assert!(!intersection.contains(MarketRestoreFlags::HAZARD));
-}
-
-#[test]
-fn test_market_restore_flags_complement() {
-    let not_discount = MarketRestoreFlags::all() & !MarketRestoreFlags::DISCOUNT;
-    assert!(!not_discount.contains(MarketRestoreFlags::DISCOUNT));
-    assert!(not_discount.contains(MarketRestoreFlags::FORWARD));
-    assert!(not_discount.contains(MarketRestoreFlags::HAZARD));
-    assert!(not_discount.contains(MarketRestoreFlags::INFLATION));
-    assert!(not_discount.contains(MarketRestoreFlags::CORRELATION));
-}
-
-#[test]
 fn test_market_restore_flags_all_and_empty() {
     let all = MarketRestoreFlags::all();
     assert!(all.contains(MarketRestoreFlags::DISCOUNT));

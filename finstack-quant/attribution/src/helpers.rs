@@ -46,7 +46,7 @@ pub(crate) struct InstrumentFactorUse {
 }
 
 impl InstrumentFactorUse {
-    pub(crate) const fn all() -> Self {
+    const fn all() -> Self {
         Self {
             rates: true,
             credit: true,
@@ -64,7 +64,7 @@ impl InstrumentFactorUse {
         }
     }
 
-    pub(crate) fn from_deps(deps: &MarketDependencies, instrument: &dyn Instrument) -> Self {
+    fn from_deps(deps: &MarketDependencies, instrument: &dyn Instrument) -> Self {
         let rates =
             !deps.curves.discount_curves.is_empty() || !deps.curves.forward_curves.is_empty();
         let credit = !deps.curves.credit_curves.is_empty();

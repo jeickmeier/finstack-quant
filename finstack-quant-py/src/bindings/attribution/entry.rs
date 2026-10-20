@@ -43,7 +43,6 @@ struct AttributionOptions<'a, 'py> {
 /// Build shared attribution inputs from typed-or-JSON Python values.
 ///
 /// Single and batch execution use the same conversion of markets, dates and options.
-#[allow(clippy::too_many_arguments)]
 fn build_inputs(
     py: Python<'_>,
     market_t0: &Bound<'_, PyAny>,
