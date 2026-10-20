@@ -41,7 +41,6 @@
 //! # }
 //! ```
 
-mod calendar;
 mod compiler;
 mod coupon_api;
 mod credit_rates;
@@ -57,7 +56,6 @@ mod rate_helpers;
 pub(crate) mod schedule;
 mod specs;
 
-pub use calendar::WEEKENDS_ONLY_ID;
 pub use credit_rates::{
     abs_to_smm, cdr_to_mdr, clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr,
     clamped_smm_to_cpr, cpr_to_smm, mdr_to_cdr, psa_cpr, psa_to_cpr, smm_to_cpr, PSA_RAMP_MONTHS,

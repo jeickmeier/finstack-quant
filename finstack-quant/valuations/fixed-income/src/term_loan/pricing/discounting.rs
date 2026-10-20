@@ -48,7 +48,7 @@
 //! - [`generate_cashflows`] for cashflow generation details
 //! - `TermLoan` for the instrument type
 
-use crate::term_loan::types::RateSpec;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::cashflow::npv;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -509,7 +509,7 @@ impl Pricer for TermLoanDiscountingPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::term_loan::spec::AmortizationSpec;
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_cashflows::builder::CouponType;
     use finstack_quant_cashflows::builder::FloatingRateSpec;
     use finstack_quant_core::cashflow::CFKind;

@@ -99,10 +99,6 @@ pub mod schema;
 
 pub(crate) mod serde_defaults;
 
-pub use accrual::{
-    accrued_interest_amount, AccrualConfig, AccrualIndex, AccrualMethod, ExCouponRule,
-};
-pub use aggregation::PeriodAggregation;
 pub use json::{
     build_cashflow_schedule_json, dated_flows_json, validate_cashflow_schedule_json,
     CashflowScheduleBuildSpec, CouponLegSpec, DatedFlowJson, PaymentProgramSpec,

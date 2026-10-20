@@ -1594,15 +1594,19 @@ mod tests {
         for schedule in [&raw, &normalized] {
             schedule.validate().expect("valid PIK state");
             assert_eq!(
-                crate::accrued_interest_amount(schedule, as_of, &crate::AccrualConfig::default())
-                    .expect("PIK accrued"),
+                crate::accrual::accrued_interest_amount(
+                    schedule,
+                    as_of,
+                    &crate::accrual::AccrualConfig::default()
+                )
+                .expect("PIK accrued"),
                 3.0
             );
             assert_eq!(
-                crate::accrued_interest_amount(
+                crate::accrual::accrued_interest_amount(
                     schedule,
                     as_of,
-                    &crate::AccrualConfig {
+                    &crate::accrual::AccrualConfig {
                         include_pik: false,
                         ..Default::default()
                     }

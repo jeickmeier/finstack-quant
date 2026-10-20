@@ -224,7 +224,7 @@ impl Default for AccrualConfig {
 ///
 /// ```
 /// use finstack_quant_cashflows::builder::CashFlowSchedule;
-/// use finstack_quant_cashflows::{accrued_interest_amount, AccrualConfig, AccrualMethod};
+/// use finstack_quant_cashflows::accrual::{accrued_interest_amount, AccrualConfig, AccrualMethod};
 /// use finstack_quant_core::dates::Date;
 ///
 /// fn accrued_as_of(

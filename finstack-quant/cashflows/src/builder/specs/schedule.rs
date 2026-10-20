@@ -136,7 +136,7 @@ pub struct ScheduleParams {
     pub roll_rule: RollRule,
 }
 
-const WK: &str = crate::builder::calendar::WEEKENDS_ONLY_ID;
+const WK: &str = finstack_quant_core::dates::WEEKENDS_ONLY_ID;
 
 impl ScheduleParams {
     fn preset(

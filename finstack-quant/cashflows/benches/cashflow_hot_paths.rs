@@ -23,6 +23,9 @@
 mod fixtures;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use finstack_quant_cashflows::accrual::{
+    accrued_interest_amount, AccrualConfig, AccrualMethod, ExCouponRule,
+};
 use finstack_quant_cashflows::aggregation::{
     aggregate_by_period, aggregate_cashflows_checked, calendar_year_ladder,
 };
@@ -32,8 +35,7 @@ use finstack_quant_cashflows::builder::{
 };
 use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_cashflows::{
-    accrued_interest_amount, build_cashflow_schedule_json, dated_flows_json,
-    validate_cashflow_schedule_json, AccrualConfig, AccrualMethod, ExCouponRule,
+    build_cashflow_schedule_json, dated_flows_json, validate_cashflow_schedule_json,
 };
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;

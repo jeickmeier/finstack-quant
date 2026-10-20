@@ -371,7 +371,7 @@ impl InflationLinkedBond {
     fn schedule_calendar_id(&self) -> &str {
         self.calendar_id
             .as_deref()
-            .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
+            .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID)
     }
 
     /// Coupon periods from issue to maturity under the bond's schedule

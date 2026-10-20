@@ -1815,9 +1815,8 @@ mod controlled_accumulation_tests {
     /// variant does not discriminate.
     #[test]
     fn early_amortization_releases_the_accumulated_balance() {
-        use finstack_quant_valuations_structured_credit::structured_credit::{
-            DefaultModelSpec, EarlyAmortizationSpec,
-        };
+        use finstack_quant_cashflows::builder::DefaultModelSpec;
+        use finstack_quant_valuations_structured_credit::structured_credit::EarlyAmortizationSpec;
 
         let build = |max_loss: f64| {
             let mut sc = deal(Some(ControlledAccumulationSpec {

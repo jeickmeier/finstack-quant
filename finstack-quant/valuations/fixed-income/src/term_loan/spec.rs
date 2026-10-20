@@ -47,7 +47,6 @@ use rust_decimal::Decimal;
 
 pub use super::super::bond::MakeWholeSpec;
 pub use super::super::loan_terms::{CommitmentStep, DrawEvent, MarginStep, OidEirSpec};
-pub use finstack_quant_cashflows::builder::AmortizationSpec;
 
 /// Original Issue Discount (OID) policy for term loan origination.
 ///

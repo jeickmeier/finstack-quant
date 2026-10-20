@@ -27,10 +27,10 @@ fn date(s: &str) -> finstack_quant_core::dates::Date {
 }
 fn accrued_json(raw: &str, as_of: &str, config: Option<&str>) -> finstack_quant_core::Result<f64> {
     let schedule: CashFlowSchedule = serde_json::from_str(raw).expect("schedule JSON");
-    let config = config.map_or_else(cf::AccrualConfig::default, |json| {
+    let config = config.map_or_else(cf::accrual::AccrualConfig::default, |json| {
         serde_json::from_str(json).expect("accrual config JSON")
     });
-    cf::accrued_interest_amount(&schedule, date(as_of), &config)
+    cf::accrual::accrued_interest_amount(&schedule, date(as_of), &config)
 }
 fn close(actual: f64, expected: f64) {
     assert!(

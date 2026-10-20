@@ -2,6 +2,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::cashflow::CFKind;
@@ -19,7 +20,7 @@ use finstack_quant_statements::prelude::*;
 use finstack_quant_statements::types::FinancialStatementInstrument;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent, OidPolicy, RateSpec, TermLoan,
+    CommitmentFeeBase, DdtlSpec, DrawEvent, OidPolicy, TermLoan,
 };
 use finstack_quant_valuations::instruments::PayReceive;
 use indexmap::IndexMap;

@@ -871,7 +871,7 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
     let schedule = bond
         .cashflow_schedule(&market, quote_date)
         .expect("cashflow schedule");
-    let accrued_at_quote = finstack_quant_cashflows::accrued_interest_amount(
+    let accrued_at_quote = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &schedule,
         quote_date,
         &bond.accrual_config(),
@@ -1294,7 +1294,7 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
         let schedule = base_bond
             .cashflow_schedule(&market, quote_date)
             .expect("build full schedule");
-        let accrued = finstack_quant_cashflows::accrued_interest_amount(
+        let accrued = finstack_quant_cashflows::accrual::accrued_interest_amount(
             &schedule,
             quote_date,
             &base_bond.accrual_config(),

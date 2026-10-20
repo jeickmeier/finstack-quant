@@ -250,7 +250,7 @@ pub(super) fn schedule_calendar_id(facility: &RevolvingCredit) -> &str {
     facility
         .calendar_id
         .as_deref()
-        .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
+        .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID)
 }
 
 /// Convert a reset-effective date to its contractual fixing observation date.
@@ -277,7 +277,7 @@ pub(super) fn floating_fixing_date(
         .fixing_calendar_id
         .as_deref()
         .or(facility_calendar_id)
-        .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID);
+        .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID);
     let calendar = finstack_quant_core::dates::calendar_by_id_strict(calendar_id)?;
     reset_effective_date.add_business_days(-spec.reset_lag_days, calendar)
 }

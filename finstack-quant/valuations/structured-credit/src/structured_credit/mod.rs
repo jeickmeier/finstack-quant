@@ -53,10 +53,7 @@ pub use types::{
     TrancheStructure, TrancheValuation, TriggerConsequence, Waterfall, WaterfallBuilder,
     WaterfallDistribution, WaterfallRules, WaterfallTier,
 };
-pub use types::{
-    DefaultModelSpec, MarketConditions, PrepaymentModelSpec, RecoveryModelSpec,
-    StructuredCreditTranche,
-};
+pub use types::{MarketConditions, StructuredCreditTranche};
 
 pub use pricing::{execute_waterfall, generate_cashflows, run_simulation};
 

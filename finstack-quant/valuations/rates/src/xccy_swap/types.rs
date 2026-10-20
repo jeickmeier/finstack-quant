@@ -472,7 +472,7 @@ impl XccySwap {
                 Ok(id)
             }
             _ if self.allow_calendar_fallback => {
-                Ok(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
+                Ok(finstack_quant_core::dates::WEEKENDS_ONLY_ID)
             }
             _ => Err(finstack_quant_core::Error::Validation(format!(
                 "XccySwap leg {} requires a resolvable calendar_id; set allow_calendar_fallback=true to opt into weekends_only",

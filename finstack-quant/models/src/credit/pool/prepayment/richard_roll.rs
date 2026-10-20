@@ -32,8 +32,9 @@
 //! - Richard, S.F., & Roll, R. (1989). "Prepayments on Fixed-Rate Mortgage-Backed Securities."
 //!   *Journal of Portfolio Management*, 15(3), 9-14. `docs/REFERENCES.md#richard-roll-1989`
 
-use super::super::{clamped_cpr_to_smm, expected_shocked_smm};
+use super::super::expected_shocked_smm;
 use super::traits::StochasticPrepayment;
+use finstack_quant_cashflows::builder::clamped_cpr_to_smm;
 
 /// Refinancing slope parameter (lambda) of the arctangent incentive response.
 const REFI_SLOPE: f64 = 20.0;

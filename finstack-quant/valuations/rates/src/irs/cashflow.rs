@@ -139,7 +139,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         calendar_id: float
             .calendar_id
             .as_deref()
-            .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+            .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID),
         end_of_month: float.end_of_month,
         day_count: float.day_count,
         payment_lag_days: float.payment_lag_days,
@@ -284,7 +284,7 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
     let calendar_id = fixed
         .calendar_id
         .as_deref()
-        .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID);
+        .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID);
     let adjust_accrual_dates = irs.adjust_fixed_accrual_dates;
     let periods = build_periods(BuildPeriodsParams {
         start: fixed.start,

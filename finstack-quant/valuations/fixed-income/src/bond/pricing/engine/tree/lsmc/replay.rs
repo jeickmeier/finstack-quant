@@ -6,7 +6,7 @@ impl FloatingCoupon {
     /// Resolve full settlement on a copy, preserving the live accrual endpoint.
     fn settlement(
         &self,
-        state: &FloatingRuntimeState,
+        state: &FloatingCouponReplayState,
         path: &[RatesCreditPathState],
     ) -> Result<finstack_quant_cashflows::builder::FloatingCouponSettlement> {
         let mut settlement_state = state.clone();
@@ -57,7 +57,7 @@ impl ReplayCursor {
         template: &ReplayTemplate,
         checkpoint: &ProductCheckpoint,
     ) -> Result<Self> {
-        let mut floating = vec![FloatingRuntimeState::default(); template.floating.len()];
+        let mut floating = vec![FloatingCouponReplayState::default(); template.floating.len()];
         for live in &checkpoint.live_floating {
             let slot = floating.get_mut(live.coupon_id).ok_or_else(|| {
                 Error::internal("bond hazard LSMC checkpoint has an invalid floating coupon id")
@@ -213,7 +213,7 @@ impl ReplayCursor {
                 coupon.payment_step
             };
             if step == final_step {
-                self.floating[coupon_id] = FloatingRuntimeState::default();
+                self.floating[coupon_id] = FloatingCouponReplayState::default();
             }
         }
         if self.outstanding < -1.0e-8 || !self.outstanding.is_finite() {
@@ -1158,7 +1158,7 @@ impl ReplayTemplate {
         step: usize,
         path: &[RatesCreditPathState],
         state: StepReplay,
-        floating: &[FloatingRuntimeState],
+        floating: &[FloatingCouponReplayState],
         make_whole_policies: Option<&[RegressionPolicy]>,
     ) -> Result<DecisionSnapshot> {
         let representative_date = self.exercise[step]
@@ -1401,7 +1401,7 @@ impl ReplayTemplate {
     pub(super) fn accrued_state(
         &self,
         date: Date,
-        coupon_states: &[FloatingRuntimeState],
+        coupon_states: &[FloatingCouponReplayState],
     ) -> Result<(f64, f64)> {
         let mut cash = 0.0;
         let mut pik = 0.0;

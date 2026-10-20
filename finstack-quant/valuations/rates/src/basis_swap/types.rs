@@ -357,7 +357,7 @@ impl BasisSwap {
             }
         }
         if self.allow_calendar_fallback {
-            return Ok(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID);
+            return Ok(finstack_quant_core::dates::WEEKENDS_ONLY_ID);
         }
         Err(finstack_quant_core::Error::Validation(format!(
             "BasisSwap '{}' {} leg requires a resolvable calendar_id; set allow_calendar_fallback=true to opt into weekends_only",
