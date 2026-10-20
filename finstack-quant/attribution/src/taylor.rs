@@ -135,16 +135,7 @@ impl TaylorAttributionConfig {
     }
 }
 
-/// Factors, repricing count and diagnostics accumulated across a Taylor run.
-#[derive(Default)]
-struct TaylorAccumulator {
-    factors: Vec<TaylorFactorResult>,
-    num_repricings: usize,
-    notes: Vec<String>,
-    result_invalid: bool,
-}
-
-impl TaylorAccumulator {
+impl TaylorAttributionResult {
     /// Record a Taylor factor result and its attempted pricing calls, including
     /// calls that returned an error before the factor completed.
     ///
@@ -156,7 +147,7 @@ impl TaylorAccumulator {
     fn record(
         &mut self,
         factor_kind: &str,
-        factor_id: &CurveId,
+        factor_id: &str,
         result: Result<TaylorFactorResult>,
         repricings: usize,
     ) {
@@ -166,7 +157,7 @@ impl TaylorAccumulator {
             Err(e) => {
                 tracing::warn!(
                     factor_kind = factor_kind,
-                    curve_id = %factor_id,
+                    factor_id,
                     error = %e,
                     "Taylor attribution: factor computation failed"
                 );
@@ -181,7 +172,7 @@ impl TaylorAccumulator {
 
 /// One Taylor factor's first-order and optional second-order P&L.
 #[derive(Debug, Clone)]
-pub(crate) struct TaylorFactorResult {
+struct TaylorFactorResult {
     /// Attribution bucket the factor's P&L lands in (`Carry` for theta).
     pub factor: AttributionFactor,
     /// Diagnostic factor label, including its curve or volatility input ID.
@@ -200,7 +191,7 @@ pub(crate) struct TaylorFactorResult {
 
 /// Complete result of Taylor-based attribution.
 #[derive(Debug, Clone)]
-pub(crate) struct TaylorAttributionResult {
+struct TaylorAttributionResult {
     /// Per-factor breakdown.
     pub factors: Vec<TaylorFactorResult>,
     /// Number of repricings performed (bump-and-reprice calls).
@@ -213,9 +204,9 @@ pub(crate) struct TaylorAttributionResult {
     /// `None` when theta computation failed; otherwise lets `attribute_pnl_taylor`
     /// split theta into PV-only and coupon components without re-collecting
     /// cashflows.
-    pub theta_coupon_income: Option<f64>,
+    pub theta_coupon_income: Option<Money>,
     /// All realized period receipts, including returned principal.
-    pub theta_cash_paid: Option<f64>,
+    pub theta_cash_paid: Option<Money>,
     /// Diagnostic notes accumulated during factor computation (failed factors,
     /// surface-averaged vol moves, missing T0 FX). Threaded into
     /// `PnlAttribution::meta.notes` by `attribute_pnl_taylor`.
@@ -262,9 +253,15 @@ fn compute_taylor_result(
     // mismatch instead of silently differencing across currencies.
     pv_t1.checked_sub(pv_t0)?;
 
-    let mut acc = TaylorAccumulator {
+    let mut acc = TaylorAttributionResult {
+        factors: Vec::new(),
         num_repricings: 2,
-        ..TaylorAccumulator::default()
+        pv_t0,
+        pv_t1,
+        theta_coupon_income: None,
+        theta_cash_paid: None,
+        notes: Vec::new(),
+        result_invalid: false,
     };
 
     // Rate sensitivities (key-rate DV01 per discount curve)
@@ -304,7 +301,7 @@ fn compute_taylor_result(
             (curve_id.clone(), result, repricings)
         };
         for (curve_id, result, repricings) in map_policy(execution_policy, curve_ids, compute) {
-            acc.record(factor_kind, &curve_id, result, repricings);
+            acc.record(factor_kind, curve_id.as_str(), result, repricings);
         }
     }
 
@@ -376,7 +373,7 @@ fn compute_taylor_result(
     };
     let credit_results = map_policy(execution_policy, credit_curves, compute_credit);
     for (curve_id, result, repricings) in credit_results {
-        acc.record("credit", &curve_id, result, repricings);
+        acc.record("credit", curve_id.as_str(), result, repricings);
     }
 
     // Volatility sensitivities (vega) — one factor per vol-surface dependency.
@@ -425,7 +422,7 @@ fn compute_taylor_result(
         };
     let vol_results = map_policy(execution_policy, &surface_dependencies, compute_vol);
     for (vol_surface_id, result, repricings) in vol_results {
-        acc.record("vol", &vol_surface_id, result, repricings);
+        acc.record("vol", vol_surface_id.as_str(), result, repricings);
     }
 
     let scalar_vol_t0 =
@@ -447,7 +444,7 @@ fn compute_taylor_result(
             "Vol:scalars",
             &mut repricings,
         );
-        acc.record("vol", &CurveId::new("Vol:scalars"), result, repricings);
+        acc.record("vol", "Vol:scalars", result, repricings);
     }
 
     // FX-exposure factor: pricing impact of FX-rate changes on cross-currency
@@ -532,19 +529,12 @@ fn compute_taylor_result(
             &params_t0,
             &mut acc.num_repricings,
         );
-        acc.record(
-            "model-parameter",
-            &CurveId::new("ModelParameters"),
-            result,
-            0,
-        );
+        acc.record("model-parameter", "ModelParameters", result, 0);
     }
 
     // Theta (time decay): reprice at T1 date with T0 market. The outcome
     // also carries `coupon_income` so `attribute_pnl_taylor` can split theta
     // into PV-only and coupon components without re-collecting cashflows.
-    let mut theta_coupon_income: Option<f64> = None;
-    let mut theta_cash_paid: Option<f64> = None;
     match compute_theta_factor(
         &instrument_t0,
         market_t0,
@@ -560,8 +550,8 @@ fn compute_taylor_result(
                 cash_paid,
             } = outcome;
 
-            theta_coupon_income = Some(coupon_income);
-            theta_cash_paid = Some(cash_paid);
+            acc.theta_coupon_income = Some(coupon_income);
+            acc.theta_cash_paid = Some(cash_paid);
             acc.factors.push(result);
         }
         Err(e) => {
@@ -576,16 +566,7 @@ fn compute_taylor_result(
         }
     }
 
-    Ok(TaylorAttributionResult {
-        factors: acc.factors,
-        num_repricings: acc.num_repricings,
-        pv_t0,
-        pv_t1,
-        theta_coupon_income,
-        theta_cash_paid,
-        notes: acc.notes,
-        result_invalid: acc.result_invalid,
-    })
+    Ok(acc)
 }
 
 /// Compute Taylor-based P&L attribution.
@@ -695,14 +676,9 @@ pub(crate) fn attribute_pnl_taylor(
             AttributionFactor::ModelParameters => &mut attribution.model_params_pnl,
             AttributionFactor::Carry => {
                 // Taylor theta already includes cashflows from compute_theta_factor.
-                let ci = factor_money_or_invalid(
-                    taylor.theta_coupon_income.unwrap_or(0.0),
-                    ccy,
-                    "Theta coupon income",
-                    &mut attribution.meta.notes,
-                    &mut non_finite_detected,
-                );
-                let cash_paid = Money::new(taylor.theta_cash_paid.unwrap_or(0.0), ccy)?;
+                let zero = Money::from((0_i64, ccy));
+                let ci = taylor.theta_coupon_income.unwrap_or(zero);
+                let cash_paid = taylor.theta_cash_paid.unwrap_or(zero);
                 let theta_only = Money::new(factor_money.amount() - cash_paid.amount(), ccy)?;
                 // Taylor path: delta_accrued and flat_window_diff are unavailable (no repricing).
                 let carry_inputs = TotalReturnCarryInputs {
@@ -1291,7 +1267,7 @@ fn restored_family_factor(
 
 /// Run a restore-and-reprice family when either market carries that family.
 fn record_restored_family_factor(
-    acc: &mut TaylorAccumulator,
+    acc: &mut TaylorAttributionResult,
     request: &AttributionRequest<'_>,
     dependencies: &finstack_quant_valuations::instruments::MarketDependencies,
     pv_t1: Money,
@@ -1314,7 +1290,7 @@ fn record_restored_family_factor(
         factor_name,
         &mut repricings,
     );
-    acc.record(factor_kind, &CurveId::new(factor_name), result, repricings);
+    acc.record(factor_kind, factor_name, result, repricings);
 }
 
 /// Isolate T₀ vs T₁ model-parameter P&L by repricing the T₁ market with the
@@ -1348,8 +1324,8 @@ fn compute_model_params_factor(
 /// is non-deterministic).
 struct ThetaFactorOutcome {
     factor: TaylorFactorResult,
-    coupon_income: f64,
-    cash_paid: f64,
+    coupon_income: Money,
+    cash_paid: Money,
 }
 
 /// Compute theta (time decay + realized cashflows) by repricing at T1 date
@@ -1376,9 +1352,7 @@ fn compute_theta_factor(
         pv_t0.currency(),
     )?;
 
-    let coupon_income = cash.income.amount();
-    let cash_paid = cash.total.amount();
-    let theta_pnl = pv_diff + cash_paid;
+    let theta_pnl = pv_diff + cash.total.amount();
     Ok(ThetaFactorOutcome {
         factor: TaylorFactorResult {
             factor: AttributionFactor::Carry,
@@ -1387,8 +1361,8 @@ fn compute_theta_factor(
             gamma_pnl: None,
             working: FactorWorking::Repriced { pv: pv_t0_at_t1 },
         },
-        coupon_income,
-        cash_paid,
+        coupon_income: cash.income,
+        cash_paid: cash.total,
     })
 }
 
