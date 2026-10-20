@@ -4,7 +4,7 @@
 //! function that takes the object (or its JSON) as the first argument. The
 //! validating `Constraint` constructors return the constraint's wire object.
 
-use crate::utils::input::{from_js_json, js_f64, js_json_value, js_opt_string, js_string, js_uint};
+use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, js_uint};
 use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
 use finstack_quant_factor::SensitivityMatrix;
 use finstack_quant_portfolio::attribution::PortfolioAttribution;
@@ -412,14 +412,8 @@ pub fn constraint_weight_bounds(
     max: JsValue,
     label: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    // A filter is `"all"` or an object, so the argument is the value itself
-    // (a string is the wire label, not JSON text to parse).
-    let filter: PositionFilter = serde_json::from_value(js_json_value(&filter, "filter")?)
-        .map_err(|error| {
-            to_js_err(finstack_quant_core::Error::Validation(format!(
-                "filter: {error}"
-            )))
-        })?;
+    // A filter is `"all"` or an object; `js_wire` reads a bare wire label.
+    let filter: PositionFilter = crate::utils::wire::js_wire(&filter, "filter")?;
     let min = js_f64(&min, "min")?;
     let max = js_f64(&max, "max")?;
     constraint_value(Constraint::weight_bounds(filter, min, max), label.as_ref())

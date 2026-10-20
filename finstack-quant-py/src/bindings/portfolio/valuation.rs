@@ -256,10 +256,7 @@ impl PyPortfolioValuation {
     /// name, e.g. ``"cashflow_date"``).
     #[getter]
     fn fx_collapse_policy(&self) -> PyResult<String> {
-        match serde_json::to_value(self.inner.fx_collapse_policy).map_err(display_to_py)? {
-            serde_json::Value::String(s) => Ok(s),
-            other => Ok(other.to_string()),
-        }
+        finstack_quant_core::wire::serde_label(&self.inner.fx_collapse_policy).map_err(core_to_py)
     }
 
     /// Whether any position carries incomplete risk metrics.
@@ -395,57 +392,6 @@ impl PyPortfolioValuation {
     }
 }
 
-/// Strictly parse user-supplied metric names into [`RequestedMetrics`].
-///
-/// Delegates to the canonical
-/// `RequestedMetrics::try_from_metric_names` in the portfolio crate (shared
-/// with the WASM binding), which resolves names against the standard metric
-/// registry and rejects unknown ones — surfaced here as a `ValueError` listing
-/// the closest standard identifiers — instead of letting a typo silently
-/// degrade to PV-only valuation.
-fn parse_requested_metrics(
-    metrics: Option<Vec<String>>,
-) -> PyResult<finstack_quant_portfolio::valuation::RequestedMetrics> {
-    finstack_quant_portfolio::valuation::RequestedMetrics::try_from_metric_names(metrics)
-        .map_err(crate::errors::core_to_py)
-}
-
-/// Run the shared valuation engine for the typed Python entry point.
-fn run_portfolio_valuation(
-    py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
-    strict_risk: Option<bool>,
-    metrics: Option<Vec<String>>,
-) -> PyResult<finstack_quant_portfolio::valuation::PortfolioValuation> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let market = extract_market_ref(py, market)?;
-    let config = finstack_quant_core::config::FinstackConfig::default();
-    let mut options = finstack_quant_portfolio::valuation::PortfolioValuationOptions {
-        metrics: parse_requested_metrics(metrics)?,
-        ..Default::default()
-    };
-    if let Some(strict_risk) = strict_risk {
-        options.strict_risk = strict_risk;
-    }
-    // Release the GIL (PyO3 `detach`) while the CPU-bound Rust valuation runs
-    // so other Python threads can execute concurrently. The `*Access` wrappers
-    // contain a `PyRef` (not `Ungil`), so we deref to plain Rust references
-    // before entering the closure — these are `Send + Sync` and therefore
-    // `Ungil`. No Python state is touched inside.
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
-    py.detach(|| {
-        finstack_quant_portfolio::valuation::value_portfolio(
-            portfolio_ref,
-            market_ref,
-            &config,
-            &options,
-        )
-    })
-    .map_err(portfolio_to_py)
-}
-
 /// Value a portfolio.
 ///
 /// Parameters
@@ -486,7 +432,38 @@ fn value_portfolio(
     strict_risk: Option<bool>,
     metrics: Option<Vec<String>>,
 ) -> PyResult<PyPortfolioValuation> {
-    let valuation = run_portfolio_valuation(py, portfolio, market, strict_risk, metrics)?;
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let market = extract_market_ref(py, market)?;
+    let config = finstack_quant_core::config::FinstackConfig::default();
+    let mut options = finstack_quant_portfolio::valuation::PortfolioValuationOptions {
+        // Strict parse shared with WASM: an unknown metric name is a ValueError
+        // naming the closest standard identifiers, not a silent PV-only run.
+        metrics: finstack_quant_portfolio::valuation::RequestedMetrics::try_from_metric_names(
+            metrics,
+        )
+        .map_err(crate::errors::core_to_py)?,
+        ..Default::default()
+    };
+    if let Some(strict_risk) = strict_risk {
+        options.strict_risk = strict_risk;
+    }
+    // Release the GIL (PyO3 `detach`) while the CPU-bound Rust valuation runs
+    // so other Python threads can execute concurrently. The `*Access` wrappers
+    // contain a `PyRef` (not `Ungil`), so we deref to plain Rust references
+    // before entering the closure — these are `Send + Sync` and therefore
+    // `Ungil`. No Python state is touched inside.
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let valuation = py
+        .detach(|| {
+            finstack_quant_portfolio::valuation::value_portfolio(
+                portfolio_ref,
+                market_ref,
+                &config,
+                &options,
+            )
+        })
+        .map_err(portfolio_to_py)?;
     Ok(PyPortfolioValuation::from_inner(valuation))
 }
 

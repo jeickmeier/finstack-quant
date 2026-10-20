@@ -105,21 +105,6 @@ fn twrr_modified_dietz(py: Python<'_>, period: &Bound<'_, PyAny>) -> PyResult<f6
     })
 }
 
-/// Parse the returns and run the canonical geometric linking.
-fn run_twrr_linked(
-    py: Python<'_>,
-    returns_json: &str,
-    horizon_years: f64,
-) -> PyResult<finstack_quant_portfolio::performance::LinkedReturn> {
-    let returns_json = returns_json.to_owned();
-    py.detach(move || {
-        let returns: Vec<f64> = serde_json::from_str(&returns_json)
-            .map_err(|err| serde_json_to_py(err, "invalid TWRR returns JSON"))?;
-        finstack_quant_portfolio::performance::twrr_linked(&returns, horizon_years)
-            .map_err(core_to_py)
-    })
-}
-
 /// Geometrically link TWRR sub-period returns.
 ///
 /// Parameters
@@ -149,9 +134,13 @@ fn twrr_linked(
     horizon_years: f64,
 ) -> PyResult<PyLinkedReturn> {
     let returns_json = crate::bindings::extract::extract_records_json(py, returns_json, "returns")?;
-    let returns_json: &str = &returns_json;
     Ok(PyLinkedReturn {
-        inner: run_twrr_linked(py, returns_json, horizon_years)?,
+        inner: py.detach(move || {
+            let returns: Vec<f64> = serde_json::from_str(&returns_json)
+                .map_err(|err| serde_json_to_py(err, "invalid TWRR returns JSON"))?;
+            finstack_quant_portfolio::performance::twrr_linked(&returns, horizon_years)
+                .map_err(core_to_py)
+        })?,
     })
 }
 /// Compute the money-weighted return (XIRR, Act/365F) from dated cashflows.

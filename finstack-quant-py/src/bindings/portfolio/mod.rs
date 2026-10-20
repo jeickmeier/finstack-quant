@@ -38,13 +38,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "__doc__",
         "Portfolio construction, valuation, cashflows, scenarios, and metrics.",
     )?;
-    // Common base for every named finstack exception; its canonical home is
-    // `finstack_quant.core`, and it is re-exported here alongside the portfolio
-    // family so `except FinstackError` is reachable without a second import.
-    m.add(
-        "FinstackError",
-        py.get_type::<crate::errors::FinstackError>(),
-    )?;
     m.add(
         "PortfolioError",
         py.get_type::<crate::errors::PortfolioError>(),
@@ -93,7 +86,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     margin::register(py, &m)?;
 
     let exports = vec![
-        "FinstackError",
         "PortfolioError",
         "ContractValidationError",
         "UnsupportedContractVersionError",

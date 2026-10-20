@@ -37,11 +37,9 @@ exporting to downstream services.
 Exceptions
 ----------
 
-``FinstackError`` is the common base for the library's named exceptions, so
-``except FinstackError`` catches ``PortfolioError``, ``ContractValidationError``
-and their subclasses in one clause. It derives from ``ValueError``, so every
-existing ``except ValueError`` keeps working unchanged. Its canonical home is
-``finstack_quant.core``; it is re-exported here for convenience.
+``PortfolioError``, ``ContractValidationError`` and their subclasses derive
+from ``finstack_quant.core.FinstackError`` (itself a ``ValueError``), so one
+``except FinstackError`` clause catches them all.
 
 Examples:
 --------
@@ -53,7 +51,6 @@ Examples:
 
 from finstack_quant.finstack_quant import portfolio as _portfolio
 
-FinstackError = _portfolio.FinstackError
 PortfolioError = _portfolio.PortfolioError
 ContractValidationError = _portfolio.ContractValidationError
 UnsupportedContractVersionError = _portfolio.UnsupportedContractVersionError
@@ -185,7 +182,6 @@ __all__ = [
     "FiAttributionResult",
     "FiCarinoLinkedResult",
     "FiReconciliationReport",
-    "FinstackError",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",

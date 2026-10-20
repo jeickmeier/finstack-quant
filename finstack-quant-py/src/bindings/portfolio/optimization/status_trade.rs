@@ -1,12 +1,13 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use finstack_quant_portfolio::optimization::{OptimizationStatus, TradeDirection, TradeSpec};
+use finstack_quant_portfolio::optimization::{OptimizationStatus, TradeSpec};
 
 use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe;
 
 use super::enums::{PyTradeDirection, PyTradeType};
 use crate::bindings::json_bridge::{deserialize_json, serialize_json};
+use crate::errors::core_to_py;
 
 /// Status of an optimization run (mirrors `OptimizationStatus`).
 #[pyclass(
@@ -17,32 +18,9 @@ use crate::bindings::json_bridge::{deserialize_json, serialize_json};
     frozen,
     from_py_object
 )]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub(super) struct PyOptimizationStatus {
     pub(crate) inner: OptimizationStatus,
-}
-
-impl std::hash::Hash for PyOptimizationStatus {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        // `OptimizationStatus` does not derive `Hash` in the Rust crate, so
-        // hash a variant tag plus the payload. Equal values (derived
-        // `PartialEq`) hash equally by construction.
-        match &self.inner {
-            OptimizationStatus::Optimal => 0u8.hash(state),
-            OptimizationStatus::FeasibleButSuboptimal => 1u8.hash(state),
-            OptimizationStatus::Unbounded => 2u8.hash(state),
-            OptimizationStatus::Infeasible {
-                conflicting_constraints,
-            } => {
-                3u8.hash(state);
-                conflicting_constraints.hash(state);
-            }
-            OptimizationStatus::Error { message } => {
-                4u8.hash(state);
-                message.hash(state);
-            }
-        }
-    }
 }
 
 impl PyOptimizationStatus {
@@ -108,14 +86,8 @@ impl PyOptimizationStatus {
 
     /// Variant tag (``"optimal"``, ``"feasible_but_suboptimal"``, ...).
     #[getter]
-    fn kind(&self) -> &'static str {
-        match &self.inner {
-            OptimizationStatus::Optimal => "optimal",
-            OptimizationStatus::FeasibleButSuboptimal => "feasible_but_suboptimal",
-            OptimizationStatus::Infeasible { .. } => "infeasible",
-            OptimizationStatus::Unbounded => "unbounded",
-            OptimizationStatus::Error { .. } => "error",
-        }
+    fn kind(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
     /// Whether this status represents a usable (feasible) solution.
@@ -145,8 +117,8 @@ impl PyOptimizationStatus {
         }
     }
 
-    fn __repr__(&self) -> String {
-        format!("OptimizationStatus.{}(...)", self.kind())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("OptimizationStatus.{}(...)", self.kind()?))
     }
 }
 
@@ -266,18 +238,14 @@ impl PyTradeSpec {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
 
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "TradeSpec(position_id={:?}, instrument_id={:?}, direction={:?}, delta_quantity={})",
             self.inner.position_id.as_str(),
             self.inner.instrument_id,
-            match self.inner.direction {
-                TradeDirection::Buy => "buy",
-                TradeDirection::Sell => "sell",
-                TradeDirection::Hold => "hold",
-            },
+            finstack_quant_core::wire::serde_label(&self.inner.direction).map_err(core_to_py)?,
             self.inner.delta_quantity,
-        )
+        ))
     }
 
     /// Render as an HTML table in Jupyter notebooks.

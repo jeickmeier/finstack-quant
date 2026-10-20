@@ -1,7 +1,8 @@
 //! WASM bindings for TWRR / MWRR return linking.
 
-use crate::utils::input::{js_f64, json_text};
+use crate::utils::input::js_f64;
 
+use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -15,9 +16,8 @@ use wasm_bindgen::prelude::*;
 /// out-of-range cashflow weight, non-finite inputs).
 #[wasm_bindgen(js_name = twrrModifiedDietz)]
 pub fn twrr_modified_dietz(period_json: JsValue) -> Result<f64, JsValue> {
-    let period_json: &str = &json_text(&period_json, "periodJson")?;
     let period: finstack_quant_portfolio::performance::TwrrPeriod =
-        serde_json::from_str(period_json).map_err(to_js_err)?;
+        from_js_json(&period_json, "periodJson")?;
     finstack_quant_portfolio::performance::twrr_modified_dietz(&period).map_err(to_js_err)
 }
 
@@ -34,8 +34,7 @@ pub fn twrr_modified_dietz(period_json: JsValue) -> Result<f64, JsValue> {
 #[wasm_bindgen(js_name = twrrLinked)]
 pub fn twrr_linked(returns_json: JsValue, horizon_years: JsValue) -> Result<JsValue, JsValue> {
     let horizon_years = js_f64(&horizon_years, "horizonYears")?;
-    let returns_json: &str = &json_text(&returns_json, "returnsJson")?;
-    let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
+    let returns: Vec<f64> = from_js_json(&returns_json, "returnsJson")?;
     let result = finstack_quant_portfolio::performance::twrr_linked(&returns, horizon_years)
         .map_err(to_js_err)?;
     to_js_value(&result)
@@ -62,8 +61,7 @@ pub fn twrr_linked(returns_json: JsValue, horizon_years: JsValue) -> Result<JsVa
 /// than -1 can be found.
 #[wasm_bindgen(js_name = mwrXirr)]
 pub fn mwr_xirr(cashflows_json: JsValue) -> Result<f64, JsValue> {
-    let cashflows_json: &str = &json_text(&cashflows_json, "cashflowsJson")?;
     let cashflows: Vec<finstack_quant_portfolio::performance::DatedCashflow> =
-        serde_json::from_str(cashflows_json).map_err(to_js_err)?;
+        from_js_json(&cashflows_json, "cashflowsJson")?;
     finstack_quant_portfolio::performance::mwr_xirr(&cashflows).map_err(to_js_err)
 }

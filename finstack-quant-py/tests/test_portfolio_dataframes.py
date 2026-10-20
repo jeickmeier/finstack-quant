@@ -1211,8 +1211,8 @@ def _portfolio_metrics() -> PortfolioMetrics:
     )
 
 
-def test_portfolio_metrics_to_aggregated_dataframe() -> None:
-    df = _portfolio_metrics().to_aggregated_dataframe()
+def test_portfolio_metrics_to_dataframe_is_aggregated_table() -> None:
+    df = _portfolio_metrics().to_dataframe()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["metric_id", "total"]

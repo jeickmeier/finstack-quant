@@ -1548,7 +1548,7 @@ book         = { python = "finstack_quant.portfolio.book",         status = "mis
 brinson      = { python = "finstack_quant.portfolio",              status = "flattened", note = "Brinson-Fachler and Carino attribution helpers are exported flat on finstack_quant.portfolio" }
 builder      = { python = "finstack_quant.portfolio",              status = "flattened", note = "PortfolioBuilder is bound flat on finstack_quant.portfolio behind Portfolio.builder(id, base_currency, as_of) (fluent name/entity/position/tag/meta/build); Portfolio.from_spec remains the JSON path" }
 cashflows    = { python = "finstack_quant.portfolio.cashflows",    status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
-dataframe    = { python = "finstack_quant.portfolio.dataframe",    status = "missing", note = "The Rust root re-exports positions_to_table/entities_to_table/metrics_to_table/aggregated_metrics_to_table, but Python does not bind the free functions; they back the typed exits (PortfolioValuation.to_dataframe/to_arrow_positions, PortfolioMetrics.to_position_dataframe/to_aggregated_dataframe). entities_to_table has no host consumer yet." }
+dataframe    = { python = "finstack_quant.portfolio.dataframe",    status = "missing", note = "Python does not bind the Rust dataframe free functions (positions_to_table, metrics_to_table, aggregated_metrics_to_table); they back the typed exits (PortfolioValuation.to_dataframe/to_arrow_positions, PortfolioMetrics.to_position_dataframe/to_dataframe)." }
 dependencies = { python = "finstack_quant.portfolio.dependencies", status = "missing" }
 error        = { python = "finstack_quant.portfolio",              status = "flattened", note = "The Rust Error/Result surface flattens onto the Python root as PortfolioError (validation-kind failures) plus the materialization ContractValidationError family; not-found failures (unknown entity, missing market data, missing FX) raise KeyError and computation failures RuntimeError, per Error::kind(). Optimization outcomes use the typed OptimizationStatus result envelope" }
 excess_return = { python = "finstack_quant.portfolio",             status = "flattened", note = "Duration-matched credit excess return functions (cell_returns_from_reference, cell_returns_from_curves, excess_returns) are exported flat on finstack_quant.portfolio (Dynkin, Hyman & Vankudre 1998, Appendix B); duration_cell_label remains Rust-only" }
@@ -1607,7 +1607,6 @@ public = [
     "FiAttributionResult",
     "FiCarinoLinkedResult",
     "FiReconciliationReport",
-    "FinstackError",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",

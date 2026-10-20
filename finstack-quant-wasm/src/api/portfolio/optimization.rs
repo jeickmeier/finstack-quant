@@ -3,6 +3,7 @@
 use super::JsPortfolio;
 use crate::utils::input::json_text;
 
+use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -22,12 +23,10 @@ use wasm_bindgen::prelude::*;
 /// produce a result, or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = optimizePortfolio)]
 pub fn optimize_portfolio(spec_json: JsValue, market_json: JsValue) -> Result<JsValue, JsValue> {
-    let spec_json: &str = &json_text(&spec_json, "specJson")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
     let spec: finstack_quant_portfolio::optimization::PortfolioOptimizationSpec =
-        serde_json::from_str(spec_json).map_err(to_js_err)?;
+        from_js_json(&spec_json, "specJson")?;
     let market: finstack_quant_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
+        from_js_json(&market_json, "marketJson")?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     let result =
         finstack_quant_portfolio::optimization::optimize_from_spec(&spec, &market, &config)

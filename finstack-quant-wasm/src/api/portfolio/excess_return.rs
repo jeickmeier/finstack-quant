@@ -1,8 +1,9 @@
 //! WASM bindings for duration-cell credit excess returns.
 
-use crate::utils::input::{js_f64, js_string, json_text};
+use crate::utils::input::{js_f64, js_string};
 
 use crate::api::core::market_data::JsDiscountCurve;
+use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -30,13 +31,11 @@ pub fn cell_returns_from_reference(
     base_label: JsValue,
     config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let reference_json: &str = &json_text(&reference_json, "referenceJson")?;
     let base_label: &str = &js_string(&base_label, "baseLabel")?;
-    let config_json: &str = &json_text(&config_json, "configJson")?;
     let reference: Vec<finstack_quant_portfolio::excess_return::ReferenceReturn> =
-        serde_json::from_str(reference_json).map_err(to_js_err)?;
+        from_js_json(&reference_json, "referenceJson")?;
     let config: finstack_quant_portfolio::excess_return::CellConfig =
-        serde_json::from_str(config_json).map_err(to_js_err)?;
+        from_js_json(&config_json, "configJson")?;
     let table = finstack_quant_portfolio::excess_return::cell_returns_from_reference(
         &reference, base_label, &config,
     )
@@ -79,9 +78,8 @@ pub fn cell_returns_from_curves(
     let horizon_years = js_f64(&horizon_years, "horizonYears")?;
     let max_duration = js_f64(&max_duration, "maxDuration")?;
     let base_label: &str = &js_string(&base_label, "baseLabel")?;
-    let config_json: &str = &json_text(&config_json, "configJson")?;
     let config: finstack_quant_portfolio::excess_return::CellConfig =
-        serde_json::from_str(config_json).map_err(to_js_err)?;
+        from_js_json(&config_json, "configJson")?;
     let table = finstack_quant_portfolio::excess_return::cell_returns_from_curves(
         &start.inner,
         &end.inner,
@@ -114,12 +112,10 @@ pub fn cell_returns_from_curves(
 /// value.
 #[wasm_bindgen(js_name = excessReturns)]
 pub fn excess_returns(positions_json: JsValue, table_json: JsValue) -> Result<JsValue, JsValue> {
-    let positions_json: &str = &json_text(&positions_json, "positionsJson")?;
-    let table_json: &str = &json_text(&table_json, "tableJson")?;
     let positions: Vec<finstack_quant_portfolio::excess_return::ExcessReturnPosition> =
-        serde_json::from_str(positions_json).map_err(to_js_err)?;
+        from_js_json(&positions_json, "positionsJson")?;
     let table: finstack_quant_portfolio::excess_return::DurationCellTable =
-        serde_json::from_str(table_json).map_err(to_js_err)?;
+        from_js_json(&table_json, "tableJson")?;
     let result = finstack_quant_portfolio::excess_return::excess_returns(&positions, &table)
         .map_err(to_js_err)?;
     to_js_value(&result)

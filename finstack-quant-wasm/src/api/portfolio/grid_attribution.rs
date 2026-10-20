@@ -1,7 +1,6 @@
 //! WASM bindings for duration-cell x sector grid attribution.
 
-use crate::utils::input::json_text;
-
+use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -31,12 +30,10 @@ pub fn grid_attribution(
     portfolio_json: JsValue,
     benchmark_json: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let portfolio_json: &str = &json_text(&portfolio_json, "portfolioJson")?;
-    let benchmark_json: &str = &json_text(&benchmark_json, "benchmarkJson")?;
     let portfolio: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
-        serde_json::from_str(portfolio_json).map_err(to_js_err)?;
+        from_js_json(&portfolio_json, "portfolioJson")?;
     let benchmark: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
-        serde_json::from_str(benchmark_json).map_err(to_js_err)?;
+        from_js_json(&benchmark_json, "benchmarkJson")?;
     let result =
         finstack_quant_portfolio::grid_attribution::grid_attribution(&portfolio, &benchmark)
             .map_err(to_js_err)?;
@@ -61,9 +58,8 @@ pub fn grid_attribution(
 /// `-1`, or the linked result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = gridCarinoLink)]
 pub fn grid_carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
-    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
     let periods: Vec<finstack_quant_portfolio::grid_attribution::GridAttributionResult> =
-        serde_json::from_str(periods_json).map_err(to_js_err)?;
+        from_js_json(&periods_json, "periodsJson")?;
     let result = finstack_quant_portfolio::grid_attribution::grid_carino_link(&periods)
         .map_err(to_js_err)?;
     to_js_value(&result)

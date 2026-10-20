@@ -29,6 +29,7 @@ import pytest
 
 from finstack_quant.analytics import AnalyticsError, constrained_least_squares
 from finstack_quant.calibration import CalibrationEnvelopeError
+from finstack_quant.core import FinstackError
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.math import linalg
@@ -36,7 +37,6 @@ from finstack_quant.core.money import Money
 from finstack_quant.portfolio import (
     ContractLimitExceededError,
     ContractValidationError,
-    FinstackError,
     MalformedContractSchemaError,
     MissingContractVersionError,
     Portfolio,

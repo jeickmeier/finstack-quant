@@ -2,6 +2,7 @@
 
 use crate::utils::input::{js_string, json_text};
 
+use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -24,15 +25,13 @@ pub fn aggregate_metrics(
     market_json: JsValue,
     as_of: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let valuation_json: &str = &json_text(&valuation_json, "valuationJson")?;
     let base_currency: &str = &js_string(&base_currency, "baseCurrency")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let valuation: finstack_quant_portfolio::valuation::PortfolioValuation =
-        serde_json::from_str(valuation_json).map_err(to_js_err)?;
+        from_js_json(&valuation_json, "valuationJson")?;
     let ccy: finstack_quant_core::currency::Currency = base_currency.parse().map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
+        from_js_json(&market_json, "marketJson")?;
     let date = crate::utils::parse_iso_date(as_of)?;
     let metrics =
         finstack_quant_portfolio::metrics::aggregate_metrics(&valuation, ccy, &market, date)

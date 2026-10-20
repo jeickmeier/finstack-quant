@@ -223,41 +223,6 @@ impl PyGridCarinoLinkedResult {
     }
 }
 
-/// Parse both sides and run the canonical single-period grid attribution.
-fn run_grid_attribution(
-    py: Python<'_>,
-    portfolio_json: &str,
-    benchmark_json: &str,
-) -> PyResult<finstack_quant_portfolio::grid_attribution::GridAttributionResult> {
-    let portfolio_json = portfolio_json.to_owned();
-    let benchmark_json = benchmark_json.to_owned();
-    py.detach(move || {
-        let portfolio: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
-            serde_json::from_str(&portfolio_json)
-                .map_err(|err| serde_json_to_py(err, "invalid grid portfolio JSON"))?;
-        let benchmark: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
-            serde_json::from_str(&benchmark_json)
-                .map_err(|err| serde_json_to_py(err, "invalid grid benchmark JSON"))?;
-        finstack_quant_portfolio::grid_attribution::grid_attribution(&portfolio, &benchmark)
-            .map_err(portfolio_to_py)
-    })
-}
-
-/// Parse period JSON and run the canonical grid Carino linking.
-fn run_grid_carino_link(
-    py: Python<'_>,
-    periods_json: &str,
-) -> PyResult<finstack_quant_portfolio::grid_attribution::GridCarinoLinkedResult> {
-    let periods_json = periods_json.to_owned();
-    py.detach(move || {
-        let periods: Vec<finstack_quant_portfolio::grid_attribution::GridAttributionResult> =
-            serde_json::from_str(&periods_json)
-                .map_err(|err| serde_json_to_py(err, "invalid grid periods JSON"))?;
-        finstack_quant_portfolio::grid_attribution::grid_carino_link(&periods)
-            .map_err(portfolio_to_py)
-    })
-}
-
 /// Compute a single-period hierarchical duration-cell x sector grid attribution.
 ///
 /// Binds Rust `finstack_quant_portfolio::grid_attribution::grid_attribution` (Dynkin, Hyman &
@@ -321,12 +286,19 @@ fn grid_attribution(
 ) -> PyResult<PyGridAttributionResult> {
     let portfolio_json =
         crate::bindings::extract::extract_records_json(py, portfolio_json, "portfolio")?;
-    let portfolio_json: &str = &portfolio_json;
     let benchmark_json =
         crate::bindings::extract::extract_records_json(py, benchmark_json, "benchmark")?;
-    let benchmark_json: &str = &benchmark_json;
     Ok(PyGridAttributionResult {
-        inner: run_grid_attribution(py, portfolio_json, benchmark_json)?,
+        inner: py.detach(move || {
+            let portfolio: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
+                serde_json::from_str(&portfolio_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid grid portfolio JSON"))?;
+            let benchmark: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
+                serde_json::from_str(&benchmark_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid grid benchmark JSON"))?;
+            finstack_quant_portfolio::grid_attribution::grid_attribution(&portfolio, &benchmark)
+                .map_err(portfolio_to_py)
+        })?,
     })
 }
 /// Carino-link multi-period hierarchical grid attribution results.
@@ -388,9 +360,14 @@ fn grid_carino_link(
     periods_json: &Bound<'_, PyAny>,
 ) -> PyResult<PyGridCarinoLinkedResult> {
     let periods_json = crate::bindings::extract::extract_records_json(py, periods_json, "periods")?;
-    let periods_json: &str = &periods_json;
     Ok(PyGridCarinoLinkedResult {
-        inner: run_grid_carino_link(py, periods_json)?,
+        inner: py.detach(move || {
+            let periods: Vec<finstack_quant_portfolio::grid_attribution::GridAttributionResult> =
+                serde_json::from_str(&periods_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid grid periods JSON"))?;
+            finstack_quant_portfolio::grid_attribution::grid_carino_link(&periods)
+                .map_err(portfolio_to_py)
+        })?,
     })
 }
 /// Register grid attribution functions on the portfolio submodule.

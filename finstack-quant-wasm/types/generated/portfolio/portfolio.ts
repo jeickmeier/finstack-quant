@@ -2046,7 +2046,7 @@ export interface TaylorAttributionConfig {
  *   indefinitely. A portfolio supports at most 100,000 books and 512 levels
  *   of ancestry, including the root.
  * - [`Book::child_book_ids`] drives rollup in [`crate::grouping::aggregate_by_book`];
- *   [`crate::portfolio::Portfolio::validate`] checks parent/child consistency
+ *   [`crate::Portfolio::validate`] checks parent/child consistency
  *   between child lists and [`Book::parent_id`]
  */
 export interface Book {

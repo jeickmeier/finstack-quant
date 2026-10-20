@@ -1,7 +1,8 @@
 //! WASM bindings for Campisi fixed-income attribution.
 
-use crate::utils::input::{js_f64, json_text};
+use crate::utils::input::js_f64;
 
+use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -41,15 +42,12 @@ pub fn campisi_attribution(
     benchmark_json: JsValue,
     config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let portfolio_json: &str = &json_text(&portfolio_json, "portfolioJson")?;
-    let benchmark_json: &str = &json_text(&benchmark_json, "benchmarkJson")?;
-    let config_json: &str = &json_text(&config_json, "configJson")?;
     let portfolio: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
-        serde_json::from_str(portfolio_json).map_err(to_js_err)?;
+        from_js_json(&portfolio_json, "portfolioJson")?;
     let benchmark: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
-        serde_json::from_str(benchmark_json).map_err(to_js_err)?;
+        from_js_json(&benchmark_json, "benchmarkJson")?;
     let config: finstack_quant_portfolio::fi_attribution::FiAttributionConfig =
-        serde_json::from_str(config_json).map_err(to_js_err)?;
+        from_js_json(&config_json, "configJson")?;
     let result = finstack_quant_portfolio::fi_attribution::campisi_attribution(
         &portfolio, &benchmark, &config,
     )
@@ -83,9 +81,8 @@ pub fn campisi_attribution(
 /// cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = campisiCarinoLink)]
 pub fn campisi_carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
-    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
     let periods: Vec<finstack_quant_portfolio::fi_attribution::FiAttributionResult> =
-        serde_json::from_str(periods_json).map_err(to_js_err)?;
+        from_js_json(&periods_json, "periodsJson")?;
     let result = finstack_quant_portfolio::fi_attribution::campisi_carino_link(&periods)
         .map_err(to_js_err)?;
     to_js_value(&result)
@@ -110,12 +107,10 @@ pub fn campisi_carino_link_from_snapshots(
     periods_json: JsValue,
     config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
-    let config_json: &str = &json_text(&config_json, "configJson")?;
     let periods: Vec<finstack_quant_portfolio::fi_attribution::FiPeriodInput> =
-        serde_json::from_str(periods_json).map_err(to_js_err)?;
+        from_js_json(&periods_json, "periodsJson")?;
     let config: finstack_quant_portfolio::fi_attribution::FiAttributionConfig =
-        serde_json::from_str(config_json).map_err(to_js_err)?;
+        from_js_json(&config_json, "configJson")?;
     let result = finstack_quant_portfolio::fi_attribution::campisi_carino_link_from_snapshots(
         &periods, &config,
     )
@@ -145,8 +140,7 @@ pub fn campisi_reconciliation_check(
     tolerance: JsValue,
 ) -> Result<JsValue, JsValue> {
     let tolerance = js_f64(&tolerance, "tolerance")?;
-    let result_json: &str = &json_text(&result_json, "resultJson")?;
     let result: finstack_quant_portfolio::fi_attribution::FiAttributionResult =
-        serde_json::from_str(result_json).map_err(to_js_err)?;
+        from_js_json(&result_json, "resultJson")?;
     to_js_value(&result.reconciliation_check(tolerance))
 }

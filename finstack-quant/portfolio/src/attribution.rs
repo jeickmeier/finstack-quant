@@ -4,7 +4,6 @@
 //! with currency conversion to portfolio base currency.
 
 use crate::error::{Error, Result};
-#[cfg(not(target_arch = "wasm32"))]
 use crate::evaluation::try_map_positions;
 use crate::evaluation::{
     supported_metrics, EvaluationProfile, PortfolioEvaluationPlan, PositionExecution,

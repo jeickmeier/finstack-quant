@@ -178,17 +178,6 @@ impl PyPortfolioMetrics {
             .collect()
     }
 
-    /// Primary :class:`pandas.DataFrame` view: the aggregated metrics table.
-    ///
-    /// Delegates to :meth:`to_aggregated_dataframe`; the per-position long
-    /// table remains available from :meth:`to_position_dataframe`.
-    ///
-    /// Columns: ``metric_id``, ``total``.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.to_aggregated_dataframe(py)
-    }
-
     /// Export the portfolio-wide aggregated metrics as a pandas ``DataFrame``.
     ///
     /// One row per entry of the ``aggregated`` map, in canonical Rust
@@ -196,12 +185,13 @@ impl PyPortfolioMetrics {
     /// ``finstack_quant_portfolio::dataframe::aggregated_metrics_to_table`` envelope so
     /// the frame cannot drift from the Rust table export. The per-entity
     /// breakdown is not flattened here — reach it through
-    /// :meth:`metric_series`.
+    /// :meth:`metric_series`; the per-position long table comes from
+    /// :meth:`to_position_dataframe`.
     ///
     /// Columns: ``metric_id``, ``total`` (sum across positions; only summable
     /// metrics are aggregated).
     #[pyo3(text_signature = "(self)")]
-    fn to_aggregated_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let table = finstack_quant_portfolio::dataframe::aggregated_metrics_to_table(&self.inner)
             .map_err(core_to_py)?;
         envelope_to_pandas(py, &table)
@@ -242,26 +232,6 @@ impl PyPortfolioMetrics {
     }
 }
 
-/// Run canonical Rust metric aggregation after extracting host inputs.
-fn run_aggregate_metrics(
-    py: Python<'_>,
-    valuation: &Bound<'_, PyAny>,
-    base_currency: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-) -> PyResult<finstack_quant_portfolio::metrics::PortfolioMetrics> {
-    let valuation = extract_valuation_ref(py, valuation)?;
-    let ccy = extract_currency(base_currency)?;
-    let market = extract_market_ref(py, market)?;
-    let date = crate::bindings::date_utils::py_to_date(as_of)?;
-    let valuation_ref: &finstack_quant_portfolio::valuation::PortfolioValuation = &valuation;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
-    py.detach(|| {
-        finstack_quant_portfolio::metrics::aggregate_metrics(valuation_ref, ccy, market_ref, date)
-    })
-    .map_err(portfolio_to_py)
-}
-
 /// Aggregate portfolio metrics from a valuation.
 ///
 /// Parameters
@@ -291,8 +261,23 @@ pub fn aggregate_metrics(
     market: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
 ) -> PyResult<crate::bindings::portfolio::metrics::PyPortfolioMetrics> {
-    let metrics = run_aggregate_metrics(py, valuation, base_currency, market, as_of)?;
-    Ok(crate::bindings::portfolio::metrics::PyPortfolioMetrics::from_inner(metrics))
+    let valuation = extract_valuation_ref(py, valuation)?;
+    let ccy = extract_currency(base_currency)?;
+    let market = extract_market_ref(py, market)?;
+    let date = crate::bindings::date_utils::py_to_date(as_of)?;
+    let valuation_ref: &finstack_quant_portfolio::valuation::PortfolioValuation = &valuation;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let metrics = py
+        .detach(|| {
+            finstack_quant_portfolio::metrics::aggregate_metrics(
+                valuation_ref,
+                ccy,
+                market_ref,
+                date,
+            )
+        })
+        .map_err(portfolio_to_py)?;
+    Ok(PyPortfolioMetrics::from_inner(metrics))
 }
 
 /// Register the metrics bindings on the portfolio submodule.

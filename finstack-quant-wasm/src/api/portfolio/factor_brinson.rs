@@ -1,7 +1,8 @@
 //! WASM bindings for factor-Brinson attribution.
 
-use crate::utils::input::{js_f64_seq, json_text};
+use crate::utils::input::js_f64_seq;
 
+use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -28,9 +29,8 @@ pub fn factor_brinson_attribution(
     factor_returns: JsValue,
 ) -> Result<JsValue, JsValue> {
     let factor_returns = js_f64_seq(&factor_returns, "factorReturns")?;
-    let input_json: &str = &json_text(&input_json, "inputJson")?;
     let input: finstack_quant_portfolio::factor_brinson::FactorBrinsonInput =
-        serde_json::from_str(input_json).map_err(to_js_err)?;
+        from_js_json(&input_json, "inputJson")?;
     let result = finstack_quant_portfolio::factor_brinson::factor_brinson_attribution(
         &input,
         &factor_returns,

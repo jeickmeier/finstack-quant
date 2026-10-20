@@ -61,13 +61,6 @@ struct ImBreakdownRow<'a> {
     currency: String,
 }
 
-/// Netting sets in the canonical wire order (ascending identifier string).
-fn sorted_netting_sets(result: &PortfolioMarginResult) -> Vec<&NettingSetMargin> {
-    let mut netting_sets: Vec<&NettingSetMargin> = result.by_netting_set.values().collect();
-    netting_sets.sort_by_key(|margin| margin.netting_set_id.to_string());
-    netting_sets
-}
-
 /// Margin results for one netting set, in the portfolio base currency.
 ///
 /// Obtained from :attr:`PortfolioMarginResult.by_netting_set`. ``sensitivities``
@@ -300,7 +293,7 @@ impl PyPortfolioMarginResult {
     #[getter]
     fn by_netting_set<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let out = PyDict::new(py);
-        for margin in sorted_netting_sets(&self.inner) {
+        for margin in self.inner.netting_sets_sorted() {
             out.set_item(
                 PyNettingSetId {
                     inner: margin.netting_set_id.clone(),
@@ -345,7 +338,9 @@ impl PyPortfolioMarginResult {
     /// order; amounts are floats in ``currency`` (the base currency).
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<NettingSetRow> = sorted_netting_sets(&self.inner)
+        let rows: Vec<NettingSetRow> = self
+            .inner
+            .netting_sets_sorted()
             .into_iter()
             .map(|margin| NettingSetRow {
                 netting_set_id: margin.netting_set_id.to_string(),

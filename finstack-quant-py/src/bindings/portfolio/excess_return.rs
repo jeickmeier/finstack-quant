@@ -156,82 +156,6 @@ impl PyExcessReturnResult {
     }
 }
 
-/// Parse inputs and build the canonical reference-universe cell table.
-fn run_cell_returns_from_reference(
-    py: Python<'_>,
-    reference_json: &str,
-    base_label: &str,
-    config_json: &str,
-) -> PyResult<finstack_quant_portfolio::excess_return::DurationCellTable> {
-    let reference_json = reference_json.to_owned();
-    let base_label = base_label.to_owned();
-    let config_json = config_json.to_owned();
-    py.detach(move || {
-        let reference: Vec<finstack_quant_portfolio::excess_return::ReferenceReturn> =
-            serde_json::from_str(&reference_json)
-                .map_err(|err| serde_json_to_py(err, "invalid reference JSON"))?;
-        let config: finstack_quant_portfolio::excess_return::CellConfig =
-            serde_json::from_str(&config_json)
-                .map_err(|err| serde_json_to_py(err, "invalid config JSON"))?;
-        finstack_quant_portfolio::excess_return::cell_returns_from_reference(
-            &reference,
-            &base_label,
-            &config,
-        )
-        .map_err(portfolio_to_py)
-    })
-}
-
-/// Parse inputs and build the canonical curve-snapshot cell table.
-fn run_cell_returns_from_curves(
-    py: Python<'_>,
-    start: &PyDiscountCurve,
-    end: &PyDiscountCurve,
-    horizon_years: f64,
-    max_duration: f64,
-    base_label: &str,
-    config_json: &str,
-) -> PyResult<finstack_quant_portfolio::excess_return::DurationCellTable> {
-    let start_curve = std::sync::Arc::clone(&start.inner);
-    let end_curve = std::sync::Arc::clone(&end.inner);
-    let base_label = base_label.to_owned();
-    let config_json = config_json.to_owned();
-    py.detach(move || {
-        let config: finstack_quant_portfolio::excess_return::CellConfig =
-            serde_json::from_str(&config_json)
-                .map_err(|err| serde_json_to_py(err, "invalid config JSON"))?;
-        finstack_quant_portfolio::excess_return::cell_returns_from_curves(
-            &start_curve,
-            &end_curve,
-            horizon_years,
-            max_duration,
-            &base_label,
-            &config,
-        )
-        .map_err(portfolio_to_py)
-    })
-}
-
-/// Parse inputs and run the canonical excess-return calculation.
-fn run_excess_returns(
-    py: Python<'_>,
-    positions_json: &str,
-    table_json: &str,
-) -> PyResult<finstack_quant_portfolio::excess_return::ExcessReturnResult> {
-    let positions_json = positions_json.to_owned();
-    let table_json = table_json.to_owned();
-    py.detach(move || {
-        let positions: Vec<finstack_quant_portfolio::excess_return::ExcessReturnPosition> =
-            serde_json::from_str(&positions_json)
-                .map_err(|err| serde_json_to_py(err, "invalid positions JSON"))?;
-        let table: finstack_quant_portfolio::excess_return::DurationCellTable =
-            serde_json::from_str(&table_json)
-                .map_err(|err| serde_json_to_py(err, "invalid table JSON"))?;
-        finstack_quant_portfolio::excess_return::excess_returns(&positions, &table)
-            .map_err(portfolio_to_py)
-    })
-}
-
 /// Build a duration-cell base-return table from a reference universe.
 ///
 /// Binds Rust `finstack_quant_portfolio::excess_return::cell_returns_from_reference`
@@ -294,11 +218,20 @@ fn cell_returns_from_reference(
 ) -> PyResult<PyDurationCellTable> {
     let reference_json =
         crate::bindings::extract::extract_records_json(py, reference_json, "reference")?;
-    let reference_json: &str = &reference_json;
     let config_json = crate::bindings::extract::extract_records_json(py, config_json, "config")?;
-    let config_json: &str = &config_json;
     Ok(PyDurationCellTable {
-        inner: run_cell_returns_from_reference(py, reference_json, base_label, config_json)?,
+        inner: py.detach(move || {
+            let reference: Vec<finstack_quant_portfolio::excess_return::ReferenceReturn> =
+                serde_json::from_str(&reference_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid reference JSON"))?;
+            let config: finstack_quant_portfolio::excess_return::CellConfig =
+                serde_json::from_str(&config_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid config JSON"))?;
+            finstack_quant_portfolio::excess_return::cell_returns_from_reference(
+                &reference, base_label, &config,
+            )
+            .map_err(portfolio_to_py)
+        })?,
     })
 }
 /// Build a duration-cell base-return table from start/end discount curves.
@@ -376,17 +309,23 @@ fn cell_returns_from_curves(
     config_json: &Bound<'_, PyAny>,
 ) -> PyResult<PyDurationCellTable> {
     let config_json = crate::bindings::extract::extract_records_json(py, config_json, "config")?;
-    let config_json: &str = &config_json;
+    let start_curve = std::sync::Arc::clone(&start.inner);
+    let end_curve = std::sync::Arc::clone(&end.inner);
     Ok(PyDurationCellTable {
-        inner: run_cell_returns_from_curves(
-            py,
-            start,
-            end,
-            horizon_years,
-            max_duration,
-            base_label,
-            config_json,
-        )?,
+        inner: py.detach(move || {
+            let config: finstack_quant_portfolio::excess_return::CellConfig =
+                serde_json::from_str(&config_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid config JSON"))?;
+            finstack_quant_portfolio::excess_return::cell_returns_from_curves(
+                &start_curve,
+                &end_curve,
+                horizon_years,
+                max_duration,
+                base_label,
+                &config,
+            )
+            .map_err(portfolio_to_py)
+        })?,
     })
 }
 /// Compute duration-matched credit excess returns against a base-return table.
@@ -451,11 +390,18 @@ fn excess_returns(
 ) -> PyResult<PyExcessReturnResult> {
     let positions_json =
         crate::bindings::extract::extract_records_json(py, positions_json, "positions")?;
-    let positions_json: &str = &positions_json;
     let table_json = crate::bindings::extract::extract_records_json(py, table_json, "table")?;
-    let table_json: &str = &table_json;
     Ok(PyExcessReturnResult {
-        inner: run_excess_returns(py, positions_json, table_json)?,
+        inner: py.detach(move || {
+            let positions: Vec<finstack_quant_portfolio::excess_return::ExcessReturnPosition> =
+                serde_json::from_str(&positions_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid positions JSON"))?;
+            let table: finstack_quant_portfolio::excess_return::DurationCellTable =
+                serde_json::from_str(&table_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid table JSON"))?;
+            finstack_quant_portfolio::excess_return::excess_returns(&positions, &table)
+                .map_err(portfolio_to_py)
+        })?,
     })
 }
 /// Register duration-matched credit excess return functions on the portfolio submodule.

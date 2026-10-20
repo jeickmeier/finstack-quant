@@ -1,7 +1,6 @@
 //! Primitive exposure reporting across direct and composite positions.
 
 use crate::error::{Error, Result};
-#[cfg(not(target_arch = "wasm32"))]
 use crate::evaluation::try_map_positions;
 use crate::fx::{convert_to_base, spot_rate_to_base};
 use crate::position::Position;

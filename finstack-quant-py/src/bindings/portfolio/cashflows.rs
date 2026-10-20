@@ -8,6 +8,7 @@ use crate::bindings::extract::extract_market_ref;
 use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::bindings::pandas_utils::serde_to_py;
+use crate::errors::core_to_py;
 use crate::errors::display_to_py;
 use crate::errors::portfolio_to_py;
 use finstack_quant_core::currency::Currency;
@@ -153,10 +154,7 @@ impl PyPortfolioCashflows {
     /// name).
     #[getter]
     fn fx_collapse_policy(&self) -> PyResult<String> {
-        match serde_json::to_value(self.inner.fx_collapse_policy).map_err(display_to_py)? {
-            serde_json::Value::String(s) => Ok(s),
-            other => Ok(other.to_string()),
-        }
+        finstack_quant_core::wire::serde_label(&self.inner.fx_collapse_policy).map_err(core_to_py)
     }
 
     /// JSON for the flat ``events`` vector only.

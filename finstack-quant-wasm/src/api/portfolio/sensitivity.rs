@@ -2,6 +2,7 @@
 
 use crate::api::core::market_context::JsMarketContext;
 use crate::utils::date::parse_iso_date;
+use crate::utils::input::from_js_json;
 use crate::utils::input::{js_opt_uint, js_string, json_text, opt_json_text};
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
@@ -138,13 +139,11 @@ pub fn decompose_factor_risk(
     covariance_json: JsValue,
     risk_measure_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let sensitivities_json: &str = &json_text(&sensitivities_json, "sensitivitiesJson")?;
-    let covariance_json: &str = &json_text(&covariance_json, "covarianceJson")?;
     let wire: finstack_quant_portfolio::sensitivity::SensitivityMatrixJson =
-        serde_json::from_str(sensitivities_json).map_err(to_js_err)?;
+        from_js_json(&sensitivities_json, "sensitivitiesJson")?;
     let matrix = finstack_quant_factor::SensitivityMatrix::try_from(wire).map_err(to_js_err)?;
     let covariance: finstack_quant_factor::FactorCovarianceMatrix =
-        serde_json::from_str(covariance_json).map_err(to_js_err)?;
+        from_js_json(&covariance_json, "covarianceJson")?;
     // `js_opt_wire`: the unit variants are bare wire strings (`"variance"`),
     // which are not JSON text.
     let measure: finstack_quant_factor::RiskMeasure =

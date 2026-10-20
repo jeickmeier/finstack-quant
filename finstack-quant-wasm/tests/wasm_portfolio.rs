@@ -13,7 +13,15 @@
 #![cfg(target_arch = "wasm32")]
 
 use finstack_quant_wasm::api::core::market_context::JsMarketContext;
+use finstack_quant_wasm::api::portfolio::brinson::*;
+use finstack_quant_wasm::api::portfolio::cashflows::*;
+use finstack_quant_wasm::api::portfolio::fi_attribution::*;
+use finstack_quant_wasm::api::portfolio::metrics::*;
+use finstack_quant_wasm::api::portfolio::performance::*;
+use finstack_quant_wasm::api::portfolio::replay::*;
+use finstack_quant_wasm::api::portfolio::scenarios::*;
 use finstack_quant_wasm::api::portfolio::sensitivity::decompose_factor_risk;
+use finstack_quant_wasm::api::portfolio::valuation::*;
 use finstack_quant_wasm::api::portfolio::*;
 use finstack_quant_wasm::api::scenarios::parse_scenario_spec;
 use finstack_quant_wasm::utils::materialization_to_js_error;

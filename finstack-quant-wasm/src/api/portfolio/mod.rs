@@ -31,8 +31,7 @@
 //! interactive dashboards), reuse the `Portfolio` and `MarketContext` handles
 //! accepted by the calculation entry points.
 
-use crate::utils::input::json_text;
-
+use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -101,9 +100,7 @@ impl JsPortfolio {
     /// unknown entity reference.
     #[wasm_bindgen(js_name = fromSpec)]
     pub fn from_spec(spec_json: JsValue) -> Result<JsPortfolio, JsValue> {
-        let spec_json: &str = &json_text(&spec_json, "specJson")?;
-        let spec: finstack_quant_portfolio::PortfolioSpec =
-            serde_json::from_str(spec_json).map_err(to_js_err)?;
+        let spec: finstack_quant_portfolio::PortfolioSpec = from_js_json(&spec_json, "specJson")?;
         let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
         Ok(Self { inner: portfolio })
     }
@@ -219,9 +216,7 @@ impl JsPortfolio {
 /// `PortfolioSpec` schema, or if the canonical form cannot be serialized.
 #[wasm_bindgen(js_name = parsePortfolioSpecJson)]
 pub fn parse_portfolio_spec_json(json_str: JsValue) -> Result<String, JsValue> {
-    let json_str: &str = &json_text(&json_str, "jsonStr")?;
-    let spec: finstack_quant_portfolio::PortfolioSpec =
-        serde_json::from_str(json_str).map_err(to_js_err)?;
+    let spec: finstack_quant_portfolio::PortfolioSpec = from_js_json(&json_str, "jsonStr")?;
 
     serde_json::to_string(&spec).map_err(to_js_err)
 }

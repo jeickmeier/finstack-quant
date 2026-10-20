@@ -2,6 +2,7 @@
 
 use crate::utils::input::json_text;
 
+use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value_with_bigints};
 use wasm_bindgen::prelude::*;
 
@@ -33,14 +34,11 @@ pub fn replay_portfolio(
     snapshots_json: JsValue,
     config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let spec_json: &str = &json_text(&spec_json, "specJson")?;
     let snapshots_json: &str = &json_text(&snapshots_json, "snapshotsJson")?;
-    let config_json: &str = &json_text(&config_json, "configJson")?;
-    let spec: finstack_quant_portfolio::PortfolioSpec =
-        serde_json::from_str(spec_json).map_err(to_js_err)?;
+    let spec: finstack_quant_portfolio::PortfolioSpec = from_js_json(&spec_json, "specJson")?;
     let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
     let config: finstack_quant_portfolio::replay::ReplayConfig =
-        serde_json::from_str(config_json).map_err(to_js_err)?;
+        from_js_json(&config_json, "configJson")?;
     let timeline =
         finstack_quant_portfolio::replay::ReplayTimeline::from_json_snapshots(snapshots_json)
             .map_err(to_js_err)?;

@@ -1,7 +1,6 @@
 //! WASM bindings for Brinson-Fachler attribution and Carino linking.
 
-use crate::utils::input::json_text;
-
+use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -18,9 +17,8 @@ use wasm_bindgen::prelude::*;
 /// not sum to one, or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = brinsonFachler)]
 pub fn brinson_fachler(sectors_json: JsValue) -> Result<JsValue, JsValue> {
-    let sectors_json: &str = &json_text(&sectors_json, "sectorsJson")?;
     let sectors: Vec<finstack_quant_portfolio::brinson::SectorPeriod> =
-        serde_json::from_str(sectors_json).map_err(to_js_err)?;
+        from_js_json(&sectors_json, "sectorsJson")?;
     let result = finstack_quant_portfolio::brinson::brinson_fachler(&sectors).map_err(to_js_err)?;
     to_js_value(&result)
 }
@@ -41,9 +39,8 @@ pub fn brinson_fachler(sectors_json: JsValue) -> Result<JsValue, JsValue> {
 /// most `-1`.
 #[wasm_bindgen(js_name = carinoLink)]
 pub fn carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
-    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
     let periods: Vec<finstack_quant_portfolio::brinson::BrinsonPeriodResult> =
-        serde_json::from_str(periods_json).map_err(to_js_err)?;
+        from_js_json(&periods_json, "periodsJson")?;
     let result = finstack_quant_portfolio::brinson::carino_link(&periods).map_err(to_js_err)?;
     to_js_value(&result)
 }
@@ -63,9 +60,8 @@ pub fn carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
 /// period return is non-finite or at most `-1`.
 #[wasm_bindgen(js_name = carinoLinkFromSectorPeriods)]
 pub fn carino_link_from_sector_periods(periods_json: JsValue) -> Result<JsValue, JsValue> {
-    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
     let periods: Vec<Vec<finstack_quant_portfolio::brinson::SectorPeriod>> =
-        serde_json::from_str(periods_json).map_err(to_js_err)?;
+        from_js_json(&periods_json, "periodsJson")?;
     let result = finstack_quant_portfolio::brinson::carino_link_from_sector_periods(&periods)
         .map_err(to_js_err)?;
     to_js_value(&result)

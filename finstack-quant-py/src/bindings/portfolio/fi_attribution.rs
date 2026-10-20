@@ -330,85 +330,6 @@ impl PyFiReconciliationReport {
     }
 }
 
-/// Parse inputs and run the canonical single-period Campisi attribution.
-fn run_campisi_attribution(
-    py: Python<'_>,
-    portfolio_json: &str,
-    benchmark_json: &str,
-    config_json: &str,
-) -> PyResult<finstack_quant_portfolio::fi_attribution::FiAttributionResult> {
-    let portfolio_json = portfolio_json.to_owned();
-    let benchmark_json = benchmark_json.to_owned();
-    let config_json = config_json.to_owned();
-    py.detach(move || {
-        let portfolio: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
-            serde_json::from_str(&portfolio_json)
-                .map_err(|err| serde_json_to_py(err, "invalid Campisi portfolio JSON"))?;
-        let benchmark: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
-            serde_json::from_str(&benchmark_json)
-                .map_err(|err| serde_json_to_py(err, "invalid Campisi benchmark JSON"))?;
-        let config: finstack_quant_portfolio::fi_attribution::FiAttributionConfig =
-            serde_json::from_str(&config_json)
-                .map_err(|err| serde_json_to_py(err, "invalid Campisi config JSON"))?;
-        finstack_quant_portfolio::fi_attribution::campisi_attribution(
-            &portfolio, &benchmark, &config,
-        )
-        .map_err(portfolio_to_py)
-    })
-}
-
-/// Parse period-result JSON and run the canonical Campisi Carino linking.
-fn run_campisi_carino_link(
-    py: Python<'_>,
-    periods_json: &str,
-) -> PyResult<finstack_quant_portfolio::fi_attribution::FiCarinoLinkedResult> {
-    let periods_json = periods_json.to_owned();
-    py.detach(move || {
-        let periods: Vec<finstack_quant_portfolio::fi_attribution::FiAttributionResult> =
-            serde_json::from_str(&periods_json)
-                .map_err(|err| serde_json_to_py(err, "invalid Campisi period results JSON"))?;
-        finstack_quant_portfolio::fi_attribution::campisi_carino_link(&periods)
-            .map_err(portfolio_to_py)
-    })
-}
-
-/// Parse snapshot JSON and run the canonical snapshot-level Carino linking.
-fn run_campisi_carino_link_from_snapshots(
-    py: Python<'_>,
-    periods_json: &str,
-    config_json: &str,
-) -> PyResult<finstack_quant_portfolio::fi_attribution::FiCarinoLinkedResult> {
-    let periods_json = periods_json.to_owned();
-    let config_json = config_json.to_owned();
-    py.detach(move || {
-        let periods: Vec<finstack_quant_portfolio::fi_attribution::FiPeriodInput> =
-            serde_json::from_str(&periods_json)
-                .map_err(|err| serde_json_to_py(err, "invalid Campisi periods JSON"))?;
-        let config: finstack_quant_portfolio::fi_attribution::FiAttributionConfig =
-            serde_json::from_str(&config_json)
-                .map_err(|err| serde_json_to_py(err, "invalid Campisi config JSON"))?;
-        finstack_quant_portfolio::fi_attribution::campisi_carino_link_from_snapshots(
-            &periods, &config,
-        )
-        .map_err(portfolio_to_py)
-    })
-}
-
-/// Parse a result and run the canonical reconciliation check.
-fn run_campisi_reconciliation_check(
-    py: Python<'_>,
-    result_json: &str,
-    tolerance: f64,
-) -> PyResult<finstack_quant_portfolio::fi_attribution::FiReconciliationReport> {
-    let result_json = result_json.to_owned();
-    py.detach(move || {
-        let result: finstack_quant_portfolio::fi_attribution::FiAttributionResult =
-            serde_json::from_str(&result_json)
-                .map_err(|err| serde_json_to_py(err, "invalid Campisi result JSON"))?;
-        Ok(result.reconciliation_check(tolerance))
-    })
-}
-
 /// Compute a single-period Campisi fixed-income attribution from JSON.
 ///
 /// Parameters
@@ -455,14 +376,25 @@ fn campisi_attribution(
 ) -> PyResult<PyFiAttributionResult> {
     let portfolio_json =
         crate::bindings::extract::extract_records_json(py, portfolio_json, "portfolio")?;
-    let portfolio_json: &str = &portfolio_json;
     let benchmark_json =
         crate::bindings::extract::extract_records_json(py, benchmark_json, "benchmark")?;
-    let benchmark_json: &str = &benchmark_json;
     let config_json = crate::bindings::extract::extract_records_json(py, config_json, "config")?;
-    let config_json: &str = &config_json;
     Ok(PyFiAttributionResult {
-        inner: run_campisi_attribution(py, portfolio_json, benchmark_json, config_json)?,
+        inner: py.detach(move || {
+            let portfolio: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
+                serde_json::from_str(&portfolio_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid Campisi portfolio JSON"))?;
+            let benchmark: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
+                serde_json::from_str(&benchmark_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid Campisi benchmark JSON"))?;
+            let config: finstack_quant_portfolio::fi_attribution::FiAttributionConfig =
+                serde_json::from_str(&config_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid Campisi config JSON"))?;
+            finstack_quant_portfolio::fi_attribution::campisi_attribution(
+                &portfolio, &benchmark, &config,
+            )
+            .map_err(portfolio_to_py)
+        })?,
     })
 }
 /// Carino-link already-computed single-period Campisi attribution results.
@@ -507,9 +439,14 @@ fn campisi_carino_link(
     periods_json: &Bound<'_, PyAny>,
 ) -> PyResult<PyFiCarinoLinkedResult> {
     let periods_json = crate::bindings::extract::extract_records_json(py, periods_json, "periods")?;
-    let periods_json: &str = &periods_json;
     Ok(PyFiCarinoLinkedResult {
-        inner: run_campisi_carino_link(py, periods_json)?,
+        inner: py.detach(move || {
+            let periods: Vec<finstack_quant_portfolio::fi_attribution::FiAttributionResult> =
+                serde_json::from_str(&periods_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid Campisi period results JSON"))?;
+            finstack_quant_portfolio::fi_attribution::campisi_carino_link(&periods)
+                .map_err(portfolio_to_py)
+        })?,
     })
 }
 /// Compute Carino-linked multi-period Campisi attribution from period JSON.
@@ -540,11 +477,20 @@ fn campisi_carino_link_from_snapshots(
     config_json: &Bound<'_, PyAny>,
 ) -> PyResult<PyFiCarinoLinkedResult> {
     let periods_json = crate::bindings::extract::extract_records_json(py, periods_json, "periods")?;
-    let periods_json: &str = &periods_json;
     let config_json = crate::bindings::extract::extract_records_json(py, config_json, "config")?;
-    let config_json: &str = &config_json;
     Ok(PyFiCarinoLinkedResult {
-        inner: run_campisi_carino_link_from_snapshots(py, periods_json, config_json)?,
+        inner: py.detach(move || {
+            let periods: Vec<finstack_quant_portfolio::fi_attribution::FiPeriodInput> =
+                serde_json::from_str(&periods_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid Campisi periods JSON"))?;
+            let config: finstack_quant_portfolio::fi_attribution::FiAttributionConfig =
+                serde_json::from_str(&config_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid Campisi config JSON"))?;
+            finstack_quant_portfolio::fi_attribution::campisi_carino_link_from_snapshots(
+                &periods, &config,
+            )
+            .map_err(portfolio_to_py)
+        })?,
     })
 }
 /// Reconcile the five Campisi effect totals against the active return.
@@ -580,9 +526,13 @@ fn campisi_reconciliation_check(
     tolerance: f64,
 ) -> PyResult<PyFiReconciliationReport> {
     let result_json = crate::bindings::extract::extract_records_json(py, result_json, "result")?;
-    let result_json: &str = &result_json;
     Ok(PyFiReconciliationReport {
-        inner: run_campisi_reconciliation_check(py, result_json, tolerance)?,
+        inner: py.detach(move || {
+            let result: finstack_quant_portfolio::fi_attribution::FiAttributionResult =
+                serde_json::from_str(&result_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid Campisi result JSON"))?;
+            Ok::<_, PyErr>(result.reconciliation_check(tolerance))
+        })?,
     })
 }
 /// Register Campisi attribution functions on the portfolio submodule.

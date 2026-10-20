@@ -1,10 +1,12 @@
 use indexmap::{IndexMap, IndexSet};
 use pyo3::prelude::*;
+
+use crate::errors::core_to_py;
 use pyo3::types::{PyDict, PyList, PyType};
 
 use finstack_quant_portfolio::optimization::{
-    CandidatePosition, OptimizationStatus, PortfolioOptimizationResult,
-    PortfolioOptimizationResultWire, PortfolioOptimizationSpec, TradeUniverse,
+    CandidatePosition, PortfolioOptimizationResult, PortfolioOptimizationResultWire,
+    PortfolioOptimizationSpec, TradeUniverse,
 };
 use finstack_quant_portfolio::types::PositionId;
 
@@ -742,19 +744,13 @@ impl PyPortfolioOptimizationResult {
             .collect()
     }
 
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "PortfolioOptimizationResult(status={:?}, objective_value={}, turnover={})",
-            match &self.inner.status {
-                OptimizationStatus::Optimal => "optimal",
-                OptimizationStatus::FeasibleButSuboptimal => "feasible_but_suboptimal",
-                OptimizationStatus::Infeasible { .. } => "infeasible",
-                OptimizationStatus::Unbounded => "unbounded",
-                OptimizationStatus::Error { .. } => "error",
-            },
+            finstack_quant_core::wire::serde_tag(&self.inner.status).map_err(core_to_py)?,
             self.inner.objective_value,
             self.inner.turnover,
-        )
+        ))
     }
 
     /// Render as an HTML table in Jupyter notebooks.

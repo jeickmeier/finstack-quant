@@ -12,7 +12,6 @@
 //! curves or discount factors fail closed.
 
 use crate::error::{Error, Result};
-#[cfg(not(target_arch = "wasm32"))]
 use crate::evaluation::try_map_positions;
 use crate::types::PositionId;
 use crate::Portfolio;

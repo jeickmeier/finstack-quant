@@ -19,6 +19,7 @@ import numpy.typing as npt
 import pandas as pd
 
 from finstack_quant.attribution import PnlAttribution
+from finstack_quant.core import FinstackError
 from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
@@ -49,7 +50,6 @@ __all__ = [
     "FiAttributionResult",
     "FiCarinoLinkedResult",
     "FiReconciliationReport",
-    "FinstackError",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",
@@ -138,31 +138,6 @@ __all__ = [
     "validate_allocation_json",
     "value_portfolio",
 ]
-
-class FinstackError(ValueError):
-    """
-    Base class for the library's named exceptions.
-
-    Catch this in a single ``except FinstackError`` clause to handle any error
-    the library raises through one of its own exception classes, rather than
-    enumerating them.
-
-    It derives from ``ValueError``, so every subclass keeps ``ValueError`` in
-    its MRO and existing ``except ValueError`` clauses are unaffected. Bare
-    ``ValueError`` / ``KeyError`` raised by the lower-level mapping helpers are
-    deliberately not reparented and are *not* caught by this class.
-
-    Its canonical home is ``finstack_quant.core``; it is re-exported here
-    alongside the portfolio exception family.
-
-    Examples
-    --------
-    >>> from finstack_quant.portfolio import FinstackError, PortfolioError
-    >>> issubclass(PortfolioError, FinstackError)
-    True
-    >>> issubclass(FinstackError, ValueError)
-    True
-    """
 
 class PortfolioError(FinstackError):
     """
@@ -3858,23 +3833,6 @@ class PortfolioMetrics:
 
     def to_dataframe(self) -> pd.DataFrame:
         """
-        Primary ``DataFrame`` view: the aggregated metrics table.
-
-        Returns
-        -------
-        pd.DataFrame
-            Columns ``metric_id``, ``total`` (delegates to
-            :meth:`to_aggregated_dataframe`).
-
-        Raises
-        ------
-        ValueError
-            If the frame cannot be built.
-        """
-        ...
-
-    def to_aggregated_dataframe(self) -> pd.DataFrame:
-        """
         Export the portfolio-wide aggregated metrics as a pandas DataFrame.
 
         One row per entry of the ``aggregated`` map, in canonical Rust
@@ -3883,17 +3841,16 @@ class PortfolioMetrics:
         from the Rust table export. The per-entity breakdown is not
         flattened here — reach it through :meth:`metric_series`.
 
-        Columns: ``metric_id``, ``total`` (sum across positions; only summable
-        metrics are aggregated).
-
         Returns
         -------
         pd.DataFrame
-            One row per aggregated metric.
+            One row per aggregated metric; columns ``metric_id``, ``total``
+            (sum across positions; only summable metrics are aggregated).
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If the frame cannot be built.
         """
         ...
 
@@ -8411,13 +8368,13 @@ class FactorContributionDelta:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> FactorContributionDelta:
+    def from_json(cls, json: str) -> FactorContributionDelta:
         """
         Deserialize a factor contribution delta from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized baseline-to-scenario factor delta, normally
             produced by ``FactorContributionDelta.to_json``.
 
@@ -8527,13 +8484,13 @@ class WhatIfResult:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> WhatIfResult:
+    def from_json(cls, json: str) -> WhatIfResult:
         """
         Deserialize a what-if result from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized before-and-after risk result, normally
             produced by ``WhatIfResult.to_json``.
 
@@ -8661,13 +8618,13 @@ class StressResult:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> StressResult:
+    def from_json(cls, json: str) -> StressResult:
         """
         Deserialize a stress result from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized stressed P&L and decomposition result, normally
             produced by ``StressResult.to_json``.
 
@@ -8800,13 +8757,13 @@ class StressPnl:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> StressPnl:
+    def from_json(cls, json: str) -> StressPnl:
         """
         Deserialize a stress P&L result from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical ``{"total_pnl", "position_pnl"}`` JSON, normally produced
             by ``StressPnl.to_json``.
 
@@ -9391,13 +9348,13 @@ class PositionAssignment:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> PositionAssignment:
+    def from_json(cls, json: str) -> PositionAssignment:
         """
         Deserialize a position assignment from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized factor assignment for one position, normally
             produced by ``PositionAssignment.to_json``.
 
@@ -9517,13 +9474,13 @@ class UnmatchedEntry:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> UnmatchedEntry:
+    def from_json(cls, json: str) -> UnmatchedEntry:
         """
         Deserialize an unmatched dependency entry from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized unmatched-factor diagnostic, normally produced
             by ``UnmatchedEntry.to_json``.
 
@@ -9614,13 +9571,13 @@ class FactorAssignmentReport:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> FactorAssignmentReport:
+    def from_json(cls, json: str) -> FactorAssignmentReport:
         """
         Deserialize a factor assignment report from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized factor-model assignment report, normally
             produced by ``FactorAssignmentReport.to_json``.
 

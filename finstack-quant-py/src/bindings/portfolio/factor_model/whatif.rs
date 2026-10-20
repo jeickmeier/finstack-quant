@@ -2,8 +2,6 @@
 //! (Rust `factor_model::whatif`): `WhatIfResult`, `FactorContributionDelta`,
 //! `StressResult` and `StressPnl`.
 
-use crate::bindings::json_bridge::deserialize_json;
-use crate::bindings::json_bridge::serialize_json;
 use crate::bindings::models::factor::risk::PyRiskDecomposition;
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pandas_utils::dict_to_dataframe;
@@ -44,30 +42,6 @@ impl PyFactorContributionDelta {
 
 #[pymethods]
 impl PyFactorContributionDelta {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: FactorContributionDelta = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Identifier of the factor whose contribution changed.
     #[getter]
     fn factor_id(&self) -> String {
@@ -97,6 +71,11 @@ impl PyFactorContributionDelta {
         )
     }
 }
+crate::bindings::macros::wire_methods!(
+    PyFactorContributionDelta,
+    FactorContributionDelta,
+    "FactorContributionDelta"
+);
 
 /// Result of a position what-if scenario.
 #[pyclass(
@@ -118,30 +97,6 @@ impl PyWhatIfResult {
 
 #[pymethods]
 impl PyWhatIfResult {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: WhatIfResult = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Baseline risk decomposition used as the comparison point.
     ///
     /// Use its own frame accessors (:meth:`RiskDecomposition.to_factor_dataframe`
@@ -197,18 +152,9 @@ impl PyWhatIfResult {
             self.inner.delta.len(),
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+crate::bindings::macros::wire_methods!(PyWhatIfResult, WhatIfResult, "WhatIfResult");
+crate::bindings::macros::impl_repr_html_via_dataframe!(PyWhatIfResult);
 
 /// Result of a factor-stress scenario.
 #[pyclass(
@@ -230,30 +176,6 @@ impl PyStressResult {
 
 #[pymethods]
 impl PyStressResult {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: StressResult = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Total portfolio P&L under the stressed market.
     ///
     /// Returns
@@ -307,18 +229,9 @@ impl PyStressResult {
             self.inner.stressed_decomposition.total_risk,
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+crate::bindings::macros::wire_methods!(PyStressResult, StressResult, "StressResult");
+crate::bindings::macros::impl_repr_html_via_dataframe!(PyStressResult);
 
 /// P&L-only result of a factor-stress scenario.
 ///
@@ -345,27 +258,6 @@ impl PyStressPnl {
 
 #[pymethods]
 impl PyStressPnl {
-    /// Support `pickle` through the same strict serde round-trip as
-    /// `to_json` / `from_json`.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: StressPnl = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Total portfolio P&L under the stressed market.
     ///
     /// Returns
@@ -409,11 +301,6 @@ impl PyStressPnl {
             self.inner.position_pnl.len(),
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks; `None` falls back to
-    /// `__repr__`.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+crate::bindings::macros::wire_methods!(PyStressPnl, StressPnl, "StressPnl");
+crate::bindings::macros::impl_repr_html_via_dataframe!(PyStressPnl);
