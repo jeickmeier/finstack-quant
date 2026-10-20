@@ -69,7 +69,7 @@ pub use coupon::{
 pub use default::DefaultModelSpec;
 pub use fees::{evaluate_fee_tiers, FeeAccrualBasis, FeeBase, FeeSpec, FeeTier};
 pub use prepayment::PrepaymentModelSpec;
-pub use principal::PrincipalExchange;
+pub use principal::{PrincipalEventSpec, PrincipalExchange};
 pub use rate::RateSpec;
 pub use recovery::RecoveryModelSpec;
 pub use schedule::{RollRule, ScheduleParams};

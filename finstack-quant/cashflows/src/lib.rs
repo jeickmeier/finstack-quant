@@ -101,7 +101,8 @@ pub(crate) mod serde_defaults;
 
 pub use json::{
     build_cashflow_schedule_json, dated_flows_json, validate_cashflow_schedule_json,
-    CashflowScheduleBuildSpec, CouponLegSpec, DatedFlowJson, PaymentProgramSpec,
+    CashflowScheduleBuildSpec, CouponLegSpec, DatedFlowJson, MarginStepSpec, PaymentProgramSpec,
+    PaymentStepSpec,
 };
 pub use traits::{
     schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider,

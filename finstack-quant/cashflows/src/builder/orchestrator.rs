@@ -5,8 +5,8 @@
 //! amortization methods live in `principal`.
 
 use super::schedule::{finalize_flows, CashFlowSchedule};
+use super::specs::PrincipalEventSpec;
 use crate::builder::{AmortizationSpec, Notional, PrincipalExchange};
-use crate::json::PrincipalEventSpec;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::decimal::f64_to_decimal;

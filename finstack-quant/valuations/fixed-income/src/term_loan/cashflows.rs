@@ -8,7 +8,8 @@ use crate::term_loan::types::TermLoan;
 use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule};
 use finstack_quant_cashflows::builder::{CashFlowBuilder, ScheduleParams};
 use finstack_quant_cashflows::builder::{
-    CouponType, FeeBase, FeeSpec, FloatingCouponSpec, FloatingRateSpec, StepUpCouponSpec,
+    CouponType, FeeBase, FeeSpec, FloatingCouponSpec, FloatingRateSpec, PrincipalEventSpec,
+    StepUpCouponSpec,
 };
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
@@ -16,14 +17,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 use std::collections::BTreeMap;
-
-struct PrincipalEvent {
-    date: Date,
-    payment_date: Date,
-    delta: Money,
-    cash: Money,
-    kind: CFKind,
-}
 
 fn loan_schedule_params(loan: &TermLoan) -> ScheduleParams {
     ScheduleParams {
@@ -47,7 +40,7 @@ pub(crate) fn generate_cashflows(
     loan: &TermLoan,
     market: &MarketContext,
 ) -> finstack_quant_core::Result<CashFlowSchedule> {
-    let mut principal_events: Vec<PrincipalEvent> = Vec::new();
+    let mut principal_events: Vec<PrincipalEventSpec> = Vec::new();
     let mut fees: Vec<FeeSpec> = Vec::new();
 
     // Draw stop date (if any)
@@ -112,20 +105,20 @@ pub(crate) fn generate_cashflows(
                 }
             }
 
-            principal_events.push(PrincipalEvent {
+            principal_events.push(PrincipalEventSpec {
                 date: ev.date,
                 payment_date: ev.date,
                 delta: ev.amount,
-                cash: cash_inflow,
+                cash: Some(cash_inflow),
                 kind: CFKind::Notional,
             });
         }
     } else if loan.notional_limit.amount() != 0.0 {
-        principal_events.push(PrincipalEvent {
+        principal_events.push(PrincipalEventSpec {
             date: loan.issue_date,
             payment_date: loan.issue_date,
             delta: loan.notional_limit,
-            cash: loan.notional_limit,
+            cash: Some(loan.notional_limit),
             kind: CFKind::Notional,
         });
     }
@@ -149,11 +142,11 @@ pub(crate) fn generate_cashflows(
     if let Some(cov) = &loan.covenants {
         for sweep in &cov.cash_sweeps {
             if sweep.amount.amount() > 0.0 {
-                principal_events.push(PrincipalEvent {
+                principal_events.push(PrincipalEventSpec {
                     date: sweep.date,
                     payment_date: sweep.date,
                     delta: Money::new(-sweep.amount.amount(), sweep.amount.currency())?,
-                    cash: sweep.amount,
+                    cash: Some(sweep.amount),
                     kind: CFKind::Amortization,
                 });
             }
@@ -195,11 +188,11 @@ pub(crate) fn generate_cashflows(
         }
         finstack_quant_cashflows::builder::AmortizationSpec::CustomPrincipal { items } => {
             for (dt, amt) in items {
-                principal_events.push(PrincipalEvent {
+                principal_events.push(PrincipalEventSpec {
                     date: *dt,
                     payment_date: *dt,
                     delta: Money::new(-amt.amount(), amt.currency())?,
-                    cash: *amt,
+                    cash: Some(*amt),
                     kind: CFKind::Amortization,
                 });
             }
@@ -226,11 +219,11 @@ pub(crate) fn generate_cashflows(
                     .sum();
                 let flat_payment = funded * pct;
                 let pay = Money::new(flat_payment, loan.currency)?;
-                principal_events.push(PrincipalEvent {
+                principal_events.push(PrincipalEventSpec {
                     date: d,
                     payment_date,
                     delta: Money::new(-pay.amount(), pay.currency())?,
-                    cash: pay,
+                    cash: Some(pay),
                     kind: CFKind::Amortization,
                 });
             }
@@ -256,7 +249,7 @@ pub(crate) fn generate_cashflows(
                     let capped = requested.min(running.max(0.0));
                     if (capped - requested).abs() > 1e-10 {
                         event.delta = Money::new(-capped, event.delta.currency())?;
-                        event.cash = Money::new(capped, event.cash.currency())?;
+                        event.cash = Some(Money::new(capped, event.delta.currency())?);
                     }
                     running -= capped;
                 }
@@ -291,7 +284,7 @@ pub(crate) fn generate_cashflows(
             event.date,
             event.payment_date,
             event.delta,
-            Some(event.cash),
+            event.cash,
             event.kind,
         );
     }
