@@ -479,8 +479,8 @@ impl Pricer for CallableRangeAccrualPricer {
             InstrumentType::CallableRangeAccrual,
         )?;
         let estimate = self.price_estimate(callable, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(
-                e.to_string(),
+            PricingError::from_core(
+                e,
                 PricingErrorContext::from_instrument(instrument)
                     .model(ModelKey::MonteCarloHullWhite1F)
                     .curve_ids([callable
@@ -512,8 +512,8 @@ impl Pricer for CallableRangeAccrualPricer {
         self.price_internal(callable, market, as_of)
             .map(|m| m.amount())
             .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
+                PricingError::from_core(
+                    e,
                     PricingErrorContext::from_instrument(instrument)
                         .model(ModelKey::MonteCarloHullWhite1F),
                 )
@@ -1155,5 +1155,47 @@ mod tests {
         assert!(result.measures.contains_key(
             &finstack_quant_valuations_core::metrics::MetricId::custom("mc_num_paths")
         ));
+    }
+
+    #[test]
+    fn missing_discount_curve_surfaces_as_not_found() {
+        let as_of = date(2025, Month::January, 1);
+        let market = market(as_of, 0.02, 0.03);
+        let mut callable = test_callable(vec![date(2026, Month::January, 1)], None, 0.05);
+        let pricer = deterministic_pricer(16);
+
+        // The single-curve guard is an input error, not a model failure.
+        callable.range_accrual.discount_curve_id = CurveId::new("MISSING-DISC");
+        let err = finstack_quant_core::Error::from(
+            pricer
+                .price_dyn(&callable, &market, as_of)
+                .expect_err("curve mismatch"),
+        );
+        assert!(
+            matches!(err, finstack_quant_core::Error::Validation(_)),
+            "single-curve guard must stay Validation, got {err:?}"
+        );
+
+        callable.range_accrual.forward_curve_id = Some(CurveId::new("MISSING-DISC"));
+        let errors = [
+            pricer
+                .price_dyn(&callable, &market, as_of)
+                .expect_err("missing curve"),
+            pricer
+                .price_raw_dyn(&callable, &market, as_of)
+                .expect_err("missing curve"),
+        ];
+        for err in errors {
+            let err = finstack_quant_core::Error::from(err);
+            assert!(
+                matches!(
+                    err,
+                    finstack_quant_core::Error::Input(
+                        finstack_quant_core::InputError::NotFound { .. }
+                    )
+                ),
+                "missing discount curve must stay NotFound, got {err:?}"
+            );
+        }
     }
 }

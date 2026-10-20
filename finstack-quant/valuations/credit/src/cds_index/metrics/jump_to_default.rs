@@ -40,7 +40,7 @@
 //! - CDX IG (125 names): $10M index with 40% recovery → JTD ≈ $48K per name default
 
 use crate::cds::PayReceive;
-use crate::cds_index::CdsIndex;
+use crate::cds_index::{CdsIndex, IndexPricing};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
@@ -109,8 +109,7 @@ impl MetricCalculator for JumpToDefaultCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let index: &CdsIndex = context.instrument_as()?;
 
-        // Check if we have constituent data for more accurate calculation
-        if !index.constituents.is_empty() {
+        if index.pricing == IndexPricing::Constituents {
             // Average per-name JTD using surviving constituents only.
             // Defaulted names have already been settled and are not exposed
             // to a future jump-to-default event.
