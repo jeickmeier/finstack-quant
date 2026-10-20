@@ -1,9 +1,11 @@
 name: PR
 
-# Runs the nightly check set (nightly.yml) on every pull request into master,
-# without coverage: coverage only feeds the SonarQube scan, which runs on
-# master. `PR gate` is the one status check the master ruleset requires, so
-# jobs in nightly.yml can change without editing the ruleset.
+# Runs the nightly check set (nightly.yml) unchanged on every pull request into
+# master. Running it unchanged, coverage included, keeps each job's build
+# identical to master's, so the caches master saves apply; the SonarQube scan
+# is master-only and skipped. `PR gate` is the one status check the master
+# ruleset requires, so jobs in nightly.yml can change without editing the
+# ruleset.
 on:
   pull_request:
     branches: [master]
@@ -21,8 +23,6 @@ jobs:
   checks:
     name: Nightly checks
     uses: ./.github/workflows/nightly.yml
-    with:
-      skip-coverage: true
 
   # A required check that is skipped counts as passing, so this job must not be
   # skipped when a check fails: it runs unless the run was cancelled, and fails

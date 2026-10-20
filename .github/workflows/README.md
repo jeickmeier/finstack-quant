@@ -4,8 +4,8 @@ CI workflows and issue templates for finstack-quant.
 
 There are three workflows. `nightly.yml` is the minimal check set and runs every
 night: lint, the standard fast tests, and audits, with no doctests or slow
-tests. `pr.yml` runs the same set, without coverage, on every pull request into
-`master`; its `PR gate` check must pass before the pull request can merge.
+tests. `pr.yml` runs the same set on every pull request into `master`; its
+`PR gate` check must pass before the pull request can merge.
 `release.yml` runs when a `vX.Y.Z` tag is pushed. It runs the nightly set plus
 the release-only gates (docs, the `--doctest` and `--slow` test variants,
 publish checks, semver), then builds and publishes the release. Branching, pull
@@ -21,7 +21,7 @@ in [`../../mise.toml`](../../mise.toml); nothing here pins a compiler.
 | File | Triggers | What it runs |
 | --- | --- | --- |
 | `nightly.yml` | daily 06:00 UTC; manual; called by `pr.yml` and `release.yml` | Lint, the fast tests on all three surfaces, supply-chain audit, and the SonarQube scan. |
-| `pr.yml` | pull request into `master` | The nightly set without coverage (SonarQube skipped), then the `PR gate` check the `master` ruleset requires. |
+| `pr.yml` | pull request into `master` | The nightly set (SonarQube skipped), then the `PR gate` check the `master` ruleset requires. |
 | `release.yml` | push of a `vX.Y.Z` tag | Version metadata check, the nightly set, docs and doctests, the slow Rust and Python suites, publish checks, and semver. If all pass, it builds wheels, sdist and WASM packages, then creates the GitHub Release. |
 
 ### nightly.yml
@@ -36,8 +36,8 @@ parallel, and SonarQube runs after all three test jobs:
 | --- | --- | --- |
 | Supply-chain Security | `mise run all-audit` | `cargo deny check` (advisories, licenses, bans), then OSV-Scanner over `Cargo.lock`, `uv.lock` and `finstack-quant-wasm/package-lock.json`, filtered by `osv-scanner.toml`. |
 | Lint | `mise run pre-commit-run`, then `mise run gen-check` | `SKIP: cargo-deny`, which the supply-chain job owns. Clippy covers lib/bins/tests/examples (`--all-features`), not Criterion benches. |
-| Test Rust | `mise run rust-test --coverage` | The fast nextest lib and integration targets under `cargo llvm-cov` (no doctests, no `#[ignore]`d tests); uploads `coverage/rust/lcov.info`. With the `skip-coverage` input, `mise run rust-test` and no upload. |
-| Test Python | `mise run python-test --coverage` | maturin dev build, then the fast pytest suite (`-m 'not slow and not doctest'`) with coverage; uploads `coverage/python/coverage.xml`. With the `skip-coverage` input, `mise run python-test` and no upload. |
+| Test Rust | `mise run rust-test --coverage` | The fast nextest lib and integration targets under `cargo llvm-cov` (no doctests, no `#[ignore]`d tests); uploads `coverage/rust/lcov.info`. |
+| Test Python | `mise run python-test --coverage` | maturin dev build, then the fast pytest suite (`-m 'not slow and not doctest'`) with coverage; uploads `coverage/python/coverage.xml`. |
 | Test WASM | `python3 scripts/check_wasm_boundary.py`, then `mise run wasm-test` | Serializer and error-path check, then wasm-bindgen tests plus the Node facade suite (the documented code samples run under `--doctest`). |
 | SonarQube | `SonarSource/sonarqube-scan-action` | `master` only, so it is skipped inside a release run. Scan only: it imports the two coverage artifacts and runs no tests and no clippy (`sonar.rust.clippy.enabled=false`; Lint owns clippy). |
 
@@ -54,9 +54,13 @@ Three details worth knowing before editing:
 
 ### pr.yml
 
-`pr.yml` calls `nightly.yml` with `skip-coverage: true`: coverage only feeds the
-SonarQube scan, which runs on `master` alone. Pull request runs restore
-`master`'s caches and never save their own.
+`pr.yml` calls `nightly.yml` unchanged, coverage included, so every job builds
+exactly what the `master` run built and restores the cache that run saved. Pull
+request runs never save a cache of their own. Do not add a pull-request-only
+build variant: `cargo llvm-cov` builds into `target/llvm-cov-target` with
+`-C instrument-coverage`, so an uninstrumented Test Rust on pull requests would
+find nothing usable in `master`'s cache and compile every dependency cold. The
+SonarQube job is `master`-only and skips.
 
 A new push to a pull request cancels that pull request's run in progress;
 `pr.yml` owns the `concurrency` group because `nightly.yml` cannot.
