@@ -2,7 +2,7 @@
 
 use super::evaluator::PyStatementResult;
 use crate::bindings::macros::wire_methods;
-use crate::errors::{serde_json_to_py, statements_to_py, value_error};
+use crate::errors::{statements_to_py, value_error};
 use finstack_quant_statements::adjustments::{
     Adjustment, AdjustmentValue, AppliedAdjustment, CapBaseMode, NormalizationConfig,
     NormalizationResult,
