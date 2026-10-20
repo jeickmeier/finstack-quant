@@ -179,7 +179,7 @@ impl BondFuturePricer {
         let factor = a * (coupon / 2.0 + c + d) - b;
 
         // CME publishes conversion factors to 4 decimal places.
-        Ok((factor * 10_000.0).round() / 10_000.0)
+        Ok(finstack_quant_core::math::round_half_away(factor, 4))
     }
 
     /// Calculate model futures price from the CTD bond, **carry-adjusted to

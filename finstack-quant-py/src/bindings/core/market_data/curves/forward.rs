@@ -176,7 +176,8 @@ impl PyForwardCurve {
     /// Parameters
     /// ----------
     /// t : float | datetime.date | str
-    ///     Year fraction from ``base_date``, or a date converted with the curve day count.
+    ///     Year fraction from ``base_date``, or a date converted with the curve day count;
+    ///     dates on or before ``base_date`` read the rate at curve time zero.
     ///
     /// Returns
     /// -------
@@ -186,7 +187,7 @@ impl PyForwardCurve {
     /// Raises
     /// ------
     /// ValueError
-    ///     If a date precedes ``base_date``.
+    ///     If the date's day-count fraction cannot be computed.
     #[pyo3(text_signature = "(self, t)")]
     fn rate(&self, t: &Bound<'_, PyAny>) -> PyResult<f64> {
         match extract_time_point(t)? {

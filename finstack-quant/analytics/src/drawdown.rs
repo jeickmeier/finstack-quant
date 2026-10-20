@@ -11,6 +11,7 @@
 
 use crate::dates::Date;
 use crate::risk_metrics::ratio_or_sign_infinity;
+use finstack_quant_core::math::stats::mean;
 
 /// Drawdown episode with start, valley, optional recovery, and max drawdown.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -238,12 +239,7 @@ fn make_episode(
 /// `0.0` if `drawdown` is empty or no episodes are found.
 #[must_use]
 pub(crate) fn mean_episode_drawdown(drawdown: &[f64], n: usize) -> f64 {
-    let episode_depths = worst_episode_depths(drawdown, n);
-    if episode_depths.is_empty() {
-        return 0.0;
-    }
-    let sum: f64 = episode_depths.iter().sum();
-    sum / episode_depths.len() as f64
+    mean(&worst_episode_depths(drawdown, n))
 }
 
 /// Extract the worst `n` episode depths from a drawdown series, sorted
@@ -382,11 +378,7 @@ pub(crate) fn max_drawdown(drawdown: &[f64]) -> f64 {
 ///   [`to_drawdown_series`]).
 #[must_use]
 pub(crate) fn mean_drawdown(drawdowns: &[f64]) -> f64 {
-    if drawdowns.is_empty() {
-        0.0
-    } else {
-        drawdowns.iter().copied().sum::<f64>() / drawdowns.len() as f64
-    }
+    mean(drawdowns)
 }
 
 /// Calmar ratio = CAGR / |max drawdown| over the supplied active window.

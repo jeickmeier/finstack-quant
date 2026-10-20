@@ -747,14 +747,14 @@ pub fn gauss_legendre_grid(
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`] when:
-/// - `panels` is zero
-/// - `order` is unsupported (supported orders: 2, 4, 8, 16)
+/// Returns [`Error::Validation`] under the same conditions as
+/// [`gauss_legendre_grid`]: non-finite bounds, `b <= a`, zero `panels`, or an
+/// unsupported `order` (supported orders: 2, 4, 8, 16).
 ///
 /// # Complexity
 ///
 /// - **Time**: O(panels × order) function evaluations
-/// - **Space**: O(1) auxiliary space
+/// - **Space**: O(panels × order) for the node grid
 pub fn gauss_legendre_integrate_composite<F2>(
     f: F2,
     a: f64,
@@ -765,19 +765,10 @@ pub fn gauss_legendre_integrate_composite<F2>(
 where
     F2: Fn(f64) -> f64,
 {
-    if panels == 0 {
-        return Err(crate::Error::Validation(
-            "Gauss-Legendre integration needs at least one panel".to_string(),
-        ));
-    }
-    let h = (b - a) / panels as f64;
-    let mut sum = 0.0;
-    for k in 0..panels {
-        let ak = a + k as f64 * h;
-        let bk = ak + h;
-        sum += gauss_legendre_integrate(&f, ak, bk, order)?;
-    }
-    Ok(sum)
+    Ok(gauss_legendre_grid(a, b, order, panels)?
+        .into_iter()
+        .map(|(x, w)| w * f(x))
+        .sum())
 }
 
 /// Adaptive Gauss–Legendre integration with automatic refinement.

@@ -32,6 +32,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::stats::mean_var;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::RandomStream;
@@ -368,15 +369,10 @@ pub fn calculate_tranche_oas(
                 .sum()
         })
         .collect();
-    let mean_pv = path_pvs.iter().sum::<f64>() / path_count;
+    let (mean_pv, var) = mean_var(&path_pvs);
     let model_price = quote.clean_price(mean_pv);
     let price_std_error = if num_paths > 1 && current_balance > 0.0 {
         // Bessel-corrected standard error of the mean: sqrt(var / n).
-        let var = path_pvs
-            .iter()
-            .map(|pv| (pv - mean_pv).powi(2))
-            .sum::<f64>()
-            / (path_count - 1.0);
         (var / path_count).sqrt() / current_balance * 100.0
     } else {
         0.0

@@ -1442,7 +1442,9 @@ fn calculate_payment_amount(
         let scale = 10f64.powi(decimals);
         let val = raw_amount;
         let rounded_val = match convention {
-            RoundingConvention::Nearest => (val * scale).round() / scale,
+            RoundingConvention::Nearest => {
+                finstack_quant_core::math::round_half_away(val, decimals)
+            }
             RoundingConvention::Floor => (val * scale).floor() / scale,
             RoundingConvention::Ceiling => (val * scale).ceil() / scale,
         };

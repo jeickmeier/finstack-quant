@@ -812,7 +812,8 @@ class ForwardCurve:
         ----------
         t : float, datetime.date or str
             Year fraction from ``base_date``, or a date converted with the
-            curve day count.
+            curve day count; dates on or before ``base_date`` read the rate at
+            curve time zero.
 
         Returns
         -------
@@ -822,7 +823,7 @@ class ForwardCurve:
         Raises
         ------
         ValueError
-            If a date precedes ``base_date``.
+            If the date's day-count fraction cannot be computed.
         """
         ...
 
@@ -3693,13 +3694,13 @@ class SabrParameterData:
     Examples
     --------
     >>> from finstack_quant.core.market_data import SabrParameterData
-    >>> p = SabrParameterData(0.02, 0.5, -0.2, 0.3)
+    >>> p = SabrParameterData(0.02, 0.5, 0.3, -0.2)
     >>> (p.alpha, p.beta, p.rho, p.nu, p.shift)
     (0.02, 0.5, -0.2, 0.3, None)
 
     """
 
-    def __init__(self, alpha: float, beta: float, rho: float, nu: float, shift: Optional[float] = None) -> None:
+    def __init__(self, alpha: float, beta: float, nu: float, rho: float, shift: Optional[float] = None) -> None:
         """
         Construct a validated SABR parameter node.
 
@@ -3709,10 +3710,10 @@ class SabrParameterData:
             Initial volatility level; strictly positive.
         beta : float
             CEV exponent in ``[0, 1]``.
-        rho : float
-            Forward/volatility correlation in ``(-1, 1)``.
         nu : float
             Volatility of volatility; nonnegative, with zero giving deterministic volatility.
+        rho : float
+            Forward/volatility correlation in ``(-1, 1)``.
         shift : float, optional
             Displacement added to forward and strike (decimal rate units).
 
@@ -3724,7 +3725,7 @@ class SabrParameterData:
         Examples
         --------
         >>> from finstack_quant.core.market_data import SabrParameterData
-        >>> SabrParameterData(0.02, 0.5, -0.2, 0.3, shift=0.03).shift
+        >>> SabrParameterData(0.02, 0.5, 0.3, -0.2, shift=0.03).shift
         0.03
 
         """
@@ -3752,7 +3753,7 @@ class SabrParameterData:
         Examples
         --------
         >>> from finstack_quant.core.market_data import SabrParameterData
-        >>> p = SabrParameterData(0.02, 0.5, -0.2, 0.3)
+        >>> p = SabrParameterData(0.02, 0.5, 0.3, -0.2)
         >>> SabrParameterData.from_json(p.to_json()) == p
         True
 
@@ -3869,7 +3870,7 @@ class VolCube:
     Examples
     --------
     >>> from finstack_quant.core.market_data import SabrParameterData, VolCube
-    >>> p = SabrParameterData(0.02, 0.5, -0.2, 0.3)
+    >>> p = SabrParameterData(0.02, 0.5, 0.3, -0.2)
     >>> cube = VolCube("USD-SWPT", [1.0, 2.0], [5.0], [p, p], [0.03, 0.032])
     >>> (cube.grid_shape, cube.forward_at(1, 0), cube.params_at(0, 0).alpha)
     ((2, 1), 0.032, 0.02)

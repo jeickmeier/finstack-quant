@@ -492,10 +492,10 @@ impl PySabrParameterData {
     ///     Initial volatility level; strictly positive.
     /// beta : float
     ///     CEV exponent in ``[0, 1]``.
-    /// rho : float
-    ///     Forward/volatility correlation in ``(-1, 1)``.
     /// nu : float
     ///     Volatility of volatility; nonnegative, with zero giving deterministic volatility.
+    /// rho : float
+    ///     Forward/volatility correlation in ``(-1, 1)``.
     /// shift : float, optional
     ///     Displacement added to forward and strike (decimal rate units, e.g. ``0.03``).
     ///
@@ -507,12 +507,12 @@ impl PySabrParameterData {
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import SabrParameterData
-    /// >>> SabrParameterData(0.02, 0.5, -0.2, 0.3, shift=0.03).shift
+    /// >>> SabrParameterData(0.02, 0.5, 0.3, -0.2, shift=0.03).shift
     /// 0.03
     #[new]
-    #[pyo3(signature = (alpha, beta, rho, nu, shift=None))]
-    fn new(alpha: f64, beta: f64, rho: f64, nu: f64, shift: Option<f64>) -> PyResult<Self> {
-        SabrParameterData::new_with_shift(alpha, beta, rho, nu, shift)
+    #[pyo3(signature = (alpha, beta, nu, rho, shift=None))]
+    fn new(alpha: f64, beta: f64, nu: f64, rho: f64, shift: Option<f64>) -> PyResult<Self> {
+        SabrParameterData::new_with_shift(alpha, beta, nu, rho, shift)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }

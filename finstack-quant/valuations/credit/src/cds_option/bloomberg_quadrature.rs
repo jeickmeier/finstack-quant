@@ -61,6 +61,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::special_functions::norm_pdf;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::money::Money;
@@ -69,8 +70,6 @@ use finstack_quant_valuations_core::constants::bloomberg_cdso;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
 use rust_decimal::Decimal;
 
-/// `1/√(2π)` — the standard normal density's normalising constant.
-const INV_SQRT_2_PI: f64 = 0.398_942_280_401_432_7_f64;
 /// Above 10% forward spread, the lognormal-mean calibration is outside the
 /// Bloomberg CDSO model's intended liquid-credit regime.
 const DISTRESSED_FORWARD_SPREAD_LIMIT: f64 = 0.10;
@@ -750,9 +749,7 @@ pub fn quadrature_payoff(
     let limit = z_limit(ctx.sigma, t_expiry);
     let density_weighted_payoff = |z: f64| {
         let s = m * s0 * (sigma_sqrt_t * z).exp();
-        (sign * ctx.swap_value_per_n(s) + h_k + d_loss).max(0.0)
-            * (-0.5 * z * z).exp()
-            * INV_SQRT_2_PI
+        (sign * ctx.swap_value_per_n(s) + h_k + d_loss).max(0.0) * norm_pdf(z)
     };
     // Refine the exercise kink instead of sampling it on the calibration
     // grid. Seed half-standard-deviation panels so a small tail exercise
@@ -803,9 +800,9 @@ where
     for i in 0..=n_steps {
         let z = -limit + (i as f64) * step;
         let weight = if i == 0 || i == n_steps { 0.5 } else { 1.0 };
-        acc += weight * value_at(z) * (-0.5 * z * z).exp();
+        acc += weight * value_at(z) * norm_pdf(z);
     }
-    acc * INV_SQRT_2_PI * step
+    acc * step
 }
 
 #[cfg(test)]
@@ -922,7 +919,7 @@ mod tests {
             * (0.319_381_530
                 + t * (-0.356_563_782
                     + t * (1.781_477_937 + t * (-1.821_255_978 + t * 1.330_274_429))));
-        let tail = INV_SQRT_2_PI * (-0.5 * x * x).exp() * poly;
+        let tail = norm_pdf(x) * poly;
         if x >= 0.0 {
             1.0 - tail
         } else {

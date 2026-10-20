@@ -5,9 +5,7 @@ use crate::exotics::asian_option::types::AsianOption;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::stats::{
-    compensated_covariance, compensated_mean, compensated_variance,
-};
+use finstack_quant_core::math::stats::OnlineCovariance;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
 use finstack_quant_valuations_core::pricer::{
@@ -79,6 +77,15 @@ pub(super) fn map_fixings_to_steps(
         time_grid,
         fixing_steps,
     })
+}
+
+/// Welford moments of the paired per-path payoffs `(xs[i], ys[i])`.
+fn paired_moments(xs: &[f64], ys: &[f64]) -> OnlineCovariance {
+    let mut moments = OnlineCovariance::new();
+    for (&x, &y) in xs.iter().zip(ys) {
+        moments.update(x, y);
+    }
+    moments
 }
 
 /// Cumulative asset carry at each contractual date, in the instrument's clock.
@@ -423,14 +430,13 @@ impl AsianOptionMcPricer {
                 .collect();
 
             let n = xs.len();
-            // Compensated (Neumaier) sample moments — the control-variate
-            // estimator sums up to `num_paths` terms, so naive summation
-            // would lose precision at large path counts (W-05).
-            let mean_x = compensated_mean(&xs);
-            let mean_y = compensated_mean(&ys);
-            let var_x = compensated_variance(&xs, mean_x);
-            let var_y = compensated_variance(&ys, mean_y);
-            let cov_xy = compensated_covariance(&xs, &ys, mean_x, mean_y);
+            // Welford sample moments — the control-variate estimator sums up
+            // to `num_paths` terms, so naive summation would lose precision at
+            // large path counts (W-05).
+            let moments = paired_moments(&xs, &ys);
+            let (mean_x, mean_y) = (moments.mean_x(), moments.mean_y());
+            let (var_x, var_y) = (moments.variance_x(), moments.variance_y());
+            let cov_xy = moments.covariance();
 
             // Analytical value of geometric Asian (control).
             //
@@ -1678,9 +1684,9 @@ mod tests {
         assert!(grid.time_grid.num_steps() >= 252);
     }
 
-    /// W-05: the compensated covariance/variance helpers must stay accurate
-    /// even when the per-path payoffs carry a large constant offset that would
-    /// swamp a naive sum of squared deviations.
+    /// W-05: the control-variate moments must stay accurate even when the
+    /// per-path payoffs carry a large constant offset that would swamp a naive
+    /// sum of squared deviations.
     #[test]
     fn w05_compensated_moments_are_accurate_with_large_offset() {
         // Values with a huge offset: naive Σ(x-mean)² loses precision badly.
@@ -1688,9 +1694,9 @@ mod tests {
         let xs: Vec<f64> = (0..10_000).map(|i| offset + (i % 7) as f64).collect();
         let ys: Vec<f64> = (0..10_000).map(|i| offset + (i % 5) as f64).collect();
 
-        let mean_x = compensated_mean(&xs);
-        let var_x = compensated_variance(&xs, mean_x);
-        let cov = compensated_covariance(&xs, &ys, mean_x, compensated_mean(&ys));
+        let moments = paired_moments(&xs, &ys);
+        let var_x = moments.variance_x();
+        let cov = moments.covariance();
 
         // Reference variance of the repeating pattern 0..7 (independent of the
         // offset). Compute it directly on the de-offset values.

@@ -25,19 +25,11 @@ use super::{annualized_ratio_or_sign_infinity, ratio_or_sign_infinity};
 /// rebuild, because removing an outlier can expose accumulated roundoff.
 pub(crate) const ROLLING_KERNEL_RECOMPUTE_INTERVAL: usize = 1024;
 
+/// Welford mean and sum of squared deviations (`M2`) of a full window.
 #[inline]
 fn recompute_mean_m2(window: &[f64]) -> (f64, f64) {
-    let mut mean = 0.0_f64;
-    let mut m2 = 0.0_f64;
-    let mut count = 0.0_f64;
-    for &value in window {
-        count += 1.0;
-        let delta = value - mean;
-        mean += delta / count;
-        let delta2 = value - mean;
-        m2 += delta * delta2;
-    }
-    (mean, m2)
+    let (mean, variance) = finstack_quant_core::math::stats::mean_var(window);
+    (mean, variance * window.len().saturating_sub(1) as f64)
 }
 
 #[inline]

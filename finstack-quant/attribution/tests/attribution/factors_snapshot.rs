@@ -539,7 +539,7 @@ fn test_restore_preserves_families_outside_the_snapshot_model() {
         .knots([(0.0, 15.0), (1.0, 18.0)])
         .build()
         .unwrap();
-    let sabr = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let sabr = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid("USD-SWAPTION", &[1.0], &[5.0], &[sabr], &[0.03]).unwrap();
 
     let market_t1 = MarketContext::new()

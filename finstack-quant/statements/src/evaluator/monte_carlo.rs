@@ -4,6 +4,7 @@ use crate::error::{Error, Result};
 use crate::evaluator::results::EvalWarning;
 use crate::types::FinancialModelSpec;
 use finstack_quant_core::dates::PeriodId;
+use finstack_quant_core::math::stats::quantile_sorted;
 use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use indexmap::IndexMap;
 use serde_json::json;
@@ -442,19 +443,9 @@ impl MonteCarloAccumulator {
 
                 let mut sorted: Vec<f64> = values.iter().map(|(_, v)| *v).collect();
                 sorted.sort_by(|a, b| a.total_cmp(b));
-                let len = sorted.len();
                 let mut pairs: Vec<(f64, f64)> = Vec::with_capacity(self.percentiles.len());
                 for &q in &self.percentiles {
-                    let index = q * (len.saturating_sub(1) as f64);
-                    let lower = index.floor() as usize;
-                    let upper = index.ceil() as usize;
-                    let value = if lower == upper {
-                        sorted[lower]
-                    } else {
-                        let weight = index - lower as f64;
-                        sorted[lower] * (1.0 - weight) + sorted[upper] * weight
-                    };
-                    pairs.push((q, value));
+                    pairs.push((q, quantile_sorted(&sorted, q)));
                 }
 
                 series.values.insert(*period_id, pairs);

@@ -85,27 +85,23 @@ impl ForwardCurve {
 
     /// Curve-basis forward rate starting on `date` for the curve's tenor.
     ///
-    /// Converts `date` to a year fraction from the base date under the curve
-    /// day count and evaluates [`ForwardCurve::rate`]. The returned rate is
+    /// Converts `date` to curve time with [`ForwardCurve::curve_time`] (dates
+    /// on or before the base date map to `0.0`, so they return the spot-start
+    /// forward) and evaluates [`ForwardCurve::rate`]. The returned rate is
     /// annualized on this curve's day-count basis; a contractual index with a
     /// different accrual basis requires conversion before calculating a coupon.
     ///
     /// # Arguments
     ///
-    /// * `date` - Calendar date on or after the curve base date at which the
-    ///   forward rate is observed.
+    /// * `date` - Calendar date at which the forward rate is observed; dates
+    ///   on or before the curve base date read the rate at curve time zero.
     ///
     /// # Errors
     ///
     /// Propagates a failure while computing the curve day-count fraction from
     /// the base date to `date`.
     pub fn rate_on_date(&self, date: Date) -> crate::Result<f64> {
-        let t = self.day_count.signed_year_fraction(
-            self.base,
-            date,
-            crate::dates::DayCountContext::default(),
-        )?;
-        Ok(self.rate(t))
+        Ok(self.rate(self.curve_time(date)?))
     }
 
     /// Curve time of a calendar date: year fraction from the curve base date on
@@ -129,12 +125,11 @@ impl ForwardCurve {
         if date <= self.base {
             return Ok(0.0);
         }
-        let t = self.day_count.signed_year_fraction(
+        self.day_count.signed_year_fraction(
             self.base,
             date,
             crate::dates::DayCountContext::default(),
-        )?;
-        Ok(t.max(0.0))
+        )
     }
 
     /// Discount-factor-implied simple term forward over a date interval,

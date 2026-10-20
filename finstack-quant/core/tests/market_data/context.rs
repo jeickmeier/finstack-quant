@@ -39,7 +39,7 @@ fn surface_node(surface: &VolSurface, expiry: f64, strike: f64) -> f64 {
 
 #[test]
 fn vol_cube_accessors_reject_each_out_of_bounds_axis_before_flattening() {
-    let params = SabrParameterData::new(0.03, 0.5, -0.2, 0.3).expect("SABR node");
+    let params = SabrParameterData::new(0.03, 0.5, 0.3, -0.2).expect("SABR node");
     let cube = VolCube::from_grid(
         "CUBE",
         &[1.0, 2.0],
@@ -903,7 +903,7 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
         "SWPT",
         &[1.0],
         &[5.0],
-        &[SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap()],
+        &[SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap()],
         &[0.03],
     )
     .unwrap();
@@ -950,7 +950,7 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
                     "NEW-SWPT",
                     &[1.0],
                     &[5.0],
-                    &[SabrParameterData::new(0.030, 0.5, -0.1, 0.3).unwrap()],
+                    &[SabrParameterData::new(0.030, 0.5, 0.3, -0.1).unwrap()],
                     &[0.025],
                 )
                 .unwrap(),

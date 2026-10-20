@@ -314,9 +314,6 @@ impl PriceCurve {
                 date, self.base
             )));
         }
-        if date == self.base {
-            return Ok(self.spot_price);
-        }
         let t = self.day_count.signed_year_fraction(
             self.base,
             date,

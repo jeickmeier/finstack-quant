@@ -1153,11 +1153,7 @@ fn fill_sobol_increments(
     match bridge {
         Some(bridge) => {
             debug_assert_eq!(num_factors, 1, "Brownian bridge only supports 1 factor");
-            if time_grid.is_uniform() {
-                bridge.construct_path(z_path, w_path, time_grid.dt(0))?;
-            } else {
-                bridge.construct_path_irregular(z_path, w_path, time_grid.times())?;
-            }
+            bridge.construct_path(z_path, w_path, time_grid.times())?;
             for step in 0..num_steps {
                 let dt = time_grid.dt(step);
                 z_increments[step] = (w_path[step + 1] - w_path[step]) / dt.sqrt();

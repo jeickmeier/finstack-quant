@@ -413,7 +413,7 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
                     };
 
                     let core_params =
-                        SabrParameterData::new_with_shift(p.alpha, p.beta, p.rho, p.nu, p.shift)?;
+                        SabrParameterData::new_with_shift(p.alpha, p.beta, p.nu, p.rho, p.shift)?;
 
                     cube_params.push(core_params);
                     cube_forwards.push(f);

@@ -424,25 +424,67 @@ pub fn quantile(data: &mut [f64], p: f64) -> f64 {
     if data.iter().any(|x| !x.is_finite()) {
         return f64::NAN;
     }
-    if n == 1 {
-        return data[0];
-    }
-    let h = (n - 1) as f64 * p;
-    let lo = h.floor() as usize;
-    let hi = lo + 1;
-    let frac = h - lo as f64;
+    let (lo, frac) = r7_rank(n, p);
     data.select_nth_unstable_by(lo, |a, b| {
         a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal)
     });
     let v_lo = data[lo];
-    if hi >= n || frac == 0.0 {
+    if frac == 0.0 {
         return v_lo;
     }
     data[lo + 1..].select_nth_unstable_by(0, |a, b| {
         a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal)
     });
-    let v_hi = data[lo + 1];
-    v_lo + frac * (v_hi - v_lo)
+    v_lo + frac * (data[lo + 1] - v_lo)
+}
+
+/// Empirical R-7 quantile of data that is already sorted ascending.
+///
+/// Same estimator as [`quantile`] (`h = (n - 1) · p`, linear interpolation
+/// between the bracketing order statistics) for callers that sort once and
+/// read several quantiles; the slice is not modified and finiteness is not
+/// re-checked.
+///
+/// # Arguments
+///
+/// * `sorted` - Observations sorted ascending (for example with
+///   [`f64::total_cmp`]).
+/// * `p` - Quantile probability in the inclusive `0.0..=1.0` range.
+///
+/// # Returns
+///
+/// The interpolated quantile, or [`f64::NAN`] when `sorted` is empty or `p`
+/// is outside `[0, 1]`.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::math::stats::quantile_sorted;
+///
+/// let sorted = [1.0, 2.0, 3.0, 4.0];
+/// assert_eq!(quantile_sorted(&sorted, 0.5), 2.5);
+/// assert_eq!(quantile_sorted(&sorted, 1.0), 4.0);
+/// assert!(quantile_sorted(&[], 0.5).is_nan());
+/// ```
+pub fn quantile_sorted(sorted: &[f64], p: f64) -> f64 {
+    let n = sorted.len();
+    if n == 0 || !(0.0..=1.0).contains(&p) {
+        return f64::NAN;
+    }
+    let (lo, frac) = r7_rank(n, p);
+    if frac == 0.0 {
+        return sorted[lo];
+    }
+    sorted[lo] + frac * (sorted[lo + 1] - sorted[lo])
+}
+
+/// R-7 rank split for `n ≥ 1` observations and `p ∈ [0, 1]`: the lower
+/// order-statistic index and the interpolation weight toward the next one
+/// (`0.0` whenever the rank lands on an order statistic, including `p = 1`).
+fn r7_rank(n: usize, p: f64) -> (usize, f64) {
+    let h = (n - 1) as f64 * p;
+    let lo = h.floor() as usize;
+    (lo, h - lo as f64)
 }
 
 /// Calculate annualized close-to-close realized variance from a close price series.
@@ -692,8 +734,8 @@ pub fn realized_variance_ohlc(
             let m = n - 1;
             let k = YANG_ZHANG_K_NUMERATOR
                 / (YANG_ZHANG_K_DENOMINATOR_BASE + (m + 1) as f64 / (m - 1) as f64);
-            let var_overnight = two_pass_sample_variance(&overnight_returns);
-            let var_open_close = two_pass_sample_variance(&open_close_returns);
+            let var_overnight = variance(&overnight_returns);
+            let var_open_close = variance(&open_close_returns);
             // RS component averages over the same m = n−1 periods that
             // contribute overnight and open-close returns (Yang & Zhang 2000,
             // Eq. (4)); dividing by the bar count n would bias it down by
@@ -709,20 +751,6 @@ pub fn realized_variance_ohlc(
         )));
     }
     Ok(result.max(0.0))
-}
-
-/// Two-pass sample variance with plain summation, as in Yang & Zhang (2000).
-///
-/// `xs` must hold at least two values.
-fn two_pass_sample_variance(xs: &[f64]) -> f64 {
-    let mean = xs.iter().sum::<f64>() / xs.len() as f64;
-    xs.iter()
-        .map(|r| {
-            let d = r - mean;
-            d * d
-        })
-        .sum::<f64>()
-        / (xs.len() - 1) as f64
 }
 
 /// Online statistics accumulator using Welford's algorithm.
@@ -1015,69 +1043,6 @@ impl OnlineCovariance {
         self.m2_y = 0.0;
         self.c = 0.0;
     }
-}
-
-/// Compensated (Neumaier) sample mean.
-///
-/// A naive `iter().sum()` loses low-order bits when many values of similar
-/// magnitude are added (for example per-path Monte Carlo payoffs); compensated
-/// summation keeps the mean accurate at large counts.
-///
-/// # Arguments
-///
-/// * `xs` - Sample values; an empty slice yields `0.0`.
-#[must_use]
-pub fn compensated_mean(xs: &[f64]) -> f64 {
-    if xs.is_empty() {
-        return 0.0;
-    }
-    let mut acc = crate::math::summation::NeumaierAccumulator::new();
-    for &x in xs {
-        acc.add(x);
-    }
-    acc.total() / xs.len() as f64
-}
-
-/// Compensated (Neumaier) unbiased sample variance about a supplied mean.
-///
-/// # Arguments
-///
-/// * `xs` - Sample values; fewer than two yield `0.0`.
-/// * `mean` - Sample mean of `xs`, typically from [`compensated_mean`].
-#[must_use]
-pub fn compensated_variance(xs: &[f64], mean: f64) -> f64 {
-    let n = xs.len();
-    if n < 2 {
-        return 0.0;
-    }
-    let mut acc = crate::math::summation::NeumaierAccumulator::new();
-    for &x in xs {
-        let d = x - mean;
-        acc.add(d * d);
-    }
-    acc.total() / (n as f64 - 1.0)
-}
-
-/// Compensated (Neumaier) unbiased sample covariance about supplied means.
-///
-/// # Arguments
-///
-/// * `xs` - First sample; only the first `min(xs.len(), ys.len())` pairs are used.
-/// * `ys` - Second sample, paired index-by-index with `xs`; entries beyond the
-///   shorter slice's length are ignored.
-/// * `mean_x` - Sample mean of `xs`.
-/// * `mean_y` - Sample mean of `ys`.
-#[must_use]
-pub fn compensated_covariance(xs: &[f64], ys: &[f64], mean_x: f64, mean_y: f64) -> f64 {
-    let n = xs.len().min(ys.len());
-    if n < 2 {
-        return 0.0;
-    }
-    let mut acc = crate::math::summation::NeumaierAccumulator::new();
-    for (&x, &y) in xs.iter().zip(ys.iter()) {
-        acc.add((x - mean_x) * (y - mean_y));
-    }
-    acc.total() / (n as f64 - 1.0)
 }
 
 #[cfg(test)]
