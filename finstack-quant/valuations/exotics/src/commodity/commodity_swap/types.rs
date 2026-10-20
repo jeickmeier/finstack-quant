@@ -434,10 +434,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommoditySwap {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let periods = self.periods()?;
         let mut flows = Vec::with_capacity(periods.len() * 2);
-        let fixed_sign = match self.side {
-            PayReceive::Pay => -1.0,
-            PayReceive::Receive => 1.0,
-        };
+        let fixed_sign = self.side.sign();
         for (period, floating_price) in self.projected_period_prices(market, as_of, periods)? {
             flows.push(self.classified_flow(
                 &period,

@@ -712,10 +712,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CreditDefaultSwap {
 
         // Apply holder-view sign: protection buyer (Pay) pays premium,
         // protection seller (Receive) receives premium.
-        let sign = match self.side {
-            PayReceive::Pay => -1.0,
-            PayReceive::Receive => 1.0,
-        };
+        let sign = self.side.sign();
         schedule.update_flows(|cf| {
             cf.amount = if sign < 0.0 {
                 cf.amount.checked_neg()

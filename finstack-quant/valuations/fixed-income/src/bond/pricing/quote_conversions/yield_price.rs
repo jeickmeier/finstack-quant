@@ -1,4 +1,3 @@
-use super::annuity::periods_per_year;
 use super::types::YieldCompounding;
 use super::ExitCandidate;
 use crate::bond::pricing::settlement::QuoteDateContext;
@@ -106,7 +105,7 @@ pub fn df_from_yield(
         }
         YieldCompounding::Rate(Compounding::Continuous) => (-ytm * t).exp(),
         YieldCompounding::Street => {
-            let m = periods_per_year(bond_frequency)?.max(1.0);
+            let m = bond_frequency.payments_per_year().max(1.0);
             let base = 1.0 + ytm / m;
             if base <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -121,7 +120,7 @@ pub fn df_from_yield(
             // and the remaining whole coupon periods are `k-1`. On a period
             // boundary (`t` is a multiple of `1/m`) this collapses to Street:
             // `w = 1/m` and `DF = (1 + y/m)^(-m*t)`.
-            let m = periods_per_year(bond_frequency)?.max(1.0);
+            let m = bond_frequency.payments_per_year().max(1.0);
             let n_full = (t * m).floor();
             let mut w = t - n_full / m;
             if w <= 1e-12 {
@@ -372,7 +371,7 @@ pub(crate) fn price_from_ytm_timed(
                         moosmuller_k = moosmuller_k.saturating_add(1);
                         moosmuller_date = Some(date);
                     }
-                    let m = periods_per_year(frequency)?.max(1.0);
+                    let m = frequency.payments_per_year().max(1.0);
                     moosmuller_df_for_coupon(ytm, m, w, moosmuller_k)?
                 }
                 _ => df_from_yield(ytm, t, comp, frequency)?,

@@ -20,6 +20,7 @@
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
@@ -61,7 +62,7 @@ pub fn calculate_tranche_convexity(
             "tranche convexity ytm_bump_bp must be finite and positive, got {ytm_bump_bp}"
         )));
     }
-    let bump = ytm_bump_bp / 10_000.0;
+    let bump = ytm_bump_bp / BASIS_POINTS_PER_UNIT;
     let day_count = crate::structured_credit::metrics::METRIC_TIME_BASIS;
     let mut pv0 = NeumaierAccumulator::new();
     let mut pv_up = NeumaierAccumulator::new();

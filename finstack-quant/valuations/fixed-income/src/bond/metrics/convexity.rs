@@ -98,7 +98,7 @@ impl MetricCalculator for ConvexityCalculator {
         // Calculate convexity using quote_date as time origin. Street
         // compounding: DF = (1 + y/m)^(-c) with c = m·t, so
         // d²DF/dy² = c·(c + 1) / (m + y)² · DF.
-        let m = crate::bond::pricing::quote_conversions::periods_per_year(frequency)?.max(1.0);
+        let m = frequency.payments_per_year().max(1.0);
         let mut d2_price = finstack_quant_core::math::summation::NeumaierAccumulator::new();
         for &(_, t, amount) in &timed {
             if t <= 0.0 {

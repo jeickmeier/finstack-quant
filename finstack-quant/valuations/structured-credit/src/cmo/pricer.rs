@@ -14,6 +14,7 @@ use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::Result;
@@ -217,7 +218,8 @@ fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPa
     // Standard fee assumptions (annual bp).
     let servicing_fee = defaults.servicing_fee_bp;
     let guarantee_fee = defaults.guarantee_fee_bp;
-    let pass_through = wac - servicing_fee / 10_000.0 - guarantee_fee / 10_000.0;
+    let pass_through =
+        wac - servicing_fee / BASIS_POINTS_PER_UNIT - guarantee_fee / BASIS_POINTS_PER_UNIT;
 
     let maturity = as_of.add_months(i32::try_from(wam).map_err(|_| {
         finstack_quant_core::Error::Validation(

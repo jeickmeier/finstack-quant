@@ -123,17 +123,10 @@ impl FxBarrierOptionMcPricer {
         // Standard FX barrier: the GBM drift `r_dom - r_for` (set above via
         // `GbmParams`) fully describes the dynamics. Quanto barriers are not
         // supported by this 1D MC payoff — see `BarrierOptionPayoff` docs.
-        use finstack_quant_models::monte_carlo::seed;
-
-        let seed = if let Some(scenario) = &inst
+        let seed = inst
             .instrument_pricing_overrides
             .model_config
-            .mc_seed_scenario
-        {
-            seed::derive_seed(&inst.id, scenario)
-        } else {
-            seed::derive_seed(&inst.id, "base")
-        };
+            .mc_seed(&inst.id);
         config.seed = seed;
 
         let (time_grid, monitoring) = inst.monitoring.time_grid(
@@ -284,46 +277,27 @@ fn expired_barrier_value_per_unit(
     spot: f64,
 ) -> finstack_quant_core::Result<f64> {
     let strike = inst.strike;
-    let is_knock_in = inst.barrier_type.is_knock_in();
     let barrier_hit = inst.observed_barrier_breached.ok_or_else(|| {
         finstack_quant_core::Error::Validation(
             "Expired FX barrier option requires `observed_barrier_breached` to determine realized payoff"
                 .to_string(),
         )
     })?;
-    let activated = if is_knock_in {
-        barrier_hit
-    } else {
-        !barrier_hit
+    let intrinsic = match inst.option_type {
+        finstack_quant_valuations_core::instruments::OptionType::Call => (spot - strike).max(0.0),
+        finstack_quant_valuations_core::instruments::OptionType::Put => (strike - spot).max(0.0),
     };
-
-    let intrinsic = if activated {
-        match inst.option_type {
-            finstack_quant_valuations_core::instruments::OptionType::Call => {
-                (spot - strike).max(0.0)
-            }
-            finstack_quant_valuations_core::instruments::OptionType::Put => {
-                (strike - spot).max(0.0)
-            }
-        }
-    } else {
-        0.0
-    };
-
-    let rebate_due = if is_knock_in {
-        !barrier_hit
-    } else {
-        // A recorded hit includes settlement of an at-hit rebate. The same
-        // claim is extinguished before, on, and after expiry.
-        barrier_hit && inst.rebate_timing == PayoutTiming::AtExpiry
-    };
-    let rebate = if rebate_due {
-        inst.rebate_per_unit().unwrap_or(0.0)
-    } else {
-        0.0
-    };
-
-    Ok(intrinsic + rebate)
+    // A recorded knock-out hit includes settlement of an at-hit rebate; the
+    // same claim is extinguished before, on, and after expiry.
+    Ok(
+        finstack_quant_models::closed_form::barrier::expired_barrier_payoff(
+            inst.barrier_type,
+            barrier_hit,
+            inst.rebate_timing,
+            intrinsic,
+            inst.rebate_per_unit().unwrap_or(0.0),
+        ),
+    )
 }
 
 #[allow(clippy::too_many_arguments)]

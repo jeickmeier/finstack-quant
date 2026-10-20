@@ -111,5 +111,3 @@ pub use metrics::{
     YtmCalculator,
     ZSpreadCalculator,
 };
-
-pub use types::constants::BASIS_POINTS_DIVISOR;

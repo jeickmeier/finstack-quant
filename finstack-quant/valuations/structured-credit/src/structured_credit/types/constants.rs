@@ -1,10 +1,7 @@
 //! Constants for structured credit instruments.
 //!
-//! This module contains the basis-point conversion and the solver tolerances
-//! shared across structured credit modeling.
-
-/// Divisor converting basis points to a decimal rate (10,000.0).
-pub const BASIS_POINTS_DIVISOR: f64 = 10_000.0;
+//! This module contains the solver tolerances shared across structured credit
+//! modeling.
 
 // These tolerances are calibrated to market conventions for structured credit.
 // Reference: Bloomberg BVAL, Intex, and industry-standard pricing systems.

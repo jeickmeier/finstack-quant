@@ -17,6 +17,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::{HashSet, Result};
@@ -493,7 +494,7 @@ fn require_currency(actual: Currency, expected: Currency, id: &InstrumentId) -> 
 fn floating_economics(spec: &FloatingRateSpec) -> Result<(f64, Option<f64>, Option<String>)> {
     let spread_bp = spec.spread_bp.as_f64();
     Ok((
-        spread_bp / 10_000.0,
+        spread_bp / BASIS_POINTS_PER_UNIT,
         Some(spread_bp),
         Some(spec.forward_curve_id.to_string()),
     ))

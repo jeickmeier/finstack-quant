@@ -102,7 +102,8 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba) -> Result<AgencyMbsPassthroug
             tba.id, factor
         )));
     }
-    let issue_date = Date::from_calendar_date(settlement_date.year(), settlement_date.month(), 1)
+    let issue_date = settlement_date
+        .replace_day(1)
         .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
     let maturity = issue_date.add_months(term_months as i32)?;
 

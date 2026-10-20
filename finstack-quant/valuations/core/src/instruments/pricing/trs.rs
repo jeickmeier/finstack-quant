@@ -40,6 +40,7 @@ use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, DayCount
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use rust_decimal::prelude::ToPrimitive;
@@ -221,6 +222,68 @@ fn financing_period_projection(
             Ok(financing_projection)
         }
     }
+}
+
+/// Visit every financing period paid after `as_of`, in schedule order, with
+/// its payment date and projected coupon.
+///
+/// Accrues on the financing leg's day count (not the schedule day count,
+/// which governs date generation) and projects the period rate per the leg's
+/// compounding convention: simple term rate, or daily-compounded overnight
+/// splicing realized `FIXING:{forward_curve_id}` observations into
+/// in-progress periods. The fixing series is optional here; a missing fixing
+/// errors only when an in-progress period needs it.
+fn for_each_financing_period(
+    financing: &FinancingLegSpec,
+    schedule: &TrsScheduleSpec,
+    market: &MarketContext,
+    as_of: Date,
+    currency: Currency,
+    collect_fixings: bool,
+    mut visit: impl FnMut(Date, FinancingPeriodProjection) -> finstack_quant_core::Result<()>,
+) -> finstack_quant_core::Result<()> {
+    let fwd = market.get_forward(financing.forward_curve_id.as_str())?;
+    let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
+        market,
+        financing.forward_curve_id.as_str(),
+    )
+    .ok();
+    let period_schedule = schedule.period_schedule()?;
+
+    for i in 1..period_schedule.dates.len() {
+        let period_start = period_schedule.dates[i - 1];
+        let period_end = period_schedule.dates[i];
+        let payment_date = schedule.payment_date_for(period_end)?;
+
+        if payment_date <= as_of {
+            continue;
+        }
+
+        let ctx = DayCountContext {
+            frequency: Some(schedule.params.frequency),
+            coupon_period: (financing.day_count == DayCount::Act365L)
+                .then_some((period_start, period_end)),
+            ..Default::default()
+        };
+        let yf = financing
+            .day_count
+            .year_fraction(period_start, period_end, ctx)?;
+        let projected = financing_period_projection(
+            financing,
+            fwd.as_ref(),
+            fixings,
+            period_start,
+            period_end,
+            yf,
+            schedule.params.frequency,
+            as_of,
+            schedule.params.calendar_id.as_str(),
+            currency,
+            collect_fixings,
+        )?;
+        visit(payment_date, projected)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -544,75 +607,30 @@ impl TrsEngine {
         as_of: Date,
         collect_fixings: bool,
     ) -> finstack_quant_core::Result<FinancingLegFlows> {
-        let fwd = market.get_forward(financing.forward_curve_id.as_str())?;
-        // For compounded legs, realized fixings for in-progress periods
-        // are sourced from MarketContext using the canonical `FIXING:{forward_curve_id}`
-        // key, shared by the basis-swap and overnight coupon projectors.
-        // `get_fixing_series` returns `None` (not an error) when absent; the
-        // error is deferred to `financing_period_rate` when a fixing is actually
-        // required for an in-progress period.
-        let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-            market,
-            financing.forward_curve_id.as_str(),
-        )
-        .ok();
-        let period_schedule = schedule.period_schedule()?;
-
-        let mut flows = Vec::new();
-        let mut projected_fixings = Vec::new();
-        let currency = notional.currency();
         let spread_decimal = financing.spread_bp.to_f64().ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
                 "TRS financing spread_bp ({}) is not representable as f64",
                 financing.spread_bp
             ))
         })? / 10_000.0;
-
-        for i in 1..period_schedule.dates.len() {
-            let period_start = period_schedule.dates[i - 1];
-            let period_end = period_schedule.dates[i];
-            let payment_date = schedule.payment_date_for(period_end)?;
-
-            if payment_date <= as_of {
-                continue;
-            }
-
-            // Use the financing leg's day count for accrual (not the schedule DC
-            // which governs date generation).
-            let ctx = DayCountContext {
-                frequency: Some(schedule.params.frequency),
-                coupon_period: (financing.day_count == DayCount::Act365L)
-                    .then_some((period_start, period_end)),
-                ..Default::default()
-            };
-            let yf = financing
-                .day_count
-                .year_fraction(period_start, period_end, ctx)?;
-
-            // Project the period rate per the leg's compounding convention
-            // (simple term-rate average vs daily-compounded OIS).
-            // For in-progress OIS periods, splices realized fixings with projected
-            // forwards; fully-future periods use forward-curve projection only.
-            let projected = financing_period_projection(
-                financing,
-                fwd.as_ref(),
-                fixings,
-                period_start,
-                period_end,
-                yf,
-                schedule.params.frequency,
-                as_of,
-                schedule.params.calendar_id.as_str(),
-                currency,
-                collect_fixings,
-            )?;
-            let payment = projected.unsigned_coupon(notional.amount(), spread_decimal);
-
-            // A completed accrual remains in PV until its lagged payment date.
-            flows.push((payment_date, Money::new(payment, currency)?));
-            projected_fixings.extend(projected.fixings);
-        }
-
+        let currency = notional.currency();
+        let mut flows = Vec::new();
+        let mut projected_fixings = Vec::new();
+        for_each_financing_period(
+            financing,
+            schedule,
+            market,
+            as_of,
+            currency,
+            collect_fixings,
+            |payment_date, projected| {
+                let payment = projected.unsigned_coupon(notional.amount(), spread_decimal);
+                // A completed accrual remains in PV until its lagged payment date.
+                flows.push((payment_date, Money::new(payment, currency)?));
+                projected_fixings.extend(projected.fixings);
+                Ok(())
+            },
+        )?;
         Ok((flows, projected_fixings))
     }
 
@@ -653,56 +671,23 @@ impl TrsEngine {
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         let disc = market.get_discount(financing.discount_curve_id.as_str())?;
-        let fwd = market.get_forward(financing.forward_curve_id.as_str())?;
-        let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-            market,
-            financing.forward_curve_id.as_str(),
-        )
-        .ok();
-        let period_schedule = schedule.period_schedule()?;
-
         let mut annuity = NeumaierAccumulator::new();
-
-        for i in 1..period_schedule.dates.len() {
-            let period_start = period_schedule.dates[i - 1];
-            let period_end = period_schedule.dates[i];
-            let payment_date = schedule.payment_date_for(period_end)?;
-
-            if payment_date <= as_of {
-                continue;
-            }
-
-            // Term legs accrue on the schedule year fraction. Overnight legs
-            // use the projector fraction so the spread term matches
-            // `unsigned_coupon` (`N × spread × proj_yf`).
-            let ctx = DayCountContext {
-                frequency: Some(schedule.params.frequency),
-                coupon_period: (financing.day_count == DayCount::Act365L)
-                    .then_some((period_start, period_end)),
-                ..Default::default()
-            };
-            let schedule_yf = financing
-                .day_count
-                .year_fraction(period_start, period_end, ctx)?;
-            let yf = financing_period_projection(
-                financing,
-                fwd.as_ref(),
-                fixings,
-                period_start,
-                period_end,
-                schedule_yf,
-                schedule.params.frequency,
-                as_of,
-                schedule.params.calendar_id.as_str(),
-                notional.currency(),
-                false,
-            )?
-            .year_fraction;
-
-            let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
-
-            annuity.add(df * yf);
-        }
+        // Term legs accrue on the schedule year fraction. Overnight legs use
+        // the projector fraction so the spread term matches `unsigned_coupon`
+        // (`N × spread × proj_yf`).
+        for_each_financing_period(
+            financing,
+            schedule,
+            market,
+            as_of,
+            notional.currency(),
+            false,
+            |payment_date, projected| {
+                let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
+                annuity.add(df * projected.year_fraction);
+                Ok(())
+            },
+        )?;
 
         let result = annuity.total() * notional.amount();
 
@@ -726,6 +711,23 @@ impl TrsEngine {
     /// spread that zeroes the NPV.
     ///
     /// Relationship: `pv_financing_leg = pv_financing_float_only + spread × annuity`
+    ///
+    /// # Arguments
+    /// * `financing` — Financing leg specification (curves, day count,
+    ///   compounding); its spread is ignored.
+    /// * `schedule` — Payment schedule specification (dates, calendar, lag).
+    /// * `notional` — Notional the floating coupons accrue on, in the
+    ///   currency of the result.
+    /// * `market` — Market holding `financing.discount_curve_id`,
+    ///   `financing.forward_curve_id` and any `FIXING:{forward_curve_id}` series.
+    /// * `as_of` — Valuation date; periods paid on or before it are excluded.
+    ///
+    /// # Returns
+    /// Discounted sum of the spread-free financing coupons.
+    ///
+    /// # Errors
+    /// Returns an error when a curve is missing, a payment date cannot be
+    /// resolved, or a required fixing for an in-progress period is missing.
     pub fn pv_financing_float_only(
         financing: &FinancingLegSpec,
         schedule: &TrsScheduleSpec,
@@ -734,58 +736,82 @@ impl TrsEngine {
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         let disc = market.get_discount(financing.discount_curve_id.as_str())?;
-        let fwd = market.get_forward(financing.forward_curve_id.as_str())?;
-        let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-            market,
-            financing.forward_curve_id.as_str(),
-        )
-        .ok();
-        let period_schedule = schedule.period_schedule()?;
-
         let mut total_pv = NeumaierAccumulator::new();
-
-        for i in 1..period_schedule.dates.len() {
-            let period_start = period_schedule.dates[i - 1];
-            let period_end = period_schedule.dates[i];
-            let payment_date = schedule.payment_date_for(period_end)?;
-
-            if payment_date <= as_of {
-                continue;
-            }
-
-            let ctx = DayCountContext {
-                frequency: Some(schedule.params.frequency),
-                coupon_period: (financing.day_count == DayCount::Act365L)
-                    .then_some((period_start, period_end)),
-                ..Default::default()
-            };
-            let yf = financing
-                .day_count
-                .year_fraction(period_start, period_end, ctx)?;
-
-            // Project the period rate per the leg's compounding convention
-            // (simple term-rate average vs daily-compounded OIS).
-            // In-progress OIS periods splice realized fixings with projected forwards.
-            let projected = financing_period_projection(
-                financing,
-                fwd.as_ref(),
-                fixings,
-                period_start,
-                period_end,
-                yf,
-                schedule.params.frequency,
-                as_of,
-                schedule.params.calendar_id.as_str(),
-                notional.currency(),
-                false,
-            )?;
-            let payment = projected.unsigned_coupon(notional.amount(), 0.0);
-
-            let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
-            total_pv.add(payment * df);
-        }
+        for_each_financing_period(
+            financing,
+            schedule,
+            market,
+            as_of,
+            notional.currency(),
+            false,
+            |payment_date, projected| {
+                let payment = projected.unsigned_coupon(notional.amount(), 0.0);
+                let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
+                total_pv.add(payment * df);
+                Ok(())
+            },
+        )?;
 
         Ok(total_pv.total())
+    }
+
+    /// Par financing spread in basis points: the spread that zeroes the
+    /// total-return receiver's NPV.
+    ///
+    /// ```text
+    /// NPV = PV(total_return) - PV(financing_float) - s * Annuity = 0
+    /// s_par = (PV(total_return) - PV(financing_float)) / Annuity
+    /// ```
+    ///
+    /// `PV(financing_float)` is [`Self::pv_financing_float_only`]. The result
+    /// is a market-level quote (analogous to a swap rate) and does not depend
+    /// on the trade side.
+    ///
+    /// # Arguments
+    /// * `total_return_pv` — Present value of the total-return leg (unsigned,
+    ///   receiver perspective) in the notional's currency.
+    /// * `financing` — Financing leg specification (curves, day count,
+    ///   compounding; its own spread is ignored).
+    /// * `schedule` — Payment schedule shared by both legs.
+    /// * `notional` — Notional the financing coupons accrue on.
+    /// * `market` — Market holding the financing discount and forward curves
+    ///   and any `FIXING:{forward_curve_id}` series.
+    /// * `as_of` — Valuation date; periods paid on or before it are excluded.
+    /// * `annuity` — Financing annuity from [`Self::financing_annuity`]
+    ///   (currency amount per unit of spread).
+    ///
+    /// # Returns
+    /// Par spread in basis points (`1.0` = 1bp).
+    ///
+    /// # Errors
+    /// Returns `Error::Validation` when `|annuity|` is below
+    /// [`super::swap_legs::ANNUITY_EPSILON`] or the result is not finite, and
+    /// propagates financing-leg projection errors.
+    pub fn par_spread_bp(
+        total_return_pv: Money,
+        financing: &FinancingLegSpec,
+        schedule: &TrsScheduleSpec,
+        notional: Money,
+        market: &MarketContext,
+        as_of: Date,
+        annuity: f64,
+    ) -> finstack_quant_core::Result<f64> {
+        if annuity.abs() < super::swap_legs::ANNUITY_EPSILON {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "TRS par spread: financing annuity {annuity:.3e} below ANNUITY_EPSILON \
+                 ({:.0e}). Division would amplify rounding noise into the par spread.",
+                super::swap_legs::ANNUITY_EPSILON
+            )));
+        }
+        let float_pv = Self::pv_financing_float_only(financing, schedule, notional, market, as_of)?;
+        let par_spread = (total_return_pv.amount() - float_pv) / annuity * BASIS_POINTS_PER_UNIT;
+        if !par_spread.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Par spread calculation produced invalid value: {par_spread}. \
+                 Check that financing annuity is non-zero."
+            )));
+        }
+        Ok(par_spread)
     }
 }
 

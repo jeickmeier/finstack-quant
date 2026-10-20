@@ -398,14 +398,14 @@ pub fn calculate_tranche_metrics(
     let cs01 = calculate_tranche_cs01(
         &cashflows.cashflows,
         curve,
-        z_spread_bp * 1e-4,
+        z_spread_bp * ONE_BASIS_POINT,
         quote.settlement,
     )?;
     let spread_duration = -cs01 / (target_value * ONE_BASIS_POINT);
     let spread_convexity = calculate_tranche_spread_convexity(
         &cashflows.cashflows,
         curve,
-        z_spread_bp * 1e-4,
+        z_spread_bp * ONE_BASIS_POINT,
         quote.settlement,
     )?;
     // The discount margin is the z-spread of a floater's projected flows, solved

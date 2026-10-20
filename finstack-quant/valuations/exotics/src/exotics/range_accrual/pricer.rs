@@ -39,18 +39,10 @@ fn asset_spot(inst: &RangeAccrual, curves: &MarketContext) -> Result<f64> {
         .quanto
         .as_ref()
         .map_or(inst.terms.notional.currency(), |q| q.asset_currency);
-    let spot = match scalar {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
-            if money.currency() != expected {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected,
-                    actual: money.currency(),
-                });
-            }
-            money.amount()
-        }
-    };
+    let spot =
+        finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+            scalar, expected,
+        )?;
     finstack_quant_core::validation::validate_f64_positive(spot, "RangeAccrual asset spot")?;
     Ok(spot)
 }
@@ -81,18 +73,11 @@ fn asset_growth(
     let asset_df = curves
         .get_discount(quanto.asset_discount_curve_id.as_str())?
         .df_between_dates(as_of, date)?;
-    let fx_spot = match curves.get_price(quanto.fx_spot_id.as_str())? {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
-            if money.currency() != inst.terms.notional.currency() {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: inst.terms.notional.currency(),
-                    actual: money.currency(),
-                });
-            }
-            money.amount()
-        }
-    };
+    let fx_spot =
+        finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+            curves.get_price(quanto.fx_spot_id.as_str())?,
+            inst.terms.notional.currency(),
+        )?;
     finstack_quant_core::validation::validate_f64_positive(fx_spot, "RangeAccrual quanto FX spot")?;
     let fx_forward = fx_spot * asset_df / payoff_df;
     let sigma_fx = resolve_sigma_at(

@@ -358,7 +358,8 @@ impl DollarRoll {
     }
 
     fn trade_cash_amount(&self, price: f64, settlement: Date) -> finstack_quant_core::Result<f64> {
-        let start = Date::from_calendar_date(settlement.year(), settlement.month(), 1)
+        let start = settlement
+            .replace_day(1)
             .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
         let accrual = finstack_quant_core::dates::DayCount::Thirty360.year_fraction(
             start,

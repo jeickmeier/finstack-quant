@@ -187,7 +187,6 @@ pub(crate) fn mapping_to_market_bumps(
                     "MarketMapping::CurveBucketed requires RateBp bump units, got {bump_units:?}"
                 )));
             }
-            let last_idx = tenor_weights.len().saturating_sub(1);
             Ok(tenor_weights
                 .iter()
                 .enumerate()
@@ -199,29 +198,12 @@ pub(crate) fn mapping_to_market_bumps(
                     // the first bucket would produce a rising triangle from
                     // t=0 and understate short-end sensitivity.
                     let scaled_bp = bump_size * weight;
-                    let spec = match (idx == 0, idx == last_idx) {
-                        (true, true) => {
-                            // Sole bucket: both wings flat ⇒ weight is 1 at every
-                            // knot, equivalent to a parallel bump.
-                            BumpSpec::parallel_bp(scaled_bp)
-                        }
-                        (true, false) => BumpSpec::triangular_key_rate_first_bp(
-                            target_bucket,
-                            tenor_weights[idx + 1].0,
-                            scaled_bp,
-                        ),
-                        (false, true) => BumpSpec::triangular_key_rate_last_bp(
-                            tenor_weights[idx - 1].0,
-                            target_bucket,
-                            scaled_bp,
-                        ),
-                        (false, false) => BumpSpec::triangular_key_rate_bp(
-                            tenor_weights[idx - 1].0,
-                            target_bucket,
-                            tenor_weights[idx + 1].0,
-                            scaled_bp,
-                        ),
-                    };
+                    let spec = BumpSpec::triangular_key_rate_bucket_bp(
+                        idx.checked_sub(1).map(|prev| tenor_weights[prev].0),
+                        target_bucket,
+                        tenor_weights.get(idx + 1).map(|&(next, _)| next),
+                        scaled_bp,
+                    );
                     MarketBump::Curve {
                         id: curve_id.clone(),
                         spec,

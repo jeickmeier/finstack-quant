@@ -538,15 +538,15 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommoditySwapti
             );
         }
 
-        // Black-76 on forward swap rate
-        let unit_price = black76_swaption_price(
+        // Black-76 on the forward swap rate; the annuity carries the discounting.
+        let unit_price = finstack_quant_models::closed_form::black76_price(
             inputs.forward,
             self.fixed_price,
+            inputs.annuity,
             inputs.sigma,
             inputs.time,
-            inputs.annuity,
             self.option_type,
-        );
+        )?;
 
         Money::new(unit_price * self.quantity, self.underlying.currency)
     }
@@ -715,29 +715,6 @@ impl CommoditySwaption {
         let vega_abs = inputs.annuity * inputs.forward * norm_pdf(d1) * inputs.time.sqrt();
         Ok(Some(vega_abs * 0.01 * self.quantity))
     }
-}
-
-/// Black-76 swaption price.
-///
-/// C = annuity * [F * N(d1) - K * N(d2)]
-/// P = annuity * [K * N(-d2) - F * N(-d1)]
-///
-/// The discount factor is already embedded in the annuity factor.
-fn black76_swaption_price(
-    forward: f64,
-    strike: f64,
-    sigma: f64,
-    t: f64,
-    annuity: f64,
-    option_type: OptionType,
-) -> f64 {
-    let undiscounted = match option_type {
-        OptionType::Call => {
-            finstack_quant_models::closed_form::black_call(forward, strike, sigma, t)
-        }
-        OptionType::Put => finstack_quant_models::closed_form::black_put(forward, strike, sigma, t),
-    };
-    undiscounted * annuity
 }
 
 finstack_quant_valuations_core::impl_empty_cashflow_provider!(

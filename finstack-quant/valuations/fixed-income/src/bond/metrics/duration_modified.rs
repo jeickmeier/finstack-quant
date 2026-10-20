@@ -71,10 +71,7 @@ impl MetricCalculator for ModifiedDurationCalculator {
             ytm
         };
 
-        let m = crate::bond::pricing::quote_conversions::periods_per_year(
-            bond.cashflow_spec.frequency(),
-        )?
-        .max(1.0);
+        let m = bond.cashflow_spec.frequency().payments_per_year().max(1.0);
         let denom = 1.0 + denominator_yield / m;
         if denom.abs() < 1e-12 {
             return Err(finstack_quant_core::Error::Validation(

@@ -640,10 +640,7 @@ fn project_cds_flows(
     as_of: Date,
 ) -> Result<Vec<CashFlow>> {
     let mut schedule = CashflowProvider::cashflow_schedule(cds, &MarketContext::new(), as_of)?;
-    let premium_sign = match cds.side {
-        PayReceive::Pay => -1.0,
-        PayReceive::Receive => 1.0,
-    };
+    let premium_sign = cds.side.sign();
     let protection_sign = -premium_sign;
     let loss_given_default = 1.0 - cds.protection_leg.recovery_rate;
 

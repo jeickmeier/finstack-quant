@@ -1,6 +1,5 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::bond::pricing::quote_conversions::periods_per_year;
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, StubKind, Tenor};
@@ -140,7 +139,7 @@ fn interpolated_swap_quote_rate(
     let Some(calibration) = disc.rate_calibration() else {
         return Ok(None);
     };
-    let yield_periods = periods_per_year(yield_frequency)?;
+    let yield_periods = yield_frequency.payments_per_year();
     let mut swap_quotes = Vec::new();
     for quote in &calibration.quotes {
         let RateCalibrationQuote::Swap {
@@ -160,11 +159,10 @@ fn interpolated_swap_quote_rate(
                 DayCountContext::default(),
             )?,
         };
-        let swap_periods = periods_per_year(
-            ConventionRegistry::try_global()?
-                .require_rate_index(index_id)?
-                .default_fixed_leg_frequency,
-        )?;
+        let swap_periods = ConventionRegistry::try_global()?
+            .require_rate_index(index_id)?
+            .default_fixed_leg_frequency
+            .payments_per_year();
         let restated =
             yield_periods * ((1.0 + rate / swap_periods).powf(swap_periods / yield_periods) - 1.0);
         swap_quotes.push((time, restated));

@@ -15,7 +15,6 @@ use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::correlation::copula::{Copula, CopulaSpec, GaussianCopula};
-use finstack_quant_valuations_core::instruments::PayReceive;
 
 impl CdsTranchePricer {
     /// Return the copula instance constructed for this pricer.
@@ -105,10 +104,7 @@ impl CdsTranchePricer {
             // A wiped-out tranche has no remaining premium/protection legs, but
             // a separately contracted upfront can still be due.
             if let Some((date, amount)) = tranche.upfront.filter(|(date, _)| *date >= as_of) {
-                let premium_sign = match tranche.side {
-                    PayReceive::Pay => -1.0,
-                    PayReceive::Receive => 1.0,
-                };
+                let premium_sign = tranche.side.sign();
                 amount.amount() * premium_sign * discount_curve.df_between_dates(as_of, date)?
             } else {
                 0.0
@@ -209,10 +205,7 @@ impl CdsTranchePricer {
             self.prepare_projection_inputs(tranche, market_ctx, as_of)?;
 
         let tranche_notional = tranche.notional.amount();
-        let premium_sign = match tranche.side {
-            PayReceive::Pay => -1.0,
-            PayReceive::Receive => 1.0,
-        };
+        let premium_sign = tranche.side.sign();
         let protection_sign = -premium_sign;
 
         let mut rows =

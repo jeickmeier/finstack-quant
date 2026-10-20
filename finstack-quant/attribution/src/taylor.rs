@@ -814,18 +814,12 @@ fn key_rate_bump_spec(i: usize, bump_bp: f64) -> BumpSpec {
 }
 
 fn key_rate_bump_on_grid(tenors: &[f64], i: usize, bump_bp: f64) -> BumpSpec {
-    if tenors.len() == 1 {
-        return BumpSpec::parallel_bp(bump_bp);
-    }
-    let target = tenors[i];
-    if i == 0 {
-        return BumpSpec::triangular_key_rate_first_bp(target, tenors[1], bump_bp);
-    }
-    let prev = tenors[i - 1];
-    if i + 1 == tenors.len() {
-        return BumpSpec::triangular_key_rate_last_bp(prev, target, bump_bp);
-    }
-    BumpSpec::triangular_key_rate_bp(prev, target, tenors[i + 1], bump_bp)
+    BumpSpec::triangular_key_rate_bucket_bp(
+        tenors[..i].last().copied(),
+        tenors[i],
+        tenors.get(i + 1).copied(),
+        bump_bp,
+    )
 }
 
 /// Compose the bucket bumps on one curve; a batch passed to `MarketContext::bump`

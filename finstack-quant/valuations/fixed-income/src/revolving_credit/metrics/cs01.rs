@@ -45,12 +45,7 @@ impl ZSpreadCs01 for RevolvingCredit {
     ) -> finstack_quant_core::Result<ZSpreadCs01Inputs> {
         // Compounding frequency for the z-spread shift = coupon/fee payments per
         // year, mirroring the term-loan and bond z-spread convention.
-        let years = self.frequency.to_years();
-        let compounds_per_year = if years > 0.0 && years.is_finite() {
-            (1.0 / years).round().max(1.0)
-        } else {
-            1.0
-        };
+        let compounds_per_year = self.frequency.compounding_frequency();
 
         let flows = match &self.draw_repay_spec {
             DrawRepaySpec::Deterministic(_) => {

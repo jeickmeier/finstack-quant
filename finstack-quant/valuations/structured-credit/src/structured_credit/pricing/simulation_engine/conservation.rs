@@ -1,6 +1,7 @@
 use super::*;
 use crate::structured_credit::types::{AssetType, PoolAsset, ReinvestmentAssumptions};
 use finstack_quant_core::dates::DayCount;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 
 /// Per-period cash-conservation invariant, checked in every build.
 ///
@@ -248,7 +249,7 @@ fn purchase_replacement_collateral(
     if maturity <= payment_date {
         return Ok(Money::from((0_i64, state.currency)));
     }
-    let spread = assumptions.spread_bp / 10_000.0;
+    let spread = assumptions.spread_bp / BASIS_POINTS_PER_UNIT;
     let coupon = match &assumptions.forward_curve_id {
         Some(index) => collateral_asset_rate_for_period(
             market.get_forward(index)?.as_ref(),
@@ -264,7 +265,9 @@ fn purchase_replacement_collateral(
         )?,
         None => spread,
     };
-    let all_in_floor = assumptions.all_in_floor_bp.map(|bp| bp / 10_000.0);
+    let all_in_floor = assumptions
+        .all_in_floor_bp
+        .map(|bp| bp / BASIS_POINTS_PER_UNIT);
     let coupon = all_in_floor.map_or(coupon, |floor| coupon.max(floor));
     if coupon / price_fraction < min_yield {
         return Ok(Money::from((0_i64, state.currency)));

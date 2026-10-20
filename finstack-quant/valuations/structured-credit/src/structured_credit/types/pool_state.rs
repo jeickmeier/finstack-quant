@@ -4,6 +4,7 @@ use super::cmbs::{BalloonSpec, PrepaymentPenalty};
 use super::npl::LiquidationSpec;
 use super::pool::{AssetPool, PoolAsset};
 use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 
 /// Structure of Arrays (SoA) layout for pool assets to improve cache locality
 /// and enable vectorization during pricing.
@@ -135,7 +136,7 @@ impl PoolState {
         self.liquidation.push(asset.liquidation);
         self.rate_floors.push(rate_floor);
         self.index_floors
-            .push(asset.index_floor_bp.map(|bp| bp / 10_000.0));
+            .push(asset.index_floor_bp.map(|bp| bp / BASIS_POINTS_PER_UNIT));
         let curve_index = asset.forward_curve_id.as_ref().map(|id| {
             self.unique_curves
                 .iter()
@@ -253,7 +254,7 @@ impl PoolState {
             index_floors: pool
                 .assets
                 .iter()
-                .map(|asset| asset.index_floor_bp.map(|bp| bp / 10_000.0))
+                .map(|asset| asset.index_floor_bp.map(|bp| bp / BASIS_POINTS_PER_UNIT))
                 .collect(),
             delinquent,
             balloon,

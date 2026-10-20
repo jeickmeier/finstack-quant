@@ -7,6 +7,7 @@
 use crate::cmo::PacSchedule;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, DealId, InstrumentId};
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -651,8 +652,8 @@ impl AgencyCmo {
                     .cmo_collateral_defaults();
                 let wac = cmo.collateral_wac.unwrap_or(defaults.wac);
                 let pass_through = wac
-                    - defaults.servicing_fee_bp / 10_000.0
-                    - defaults.guarantee_fee_bp / 10_000.0;
+                    - defaults.servicing_fee_bp / BASIS_POINTS_PER_UNIT
+                    - defaults.guarantee_fee_bp / BASIS_POINTS_PER_UNIT;
                 (pass_through, cmo.waterfall.total_current_face()?.amount())
             }
         };

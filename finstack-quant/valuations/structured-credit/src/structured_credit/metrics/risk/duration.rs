@@ -3,6 +3,7 @@
 use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
@@ -163,7 +164,7 @@ pub fn calculate_tranche_duration(
     }
 
     let day_count = crate::structured_credit::metrics::METRIC_TIME_BASIS;
-    let yield_shift = ytm_bump_bp / 10_000.0;
+    let yield_shift = ytm_bump_bp / BASIS_POINTS_PER_UNIT;
 
     let mut base_pv = 0.0;
     let mut shifted_pv = 0.0;

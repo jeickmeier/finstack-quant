@@ -4,6 +4,7 @@ use finstack_quant_core::dates::{
     adjust, resolve_joint_calendar, BusinessDayConvention, Date, DateExt, HolidayCalendar,
     ScheduleBuilder, StubKind, Tenor, TenorUnit,
 };
+use finstack_quant_core::math::stats::RealizedVarMethod;
 
 /// Calendar convention for a realized-variance observation schedule.
 pub enum VarianceCalendar<'a> {
@@ -114,6 +115,63 @@ pub fn annualization_factor(frequency: Tenor, trading_days_per_year: f64) -> f64
     } else {
         trading_days_per_year
     }
+}
+
+/// Fraction of a variance swap's estimator samples observed by `as_of`.
+///
+/// Close-to-close and Yang-Zhang need the first level as an anchor, so their
+/// samples are the return intervals between observations; Parkinson,
+/// Garman-Klass and Rogers-Satchell count each observed bar as one sample.
+///
+/// # Arguments
+///
+/// * `dates` - Contractual observation dates, sorted ascending (see
+///   [`variance_observation_dates`]). Observations on `as_of` count as
+///   realized.
+/// * `as_of` - Valuation date. An empty schedule returns `0.0`; a date on or
+///   after the final observation returns `1.0`.
+/// * `method` - Realized-variance estimator that defines a sample.
+///
+/// # Returns
+///
+/// Realized samples divided by contractual samples, in `[0, 1]`.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when the schedule has no estimator samples
+/// before its final observation (a single close-to-close or Yang-Zhang
+/// observation has no return interval).
+pub fn realized_sample_fraction(
+    dates: &[Date],
+    as_of: Date,
+    method: RealizedVarMethod,
+) -> finstack_quant_core::Result<f64> {
+    let Some(&last) = dates.last() else {
+        return Ok(0.0);
+    };
+    if as_of >= last {
+        return Ok(1.0);
+    }
+    let anchor = match method {
+        // Yang-Zhang's first close anchors the overnight return of the next
+        // bar; it is not itself an estimator sample.
+        RealizedVarMethod::CloseToClose | RealizedVarMethod::YangZhang => 1,
+        RealizedVarMethod::Parkinson
+        | RealizedVarMethod::GarmanKlass
+        | RealizedVarMethod::RogersSatchell => 0,
+    };
+    let total = dates.len().saturating_sub(anchor);
+    let realized = dates
+        .iter()
+        .filter(|&&d| d <= as_of)
+        .count()
+        .saturating_sub(anchor);
+    if total == 0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "variance swap has no return samples".into(),
+        ));
+    }
+    Ok(realized as f64 / total as f64)
 }
 
 #[cfg(test)]

@@ -5,6 +5,7 @@ use super::{
     Waterfall,
 };
 use crate::structured_credit::assumptions::embedded_registry_or_panic;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 
 impl Default for MarketConditions {
@@ -134,7 +135,7 @@ impl StructuredCredit {
                     id,
                     RecipientType::ServiceProvider(name.to_string()),
                     PaymentCalculation::PercentageOfCollateral {
-                        rate: bp / 10_000.0,
+                        rate: bp / BASIS_POINTS_PER_UNIT,
                         annualized: true,
                         day_count: None,
                         rounding: None,
@@ -178,7 +179,7 @@ impl StructuredCredit {
                     "special_servicer_fee",
                     RecipientType::ServiceProvider("SpecialServicer".to_string()),
                     PaymentCalculation::PercentageOfSpecialServiced {
-                        rate: bp / 10_000.0,
+                        rate: bp / BASIS_POINTS_PER_UNIT,
                         annualized: true,
                         day_count: None,
                         rounding: None,
@@ -195,7 +196,7 @@ impl StructuredCredit {
                 "subordinated_mgmt_fee",
                 RecipientType::ManagerFee(super::ManagementFeeType::Subordinated),
                 PaymentCalculation::PercentageOfCollateral {
-                    rate: fees.subordinated_mgmt_fee_bp / 10_000.0,
+                    rate: fees.subordinated_mgmt_fee_bp / BASIS_POINTS_PER_UNIT,
                     annualized: true,
                     day_count: None,
                     rounding: None,

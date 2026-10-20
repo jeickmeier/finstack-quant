@@ -10,6 +10,7 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
@@ -83,7 +84,7 @@ impl MetricCalculator for ZSpreadCalculator {
             &curve,
             Money::new(target, deal.pool.get_currency())?,
             settlement,
-        )? * 1e-4;
+        )? * ONE_BASIS_POINT;
         if !(Z_SPREAD_MIN..=Z_SPREAD_MAX).contains(&spread) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "structured-credit z-spread {spread} is outside [{Z_SPREAD_MIN}, {Z_SPREAD_MAX}]"
@@ -289,7 +290,7 @@ pub fn calculate_tranche_z_spread(
     let z_spread = solver.solve(objective, 0.0)?;
 
     // Convert to basis points
-    Ok(z_spread * 10_000.0)
+    Ok(z_spread * BASIS_POINTS_PER_UNIT)
 }
 
 /// Calculate tranche-specific CS01 (credit spread sensitivity).
@@ -487,7 +488,7 @@ pub fn calculate_tranche_discount_margin(
         quote.settlement,
     )?;
 
-    Ok(checked_discount_margin_bp(z_spread_bp)? * 1e-4)
+    Ok(checked_discount_margin_bp(z_spread_bp)? * ONE_BASIS_POINT)
 }
 
 /// Discount margin in basis points from a floater's solved z-spread.

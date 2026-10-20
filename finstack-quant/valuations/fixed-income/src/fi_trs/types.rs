@@ -155,20 +155,16 @@ impl FiIndexTotalReturnSwap {
     /// * `market` - Market containing `underlying.duration_id` as a finite
     ///   unitless duration in years. No default duration is inferred.
     pub(crate) fn index_duration(&self, market: &MarketContext) -> Result<f64> {
-        use finstack_quant_core::market_data::scalars::MarketScalar;
         let id = self.underlying.duration_id.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "FI TRS duration risk requires duration_id and a supplied or calculated index duration".into(),
             )
         })?;
-        let duration = match market.get_price(id.as_str())? {
-            MarketScalar::Unitless(value) => *value,
-            MarketScalar::Price(_) => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Index duration '{id}' must be a unitless scalar in years"
-                )))
-            }
-        };
+        let duration = finstack_quant_valuations_core::instruments::common_impl::helpers::get_unitless_scalar_strict(
+            market,
+            id.as_str(),
+            "FI TRS index duration",
+        )?;
         if !duration.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Index duration '{id}' must be finite, got {duration}"

@@ -478,7 +478,7 @@ pub fn get_unitless_scalar_strict(
         ))),
         Err(_) => Err(finstack_quant_core::Error::from(
             finstack_quant_core::InputError::NotFound {
-                id: format!("{key} (required by {model} strict from_market resolver)"),
+                id: format!("{key} (required by {model})"),
             },
         )),
     }

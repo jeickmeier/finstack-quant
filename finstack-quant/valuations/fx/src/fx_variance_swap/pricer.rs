@@ -63,41 +63,11 @@ pub(crate) fn annualization_factor(inst: &FxVarianceSwap) -> f64 {
 }
 
 pub(crate) fn realized_fraction_by_observations(inst: &FxVarianceSwap, as_of: Date) -> Result<f64> {
-    Ok(realized_fraction_by_observations_with_dates(
-        inst,
-        as_of,
+    finstack_quant_valuations_core::instruments::pricing::variance_observations::realized_sample_fraction(
         &observation_dates(inst)?,
-    ))
-}
-
-fn realized_fraction_by_observations_with_dates(
-    inst: &FxVarianceSwap,
-    as_of: Date,
-    all: &[Date],
-) -> f64 {
-    if all.is_empty() {
-        return 0.0;
-    }
-    if as_of >= all.last().copied().unwrap_or(inst.maturity) {
-        return 1.0;
-    }
-    let accrued = all.iter().filter(|&&d| d <= as_of).count();
-    use finstack_quant_core::math::stats::RealizedVarMethod;
-    let (realized, total) = match inst.realized_var_method {
-        RealizedVarMethod::CloseToClose | RealizedVarMethod::YangZhang => {
-            // Yang-Zhang's first close anchors the overnight return of the
-            // next bar; it is not itself an estimator sample.
-            (accrued.saturating_sub(1), all.len().saturating_sub(1))
-        }
-        RealizedVarMethod::Parkinson
-        | RealizedVarMethod::GarmanKlass
-        | RealizedVarMethod::RogersSatchell => (accrued, all.len()),
-    };
-    if total == 0 {
-        0.0
-    } else {
-        realized as f64 / total as f64
-    }
+        as_of,
+        inst.realized_var_method,
+    )
 }
 
 fn get_historical_prices_with_dates(

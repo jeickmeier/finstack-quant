@@ -1,6 +1,7 @@
 //! ABS-specific metrics (speed, delinquency, excess spread, credit enhancement).
 
 use crate::structured_credit::{StructuredCredit, TrancheSeniority};
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::math::units::DECIMAL_TO_PERCENT;
 use finstack_quant_valuations_core::metrics::MetricContext;
 
@@ -75,7 +76,7 @@ impl finstack_quant_valuations_core::metrics::MetricCalculator for AbsExcessSpre
         let servicing = abs
             .fees
             .as_ref()
-            .map_or(0.0, |fees| fees.servicing_fee_bp / 10_000.0);
+            .map_or(0.0, |fees| fees.servicing_fee_bp / BASIS_POINTS_PER_UNIT);
         let excess =
             card.portfolio_yield - weighted_coupon / pool - servicing - card.charge_off_rate;
         Ok(excess * DECIMAL_TO_PERCENT)

@@ -27,7 +27,6 @@
 use super::types::FiIndexTotalReturnSwap;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::pricing::{
@@ -51,36 +50,18 @@ use finstack_quant_valuations_core::instruments::pricing::{
 ///
 /// # Errors
 ///
-/// Returns an error if `yield_id` is configured but the corresponding market data
-/// is missing. This prevents silent zero-yield assumptions that would materially
-/// affect carry calculations.
+/// Returns `NotFound` if `yield_id` is configured but the corresponding market
+/// data is missing (this prevents silent zero-yield assumptions that would
+/// materially affect carry calculations), and `Validation` if the scalar is a
+/// price rather than a unitless yield.
 fn extract_index_yield(trs: &FiIndexTotalReturnSwap, context: &MarketContext) -> Result<f64> {
     match &trs.underlying.yield_id {
-        Some(id) => {
-            let scalar = context.get_price(id.as_str()).map_err(|_| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Index yield data '{}' is configured but not found in market context. \
-                     Provide the yield scalar or remove yield_id to use zero yield.",
-                    id
-                ))
-            })?;
-            Ok(require_unitless_scalar(scalar, "yield", id)?)
-        }
+        Some(id) => finstack_quant_valuations_core::instruments::common_impl::helpers::get_unitless_scalar_strict(
+            context,
+            id.as_str(),
+            "FI index TRS yield",
+        ),
         None => Ok(0.0), // No yield configured — intentional zero carry
-    }
-}
-
-/// Extracts a unitless f64 from a [`MarketScalar`], returning an error if the
-/// variant is `Price` (which indicates a likely configuration mistake — yield
-/// and duration are dimensionless quantities, not monetary amounts).
-fn require_unitless_scalar(scalar: &MarketScalar, kind: &str, id: &str) -> Result<f64> {
-    match scalar {
-        MarketScalar::Unitless(v) => Ok(*v),
-        MarketScalar::Price(_) => Err(finstack_quant_core::Error::Validation(format!(
-            "Market scalar '{}' for index {} has type Price, but {} is a unitless quantity. \
-             Use MarketScalar::Unitless instead.",
-            id, kind, kind
-        ))),
     }
 }
 
@@ -269,11 +250,7 @@ pub(crate) fn net_cashflows(
         initial_level: trs.initial_level,
     };
     let mut flows = std::collections::BTreeMap::<Date, f64>::new();
-    let sign = if trs.side == finstack_quant_valuations_core::instruments::PayReceive::Receive {
-        1.0
-    } else {
-        -1.0
-    };
+    let sign = trs.side.sign();
     for (date, amount) in
         TrsEngine::cashflows_total_return_leg_with_model(params, context, as_of, &model)?
     {

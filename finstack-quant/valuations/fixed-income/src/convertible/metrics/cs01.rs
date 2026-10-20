@@ -129,18 +129,12 @@ impl MetricCalculator for Cs01Calculator {
 /// the partition below the first bucket, and an infinite `next` sentinel is
 /// rejected by the curve bump paths (NaN weight beyond the last bucket).
 fn key_rate_spec(i: usize, bump_bp: f64, buckets: &[f64]) -> BumpSpec {
-    let target = buckets[i];
-    if i == 0 && buckets.len() == 1 {
-        return BumpSpec::parallel_bp(bump_bp);
-    }
-    if i == 0 {
-        return BumpSpec::triangular_key_rate_first_bp(target, buckets[1], bump_bp);
-    }
-    let prev = buckets[i - 1];
-    if i + 1 == buckets.len() {
-        return BumpSpec::triangular_key_rate_last_bp(prev, target, bump_bp);
-    }
-    BumpSpec::triangular_key_rate_bp(prev, target, buckets[i + 1], bump_bp)
+    BumpSpec::triangular_key_rate_bucket_bp(
+        buckets[..i].last().copied(),
+        buckets[i],
+        buckets.get(i + 1).copied(),
+        bump_bp,
+    )
 }
 
 /// Key-rate (bucketed) CS01 calculator for convertible bonds.
