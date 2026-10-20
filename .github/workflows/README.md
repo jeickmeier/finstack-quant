@@ -102,10 +102,10 @@ Local equivalents:
   Lint, Test, and Supply-chain checks (without coverage). GitHub CI uses
   `gen-check` as a non-mutating drift gate so uncommitted generated files fail
   the Lint job.
-- The release gates are `mise run all-doc`; `rust-test`, `python-test` and
-  `wasm-test` with `--doctest`; `rust-test --slow` and `python-test --slow`;
-  `mise run rust-publish-checks`; and `cargo semver-checks check-release
-  --baseline-rev <previous tag>`.
+- `mise run all-ci --release` adds the release gates: `all-doc`; `rust-test`,
+  `python-test` and `wasm-test` with `--doctest`; `rust-test --slow` and
+  `python-test --slow`; `rust-publish-checks`; and `cargo semver-checks
+  check-release` against the previous release tag.
 - Benchmarks are not run in CI. Use `mise run rust-bench` or
   `mise run rust-bench-crate`, and `scripts/materialization_bench.sh` for the
   materialization record.

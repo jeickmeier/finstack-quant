@@ -345,10 +345,10 @@ Create `RELEASE_NOTES_X.Y.Z.md` following the established template (see `RELEASE
 mise run all-test
 ```
 
-### 7b. CI and quality gates
+### 7b. CI and release gates
 
 ```bash
-mise run all-ci
+mise run all-ci --release
 ```
 
 ### 7c. Pre-release checklist
@@ -418,7 +418,7 @@ After completing the audit, produce a release readiness report:
 ### Quality gates
 | Check | Status |
 |-------|--------|
-| `mise run all-ci` | pass/fail |
+| `mise run all-ci --release` | pass/fail |
 | `mise run all-lint` | pass/fail |
 | `cargo deny check` | pass/fail |
 | `bandit -r finstack-quant-py` | pass/fail |

@@ -79,7 +79,7 @@ depends = ["rust-build", "python-build", "wasm-build"]
 
 [tasks.all-test]
 description = "Run all tests (Rust + Python + WASM)"
-run = [{ task = "rust-test" }, "mise run python-test --all", { task = "wasm-test" }]
+run = [{ task = "rust-test" }, { task = "python-test" }, { task = "wasm-test" }]
 
 [tasks.all-fmt]
 description = "Format Rust, Python and WASM; auto-fix Python and WASM"
@@ -104,9 +104,30 @@ run = [
 ]
 
 [tasks.all-ci]
-description = "Regenerate derived artifacts, then run the nightly CI checks locally"
+description = "Regenerate derived artifacts, then run the nightly CI checks locally (--release adds the release gates)"
+usage = 'flag "--release" help="Also run the release gates (docs, doctests, slow suites, publish checks, semver)"'
 depends = ["gen-write"]
-run = [{ tasks = ["pre-commit-run", "gen-check", "all-test", "all-audit"] }]
+run = [
+  { tasks = ["pre-commit-run", "gen-check", "all-test", "all-audit"] },
+  '''
+  if [ "${usage_release:-false}" = "true" ]; then
+    mise run all-doc
+    mise run rust-test --doctest
+    mise run python-test --doctest
+    mise run wasm-test --doctest
+    mise run rust-test --slow
+    mise run python-test --slow
+    mise run rust-publish-checks
+    baseline=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' HEAD^)
+    echo "Baseline: $baseline"
+    cargo semver-checks check-release \
+      -p finstack-quant-core \
+      -p finstack-quant-valuations \
+      -p finstack-quant-portfolio \
+      --baseline-rev "$baseline"
+  fi
+  ''',
+]
 
 [tasks.all-clean]
 description = "Remove build artifacts and virtualenvs (scripts/clean_workspace.py --help for targeted cleans)"
