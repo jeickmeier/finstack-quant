@@ -53,7 +53,7 @@ pub use types::{
 };
 pub use types::{MarketConditions, StructuredCreditTranche};
 
-pub use pricing::{execute_waterfall, generate_cashflows, run_simulation};
+pub use pricing::{execute_waterfall, run_simulation};
 
 pub use finstack_quant_valuations_core::results::structured_credit::{
     StochasticPricingResult, StructuredCreditPricingMode, TranchePricingResult,

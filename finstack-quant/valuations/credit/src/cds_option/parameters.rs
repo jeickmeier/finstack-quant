@@ -321,8 +321,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            params.strike.clean_price_pct_decimal(),
-            Some(Decimal::new(1070, 1))
+            params.strike,
+            CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1))
         );
     }
 

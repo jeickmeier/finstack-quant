@@ -12,9 +12,7 @@ use crate::structured_credit::types::{
 use finstack_quant_core::HashSet;
 
 /// Validation error details.
-#[derive(Debug, Clone, PartialEq, thiserror::Error, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum ValidationError {
     /// Duplicate tier ID.
@@ -30,14 +28,6 @@ pub enum ValidationError {
         tier_id: String,
         /// Recipient id.
         recipient_id: String,
-    },
-    /// Invalid priority (must be > 0).
-    #[error("Invalid priority {priority} for tier '{tier_id}' (must be > 0)")]
-    InvalidPriority {
-        /// Tier id.
-        tier_id: String,
-        /// Priority.
-        priority: usize,
     },
     /// Tier has no recipients.
     #[error("Tier '{tier_id}' has no recipients")]

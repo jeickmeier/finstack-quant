@@ -6,7 +6,6 @@ use super::{
 };
 use crate::structured_credit::assumptions::embedded_registry_or_panic;
 use finstack_quant_core::dates::BusinessDayConvention;
-use finstack_quant_core::math::units::DECIMAL_TO_PERCENT;
 use finstack_quant_core::money::Money;
 
 impl Default for MarketConditions {
@@ -444,33 +443,6 @@ impl StructuredCredit {
     pub fn effective_principal_covers_senior_interest(&self) -> bool {
         self.principal_covers_senior_interest
             .unwrap_or(matches!(self.deal_type, DealType::Clo | DealType::Cbo))
-    }
-
-    /// Calculate current loss percentage of the pool.
-    ///
-    /// Reconstructs the original pool balance as the denominator:
-    /// `current_balance + cumulative_defaults + cumulative_prepayments + cumulative_scheduled_amortization`
-    ///
-    /// This avoids inflating the loss rate as the pool amortizes and aligns with
-    /// Moody's/S&P convention of reporting cumulative losses against original pool balance.
-    pub fn current_loss_percentage(&self) -> finstack_quant_core::Result<f64> {
-        let current_balance = self.pool.total_balance()?.amount();
-        let scheduled_amort = self.pool.cumulative_scheduled_amortization.amount();
-        // Reconstruct original balance from all tracked reductions
-        let original_balance = current_balance
-            + self.pool.cumulative_defaults.amount()
-            + self.pool.cumulative_prepayments.amount()
-            + scheduled_amort;
-
-        if original_balance <= 0.0 {
-            return Ok(0.0);
-        }
-
-        Ok(
-            (self.pool.cumulative_defaults.amount() - self.pool.cumulative_recoveries.amount())
-                / original_balance
-                * DECIMAL_TO_PERCENT,
-        )
     }
 
     /// Create waterfall from instrument configuration.

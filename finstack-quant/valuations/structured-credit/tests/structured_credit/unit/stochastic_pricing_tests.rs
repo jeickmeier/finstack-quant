@@ -13,9 +13,9 @@ use finstack_quant_models::credit::pool::{
 use finstack_quant_valuations_core::instruments::{Instrument, ScenarioPricingOverrides};
 use finstack_quant_valuations_structured_credit::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
-    calculate_tranche_oas, generate_cashflows, run_simulation, scenario_table, AssetPool, DealType,
-    HedgeSwap, OasConfig, PoolAsset, ScenarioGrid, StructuredCredit, StructuredCreditPricingMode,
-    Tranche, TrancheSeniority, TrancheStructure,
+    calculate_tranche_oas, run_simulation, scenario_table, AssetPool, DealType, HedgeSwap,
+    OasConfig, PoolAsset, ScenarioGrid, StructuredCredit, StructuredCreditPricingMode, Tranche,
+    TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -207,24 +207,6 @@ fn correlation_constructor_rejects_invalid_matrix() {
 }
 
 #[test]
-fn current_loss_percentage_respects_defaults_and_recoveries() {
-    let mut sc = build_sc("ABS-LOSS", 1_000_000.0);
-    sc.pool.cumulative_defaults =
-        Money::new(100_000.0, Currency::USD).expect("valid money fixture");
-    sc.pool.cumulative_recoveries =
-        Money::new(25_000.0, Currency::USD).expect("valid money fixture");
-
-    let loss_pct = sc.current_loss_percentage().expect("loss percentage");
-    // Original balance ≈ current(1M) + defaults(100k) + prepays(0) = 1.1M
-    // Net loss = 100k - 25k = 75k => 75k / 1.1M * 100 ≈ 6.818%
-    let expected = (100_000.0 - 25_000.0) / 1_100_000.0 * 100.0;
-    assert!(
-        (loss_pct - expected).abs() < 1e-9,
-        "expected {expected}%, got {loss_pct}"
-    );
-}
-
-#[test]
 fn stochastic_helper_methods_toggle_flags() {
     let mut sc = build_sc("ABS-STOCHASTIC", 1_000_000.0);
     assert!(!sc.is_stochastic());
@@ -248,27 +230,44 @@ fn enable_stochastic_populates_specs_for_each_deal_family() {
     abs.enable_stochastic().expect("valid built-in defaults");
     assert!(abs.is_stochastic());
 
-    let make = |deal_type| {
-        let pool = AssetPool::new("POOL", deal_type, Currency::USD);
-        let tranches = single_tranche_structure(1_000_000.0);
-        StructuredCredit::apply_deal_defaults(
-            format!("TEST-{deal_type:?}"),
-            deal_type,
-            pool,
-            tranches,
-            closing_date(),
-            legal_maturity(),
+    let pool = |deal_type| AssetPool::new("POOL", deal_type, Currency::USD);
+    let tranches = || single_tranche_structure(1_000_000.0);
+    let (close, legal) = (closing_date(), legal_maturity());
+    for sc in [
+        StructuredCredit::new_rmbs(
+            "RMBS",
+            pool(DealType::Rmbs),
+            tranches(),
+            close,
+            legal,
             "USD-OIS",
-        )
-        .expect("valid structured-credit dates")
-    };
-
-    for mut sc in [
-        make(DealType::Rmbs),
-        make(DealType::Clo),
-        make(DealType::Cmbs),
-        make(DealType::Card),
+        ),
+        StructuredCredit::new_clo(
+            "CLO",
+            pool(DealType::Clo),
+            tranches(),
+            close,
+            legal,
+            "USD-OIS",
+        ),
+        StructuredCredit::new_cmbs(
+            "CMBS",
+            pool(DealType::Cmbs),
+            tranches(),
+            close,
+            legal,
+            "USD-OIS",
+        ),
+        StructuredCredit::new_abs(
+            "CARD",
+            pool(DealType::Card),
+            tranches(),
+            close,
+            legal,
+            "USD-OIS",
+        ),
     ] {
+        let mut sc = sc.expect("valid structured-credit dates");
         sc.enable_stochastic().expect("valid built-in defaults");
         assert!(sc.credit_model.stochastic_prepay_spec.is_some());
         assert!(sc.credit_model.stochastic_default_spec.is_some());
@@ -382,9 +381,6 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
     let errors = [
         run_simulation(&sc, &market, closing_date())
             .expect_err("invalid simulation")
-            .to_string(),
-        generate_cashflows(&sc, &market, closing_date())
-            .expect_err("invalid aggregate cashflows")
             .to_string(),
         (sc).tranche_cashflows("missing", &market, closing_date())
             .expect_err("invalid tranche cashflows")

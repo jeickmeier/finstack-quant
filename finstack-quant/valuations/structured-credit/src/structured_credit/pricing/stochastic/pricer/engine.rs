@@ -11,7 +11,6 @@ use crate::structured_credit::pricing::simulation_engine::{
 use crate::structured_credit::types::{
     StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority,
 };
-use finstack_quant_cashflows::builder::weighted_average_life_from_principal;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::OnlineStats;
@@ -1119,8 +1118,7 @@ impl PathTrancheMetrics {
             }
         }
 
-        let wal =
-            weighted_average_life_from_principal(cashflows.principal_flows.iter().copied(), as_of)?;
+        let wal = crate::structured_credit::metrics::calculate_tranche_wal(cashflows, as_of)?;
         let principal: f64 = cashflows
             .principal_flows
             .iter()
@@ -1509,9 +1507,11 @@ mod tests {
         let metrics =
             PathTrancheMetrics::from_cashflows(&cashflows, as_of, test_discount_curve().as_ref())
                 .expect("path metrics");
-        let expected =
-            weighted_average_life_from_principal(cashflows.principal_flows.iter().copied(), as_of)
-                .expect("canonical WAL");
+        let expected = finstack_quant_cashflows::builder::weighted_average_life_from_principal(
+            cashflows.principal_flows.iter().copied(),
+            as_of,
+        )
+        .expect("canonical WAL");
 
         assert_eq!(metrics.wal, expected);
     }

@@ -12,8 +12,6 @@ use finstack_quant_valuations_structured_credit::structured_credit::{
 };
 use time::Month;
 
-const DECIMAL_TO_PERCENT: f64 = 100.0;
-
 fn test_date() -> Date {
     Date::from_calendar_date(2025, Month::January, 1).unwrap()
 }
@@ -51,7 +49,7 @@ fn create_single_tranche() -> TrancheStructure {
 }
 
 #[test]
-fn test_apply_deal_defaults_sets_expected_assumptions() {
+fn per_type_constructors_set_expected_assumptions() {
     let pool = create_pool_with_balance(1_000_000.0);
     let tranches = create_single_tranche();
     let closing = Date::from_calendar_date(2024, Month::January, 1).unwrap();
@@ -60,24 +58,36 @@ fn test_apply_deal_defaults_sets_expected_assumptions() {
     // Expected annual CDRs are the `constructor.default_cdr` values of the
     // embedded registry's deal profiles
     // (`data/assumptions/structured_credit_assumptions.v1.json`).
+    let (p, t) = (|| pool.clone(), || tranches.clone());
     let cases = [
-        (DealType::Abs, Tenor::monthly(), 0.02),
-        (DealType::Clo, Tenor::quarterly(), 0.02),
-        (DealType::Cmbs, Tenor::monthly(), 0.005),
-        (DealType::Rmbs, Tenor::monthly(), 0.006),
+        (
+            StructuredCredit::new_abs("ABS", p(), t(), closing, legal, "USD-OIS"),
+            DealType::Abs,
+            Tenor::monthly(),
+            0.02,
+        ),
+        (
+            StructuredCredit::new_clo("CLO", p(), t(), closing, legal, "USD-OIS"),
+            DealType::Clo,
+            Tenor::quarterly(),
+            0.02,
+        ),
+        (
+            StructuredCredit::new_cmbs("CMBS", p(), t(), closing, legal, "USD-OIS"),
+            DealType::Cmbs,
+            Tenor::monthly(),
+            0.005,
+        ),
+        (
+            StructuredCredit::new_rmbs("RMBS", p(), t(), closing, legal, "USD-OIS"),
+            DealType::Rmbs,
+            Tenor::monthly(),
+            0.006,
+        ),
     ];
 
-    for (deal_type, expected_frequency, expected_cdr) in cases {
-        let sc = StructuredCredit::apply_deal_defaults(
-            format!("TEST-{deal_type:?}"),
-            deal_type,
-            pool.clone(),
-            tranches.clone(),
-            closing,
-            legal,
-            "USD-OIS",
-        )
-        .expect("valid structured-credit dates");
+    for (sc, deal_type, expected_frequency, expected_cdr) in cases {
+        let sc = sc.expect("valid structured-credit dates");
 
         assert_eq!(sc.deal_type, deal_type);
         assert_eq!(sc.frequency, expected_frequency);
@@ -158,11 +168,11 @@ fn test_prepayment_spec_shapes_drive_monthly_rates() {
     .expect("valid structured-credit dates");
 
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::abs(0.02);
-    let abs_rate = sc.calculate_smm(1).unwrap();
+    let abs_rate = sc.credit_model.prepayment_spec.smm(1).unwrap();
     assert!((abs_rate - 0.02).abs() < 1e-12);
 
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.12);
-    let cpr_rate = sc.calculate_smm(1).unwrap();
+    let cpr_rate = sc.credit_model.prepayment_spec.smm(1).unwrap();
     assert!((cpr_rate - clamped_cpr_to_smm(0.12)).abs() < 1e-12);
 
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::psa(2.0);
@@ -170,7 +180,7 @@ fn test_prepayment_spec_shapes_drive_monthly_rates() {
     let seasoning = 3;
     let base_cpr = (seasoning as f64 / 30.0) * 0.06;
     let expected = clamped_cpr_to_smm(base_cpr * 2.0);
-    let psa_rate = sc.calculate_smm(seasoning).unwrap();
+    let psa_rate = sc.credit_model.prepayment_spec.smm(seasoning).unwrap();
     assert!((psa_rate - expected).abs() < 1e-12);
 }
 
@@ -189,7 +199,7 @@ fn test_default_spec_shapes_drive_monthly_rates() {
     .expect("valid structured-credit dates");
 
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.12);
-    let cdr_rate = sc.calculate_default_rate(1).unwrap();
+    let cdr_rate = sc.credit_model.default_spec.mdr(1).unwrap();
     assert!((cdr_rate - clamped_cdr_to_mdr(0.12)).abs() < 1e-12);
 
     sc.credit_model.default_spec = DefaultModelSpec::sda(1.5);
@@ -202,7 +212,7 @@ fn test_default_spec_shapes_drive_monthly_rates() {
     let plateau_seasoning = sda_peak_month + 1;
     let plateau_cdr = sda_peak_cdr * 1.5;
     let expected_plateau = 1.0 - (1.0 - plateau_cdr).powf(1.0 / 12.0);
-    let plateau_rate = sc.calculate_default_rate(plateau_seasoning).unwrap();
+    let plateau_rate = sc.credit_model.default_spec.mdr(plateau_seasoning).unwrap();
     assert!((plateau_rate - expected_plateau).abs() < 1e-12);
 
     // Months 61-120 decline linearly from the peak to the terminal CDR;
@@ -211,42 +221,6 @@ fn test_default_spec_shapes_drive_monthly_rates() {
     let frac = f64::from(decline_seasoning - 60) / 60.0;
     let decline_cdr = (sda_peak_cdr - frac * (sda_peak_cdr - sda_terminal_cdr)) * 1.5;
     let expected_decline = 1.0 - (1.0 - decline_cdr).powf(1.0 / 12.0);
-    let decline_rate = sc.calculate_default_rate(decline_seasoning).unwrap();
+    let decline_rate = sc.credit_model.default_spec.mdr(decline_seasoning).unwrap();
     assert!((decline_rate - expected_decline).abs() < 1e-12);
-}
-
-#[test]
-fn test_current_loss_percentage_handles_zero_balance_and_offsets() {
-    let empty_pool = create_pool_with_balance(0.0);
-    let tranches = create_single_tranche();
-    let sc_zero = StructuredCredit::new_abs(
-        "TEST-ZERO",
-        empty_pool,
-        tranches.clone(),
-        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
-        maturity_date(),
-        "USD-OIS",
-    )
-    .expect("valid structured-credit dates");
-    assert_eq!(sc_zero.current_loss_percentage().unwrap(), 0.0);
-
-    let mut pool = create_pool_with_balance(1_000_000.0);
-    pool.cumulative_defaults = Money::new(50_000.0, Currency::USD).expect("valid money fixture");
-    pool.cumulative_recoveries = Money::new(10_000.0, Currency::USD).expect("valid money fixture");
-    let sc = StructuredCredit::new_abs(
-        "TEST-LOSS",
-        pool,
-        tranches,
-        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
-        maturity_date(),
-        "USD-OIS",
-    )
-    .expect("valid structured-credit dates");
-    // Denominator is original balance approximated as:
-    // current_balance + cumulative_defaults + cumulative_prepayments
-    // = 1,000,000 + 50,000 + 0 = 1,050,000
-    let original_balance = 1_000_000.0 + 50_000.0;
-    let expected = (50_000.0 - 10_000.0) / original_balance * DECIMAL_TO_PERCENT;
-    let actual = sc.current_loss_percentage().unwrap();
-    assert!((actual - expected).abs() < 1e-12);
 }

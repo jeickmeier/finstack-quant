@@ -13,9 +13,7 @@
 
 use crate::cds::pricing::{date_from_hazard_time, CdsPricer, CdsPricerConfig};
 use crate::cds::CreditDefaultSwap;
-use crate::cds_index::{
-    CdsIndex, ConstituentResult, IndexParSpreadResult, IndexPricing, IndexResult,
-};
+use crate::cds_index::{CdsIndex, IndexPricing};
 use finstack_quant_cashflows::builder::merge_cashflow_schedules;
 use finstack_quant_cashflows::builder::{CashFlowSchedule, Notional};
 use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
@@ -71,7 +69,6 @@ struct ResolvedConstituent<'a> {
     ordinal: usize,
     credit_curve_id: &'a CurveId,
     recovery_rate: f64,
-    weight_raw: f64,
     weight_effective: f64,
 }
 
@@ -120,16 +117,6 @@ impl CdsIndexPricer {
     }
 
     /// Compute instrument NPV from the perspective of `PayReceive`.
-    pub(crate) fn npv(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        Ok(self.npv_detailed(index, curves, as_of)?.total)
-    }
-
-    /// Compute instrument NPV with optional per-constituent breakdown.
     ///
     /// NPV is computed by delegating to `CdsPricer::npv_full` per resolved
     /// position (one synthetic CDS in `SingleCurve` mode, N constituents
@@ -138,37 +125,30 @@ impl CdsIndexPricer {
     /// premium discount curve and applied once at the aggregate, with the same
     /// sign convention used by `CdsPricer::npv_full` for single-name CDS
     /// upfronts. Upfronts paid before `as_of` are dropped.
-    pub(crate) fn npv_detailed(
+    pub(crate) fn npv(
         &self,
         index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
-    ) -> Result<IndexResult<Money>> {
+    ) -> Result<Money> {
         let currency = index.notional.currency();
-        let mut result = self.aggregate_money_detailed(
-            index,
-            curves,
-            as_of,
-            |pricer, cds, disc, surv, as_of| {
-                let raw = pricer.npv_full(cds, disc, surv, as_of)?;
-                Money::new(raw, cds.notional.currency())
-            },
-        )?;
+        let mut total = self.sum_money(index, curves, as_of, |pricer, cds, disc, surv| {
+            Money::new(
+                pricer.npv_full(cds, disc, surv, as_of)?,
+                cds.notional.currency(),
+            )
+        })?;
         if let Some((date, amount)) = index.upfront.filter(|(date, _)| *date >= as_of) {
             let df = curves
                 .get_discount(index.premium_leg.discount_curve_id.as_str())?
                 .df_between_dates(as_of, date)?;
             let upfront = Money::new(amount.amount() * df, amount.currency())?;
-            result.total = match index.side {
-                PayReceive::Pay => result.total.checked_sub(upfront)?,
-                PayReceive::Receive => result.total.checked_add(upfront)?,
+            total = match index.side {
+                PayReceive::Pay => total.checked_sub(upfront)?,
+                PayReceive::Receive => total.checked_add(upfront)?,
             };
         }
-        // Ensure consistent currency handling even when constituents list is empty.
-        if result.total.currency() != currency {
-            result.total = Money::new(result.total.amount(), currency)?;
-        }
-        Ok(result)
+        Money::new(total.amount(), currency)
     }
 
     /// Present value of the protection leg (aggregated by pricing mode).
@@ -180,20 +160,7 @@ impl CdsIndexPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        Ok(self.pv_protection_leg_detailed(index, curves, as_of)?.total)
-    }
-
-    /// Present value of the protection leg with optional per-constituent breakdown.
-    ///
-    /// Delegates to `CdsPricer::pv_protection_leg` per resolved position and
-    /// sums. Result is the unsigned (non-negative) protection-leg PV.
-    pub(crate) fn pv_protection_leg_detailed(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<IndexResult<Money>> {
-        self.aggregate_money_detailed(index, curves, as_of, |pricer, cds, disc, surv, as_of| {
+        self.sum_money(index, curves, as_of, |pricer, cds, disc, surv| {
             pricer.pv_protection_leg(cds, disc, surv, as_of)
         })
     }
@@ -207,47 +174,21 @@ impl CdsIndexPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        Ok(self.pv_premium_leg_detailed(index, curves, as_of)?.total)
-    }
-
-    /// Present value of the premium leg with optional per-constituent breakdown.
-    ///
-    /// Delegates to `CdsPricer::pv_premium_leg` per resolved position and
-    /// sums. Result is the unsigned (non-negative) premium-leg PV.
-    pub(crate) fn pv_premium_leg_detailed(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<IndexResult<Money>> {
-        self.aggregate_money_detailed(index, curves, as_of, |pricer, cds, disc, surv, as_of| {
+        self.sum_money(index, curves, as_of, |pricer, cds, disc, surv| {
             pricer.pv_premium_leg(cds, disc, surv, as_of)
         })
     }
 
     /// Par spread in basis points that sets NPV to zero.
+    ///
+    /// Both branches (`SingleCurve` and `Constituents`) divide the protection
+    /// PV by the ISDA-standard risky-annuity denominator.
     pub(crate) fn par_spread(
         &self,
         index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
-        Ok(self
-            .par_spread_detailed(index, curves, as_of)?
-            .total_spread_bp)
-    }
-
-    /// Par spread in basis points with optional per-constituent breakdown.
-    ///
-    /// Both branches (`SingleCurve` and `Constituents`) use the ISDA-standard
-    /// risky-annuity denominator; the aggregated value is reported in
-    /// [`IndexParSpreadResult::denominator`].
-    pub(crate) fn par_spread_detailed(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<IndexParSpreadResult> {
         // Enforce the same top-level trade invariants as the npv/leg-PV/CS01
         // aggregation paths; without this the SingleCurve branch builds the
         // synthetic CDS directly and silently prices e.g. index_factor > 1.
@@ -270,21 +211,13 @@ impl CdsIndexPricer {
                             .to_string(),
                     ));
                 }
-                let total_spread_bp =
-                    numerator_protection_pv.amount() / denominator * BASIS_POINTS_PER_UNIT;
-                Ok(IndexParSpreadResult {
-                    total_spread_bp,
-                    constituents_spread_bp: Vec::new(),
-                    numerator_protection_pv,
-                    denominator,
-                })
+                Ok(numerator_protection_pv.amount() / denominator * BASIS_POINTS_PER_UNIT)
             }
             IndexPricing::Constituents => {
                 let mut cds = self.synthetic_cds(index)?;
                 let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
                 let mut numerator_protection_pv = Money::from((0_i64, index.notional.currency()));
                 let mut denominator = 0.0;
-                let mut constituents_spread_bp = Vec::with_capacity(index.constituents.len());
                 self.for_each_constituent(index, |position| {
                     position.apply_to_cds(index, &mut cds)?;
                     let surv = curves.get_hazard(position.credit_curve_id)?;
@@ -293,21 +226,7 @@ impl CdsIndexPricer {
                     numerator_protection_pv = numerator_protection_pv.checked_add(prot_pv)?;
                     let denom_per_unit =
                         pricer.par_spread_denominator(&cds, disc.as_ref(), surv.as_ref(), as_of)?;
-                    let local_denom = denom_per_unit * cds.notional.amount();
-                    denominator += local_denom;
-                    let constituent_spread_bp = if local_denom <= credit::PAR_SPREAD_DENOM_TOLERANCE
-                    {
-                        f64::NAN
-                    } else {
-                        prot_pv.amount() / local_denom * BASIS_POINTS_PER_UNIT
-                    };
-                    constituents_spread_bp.push(ConstituentResult {
-                        credit_curve_id: position.credit_curve_id.clone(),
-                        recovery_rate: position.recovery_rate,
-                        weight_raw: position.weight_raw,
-                        weight_effective: position.weight_effective,
-                        value: constituent_spread_bp,
-                    });
+                    denominator += denom_per_unit * cds.notional.amount();
                     Ok(())
                 })?;
                 if denominator <= credit::PAR_SPREAD_DENOM_TOLERANCE {
@@ -317,14 +236,7 @@ impl CdsIndexPricer {
                             .to_string(),
                     ));
                 }
-                let total_spread_bp =
-                    numerator_protection_pv.amount() / denominator * BASIS_POINTS_PER_UNIT;
-                Ok(IndexParSpreadResult {
-                    total_spread_bp,
-                    constituents_spread_bp,
-                    numerator_protection_pv,
-                    denominator,
-                })
+                Ok(numerator_protection_pv.amount() / denominator * BASIS_POINTS_PER_UNIT)
             }
         }
     }
@@ -336,7 +248,9 @@ impl CdsIndexPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
-        Ok(self.risky_pv01_detailed(index, curves, as_of)?.total)
+        self.sum_f64(index, curves, as_of, |pricer, cds, disc, surv| {
+            pricer.risky_pv01(cds, disc, surv, as_of)
+        })
     }
 
     /// Build an informational projected premium/default schedule for the index.
@@ -386,18 +300,6 @@ impl CdsIndexPricer {
         }
     }
 
-    /// Risky PV01 with optional per-constituent breakdown.
-    pub(crate) fn risky_pv01_detailed(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<IndexResult<f64>> {
-        self.aggregate_f64_detailed(index, curves, as_of, |pricer, cds, disc, surv, as_of| {
-            pricer.risky_pv01(cds, disc, surv, as_of)
-        })
-    }
-
     /// CS01 (approximate) aggregated by pricing mode, central difference
     /// over a parallel `bump_bp` par-spread shock (basis points).
     pub(crate) fn cs01(
@@ -408,21 +310,7 @@ impl CdsIndexPricer {
         provider: &dyn RecalibrationProvider,
         bump_bp: f64,
     ) -> Result<f64> {
-        Ok(self
-            .cs01_detailed(index, curves, as_of, provider, bump_bp)?
-            .total)
-    }
-
-    /// CS01 (approximate) with optional per-constituent breakdown.
-    pub(crate) fn cs01_detailed(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-        provider: &dyn RecalibrationProvider,
-        bump_bp: f64,
-    ) -> Result<IndexResult<f64>> {
-        self.aggregate_f64_detailed(index, curves, as_of, |_, cds, _, _, _| {
+        self.sum_f64(index, curves, as_of, |_, cds, _, _| {
             self.compute_cds_cs01(cds, curves, as_of, provider, bump_bp)
         })
     }
@@ -484,9 +372,9 @@ impl CdsIndexPricer {
 
     // ----- internals -----
 
-    fn visit_positions<'a>(
+    fn visit_positions(
         &self,
-        index: &'a CdsIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
         mut visit: impl FnMut(
@@ -494,7 +382,6 @@ impl CdsIndexPricer {
             &CreditDefaultSwap,
             &DiscountCurve,
             &HazardCurve,
-            Option<ResolvedConstituent<'a>>,
         ) -> Result<()>,
     ) -> Result<()> {
         index.validate()?;
@@ -507,90 +394,51 @@ impl CdsIndexPricer {
         match index.pricing {
             IndexPricing::SingleCurve => {
                 let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
-                visit(&pricer, &cds, disc.as_ref(), surv.as_ref(), None)
+                visit(&pricer, &cds, disc.as_ref(), surv.as_ref())
             }
             IndexPricing::Constituents => {
                 self.for_each_constituent(index, |position| {
                     position.apply_to_cds(index, &mut cds)?;
                     let surv = curves.get_hazard(position.credit_curve_id)?;
-                    visit(&pricer, &cds, disc.as_ref(), surv.as_ref(), Some(position))
+                    visit(&pricer, &cds, disc.as_ref(), surv.as_ref())
                 })?;
                 Ok(())
             }
         }
     }
 
-    /// Aggregate a per-CDS scalar metric across the resolved positions.
-    ///
-    /// Caches discount-curve lookups by `CurveId`: the common case is that
-    /// every constituent shares the index discount curve, in which case the
-    /// `MarketContext::get_discount` call is performed exactly once.
-    fn aggregate_f64_detailed<F>(
+    /// Sum a per-CDS scalar metric over the resolved positions (one synthetic
+    /// CDS in `SingleCurve` mode, one per live constituent otherwise).
+    fn sum_f64(
         &self,
         index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
-        f: F,
-    ) -> Result<IndexResult<f64>>
-    where
-        F: Fn(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve, Date) -> Result<f64>,
-    {
+        f: impl Fn(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve) -> Result<f64>,
+    ) -> Result<f64> {
         let mut total = 0.0;
-        let mut constituents = Vec::with_capacity(index.constituents.len());
-        self.visit_positions(index, curves, as_of, |pricer, cds, disc, surv, position| {
-            let value = f(pricer, cds, disc, surv, as_of)?;
-            total += value;
-            if let Some(position) = position {
-                constituents.push(ConstituentResult {
-                    credit_curve_id: position.credit_curve_id.clone(),
-                    recovery_rate: position.recovery_rate,
-                    weight_raw: position.weight_raw,
-                    weight_effective: position.weight_effective,
-                    value,
-                });
-            }
+        self.visit_positions(index, curves, as_of, |pricer, cds, disc, surv| {
+            total += f(pricer, cds, disc, surv)?;
             Ok(())
         })?;
-        Ok(IndexResult {
-            total,
-            constituents,
-        })
+        Ok(total)
     }
 
-    /// Aggregate a per-CDS Money metric across the resolved positions.
-    ///
-    /// Same dispatch as `aggregate_f64_detailed` but for currency-typed
-    /// outputs. Returns the aggregate in the index notional currency.
-    fn aggregate_money_detailed<F>(
+    /// [`Self::sum_f64`] for currency-typed metrics; the sum is in the index
+    /// notional currency.
+    fn sum_money(
         &self,
         index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
-        f: F,
-    ) -> Result<IndexResult<Money>>
-    where
-        F: Fn(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve, Date) -> Result<Money>,
-    {
+        f: impl Fn(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve) -> Result<Money>,
+    ) -> Result<Money> {
         let mut total = Money::from((0_i64, index.notional.currency()));
-        let mut constituents = Vec::with_capacity(index.constituents.len());
-        self.visit_positions(index, curves, as_of, |pricer, cds, disc, surv, position| {
-            let value = f(pricer, cds, disc, surv, as_of)?;
-            total = total.checked_add(value)?;
-            if let Some(position) = position {
-                constituents.push(ConstituentResult {
-                    credit_curve_id: position.credit_curve_id.clone(),
-                    recovery_rate: position.recovery_rate,
-                    weight_raw: position.weight_raw,
-                    weight_effective: position.weight_effective,
-                    value,
-                });
-            }
+        self.visit_positions(index, curves, as_of, |pricer, cds, disc, surv| {
+            total = total.checked_add(f(pricer, cds, disc, surv)?)?;
             Ok(())
         })?;
-        Ok(IndexResult {
-            total,
-            constituents,
-        })
+        Ok(total)
     }
 
     fn for_each_constituent<'a>(
@@ -704,7 +552,6 @@ impl CdsIndexPricer {
                 ordinal: ordinal + 1,
                 credit_curve_id: &constituent.credit.credit_curve_id,
                 recovery_rate: constituent.credit.recovery_rate,
-                weight_raw: constituent.weight,
                 weight_effective: constituent.weight / norm,
             })?;
         }
@@ -1249,33 +1096,6 @@ mod tests {
     }
 
     #[test]
-    fn par_spread_detailed_fields_are_internally_consistent() {
-        // Regression guard for the bug where the reported denominator was the
-        // risky annuity while `total_spread_bp` came from `pricer.par_spread()`:
-        // numerator / denominator must reproduce the reported total.
-        let as_of = date(2024, 5, 15);
-        let market = sample_market(as_of);
-        let index = CdsIndex::example().expect("example");
-        assert_eq!(index.pricing, IndexPricing::SingleCurve);
-
-        let r = CdsIndexPricer::new()
-            .par_spread_detailed(&index, &market, as_of)
-            .expect("detailed par spread");
-
-        assert!(r.total_spread_bp.is_finite());
-        let implied = r.numerator_protection_pv.amount() / r.denominator * BASIS_POINTS_PER_UNIT;
-        assert!(
-            (implied - r.total_spread_bp).abs() < 1e-6,
-            "IndexParSpreadResult fields must be internally consistent: \
-             numerator={}, denominator={}, implied={}, total_bp={}",
-            r.numerator_protection_pv.amount(),
-            r.denominator,
-            implied,
-            r.total_spread_bp
-        );
-    }
-
-    #[test]
     fn rejects_negative_constituent_weight() {
         let mut index = CdsIndex::example().expect("example");
         index.pricing = IndexPricing::Constituents;
@@ -1334,146 +1154,6 @@ mod tests {
             CdsIndexPricer::settlement_date_with_delay(d, 0).expect("valid settlement date"),
             d,
             "T+0 settlement is a pass-through of the default date"
-        );
-    }
-
-    /// Market with one flat hazard curve per `(id, hazard_rate)` pair on top
-    /// of [`sample_market`].
-    fn constituents_market(as_of: Date, hazards: &[(&str, f64)]) -> MarketContext {
-        let mut market = sample_market(as_of);
-        for (id, rate) in hazards {
-            market = market.insert(
-                HazardCurve::builder(*id)
-                    .base_date(as_of)
-                    .currency(Currency::USD)
-                    .recovery_rate(0.40)
-                    .knots([(0.0, *rate), (5.0, *rate)])
-                    .build()
-                    .expect("hazard curve"),
-            );
-        }
-        market
-    }
-
-    /// Constituents-mode index over `(entity, hazard_id, weight)` triples.
-    fn constituents_index(constituents: &[(&str, &str, f64)]) -> CdsIndex {
-        let mut index = CdsIndex::example().expect("example");
-        index.pricing = IndexPricing::Constituents;
-        index.upfront = None;
-        index.constituents = constituents
-            .iter()
-            .map(|&(entity, hazard_id, weight)| CdsIndexConstituent {
-                credit: CreditParams::corporate_standard(entity, hazard_id),
-                weight,
-                defaulted: false,
-            })
-            .collect();
-        index
-    }
-
-    #[test]
-    fn detailed_results_sum_to_totals_across_constituents() {
-        let as_of = date(2024, 1, 1);
-        let market = constituents_market(as_of, &[("HZ-A", 0.02), ("HZ-B", 0.03), ("HZ-C", 0.01)]);
-        let index =
-            constituents_index(&[("A", "HZ-A", 0.5), ("B", "HZ-B", 0.3), ("C", "HZ-C", 0.2)]);
-        let pricer = CdsIndexPricer::new();
-
-        let npv = pricer.npv_detailed(&index, &market, as_of).expect("npv");
-        let npv_sum: f64 = npv.constituents.iter().map(|c| c.value.amount()).sum();
-        assert_eq!(npv.constituents.len(), 3);
-        assert!(
-            (npv.total.amount() - npv_sum).abs() < 1e-6,
-            "NPV total {} must equal the constituent sum {npv_sum}",
-            npv.total.amount()
-        );
-
-        let pv_prot = pricer
-            .pv_protection_leg_detailed(&index, &market, as_of)
-            .expect("protection leg");
-        let pv_prot_sum: f64 = pv_prot.constituents.iter().map(|c| c.value.amount()).sum();
-        assert!((pv_prot.total.amount() - pv_prot_sum).abs() < 1e-6);
-
-        let pv_prem = pricer
-            .pv_premium_leg_detailed(&index, &market, as_of)
-            .expect("premium leg");
-        let pv_prem_sum: f64 = pv_prem.constituents.iter().map(|c| c.value.amount()).sum();
-        assert!((pv_prem.total.amount() - pv_prem_sum).abs() < 1e-6);
-
-        let rpv01 = pricer
-            .risky_pv01_detailed(&index, &market, as_of)
-            .expect("risky pv01");
-        let rpv01_sum: f64 = rpv01.constituents.iter().map(|c| c.value).sum();
-        assert!((rpv01.total - rpv01_sum).abs() < 1e-10 * rpv01.total.abs().max(1.0));
-    }
-
-    #[test]
-    fn detailed_results_report_constituent_weights_and_curve_ids() {
-        let as_of = date(2024, 1, 1);
-        let market = constituents_market(as_of, &[("HZ-A", 0.02), ("HZ-B", 0.02), ("HZ-C", 0.02)]);
-        let third = 1.0 / 3.0;
-        let index = constituents_index(&[
-            ("A", "HZ-A", third),
-            ("B", "HZ-B", third),
-            ("C", "HZ-C", third),
-        ]);
-
-        let detailed = CdsIndexPricer::new()
-            .risky_pv01_detailed(&index, &market, as_of)
-            .expect("risky pv01");
-        let weight_sum: f64 = detailed
-            .constituents
-            .iter()
-            .map(|c| c.weight_effective)
-            .sum();
-        assert!(
-            (weight_sum - 1.0).abs() < 1e-12,
-            "effective weights sum to 1"
-        );
-        for (constituent, expected_id) in detailed.constituents.iter().zip(["HZ-A", "HZ-B", "HZ-C"])
-        {
-            assert_eq!(constituent.credit_curve_id.as_str(), expected_id);
-            assert!((constituent.weight_raw - third).abs() < 1e-12);
-            assert!((constituent.weight_effective - third).abs() < 1e-12);
-            assert!(constituent.recovery_rate > 0.0 && constituent.recovery_rate < 1.0);
-        }
-    }
-
-    #[test]
-    fn par_spread_detailed_constituent_spreads_are_informational() {
-        let as_of = date(2024, 1, 1);
-        let market = constituents_market(as_of, &[("HZ-A", 0.02), ("HZ-B", 0.02), ("HZ-C", 0.02)]);
-        let third = 1.0 / 3.0;
-        let index = constituents_index(&[
-            ("A", "HZ-A", third),
-            ("B", "HZ-B", third),
-            ("C", "HZ-C", third),
-        ]);
-
-        let detailed = CdsIndexPricer::new()
-            .par_spread_detailed(&index, &market, as_of)
-            .expect("detailed par spread");
-        assert_eq!(detailed.constituents_spread_bp.len(), 3);
-
-        // Identical constituents: each informational spread equals the total,
-        // so the (non-additive) sum is N times the total.
-        let sum_spreads: f64 = detailed
-            .constituents_spread_bp
-            .iter()
-            .map(|c| c.value)
-            .sum();
-        assert!(
-            (sum_spreads - detailed.total_spread_bp * 3.0).abs()
-                < 1e-10 * detailed.total_spread_bp.abs().max(1.0),
-            "sum of constituent par spreads {sum_spreads} vs 3 x total {}",
-            detailed.total_spread_bp
-        );
-
-        let implied = detailed.numerator_protection_pv.amount() / detailed.denominator
-            * BASIS_POINTS_PER_UNIT;
-        assert!(
-            (implied - detailed.total_spread_bp).abs() < 1e-6,
-            "par spread total must be consistent with numerator/denominator"
         );
     }
 }

@@ -302,24 +302,6 @@ impl Tranche {
         self.effective_detach_pct() - self.effective_attach_pct()
     }
 
-    /// Check if tranche is first loss (attachment at 0%)
-    pub fn is_first_loss(&self) -> bool {
-        self.effective_attach_pct() == 0.0
-    }
-
-    /// Check if tranche is currently impaired by losses.
-    ///
-    /// A tranche is impaired when cumulative pool losses, expressed in
-    /// percentage points of performing pool balance, exceed the tranche's
-    /// attachment point.
-    ///
-    /// # Arguments
-    /// * `cumulative_loss_pct` - Cumulative net loss in percentage points of
-    ///   performing pool balance, in `[0, 100]` (for example, `5.0` means 5%).
-    pub fn is_impaired(&self, cumulative_loss_pct: f64) -> bool {
-        cumulative_loss_pct > self.effective_attach_pct()
-    }
-
     /// Calculate the dollar loss allocated to this tranche given cumulative pool losses.
     ///
     /// Uses attachment/detachment point convention (INTEX/Moody's Analytics):
@@ -347,25 +329,6 @@ impl Tranche {
             let loss_rate = loss_within_tranche_pct / self.thickness();
             self.original_balance.checked_mul_f64(loss_rate)
         }
-    }
-
-    /// Current tranche balance after applying cumulative losses.
-    ///
-    /// Returns `max(0, current_balance - loss_allocation)`.
-    ///
-    /// # Arguments
-    ///
-    /// * `cumulative_loss_pct` - Cumulative net loss in percentage points of
-    ///   performing pool balance, in `[0, 100]` (for example, `12.0` means 12%).
-    pub fn current_balance_after_losses(
-        &self,
-        cumulative_loss_pct: f64,
-    ) -> finstack_quant_core::Result<Money> {
-        let loss_amount = self.loss_allocation(cumulative_loss_pct)?;
-        Money::new(
-            (self.current_balance.amount() - loss_amount.amount()).max(0.0),
-            self.current_balance.currency(),
-        )
     }
 
     /// Builder methods for fluent construction
@@ -841,7 +804,7 @@ impl TrancheStructure {
     /// A real CLO/ABS carries multiple notes at one `TrancheSeniority` (Class
     /// A-1, A-2, A-3 all `Senior`); deriving `payment_priority` from the
     /// 4-valued seniority enum directly collapses them onto one value, which
-    /// breaks `senior_to` / `subordination_amount` (strict `<`/`>` filters) and
+    /// breaks `senior_to` (a strict `<` filter) and
     /// the OC/IC coverage denominators built on them.
     ///
     /// Ranking rule: `(TrancheSeniority discriminant ASCENDING, then original
@@ -974,14 +937,6 @@ impl TrancheStructure {
         Ok(())
     }
 
-    /// Get tranches by seniority
-    pub fn by_seniority(&self, seniority: TrancheSeniority) -> Vec<&Tranche> {
-        self.tranches
-            .iter()
-            .filter(|t| t.seniority == seniority)
-            .collect()
-    }
-
     /// Get tranches senior to a given tranche
     pub fn senior_to(&self, tranche_id: &str) -> Vec<&Tranche> {
         let target_tranche = self.tranches.iter().find(|t| t.id.as_str() == tranche_id);
@@ -1004,23 +959,6 @@ impl TrancheStructure {
                 acc.checked_add(t.current_balance)
             })
             .unwrap_or_else(|_| Money::from((0_i64, self.currency)))
-    }
-
-    /// Calculate tranche subordination amount
-    pub fn subordination_amount(&self, tranche_id: &str) -> Money {
-        let target_tranche = self.tranches.iter().find(|t| t.id.as_str() == tranche_id);
-
-        if let Some(target) = target_tranche {
-            self.tranches
-                .iter()
-                .filter(|t| t.payment_priority > target.payment_priority)
-                .try_fold(Money::from((0_i64, self.currency)), |acc, t| {
-                    acc.checked_add(t.current_balance)
-                })
-                .unwrap_or_else(|_| Money::from((0_i64, self.currency)))
-        } else {
-            Money::from((0_i64, self.currency))
-        }
     }
 }
 
@@ -1083,7 +1021,6 @@ mod tests {
         assert_eq!(tranche.attach_pct, Some(0.0));
         assert_eq!(tranche.detach_pct, Some(10.0));
         assert_eq!(tranche.thickness(), 10.0);
-        assert!(tranche.is_first_loss());
     }
 
     #[test]

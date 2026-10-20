@@ -5874,10 +5874,9 @@ export interface AssetPool {
   /**
    * Cumulative scheduled amortization (level-pay principal for amortizing assets).
    *
-   * Part of the original-balance denominator in
-   * [`current_loss_percentage`](super::StructuredCredit::current_loss_percentage),
-   * so it must be stated: omitting it understates the denominator and
-   * overstates the reported loss rate.
+   * Part of the reconstructed original balance
+   * ([`AssetPool::original_balance_or_reconstructed`]) when no explicit
+   * `original_balance` is supplied.
    */
   cumulative_scheduled_amortization: Money;
   /**
@@ -19895,7 +19894,7 @@ export interface PoolStats {
    * Weighted average maturity (WAM) in years.
    *
    * For weighted average life use
-   * [`AssetPool::wal_from_cashflows`].
+   * [`weighted_average_life_from_principal`](finstack_quant_cashflows::builder::weighted_average_life_from_principal).
    */
   weighted_avg_maturity: number;
   /**

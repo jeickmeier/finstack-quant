@@ -25,31 +25,6 @@ use finstack_quant_valuations_core::results::structured_credit::{
 };
 
 impl StructuredCredit {
-    /// Calculate monthly prepayment probability at the supplied collateral age.
-    ///
-    /// # Arguments
-    ///
-    /// * `seasoning_months` - Collateral age in months, including age at closing.
-    pub fn calculate_smm(&self, seasoning_months: u32) -> finstack_quant_core::Result<f64> {
-        self.validated_credit_model()?
-            .prepayment_spec
-            .smm(seasoning_months)
-    }
-
-    /// Calculate monthly default probability at the supplied collateral age.
-    ///
-    /// # Arguments
-    ///
-    /// * `seasoning_months` - Collateral age in months, including age at closing.
-    pub fn calculate_default_rate(
-        &self,
-        seasoning_months: u32,
-    ) -> finstack_quant_core::Result<f64> {
-        self.validated_credit_model()?
-            .default_spec
-            .mdr(seasoning_months)
-    }
-
     /// Monte Carlo stochastic pricing with optional estimator-count and
     /// pairing overrides.
     ///
@@ -655,12 +630,22 @@ mod production_structured_assumptions {
             panic!("deterministic default model");
         };
         assert!(
-            (prepay.smm(12).expect("SMM") - deal.calculate_smm(12).expect("resolved SMM")).abs()
+            (prepay.smm(12).expect("SMM")
+                - deal
+                    .credit_model
+                    .prepayment_spec
+                    .smm(12)
+                    .expect("resolved SMM"))
+            .abs()
                 < 1e-14
         );
         assert!(
             (default.mdr(12).expect("MDR")
-                - deal.calculate_default_rate(12).expect("resolved MDR"))
+                - deal
+                    .credit_model
+                    .default_spec
+                    .mdr(12)
+                    .expect("resolved MDR"))
             .abs()
                 < 1e-14
         );

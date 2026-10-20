@@ -170,11 +170,6 @@ RUNTIME_RESULT_EXCEPTIONS = (
         ("WaterfallPeriodResult",),
     ),
     *_runtime_exception(
-        "valuations-credit",
-        "src/cds_index/types.rs",
-        ("ConstituentResult", "IndexResult", "IndexParSpreadResult"),
-    ),
-    *_runtime_exception(
         "valuations-fixed-income",
         "src/bond/pricing/ytm_solver.rs",
         ("YtmPricingSpec",),

@@ -851,38 +851,6 @@ fn drain_pending_recoveries_at_end(
     Ok(final_date)
 }
 
-/// Aggregate tranche-level cashflows into one dated cashflow vector.
-pub(crate) fn aggregate_tranche_cashflows(
-    full_results: &HashMap<String, TrancheCashflows>,
-) -> Result<DatedFlows> {
-    // Aggregate all tranche cashflows into a single schedule
-    let estimated_dates = full_results
-        .values()
-        .next()
-        .map(|r| r.cashflows.len())
-        .unwrap_or(0);
-    let mut flow_map: HashMap<Date, Money> = {
-        let mut m = HashMap::default();
-        m.reserve(estimated_dates);
-        m
-    };
-
-    for result in full_results.values() {
-        for (date, amount) in &result.cashflows {
-            if let Some(existing) = flow_map.get_mut(date) {
-                *existing = existing.checked_add(*amount)?;
-            } else {
-                flow_map.insert(*date, *amount);
-            }
-        }
-    }
-
-    let mut all_flows: DatedFlows = flow_map.into_iter().collect();
-    all_flows.sort_by_key(|(d, _)| *d);
-
-    Ok(all_flows)
-}
-
 /// Calendar-month exposure: whole contractual months plus the actual fraction
 /// of the next calendar month. Annual CPR/CDR survival is raised to months/12.
 fn contractual_months(start: Date, end: Date) -> Result<f64> {

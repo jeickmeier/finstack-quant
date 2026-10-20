@@ -70,57 +70,6 @@ impl CdsIndexConstituent {
     }
 }
 
-/// Per-constituent result entry for index-level analytics.
-#[derive(Debug, Clone)]
-pub struct ConstituentResult<T> {
-    /// Hazard curve identifier for the constituent.
-    pub credit_curve_id: CurveId,
-    /// Recovery rate used for the constituent.
-    pub recovery_rate: f64,
-    /// Raw weight supplied on the index definition.
-    pub weight_raw: f64,
-    /// Effective weight used after optional normalization.
-    pub weight_effective: f64,
-    /// Computed value for the constituent.
-    pub value: T,
-}
-
-/// Aggregate result for index-level analytics.
-///
-/// In `SingleCurve` mode, `constituents` is empty.
-#[derive(Debug, Clone)]
-pub struct IndexResult<T> {
-    /// Total aggregated value.
-    pub total: T,
-    /// Optional per-constituent breakdown.
-    pub constituents: Vec<ConstituentResult<T>>,
-}
-
-impl<T> IndexResult<T> {
-    /// Construct a single-curve result with no breakdown.
-    pub fn single_curve(total: T) -> Self {
-        Self {
-            total,
-            constituents: Vec::new(),
-        }
-    }
-}
-
-/// Detailed par spread result for CDS indices.
-///
-/// Note: constituent par spreads are informational and are not additive.
-#[derive(Debug, Clone)]
-pub struct IndexParSpreadResult {
-    /// Total par spread in basis points.
-    pub total_spread_bp: f64,
-    /// Per-constituent par spreads in basis points (informational).
-    pub constituents_spread_bp: Vec<ConstituentResult<f64>>,
-    /// Aggregated protection PV used in the total calculation.
-    pub numerator_protection_pv: Money,
-    /// Aggregated denominator used in the total calculation.
-    pub denominator: f64,
-}
-
 /// CDS Index instrument definition
 #[derive(
     Clone,
