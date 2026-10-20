@@ -488,17 +488,7 @@ impl HorizonResult {
     /// # Arguments
     /// * `factor` - Attribution component whose P&L is divided by positive initial value.
     pub fn factor_contribution(&self, factor: &AttributionFactor) -> f64 {
-        let factor_money = match factor {
-            AttributionFactor::Carry => &self.attribution.carry,
-            AttributionFactor::RatesCurves => &self.attribution.rates_curves_pnl,
-            AttributionFactor::CreditCurves => &self.attribution.credit_curves_pnl,
-            AttributionFactor::InflationCurves => &self.attribution.inflation_curves_pnl,
-            AttributionFactor::Correlations => &self.attribution.correlations_pnl,
-            AttributionFactor::Fx => &self.attribution.fx_pnl,
-            AttributionFactor::Volatility => &self.attribution.vol_pnl,
-            AttributionFactor::ModelParameters => &self.attribution.model_params_pnl,
-            AttributionFactor::MarketScalars => &self.attribution.market_scalars_pnl,
-        };
+        let factor_money = self.attribution.get_factor_pnl(factor);
         if self.initial_value.currency() != factor_money.currency() {
             return f64::NAN;
         }

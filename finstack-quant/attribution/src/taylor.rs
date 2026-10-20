@@ -665,35 +665,26 @@ pub(crate) fn attribute_pnl_taylor(
         // Route accumulation through Money::checked_add so a currency
         // mismatch surfaces as an error instead of being silently coerced into
         // `ccy`.
-        let bucket = match factor.factor {
-            AttributionFactor::RatesCurves => &mut attribution.rates_curves_pnl,
-            AttributionFactor::CreditCurves => &mut attribution.credit_curves_pnl,
-            AttributionFactor::InflationCurves => &mut attribution.inflation_curves_pnl,
-            AttributionFactor::Correlations => &mut attribution.correlations_pnl,
-            AttributionFactor::Fx => &mut attribution.fx_pnl,
-            AttributionFactor::Volatility => &mut attribution.vol_pnl,
-            AttributionFactor::MarketScalars => &mut attribution.market_scalars_pnl,
-            AttributionFactor::ModelParameters => &mut attribution.model_params_pnl,
-            AttributionFactor::Carry => {
-                // Taylor theta already includes cashflows from compute_theta_factor.
-                let zero = Money::from((0_i64, ccy));
-                let ci = taylor.theta_coupon_income.unwrap_or(zero);
-                let cash_paid = taylor.theta_cash_paid.unwrap_or(zero);
-                let theta_only = Money::new(factor_money.amount() - cash_paid.amount(), ccy)?;
-                // Taylor path: delta_accrued and flat_window_diff are unavailable (no repricing).
-                let carry_inputs = TotalReturnCarryInputs {
-                    cash_paid,
-                    income_cash_paid: ci,
-                    delta_accrued: None,
-                    flat_window_diff: None,
-                    funding_cost: None,
-                    num_repricings: 0,
-                    warnings: Vec::new(),
-                };
-                apply_total_return_carry(&mut attribution, theta_only, carry_inputs)?;
-                continue;
-            }
-        };
+        if factor.factor == AttributionFactor::Carry {
+            // Taylor theta already includes cashflows from compute_theta_factor.
+            let zero = Money::from((0_i64, ccy));
+            let ci = taylor.theta_coupon_income.unwrap_or(zero);
+            let cash_paid = taylor.theta_cash_paid.unwrap_or(zero);
+            let theta_only = Money::new(factor_money.amount() - cash_paid.amount(), ccy)?;
+            // Taylor path: delta_accrued and flat_window_diff are unavailable (no repricing).
+            let carry_inputs = TotalReturnCarryInputs {
+                cash_paid,
+                income_cash_paid: ci,
+                delta_accrued: None,
+                flat_window_diff: None,
+                funding_cost: None,
+                num_repricings: 0,
+                warnings: Vec::new(),
+            };
+            apply_total_return_carry(&mut attribution, theta_only, carry_inputs)?;
+            continue;
+        }
+        let bucket = attribution.factor_pnl_mut(&factor.factor);
         *bucket = bucket.checked_add(factor_money)?;
         if factor.factor == AttributionFactor::Fx {
             stamp_fx_policy(

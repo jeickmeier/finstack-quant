@@ -514,29 +514,20 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
             continue;
         };
         num_repricings += 1;
+        // Carry is not a restore factor. Discount and forward both land in
+        // rates on the full-cross path, so factor P&L adds into its field.
+        if spec.factor != AttributionFactor::Carry {
+            let field = attribution.factor_pnl_mut(&spec.factor);
+            *field = field.checked_add(pnl)?;
+        }
         match spec.factor {
-            // Discount and forward both land in rates on the full-cross path.
-            AttributionFactor::RatesCurves => {
-                attribution.rates_curves_pnl = attribution.rates_curves_pnl.checked_add(pnl)?;
-            }
-            AttributionFactor::CreditCurves => {
-                attribution.credit_curves_pnl = pnl;
-                val_with_t0_credit = Some(reprice);
-            }
-            AttributionFactor::InflationCurves => attribution.inflation_curves_pnl = pnl,
-            AttributionFactor::Correlations => attribution.correlations_pnl = pnl,
-            AttributionFactor::Fx => {
-                attribution.fx_pnl = pnl;
-                stamp_fx_policy(
-                    &mut attribution,
-                    ccy,
-                    "Combined FX exposure and translation P&L (see parallel.rs for details)",
-                );
-            }
-            AttributionFactor::Volatility => attribution.vol_pnl = pnl,
-            AttributionFactor::MarketScalars => attribution.market_scalars_pnl = pnl,
-            AttributionFactor::ModelParameters => attribution.model_params_pnl = pnl,
-            AttributionFactor::Carry => {}
+            AttributionFactor::CreditCurves => val_with_t0_credit = Some(reprice),
+            AttributionFactor::Fx => stamp_fx_policy(
+                &mut attribution,
+                ccy,
+                "Combined FX exposure and translation P&L (see parallel.rs for details)",
+            ),
+            _ => {}
         }
         active.push((spec, reprice));
     }

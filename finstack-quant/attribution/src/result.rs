@@ -891,6 +891,67 @@ impl PnlAttribution {
         Ok(())
     }
 
+    /// P&L amount attributed to one factor.
+    ///
+    /// `Carry` reads [`Self::carry`]; every other factor reads its own
+    /// `*_pnl` field (`RatesCurves` → [`Self::rates_curves_pnl`], …).
+    ///
+    /// # Arguments
+    ///
+    /// * `factor` - Attribution factor whose headline amount is returned, in
+    ///   the attribution's reporting currency.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_attribution::{AttributionFactor, AttributionMethod, PnlAttribution};
+    /// use finstack_quant_core::{currency::Currency, money::Money};
+    /// use time::macros::date;
+    ///
+    /// let mut attribution = PnlAttribution::new(
+    ///     Money::from((100_i64, Currency::USD)),
+    ///     "BOND-1",
+    ///     date!(2025 - 01 - 15),
+    ///     date!(2025 - 01 - 16),
+    ///     AttributionMethod::Parallel,
+    /// );
+    /// attribution.rates_curves_pnl = Money::from((60_i64, Currency::USD));
+    /// assert_eq!(
+    ///     attribution.get_factor_pnl(&AttributionFactor::RatesCurves),
+    ///     Money::from((60_i64, Currency::USD)),
+    /// );
+    /// ```
+    #[must_use]
+    pub fn get_factor_pnl(&self, factor: &AttributionFactor) -> Money {
+        match factor {
+            AttributionFactor::Carry => self.carry,
+            AttributionFactor::RatesCurves => self.rates_curves_pnl,
+            AttributionFactor::CreditCurves => self.credit_curves_pnl,
+            AttributionFactor::InflationCurves => self.inflation_curves_pnl,
+            AttributionFactor::Correlations => self.correlations_pnl,
+            AttributionFactor::Fx => self.fx_pnl,
+            AttributionFactor::Volatility => self.vol_pnl,
+            AttributionFactor::ModelParameters => self.model_params_pnl,
+            AttributionFactor::MarketScalars => self.market_scalars_pnl,
+        }
+    }
+
+    /// Mutable twin of [`Self::get_factor_pnl`], used by the engines to land
+    /// a factor's P&L in its field.
+    pub(crate) fn factor_pnl_mut(&mut self, factor: &AttributionFactor) -> &mut Money {
+        match factor {
+            AttributionFactor::Carry => &mut self.carry,
+            AttributionFactor::RatesCurves => &mut self.rates_curves_pnl,
+            AttributionFactor::CreditCurves => &mut self.credit_curves_pnl,
+            AttributionFactor::InflationCurves => &mut self.inflation_curves_pnl,
+            AttributionFactor::Correlations => &mut self.correlations_pnl,
+            AttributionFactor::Fx => &mut self.fx_pnl,
+            AttributionFactor::Volatility => &mut self.vol_pnl,
+            AttributionFactor::ModelParameters => &mut self.model_params_pnl,
+            AttributionFactor::MarketScalars => &mut self.market_scalars_pnl,
+        }
+    }
+
     /// Share of total P&L, in percent, that an amount represents.
     ///
     /// Computes `amount / total_pnl × 100`, the per-factor percentage shown by

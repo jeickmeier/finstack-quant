@@ -313,30 +313,23 @@ pub(crate) fn attribute_pnl_waterfall(
                 ctx.num_repricings +=
                     apply_total_return_carry(&mut attribution, theta, carry_inputs)?;
             }
-            AttributionFactor::RatesCurves => attribution.rates_curves_pnl = factor_pnl,
-            AttributionFactor::CreditCurves => attribution.credit_curves_pnl = factor_pnl,
-            AttributionFactor::InflationCurves => attribution.inflation_curves_pnl = factor_pnl,
-            AttributionFactor::Correlations => attribution.correlations_pnl = factor_pnl,
-            AttributionFactor::Fx => {
-                attribution.fx_pnl = factor_pnl;
-                let target_currency = attribution.fx_pnl.currency();
-                stamp_fx_policy(
-                    &mut attribution,
-                    target_currency,
-                    "Waterfall FX attribution with full translation",
-                );
-            }
-            AttributionFactor::Volatility => attribution.vol_pnl = factor_pnl,
-            AttributionFactor::ModelParameters => {
-                attribution.model_params_pnl = factor_pnl;
-                if factor_pnl.amount().abs() < 1e-10 {
+            factor => {
+                *attribution.factor_pnl_mut(&factor) = factor_pnl;
+                if factor == AttributionFactor::Fx {
+                    stamp_fx_policy(
+                        &mut attribution,
+                        factor_pnl.currency(),
+                        "Waterfall FX attribution with full translation",
+                    );
+                }
+                if factor == AttributionFactor::ModelParameters && factor_pnl.amount().abs() < 1e-10
+                {
                     attribution
                         .meta
                         .notes
                         .push("Model parameters attribution returned zero".to_string());
                 }
             }
-            AttributionFactor::MarketScalars => attribution.market_scalars_pnl = factor_pnl,
         }
     }
 
