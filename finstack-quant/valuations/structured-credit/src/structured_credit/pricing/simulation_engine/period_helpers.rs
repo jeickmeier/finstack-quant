@@ -1,4 +1,5 @@
 use super::*;
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
 
 /// Resolve a collateral index fixing or project its contractual term rate.
 ///
@@ -28,11 +29,7 @@ pub(crate) fn term_rate_for_period(
             fwd.base_date(),
         );
     }
-    let reset_end = crate::structured_credit::utils::rate_helpers::try_tenor_to_period_end(
-        fixing_date,
-        fwd.tenor(),
-        fwd.day_count(),
-    )?;
+    let reset_end = try_tenor_to_period_end(fixing_date, fwd.tenor(), fwd.day_count())?;
     let accrual_year_fraction =
         day_count.year_fraction(fixing_date, reset_end, DayCountContext::default())?;
     fwd.rate_between_dates(fixing_date, reset_end, accrual_year_fraction)
@@ -240,4 +237,41 @@ pub(super) struct SimulationPeriod {
     /// suspended and the equity residual is withheld so it joins the
     /// redemption proceeds.
     pub(super) redemption: bool,
+}
+
+// Date helpers for structured-credit floating-rate periods.
+
+/// Calculate a floating-rate period end from a tenor expressed in years.
+///
+/// Pricing callers propagate date-arithmetic failures rather than silently
+/// replacing the period end with the start date.
+#[inline]
+pub(crate) fn try_tenor_to_period_end(
+    start: Date,
+    tenor_years: f64,
+    day_count: DayCount,
+) -> finstack_quant_core::Result<Date> {
+    Tenor::from_years(tenor_years, day_count)?.add_to_date(
+        start,
+        None,
+        BusinessDayConvention::Unadjusted,
+    )
+}
+
+#[cfg(test)]
+mod rate_helpers_tests {
+    use super::*;
+    use time::macros::date;
+
+    #[test]
+    fn rolls_standard_periods() {
+        assert_eq!(
+            try_tenor_to_period_end(date!(2025 - 01 - 31), 0.25, DayCount::Act360),
+            Ok(date!(2025 - 04 - 30))
+        );
+        assert_eq!(
+            try_tenor_to_period_end(date!(2025 - 01 - 31), 1.0, DayCount::Act365F),
+            Ok(date!(2026 - 01 - 31))
+        );
+    }
 }

@@ -1,5 +1,5 @@
 //! Heterogeneous capped loss by exact states for small pools and grid convolution.
-use super::config::{
+use super::pricer::{
     CdsTranchePricer, PoolExposure, CDF_CLIP, GRID_STEP, HOMOGENEITY_TOLERANCE,
     MAX_CONVOLUTION_WORK, MAX_GRID_POINTS, NUMERICAL_TOLERANCE,
 };

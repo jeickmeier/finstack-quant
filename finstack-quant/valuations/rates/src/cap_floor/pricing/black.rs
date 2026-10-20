@@ -28,7 +28,7 @@
 //! - Black, F. (1976). "The pricing of commodity contracts."
 //!   *Journal of Financial Economics*, 3(1-2), 167-179. `docs/REFERENCES.md#black-1976`
 
-use super::payoff::CapletFloorletInputs;
+use super::CapletFloorletInputs;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::{
     black_call, black_delta_call, black_delta_put, black_put,

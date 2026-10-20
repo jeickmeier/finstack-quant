@@ -1880,7 +1880,7 @@
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/credit/src/cds/pricing/integration.rs",
+      "path": "finstack-quant/valuations/credit/src/cds/pricing/engine.rs",
       "category": "credit_assumption",
       "contains": "let lgd = 1.0 - recovery;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
@@ -2060,25 +2060,25 @@
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/engine/hazard.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/hazard.rs",
       "category": "credit_assumption",
       "contains": "if recovery > 0.0 {",
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/engine/hazard.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/hazard.rs",
       "category": "credit_assumption",
       "contains": "let recovery = hazard.recovery_rate().clamp(0.0, 1.0);",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/engine/merton_mc/engine.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/merton_mc/engine.rs",
       "category": "credit_assumption",
       "contains": "-(1.0 - pd).ln() / coupon_t",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/engine/tree/bond_valuator.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/tree/bond_valuator.rs",
       "category": "credit_assumption",
       "contains": "let p_surv = (-hazard.max(0.0) * dt).exp();",
       "reason": "Financial formula or unit conversion, not an external default to configure."
@@ -2150,7 +2150,7 @@
       "reason": "Binding metadata, repr text, or module/export label; not a mutable financial assumption."
     },
     {
-      "path": "finstack-quant/valuations/structured-credit/src/cmo/tranches/pac_support.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/cmo/pac_support.rs",
       "category": "structured_credit",
       "contains": "1.0 - (1.0 - cpr).powf(1.0 / 12.0)",
       "reason": "Financial formula or unit conversion, not an external default to configure."
@@ -2288,31 +2288,31 @@
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/characteristics.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool.rs",
       "category": "structured_credit",
       "contains": "(cdr * speed_multiplier).clamp(0.0, 1.0)",
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/mod.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool.rs",
       "category": "rating_agency",
       "contains": "pub use warf::CloWarfCalculator;",
       "reason": "Rating scale or WARF API plumbing; rating factors and scales are sourced from the rating-scale registry."
     },
     {
-      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/mod.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool.rs",
       "category": "rating_agency",
       "contains": "pub(crate) mod warf;",
       "reason": "Rating scale or WARF API plumbing; rating factors and scales are sourced from the rating-scale registry."
     },
     {
-      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/mod.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool.rs",
       "category": "rating_agency",
       "contains": "let rating_factor = asset",
       "reason": "Rating scale or WARF API plumbing; rating factors and scales are sourced from the rating-scale registry."
     },
     {
-      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool/mod.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool.rs",
       "category": "rating_agency",
       "contains": "weighted_sum += balance * rating_factor;",
       "reason": "Rating scale or WARF API plumbing; rating factors and scales are sourced from the rating-scale registry."
@@ -2378,7 +2378,7 @@
       "reason": "Structured-credit formula, named standard factory, or diagnostic; mutable assumptions live in structured-credit/TBA registries."
     },
     {
-      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/utils/rate_helpers.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/period_helpers.rs",
       "category": "contract_spec",
       "contains": "id: \"asset.index_id\".to_string(),",
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."

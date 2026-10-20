@@ -324,7 +324,7 @@ mod tests {
                                 .expect("actual payment discount")
                     })
                     .sum::<f64>();
-                let curve_pv = crate::bond::pricing::engine::discount::BondEngine::price_with_oas(
+                let curve_pv = crate::bond::pricing::discount::BondEngine::price_with_oas(
                     &bond, &market, as_of, 0.0,
                 )
                 .expect("actual-date curve price");

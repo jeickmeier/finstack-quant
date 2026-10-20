@@ -1,7 +1,7 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
 use super::embedded_option_value::{holder_option_value, resolve_oas_decimal};
-use crate::bond::pricing::engine::tree::{bond_tree_config, TreeModelChoice};
+use crate::bond::pricing::tree::{bond_tree_config, TreeModelChoice};
 use crate::bond::Bond;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};

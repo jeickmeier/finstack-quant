@@ -77,7 +77,6 @@
 //! - [`finstack_quant_models::correlation::copula`] for copula model implementations
 //! - Base correlation calibration via plan-driven `calibration::api`
 
-mod credit_risk;
 pub(crate) mod metrics;
 pub(crate) mod parameters;
 pub(crate) mod pricing;

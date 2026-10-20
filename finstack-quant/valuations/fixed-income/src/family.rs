@@ -22,9 +22,9 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
         ModelKey::HazardRate,
         ModelKey::RatesCredit,
     ] {
-        registry.register(crate::bond::pricing::engine::BondPricer::new(model))?;
+        registry.register(crate::bond::pricing::BondPricer::new(model))?;
     }
-    registry.register(crate::bond::pricing::engine::SimpleBondMertonMcPricer)?;
+    registry.register(crate::bond::pricing::SimpleBondMertonMcPricer)?;
     registry.register(crate::bond_future::pricer::BondFuturePricer)?;
 
     register_generic!(

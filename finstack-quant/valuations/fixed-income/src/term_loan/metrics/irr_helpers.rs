@@ -241,7 +241,7 @@ pub(super) fn solve_irr_to_date(
     let schedule = cached_full_schedule(context)?;
     let loan: &TermLoan = context.instrument_as()?;
     let (principal, cash_accrued) =
-        super::super::pricing::call::exercise_claim(loan, &schedule, exercise_date)?;
+        crate::term_loan::pricing::call::exercise_claim(loan, &schedule, exercise_date)?;
     let outstanding = Money::new(principal + cash_accrued, loan.currency)?;
 
     solve_irr_to_exercise(
@@ -334,8 +334,8 @@ pub(super) fn exercisable_call_candidates(
         .into_iter()
         .map(|(exercise, call)| {
             let (outstanding, accrued) =
-                super::super::pricing::call::exercise_claim(loan, schedule, exercise)?;
-            let clean = super::super::pricing::call::clean_call_price(
+                crate::term_loan::pricing::call::exercise_claim(loan, schedule, exercise)?;
+            let clean = crate::term_loan::pricing::call::clean_call_price(
                 call,
                 schedule,
                 market,

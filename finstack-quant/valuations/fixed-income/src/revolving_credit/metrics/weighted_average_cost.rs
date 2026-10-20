@@ -98,7 +98,7 @@ fn average_forward_rate(
     if as_of >= facility.maturity {
         return Ok(0.0);
     }
-    let periods = super::super::utils::build_payment_periods(facility)?;
+    let periods = crate::revolving_credit::utils::build_payment_periods(facility)?;
     let (mut weighted, mut weight) = (0.0, 0.0);
     for period in periods.iter().filter(|period| period.accrual_end > as_of) {
         let remaining_start = period.accrual_start.max(as_of);

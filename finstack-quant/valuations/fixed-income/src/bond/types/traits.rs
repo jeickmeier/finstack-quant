@@ -1,5 +1,14 @@
-//! Trait implementations for Bond (Instrument and Monte Carlo).
+//! Trait implementations for Bond (Instrument, Monte Carlo and cashflow source).
+//!
+//! The cashflow schedule source produces a signed canonical schedule that
+//! preserves fees, signed notionals, and all valid cash events. PIK accretion
+//! retains its classification and amount for accrual and balance replay; dated
+//! settlement views omit the non-cash rows.
 
+use finstack_quant_cashflows::builder::CashflowRepresentation;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::impl_instrument_base;
 
@@ -271,8 +280,8 @@ impl Bond {
         config: &finstack_quant_valuations_core::instruments::MertonMcConfig,
         discount_rate: f64,
         as_of: time::Date,
-    ) -> finstack_quant_core::Result<crate::bond::pricing::engine::merton_mc::MertonMcResult> {
-        let run = crate::bond::pricing::engine::merton_mc::MertonMcRun::resolve(
+    ) -> finstack_quant_core::Result<crate::bond::pricing::merton_mc::MertonMcResult> {
+        let run = crate::bond::pricing::merton_mc::MertonMcRun::resolve(
             &self.id,
             &self.instrument_pricing_overrides.model_config,
         )?;
@@ -285,11 +294,11 @@ impl Bond {
     pub(crate) fn price_merton_mc_with_run(
         &self,
         config: &finstack_quant_valuations_core::instruments::MertonMcConfig,
-        run: &crate::bond::pricing::engine::merton_mc::MertonMcRun,
+        run: &crate::bond::pricing::merton_mc::MertonMcRun,
         discount_rate: f64,
         as_of: time::Date,
-    ) -> finstack_quant_core::Result<crate::bond::pricing::engine::merton_mc::MertonMcResult> {
-        use crate::bond::pricing::engine::merton_mc::{MertonBondTerms, MertonMcEngine};
+    ) -> finstack_quant_core::Result<crate::bond::pricing::merton_mc::MertonMcResult> {
+        use crate::bond::pricing::merton_mc::{MertonBondTerms, MertonMcEngine};
         use finstack_quant_cashflows::builder::CouponType;
         use finstack_quant_valuations_core::instruments::{MertonMcConfig, PikMode, PikSchedule};
         use rust_decimal::prelude::ToPrimitive;
@@ -363,6 +372,32 @@ impl Bond {
         };
 
         MertonMcEngine::price_terms(&terms, config_ref, run, discount_rate)
+    }
+}
+
+impl finstack_quant_cashflows::CashflowScheduleSource for Bond {
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
+    }
+
+    fn raw_cashflow_schedule(
+        &self,
+        curves: &MarketContext,
+        _as_of: Date,
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+        let schedule = if let Some(ref custom) = self.custom_cashflows {
+            custom.clone()
+        } else {
+            self.full_cashflow_schedule(curves)?
+        };
+
+        let representation = if self.has_floating_coupons() {
+            CashflowRepresentation::Projected
+        } else {
+            CashflowRepresentation::Contractual
+        };
+
+        Ok(schedule.with_representation(representation))
     }
 }
 

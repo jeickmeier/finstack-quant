@@ -43,7 +43,8 @@ rather than repeating it.
 
 Two non-instrument files sit beside the leaves: `forward_swap_rate.rs` (forward
 swap rate, annuity and term-curve checks shared by the CMS leaves and
-`ir_future`) and `cms_fixings.rs` (historical CMS fixing lookup, crate-private).
+`ir_future`) and `cms_common.rs` (CMS reference-swap resolution and historical
+CMS fixing lookup, crate-private).
 The Hull-White 1-factor Monte Carlo and LSMC engines that the swaption,
 cap/floor, CMS, TARN, snowball, callable range accrual, MBS OAS and revolver
 pricers drive live in `finstack_quant_models::rates::hw1f`; the κ/σ resolution
@@ -90,10 +91,10 @@ Swaptions use the shared `ExerciseStyle`, `SettlementType` and
 `finstack_quant_valuations::instruments`.
 
 Inside a leaf, `metrics/`, `types.rs`/`types/`, `pricer.rs`/`pricing/` and the
-model-specific pricers (`hw_pricer.rs`, `bermudan/`) are `pub(crate)` or private; supported
+model-specific pricers (`hw_pricer.rs`, `bermudan.rs`) are `pub(crate)` or private; supported
 items surface through each leaf's `pub use`. Genuinely public submodules are
 `swaption::lmm_pricer`, `cms_option::pricer` and `cms_option::replication_pricer`; `cms_common`,
-`cms_fixings`, `cms_swap::pricer` and `forward_swap_rate` are `pub(crate)`.
+`cms_swap::pricer` and `forward_swap_rate` are `pub(crate)`.
 
 ## Family conventions
 

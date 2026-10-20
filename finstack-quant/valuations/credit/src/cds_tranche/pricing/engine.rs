@@ -1,7 +1,7 @@
 //! Copula selection, projected premium and protection schedules, discounting and
 //! settlement for `CdsTranchePricer`.
 
-use super::config::{
+use super::pricer::{
     CdsTranchePricer, DiscountAt, EffectiveStructure, ProjectedDiscountedRow, ProjectionInputs,
     BESPOKE_SETTLEMENT_DAYS, INDEX_SETTLEMENT_DAYS, PROBABILITY_CLIP,
 };
@@ -435,7 +435,7 @@ impl CdsTranchePricer {
         let known_count = periods.iter().filter(|p| p.accrual_end <= as_of).count();
         let mut el_curve = Vec::with_capacity(periods.len());
         for _ in 0..known_count {
-            el_curve.push(super::config::ElWdPoint {
+            el_curve.push(super::pricer::ElWdPoint {
                 el_fraction: self.calculate_prior_tranche_loss(tranche),
                 wd_fraction: self
                     .calculate_prior_tranche_writedown(tranche, index_data_arc.recovery_rate()),

@@ -869,7 +869,7 @@ mod tests {
         vol: f64,
     ) -> CdsOption {
         let params = CdsOptionParams::new(
-            super::super::strike::CdsOptionStrike::Spread(bp_to_decimal(strike_bp)),
+            crate::cds_option::strike::CdsOptionStrike::Spread(bp_to_decimal(strike_bp)),
             as_of.add_months(12).expect("valid date shift"),
             as_of.add_months(60).expect("valid date shift"),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -1414,7 +1414,7 @@ mod tests {
         use finstack_quant_valuations_core::instruments::Instrument;
 
         let params = CdsOptionParams::new(
-            super::super::strike::CdsOptionStrike::CleanPricePct(
+            crate::cds_option::strike::CdsOptionStrike::CleanPricePct(
                 Decimal::try_from(strike_price_pct).expect("valid clean-price strike"),
             ),
             as_of.add_months(12).expect("valid date shift"),
@@ -1760,7 +1760,7 @@ mod tests {
             payer.underlying_is_index = true;
             payer.knockout = false;
             payer.strike =
-                super::super::super::strike::CdsOptionStrike::CleanPricePct(Decimal::from(100));
+                crate::cds_option::strike::CdsOptionStrike::CleanPricePct(Decimal::from(100));
             payer.strike_index_factor = Some(1.0);
             let mut receiver = payer.clone();
             receiver.option_type = OptionType::Put;

@@ -10,7 +10,7 @@ pub(crate) mod market;
 mod merton_mc;
 mod pricing;
 mod schema;
-mod structured_credit;
+pub(crate) mod typed_convertible;
 pub(crate) mod typed_credit;
 pub(crate) mod typed_equity;
 pub(crate) mod typed_fx;
@@ -727,6 +727,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_legs::register(py, &m)?;
     typed_rates::register(py, &m)?;
     typed_credit::register(py, &m)?;
+    typed_convertible::register(py, &m)?;
     typed_equity::register(py, &m)?;
     typed_fx::register(py, &m)?;
     typed_structured_credit::register(py, &m)?;
@@ -734,7 +735,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_asset_backed_facility::register(py, &m)?;
     pricing::register(py, &m)?;
     var::register(&m)?;
-    structured_credit::register(&m)?;
+    typed_structured_credit::tranche_analytics::register(&m)?;
     let mut exports = vec![
         "validate_instrument_json",
         "validate_typed_instrument_json",
@@ -743,11 +744,12 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "bond_from_cashflows_json",
     ];
     exports.extend_from_slice(merton_mc::EXPORTS);
-    exports.extend_from_slice(structured_credit::EXPORTS);
+    exports.extend_from_slice(typed_structured_credit::tranche_analytics::EXPORTS);
     exports.extend_from_slice(instruments::EXPORTS);
     exports.extend_from_slice(typed_legs::EXPORTS);
     exports.extend_from_slice(typed_rates::EXPORTS);
     exports.extend_from_slice(typed_credit::EXPORTS);
+    exports.extend_from_slice(typed_convertible::EXPORTS);
     exports.extend_from_slice(typed_equity::EXPORTS);
     exports.extend_from_slice(typed_fx::EXPORTS);
     exports.extend_from_slice(typed_structured_credit::EXPORTS);

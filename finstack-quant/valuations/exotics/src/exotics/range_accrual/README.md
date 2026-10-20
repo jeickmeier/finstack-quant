@@ -39,7 +39,7 @@ range_accrual/
 ├── types.rs        # RangeAccrual, RangeAccrualTerms, BoundsType, builders, examples, validate
 ├── pricer.rs       # RangeAccrualStaticReplicationPricer, RangeAccrualMcPricer, npv_analytic
 ├── monte_carlo.rs  # RangeAccrualPayoff for the shared MC path-dependent pricer
-└── metrics/        # generic FD greeks and curve risk registered in mod.rs
+└── metrics.rs      # generic FD greeks and curve risk registration
 ```
 
 ## Pricing
@@ -198,7 +198,7 @@ pricing; normal or displaced surface quotes produce a validation error.
 
 ## Metrics
 
-Registered for `InstrumentType::RangeAccrual` in `metrics/mod.rs`, all
+Registered for `InstrumentType::RangeAccrual` in `metrics.rs`, all
 finite-difference:
 
 | `MetricId` | Calculator |

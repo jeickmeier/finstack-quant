@@ -12,7 +12,7 @@
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 
-use crate::bond::pricing::engine::tree::BondValuator;
+use crate::bond::pricing::tree::BondValuator;
 use crate::bond::{
     Bond, CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorKind, ReturnFloorSpec,
 };

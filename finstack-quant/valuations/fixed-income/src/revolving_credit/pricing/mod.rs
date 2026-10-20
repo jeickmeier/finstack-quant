@@ -3,7 +3,6 @@
 //! [`RevolvingCreditPricer`] handles deterministic and stochastic facilities.
 //! Path generation lives in [`path_generator`].
 
-mod components;
 pub mod path_generator;
 mod path_pricing;
 mod results;
@@ -24,7 +23,7 @@ mod tests {
     use finstack_quant_valuations_core::pricer::{InstrumentType, ModelKey, Pricer, PricerKey};
     use time::Month;
 
-    use super::super::types::{DrawRepaySpec, RevolvingCredit, RevolvingCreditFees};
+    use crate::revolving_credit::types::{DrawRepaySpec, RevolvingCredit, RevolvingCreditFees};
     use finstack_quant_cashflows::builder::RateSpec;
 
     #[test]
@@ -83,7 +82,7 @@ mod tests {
 
     #[test]
     fn test_unified_pricer_stochastic() {
-        use super::super::types::{CreditSpreadProcessSpec, McConfig};
+        use crate::revolving_credit::types::{CreditSpreadProcessSpec, McConfig};
         use finstack_quant_valuations_core::instruments::Instrument;
 
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
@@ -107,13 +106,14 @@ mod tests {
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
-                super::super::types::StochasticUtilizationSpec {
-                    utilization_process: super::super::types::UtilizationProcess::MeanReverting {
-                        theta: 0.5,
-                        kappa: 1.0,
-                        sigma: 0.1,
-                        spread_sensitivity: 0.0,
-                    },
+                crate::revolving_credit::types::StochasticUtilizationSpec {
+                    utilization_process:
+                        crate::revolving_credit::types::UtilizationProcess::MeanReverting {
+                            theta: 0.5,
+                            kappa: 1.0,
+                            sigma: 0.1,
+                            spread_sensitivity: 0.0,
+                        },
                     mc_config: Some(mc_config),
                 },
             )))

@@ -134,8 +134,8 @@ impl MetricCalculator for EmbeddedOptionValueCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bond::pricing::engine::tree::{bond_tree_settings, TreePricer};
     use crate::bond::pricing::quote_conversions::price_from_oas;
+    use crate::bond::pricing::tree::{bond_tree_settings, TreePricer};
     use crate::bond::BondSettlementConvention;
     use crate::bond::CashflowSpec;
     use crate::bond::{CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorSpec};
@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn straight_leg_uses_the_optioned_bond_short_rate_model() {
-        use crate::bond::pricing::engine::tree::bond_tree_config;
+        use crate::bond::pricing::tree::bond_tree_config;
 
         let bond = create_callable_bond();
         let market = create_test_market();

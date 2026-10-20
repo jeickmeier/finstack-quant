@@ -4,7 +4,7 @@
 //! redistribute the cashflows from underlying MBS pools into tranches with
 //! different risk/return profiles.
 
-use super::tranches::pac_support::PacSchedule;
+use crate::cmo::PacSchedule;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;

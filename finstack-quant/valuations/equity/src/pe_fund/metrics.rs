@@ -1,8 +1,11 @@
 //! Private markets fund metrics: IRR, MOIC, DPI, TVPI, carry calculations, and theta.
 
+use crate::pe_fund::waterfall::{FundEventKind, PeFundWaterfallSpec, PeFundWaterfallTranche};
 use crate::pe_fund::PrivateMarketsFund;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::Result;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 
 /// Total LP contributions (paid-in capital) on or before `as_of`, in
@@ -211,10 +214,6 @@ pub(crate) fn calculate_irr(
     finstack_quant_core::cashflow::xirr_with_daycount(&dated, day_count, None)
 }
 
-mod carry01;
-mod hurdle01;
-mod nav01;
-
 /// Register all private markets fund metrics.
 pub(crate) fn register_private_markets_fund_metrics(
     registry: &mut MetricRegistry,
@@ -232,12 +231,241 @@ pub(crate) fn register_private_markets_fund_metrics(
             (TvpiLp, TvpiLpCalculator),
             (CarryAccrued, CarryAccruedCalculator),
             // Private markets fund-specific risk metrics (custom metrics)
-            (Nav01, nav01::Nav01Calculator),
-            (Carry01, carry01::Carry01Calculator),
-            (Hurdle01, hurdle01::Hurdle01Calculator),
+            (Nav01, Nav01Calculator),
+            (Carry01, Carry01Calculator),
+            (Hurdle01, Hurdle01Calculator),
         ]
     }
     Ok(())
+}
+
+// Carry01 calculator for PrivateMarketsFund.
+//
+// Computes Carry01 (GP carry sensitivity) using finite differences:
+// the LP position's PV change for a 1bp move in the GP share.
+//
+// # Formula
+// ```text
+// Carry01 = (PV(GP_share + h) - PV(GP_share - h)) / 2
+// ```
+// Where the FD bump h is 1bp (0.0001). The central difference is divided
+// by 2 (not 2h), so the result is the PV change *per 1bp move*, in
+// currency units, consistent with the workspace `Dv01` convention. When a
+// GP share sits at a boundary (0 or 1) so one direction cannot be bumped,
+// a one-sided difference against the unbumped base value is used instead
+// of silently halving the sensitivity with a clamped no-op bump.
+//
+// # Note
+// GP carry is determined by the waterfall allocation (promote tiers, catch-up).
+// This metric bumps the GP share in all promote tiers and catch-up tranches
+// and measures the impact on LP valuation (lower carry = higher LP value).
+
+/// Standard carry bump: 1bp (0.0001 = 0.01%)
+const CARRY_BUMP: f64 = 0.0001;
+
+/// Return a copy of the spec with GP shares in catch-up and promote tranches
+/// shifted by `delta` (promote LP shares renormalized to sum to 1.0).
+fn carry_bumped_spec(spec: &PeFundWaterfallSpec, delta: f64) -> PeFundWaterfallSpec {
+    let mut bumped = spec.clone();
+    for tranche in &mut bumped.tranches {
+        match tranche {
+            PeFundWaterfallTranche::CatchUp { gp_share } => {
+                *gp_share += delta;
+            }
+            PeFundWaterfallTranche::PromoteTier {
+                lp_share, gp_share, ..
+            } => {
+                *gp_share += delta;
+                *lp_share = 1.0 - *gp_share;
+            }
+            _ => {
+                // ReturnOfCapital, PreferredIrr don't affect carry directly
+            }
+        }
+    }
+    bumped
+}
+
+/// Whether every carry-bearing GP share in the spec can absorb `delta`
+/// without leaving `[0, 1]`.
+fn can_bump(spec: &PeFundWaterfallSpec, delta: f64) -> bool {
+    spec.tranches.iter().all(|t| match t {
+        PeFundWaterfallTranche::CatchUp { gp_share }
+        | PeFundWaterfallTranche::PromoteTier { gp_share, .. } => {
+            (0.0..=1.0).contains(&(gp_share + delta))
+        }
+        _ => true,
+    })
+}
+
+/// Carry01 calculator for PrivateMarketsFund.
+pub(crate) struct Carry01Calculator;
+
+impl MetricCalculator for Carry01Calculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let fund: &PrivateMarketsFund = context.instrument_as()?;
+        let as_of = context.as_of;
+
+        let pv_for = |spec: PeFundWaterfallSpec| -> Result<f64> {
+            let mut bumped_fund = fund.clone();
+            bumped_fund.waterfall_spec = spec;
+            Ok(bumped_fund.value(context.curves.as_ref(), as_of)?.amount())
+        };
+
+        let can_up = can_bump(&fund.waterfall_spec, CARRY_BUMP);
+        let can_down = can_bump(&fund.waterfall_spec, -CARRY_BUMP);
+
+        // Higher GP carry means less for LPs, so PV_up < PV_down typically.
+        // Return the PV change for a +1bp GP share move.
+        let carry01 = match (can_up, can_down) {
+            (true, true) => {
+                let pv_up = pv_for(carry_bumped_spec(&fund.waterfall_spec, CARRY_BUMP))?;
+                let pv_down = pv_for(carry_bumped_spec(&fund.waterfall_spec, -CARRY_BUMP))?;
+                (pv_up - pv_down) / 2.0
+            }
+            (true, false) => {
+                let pv_up = pv_for(carry_bumped_spec(&fund.waterfall_spec, CARRY_BUMP))?;
+                pv_up - context.base_value.amount()
+            }
+            (false, true) => {
+                let pv_down = pv_for(carry_bumped_spec(&fund.waterfall_spec, -CARRY_BUMP))?;
+                context.base_value.amount() - pv_down
+            }
+            // Shares pinned at opposite boundaries across tranches: no
+            // consistent bump direction exists.
+            (false, false) => 0.0,
+        };
+
+        Ok(carry01)
+    }
+}
+
+// Hurdle01 calculator for PrivateMarketsFund.
+//
+// Computes Hurdle01 (hurdle rate sensitivity) using finite differences:
+// the LP position's PV change for a 1bp move in the hurdle IRR rates.
+//
+// # Formula
+// ```text
+// Hurdle01 = (PV(hurdle_rate + h) - PV(hurdle_rate - h)) / 2
+// ```
+// Where the FD bump h is 1bp (0.0001). The central difference is divided
+// by 2 (not 2h), so the result is the PV change *per 1bp move*, in
+// currency units, consistent with the workspace `Dv01` convention. Bumps
+// are not clamped at zero: the IRR solve accepts slightly negative hurdle
+// targets, so a 0% hurdle still gets a genuine central difference.
+//
+// # Note
+//
+// Hurdle rates appear in:
+// - `PeFundWaterfallTranche::PreferredIrr { hurdle_irr }` - preferred return hurdle
+// - `PeFundWaterfallTranche::PromoteTier { hurdle_irr, ... }` - promote tier hurdle
+//
+// Higher hurdle rates increase the LP preferred return, potentially reducing GP carry
+// and affecting LP valuation.
+
+/// Standard hurdle bump: 1bp (0.0001)
+const HURDLE_BUMP: f64 = 0.0001;
+
+/// Return a copy of the spec with all hurdle IRR rates shifted by `delta`.
+fn hurdle_bumped_spec(spec: &PeFundWaterfallSpec, delta: f64) -> PeFundWaterfallSpec {
+    let mut bumped = spec.clone();
+    for tranche in &mut bumped.tranches {
+        match tranche {
+            PeFundWaterfallTranche::PreferredIrr { hurdle_irr }
+            | PeFundWaterfallTranche::PromoteTier { hurdle_irr, .. } => *hurdle_irr += delta,
+            _ => {}
+        }
+    }
+    bumped
+}
+
+/// Hurdle01 calculator for PrivateMarketsFund.
+pub(crate) struct Hurdle01Calculator;
+
+impl MetricCalculator for Hurdle01Calculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let fund: &PrivateMarketsFund = context.instrument_as()?;
+        let as_of = context.as_of;
+
+        let mut fund_up = fund.clone();
+        fund_up.waterfall_spec = hurdle_bumped_spec(&fund.waterfall_spec, HURDLE_BUMP);
+        let pv_up = fund_up.value(context.curves.as_ref(), as_of)?.amount();
+
+        let mut fund_down = fund.clone();
+        fund_down.waterfall_spec = hurdle_bumped_spec(&fund.waterfall_spec, -HURDLE_BUMP);
+        let pv_down = fund_down.value(context.curves.as_ref(), as_of)?.amount();
+
+        // Scenarios are ±1bp; return the PV change for one basis point.
+        // Higher hurdle typically benefits LPs (more preferred return before GP carry)
+        Ok((pv_up - pv_down) / 2.0)
+    }
+}
+
+// NAV01 calculator for PrivateMarketsFund.
+//
+// Computes NAV01 (residual NAV sensitivity) using finite differences:
+// the LP position's PV change for a 1% proportional move in fund value.
+//
+// # Formula
+// ```text
+// NAV01 = (PV(value scaled * (1 + h)) - PV(value scaled * (1 - h))) / 2
+// ```
+// Where the FD bump h is 1% (0.01). The central difference is divided by 2
+// (not 2h), so the result is the PV change *per 1% move*, in currency
+// units, consistent with the per-1bp `Dv01` convention.
+//
+// # Note
+// Both value inputs are scaled by ±1%: every distribution/proceeds event
+// (which drives the waterfall and future LP cashflows) and the fund's
+// stated `unrealized_nav` (the residual mark that dominates holder-view PV
+// for an unrealized fund). Contributions are unchanged.
+
+/// Standard NAV bump: 1% (0.01)
+const NAV_BUMP_PCT: f64 = 0.01;
+
+/// Return a copy of the fund with all distribution/proceeds events and the
+/// stated `unrealized_nav` scaled by `1 + bump`.
+fn scaled_fund(
+    fund: &PrivateMarketsFund,
+    bump: f64,
+) -> finstack_quant_core::Result<PrivateMarketsFund> {
+    let mut scaled = fund.clone();
+    for event in &mut scaled.events {
+        if matches!(
+            event.kind,
+            FundEventKind::Distribution | FundEventKind::Proceeds
+        ) {
+            event.amount = Money::new(
+                event.amount.amount() * (1.0 + bump),
+                event.amount.currency(),
+            )?;
+        }
+    }
+    if let Some(nav) = scaled.unrealized_nav {
+        scaled.unrealized_nav = Some(Money::new(nav.amount() * (1.0 + bump), nav.currency())?);
+    }
+    Ok(scaled)
+}
+
+/// NAV01 calculator for PrivateMarketsFund.
+pub(crate) struct Nav01Calculator;
+
+impl MetricCalculator for Nav01Calculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let fund: &PrivateMarketsFund = context.instrument_as()?;
+        let as_of = context.as_of;
+
+        let pv_up = scaled_fund(fund, NAV_BUMP_PCT)?
+            .value(context.curves.as_ref(), as_of)?
+            .amount();
+        let pv_down = scaled_fund(fund, -NAV_BUMP_PCT)?
+            .value(context.curves.as_ref(), as_of)?
+            .amount();
+
+        // Scenarios are ±1%; return the PV change for a 1% NAV move.
+        Ok((pv_up - pv_down) / 2.0)
+    }
 }
 
 #[cfg(test)]

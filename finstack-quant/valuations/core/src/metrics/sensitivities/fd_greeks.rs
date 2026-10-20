@@ -22,7 +22,7 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::common_impl::{
     dependencies::MarketDependencies, dependencies::VolatilityDependency,
 };
-use crate::metrics::core::finite_difference::{
+use crate::metrics::finite_difference::{
     apply_parallel_surface_bumps_in_place, bumped_volatility_override, revert_scratch_bumps,
     scalar_numeric_value, volatility_override,
 };
@@ -56,7 +56,7 @@ use finstack_quant_core::Result;
 /// this floor.
 pub const MIN_ABSOLUTE_BUMP: f64 = 1e-8;
 
-use crate::metrics::core::finite_difference::{min_grid_vol, VOL_POINTS_PER_ABSOLUTE_VOL};
+use crate::metrics::finite_difference::{min_grid_vol, VOL_POINTS_PER_ABSOLUTE_VOL};
 
 /// Common random number seed scenario for MC greek calculations.
 ///
@@ -419,7 +419,7 @@ where
         // Central difference: delta = (PV_up - PV_down) / (2 * bump_size).
         // Route through the guarded helper so a degenerate bump width is
         // surfaced as an error rather than producing a silent NaN/∞.
-        let delta = crate::metrics::core::finite_difference::central_diff_by_width(
+        let delta = crate::metrics::finite_difference::central_diff_by_width(
             pv_up,
             pv_down,
             2.0 * bump.absolute,
@@ -577,7 +577,7 @@ where
                 )?;
                 let pv_base = context.reprice_instrument_raw(&seeded_instrument, scratch, as_of)?;
                 // Forward difference: (PV(σ+h) - PV(σ)) / h.
-                crate::metrics::core::finite_difference::central_diff_by_width(
+                crate::metrics::finite_difference::central_diff_by_width(
                     pv_up,
                     pv_base,
                     bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL,
@@ -602,7 +602,7 @@ where
                     Some((&vol_surface_ids, -bump_abs)),
                 )?;
                 // Central difference: (PV(σ+h) - PV(σ-h)) / 2h.
-                crate::metrics::core::finite_difference::central_diff_by_width(
+                crate::metrics::finite_difference::central_diff_by_width(
                     pv_up,
                     pv_down,
                     2.0 * bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL,

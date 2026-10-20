@@ -15,5 +15,5 @@
 mod config;
 mod engine;
 
-pub(crate) use config::StochasticPricerConfig;
+pub(crate) use config::{ScenarioTreeConfig, StochasticPricerConfig};
 pub(crate) use engine::StochasticPricer;

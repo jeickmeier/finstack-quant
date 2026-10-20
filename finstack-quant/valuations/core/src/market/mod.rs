@@ -6,7 +6,7 @@
 //!    data. Conventions define day count, business day adjustments, payment frequencies, and
 //!    other market-standard parameters required for instrument construction.
 //!
-//! 2. **Listed catalog** (`listed/`): Maintained exchange product-family coverage and routing
+//! 2. **Listed catalog** (`listed`): Maintained exchange product-family coverage and routing
 //!    metadata for canonical asset-class instruments.
 //!
 //! 3. **Volatility resolution**: Pricing-time selection of already-built

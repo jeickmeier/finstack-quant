@@ -33,7 +33,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
     else {
         return Ok(None);
     };
-    let config = crate::bond::pricing::engine::tree::bond_tree_settings(bond);
+    let config = crate::bond::pricing::tree::bond_tree_settings(bond);
     let quote_context = crate::bond::pricing::settlement::QuoteDateContext::new(
         bond,
         context.curves.as_ref(),
@@ -63,7 +63,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
             .scenario_spread_shock_bp
             .is_none()
     {
-        use crate::bond::pricing::engine::tree::{bond_tree_config, TreePricer};
+        use crate::bond::pricing::tree::{bond_tree_config, TreePricer};
         match model {
             finstack_quant_valuations_core::pricer::ModelKey::Tree => Some(
                 TreePricer::with_config(bond_tree_config(bond, context.curves.as_ref())?),

@@ -1,6 +1,6 @@
 //! Adaptive conditioning-factor integration for bounded pool expectations.
 
-use super::config::{CdsTranchePricer, INTEGRATION_MAX_DEPTH, INTEGRATION_TOLERANCE};
+use super::pricer::{CdsTranchePricer, INTEGRATION_MAX_DEPTH, INTEGRATION_TOLERANCE};
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::norm_pdf;
 use finstack_quant_core::{Error, Result};

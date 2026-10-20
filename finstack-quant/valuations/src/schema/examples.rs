@@ -335,26 +335,26 @@ pub(super) fn facility_projection() -> Result<Vec<Value>> {
 }
 
 pub(super) fn merton_mc_result() -> Result<Vec<Value>> {
-    example_from_json::<
-        crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcResult,
-    >(json!({
-        "clean_price_pct": 94.8,
-        "dirty_price_pct": 96.1,
-        "expected_loss": 0.031,
-        "unexpected_loss": 0.094,
-        "expected_shortfall_95": 0.41,
-        "average_pik_fraction": 0.22,
-        "effective_spread_bp": 485.0,
-        "path_statistics": {
-            "default_rate": 0.058,
-            "avg_default_time": 3.4,
-            "avg_terminal_notional": 108.5,
-            "avg_recovery_rate": 0.42,
-            "pik_exercise_rate": 0.22
-        },
-        "num_paths": 10_000,
-        "standard_error": 0.12
-    }))
+    example_from_json::<crate::instruments::fixed_income::bond::pricing::merton_mc::MertonMcResult>(
+        json!({
+            "clean_price_pct": 94.8,
+            "dirty_price_pct": 96.1,
+            "expected_loss": 0.031,
+            "unexpected_loss": 0.094,
+            "expected_shortfall_95": 0.41,
+            "average_pik_fraction": 0.22,
+            "effective_spread_bp": 485.0,
+            "path_statistics": {
+                "default_rate": 0.058,
+                "avg_default_time": 3.4,
+                "avg_terminal_notional": 108.5,
+                "avg_recovery_rate": 0.42,
+                "pik_exercise_rate": 0.22
+            },
+            "num_paths": 10_000,
+            "standard_error": 0.12
+        }),
+    )
 }
 
 pub(super) fn cds_index_params() -> Result<Vec<Value>> {

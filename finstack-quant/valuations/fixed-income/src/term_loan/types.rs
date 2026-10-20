@@ -691,7 +691,7 @@ impl TermLoan {
                     amount: Money::from((5_000_000_i64, Currency::USD)),
                 },
             ],
-            commitment_steps: vec![super::super::loan_terms::CommitmentStep {
+            commitment_steps: vec![crate::loan_terms::CommitmentStep {
                 date: date!(2024 - 10 - 15),
                 amount: Money::from((15_000_000_i64, Currency::USD)),
                 reduction_fee_bp: Decimal::ZERO,
