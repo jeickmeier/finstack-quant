@@ -118,7 +118,6 @@ SensitivityMatrix = _portfolio.SensitivityMatrix
 FactorPnlProfile = _portfolio.FactorPnlProfile
 compute_factor_sensitivities = _portfolio.compute_factor_sensitivities
 compute_pnl_profiles = _portfolio.compute_pnl_profiles
-decompose_factor_risk = _portfolio.decompose_factor_risk
 FactorContributionDelta = _portfolio.FactorContributionDelta
 WhatIfResult = _portfolio.WhatIfResult
 StressResult = _portfolio.StressResult
@@ -235,7 +234,6 @@ __all__ = [
     "cell_returns_from_reference",
     "compute_factor_sensitivities",
     "compute_pnl_profiles",
-    "decompose_factor_risk",
     "excess_returns",
     "factor_brinson_attribution",
     "grid_attribution",

@@ -111,7 +111,6 @@ __all__ = [
     "cell_returns_from_reference",
     "compute_factor_sensitivities",
     "compute_pnl_profiles",
-    "decompose_factor_risk",
     "excess_returns",
     "factor_brinson_attribution",
     "grid_attribution",
@@ -13229,7 +13228,7 @@ class SensitivityMatrix:
         The wire object is ``{base_currency, position_ids, factor_ids, data}``
         with ``data`` as one row per position (``data[position][factor]``):
         the JSON :meth:`to_json` emits, the WASM
-        ``computeFactorSensitivities`` returns and ``decomposeFactorRisk``
+        ``computeFactorSensitivities`` returns and ``models.factor.risk.decomposeFactors``
         accepts.
 
         Parameters
@@ -13274,7 +13273,7 @@ class SensitivityMatrix:
         -------
         str
             Canonical monetary matrix JSON with nested rows, accepted by
-            :meth:`from_json` and WASM ``decomposeFactorRisk``; also backs
+            :meth:`from_json` and WASM ``models.factor.risk.decomposeFactors``; also backs
             ``pickle``. The derived ``n_factors`` count is omitted.
 
         Notes
@@ -13711,54 +13710,5 @@ def compute_pnl_profiles(
     >>> from finstack_quant.portfolio import compute_pnl_profiles
     >>> compute_pnl_profiles("[]", "[]", MarketContext(), "2025-01-15", "USD")
     []
-    """
-    ...
-
-# Risk Decomposition
-
-def decompose_factor_risk(
-    sensitivities: SensitivityMatrix,
-    covariance_json: str,
-    risk_measure: str | dict[str, Any] | None = None,
-) -> RiskDecomposition:
-    """
-    Decompose portfolio risk into factor and position contributions.
-
-    Uses the parametric (covariance-based) Euler decomposition to attribute
-    forecasted portfolio risk across factors and individual positions.
-
-    Parameters
-    ----------
-    sensitivities : SensitivityMatrix
-        Weighted position x factor sensitivity matrix, as
-        returned by :func:`compute_factor_sensitivities`.
-    covariance_json : str
-        JSON-serialized ``FactorCovarianceMatrix``.  Must use
-        the same factor IDs and ordering as the sensitivity matrix.
-    risk_measure : str or dict[str, Any] or None, optional
-        Risk measure.  Defaults to ``"variance"``.
-        Accepts Python strings (``"variance"``, ``"volatility"``) or dicts
-        (``{"var": {"confidence": 0.99}}``,
-        ``{"expected_shortfall": {"confidence": 0.975}}``).
-
-    Returns
-    -------
-    finstack_quant.models.factor.risk.RiskDecomposition
-        Portfolio-level risk decomposition with factor and position detail.
-
-    Raises
-    ------
-    ValueError
-        If factor axes do not match or the covariance matrix is
-        invalid.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import compute_factor_sensitivities, decompose_factor_risk
-    >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15", "USD")
-    >>> result = decompose_factor_risk(matrix, '{"factor_ids":[],"n":0,"data":[]}', "volatility")
-    >>> (result.total_risk, result.to_factor_dataframe().shape)
-    (0.0, (0, 4))
     """
     ...

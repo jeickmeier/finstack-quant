@@ -19,7 +19,8 @@ pub const DEFAULT_PNL_SCENARIO_POINTS: usize = 5;
 ///
 /// Serializes as `{base_currency, position_ids, factor_ids, data}` with `data`
 /// as nested rows, `data[position][factor]`. It is what the WASM
-/// `computeFactorSensitivities*` return and `decomposeFactorRisk` accepts, and
+/// `computeFactorSensitivities*` return and `models.factor.risk.decomposeFactors`
+/// accepts, and
 /// what the Python `SensitivityMatrix.to_json` / `from_json` emit and accept,
 /// so a matrix produced by either host is readable by the other. Unknown keys
 /// are rejected and `base_currency` must be an ISO-4217 code; converting to a

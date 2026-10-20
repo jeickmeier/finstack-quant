@@ -53,7 +53,6 @@ const EXPORTED_KEYS = [
   'constraintExposureMinimum',
   'constraintMaxTurnover',
   'constraintWeightBounds',
-  'decomposeFactorRisk',
   'excessReturns',
   'factorBrinsonAttribution',
   'fiAttributionResultReconciliationCheck',
@@ -118,7 +117,7 @@ test('portfolio namespace exposes exactly the pinned contract surface', () => {
   }
 });
 
-test('portfolio.decomposeFactorRisk consumes the canonical Python monetary matrix wire', () => {
+test('models.factor.risk.decomposeFactors consumes the canonical Python monetary matrix wire', () => {
   const sensitivities = {
     base_currency: 'EUR',
     position_ids: ['A', 'B'],
@@ -127,7 +126,7 @@ test('portfolio.decomposeFactorRisk consumes the canonical Python monetary matri
   };
   const covariance = JSON.stringify({ factor_ids: ['F'], n: 1, data: [0.04] });
   const result = assertStructured(
-    portfolio.decomposeFactorRisk(JSON.stringify(sensitivities), covariance),
+    models.factor.risk.decomposeFactors(JSON.stringify(sensitivities), covariance),
     'factor decomposition'
   );
   assert.ok(Math.abs(result.total_risk - 1.0) < 1e-12);
@@ -147,7 +146,7 @@ test('portfolio.decomposeFactorRisk consumes the canonical Python monetary matri
     { var: { confidence: 0.99 } },
     { expected_shortfall: { confidence: 0.975 } },
   ]) {
-    const measured = portfolio.decomposeFactorRisk(
+    const measured = models.factor.risk.decomposeFactors(
       JSON.stringify(sensitivities),
       covariance,
       JSON.stringify(measure)
@@ -157,21 +156,23 @@ test('portfolio.decomposeFactorRisk consumes the canonical Python monetary matri
   }
 });
 
-test('portfolio.decomposeFactorRisk rejects malformed matrices and missing reporting currency', () => {
+test('models.factor.risk.decomposeFactors rejects malformed matrices and missing reporting currency', () => {
   const valid = { base_currency: 'USD', position_ids: ['P'], factor_ids: ['F'], data: [[2.0]] };
   const covariance = JSON.stringify({ factor_ids: ['F'], n: 1, data: [0.04] });
   for (const data of [[], [[], []], [[]], [[2.0, 3.0]], [2.0], [[null]]]) {
     assert.throws(() =>
-      portfolio.decomposeFactorRisk(JSON.stringify({ ...valid, data }), covariance)
+      models.factor.risk.decomposeFactors(JSON.stringify({ ...valid, data }), covariance)
     );
   }
   for (const extra of [{ n_factors: 1 }, { unexpected: true }, { base_currency: 'BAD' }]) {
     assert.throws(() =>
-      portfolio.decomposeFactorRisk(JSON.stringify({ ...valid, ...extra }), covariance)
+      models.factor.risk.decomposeFactors(JSON.stringify({ ...valid, ...extra }), covariance)
     );
   }
   const missingCurrency = { position_ids: ['P'], factor_ids: ['F'], data: [[2.0]] };
-  assert.throws(() => portfolio.decomposeFactorRisk(JSON.stringify(missingCurrency), covariance));
+  assert.throws(() =>
+    models.factor.risk.decomposeFactors(JSON.stringify(missingCurrency), covariance)
+  );
 });
 
 // Runtime arity gate. `index.d.ts` is hand-maintained, so a declaration with
@@ -1180,10 +1181,10 @@ const SENSITIVITY_COVARIANCE = JSON.stringify({
   data: [0.04, 0.01, 0.01, 0.09],
 });
 
-test('portfolio.decomposeFactorRisk reads the canonical wire and returns the Rust result', () => {
+test('models.factor.risk.decomposeFactors reads the canonical wire and returns the Rust result', () => {
   const variance = assertStructured(
-    portfolio.decomposeFactorRisk(JSON.stringify(SENSITIVITY_WIRE), SENSITIVITY_COVARIANCE),
-    'decomposeFactorRisk result'
+    models.factor.risk.decomposeFactors(JSON.stringify(SENSITIVITY_WIRE), SENSITIVITY_COVARIANCE),
+    'decomposeFactors result'
   );
   // exposures e = [4, 1]; e' S e = 16*0.04 + 2*4*0.01 + 0.09 = 0.81
   assert.ok(Math.abs(variance.total_risk - 0.81) < 1e-12);
@@ -1197,7 +1198,7 @@ test('portfolio.decomposeFactorRisk reads the canonical wire and returns the Rus
     [{ expected_shortfall: { confidence: 0.975 } }, { expected_shortfall: { confidence: 0.975 } }],
     ['volatility', 'volatility'],
   ]) {
-    const decomposition = portfolio.decomposeFactorRisk(
+    const decomposition = models.factor.risk.decomposeFactors(
       SENSITIVITY_WIRE,
       SENSITIVITY_COVARIANCE,
       JSON.stringify(measure)
@@ -1207,16 +1208,17 @@ test('portfolio.decomposeFactorRisk reads the canonical wire and returns the Rus
 
   // A unit variant is its bare wire label, as the declared type says.
   assert.equal(
-    portfolio.decomposeFactorRisk(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'volatility').measure,
+    models.factor.risk.decomposeFactors(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'volatility')
+      .measure,
     'volatility'
   );
   assert.throws(
-    () => portfolio.decomposeFactorRisk(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'nope'),
+    () => models.factor.risk.decomposeFactors(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'nope'),
     (error) => error.kind === 'validation' && /riskMeasureJson/.test(error.message)
   );
 });
 
-test('portfolio.decomposeFactorRisk rejects malformed sensitivity wire with a validation error', () => {
+test('models.factor.risk.decomposeFactors rejects malformed sensitivity wire with a validation error', () => {
   const isValidation = (pattern) => (error) =>
     error instanceof Error && error.kind === 'validation' && pattern.test(error.message);
   for (const [wire, pattern] of [
@@ -1227,7 +1229,7 @@ test('portfolio.decomposeFactorRisk rejects malformed sensitivity wire with a va
     [{ ...SENSITIVITY_WIRE, data: [1.0, 2.0, 3.0, -1.0] }, /invalid type/],
   ]) {
     assert.throws(
-      () => portfolio.decomposeFactorRisk(JSON.stringify(wire), SENSITIVITY_COVARIANCE),
+      () => models.factor.risk.decomposeFactors(JSON.stringify(wire), SENSITIVITY_COVARIANCE),
       isValidation(pattern)
     );
   }

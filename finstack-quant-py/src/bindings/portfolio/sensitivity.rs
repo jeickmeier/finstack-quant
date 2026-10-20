@@ -4,8 +4,6 @@
 //! full-repricing factor sensitivities from Python, with DataFrame export.
 
 use crate::bindings::extract::extract_market;
-use crate::bindings::models::factor::risk::PyRiskDecomposition;
-use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{core_to_py, display_to_py};
 use pyo3::prelude::*;
@@ -56,7 +54,7 @@ impl PySensitivityMatrix {
     /// Parse from the canonical wire JSON
     /// (``{base_currency, position_ids, factor_ids, data}``, ``data`` as one
     /// row per position), the shape WASM ``computeFactorSensitivities``
-    /// returns and ``decomposeFactorRisk`` accepts.
+    /// returns and ``models.factor.risk.decomposeFactors`` accepts.
     ///
     /// ``data[position][factor]`` must contain exactly one finite entry per
     /// declared position/factor pair. Malformed shapes and unknown fields raise
@@ -413,64 +411,11 @@ fn compute_pnl_profiles(
     .map_err(core_to_py)
 }
 
-// decompose_factor_risk
-
-/// Decompose portfolio risk into factor and position contributions.
-///
-/// Uses the parametric (covariance-based) Euler decomposition to attribute
-/// forecasted portfolio risk across factors and individual positions.
-///
-/// Parameters
-/// ----------
-/// sensitivities : SensitivityMatrix
-///     Weighted position × factor sensitivity matrix, as returned by
-///     :func:`compute_factor_sensitivities`.
-/// covariance_json : str | dict | list | pandas.DataFrame
-///     JSON-serialized ``FactorCovarianceMatrix``.  Must use the same factor
-///     IDs and ordering as the sensitivity matrix.
-/// risk_measure : str | dict, optional
-///     Risk measure.  Defaults to ``"variance"``.
-///     Accepts Python strings (``"variance"``, ``"volatility"``) or dicts
-///     (``{"var": {"confidence": 0.99}}``,
-///     ``{"expected_shortfall": {"confidence": 0.975}}``).
-///
-/// Returns
-/// -------
-/// finstack_quant.models.factor.risk.RiskDecomposition
-///     Portfolio-level risk decomposition with factor and position detail.
-#[pyfunction]
-#[pyo3(signature = (sensitivities, covariance_json, risk_measure=None))]
-fn decompose_factor_risk(
-    py: Python<'_>,
-    sensitivities: &PySensitivityMatrix,
-    covariance_json: &Bound<'_, PyAny>,
-    risk_measure: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyRiskDecomposition> {
-    let covariance_json =
-        crate::bindings::extract::extract_records_json(py, covariance_json, "covariance")?;
-    let covariance_json: &str = &covariance_json;
-    let measure: finstack_quant_factor::RiskMeasure = match risk_measure {
-        Some(obj) => py_to_serde(py, obj, "risk_measure")?,
-        None => finstack_quant_factor::RiskMeasure::default(),
-    };
-
-    let matrix = sensitivities.inner.clone();
-    let covariance_json = covariance_json.to_owned();
-    py.detach(move || {
-        let covariance: finstack_quant_factor::FactorCovarianceMatrix =
-            serde_json::from_str(&covariance_json).map_err(display_to_py)?;
-        let result = finstack_quant_factor::risk::decompose_factors(&matrix, &covariance, &measure)
-            .map_err(core_to_py)?;
-        Ok(PyRiskDecomposition::from_inner(result))
-    })
-}
-
 /// Register factor-model functions on the valuations submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySensitivityMatrix>()?;
     m.add_class::<PyFactorPnlProfile>()?;
     m.add_function(pyo3::wrap_pyfunction!(compute_factor_sensitivities, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(compute_pnl_profiles, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(decompose_factor_risk, m)?)?;
     Ok(())
 }

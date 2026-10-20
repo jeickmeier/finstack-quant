@@ -1,7 +1,7 @@
 """Regression tests for factor-model risk binding edge-cases.
 
 Covers:
-- decompose_factor_risk returns a clean zero-risk decomposition for zero factors.
+- decompose_factors returns a clean zero-risk decomposition for zero factors.
 """
 
 from __future__ import annotations
@@ -13,11 +13,11 @@ import pickle
 import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.models.factor.risk import decompose_factors
 from finstack_quant.portfolio import (
     SensitivityMatrix,
     compute_factor_sensitivities,
     compute_pnl_profiles,
-    decompose_factor_risk,
 )
 
 # Shared helpers
@@ -74,8 +74,8 @@ def _market_and_positions() -> tuple[MarketContext, str]:
 # C20 — zero-factor matrix must not abort
 
 
-def test_decompose_factor_risk_zero_factors_returns_zero_risk() -> None:
-    """Regression: decompose_factor_risk must handle zero factors cleanly.
+def test_decompose_factors_zero_factors_returns_zero_risk() -> None:
+    """Regression: decompose_factors must handle zero factors cleanly.
 
     when the sensitivity matrix has n_factors == 0.
 
@@ -97,7 +97,7 @@ def test_decompose_factor_risk_zero_factors_returns_zero_risk() -> None:
     # Dummy covariance for a zero-factor model.
     cov_json = json.dumps({"factor_ids": [], "n": 0, "data": []})
 
-    decomposition = decompose_factor_risk(zero_factor_matrix, cov_json)
+    decomposition = decompose_factors(zero_factor_matrix, cov_json)
 
     assert decomposition.total_risk == 0.0
     assert decomposition.residual_risk == 0.0
@@ -133,7 +133,7 @@ def test_canonical_nested_sensitivity_json_roundtrips_and_reconciles_risk() -> N
     assert matrix.position_deltas(0) == [2.0]
     assert matrix.factor_deltas(0) == [2.0, 3.0]
     assert json.loads(pickle.loads(pickle.dumps(matrix)).to_json()) == payload  # noqa: S301
-    decomposition = decompose_factor_risk(matrix, '{"factor_ids":["F"],"n":1,"data":[0.04]}')
+    decomposition = decompose_factors(matrix, '{"factor_ids":["F"],"n":1,"data":[0.04]}')
     assert decomposition.total_risk == pytest.approx(1.0)
     contributions = decomposition.position_factor_contributions
     assert sum(row.risk_contribution for row in contributions) == pytest.approx(1.0)

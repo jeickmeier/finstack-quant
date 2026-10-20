@@ -3,7 +3,7 @@
 ``SensitivityMatrix.to_json`` / ``from_json`` use the Rust
 ``SensitivityMatrixJson`` shape (``{base_currency, position_ids, factor_ids,
 data}`` with nested rows), which is also what WASM ``computeFactorSensitivities``
-returns and ``decomposeFactorRisk`` accepts. The golden below is asserted
+returns and ``models.factor.risk.decomposeFactors`` accepts. The golden below is asserted
 identically by ``finstack-quant-wasm/tests/facade/portfolio.test.mjs``.
 """
 
@@ -14,7 +14,8 @@ import json
 import pytest
 
 from finstack_quant.core.market_data import MarketContext
-from finstack_quant.portfolio import SensitivityMatrix, compute_factor_sensitivities, decompose_factor_risk
+from finstack_quant.models.factor.risk import decompose_factors
+from finstack_quant.portfolio import SensitivityMatrix, compute_factor_sensitivities
 
 SENSITIVITY_WIRE = {
     "base_currency": "USD",
@@ -30,7 +31,7 @@ def test_wire_round_trips_exactly_and_decomposes_like_wasm() -> None:
     assert json.loads(matrix.to_json()) == SENSITIVITY_WIRE
     assert matrix.position_deltas(1) == [3.0, -1.0]
 
-    variance = decompose_factor_risk(matrix, SENSITIVITY_COVARIANCE)
+    variance = decompose_factors(matrix, SENSITIVITY_COVARIANCE)
     # exposures e = [4, 1]; e' S e = 16*0.04 + 2*4*0.01 + 0.09 = 0.81
     assert variance.total_risk == pytest.approx(0.81, abs=1e-12)
     assert variance.measure == "variance"
@@ -44,7 +45,7 @@ def test_wire_round_trips_exactly_and_decomposes_like_wasm() -> None:
 )
 def test_measure_keeps_its_serde_form(measure: object) -> None:
     matrix = SensitivityMatrix.from_json(json.dumps(SENSITIVITY_WIRE))
-    decomposition = decompose_factor_risk(matrix, SENSITIVITY_COVARIANCE, measure)
+    decomposition = decompose_factors(matrix, SENSITIVITY_COVARIANCE, measure)
     assert decomposition.measure == measure
     assert json.loads(decomposition.to_json())["measure"] == measure
 

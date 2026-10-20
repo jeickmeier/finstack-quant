@@ -25,7 +25,7 @@ mod replay;
 mod results;
 mod scenarios;
 mod schema;
-mod sensitivity;
+pub(crate) mod sensitivity;
 pub(crate) mod valuation;
 
 use pyo3::prelude::*;
@@ -147,7 +147,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "FactorPnlProfile",
         "compute_factor_sensitivities",
         "compute_pnl_profiles",
-        "decompose_factor_risk",
         // portfolio-owned factor workflow result classes
         "FactorContributionDelta",
         "WhatIfResult",

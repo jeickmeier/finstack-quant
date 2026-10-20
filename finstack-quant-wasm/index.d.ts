@@ -10090,6 +10090,34 @@ export interface FactorRiskNamespace {
    * @throws Error - Throws a `validation` error if `decomp` is malformed, and a `not_found` error if the position is not in the decomposition.
    */
   positionComponentVar(decomp: PositionRiskDecomposition | string, positionId: string): number;
+  /**
+   * Decompose portfolio risk into factor and position contributions.
+   *
+   * Uses the parametric (covariance-based) Euler decomposition.  Accepts
+   * the canonical sensitivity-matrix wire object (the output of
+   * `portfolio.computeFactorSensitivities`, or the Python `SensitivityMatrix.to_json`),
+   * a `FactorCovarianceMatrix` JSON, and an optional `RiskMeasure` JSON.
+   *
+   * Returns a structured object with `total_risk`, `measure`, `residual_risk`,
+   * `factor_contributions` (array), `position_factor_contributions` (array),
+   * and `position_residual_contributions` (array; empty for the parametric
+   * decomposer — populated only by credit-aware position decomposers).
+   *
+   * `measure` is the risk measure in its canonical serde form, the same shape
+   * as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
+   * object carrying `confidence` for `var` / `expected_shortfall`. The Python
+   * `RiskDecomposition.measure` getter returns the same value.
+   * @returns Returns a structured `RiskDecomposition` object.
+   * @param sensitivitiesJson - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
+   * @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
+   * @param riskMeasureJson - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
+   * @throws Error - Throws a JavaScript exception (`kind` `validation`) if any JSON input is malformed or has unknown keys; `base_currency` is not an ISO-4217 code; the sensitivity rows do not match `position_ids` / `factor_ids`; sensitivity and covariance factor axes disagree; the covariance matrix or risk measure is invalid; or decomposition produces invalid variance or another non-finite value.
+   */
+  decomposeFactors(
+    sensitivitiesJson: JsonInput,
+    covarianceJson: JsonInput,
+    riskMeasureJson?: JsonInput
+  ): RiskDecomposition;
 }
 
 /**
@@ -34552,7 +34580,7 @@ declare class FactorModel {
    *
    * Returns the sensitivity-matrix wire object (`base_currency`,
    * `position_ids`, `factor_ids`, `data` rows), the same shape
-   * `computeFactorSensitivities` returns and `decomposeFactorRisk` accepts.
+   * `computeFactorSensitivities` returns and `models.factor.risk.decomposeFactors` accepts.
    * @param portfolio - Built portfolio; its base currency is the reporting currency of every sensitivity.
    * @param market - `core.MarketContext` handle bumped by the sensitivity engine, including FX for cross-currency positions.
    * @param asOf - ISO-8601 valuation date for sensitivities and spot FX.
@@ -35181,34 +35209,6 @@ export interface PortfolioNamespace {
     nScenarioPoints?: number
   ): FactorPnlProfile[];
   /**
-   * Decompose portfolio risk into factor and position contributions.
-   *
-   * Uses the parametric (covariance-based) Euler decomposition.  Accepts
-   * the canonical sensitivity-matrix wire object (the output of
-   * `computeFactorSensitivities`, or the Python `SensitivityMatrix.to_json`),
-   * a `FactorCovarianceMatrix` JSON, and an optional `RiskMeasure` JSON.
-   *
-   * Returns a structured object with `total_risk`, `measure`, `residual_risk`,
-   * `factor_contributions` (array), `position_factor_contributions` (array),
-   * and `position_residual_contributions` (array; empty for the parametric
-   * decomposer — populated only by credit-aware position decomposers).
-   *
-   * `measure` is the risk measure in its canonical serde form, the same shape
-   * as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
-   * object carrying `confidence` for `var` / `expected_shortfall`. The Python
-   * `RiskDecomposition.measure` getter returns the same value.
-   * @returns Returns a structured `RiskDecomposition` object.
-   * @param sensitivitiesJson - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
-   * @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
-   * @param riskMeasureJson - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
-   * @throws Error - Throws a JavaScript exception (`kind` `validation`) if any JSON input is malformed or has unknown keys; `base_currency` is not an ISO-4217 code; the sensitivity rows do not match `position_ids` / `factor_ids`; sensitivity and covariance factor axes disagree; the covariance matrix or risk measure is invalid; or decomposition produces invalid variance or another non-finite value.
-   */
-  decomposeFactorRisk(
-    sensitivitiesJson: JsonInput,
-    covarianceJson: JsonInput,
-    riskMeasureJson?: JsonInput
-  ): RiskDecomposition;
-  /**
    * Fluent portfolio builder class; instances come from `Portfolio.builder`.
    */
   PortfolioBuilder: typeof PortfolioBuilder;
@@ -35250,7 +35250,7 @@ export interface PortfolioNamespace {
    * level. Returns the `CreditVolReport`: `total`, `measure`, the `generic`
    * credit-factor contribution, `by_level` rollups, `idiosyncratic_total` and,
    * when requested, `by_position_optional` rows.
-   * @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `decomposeFactorRisk`.
+   * @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `models.factor.risk.decomposeFactors`.
    * @param model - `models.factor.credit.CreditFactorModel` handle whose hierarchy names the levels.
    * @param byPosition - `true` to include the per-position breakdown; `false` leaves `by_position_optional` `null`.
    * @returns The `CreditVolReport`.

@@ -13,6 +13,7 @@ import time
 import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.models.factor.risk import decompose_factors
 from finstack_quant.models.liquidity import (
     amihud_illiquidity,
     kyle_lambda,
@@ -26,7 +27,6 @@ from finstack_quant.portfolio import (
     brinson_fachler,
     carino_link,
     compute_factor_sensitivities,
-    decompose_factor_risk,
     replay_portfolio,
     twrr_linked,
     value_portfolio,
@@ -378,7 +378,7 @@ def test_sensitivity_result_conversion_and_decomposition_release_gil() -> None:
             "USD",
         )
     )
-    decomposition = _assert_releases_gil(lambda: decompose_factor_risk(matrix, covariance_json))
+    decomposition = _assert_releases_gil(lambda: decompose_factors(matrix, covariance_json))
 
     assert matrix.n_positions == 2_000
     assert matrix.n_factors == 1

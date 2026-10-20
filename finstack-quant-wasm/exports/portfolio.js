@@ -65,7 +65,6 @@ export const portfolio = {
   computePnlProfiles: wasm.computePnlProfiles,
   // Takes the computeFactorSensitivities wire object; malformed dimensions
   // throw a validation Error.
-  decomposeFactorRisk: wasm.decomposeFactorRisk,
   PortfolioBuilder: wasm.PortfolioBuilder,
   allocateWeights: wasm.allocateWeights,
   buildCreditVolReport: wasm.buildCreditVolReport,

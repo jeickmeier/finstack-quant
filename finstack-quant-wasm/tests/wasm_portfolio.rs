@@ -13,6 +13,7 @@
 #![cfg(target_arch = "wasm32")]
 
 use finstack_quant_wasm::api::core::market_context::JsMarketContext;
+use finstack_quant_wasm::api::models::factor::risk::decompose_factors;
 use finstack_quant_wasm::api::portfolio::brinson::*;
 use finstack_quant_wasm::api::portfolio::cashflows::*;
 use finstack_quant_wasm::api::portfolio::fi_attribution::*;
@@ -20,7 +21,6 @@ use finstack_quant_wasm::api::portfolio::metrics::*;
 use finstack_quant_wasm::api::portfolio::performance::*;
 use finstack_quant_wasm::api::portfolio::replay::*;
 use finstack_quant_wasm::api::portfolio::scenarios::*;
-use finstack_quant_wasm::api::portfolio::sensitivity::decompose_factor_risk;
 use finstack_quant_wasm::api::portfolio::valuation::*;
 use finstack_quant_wasm::api::portfolio::*;
 use finstack_quant_wasm::api::scenarios::parse_scenario_spec;
@@ -271,7 +271,7 @@ fn replay_portfolio_returns_a_structured_object() {
 }
 
 #[wasm_bindgen_test]
-fn mo25_26_decompose_factor_risk_accepts_zero_factors_with_canonical_measure() {
+fn mo25_26_decompose_factors_accepts_zero_factors_with_canonical_measure() {
     let sensitivities = serde_json::json!({
         "base_currency": "USD",
         "position_ids": [],
@@ -283,7 +283,7 @@ fn mo25_26_decompose_factor_risk_accepts_zero_factors_with_canonical_measure() {
         .expect("empty covariance should build");
     let covariance_json = serde_json::to_string(&covariance).expect("serialize covariance");
 
-    let output = decompose_factor_risk(
+    let output = decompose_factors(
         JsValue::from(&sensitivities),
         JsValue::from(&covariance_json),
         None,

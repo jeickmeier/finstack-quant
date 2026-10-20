@@ -1,8 +1,7 @@
-//! WASM bindings for factor-model sensitivities and risk decomposition.
+//! WASM bindings for factor-model sensitivities and P&L profiles.
 
 use crate::api::core::market_context::JsMarketContext;
 use crate::utils::date::parse_iso_date;
-use crate::utils::input::from_js_json;
 use crate::utils::input::{js_opt_uint, js_string, json_text, opt_json_text};
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
@@ -103,53 +102,4 @@ pub fn compute_pnl_profiles(
     )
     .map_err(to_js_err)?;
     to_js_value(&profiles)
-}
-
-/// Decompose portfolio risk into factor and position contributions.
-///
-/// Uses the parametric (covariance-based) Euler decomposition.  Accepts
-/// the canonical sensitivity-matrix wire object (the output of
-/// `computeFactorSensitivities`, or the Python `SensitivityMatrix.to_json`),
-/// a `FactorCovarianceMatrix` JSON, and an optional `RiskMeasure` JSON.
-///
-/// Returns a structured object with `total_risk`, `measure`, `residual_risk`,
-/// `factor_contributions` (array), `position_factor_contributions` (array),
-/// and `position_residual_contributions` (array; empty for the parametric
-/// decomposer — populated only by credit-aware position decomposers).
-///
-/// `measure` is the risk measure in its canonical serde form, the same shape
-/// as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
-/// object carrying `confidence` for `var` / `expected_shortfall`. The Python
-/// `RiskDecomposition.measure` getter returns the same value.
-/// @param sensitivities_json - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
-/// @param covariance_json - Factor covariance-matrix JSON aligned with the supplied sensitivities.
-/// @param risk_measure_json - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception (`kind` `validation`) if any JSON input is
-/// malformed or has unknown keys; `base_currency` is not an ISO-4217 code; the
-/// sensitivity rows do not match `position_ids` / `factor_ids`; sensitivity and
-/// covariance factor axes disagree; the covariance matrix or risk measure is
-/// invalid; or decomposition produces invalid variance or another non-finite
-/// value.
-#[wasm_bindgen(js_name = decomposeFactorRisk)]
-pub fn decompose_factor_risk(
-    sensitivities_json: JsValue,
-    covariance_json: JsValue,
-    risk_measure_json: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let wire: finstack_quant_portfolio::sensitivity::SensitivityMatrixJson =
-        from_js_json(&sensitivities_json, "sensitivitiesJson")?;
-    let matrix = finstack_quant_factor::SensitivityMatrix::try_from(wire).map_err(to_js_err)?;
-    let covariance: finstack_quant_factor::FactorCovarianceMatrix =
-        from_js_json(&covariance_json, "covarianceJson")?;
-    // `js_opt_wire`: the unit variants are bare wire strings (`"variance"`),
-    // which are not JSON text.
-    let measure: finstack_quant_factor::RiskMeasure =
-        crate::utils::wire::js_opt_wire(risk_measure_json.as_ref(), "riskMeasureJson")?
-            .unwrap_or_default();
-    let result = finstack_quant_factor::risk::decompose_factors(&matrix, &covariance, &measure)
-        .map_err(to_js_err)?;
-    to_js_value(&result)
 }

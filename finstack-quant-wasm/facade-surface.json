@@ -2997,6 +2997,7 @@
     "kind": "namespace",
     "keys": [
       "buildStressAttribution",
+      "decomposeFactors",
       "defaultUtilizationThreshold",
       "evaluateRiskBudget",
       "historicalVarDecomposition",
@@ -3021,6 +3022,9 @@
     "kind": "function"
   },
   "models.factor.risk.positionComponentVar": {
+    "kind": "function"
+  },
+  "models.factor.risk.decomposeFactors": {
     "kind": "function"
   },
   "models.factor.risk.defaultUtilizationThreshold": {
@@ -3505,7 +3509,6 @@
       "constraintExposureMinimum",
       "constraintMaxTurnover",
       "constraintWeightBounds",
-      "decomposeFactorRisk",
       "excessReturns",
       "factorBrinsonAttribution",
       "fiAttributionResultReconciliationCheck",
@@ -3655,9 +3658,6 @@
     "kind": "function"
   },
   "portfolio.computePnlProfiles": {
-    "kind": "function"
-  },
-  "portfolio.decomposeFactorRisk": {
     "kind": "function"
   },
   "portfolio.PortfolioBuilder": {

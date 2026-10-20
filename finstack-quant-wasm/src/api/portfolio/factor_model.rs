@@ -84,7 +84,7 @@ impl JsFactorModel {
     ///
     /// Returns the sensitivity-matrix wire object (`base_currency`,
     /// `position_ids`, `factor_ids`, `data` rows), the same shape
-    /// `computeFactorSensitivities` returns and `decomposeFactorRisk` accepts.
+    /// `computeFactorSensitivities` returns and `models.factor.risk.decomposeFactors` accepts.
     /// @param portfolio - Built portfolio; its base currency is the reporting currency of every sensitivity.
     /// @param market - `core.MarketContext` handle bumped by the sensitivity engine, including FX for cross-currency positions.
     /// @param as_of - ISO-8601 valuation date for sensitivities and spot FX.
@@ -265,7 +265,7 @@ pub fn allocate_weights(spec: JsValue) -> Result<JsValue, JsValue> {
 /// level. Returns the `CreditVolReport`: `total`, `measure`, the `generic`
 /// credit-factor contribution, `by_level` rollups, `idiosyncratic_total` and,
 /// when requested, `by_position_optional` rows.
-/// @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `decomposeFactorRisk`.
+/// @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `models.factor.risk.decomposeFactors`.
 /// @param model - `models.factor.credit.CreditFactorModel` handle whose hierarchy names the levels.
 /// @param by_position - `true` to include the per-position breakdown; `false` leaves `by_position_optional` `null`.
 /// @returns The `CreditVolReport`.
