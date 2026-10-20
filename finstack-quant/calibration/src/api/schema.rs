@@ -1010,9 +1010,6 @@ pub struct SwaptionVolParams {
     /// Target tenor times (in years) for the surface grid.
     #[serde(default)]
     pub target_tenors: Vec<f64>,
-    /// SABR parameter interpolation method between expiries/tenors.
-    #[serde(default)]
-    pub sabr_interpolation: SabrInterpolationMethod,
     /// Optional calendar identifier for date adjustments.
     #[serde(default)]
     pub calendar_id: Option<String>,
@@ -1323,16 +1320,6 @@ pub enum SwaptionVolConvention {
         /// both forwards and strikes and retained in calibrated artifacts.
         shift: f64,
     },
-}
-
-/// Interpolation method for SABR parameters across the expiry–tenor grid.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum SabrInterpolationMethod {
-    /// Bilinear interpolation in (expiry, tenor) over SABR parameters.
-    #[default]
-    Bilinear,
 }
 
 fn default_interp_linear() -> InterpStyle {

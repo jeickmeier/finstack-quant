@@ -580,7 +580,6 @@ fn check_dependencies(
                     step_id: node.step_id.clone(),
                     step_kind: node.kind.clone(),
                     missing_id: read_id.clone(),
-                    missing_kind: "curve".to_string(),
                     available: available.iter().cloned().collect(),
                 });
             }

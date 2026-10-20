@@ -124,7 +124,7 @@ impl EnvelopeError {
 pub enum EnvelopeError {
     /// A step references a curve / surface ID that's not produced by an
     /// earlier step or carried in `market_data` / `prior_market`.
-    #[error("step[{step_index}] '{step_id}' (kind='{step_kind}'): missing {missing_kind} dependency '{missing_id}'. Available: [{}]", available.join(", "))]
+    #[error("step[{step_index}] '{step_id}' (kind='{step_kind}'): missing dependency '{missing_id}'. Available: [{}]", available.join(", "))]
     MissingDependency {
         /// Zero-based index of the offending step in `plan.steps`.
         step_index: usize,
@@ -134,8 +134,6 @@ pub enum EnvelopeError {
         step_kind: String,
         /// The missing curve/surface identifier referenced by the step.
         missing_id: String,
-        /// Kind of the missing dependency (e.g. `"discount"`, `"surface"`).
-        missing_kind: String,
         /// Identifiers available at the time the step would run.
         available: Vec<String>,
     },

@@ -4,9 +4,8 @@ use crate::calibration::calibration_support as cal_utils;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationStep,
-    ForwardCurveParams, HazardCurveParams, InflationCurveParams, SabrInterpolationMethod,
-    StepParams, SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams,
-    VolSurfaceParams,
+    ForwardCurveParams, HazardCurveParams, InflationCurveParams, StepParams,
+    SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams, VolSurfaceParams,
 };
 use finstack_quant_calibration::quotes::cds::CdsQuote;
 use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
@@ -258,7 +257,6 @@ fn swaption_vol_preflight_rejects_invalid_shift() {
             sabr_beta: 0.5,
             target_expiries: Vec::new(),
             target_tenors: Vec::new(),
-            sabr_interpolation: SabrInterpolationMethod::default(),
             calendar_id: None,
             fixed_day_count: None,
             swap_index: None,

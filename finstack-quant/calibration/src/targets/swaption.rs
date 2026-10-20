@@ -1,8 +1,6 @@
 //! Calibration target construction and shared input validation.
 //!
-use crate::api::schema::{
-    SabrInterpolationMethod, SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams,
-};
+use crate::api::schema::{SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams};
 use crate::config::CalibrationConfig;
 use crate::quotes::vol::VolQuote;
 use crate::quotes::MarketQuote;
@@ -378,18 +376,14 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
                 };
 
                 let p = sabr_params.get(&key).cloned().or_else(|| {
-                    let p = match params.sabr_interpolation {
-                        SabrInterpolationMethod::Bilinear => {
-                            Self::interpolate_sabr_params_bilinear(
-                                texp,
-                                tten,
-                                &sabr_params,
-                                (&expiries_axis, &tenors_axis),
-                                extrap_policy,
-                                allow_missing,
-                            )
-                        }
-                    };
+                    let p = Self::interpolate_sabr_params_bilinear(
+                        texp,
+                        tten,
+                        &sabr_params,
+                        (&expiries_axis, &tenors_axis),
+                        extrap_policy,
+                        allow_missing,
+                    );
                     if p.is_some() {
                         interpolated_points += 1;
                     }
@@ -1154,7 +1148,6 @@ mod tests {
             sabr_beta: 0.5,
             target_expiries: vec![1.0, 2.0],
             target_tenors: vec![5.0, 10.0],
-            sabr_interpolation: crate::api::schema::SabrInterpolationMethod::Bilinear,
             calendar_id: None,
             fixed_day_count: Some(DayCount::Act365F),
             swap_index: Some("USD-SOFR-3M".into()),

@@ -43,7 +43,6 @@ fn envelope_error_display_includes_step_id() {
         step_id: "cdx_hazard".to_string(),
         step_kind: "hazard".to_string(),
         missing_id: "USD-OIS".to_string(),
-        missing_kind: "discount".to_string(),
         available: vec!["EUR-OIS".to_string()],
     };
     let s = format!("{err}");

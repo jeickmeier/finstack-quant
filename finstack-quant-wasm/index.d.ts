@@ -30621,7 +30621,7 @@ export interface CalibrationNamespace {
    * @param currency - ISO-4217 currency code of the surface.
    * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
    * @param volSurfaceId - Identifier of the produced surface; defaults to `id`.
-   * @param params - Optional object (or JSON) of further wire fields: `forward_id`, `vol_convention`, `sabr_beta`, `target_expiries`, `target_tenors`, `sabr_interpolation`, `calendar_id`, `fixed_day_count`, `swap_index`, `vol_tolerance`, `sabr_extrapolation`, `allow_sabr_missing_bucket_fallback`. An entry named like another argument is replaced by that argument.
+   * @param params - Optional object (or JSON) of further wire fields: `forward_id`, `vol_convention`, `sabr_beta`, `target_expiries`, `target_tenors`, `calendar_id`, `fixed_day_count`, `swap_index`, `vol_tolerance`, `sabr_extrapolation`, `allow_sabr_missing_bucket_fallback`. An entry named like another argument is replaced by that argument.
    * @returns A `CalibrationStep` object with `kind: "swaption_vol"`.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
    */

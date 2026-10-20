@@ -1163,10 +1163,6 @@ export type CalibrationStep =
        */
       sabr_extrapolation?: SurfaceExtrapolationPolicy;
       /**
-       * SABR parameter interpolation method between expiries/tenors.
-       */
-      sabr_interpolation?: SabrInterpolationMethod;
-      /**
        * Optional floating index identifier used to resolve market swap conventions.
        *
        * Swaption forward/par rate calculations require swap schedule conventions (fixed frequency,
@@ -1682,10 +1678,6 @@ export type Seniority = "senior_secured" | "senior" | "subordinated" | "junior";
  * Extrapolation policy for volatility surface construction.
  */
 export type SurfaceExtrapolationPolicy = "error" | "clamp";
-/**
- * Interpolation method for SABR parameters across the expiry–tenor grid.
- */
-export type SabrInterpolationMethod = "bilinear";
 /**
  * Volatility quoting convention for swaptions.
  */
@@ -2836,10 +2828,6 @@ export type EnvelopeError =
        */
       missing_id: string;
       /**
-       * Kind of the missing dependency (e.g. `"discount"`, `"surface"`).
-       */
-      missing_kind: string;
-      /**
        * Step identifier.
        */
       step_id: string;
@@ -3939,10 +3927,6 @@ export type StepParams =
        */
       sabr_extrapolation?: SurfaceExtrapolationPolicy;
       /**
-       * SABR parameter interpolation method between expiries/tenors.
-       */
-      sabr_interpolation?: SabrInterpolationMethod;
-      /**
        * Optional floating index identifier used to resolve market swap conventions.
        *
        * Swaption forward/par rate calculations require swap schedule conventions (fixed frequency,
@@ -4498,10 +4482,6 @@ export interface CalibrationConfig {
    */
   validation_mode?: ValidationMode;
   /**
-   * Enable verbose logging of the calibration process.
-   */
-  verbose?: boolean;
-  /**
    * Volatility-surface specific solver configuration (SABR and SVI).
    */
   vol_surface?: VolSurfaceSolveConfig;
@@ -4543,10 +4523,6 @@ export interface DiscountCurveSolveConfig {
    * Minimum required success points in scan before attempting polish.
    */
   min_scan_grid_points?: number;
-  /**
-   * Minimum time threshold for considering a knot at spot (t=0).
-   */
-  min_t_spot?: number;
   /**
    * Number of points in the initial geometric scan grid.
    */
