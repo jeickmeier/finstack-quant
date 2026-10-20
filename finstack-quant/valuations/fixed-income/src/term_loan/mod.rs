@@ -25,9 +25,8 @@
 //! # Quick Example
 //!
 //! ```
-//! use finstack_quant_valuations_fixed_income::term_loan::{
-//!     AmortizationSpec, RateSpec, TermLoan,
-//! };
+//! use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
+//! use finstack_quant_valuations_fixed_income::term_loan::TermLoan;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::{DayCount, Tenor};
 //! use finstack_quant_core::money::Money;
@@ -66,12 +65,11 @@ pub(crate) mod pricing;
 pub mod spec;
 pub(crate) mod types;
 
-pub use super::loan_terms::{CommitmentStep, MarginStep, OidEirSpec};
 pub use spec::{
-    AmortizationSpec, CashSweepEvent, CommitmentFeeBase, DdtlSpec, DrawEvent, LoanCall,
-    LoanCallSchedule, LoanCallType, MakeWholeSpec, OidPolicy, PikToggle, TermLoanCovenantEvents,
+    CashSweepEvent, CommitmentFeeBase, DdtlSpec, LoanCall, LoanCallSchedule, LoanCallType,
+    OidPolicy, PikToggle, TermLoanCovenantEvents,
 };
-pub use types::{RateSpec, TermLoan, TermLoanBuilder};
+pub use types::{TermLoan, TermLoanBuilder};
 
 pub use pricing::TermLoanDiscountingPricer;
 pub use pricing::TermLoanTreePricer;

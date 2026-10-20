@@ -1,15 +1,16 @@
 //! Edge case and boundary condition tests.
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_fixed_income::loan_terms::{CommitmentStep, DrawEvent};
 use finstack_quant_valuations_fixed_income::term_loan::{
-    AmortizationSpec, CommitmentFeeBase, CommitmentStep, DdtlSpec, DrawEvent, OidPolicy, RateSpec,
-    TermLoan,
+    CommitmentFeeBase, DdtlSpec, OidPolicy, TermLoan,
 };
 use time::macros::date;
 

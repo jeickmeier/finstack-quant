@@ -902,7 +902,8 @@ mod tests {
 
     #[test]
     fn quote_engine_works_for_bond_with_hazard_curve() {
-        use crate::bond::pricing::quote_conversions::{compute_quotes, BondQuoteInput};
+        use crate::bond::pricing::quote_conversions::compute_quotes;
+        use finstack_quant_valuations_core::instruments::BondQuoteInput;
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
         let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
 

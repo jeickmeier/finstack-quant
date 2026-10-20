@@ -17,8 +17,9 @@ use finstack_quant_cashflows::builder::{
     CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec,
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
+use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
+use finstack_quant_valuations::instruments::{
+    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };
 
 /// Standard test dates

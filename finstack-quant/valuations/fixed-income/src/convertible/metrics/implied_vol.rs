@@ -154,9 +154,7 @@ fn admissible_lower_volatility(evaluate: &impl Fn(f64) -> Result<f64>, upper: f6
 mod tests {
     use std::sync::Arc;
 
-    use crate::convertible::{
-        AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
-    };
+    use crate::convertible::ConvertibleBond;
     use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
@@ -166,6 +164,9 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::{
+        AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+    };
     use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
     use time::Month;
 

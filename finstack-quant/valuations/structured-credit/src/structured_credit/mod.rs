@@ -53,16 +53,14 @@ pub use types::{
     TrancheStructure, TrancheValuation, TriggerConsequence, Waterfall, WaterfallBuilder,
     WaterfallDistribution, WaterfallRules, WaterfallTier,
 };
-pub use types::{
-    DefaultModelSpec, MarketConditions, PrepaymentModelSpec, RecoveryModelSpec,
-    StructuredCreditTranche,
-};
+pub use types::{MarketConditions, StructuredCreditTranche};
 
 pub use pricing::{execute_waterfall, generate_cashflows, run_simulation};
 
+pub use finstack_quant_valuations_core::results::structured_credit::{
+    StochasticPricingResult, StructuredCreditPricingMode, TranchePricingResult,
+};
 pub use pricing::coverage_tests::{TestContext, TestResult};
-pub use pricing::stochastic::StructuredCreditPricingMode;
-pub use pricing::stochastic::{StochasticPricingResult, TranchePricingResult};
 pub use pricing::waterfall::WaterfallContext;
 pub use pricing::{
     run_simulation_with_diagnostics, CoverageTestDiagnostic, PeriodDiagnostics,

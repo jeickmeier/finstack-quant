@@ -7,7 +7,7 @@ use crate::structured_credit::pricing::stochastic::calibrations::{
     rmbs_correlation_structure,
 };
 use crate::structured_credit::pricing::stochastic::pricer::{
-    StochasticPricer, StochasticPricerConfig, StochasticPricingResult, StructuredCreditPricingMode,
+    StochasticPricer, StochasticPricerConfig,
 };
 use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
 use finstack_quant_core::dates::{Date, DateExt};
@@ -20,6 +20,9 @@ use finstack_quant_models::credit::pool::{
 };
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations_core::results::structured_credit::{
+    StochasticPricingResult, StructuredCreditPricingMode,
+};
 
 impl StructuredCredit {
     /// Calculate monthly prepayment probability at the supplied collateral age.

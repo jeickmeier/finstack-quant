@@ -37,8 +37,3 @@ pub use metrics::{
 };
 pub use pricing::{FacilityProjection, FACILITY_TRANCHE_ID, RESIDUAL_TRANCHE_ID};
 pub use types::{AmortizationEvent, AssetBackedFacility, AssetBackedFacilityBuilder, TermOutSpec};
-
-pub use crate::structured_credit::{
-    AdvanceRate, BorrowingBaseReport, BorrowingBaseRules, ConcentrationLimit, ConcentrationScope,
-    EligibilityRule,
-};

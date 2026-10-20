@@ -1,6 +1,7 @@
 //! Term loan cashflow generation tests.
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
@@ -10,8 +11,9 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_valuations_fixed_income::loan_terms::DrawEvent;
 use finstack_quant_valuations_fixed_income::term_loan::{
-    AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent, OidPolicy, RateSpec, TermLoan,
+    CommitmentFeeBase, DdtlSpec, OidPolicy, TermLoan,
 };
 use time::macros::date;
 
@@ -511,9 +513,8 @@ fn test_flat_vs_geometric_amort_differ() {
 /// not the full commitment limit.
 #[test]
 fn test_ddtl_partial_draw_amort_uses_funded_amount() {
-    use finstack_quant_valuations_fixed_income::term_loan::{
-        CommitmentFeeBase, DdtlSpec, DrawEvent,
-    };
+    use finstack_quant_valuations_fixed_income::loan_terms::DrawEvent;
+    use finstack_quant_valuations_fixed_income::term_loan::{CommitmentFeeBase, DdtlSpec};
 
     let issue = date!(2025 - 01 - 01);
     let commitment = 10_000_000.0;
@@ -671,7 +672,8 @@ mod margin_stepup_period_semantics {
     use super::*;
     use finstack_quant_cashflows::builder::FloatingRateSpec;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
-    use finstack_quant_valuations_fixed_income::term_loan::{MarginStep, TermLoanCovenantEvents};
+    use finstack_quant_valuations_fixed_income::loan_terms::MarginStep;
+    use finstack_quant_valuations_fixed_income::term_loan::TermLoanCovenantEvents;
     use rust_decimal::Decimal;
 
     /// Off-cycle step date in the middle of the second quarterly period.

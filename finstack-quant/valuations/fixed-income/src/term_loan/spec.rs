@@ -16,12 +16,12 @@
 //!
 //! - [`DdtlSpec`]: Delayed-draw term loan features
 //! - [`TermLoanCovenantEvents`]: Covenant-driven events
-//! - [`AmortizationSpec`]: Principal repayment schedules (the shared cashflows
+//! - [`AmortizationSpec`](finstack_quant_cashflows::builder::AmortizationSpec): Principal repayment schedules (the shared cashflows
 //!   type; term loans accept every variant except `LinearTo` and
 //!   `StepRemaining`)
 //! - [`LoanCallSchedule`]: Borrower prepayment options
 //! - [`OidPolicy`]: Original issue discount handling
-//! - [`OidEirSpec`]: Effective interest rate amortization settings
+//! - [`OidEirSpec`](crate::loan_terms::OidEirSpec): Effective interest rate amortization settings
 //!
 //! LSTA par-trade marks use T+7:
 //!
@@ -45,9 +45,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
-pub use super::super::bond::MakeWholeSpec;
-pub use super::super::loan_terms::{CommitmentStep, DrawEvent, MarginStep, OidEirSpec};
-pub use finstack_quant_cashflows::builder::AmortizationSpec;
+use crate::bond::MakeWholeSpec;
+use crate::loan_terms::{CommitmentStep, DrawEvent, MarginStep};
 
 /// Original Issue Discount (OID) policy for term loan origination.
 ///
@@ -69,7 +68,7 @@ pub use finstack_quant_cashflows::builder::AmortizationSpec;
 /// - **Withheld**: Reduces initial cash proceeds, increases effective yield
 /// - **Separate**: May be accounted as upfront fee or amortized discount
 ///
-/// For effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].
+/// For effective interest rate (EIR) amortization schedules, see [`OidEirSpec`](crate::loan_terms::OidEirSpec).
 ///
 /// # Variants
 ///

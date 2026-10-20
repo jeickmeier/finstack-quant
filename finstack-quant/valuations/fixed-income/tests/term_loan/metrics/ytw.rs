@@ -1,6 +1,7 @@
 //! Yield to worst tests.
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -9,9 +10,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::{Instrument, InstrumentPricingOverrides};
 use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_fixed_income::loan_terms::DrawEvent;
 use finstack_quant_valuations_fixed_income::term_loan::{
-    AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent, LoanCall, LoanCallSchedule,
-    LoanCallType, RateSpec, TermLoan,
+    CommitmentFeeBase, DdtlSpec, LoanCall, LoanCallSchedule, LoanCallType, TermLoan,
 };
 use time::macros::date;
 

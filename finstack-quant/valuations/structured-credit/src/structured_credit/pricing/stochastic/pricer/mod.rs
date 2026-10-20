@@ -58,7 +58,3 @@ mod engine;
 
 pub(crate) use config::StochasticPricerConfig;
 pub(crate) use engine::StochasticPricer;
-pub use finstack_quant_valuations_core::results::structured_credit::StructuredCreditPricingMode;
-pub use finstack_quant_valuations_core::results::structured_credit::{
-    StochasticPricingResult, TranchePricingResult,
-};

@@ -55,7 +55,7 @@ pub(crate) fn generate_cashflows(
 
     // DDTL draws or upfront funding
     if let Some(ddtl) = &loan.ddtl {
-        let valid_draws: Vec<&super::spec::DrawEvent> = ddtl
+        let valid_draws: Vec<&crate::loan_terms::DrawEvent> = ddtl
             .draws
             .iter()
             .filter(|ev| {
@@ -186,14 +186,14 @@ pub(crate) fn generate_cashflows(
 
     // Amortization → principal events
     match &loan.amortization {
-        super::spec::AmortizationSpec::LinearTo { .. }
-        | super::spec::AmortizationSpec::StepRemaining { .. } => {
+        finstack_quant_cashflows::builder::AmortizationSpec::LinearTo { .. }
+        | finstack_quant_cashflows::builder::AmortizationSpec::StepRemaining { .. } => {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Term loan '{}' amortization does not support linear_to or step_remaining",
                 loan.id.as_str()
             )));
         }
-        super::spec::AmortizationSpec::CustomPrincipal { items } => {
+        finstack_quant_cashflows::builder::AmortizationSpec::CustomPrincipal { items } => {
             for (dt, amt) in items {
                 principal_events.push(PrincipalEvent {
                     date: *dt,
@@ -206,10 +206,12 @@ pub(crate) fn generate_cashflows(
         }
         // Balance-dependent rules are executed by the canonical builder after
         // coupon PIK capitalization, never precomputed from funded draws alone.
-        super::spec::AmortizationSpec::None
-        | super::spec::AmortizationSpec::PercentOfRemainingPerPeriod { .. }
-        | super::spec::AmortizationSpec::LinearBetween { .. } => {}
-        super::spec::AmortizationSpec::PercentOfOriginalPerPeriod { pct } => {
+        finstack_quant_cashflows::builder::AmortizationSpec::None
+        | finstack_quant_cashflows::builder::AmortizationSpec::PercentOfRemainingPerPeriod {
+            ..
+        }
+        | finstack_quant_cashflows::builder::AmortizationSpec::LinearBetween { .. } => {}
+        finstack_quant_cashflows::builder::AmortizationSpec::PercentOfOriginalPerPeriod { pct } => {
             let funding: Vec<_> = principal_events
                 .iter()
                 .filter(|event| event.kind == CFKind::Notional && event.delta.amount() > 0.0)
@@ -271,12 +273,12 @@ pub(crate) fn generate_cashflows(
             loan.maturity,
         )
         .amortization(match &loan.amortization {
-            super::spec::AmortizationSpec::PercentOfRemainingPerPeriod { pct } => {
-                finstack_quant_cashflows::builder::AmortizationSpec::PercentOfRemainingPerPeriod {
-                    pct: *pct,
-                }
-            }
-            super::spec::AmortizationSpec::LinearBetween { start, end } => {
+            finstack_quant_cashflows::builder::AmortizationSpec::PercentOfRemainingPerPeriod {
+                pct,
+            } => finstack_quant_cashflows::builder::AmortizationSpec::PercentOfRemainingPerPeriod {
+                pct: *pct,
+            },
+            finstack_quant_cashflows::builder::AmortizationSpec::LinearBetween { start, end } => {
                 finstack_quant_cashflows::builder::AmortizationSpec::LinearBetween {
                     start: *start,
                     end: *end,
@@ -295,7 +297,7 @@ pub(crate) fn generate_cashflows(
     }
 
     match &loan.rate {
-        super::types::RateSpec::Fixed { rate } => {
+        finstack_quant_cashflows::builder::RateSpec::Fixed { rate } => {
             let initial_rate = finstack_quant_core::decimal::f64_to_decimal(*rate)?;
             let margin_steps = loan
                 .covenants
@@ -316,7 +318,7 @@ pub(crate) fn generate_cashflows(
             };
             let _ = builder.step_up_cf(spec);
         }
-        super::types::RateSpec::Floating(spec) => {
+        finstack_quant_cashflows::builder::RateSpec::Floating(spec) => {
             // LSTA convention: a margin change takes effect from the start of
             // the NEXT interest period on or after its effective date, never
             // mid-period. Snap each covenant step date to the accrual-period
@@ -630,7 +632,9 @@ pub(crate) fn build_oid_eir_schedule(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::term_loan::spec::{AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent};
+    use crate::loan_terms::DrawEvent;
+    use crate::term_loan::spec::{CommitmentFeeBase, DdtlSpec};
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};

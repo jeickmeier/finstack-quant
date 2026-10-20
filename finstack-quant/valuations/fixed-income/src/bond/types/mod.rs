@@ -12,7 +12,6 @@ mod tests;
 mod tests_stepup;
 
 pub(crate) use super::cashflow_spec::CashflowSpec;
-pub use finstack_quant_cashflows::builder::AmortizationSpec;
 
 pub use definitions::{
     Bond, BondBuilder, BondSettlementConvention, CallPut, CallPutSchedule, MakeWholeSpec,

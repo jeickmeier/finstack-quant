@@ -757,7 +757,7 @@ fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
     // After step1: 2/3 remaining (paid 1/3), after step2: 1/3 remaining (paid 2/3).
     let amort_step1 = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
     let amort_step2 = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
-    let amort_schedule = AmortizationSpec::StepRemaining {
+    let amort_schedule = finstack_quant_cashflows::builder::AmortizationSpec::StepRemaining {
         schedule: vec![
             (
                 amort_step1,

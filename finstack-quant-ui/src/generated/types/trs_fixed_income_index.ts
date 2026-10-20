@@ -770,9 +770,7 @@ export interface D_29A90D894679A1E11782 {
  * use finstack_quant_cashflows::builder::ScheduleParams;
  * use finstack_quant_valuations_core::instruments::{Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive};
  * use finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap;
- * use finstack_quant_valuations_fixed_income::fi_trs::{
- *     TrsScheduleSpec,
- * };
+ * use finstack_quant_valuations_core::instruments::TrsScheduleSpec;
  * use rust_decimal::Decimal;
  * use time::macros::date;
  *

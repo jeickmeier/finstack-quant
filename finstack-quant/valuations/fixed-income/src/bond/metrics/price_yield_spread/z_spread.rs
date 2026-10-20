@@ -143,7 +143,7 @@ impl BondZSpreadPricingKernel {
                             DayCountContext {
                                 frequency: Some(bond.cashflow_spec.frequency()),
                                 coupon_period:
-                                    crate::bond::pricing::quote_conversions::icma_reference_period(
+                                    finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
                                         day_count,
                                         bond.cashflow_spec.frequency(),
                                         spread_flows.iter().map(|(d, _)| *d),

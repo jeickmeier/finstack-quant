@@ -5,9 +5,12 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::{Error, Result};
 
-use crate::convertible::{ConversionEvent, ConversionPolicy, ConvertibleBond, PriceTrigger};
+use crate::convertible::ConvertibleBond;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::math::map_date_to_step;
+use finstack_quant_valuations_core::instruments::{
+    ConversionEvent, ConversionPolicy, PriceTrigger,
+};
 
 /// Contractual debt events and exercise decisions for the defaultable-equity tree.
 pub(super) struct ConvertibleBondValuator {
@@ -526,7 +529,7 @@ impl ConvertibleBondValuator {
     ///
     /// `ratio_accretion` is the dividend-protection factor `exp(q * t)` at the
     /// node's step time `t` (1.0 when the bond is unprotected; see
-    /// [`DividendAdjustment`](crate::convertible::DividendAdjustment)).
+    /// [`DividendAdjustment`](finstack_quant_valuations_core::instruments::DividendAdjustment)).
     /// The stored
     /// `conversion_ratio` already includes anti-dilution event adjustments, so
     /// protection composes multiplicatively on top of those (event-adjusted

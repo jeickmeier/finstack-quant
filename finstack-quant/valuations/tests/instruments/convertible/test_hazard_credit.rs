@@ -59,7 +59,7 @@ fn credit_bond(recovery: f64) -> ConvertibleBond {
 #[test]
 fn convertible_frp_matches_european_closed_form() {
     use finstack_quant_core::math::norm_cdf;
-    use finstack_quant_valuations::instruments::fixed_income::convertible::ConversionPolicy;
+    use finstack_quant_valuations::instruments::ConversionPolicy;
     for spot in [50.0, 100.0, 150.0] {
         for recovery in [0.0, 0.4, 1.0] {
             let mut bond = credit_bond(recovery);
