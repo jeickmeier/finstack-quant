@@ -147,7 +147,8 @@ fn make_fund(
     spec: PeFundWaterfallSpec,
     with_discount: bool,
 ) -> PrivateMarketsFund {
-    let fund = PrivateMarketsFund::new("PMF-BENCH", Currency::USD, spec, events);
+    let fund =
+        PrivateMarketsFund::new("PMF-BENCH", Currency::USD, spec, events).expect("valid fund");
     if with_discount {
         fund.with_discount_curve_id("USD-OIS")
     } else {

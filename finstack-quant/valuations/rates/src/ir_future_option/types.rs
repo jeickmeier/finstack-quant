@@ -59,32 +59,19 @@ pub struct InterestRateFutureOption {
 }
 
 impl InterestRateFutureOption {
-    /// Construct an interest-rate futures option from arbitrary listed or OTC terms.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Stable instrument identifier.
-    /// * `terms` - Complete caller-supplied futures-option economics; no venue, root, or contract definition is implied.
-    pub fn new(
-        id: impl Into<InstrumentId>,
-        terms: FutureOptionTerms,
-    ) -> finstack_quant_core::Result<Self> {
-        Self::builder().id(id.into()).terms(terms).build()
-    }
-
     /// Create a neutral schema and serialization example.
     pub fn example() -> finstack_quant_core::Result<Self> {
         Ok(Self {
             instrument_pricing_overrides:
                 finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
                     .with_implied_volatility(0.20),
-            ..Self::new(
-                InstrumentId::new("INTEREST-RATE-FUTURE-OPTION-EXAMPLE"),
-                FutureOptionTerms {
+            ..Self::builder()
+                .id(InstrumentId::new("INTEREST-RATE-FUTURE-OPTION-EXAMPLE"))
+                .terms(FutureOptionTerms {
                     underlying_price_change_per_bp: Some(-0.01),
                     ..FutureOptionTerms::example()?
-                },
-            )?
+                })
+                .build()?
         })
     }
 
@@ -157,9 +144,11 @@ mod tests {
             payment_date: date!(2026 - 12 - 16),
         };
 
-        let option =
-            InterestRateFutureOption::new(InstrumentId::new("OTC-RATE-FUTURE-OPTION"), terms)
-                .expect("custom bilateral contract");
+        let option = InterestRateFutureOption::builder()
+            .id(InstrumentId::new("OTC-RATE-FUTURE-OPTION"))
+            .terms(terms)
+            .build()
+            .expect("custom bilateral contract");
 
         assert_eq!(option.terms.underlying, "OTC-CUSTOM-RATE-FUTURE");
         assert_eq!(option.terms.contracts, 2.5);
@@ -185,7 +174,10 @@ mod tests {
     #[test]
     fn rate_future_option_rejects_missing_rate_risk_transform() {
         let terms = FutureOptionTerms::example().expect("terms");
-        let error = InterestRateFutureOption::new(InstrumentId::new("MISSING-RISK"), terms)
+        let error = InterestRateFutureOption::builder()
+            .id(InstrumentId::new("MISSING-RISK"))
+            .terms(terms)
+            .build()
             .expect_err("missing rate-risk transform");
         assert!(error.to_string().contains("underlying_price_change_per_bp"));
     }

@@ -4,7 +4,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_rates::inflation_swap::InflationSwapBuilder;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations_test_support::inflation::*;
 use rust_decimal::Decimal;
 use time::Month;
@@ -16,7 +16,7 @@ fn test_complete_pricing_workflow() {
 
     let ctx = realistic_market(as_of);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-FULL-1".into())
         .notional(large_notional())
         .start_date(as_of)
@@ -85,7 +85,7 @@ fn test_pricing_over_time() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-TIME".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -132,7 +132,7 @@ fn test_portfolio_of_swaps() {
         (10, PayReceive::Pay),
     ] {
         let maturity = Date::from_calendar_date(2025 + years, Month::January, 1).unwrap();
-        let swap = InflationSwapBuilder::new()
+        let swap = InflationSwap::builder()
             .id(format!("ZCINF-PORT-{}Y", years).into())
             .notional(standard_notional())
             .start_date(as_of)
@@ -176,7 +176,7 @@ fn test_stress_scenarios() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-STRESS".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -222,7 +222,7 @@ fn test_side_symmetry() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap_pay = InflationSwapBuilder::new()
+    let swap_pay = InflationSwap::builder()
         .id("ZCINF-SYM-PAY".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -236,7 +236,7 @@ fn test_side_symmetry() {
         .build()
         .unwrap();
 
-    let swap_receive = InflationSwapBuilder::new()
+    let swap_receive = InflationSwap::builder()
         .id("ZCINF-SYM-RCV".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -270,7 +270,7 @@ fn test_realistic_market_workflow() {
     let ctx = realistic_market(as_of);
 
     // 10Y inflation swap at market
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-REAL-MKT".into())
         .notional(large_notional())
         .start_date(as_of)
@@ -296,7 +296,7 @@ fn test_realistic_market_workflow() {
     let par_rate = *result.measures.get("par_rate").unwrap();
 
     // Create swap at par
-    let swap_at_par = InflationSwapBuilder::new()
+    let swap_at_par = InflationSwap::builder()
         .id("ZCINF-REAL-PAR".into())
         .notional(large_notional())
         .start_date(as_of)

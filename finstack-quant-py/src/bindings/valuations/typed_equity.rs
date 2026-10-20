@@ -177,8 +177,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
             enum_from_str(option_type, "option_type")?,
             quantity,
             currency_from_py(currency, "currency")?,
-        )
-        .with_settlement(finstack_quant_valuations::instruments::SettlementType::Cash);
+        );
         let inner =
             finstack_quant_valuations::instruments::EquityOption::european_with_market_data(
                 id,

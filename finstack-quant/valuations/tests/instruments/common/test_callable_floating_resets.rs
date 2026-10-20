@@ -97,12 +97,12 @@ fn floating_credit_bond() -> Bond {
         "USD-OIS",
     )
     .unwrap();
-    bond.cashflow_spec = CashflowSpec::floating_with_reset_lag(
+    bond.cashflow_spec = CashflowSpec::floating(
         CurveId::from("USD-SOFR-3M"),
         200.0,
         Tenor::quarterly(),
         DayCount::Act360,
-        0,
+        Some(0),
     )
     .unwrap();
     bond.credit_curve_id = Some(CurveId::from("USD-HAZ"));

@@ -486,7 +486,7 @@ fn test_metric_date_handling_uses_adjusted_dates() {
 
     let collateral = treasury_collateral();
 
-    let repo_weekend = finstack_quant_valuations::instruments::rates::repo::RepoBuilder::new()
+    let repo_weekend = finstack_quant_valuations::instruments::rates::repo::Repo::builder()
         .id("WEEKEND-DATES".into())
         .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral.clone())
@@ -509,7 +509,7 @@ fn test_metric_date_handling_uses_adjusted_dates() {
     let start_monday = date(2025, 1, 6);
     let maturity_monday = date(2025, 1, 13);
 
-    let repo_adjusted = finstack_quant_valuations::instruments::rates::repo::RepoBuilder::new()
+    let repo_adjusted = finstack_quant_valuations::instruments::rates::repo::Repo::builder()
         .id("ADJUSTED-DATES".into())
         .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)

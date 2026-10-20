@@ -265,38 +265,7 @@ impl CdsTranche {
         credit_index_id: impl Into<CurveId>,
         side: PayReceive,
     ) -> finstack_quant_core::Result<Self> {
-        if tranche_params.attach_pct >= tranche_params.detach_pct {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "attach_pct ({}) must be less than detach_pct ({})",
-                tranche_params.attach_pct, tranche_params.detach_pct
-            )));
-        }
-        if tranche_params.attach_pct < 0.0 || tranche_params.detach_pct > 100.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "attach_pct ({}) and detach_pct ({}) must be in [0, 100] (percent, not fraction)",
-                tranche_params.attach_pct, tranche_params.detach_pct
-            )));
-        }
-        if tranche_params.notional.amount() <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Tranche notional must be positive, got {}",
-                tranche_params.notional.amount()
-            )));
-        }
-
-        // Reject values that look like fractions (very small non-zero
-        // detachment). Tranche points are quoted in percent; a 0.03/0.07
-        // "3-7%" tranche passed as fractions would silently price a 100×
-        // thinner tranche.
-        if tranche_params.detach_pct <= 1.0 && tranche_params.detach_pct > 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "detach_pct={} looks like a fraction; attach/detach are quoted in percent \
-                 (e.g., 3.0 for 3%). Multiply fractional inputs by 100.",
-                tranche_params.detach_pct
-            )));
-        }
-
-        Ok(Self {
+        let tranche = Self {
             id: id.into(),
             index_name: tranche_params.index_name.to_owned(),
             series: tranche_params.series,
@@ -322,7 +291,9 @@ impl CdsTranche {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
-        })
+        };
+        tranche.validate()?;
+        Ok(tranche)
     }
 
     /// Create a standard CDS tranche with IMM coupon dates and market conventions.

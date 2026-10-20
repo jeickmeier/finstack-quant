@@ -316,7 +316,6 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
     });
 
     let builder_doc = format!("Builder for `{}`.", struct_name);
-    let new_doc = "Creates a new builder instance.";
     let build_doc = "Builds the final instance.";
     let builder_method_doc = "Creates a new builder.";
     let validation = if let Some(validator) = custom_validator {
@@ -337,8 +336,6 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
         }
 
         impl #builder_name {
-            #[doc = #new_doc]
-            pub fn new() -> Self { Self::default() }
             #(#setter_req)*
             #(#setter_opt)*
             #[doc = #build_doc]
@@ -355,7 +352,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
         impl #struct_name {
             #[doc = #builder_method_doc]
             #[must_use]
-            pub fn builder() -> #builder_name { #builder_name::new() }
+            pub fn builder() -> #builder_name { #builder_name::default() }
         }
     };
 

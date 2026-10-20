@@ -6,7 +6,6 @@ use finstack_quant_core::dates::{Date, DateExt, DayCount, StubKind};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{Bps, CurveId, InstrumentId, Rate};
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
 use time::macros::date;
 
@@ -218,8 +217,11 @@ impl Bond {
         discount_curve_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
         let coupon_rate = coupon_rate.into();
-        let mut cashflow_spec =
-            CashflowSpec::fixed_rate(coupon_rate, convention.frequency(), convention.day_count())?;
+        let mut cashflow_spec = CashflowSpec::fixed(
+            coupon_rate.as_decimal(),
+            convention.frequency(),
+            convention.day_count(),
+        )?;
         if let CashflowSpec::Fixed(spec) = &mut cashflow_spec {
             spec.schedule.stub = convention.stub_convention();
             spec.schedule.business_day_convention = convention.business_day_convention();
@@ -230,28 +232,15 @@ impl Bond {
             spec.schedule.end_of_month =
                 issue_date.end_of_month() == issue_date && maturity.end_of_month() == maturity;
         }
-        let bond = Self::builder()
+        Self::builder()
             .id(id.into())
             .notional(notional)
             .issue_date(issue_date)
             .maturity(maturity)
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(discount_curve_id.into())
-            .credit_curve_id_opt(None)
-            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-            .attributes(Attributes::new())
-            .settlement_convention_opt(Some(BondSettlementConvention {
-                settlement_days: convention.settlement_days(),
-                ex_coupon_days: convention.ex_coupon_days().unwrap_or(0),
-                ex_coupon_calendar_id: convention
-                    .calendar_id()
-                    .map(|id| id.to_string())
-                    .map(Into::into),
-            }))
-            .build()?;
-
-        bond.validate()?;
-        Ok(bond)
+            .settlement_convention(convention_settlement(convention))
+            .build()
     }
 
     /// Set the coupon-schedule stub convention.
@@ -443,8 +432,13 @@ impl Bond {
         discount_curve_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
         let spread_bp = spread_bp.into();
-        let mut cashflow_spec =
-            CashflowSpec::floating_bp(forward_curve_id.into(), spread_bp, frequency, day_count);
+        let mut cashflow_spec = CashflowSpec::floating(
+            forward_curve_id.into(),
+            f64::from(spread_bp.as_bp()),
+            frequency,
+            day_count,
+            None,
+        )?;
         if let CashflowSpec::Floating(spec) = &mut cashflow_spec {
             spec.schedule.business_day_convention = convention.business_day_convention();
             spec.schedule.calendar_id = convention
@@ -452,28 +446,15 @@ impl Bond {
                 .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
                 .into();
         }
-        let bond = Self::builder()
+        Self::builder()
             .id(id.into())
             .notional(notional)
             .issue_date(issue_date)
             .maturity(maturity)
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(discount_curve_id.into())
-            .credit_curve_id_opt(None)
-            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-            .attributes(Attributes::new())
-            .settlement_convention_opt(Some(BondSettlementConvention {
-                settlement_days: convention.settlement_days(),
-                ex_coupon_days: convention.ex_coupon_days().unwrap_or(0),
-                ex_coupon_calendar_id: convention
-                    .calendar_id()
-                    .map(|id| id.to_string())
-                    .map(Into::into),
-            }))
-            .build()?;
-
-        bond.validate()?;
-        Ok(bond)
+            .settlement_convention(convention_settlement(convention))
+            .build()
     }
 
     /// Create a zero-coupon bond.
@@ -517,7 +498,7 @@ impl Bond {
         maturity: Date,
         discount_curve_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
-        let bond = Self::builder()
+        Self::builder()
             .id(id.into())
             .notional(notional)
             .issue_date(issue_date)
@@ -528,14 +509,7 @@ impl Bond {
                 DayCount::Act365F,
             )?)
             .discount_curve_id(discount_curve_id.into())
-            .credit_curve_id_opt(None)
-            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-            .attributes(Attributes::new())
-            .settlement_convention_opt(None)
-            .build()?;
-
-        bond.validate()?;
-        Ok(bond)
+            .build()
     }
 
     /// Create a bond from a pre-built cashflow schedule.
@@ -716,11 +690,8 @@ impl Bond {
             .maturity(maturity)
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(discount_curve_id.into())
-            .credit_curve_id_opt(None)
             .instrument_pricing_overrides(pricing_overrides)
             .custom_cashflows_opt(Some(schedule))
-            .attributes(Attributes::new())
-            .settlement_convention_opt(None)
             .build()
     }
 
@@ -899,24 +870,18 @@ impl Bond {
             },
         });
 
-        let bond = Self::builder()
+        Self::builder()
             .id(InstrumentId::new("FRN-USD-SOFR-5Y"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2029 - 01 - 15))
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(CurveId::new("USD-OIS"))
-            .credit_curve_id_opt(None)
-            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-            .attributes(Attributes::new())
-            .settlement_convention_opt(Some(BondSettlementConvention {
+            .settlement_convention(BondSettlementConvention {
                 settlement_days: 2,
                 ..Default::default()
-            }))
-            .build()?;
-
-        bond.validate()?;
-        Ok(bond)
+            })
+            .build()
     }
 
     /// Create an example callable fixed-rate bond for testing and documentation.
@@ -955,25 +920,19 @@ impl Bond {
             puts: vec![],
         };
 
-        let bond = Self::builder()
+        Self::builder()
             .id(InstrumentId::new("CALLABLE-USD-10Y"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2034 - 01 - 15))
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(CurveId::new("USD-OIS"))
-            .credit_curve_id_opt(None)
-            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .call_put_opt(Some(call_put))
-            .attributes(Attributes::new())
-            .settlement_convention_opt(Some(BondSettlementConvention {
+            .settlement_convention(BondSettlementConvention {
                 settlement_days: 2,
                 ..Default::default()
-            }))
-            .build()?;
-
-        bond.validate()?;
-        Ok(bond)
+            })
+            .build()
     }
 
     /// Create an example amortizing fixed-rate bond for testing and documentation.
@@ -1010,24 +969,18 @@ impl Bond {
             },
         };
 
-        let bond = Self::builder()
+        Self::builder()
             .id(InstrumentId::new("AMORT-USD-5Y"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2029 - 01 - 15))
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(CurveId::new("USD-OIS"))
-            .credit_curve_id_opt(None)
-            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-            .attributes(Attributes::new())
-            .settlement_convention_opt(Some(BondSettlementConvention {
+            .settlement_convention(BondSettlementConvention {
                 settlement_days: 2,
                 ..Default::default()
-            }))
-            .build()?;
-
-        bond.validate()?;
-        Ok(bond)
+            })
+            .build()
     }
 }
 
@@ -1111,6 +1064,20 @@ impl Bond {
     #[must_use]
     pub fn min_xirr(self, rate: impl Into<Rate>) -> Self {
         self.with_return_floor(ReturnFloorSpec::xirr(rate))
+    }
+}
+
+/// Settlement and ex-coupon terms a bond market convention implies.
+fn convention_settlement(
+    convention: finstack_quant_valuations_core::instruments::BondConvention,
+) -> BondSettlementConvention {
+    BondSettlementConvention {
+        settlement_days: convention.settlement_days(),
+        ex_coupon_days: convention.ex_coupon_days().unwrap_or(0),
+        ex_coupon_calendar_id: convention
+            .calendar_id()
+            .map(|id| id.to_string())
+            .map(Into::into),
     }
 }
 
