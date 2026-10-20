@@ -409,19 +409,6 @@ fn collect_lookback_inputs(
 /// Lookback option analytical pricer (continuous monitoring).
 pub(crate) struct LookbackOptionAnalyticalPricer;
 
-impl LookbackOptionAnalyticalPricer {
-    /// Create a new analytical lookback option pricer
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for LookbackOptionAnalyticalPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Pricer for LookbackOptionAnalyticalPricer {
     fn key(&self) -> PricerKey {
         PricerKey::new(

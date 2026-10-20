@@ -61,11 +61,9 @@ mod engine;
 mod expected_loss;
 mod heterogeneous;
 mod integration;
-mod registry;
 mod sensitivities;
 
 #[cfg(test)]
 mod tests;
 
 pub use config::CdsTranchePricer;
-pub(crate) use registry::SimpleCdsTrancheHazardPricer;

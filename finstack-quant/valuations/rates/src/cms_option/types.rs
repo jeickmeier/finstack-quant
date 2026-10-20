@@ -263,7 +263,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsOption {
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         self.validate()?;
         // Present value using convexity-adjusted Black (full convexity).
-        crate::cms_option::pricer::CmsOptionPricer::new()
+        crate::cms_option::pricer::CmsOptionPricer
             .price_internal_with_convexity(self, market, as_of, 1.0)
     }
 

@@ -34,19 +34,6 @@ use finstack_quant_valuations_core::pricer::PricingError;
 /// | `ROUGH_HESTON_HURST` | Hurst exponent |
 pub(crate) struct EquityOptionRoughHestonFourierPricer;
 
-impl EquityOptionRoughHestonFourierPricer {
-    /// Create a new rough Heston Fourier pricer.
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for EquityOptionRoughHestonFourierPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonFourierPricer {
     fn key(&self) -> finstack_quant_valuations_core::pricer::PricerKey {
         finstack_quant_valuations_core::pricer::PricerKey::new(
@@ -252,7 +239,7 @@ mod tests {
         let mut inst = option(date(2026, 1, 1));
         inst.discrete_dividends = vec![(date(2025, 7, 1), 2.0)];
 
-        let err = EquityOptionRoughHestonFourierPricer::new()
+        let err = EquityOptionRoughHestonFourierPricer
             .price_dyn(&inst, &market(as_of), as_of)
             .expect_err("rough Heston Fourier must reject discrete dividends");
         let msg = err.to_string();

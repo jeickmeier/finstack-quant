@@ -433,19 +433,6 @@ fn collect_fx_barrier_inputs(
 /// FX Barrier option analytical pricer (continuous monitoring).
 pub(crate) struct FxBarrierOptionAnalyticalPricer;
 
-impl FxBarrierOptionAnalyticalPricer {
-    /// Create a new analytical FX barrier option pricer
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for FxBarrierOptionAnalyticalPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Compute the BS barrier price + optional rebate (without notional scaling).
 fn bs_barrier_price_per_unit(
     fx_barrier: &FxBarrierOption,
@@ -640,7 +627,7 @@ mod tests {
             observation_dates: vec![start, inst.expiry],
         };
 
-        let error = FxBarrierOptionAnalyticalPricer::new()
+        let error = FxBarrierOptionAnalyticalPricer
             .price_dyn(&inst, &MarketContext::new(), start)
             .expect_err("discrete contract must reject analytical model");
         let PricingError::InvalidInput { context, .. } = error else {
@@ -663,7 +650,7 @@ mod tests {
         let mut inst = FxBarrierOption::example().expect("example");
         let as_of = inst.monitoring_start_date.expect("example start");
         inst.monitoring_start_date = Some(inst.expiry);
-        let error = FxBarrierOptionAnalyticalPricer::new()
+        let error = FxBarrierOptionAnalyticalPricer
             .price_dyn(&inst, &MarketContext::new(), as_of)
             .expect_err("future monitoring");
         assert!(error.to_string().contains("Future FX barrier monitoring"));
@@ -793,7 +780,7 @@ mod tests {
                 };
                 let booked = 50_000.0 - remaining;
                 for result in [
-                    FxBarrierOptionAnalyticalPricer::new().price_dyn(&inst, &market, as_of),
+                    FxBarrierOptionAnalyticalPricer.price_dyn(&inst, &market, as_of),
                     FxBarrierOptionMcPricer::new().price_dyn(&inst, &market, as_of),
                 ] {
                     let pv = result.expect("processed hit value").value.amount();

@@ -264,7 +264,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for BarrierOption {
         use crate::exotics::barrier_option::pricer::BarrierOptionAnalyticalPricer;
         use finstack_quant_valuations_core::pricer::Pricer;
 
-        let pricer = BarrierOptionAnalyticalPricer::new();
+        let pricer = BarrierOptionAnalyticalPricer;
         let result = pricer.price_dyn(self, market, as_of)?;
         Ok(result.value)
     }

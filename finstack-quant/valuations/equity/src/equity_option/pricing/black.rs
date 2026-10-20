@@ -500,26 +500,12 @@ fn tree_finite_difference_greeks(
     })
 }
 
-/// Registry pricer for Equity Option using Black-Scholes model
+/// Registry pricer for Equity Option using Black-Scholes model.
+///
+/// Registered under `ModelKey::Black76`, the library-wide key for lognormal
+/// option pricing: BSM is Black-76 applied to the forward
+/// `F = S × exp((r-q)T)`, so the same model key covers both.
 pub(crate) struct SimpleEquityOptionBlackPricer;
-
-impl SimpleEquityOptionBlackPricer {
-    /// Create new Black-Scholes pricer with default model.
-    ///
-    /// Uses `ModelKey::Black76` which is the library-wide convention for
-    /// lognormal option pricing. BSM and Black-76 are mathematically
-    /// equivalent (BSM is Black-76 applied to the forward
-    /// `F = S × exp((r-q)T)`), so the same model key covers both.
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for SimpleEquityOptionBlackPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl finstack_quant_valuations_core::pricer::Pricer for SimpleEquityOptionBlackPricer {
     fn key(&self) -> finstack_quant_valuations_core::pricer::PricerKey {

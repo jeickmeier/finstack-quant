@@ -581,19 +581,6 @@ fn analytic_inputs(
 /// Geometric Asian option analytical pricer.
 pub struct AsianOptionAnalyticalGeometricPricer;
 
-impl AsianOptionAnalyticalGeometricPricer {
-    /// Create a new analytical geometric Asian option pricer
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for AsianOptionAnalyticalGeometricPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Pricer for AsianOptionAnalyticalGeometricPricer {
     fn key(&self) -> PricerKey {
         PricerKey::new(InstrumentType::AsianOption, ModelKey::AsianGeometricBS)
@@ -731,19 +718,6 @@ fn fixing_year_fractions(
 
 /// Arithmetic Asian option semi-analytical pricer (Turnbull-Wakeman).
 pub struct AsianOptionSemiAnalyticalTwPricer;
-
-impl AsianOptionSemiAnalyticalTwPricer {
-    /// Create a new Turnbull-Wakeman approximation Asian option pricer
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for AsianOptionSemiAnalyticalTwPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Pricer for AsianOptionSemiAnalyticalTwPricer {
     fn key(&self) -> PricerKey {
@@ -1323,7 +1297,7 @@ mod tests {
         );
         option.past_fixings = fixing_dates.iter().copied().zip([100.0, 121.0]).collect();
 
-        let pricer = AsianOptionAnalyticalGeometricPricer::new();
+        let pricer = AsianOptionAnalyticalGeometricPricer;
         let low_spot_pv = pricer
             .price_dyn(&option, &market(as_of, 50.0, 0.20, 0.05, 0.0), as_of)
             .expect("expired geometric Asian price at low current spot")
@@ -1357,7 +1331,7 @@ mod tests {
             vec![date(2025, 3, 31), date(2025, 6, 30)],
         );
 
-        let err = AsianOptionAnalyticalGeometricPricer::new()
+        let err = AsianOptionAnalyticalGeometricPricer
             .price_dyn(&option, &market(as_of, 125.0, 0.20, 0.05, 0.0), as_of)
             .expect_err("expired Asian option must require realized fixings");
         assert!(err.to_string().contains("missing a past fixing"));
@@ -1375,7 +1349,7 @@ mod tests {
             vec![date(2025, 3, 2), expiry],
         );
 
-        let err = AsianOptionAnalyticalGeometricPricer::new()
+        let err = AsianOptionAnalyticalGeometricPricer
             .price_dyn(&option, &market_without_vol(as_of, 100.0, 0.05, 0.0), as_of)
             .expect_err("missing vol surface should be wrapped");
         assert!(err.to_string().contains("SPX-VOL"));
@@ -1407,7 +1381,7 @@ mod tests {
             .zip([101.0, 103.0, 102.0])
             .collect();
 
-        let err = AsianOptionAnalyticalGeometricPricer::new()
+        let err = AsianOptionAnalyticalGeometricPricer
             .price_dyn(&option, &market(as_of, 100.0, 0.20, 0.05, 0.0), as_of)
             .expect_err("seasoned geometric analytical pricing should be rejected");
         assert!(err
@@ -1442,7 +1416,7 @@ mod tests {
             .collect();
 
         let market = market(as_of, 100.0, 0.20, 0.05, 0.0);
-        let pv = AsianOptionSemiAnalyticalTwPricer::new()
+        let pv = AsianOptionSemiAnalyticalTwPricer
             .price_dyn(&option, &market, as_of)
             .expect("deterministic TW price")
             .value
@@ -1494,7 +1468,7 @@ mod tests {
             .collect();
 
         let market = market(as_of, 100.0, 0.20, 0.05, 0.01);
-        let pv = AsianOptionSemiAnalyticalTwPricer::new()
+        let pv = AsianOptionSemiAnalyticalTwPricer
             .price_dyn(&option, &market, as_of)
             .expect("deep ITM TW price")
             .value
@@ -1562,7 +1536,7 @@ mod tests {
             .zip([250.0, 240.0, 260.0, 255.0])
             .collect();
 
-        let pv = AsianOptionSemiAnalyticalTwPricer::new()
+        let pv = AsianOptionSemiAnalyticalTwPricer
             .price_dyn(&option, &market(as_of, 100.0, 0.20, 0.05, 0.01), as_of)
             .expect("deep OTM TW put should price")
             .value
@@ -1605,7 +1579,7 @@ mod tests {
             vec![date(2025, 3, 2), expiry],
         );
 
-        let err = AsianOptionSemiAnalyticalTwPricer::new()
+        let err = AsianOptionSemiAnalyticalTwPricer
             .price_dyn(&option, &market_without_vol(as_of, 100.0, 0.05, 0.0), as_of)
             .expect_err("missing vol surface should be wrapped");
         assert!(err.to_string().contains("SPX-VOL"));
@@ -1905,7 +1879,7 @@ mod tests {
                 .expect("curve");
             let curves = market(as_of, 100.0, 0.0, 0.0, 0.0).insert(curve);
             let expected = 5.0 * terminal_df;
-            let actual = AsianOptionAnalyticalGeometricPricer::new()
+            let actual = AsianOptionAnalyticalGeometricPricer
                 .price_dyn(&option, &curves, as_of)
                 .expect("analytical")
                 .value
@@ -2135,7 +2109,7 @@ mod tests {
                             - expected_g * finstack_quant_core::math::norm_cdf(-d1)
                     }
                 };
-            let actual = AsianOptionAnalyticalGeometricPricer::new()
+            let actual = AsianOptionAnalyticalGeometricPricer
                 .price_dyn(&option, &curves, as_of)
                 .expect("analytic")
                 .value
@@ -2223,11 +2197,11 @@ mod tests {
                 .expect("theta spot"),
         );
         let registry_errors = [
-            AsianOptionAnalyticalGeometricPricer::new()
+            AsianOptionAnalyticalGeometricPricer
                 .price_dyn(&geometric, &eur_spot, as_of)
                 .expect_err("geometric spot")
                 .to_string(),
-            AsianOptionSemiAnalyticalTwPricer::new()
+            AsianOptionSemiAnalyticalTwPricer
                 .price_dyn(&arithmetic, &eur_spot, as_of)
                 .expect_err("TW spot")
                 .to_string(),
@@ -2250,8 +2224,8 @@ mod tests {
         let as_of = date(2025, 1, 2);
         let surface_20 = market(as_of, 100.0, 0.20, 0.05, 0.01);
         let surface_40 = market(as_of, 100.0, 0.40, 0.05, 0.01);
-        let geometric_pricer = AsianOptionAnalyticalGeometricPricer::new();
-        let tw_pricer = AsianOptionSemiAnalyticalTwPricer::new();
+        let geometric_pricer = AsianOptionAnalyticalGeometricPricer;
+        let tw_pricer = AsianOptionSemiAnalyticalTwPricer;
         let price = |pricer: &dyn Pricer, option: &AsianOption, curves: &MarketContext| {
             pricer
                 .price_dyn(option, curves, as_of)

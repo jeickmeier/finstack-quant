@@ -587,7 +587,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxBarrierOption
             return compute_pv(self, market, as_of);
         }
 
-        let pricer = FxBarrierOptionAnalyticalPricer::new();
+        let pricer = FxBarrierOptionAnalyticalPricer;
         let result = pricer
             .price_dyn(self, market, as_of)
             .map_err(finstack_quant_core::Error::from)?;

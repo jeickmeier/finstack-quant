@@ -28,40 +28,10 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 pub(crate) fn register_inflation_swap_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::MetricId;
     use finstack_quant_valuations_core::pricer::InstrumentType;
-    use std::sync::Arc;
 
-    // Custom metrics
-    for (id, calculator) in [
-        (
-            MetricId::custom("breakeven"),
-            Arc::new(BreakevenCalculator)
-                as Arc<dyn finstack_quant_valuations_core::metrics::MetricCalculator>,
-        ),
-        (
-            MetricId::custom("fixed_leg_pv"),
-            Arc::new(FixedLegPvCalculator),
-        ),
-        (
-            MetricId::custom("inflation_leg_pv"),
-            Arc::new(InflationLegPvCalculator),
-        ),
-        (
-            MetricId::Inflation01,
-            Arc::new(inflation01::Inflation01Calculator),
-        ),
-        (
-            MetricId::InflationConvexity,
-            Arc::new(inflation_convexity::InflationConvexityCalculator),
-        ),
-    ] {
-        registry.register_metric(id, calculator, &[InstrumentType::InflationSwap])?;
-    }
     // Note: `Npv01` is intentionally NOT registered — it was an exact
     // duplicate of `Dv01` (same `parallel_combined` config). Use `Dv01`.
-
-    // Standard metrics using macro
     finstack_quant_valuations_core::register_metrics! {
         registry: registry,
         instrument: InstrumentType::InflationSwap,
@@ -69,6 +39,13 @@ pub(crate) fn register_inflation_swap_metrics(
             (ParRate, ParRateCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (Inflation01, inflation01::Inflation01Calculator),
+            (InflationConvexity, inflation_convexity::InflationConvexityCalculator),
+        ],
+        custom: [
+            ("breakeven", BreakevenCalculator),
+            ("fixed_leg_pv", FixedLegPvCalculator),
+            ("inflation_leg_pv", InflationLegPvCalculator),
         ]
     }
 

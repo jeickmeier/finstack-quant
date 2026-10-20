@@ -715,7 +715,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for QuantoOption {
 
         self.validate()?;
 
-        let pricer = QuantoOptionAnalyticalPricer::new();
+        let pricer = QuantoOptionAnalyticalPricer;
         let result = pricer
             .price_dyn(self, market, as_of)
             .map_err(finstack_quant_core::Error::from)?;

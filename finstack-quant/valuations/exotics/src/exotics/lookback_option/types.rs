@@ -286,7 +286,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for LookbackOption 
         use crate::exotics::lookback_option::pricer::LookbackOptionAnalyticalPricer;
         use finstack_quant_valuations_core::pricer::Pricer;
 
-        let pricer = LookbackOptionAnalyticalPricer::new();
+        let pricer = LookbackOptionAnalyticalPricer;
         let result = pricer.price_dyn(self, market, as_of)?;
         Ok(result.value)
     }

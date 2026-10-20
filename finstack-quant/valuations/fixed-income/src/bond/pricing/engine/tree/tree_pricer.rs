@@ -312,26 +312,6 @@ impl TreePricer {
             .unwrap_or(self.config.tree_steps)
     }
 
-    /// Create a new tree pricer with default configuration.
-    ///
-    /// # Returns
-    ///
-    /// A `TreePricer` with default configuration (200 steps, 1% volatility).
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations_fixed_income::bond::pricing::engine::tree::TreePricer;
-    ///
-    /// let pricer = TreePricer::new();
-    /// ```
-    pub fn new() -> Self {
-        Self {
-            config: TreePricerConfig::default(),
-            model: BondTreeModel::RatesOnly,
-        }
-    }
-
     /// Create a tree pricer with custom configuration.
     ///
     /// # Arguments
@@ -678,12 +658,6 @@ impl OasPricer<'_> {
     }
 }
 
-impl Default for TreePricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Reject a lognormal short-rate tree whose calibration missed the curve.
 ///
 /// `model` names the lattice ("BDT", "Black-Karasinski") in the error.
@@ -803,7 +777,7 @@ mod tests {
             });
             bond
         };
-        let pricer = TreePricer::new();
+        let pricer = TreePricer::with_config(TreePricerConfig::default());
         let bullet_pv = pricer
             .price_at_oas(&bullet, &market, as_of, 0.0)
             .expect("rolled bullet price");

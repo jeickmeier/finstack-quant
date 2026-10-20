@@ -390,12 +390,12 @@ impl finstack_quant_valuations_core::instruments::Instrument for AsianOption {
 
         match self.averaging_method {
             AveragingMethod::Geometric => {
-                let pricer = AsianOptionAnalyticalGeometricPricer::new();
+                let pricer = AsianOptionAnalyticalGeometricPricer;
                 let result = pricer.price_dyn(self, market, as_of)?;
                 Ok(result.value)
             }
             AveragingMethod::Arithmetic => {
-                let pricer = AsianOptionSemiAnalyticalTwPricer::new();
+                let pricer = AsianOptionSemiAnalyticalTwPricer;
                 let result = pricer.price_dyn(self, market, as_of)?;
                 Ok(result.value)
             }

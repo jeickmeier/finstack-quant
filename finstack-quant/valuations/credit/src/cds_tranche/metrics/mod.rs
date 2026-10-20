@@ -26,31 +26,15 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 pub(crate) fn register_cds_tranche_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::MetricId;
     use finstack_quant_valuations_core::pricer::InstrumentType;
-    use std::sync::Arc;
 
-    for (id, calculator) in [
-        (
-            MetricId::custom("model_upfront"),
-            Arc::new(ModelUpfrontCalculator)
-                as Arc<dyn finstack_quant_valuations_core::metrics::MetricCalculator>,
-        ),
-        (MetricId::SpreadDv01, Arc::new(SpreadDv01Calculator)),
-        (MetricId::Correlation01, Arc::new(Correlation01Calculator)),
-        (
-            MetricId::Recovery01,
-            Arc::new(recovery01::Recovery01Calculator),
-        ),
-    ] {
-        registry.register_metric(id, calculator, &[InstrumentType::CdsTranche])?;
-    }
-
-    // Standard metrics using macro
     finstack_quant_valuations_core::register_metrics! {
         registry: registry,
         instrument: InstrumentType::CdsTranche,
         metrics: [
+            (SpreadDv01, SpreadDv01Calculator),
+            (Correlation01, Correlation01Calculator),
+            (Recovery01, recovery01::Recovery01Calculator),
             (Cs01, cs01::CdsTrancheCs01Calculator),
             (BucketedCs01, cs01::CdsTrancheBucketedCs01Calculator),
             (ParSpread, ParSpreadCalculator),
@@ -58,6 +42,9 @@ pub(crate) fn register_cds_tranche_metrics(
             (JumpToDefault, JumpToDefaultCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+        ],
+        custom: [
+            ("model_upfront", ModelUpfrontCalculator),
         ]
     }
     Ok(())

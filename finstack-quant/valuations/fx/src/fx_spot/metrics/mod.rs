@@ -18,30 +18,18 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 pub(crate) fn register_fx_spot_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::MetricId;
+    use finstack_quant_valuations_core::metrics::sensitivities::fx01::GenericFx01Calculator;
     use finstack_quant_valuations_core::pricer::InstrumentType;
-
-    // FxDelta and Fx01 are the same quantity (PV change per 1% relative spot
-    // move) and share the generic calculator; both ids are kept because
-    // consumers ask for either name.
-    registry.register_metric(
-        MetricId::FxDelta,
-        finstack_quant_valuations_core::metrics::sensitivities::fx01::arc_generic_fx01(),
-        &[InstrumentType::FxSpot],
-    )?;
-    // FX01 now uses the shared `GenericFx01Calculator` (1% relative spot
-    // move) instead of the per-instrument trivial `notional * 0.0001` shim.
-    // This aligns the unit convention with every attribution consumer.
-    registry.register_metric(
-        MetricId::Fx01,
-        finstack_quant_valuations_core::metrics::sensitivities::fx01::arc_generic_fx01(),
-        &[InstrumentType::FxSpot],
-    )?;
 
     finstack_quant_valuations_core::register_metrics! {
         registry: registry,
         instrument: InstrumentType::FxSpot,
         metrics: [
+            // FxDelta and Fx01 are the same quantity (PV change per 1%
+            // relative spot move) and share the generic calculator; both ids
+            // are kept because consumers ask for either name.
+            (FxDelta, GenericFx01Calculator),
+            (Fx01, GenericFx01Calculator),
             (SpotRate, SpotRateCalculator),
             (BaseAmount, BaseAmountCalculator),
             (InverseRate, InverseRateCalculator),

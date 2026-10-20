@@ -38,7 +38,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
         return Ok(None);
     };
 
-    let pricer = crate::term_loan::pricing::TermLoanTreePricer::new();
+    let pricer = crate::term_loan::pricing::TermLoanTreePricer;
     let oas_bp = pricer.calculate_oas(loan, context.curves.as_ref(), context.as_of, clean_price)?;
     Ok(Some(oas_bp / 10_000.0))
 }

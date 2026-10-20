@@ -729,16 +729,13 @@ impl TreeValuator for TermLoanValuator {
 }
 
 /// Tree-based pricer for callable term loans.
-#[derive(Debug, Clone, Default)]
+///
+/// A unit struct: per-loan settings come from the loan's
+/// `instrument_pricing_overrides.model_config`.
+#[derive(Debug, Clone)]
 pub struct TermLoanTreePricer;
 
 impl TermLoanTreePricer {
-    /// Create a tree pricer; per-loan settings come from the loan's
-    /// `instrument_pricing_overrides.model_config`.
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Tree steps: `model_config.tree_steps`, else [`DEFAULT_TREE_STEPS`].
     fn tree_steps(loan: &TermLoan) -> usize {
         loan.instrument_pricing_overrides

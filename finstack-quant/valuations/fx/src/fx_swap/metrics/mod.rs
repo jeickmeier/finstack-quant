@@ -23,41 +23,25 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 pub(crate) fn register_fx_swap_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::MetricId;
+    use finstack_quant_valuations_core::metrics::sensitivities::fx01::GenericFx01Calculator;
     use finstack_quant_valuations_core::pricer::InstrumentType;
-    use std::sync::Arc;
 
-    // Custom metrics
-    for (id, calculator) in [
-        (
-            MetricId::custom("carry_pv"),
-            Arc::new(CarryPv) as Arc<dyn finstack_quant_valuations_core::metrics::MetricCalculator>,
-        ),
-        (MetricId::custom("forward_points"), Arc::new(ForwardPoints)),
-        (
-            MetricId::Fx01,
-            finstack_quant_valuations_core::metrics::sensitivities::fx01::arc_generic_fx01(),
-        ),
-        (
-            MetricId::FxDelta,
-            finstack_quant_valuations_core::metrics::sensitivities::fx01::arc_generic_fx01(),
-        ),
-        (
-            MetricId::Dv01Domestic,
-            Arc::new(ir01_domestic::DomesticIR01),
-        ),
-        (MetricId::Dv01Foreign, Arc::new(ir01_foreign::ForeignIR01)),
-    ] {
-        registry.register_metric(id, calculator, &[InstrumentType::FxSwap])?;
-    }
-
-    // Standard metrics using macro
+    // Fx01 and FxDelta are the same quantity (PV change per 1% relative spot
+    // move); both ids are kept because consumers ask for either name.
     finstack_quant_valuations_core::register_metrics! {
         registry: registry,
         instrument: InstrumentType::FxSwap,
         metrics: [
+            (Fx01, GenericFx01Calculator),
+            (FxDelta, GenericFx01Calculator),
+            (Dv01Domestic, ir01_domestic::DomesticIR01),
+            (Dv01Foreign, ir01_foreign::ForeignIR01),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+        ],
+        custom: [
+            ("carry_pv", CarryPv),
+            ("forward_points", ForwardPoints),
         ]
     }
     Ok(())

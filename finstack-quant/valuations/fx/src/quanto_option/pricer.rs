@@ -135,19 +135,6 @@ fn payoff_scale(inst: &QuantoOption) -> finstack_quant_core::Result<f64> {
 /// Quanto option analytical pricer.
 pub(crate) struct QuantoOptionAnalyticalPricer;
 
-impl QuantoOptionAnalyticalPricer {
-    /// Create a new analytical quanto option pricer
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for QuantoOptionAnalyticalPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Pricer for QuantoOptionAnalyticalPricer {
     fn key(&self) -> PricerKey {
         PricerKey::new(InstrumentType::QuantoOption, ModelKey::QuantoBS)
@@ -457,7 +444,7 @@ mod tests {
             .build()
             .expect("quanto");
 
-        let result = QuantoOptionAnalyticalPricer::new()
+        let result = QuantoOptionAnalyticalPricer
             .price_dyn(&quanto, &market, as_of)
             .expect("expiry-day valuation");
 
@@ -474,7 +461,7 @@ mod tests {
         // OTM put on the same fixture is worthless at expiry.
         let mut put = quanto;
         put.option_type = finstack_quant_valuations_core::instruments::OptionType::Put;
-        let put_result = QuantoOptionAnalyticalPricer::new()
+        let put_result = QuantoOptionAnalyticalPricer
             .price_dyn(&put, &market, as_of)
             .expect("expiry-day put valuation");
         assert!(

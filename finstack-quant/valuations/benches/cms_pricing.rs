@@ -236,7 +236,7 @@ fn bench_cms_option_replication(c: &mut Criterion) {
         n,
         Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap(),
     );
-    let pricer = CmsReplicationPricer::new();
+    let pricer = CmsReplicationPricer;
 
     group.throughput(Throughput::Elements(n as u64));
     group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {

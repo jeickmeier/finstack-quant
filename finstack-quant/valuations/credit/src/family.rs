@@ -8,6 +8,7 @@ use finstack_quant_valuations_core::pricer::{
     expect_inst, Family, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
     PricingErrorContext,
 };
+use finstack_quant_valuations_core::register_generic;
 use finstack_quant_valuations_core::results::{
     CreditDerivativeValuationDetails, ValuationDetails, ValuationResult,
 };
@@ -17,9 +18,24 @@ pub static CREDIT: Family = Family::new("credit", register_pricers, register_met
 
 fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     registry.register(CdsHazardPricer)?;
-    registry.register(crate::cds_index::pricer::SimpleCdsIndexHazardPricer)?;
-    registry.register(crate::cds_tranche::pricing::SimpleCdsTrancheHazardPricer)?;
-    registry.register(crate::cds_option::pricer::BloombergCdsoPricer)?;
+    register_generic!(
+        registry,
+        InstrumentType::CdsIndex,
+        crate::cds_index::CdsIndex,
+        ModelKey::HazardRate
+    );
+    register_generic!(
+        registry,
+        InstrumentType::CdsTranche,
+        crate::cds_tranche::CdsTranche,
+        ModelKey::HazardRate
+    );
+    register_generic!(
+        registry,
+        InstrumentType::CdsOption,
+        crate::cds_option::CdsOption,
+        ModelKey::BloombergCdso
+    );
     Ok(())
 }
 
@@ -31,7 +47,34 @@ fn register_metrics(registry: &mut MetricRegistry) -> Result<(), MetricRegistryE
     Ok(())
 }
 
+/// Valuation details stamped on every credit-derivative result.
+///
+/// Each credit instrument has exactly one registered pricer, so its
+/// [`Instrument::valuation_details`] hook can name that pricer's model.
+///
+/// # Arguments
+///
+/// * `model_key` - Registered model key of the instrument's pricer.
+/// * `integration_method` - CDS leg integration method the pricer uses
+///   (`"isda_standard_model"`), or `None` when the model has no such choice.
+pub(crate) fn credit_derivative_details(
+    model_key: ModelKey,
+    integration_method: Option<&str>,
+) -> Option<ValuationDetails> {
+    Some(ValuationDetails::CreditDerivative(
+        CreditDerivativeValuationDetails {
+            model_key,
+            integration_method: integration_method.map(str::to_string),
+        },
+    ))
+}
+
 /// Registry adapter pricing a single-name CDS off its hazard curve.
+///
+/// Not a `register_generic!` pricer: the generic pricer's raw-PV path calls
+/// `CreditDefaultSwap::base_value_raw` (unrounded f64), while this adapter's
+/// raw path goes through the `Money` amount. The two differ in the last bits,
+/// so switching would move every finite-difference CDS risk number.
 struct CdsHazardPricer;
 
 impl Pricer for CdsHazardPricer {
@@ -53,24 +96,11 @@ impl Pricer for CdsHazardPricer {
             )
         })?;
 
-        Ok(
-            ValuationResult::stamped(cds.id(), as_of, value).with_details(
-                ValuationDetails::CreditDerivative(credit_derivative_details(
-                    ModelKey::HazardRate,
-                    Some("isda_standard_model"),
-                )),
-            ),
-        )
-    }
-}
-
-fn credit_derivative_details(
-    model_key: ModelKey,
-    integration_method: Option<&str>,
-) -> CreditDerivativeValuationDetails {
-    CreditDerivativeValuationDetails {
-        model_key,
-        integration_method: integration_method.map(str::to_string),
+        let mut result = ValuationResult::stamped(cds.id(), as_of, value);
+        if let Some(details) = cds.valuation_details(market, as_of) {
+            result = result.with_details(details);
+        }
+        Ok(result)
     }
 }
 

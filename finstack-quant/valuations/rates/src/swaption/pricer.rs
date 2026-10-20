@@ -13,19 +13,6 @@ use finstack_quant_valuations_core::results::ValuationResult;
 /// European swaption pricer using the Black-76 formula.
 pub struct SimpleSwaptionBlackPricer;
 
-impl SimpleSwaptionBlackPricer {
-    /// Create a Black-76 swaption pricer.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for SimpleSwaptionBlackPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Pricer for SimpleSwaptionBlackPricer {
     fn key(&self) -> PricerKey {
         PricerKey::new(InstrumentType::Swaption, ModelKey::Black76)
@@ -54,19 +41,6 @@ impl Pricer for SimpleSwaptionBlackPricer {
 
 /// European swaption pricer using the Bachelier normal formula.
 pub struct SimpleSwaptionNormalPricer;
-
-impl SimpleSwaptionNormalPricer {
-    /// Create a Bachelier normal swaption pricer.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for SimpleSwaptionNormalPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Pricer for SimpleSwaptionNormalPricer {
     fn key(&self) -> PricerKey {

@@ -182,11 +182,6 @@ pub(crate) fn replicated_cms_optionlet(
 pub struct CmsReplicationPricer;
 
 impl CmsReplicationPricer {
-    /// Create a new CMS replication pricer.
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Core pricing logic: iterate over fixings and apply static replication.
     fn price_internal(
         &self,
@@ -292,12 +287,6 @@ impl CmsReplicationPricer {
         }
 
         Money::new(total_pv * inst.notional.amount(), inst.notional.currency())
-    }
-}
-
-impl Default for CmsReplicationPricer {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

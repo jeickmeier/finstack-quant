@@ -411,12 +411,6 @@ impl finstack_quant_valuations_core::pricer::Pricer for BondFuturePricer {
     }
 }
 
-impl Default for BondFuturePricer {
-    fn default() -> Self {
-        Self
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
