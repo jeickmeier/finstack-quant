@@ -8,7 +8,7 @@ use crate::bindings::attribution::return_contribution::{
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::extract::{extract_market_ref, InstrumentArg};
+use crate::bindings::extract::{extract_instrument, extract_market_ref};
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::errors::{core_to_py, serde_json_to_py};
@@ -16,20 +16,15 @@ use finstack_quant_attribution::{
     AttributionConfig, AttributionEnvelope, AttributionInputs, AttributionMethod, AttributionSpec,
 };
 use finstack_quant_core::market_data::context::MarketContextState;
-use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::InstrumentJson;
 use pyo3::prelude::*;
 
-/// Parse a typed instrument wrapper or canonical envelope JSON into the
-/// instrument payload the attribution spec carries.
-fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentJson> {
-    match crate::bindings::extract::extract_instrument(obj)? {
-        InstrumentArg::Typed(instrument) => Ok(*instrument),
-        InstrumentArg::Envelope(json) => {
-            let envelope: InstrumentEnvelope = serde_json::from_str(&json)
-                .map_err(|e| serde_json_to_py(e, "invalid attribution instrument envelope JSON"))?;
-            Ok(envelope.instrument)
-        }
-    }
+/// The validated instrument payload of a typed instrument wrapper or a
+/// canonical envelope (`dict` or JSON text), through the canonical loader.
+fn instrument_payload(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentJson> {
+    extract_instrument(obj)?
+        .into_instrument_json()
+        .map_err(core_to_py)
 }
 
 /// Shared optional inputs of [`attribute_pnl`] / [`attribute_pnl_many`].
@@ -38,6 +33,7 @@ struct AttributionOptions<'a, 'py> {
     full_cross_attribution: bool,
     model_params_t0_json: Option<&'a str>,
     credit_factor_model_json: Option<&'a str>,
+    credit_factor_detail_options: Option<&'a Bound<'py, PyAny>>,
 }
 
 /// Build shared attribution inputs from typed-or-JSON Python values.
@@ -91,7 +87,14 @@ fn build_inputs(
         model_params_t0,
         config,
         credit_factor_model,
-        credit_factor_detail_options: Default::default(),
+        credit_factor_detail_options: options
+            .credit_factor_detail_options
+            .map(|value| {
+                serde_json::from_value(py_to_json_value(py, value, "credit_factor_detail_options")?)
+                    .map_err(|e| serde_json_to_py(e, "invalid credit_factor_detail_options"))
+            })
+            .transpose()?
+            .unwrap_or_default(),
         full_cross_attribution: options.full_cross_attribution,
     })
 }
@@ -145,6 +148,10 @@ fn build_inputs(
 /// credit_factor_model_json : str, optional
 ///     Serialized ``CreditFactorModel``. When supplied, credit-factor
 ///     hierarchy detail is populated on the result.
+/// credit_factor_detail_options : dict | str, optional
+///     ``CreditFactorDetailOptions`` (``include_per_issuer_adder``,
+///     ``include_per_bucket_breakdown``) for that detail; omitted fields
+///     keep their defaults (per-issuer adder off, per-bucket breakdown on).
 ///
 /// Returns
 /// -------
@@ -173,7 +180,7 @@ fn build_inputs(
 /// ...     "instrument envelope" in str(exc)
 /// True
 #[pyfunction]
-#[pyo3(signature = (instrument, market_t0, market_t1, as_of_t0, as_of_t1, method, config=None, full_cross_attribution=false, model_params_t0_json=None, credit_factor_model_json=None))]
+#[pyo3(signature = (instrument, market_t0, market_t1, as_of_t0, as_of_t1, method, config=None, full_cross_attribution=false, model_params_t0_json=None, credit_factor_model_json=None, credit_factor_detail_options=None))]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn attribute_pnl(
     py: Python<'_>,
@@ -187,8 +194,9 @@ pub(crate) fn attribute_pnl(
     full_cross_attribution: bool,
     model_params_t0_json: Option<&str>,
     credit_factor_model_json: Option<&str>,
+    credit_factor_detail_options: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyPnlAttribution> {
-    let instrument = extract_instrument(instrument)?;
+    let instrument = instrument_payload(instrument)?;
     let inputs = build_inputs(
         py,
         market_t0,
@@ -201,6 +209,7 @@ pub(crate) fn attribute_pnl(
             full_cross_attribution,
             model_params_t0_json,
             credit_factor_model_json,
+            credit_factor_detail_options,
         },
     )?;
 
@@ -244,6 +253,9 @@ pub(crate) fn attribute_pnl(
 ///     Serialized opening ``ModelParamsSnapshot`` applied to every instrument.
 /// credit_factor_model_json : str, optional
 ///     Serialized ``CreditFactorModel`` applied to every instrument.
+/// credit_factor_detail_options : dict | str, optional
+///     ``CreditFactorDetailOptions`` for that detail; omitted fields keep
+///     their defaults (per-issuer adder off, per-bucket breakdown on).
 ///
 /// Returns
 /// -------
@@ -275,7 +287,7 @@ pub(crate) fn attribute_pnl(
 /// ...     "instrument envelope" in str(exc)
 /// True
 #[pyfunction]
-#[pyo3(signature = (instruments, market_t0, market_t1, as_of_t0, as_of_t1, method, config=None, full_cross_attribution=false, model_params_t0_json=None, credit_factor_model_json=None))]
+#[pyo3(signature = (instruments, market_t0, market_t1, as_of_t0, as_of_t1, method, config=None, full_cross_attribution=false, model_params_t0_json=None, credit_factor_model_json=None, credit_factor_detail_options=None))]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn attribute_pnl_many<'py>(
     py: Python<'py>,
@@ -289,10 +301,11 @@ pub(crate) fn attribute_pnl_many<'py>(
     full_cross_attribution: bool,
     model_params_t0_json: Option<&str>,
     credit_factor_model_json: Option<&str>,
+    credit_factor_detail_options: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let payloads = instruments
         .iter()
-        .map(extract_instrument)
+        .map(instrument_payload)
         .collect::<PyResult<Vec<_>>>()?;
     let inputs = build_inputs(
         py,
@@ -306,6 +319,7 @@ pub(crate) fn attribute_pnl_many<'py>(
             full_cross_attribution,
             model_params_t0_json,
             credit_factor_model_json,
+            credit_factor_detail_options,
         },
     )?;
     let attributions = py
@@ -377,7 +391,7 @@ pub(crate) fn pnl_bridge(
 ) -> PyResult<PyMoney> {
     let instrument: std::sync::Arc<dyn finstack_quant_valuations::instruments::Instrument> =
         std::sync::Arc::from(
-            extract_instrument(instrument)?
+            instrument_payload(instrument)?
                 .into_boxed()
                 .map_err(core_to_py)?,
         );

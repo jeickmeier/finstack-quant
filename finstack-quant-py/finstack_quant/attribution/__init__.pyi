@@ -1623,6 +1623,7 @@ def attribute_pnl(
     full_cross_attribution: bool = False,
     model_params_t0_json: str | None = None,
     credit_factor_model_json: str | None = None,
+    credit_factor_detail_options: Mapping[str, bool] | str | None = None,
 ) -> PnlAttribution:
     """
     Run P&L attribution for a single instrument.
@@ -1671,6 +1672,10 @@ def attribute_pnl(
     credit_factor_model_json : str or None
         Serialized ``CreditFactorModel``. When supplied, credit-factor
         hierarchy detail is populated on the result.
+    credit_factor_detail_options : Mapping[str, bool] or str or None
+        ``CreditFactorDetailOptions`` (``include_per_issuer_adder``,
+        ``include_per_bucket_breakdown``) for that detail; omitted fields
+        keep their defaults (per-issuer adder off, per-bucket breakdown on).
 
     Returns
     -------
@@ -1713,6 +1718,7 @@ def attribute_pnl_many(
     full_cross_attribution: bool = False,
     model_params_t0_json: str | None = None,
     credit_factor_model_json: str | None = None,
+    credit_factor_detail_options: Mapping[str, bool] | str | None = None,
 ) -> pd.DataFrame:
     """
     Run one attribution set-up against many instruments and tabulate.
@@ -1744,6 +1750,9 @@ def attribute_pnl_many(
         Serialized opening ``ModelParamsSnapshot`` applied to every instrument.
     credit_factor_model_json : str or None
         Serialized ``CreditFactorModel`` applied to every instrument.
+    credit_factor_detail_options : Mapping[str, bool] or str or None
+        ``CreditFactorDetailOptions`` for that detail; omitted fields keep
+        their defaults (per-issuer adder off, per-bucket breakdown on).
 
     Returns
     -------
