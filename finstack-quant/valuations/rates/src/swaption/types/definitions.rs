@@ -114,18 +114,6 @@ impl BermudanSchedule {
         }
     }
 
-    /// Create schedule with lockout period.
-    pub fn with_lockout(mut self, lockout_end: Date) -> Self {
-        self.lockout_end = Some(lockout_end);
-        self
-    }
-
-    /// Create schedule with notice period.
-    pub fn with_notice_days(mut self, days: u32) -> Self {
-        self.notice_days = days;
-        self
-    }
-
     /// Generate co-terminal exercise dates from swap schedule.
     ///
     /// Creates exercise dates on each fixed leg payment date from `first_exercise`
@@ -192,11 +180,6 @@ impl BermudanSchedule {
             .filter(|&&d| d > as_of)
             .map(|&d| day_count.year_fraction(as_of, d, ctx))
             .collect()
-    }
-
-    /// Number of exercise opportunities.
-    pub fn num_exercises(&self) -> usize {
-        self.effective_dates().len()
     }
 }
 

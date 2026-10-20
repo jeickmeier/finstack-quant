@@ -39,9 +39,13 @@ fn test_standard_major_currency_pairs() {
     ];
 
     for (base, quote, name, expected_rate) in pairs {
-        let fx = FxSpot::new(InstrumentId::new(name), base, quote)
-            .with_notional(Money::new(1_000_000.0, base).expect("valid money fixture"))
-            .unwrap();
+        let fx = FxSpot::builder()
+            .id(InstrumentId::new(name))
+            .base_currency(base)
+            .quote_currency(quote)
+            .notional(Money::new(1_000_000.0, base).expect("valid money fixture"))
+            .build()
+            .expect("valid FX spot");
 
         let pv = fx.value(&market, as_of).unwrap();
         assert_eq!(pv.currency(), quote);
@@ -89,21 +93,27 @@ fn test_cross_rate_consistency() {
     let market = market_with_fx_matrix();
     let as_of = test_date();
 
-    let eur_usd = sample_eurusd()
-        .with_notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap();
-    let gbp_usd = sample_gbpusd()
-        .with_notional(Money::new(1.0, Currency::GBP).expect("valid money fixture"))
-        .unwrap();
+    let eur_usd = FxSpot {
+        notional: Money::new(1.0, Currency::EUR).expect("valid money fixture"),
+        ..sample_eurusd()
+    };
+    let gbp_usd = FxSpot {
+        notional: Money::new(1.0, Currency::GBP).expect("valid money fixture"),
+        ..sample_gbpusd()
+    };
 
     let eur_usd_rate = eur_usd.value(&market, as_of).unwrap().amount(); // 1.20
     let gbp_usd_rate = gbp_usd.value(&market, as_of).unwrap().amount(); // 1.40
 
     let expected_eur_gbp = eur_usd_rate / gbp_usd_rate; // 1.20 / 1.40
 
-    let eur_gbp = FxSpot::new(InstrumentId::new("EURGBP"), Currency::EUR, Currency::GBP)
-        .with_notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap();
+    let eur_gbp = FxSpot::builder()
+        .id(InstrumentId::new("EURGBP"))
+        .base_currency(Currency::EUR)
+        .quote_currency(Currency::GBP)
+        .notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
+        .build()
+        .expect("valid FX spot");
 
     let eur_gbp_rate = eur_gbp.value(&market, as_of).unwrap().amount();
 
@@ -121,12 +131,17 @@ fn test_inverse_pair_consistency() {
     let market = market_with_fx_matrix();
     let as_of = test_date();
 
-    let eur_usd = sample_eurusd()
-        .with_notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap();
-    let usd_eur = FxSpot::new(InstrumentId::new("USDEUR"), Currency::USD, Currency::EUR)
-        .with_notional(Money::new(1.0, Currency::USD).expect("valid money fixture"))
-        .unwrap();
+    let eur_usd = FxSpot {
+        notional: Money::new(1.0, Currency::EUR).expect("valid money fixture"),
+        ..sample_eurusd()
+    };
+    let usd_eur = FxSpot::builder()
+        .id(InstrumentId::new("USDEUR"))
+        .base_currency(Currency::USD)
+        .quote_currency(Currency::EUR)
+        .notional(Money::new(1.0, Currency::USD).expect("valid money fixture"))
+        .build()
+        .expect("valid FX spot");
 
     let eur_usd_rate = eur_usd.value(&market, as_of).unwrap().amount();
     let usd_eur_rate = usd_eur.value(&market, as_of).unwrap().amount();
@@ -185,25 +200,31 @@ fn test_triangular_arbitrage_absence() {
     let market = MarketContext::new().insert_fx(fx_matrix);
     let as_of = test_date();
 
-    let eur_usd = sample_eurusd()
-        .with_notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap()
-        .value(&market, as_of)
-        .unwrap()
-        .amount();
+    let eur_usd = FxSpot {
+        notional: Money::new(1.0, Currency::EUR).expect("valid money fixture"),
+        ..sample_eurusd()
+    }
+    .value(&market, as_of)
+    .unwrap()
+    .amount();
 
-    let usd_jpy = sample_usdjpy()
-        .with_notional(Money::new(1.0, Currency::USD).expect("valid money fixture"))
-        .unwrap()
-        .value(&market, as_of)
-        .unwrap()
-        .amount();
+    let usd_jpy = FxSpot {
+        notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
+        ..sample_usdjpy()
+    }
+    .value(&market, as_of)
+    .unwrap()
+    .amount();
 
     let eur_jpy_implied = eur_usd * usd_jpy;
 
-    let eur_jpy = FxSpot::new(InstrumentId::new("EURJPY"), Currency::EUR, Currency::JPY)
-        .with_notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap()
+    let eur_jpy = FxSpot::builder()
+        .id(InstrumentId::new("EURJPY"))
+        .base_currency(Currency::EUR)
+        .quote_currency(Currency::JPY)
+        .notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
+        .build()
+        .expect("valid FX spot")
         .value(&market, as_of)
         .unwrap()
         .amount();

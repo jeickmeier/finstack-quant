@@ -300,26 +300,32 @@ fn property_pro_rata_weight_distribution() {
             WaterfallTier::new("pro_rata_tier", 1, PaymentType::Interest)
                 .allocation_mode(AllocationMode::ProRata)
                 .add_recipient(
-                    Recipient::new(
-                        "recipient1",
-                        RecipientType::ServiceProvider("Provider1".into()),
-                        PaymentCalculation::FixedAmount {
-                            rounding: None,
-                            amount: Money::new(100_000.0, currency).expect("valid money fixture"),
-                        },
-                    )
-                    .with_weight(0.60), // 60%
+                    Recipient {
+                        weight: Some(0.60),
+                        ..Recipient::new(
+                            "recipient1",
+                            RecipientType::ServiceProvider("Provider1".into()),
+                            PaymentCalculation::FixedAmount {
+                                rounding: None,
+                                amount: Money::new(100_000.0, currency)
+                                    .expect("valid money fixture"),
+                            },
+                        )
+                    }, // 60%
                 )
                 .add_recipient(
-                    Recipient::new(
-                        "recipient2",
-                        RecipientType::ServiceProvider("Provider2".into()),
-                        PaymentCalculation::FixedAmount {
-                            rounding: None,
-                            amount: Money::new(100_000.0, currency).expect("valid money fixture"),
-                        },
-                    )
-                    .with_weight(0.40), // 40%
+                    Recipient {
+                        weight: Some(0.40),
+                        ..Recipient::new(
+                            "recipient2",
+                            RecipientType::ServiceProvider("Provider2".into()),
+                            PaymentCalculation::FixedAmount {
+                                rounding: None,
+                                amount: Money::new(100_000.0, currency)
+                                    .expect("valid money fixture"),
+                            },
+                        )
+                    }, // 40%
                 ),
         )
         .build()

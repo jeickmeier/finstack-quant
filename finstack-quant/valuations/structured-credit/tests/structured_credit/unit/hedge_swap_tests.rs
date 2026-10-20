@@ -18,8 +18,9 @@ use finstack_quant_core::HashMap;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     execute_waterfall, run_simulation, AssetPool, CoverageTestSpec, DealType, HedgeSwap,
-    PaymentType, PoolAsset, Recipient, StructuredCredit, SwapPriority, Tranche, TrancheCashflows,
-    TrancheSeniority, TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
+    PaymentType, PoolAsset, Recipient, StructuredCredit, SwapNotional, SwapPriority, Tranche,
+    TrancheCashflows, TrancheSeniority, TrancheStructure, Waterfall, WaterfallContext,
+    WaterfallTier,
 };
 use time::macros::date;
 
@@ -128,7 +129,10 @@ fn abs(hedged: bool) -> StructuredCredit {
         .expect("swap");
         swap.fixed_leg.frequency = Tenor::monthly();
         swap.float_leg.frequency = Tenor::monthly();
-        deal = deal.with_hedge_swap(HedgeSwap::new(swap).on_tranche_par("A"));
+        deal.hedge_swaps.push(HedgeSwap {
+            notional: SwapNotional::TranchePar("A".into()),
+            ..HedgeSwap::new(swap)
+        });
     }
     deal
 }

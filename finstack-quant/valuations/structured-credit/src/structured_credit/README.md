@@ -385,7 +385,7 @@ to the earliest principal tier's recipients in order
 therefore traps only the residual; a Class A test placed after A's coupon traps
 the mezzanine coupons and the residual. `after_junior_fees()` places a test
 after the subordinated management fee, ahead of the residual, and
-`with_divert_pct(50.0)` caps what a failure diverts at that share of the
+`divert_pct: Some(50.0)` caps what a failure diverts at that share of the
 interest remaining at the test (`CoverageTestSpec::placement` /
 `divert_pct` on the wire). Every failing `PayDownSenior` test also suspends
 reinvestment for the period; the pre-waterfall evaluation that makes that
@@ -397,10 +397,12 @@ the interest proceeds — so the two never disagree.
 // Deal-level: placed after the tested class's interest tier by `create_waterfall`.
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
 
-let deal = deal.with_coverage_triggers(vec![
+deal.coverage_triggers = vec![
     CoverageTestSpec::oc("CLASS_B", 1.20),
     CoverageTestSpec::ic("CLASS_B", 1.15).after_tranche("CLASS_A"),
-])?;
+];
+// Validated with the rest of the deal by `validate_invariants` / at pricing.
+deal.validate_invariants()?;
 ```
 
 ```rust
@@ -427,8 +429,10 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     CoverageTrigger, TriggerConsequence,
 };
 
-let trigger = CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
-    .with_cure_level(1.25);
+let trigger = CoverageTrigger {
+    cure_level: Some(1.25),
+    ..CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
+};
 ```
 
 #### Borrowing-base tests

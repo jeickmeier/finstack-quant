@@ -658,48 +658,52 @@ fn test_golden_cre_pro_rata_distribution() {
             WaterfallTier::new("preferred_return", 2, PaymentType::Interest)
                 .allocation_mode(AllocationMode::ProRata)
                 .add_recipient(
-                    Recipient::new(
-                        "lp_pref",
-                        RecipientType::Tranche("LP".into()),
-                        PaymentCalculation::TrancheInterest {
-                            tranche_id: "LP".into(),
-                            rounding: None,
-                        },
-                    )
-                    .with_weight(0.95), // 95% ownership
+                    Recipient {
+                        weight: Some(0.95),
+                        ..Recipient::new(
+                            "lp_pref",
+                            RecipientType::Tranche("LP".into()),
+                            PaymentCalculation::TrancheInterest {
+                                tranche_id: "LP".into(),
+                                rounding: None,
+                            },
+                        )
+                    }, // 95% ownership
                 )
                 .add_recipient(
-                    Recipient::new(
-                        "gp_pref",
-                        RecipientType::Tranche("GP".into()),
-                        PaymentCalculation::TrancheInterest {
-                            tranche_id: "GP".into(),
-                            rounding: None,
-                        },
-                    )
-                    .with_weight(0.05), // 5% ownership
+                    Recipient {
+                        weight: Some(0.05),
+                        ..Recipient::new(
+                            "gp_pref",
+                            RecipientType::Tranche("GP".into()),
+                            PaymentCalculation::TrancheInterest {
+                                tranche_id: "GP".into(),
+                                rounding: None,
+                            },
+                        )
+                    }, // 5% ownership
                 ),
         )
         // Residual split (80/20)
         .add_tier(
             WaterfallTier::new("residual", 3, PaymentType::Residual)
                 .allocation_mode(AllocationMode::ProRata)
-                .add_recipient(
-                    Recipient::new(
+                .add_recipient(Recipient {
+                    weight: Some(0.80),
+                    ..Recipient::new(
                         "lp_residual",
                         RecipientType::Tranche("LP".into()),
                         PaymentCalculation::ResidualCash,
                     )
-                    .with_weight(0.80),
-                )
-                .add_recipient(
-                    Recipient::new(
+                })
+                .add_recipient(Recipient {
+                    weight: Some(0.20),
+                    ..Recipient::new(
                         "gp_promote",
                         RecipientType::ManagerFee(ManagementFeeType::Incentive),
                         PaymentCalculation::ResidualCash,
                     )
-                    .with_weight(0.20),
-                ),
+                }),
         )
         .build()
         .expect("build waterfall");

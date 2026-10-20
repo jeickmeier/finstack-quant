@@ -705,7 +705,13 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             1 => (Currency::GBP, Currency::USD),
             _ => (Currency::USD, Currency::JPY),
         };
-        let fx_spot = FxSpot::new(fx_id.clone(), base_currency, quote_currency);
+        let fx_spot = FxSpot::builder()
+            .id(fx_id.as_str().into())
+            .base_currency(base_currency)
+            .quote_currency(quote_currency)
+            .notional(Money::from((1_i64, base_currency)))
+            .build()
+            .expect("valid FX spot");
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(

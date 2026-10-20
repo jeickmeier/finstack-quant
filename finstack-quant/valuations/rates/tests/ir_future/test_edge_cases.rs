@@ -45,7 +45,9 @@ fn test_zero_face_value() {
         ..FutureContractSpecs::default()
     };
 
-    let future = create_standard_future(start, end).with_contract_specs(specs);
+    let mut future = create_standard_future(start, end);
+
+    future.contract_specs = specs;
 
     let err = future
         .value(&market, as_of)

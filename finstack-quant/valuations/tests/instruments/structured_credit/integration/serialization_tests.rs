@@ -237,30 +237,34 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
 
     let mut pool = AssetPool::new("POOL-FULL", DealType::Clo, Currency::USD);
 
-    let mut loan = PoolAsset::floating_rate_loan(
-        "LOAN1",
-        Money::new(12_000_000.0, Currency::USD).expect("valid money fixture"),
-        "SOFR-3M",
-        350.0,
-        Date::from_calendar_date(2030, Month::January, 1).unwrap(),
-        DayCount::Act360,
-    )
-    .with_rating(CreditRating::BB)
-    .with_industry("Technology")
-    .with_obligor_id("OBLIGOR-1");
+    let mut loan = PoolAsset {
+        industry: Some("Technology".into()),
+        obligor_id: Some("OBLIGOR-1".into()),
+        ..PoolAsset::floating_rate_loan(
+            "LOAN1",
+            Money::new(12_000_000.0, Currency::USD).expect("valid money fixture"),
+            "SOFR-3M",
+            350.0,
+            Date::from_calendar_date(2030, Month::January, 1).unwrap(),
+            DayCount::Act360,
+        )
+        .with_rating(CreditRating::BB)
+    };
     loan.smm_override = Some(0.0123);
     loan.mdr_override = Some(0.0042);
 
-    let mut bond = PoolAsset::fixed_rate_bond(
-        "BOND1",
-        Money::new(8_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.055,
-        Date::from_calendar_date(2029, Month::July, 1).unwrap(),
-        DayCount::Act365F,
-    )
-    .with_rating(CreditRating::A)
-    .with_industry("Healthcare")
-    .with_obligor_id("OBLIGOR-2");
+    let mut bond = PoolAsset {
+        industry: Some("Healthcare".into()),
+        obligor_id: Some("OBLIGOR-2".into()),
+        ..PoolAsset::fixed_rate_bond(
+            "BOND1",
+            Money::new(8_000_000.0, Currency::USD).expect("valid money fixture"),
+            0.055,
+            Date::from_calendar_date(2029, Month::July, 1).unwrap(),
+            DayCount::Act365F,
+        )
+        .with_rating(CreditRating::A)
+    };
     bond.defaulted = true;
     bond.recovery_amount =
         Some(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"));
@@ -295,24 +299,26 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     .with_cdr(0.03)
     .with_recovery_rate(0.50)]);
 
-    let mut equity = Tranche::new(
-        "EQUITY",
-        0.0,
-        10.0,
-        TrancheSeniority::Equity,
-        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-        RateSpec::Fixed { rate: 0.12 },
-        legal,
-    )
-    .unwrap()
-    .with_oc_trigger(CoverageTrigger::new(
-        1.15,
-        TriggerConsequence::DivertCashFlow,
-    ))
-    .with_ic_trigger(CoverageTrigger::new(
-        1.05,
-        TriggerConsequence::DivertCashFlow,
-    ));
+    let mut equity = Tranche {
+        oc_trigger: Some(CoverageTrigger::new(
+            1.15,
+            TriggerConsequence::DivertCashFlow,
+        )),
+        ic_trigger: Some(CoverageTrigger::new(
+            1.05,
+            TriggerConsequence::DivertCashFlow,
+        )),
+        ..Tranche::new(
+            "EQUITY",
+            0.0,
+            10.0,
+            TrancheSeniority::Equity,
+            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
+            RateSpec::Fixed { rate: 0.12 },
+            legal,
+        )
+        .unwrap()
+    };
     equity.rating = Some(CreditRating::BB);
     equity.attributes = Attributes::new()
         .with_tag("equity")
@@ -399,8 +405,10 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         PayReceive::Pay,
     )
     .expect("valid swap");
-    deal.hedge_swaps
-        .push(HedgeSwap::new(swap).on_tranche_par("SENIOR"));
+    deal.hedge_swaps.push(HedgeSwap {
+        notional: SwapNotional::TranchePar("SENIOR".into()),
+        ..HedgeSwap::new(swap)
+    });
 
     deal
 }

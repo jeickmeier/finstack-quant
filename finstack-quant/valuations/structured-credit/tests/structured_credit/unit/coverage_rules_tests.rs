@@ -341,18 +341,19 @@ fn clo_with_closing_default(valuation: DefaultedValuation) -> (StructuredCredit,
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal = StructuredCredit::new_clo(
-        "CLO-DEFAULTED-VALUATION",
-        pool,
-        tranches,
-        close,
-        maturity(),
-        "USD-OIS",
-    )
-    .expect("valid structured-credit dates")
-    .with_calendar_id("nyse")
-    .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.54)])
-    .expect("coverage test");
+    let mut deal = StructuredCredit {
+        coverage_triggers: vec![CoverageTestSpec::oc("A", 1.54)],
+        ..StructuredCredit::new_clo(
+            "CLO-DEFAULTED-VALUATION",
+            pool,
+            tranches,
+            close,
+            maturity(),
+            "USD-OIS",
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse")
+    };
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 18);
@@ -415,20 +416,21 @@ fn bond_deal(rules: Option<CoverageRules>) -> StructuredCredit {
     bond.id = InstrumentId::new("B-8");
     bond.cashflow_spec =
         CashflowSpec::fixed(0.08, Tenor::semi_annual(), DayCount::Thirty360).expect("coupon");
-    let mut deal = deal_with(DealSpec {
-        collateral: InstrumentCollateral {
-            bonds: vec![bond],
-            ..Default::default()
-        },
-        reserve: 0.0,
-        reserve_target: None,
-        closing: date!(2024 - 01 - 15),
-        maturity: date!(2034 - 01 - 15),
-        senior: 900_000.0,
-        equity: 100_000.0,
-    })
-    .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.05)])
-    .expect("oc test");
+    let mut deal = StructuredCredit {
+        coverage_triggers: vec![CoverageTestSpec::oc("A", 1.05)],
+        ..deal_with(DealSpec {
+            collateral: InstrumentCollateral {
+                bonds: vec![bond],
+                ..Default::default()
+            },
+            reserve: 0.0,
+            reserve_target: None,
+            closing: date!(2024 - 01 - 15),
+            maturity: date!(2034 - 01 - 15),
+            senior: 900_000.0,
+            equity: 100_000.0,
+        })
+    };
     deal.coverage_rules = rules;
     deal
 }

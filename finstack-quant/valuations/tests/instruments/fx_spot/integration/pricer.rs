@@ -2,6 +2,7 @@
 
 use super::super::common::*;
 use finstack_quant_core::{currency::Currency, market_data::context::MarketContext, money::Money};
+use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
 use finstack_quant_valuations::{
     instruments::Instrument,
     pricer::{standard_pricer_registry, InstrumentType, ModelKey, PricerKey},
@@ -48,20 +49,16 @@ fn test_pricer_with_various_instruments() {
 
     let instruments: Vec<Box<dyn Instrument>> = vec![
         Box::new(eurusd_with_notional(1_000_000.0, 1.20)),
-        Box::new(
-            sample_gbpusd()
-                .with_notional(Money::new(500_000.0, Currency::GBP).expect("valid money fixture"))
-                .unwrap()
-                .with_quoted_spot(1.40)
-                .expect("test rate"),
-        ),
-        Box::new(
-            sample_usdjpy()
-                .with_notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
-                .unwrap()
-                .with_quoted_spot(110.0)
-                .expect("test rate"),
-        ),
+        Box::new(FxSpot {
+            notional: Money::new(500_000.0, Currency::GBP).expect("valid money fixture"),
+            quoted_spot: Some(1.40),
+            ..sample_gbpusd()
+        }),
+        Box::new(FxSpot {
+            notional: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+            quoted_spot: Some(110.0),
+            ..sample_usdjpy()
+        }),
     ];
 
     let as_of = finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
@@ -111,9 +108,10 @@ fn test_pricer_consistent_with_instrument_value() {
 
 #[test]
 fn test_pricer_with_fx_matrix() {
-    let fx = sample_eurusd()
-        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap();
+    let fx = FxSpot {
+        notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+        ..sample_eurusd()
+    };
     let registry = standard_pricer_registry();
     let market = market_with_fx_matrix(); // EUR/USD = 1.20
     let as_of = finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)

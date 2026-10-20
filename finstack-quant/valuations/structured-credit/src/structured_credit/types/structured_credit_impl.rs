@@ -1,11 +1,10 @@
 use super::{
-    CoverageTestSpec, CreditModelConfig, DealFees, DealType, DefaultModelSpec, HedgeSwap,
+    CoverageTestSpec, CreditModelConfig, DealFees, DealType, DefaultModelSpec,
     LossAllocationPolicy, MarketConditions, PaymentCalculation, PaymentType, PrepaymentModelSpec,
     Recipient, RecipientType, RecoveryModelSpec, StructuredCredit, TemplateFees, TrancheSeniority,
     Waterfall,
 };
 use crate::structured_credit::assumptions::embedded_registry_or_panic;
-use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::money::Money;
 
 impl Default for MarketConditions {
@@ -56,12 +55,9 @@ impl StructuredCredit {
     /// # Example
     ///
     /// ```
-    /// use finstack_quant_core::dates::BusinessDayConvention;
     /// use finstack_quant_valuations_structured_credit::structured_credit::StructuredCredit;
     ///
-    /// let clo = StructuredCredit::example().expect("example")
-    ///     .with_calendar_id("nyse")
-    ///     .with_business_day_convention(BusinessDayConvention::ModifiedFollowing);
+    /// let clo = StructuredCredit::example().expect("example").with_calendar_id("nyse");
     /// # let _ = clo;
     /// ```
     #[must_use]
@@ -71,39 +67,6 @@ impl StructuredCredit {
     ) -> Self {
         self.calendar_id = Some(calendar_id.into());
         self
-    }
-
-    /// Set the business day convention for payment date adjustments.
-    ///
-    /// If not specified, defaults to `BusinessDayConvention::ModifiedFollowing`.
-    #[must_use]
-    pub fn with_business_day_convention(mut self, convention: BusinessDayConvention) -> Self {
-        self.business_day_convention = Some(convention);
-        self
-    }
-
-    /// Set the clean-up call pool factor threshold.
-    ///
-    /// When the pool factor (current balance / original balance) drops below
-    /// this threshold, the deal may be optionally redeemed. Tranches are paid
-    /// in seniority order (senior first), bounded by remaining pool value.
-    ///
-    /// Industry standard: typically 0.10 (10%).
-    ///
-    /// # Errors
-    /// Returns a validation error if `threshold` is not finite or is outside
-    /// `(0.0, 1.0)`.
-    pub fn with_cleanup_call_decimal(
-        mut self,
-        threshold: f64,
-    ) -> finstack_quant_core::Result<Self> {
-        if !threshold.is_finite() || threshold <= 0.0 || threshold >= 1.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "cleanup_call_decimal must be finite and in (0, 1), got {threshold}"
-            )));
-        }
-        self.cleanup_call_decimal = Some(threshold);
-        Ok(self)
     }
 
     /// Build the template's fee recipients from the deal's [`DealFees`]:
@@ -295,72 +258,10 @@ impl StructuredCredit {
         self
     }
 
-    /// Attach a hedge swap that settles through the waterfall (chainable).
-    ///
-    /// # Arguments
-    ///
-    /// * `hedge` - Swap, tracked notional and fee-tier priority; validated
-    ///   against the deal currency and tranches when the deal is priced.
-    #[must_use]
-    pub fn with_hedge_swap(mut self, hedge: HedgeSwap) -> Self {
-        self.hedge_swaps.push(hedge);
-        self
-    }
-
-    /// Attach explicit transaction fees.
-    #[must_use]
-    pub fn with_fees(mut self, fees: DealFees) -> Self {
-        self.fees = Some(fees);
-        self
-    }
-
-    /// Attach overcollateralization / interest-coverage tests to the deal.
-    ///
-    /// Each test names the tested class, its kind and level and what a
-    /// failure does with the diverted interest; the waterfall places it right
-    /// after the interest tier of its placement tranche, so a failure can only
-    /// divert cash ranked below that position (see
-    /// [`Self::coverage_triggers`]).
-    ///
-    /// # Arguments
-    ///
-    /// * `tests` - Coverage tests to evaluate each payment period.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err` when a level is not finite or not strictly positive, when
-    /// a test names a tranche that is not part of this deal or an equity
-    /// tranche, when two tests share a tranche and kind, or when an id is
-    /// duplicated — a silently-ignored test would look like protection that
-    /// is not there.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # use finstack_quant_valuations_structured_credit::structured_credit::{
-    /// #     CoverageTestSpec, StructuredCredit,
-    /// # };
-    /// # fn example(deal: StructuredCredit) -> finstack_quant_core::Result<()> {
-    /// let deal = deal.with_coverage_triggers(vec![
-    ///     CoverageTestSpec::oc("CLASS_B", 1.20),
-    ///     CoverageTestSpec::ic("CLASS_B", 1.15),
-    /// ])?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn with_coverage_triggers(
-        mut self,
-        tests: Vec<CoverageTestSpec>,
-    ) -> finstack_quant_core::Result<Self> {
-        self.validate_coverage_tests(tests.iter())?;
-        self.coverage_triggers = tests;
-        Ok(self)
-    }
-
     /// Validate a set of coverage tests against this deal's tranches: known,
     /// non-equity tranche ids (tested and placement), finite positive levels,
     /// unique ids and at most one test per `(tranche, kind)`.
-    fn validate_coverage_tests<'a>(
+    pub(super) fn validate_coverage_tests<'a>(
         &self,
         tests: impl Iterator<Item = &'a CoverageTestSpec>,
     ) -> finstack_quant_core::Result<()> {
@@ -478,51 +379,12 @@ impl StructuredCredit {
         Ok(waterfall)
     }
 
-    /// Attach a fully custom payment waterfall, replacing the template.
-    ///
-    /// The waterfall is used verbatim by pricing (see [`Self::waterfall`] for
-    /// the composition rules with `coverage_triggers` and `waterfall_rules`).
-    /// Validation runs immediately so a malformed structure fails at
-    /// construction rather than silently mispricing.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Error::Validation` when the waterfall is structurally invalid
-    /// (duplicate tier/recipient ids, bad weights, non-finite parameters),
-    /// references a tranche not in this deal, pays an equity tranche by id
-    /// instead of [`RecipientType::Equity`], mismatches the pool currency,
-    /// duplicates a coverage trigger, or when deal-level [`Self::fees`] are
-    /// set (encode fees as leading `Fee` tiers of the waterfall instead).
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # use finstack_quant_valuations_structured_credit::structured_credit::StructuredCredit;
-    /// # fn example(deal: StructuredCredit) -> finstack_quant_core::Result<()> {
-    /// // Start from the template and customize, or build from scratch.
-    /// let waterfall = deal.create_waterfall().expect("valid create_waterfall fixture");
-    /// let deal = deal.with_waterfall(waterfall)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `waterfall` - Replacement payment waterfall used verbatim by pricing; must
-    ///   reference this deal's tranches and currency.
-    pub fn with_waterfall(mut self, waterfall: Waterfall) -> finstack_quant_core::Result<Self> {
-        self.waterfall = Some(waterfall);
-        self.validate_custom_waterfall()?;
-        Ok(self)
-    }
-
     /// Validate an attached custom waterfall against the deal.
     ///
     /// No-op when the deal carries no custom waterfall. Called by
-    /// [`Self::with_waterfall`] for fail-fast construction and again by the
-    /// simulation engine (and `validate_invariants`), so deals arriving via
-    /// JSON — which never pass through `with_waterfall` — get identical
-    /// errors instead of silently mispricing.
+    /// `validate_invariants` and again by the simulation engine, so every
+    /// construction path (Rust, JSON, bindings) gets identical errors instead
+    /// of silently mispricing.
     pub(crate) fn validate_custom_waterfall(&self) -> finstack_quant_core::Result<()> {
         let Some(waterfall) = self.waterfall.as_ref() else {
             return Ok(());

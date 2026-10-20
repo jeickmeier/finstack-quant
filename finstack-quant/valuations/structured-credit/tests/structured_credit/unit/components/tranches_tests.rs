@@ -452,8 +452,10 @@ fn test_tranche_structure_senior_balance() {
 #[test]
 fn test_coverage_trigger_creation() {
     // Arrange & Act
-    let trigger =
-        CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow).with_cure_level(1.25);
+    let trigger = CoverageTrigger {
+        cure_level: Some(1.25),
+        ..CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
+    };
 
     // Assert
     assert_eq!(trigger.trigger_level, 1.20);
@@ -474,8 +476,10 @@ fn test_coverage_trigger_is_breached() {
 #[test]
 fn test_coverage_trigger_is_cured() {
     // Arrange
-    let trigger =
-        CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow).with_cure_level(1.25);
+    let trigger = CoverageTrigger {
+        cure_level: Some(1.25),
+        ..CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
+    };
 
     // Act & Assert
     assert!(!trigger.is_cured(1.22)); // Above trigger but below cure

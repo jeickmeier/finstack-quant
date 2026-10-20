@@ -409,31 +409,6 @@ impl CdsIndex {
         })
     }
 
-    /// Configure equal-weight constituents by credit parameter set per name.
-    /// Each name receives weight = 1/(n names). Mode switches to `Constituents`.
-    pub fn with_constituents_equal_weight(
-        mut self,
-        names: impl IntoIterator<Item = CreditParams>,
-    ) -> Self {
-        let list: Vec<CreditParams> = names.into_iter().collect();
-        if list.is_empty() {
-            self.constituents.clear();
-            self.pricing = IndexPricing::SingleCurve;
-            return self;
-        }
-        let w = 1.0 / (list.len() as f64);
-        self.constituents = list
-            .into_iter()
-            .map(|credit| CdsIndexConstituent {
-                credit,
-                weight: w,
-                defaulted: false,
-            })
-            .collect();
-        self.pricing = IndexPricing::Constituents;
-        self
-    }
-
     /// Configure explicit constituents with custom weights.
     pub fn with_constituents(mut self, constituents: Vec<CdsIndexConstituent>) -> Self {
         if constituents.is_empty() {

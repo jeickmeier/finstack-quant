@@ -74,8 +74,8 @@ fn test_simple_swaption_black_pricer_uses_sabr_dispatch_when_present() {
         nu: 0.4,
         shift: None,
     };
-    let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05)
-        .with_sabr_params(sabr_params);
+    let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
+    swaption.sabr_params = Some(sabr_params);
     let market = create_flat_market(as_of, 0.05, 0.30);
 
     let expected = swaption.price_sabr(&market, as_of).unwrap();

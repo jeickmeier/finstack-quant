@@ -294,8 +294,7 @@ impl CdsOptionBuilder {
             self.option_type,
         )
         .expect("valid option params");
-        option_params =
-            option_params.with_protection_start_convention(self.protection_start_convention);
+        option_params.protection_start_convention = self.protection_start_convention;
 
         if self.is_index {
             option_params = option_params

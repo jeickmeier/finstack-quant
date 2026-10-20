@@ -434,8 +434,8 @@ pub(crate) fn prepare_deal_simulation(
     }
 
     // A custom waterfall must be structurally valid, reference only real
-    // (non-equity) tranches, and not conflict with deal-level `fees`. Deals
-    // arriving via JSON never pass through `with_waterfall`, so re-validate
+    // (non-equity) tranches, and not conflict with deal-level `fees`. The
+    // engine can be reached without `validate_invariants`, so re-validate
     // here rather than pricing a silently-broken structure.
     instrument.validate_custom_waterfall()?;
 

@@ -2046,8 +2046,10 @@ mod coverage_position_tests {
             .add_tier(WaterfallTier::coverage_tests(
                 "reinvestment_oc",
                 2,
-                vec![CoverageTestSpec::oc("CLASS_B", 1.05)
-                    .with_action(super::CoverageTestAction::Reinvest)],
+                vec![CoverageTestSpec {
+                    action: super::CoverageTestAction::Reinvest,
+                    ..CoverageTestSpec::oc("CLASS_B", 1.05)
+                }],
             ))
             .add_tier(
                 WaterfallTier::new("principal", 3, PaymentType::Principal)
