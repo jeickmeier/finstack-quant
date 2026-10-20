@@ -41,7 +41,7 @@ status = "exists"  # Python package already present
 
 [crates.core.modules]
 canonical     = { python = "finstack_quant.core.canonical",     status = "missing", note = "Rust-only canonical-form normalization infrastructure; no host-language surface planned." }
-cashflow      = { python = "finstack_quant.core.cashflow",      status = "exists", note = "Typed CashFlow, CFKind and CashFlowAccrual. The npv/xirr/irr helpers stay Rust-only (hosts price through valuations)." }
+cashflow      = { python = "finstack_quant.core.cashflow",      status = "exists", note = "Typed CashFlow, CFKind and CashFlowAccrual. The npv/xirr/irr helpers and CFKind::is_principal_repayment (the WAL / principal-repaid kind set) stay Rust-only." }
 config        = { python = "finstack_quant.core.config",        status = "exists" }
 contract      = { python = "finstack_quant.core.contract",      status = "missing", note = "Rust-only API-contract helper infrastructure; no host-language surface planned." }
 currency      = { python = "finstack_quant.core.currency",      status = "exists" }
@@ -329,7 +329,9 @@ python_package = "finstack_quant.cashflows.builder"
 # carried inside schedule JSON); evaluate_fee_tiers / FeeTier / RateSpec /
 # PrincipalEventSpec (spec internals reachable through the spec types); and the
 # credit-rate helpers clamped_cpr_to_smm / clamped_cdr_to_mdr / psa_cpr /
-# PSA_RAMP_MONTHS / PSA_TERMINAL_CPR / SDA_PEAK_CDR.
+# PSA_RAMP_MONTHS / PSA_TERMINAL_CPR / SDA_PEAK_CDR. The FloatingRateSpec
+# DEFAULT_GEARING / DEFAULT_GEARING_INCLUDES_SPREAD / DEFAULT_RESET_LAG_DAYS
+# constants are Rust-only; the Python constructor defaults read them.
 note = "Typed CashFlowBuilder includes build_as_of / buildAsOf for explicit fixing cutoffs and matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM binds CashFlowSchedule / CashFlowBuilder as classes, and the spec types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",

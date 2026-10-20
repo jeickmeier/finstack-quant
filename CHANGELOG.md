@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Cashflows: one path per capability
+
+#### Changed
+
+- `CFKind`, `CashFlow` and `CashFlowAccrual` bind where Rust defines them: Python `finstack_quant.core.cashflow` (was `finstack_quant.cashflows.primitives`) and WASM `core.cfKindParse` / `core.cfKindIs*` / `core.cashFlowGetBalanceDate` / `core.cashFlowValidate` (were under `cashflows`).
+- `CashFlowSchedule::builder()` is the only builder entry point. `schedule_from_dated_flows` / `schedule_from_classified_flows` validate their rows and return `Result`. Python and WASM schedules built from host parts are validated.
+- `pv_by_period` drops its unused day-count argument (Rust, Python, WASM); the PV path rejects flows in a currency other than the requested base.
+- `weighted_average_life_from_principal` moves from `builder` to `aggregation`. `CFKind::is_principal_repayment()` names the repayment kind set used by schedule WAL, principal-repaid aggregation and statements.
+- Accrual items and `PeriodAggregation` are reached through `accrual::` and `aggregation::` only; `PrincipalEventSpec` is exported from `builder`, and `MarginStepSpec` / `PaymentStepSpec` from the crate root. `WEEKENDS_ONLY_ID` lives in `core::dates`.
+- `FloatingRateSpec::DEFAULT_GEARING`, `DEFAULT_GEARING_INCLUDES_SPREAD` and `DEFAULT_RESET_LAG_DAYS` are public; the Python constructor uses them. Fee specs default their business-day convention through serde like `ScheduleParams`.
+- Term-loan call exercise builds its outstanding path and accrual indexes once per schedule, not on every tree step.
+
+#### Removed
+
+- `finstack_quant_cashflows::primitives` (use `finstack_quant_core::cashflow`).
+- `CashFlowSchedule::npv` (use `finstack_quant_core::cashflow::npv` over `dated_flows()`), the `IntoIterator` impls on `CashFlowSchedule` (use `into_flows()` / `get_flows()`), `PeriodAggregation::into_inner`, and the six `CashFlowBuilder::get_*` getters (the builder implements `Display`).
+- `builder::emit_inflation_coupons` (inlined at the inflation-linked bond) and `AssetPool::wal_from_cashflows`.
+- `clamped_smm_to_cpr`, `clamped_mdr_to_cdr`, `psa_to_cpr` and `cdr_2pct` (Rust, Python, WASM), and the inert SDA registry record (`SDA_PEAK_CDR` replaces it).
+- Host `from_parts` constructors, `DateContext`, `valuations::__private`, the valuations re-exports of cashflows types, and the cashflows crate-root re-exports of accrual items.
+
 ### Statements: scenario forecast overrides, rollups, capital-structure scenarios
 
 #### Added
