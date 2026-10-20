@@ -778,6 +778,85 @@ impl PnlAttribution {
         Ok(())
     }
 
+    /// Add another attribution's headline amounts into this one.
+    ///
+    /// Sums `total_pnl`, every factor field, `cross_factor_pnl`,
+    /// `fx_translation_pnl` and `residual` with currency-checked `Money`
+    /// arithmetic. `mark_to_market_pnl`, `pv_t0` and `pv_t1` stay present
+    /// only when both sides carry them. `result_invalid`, the repricing count
+    /// and the notes are merged; detail structs and step rows are not, since
+    /// per-instrument breakdowns do not sum into one tree. Use it to aggregate
+    /// positions or composite legs that are already in one reporting currency
+    /// (see [`crate::translate_to_target_currency`]).
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - Attribution to add, in the same currency as `self`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::CurrencyMismatch`] when an amount
+    /// of `other` is in a different currency, or the checked-addition error
+    /// when a sum cannot be represented. `self` may then be partially
+    /// updated, so callers abort the aggregation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_attribution::{AttributionMethod, PnlAttribution};
+    /// use finstack_quant_core::{currency::Currency, money::Money};
+    /// use time::macros::date;
+    ///
+    /// let leg = |carry: i64| {
+    ///     let mut attribution = PnlAttribution::new(
+    ///         Money::from((carry, Currency::USD)),
+    ///         "LEG",
+    ///         date!(2025 - 01 - 15),
+    ///         date!(2025 - 01 - 16),
+    ///         AttributionMethod::Parallel,
+    ///     );
+    ///     attribution.carry = attribution.total_pnl;
+    ///     attribution
+    /// };
+    /// let mut book = leg(10);
+    /// book.accumulate(leg(15))?;
+    /// assert_eq!(book.carry, Money::from((25_i64, Currency::USD)));
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn accumulate(&mut self, other: PnlAttribution) -> Result<()> {
+        self.total_pnl = self.total_pnl.checked_add(other.total_pnl)?;
+        for (target, source) in [
+            (&mut self.mark_to_market_pnl, other.mark_to_market_pnl),
+            (&mut self.pv_t0, other.pv_t0),
+            (&mut self.pv_t1, other.pv_t1),
+        ] {
+            *target = match (*target, source) {
+                (Some(target), Some(source)) => Some(target.checked_add(source)?),
+                _ => None,
+            };
+        }
+        for (target, source) in [
+            (&mut self.carry, other.carry),
+            (&mut self.rates_curves_pnl, other.rates_curves_pnl),
+            (&mut self.credit_curves_pnl, other.credit_curves_pnl),
+            (&mut self.inflation_curves_pnl, other.inflation_curves_pnl),
+            (&mut self.correlations_pnl, other.correlations_pnl),
+            (&mut self.fx_pnl, other.fx_pnl),
+            (&mut self.vol_pnl, other.vol_pnl),
+            (&mut self.cross_factor_pnl, other.cross_factor_pnl),
+            (&mut self.model_params_pnl, other.model_params_pnl),
+            (&mut self.market_scalars_pnl, other.market_scalars_pnl),
+            (&mut self.fx_translation_pnl, other.fx_translation_pnl),
+            (&mut self.residual, other.residual),
+        ] {
+            *target = target.checked_add(source)?;
+        }
+        self.result_invalid |= other.result_invalid;
+        self.meta.num_repricings += other.meta.num_repricings;
+        self.meta.notes.extend(other.meta.notes);
+        Ok(())
+    }
+
     /// Validate that every monetary amount uses `total_pnl`'s currency.
     ///
     /// Includes headline P&L, residual, all nested factor and carry details,
