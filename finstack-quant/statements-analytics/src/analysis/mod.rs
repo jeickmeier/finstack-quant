@@ -5,7 +5,7 @@
 //! - DCF corporate valuation and the orchestrated analysis pipeline
 //! - Covenant forecasting and credit coverage metrics
 //! - Scenario sets, sensitivity sweeps, and variance
-//! - Dependency tracing and formula explanation ([`DependencyTracer`], [`FormulaExplainer`])
+//! - Dependency tracing and formula explanation ([`DependencyTracer`], [`explain_formula`])
 //! - Formatted P&L summaries and credit assessment reports ([`PLSummaryReport`])
 //! - Root-finding for target metric values ([`goal_seek()`])
 //! - Forecast accuracy metrics ([`backtest_forecast`])
@@ -16,9 +16,9 @@
 //!
 //! - Use [`crate::analysis::CorporateAnalysisBuilder`] when you want one orchestrated pipeline
 //!   that evaluates statements and optionally adds equity plus credit analysis.
-//! - Use [`crate::analysis::evaluate_dcf_with_market`] for direct DCF valuation from a statement
+//! - Use [`crate::analysis::evaluate_dcf`] for direct DCF valuation from a statement
 //!   model.
-//! - Use [`crate::analysis::ScenarioSet`] and [`crate::analysis::VarianceAnalyzer`] when comparing multiple
+//! - Use [`crate::analysis::ScenarioSet`] and [`crate::analysis::run_variance`] when comparing multiple
 //!   operating cases.
 //! - Use [`crate::analysis::forecast_breaches`] and [`crate::analysis::compute_credit_context`] for lender-style
 //!   compliance and coverage analysis.
@@ -58,31 +58,32 @@ pub use credit::{
 };
 pub use goal_seek::{goal_seek, GoalSeekResult};
 pub use introspection::{
-    render_tree_ascii, render_tree_detailed, DependencyTracer, DependencyTree, Explanation,
-    ExplanationStep, FormulaExplainer,
+    explain_formula, render_tree_ascii, render_tree_detailed, DependencyTracer, DependencyTree,
+    Explanation, ExplanationStep,
 };
 pub use reports::{
     CreditAssessment, CreditAssessmentPoint, CreditAssessmentReport, PLSummaryReport,
 };
 pub use scenarios::{
-    generate_tornado_entries, BridgeChart, BridgeStep, ParameterSpec, ScenarioDefinition,
-    ScenarioDiff, ScenarioResults, ScenarioSet, SensitivityAnalyzer, SensitivityConfig,
-    SensitivityMode, SensitivityResult, SensitivityScenario, TornadoEntry, VarianceAnalyzer,
+    generate_tornado_entries, run_sensitivity, run_variance, variance_bridge, BridgeChart,
+    BridgeStep, ParameterSpec, ScenarioDefinition, ScenarioDiff, ScenarioResults, ScenarioSet,
+    SensitivityConfig, SensitivityMode, SensitivityResult, SensitivityScenario, TornadoEntry,
     VarianceConfig, VarianceReport, VarianceRow,
 };
 pub use valuation::{
-    dcf_sensitivity, evaluate_dcf_with_market, evaluate_lbo, run_corporate_analysis, wacc,
-    CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions,
-    CorporateValuationResult, DcfOptions, DcfPeriodRow, DcfSensitivityResult, ExitMultipleBump,
-    LboCheckMappings, LboConfig, LboResult, LboTranche, DEFAULT_UFCF_NODE,
+    dcf_sensitivity, evaluate_dcf, evaluate_lbo, run_corporate_analysis, wacc, CorporateAnalysis,
+    CorporateAnalysisBuilder, CorporateAnalysisOptions, CorporateValuationResult, DcfOptions,
+    DcfPeriodRow, DcfSensitivityResult, ExitMultipleBump, LboCheckMappings, LboConfig, LboResult,
+    LboTranche, DEFAULT_UFCF_NODE,
 };
 
 pub use checks::{
-    credit_underwriting_checks, lbo_model_checks, three_statement_checks, CapexReconciliation,
-    CheckReportRenderer, CoverageFloorCheck, CreditMapping, DepreciationReconciliation,
-    DividendReconciliation, EffectiveTaxRateCheck, FcfSignCheck, GrowthRateConsistency,
-    InterestExpenseReconciliation, LeverageRangeCheck, LiquidityRunwayCheck, ThreeStatementMapping,
-    TrendCheck, TrendDirection, WorkingCapitalConsistency,
+    credit_underwriting_checks, lbo_model_checks, render_check_report_html,
+    render_check_report_text, three_statement_checks, CapexReconciliation, CoverageFloorCheck,
+    CreditMapping, DepreciationReconciliation, DividendReconciliation, EffectiveTaxRateCheck,
+    FcfSignCheck, GrowthRateConsistency, InterestExpenseReconciliation, LeverageRangeCheck,
+    LiquidityRunwayCheck, ThreeStatementMapping, TrendCheck, TrendDirection,
+    WorkingCapitalConsistency,
 };
 
 pub use ecl::{

@@ -10,13 +10,44 @@ use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
 use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec, NodeValueType};
 use indexmap::IndexMap;
 
-/// Sensitivity analyzer for financial models.
+/// Run a sensitivity sweep over a statement model.
+///
+///
+/// # Parallelism
+///
+/// On native targets, diagonal and tornado sensitivity run each
+/// `(parameter, perturbation)` pair concurrently via Rayon; WebAssembly
+/// builds (no Rayon thread pool) run the same pairs serially. Each pair
+/// holds its own cloned `FinancialModelSpec` and `Evaluator`. Results
+/// match the serial path bit-for-bit given the same seed and model, and
+/// so do errors: when several pairs fail, the error is the first failing
+/// pair's in `(parameter, perturbation)` order on every target.
+///
+/// Full-grid mode is serial.
+///
+/// # Errors
+///
+/// Propagates invalid sensitivity configuration, parameter perturbation,
+/// model evaluation, and result-collection errors from the selected mode.
+/// Requests are limited to 128 distinct node/period parameters, 10,000
+/// scenarios, and 10 million model node/period cells across all evaluations
+/// (including the unperturbed baseline). Limits are checked before preparing
+/// or evaluating the model.
+///
+/// # Arguments
+///
+/// * `model` - Baseline statement model; sweeps vary forecast inputs on owned
+///   copies and leave this model unchanged.
+/// * `config` - Sensitivity mode, the target metrics used to rank tornado
+///   impacts, and a non-empty parameter sweep with finite base values and
+///   absolute perturbation values. Each parameter must name a distinct
+///   node/forecast-period pair with at least one perturbation.
 ///
 /// # Examples
 ///
 /// ```rust
 /// use finstack_quant_statements::prelude::*;
-/// use finstack_quant_statements_analytics::analysis::{SensitivityAnalyzer, SensitivityConfig, SensitivityMode, ParameterSpec};
+/// use finstack_quant_statements_analytics::analysis::{run_sensitivity, SensitivityConfig, SensitivityMode, ParameterSpec};
 ///
 /// # fn main() -> Result<()> {
 /// let model = ModelBuilder::new("sensitivity_test")
@@ -29,7 +60,6 @@ use indexmap::IndexMap;
 ///     .compute("gross_profit", "revenue - cogs")?
 ///     .build()?;
 ///
-/// let analyzer = SensitivityAnalyzer::new(&model);
 /// let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
 ///
 /// config.add_parameter(ParameterSpec::with_percentages(
@@ -40,12 +70,20 @@ use indexmap::IndexMap;
 /// ));
 /// config.add_target_metric("gross_profit");
 ///
-/// let result = analyzer.run(&config)?;
+/// let result = run_sensitivity(&model, &config)?;
 /// assert_eq!(result.scenarios.len(), 3);
 /// # Ok(())
 /// # }
-/// ```
-pub struct SensitivityAnalyzer<'a> {
+pub fn run_sensitivity(
+    model: &FinancialModelSpec,
+    config: &SensitivityConfig,
+) -> Result<SensitivityResult> {
+    SensitivityAnalyzer { model }.run(config)
+}
+
+/// Sweep state shared by the sensitivity modes: the baseline model every
+/// perturbation clones.
+struct SensitivityAnalyzer<'a> {
     model: &'a FinancialModelSpec,
 }
 
@@ -54,46 +92,7 @@ const MAX_SCENARIOS: usize = 10_000;
 const MAX_EVALUATION_CELLS: usize = 10_000_000;
 
 impl<'a> SensitivityAnalyzer<'a> {
-    /// Create a new sensitivity analyzer.
-    ///
-    /// # Arguments
-    ///
-    /// * `model` - Baseline statement model; sweeps vary forecast inputs on
-    ///   owned copies and leave this model unchanged.
-    pub fn new(model: &'a FinancialModelSpec) -> Self {
-        Self { model }
-    }
-
-    /// Run sensitivity analysis.
-    ///
-    /// # Parallelism
-    ///
-    /// On native targets, diagonal and tornado sensitivity run each
-    /// `(parameter, perturbation)` pair concurrently via Rayon; WebAssembly
-    /// builds (no Rayon thread pool) run the same pairs serially. Each pair
-    /// holds its own cloned `FinancialModelSpec` and `Evaluator`. Results
-    /// match the serial path bit-for-bit given the same seed and model, and
-    /// so do errors: when several pairs fail, the error is the first failing
-    /// pair's in `(parameter, perturbation)` order on every target.
-    ///
-    /// Full-grid mode is serial.
-    ///
-    /// # Errors
-    ///
-    /// Propagates invalid sensitivity configuration, parameter perturbation,
-    /// model evaluation, and result-collection errors from the selected mode.
-    /// Requests are limited to 128 distinct node/period parameters, 10,000
-    /// scenarios, and 10 million model node/period cells across all evaluations
-    /// (including the unperturbed baseline). Limits are checked before preparing
-    /// or evaluating the model.
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - Sensitivity mode, the target metrics used to rank tornado
-    ///   impacts, and a non-empty parameter sweep with finite base values and
-    ///   absolute perturbation values. Each parameter must name a distinct
-    ///   node/forecast-period pair with at least one perturbation.
-    pub fn run(&self, config: &SensitivityConfig) -> Result<SensitivityResult> {
+    fn run(&self, config: &SensitivityConfig) -> Result<SensitivityResult> {
         let scenario_count = self.validate_config(config)?;
         match config.mode {
             SensitivityMode::Diagonal => self.run_diagonal(config),
@@ -565,8 +564,6 @@ mod tests {
             .build()
             .expect("valid model");
 
-        let analyzer = SensitivityAnalyzer::new(&model);
-
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         config.add_parameter(ParameterSpec::with_percentages(
             "revenue",
@@ -576,9 +573,7 @@ mod tests {
         ));
         config.add_target_metric("gross_profit");
 
-        let result = analyzer
-            .run(&config)
-            .expect("sensitivity analysis should succeed");
+        let result = run_sensitivity(&model, &config).expect("sensitivity analysis should succeed");
         assert_eq!(result.scenarios.len(), 3); // 3 perturbations
     }
 
@@ -594,8 +589,6 @@ mod tests {
             .expect("valid formula")
             .build()
             .expect("valid model");
-
-        let analyzer = SensitivityAnalyzer::new(&model);
         let mut config = SensitivityConfig::new(SensitivityMode::FullGrid);
         config.add_parameter(ParameterSpec::new(
             "revenue",
@@ -611,7 +604,7 @@ mod tests {
         ));
         config.add_target_metric("gross_profit");
 
-        let result = analyzer.run(&config).expect("full grid should succeed");
+        let result = run_sensitivity(&model, &config).expect("full grid should succeed");
         assert_eq!(result.scenarios.len(), 4);
         assert!(result
             .scenarios
@@ -631,8 +624,6 @@ mod tests {
             .expect("valid formula")
             .build()
             .expect("valid model");
-
-        let analyzer = SensitivityAnalyzer::new(&model);
         let mut config = SensitivityConfig::new(SensitivityMode::Tornado);
         config.add_parameter(ParameterSpec::new(
             "revenue",
@@ -648,7 +639,7 @@ mod tests {
         ));
         config.add_target_metric("gross_profit");
 
-        let result = analyzer.run(&config).expect("tornado should succeed");
+        let result = run_sensitivity(&model, &config).expect("tornado should succeed");
         assert_eq!(result.scenarios.len(), 4);
         assert_eq!(
             result.scenarios[0].parameter_values.keys().next(),
@@ -672,8 +663,7 @@ mod tests {
         let mut config = SensitivityConfig::new(SensitivityMode::Tornado);
         config.add_parameter(ParameterSpec::new("revenue", period, 100.0, vec![90.0]));
         config.add_target_metric("missing");
-        assert!(SensitivityAnalyzer::new(&model)
-            .run(&config)
+        assert!(run_sensitivity(&model, &config)
             .expect_err("missing target")
             .to_string()
             .contains("Missing tornado metric"));
@@ -696,8 +686,7 @@ mod tests {
             vec![f64::MAX],
         ));
         config.add_target_metric("revenue");
-        assert!(SensitivityAnalyzer::new(&model)
-            .run(&config)
+        assert!(run_sensitivity(&model, &config)
             .expect_err("overflowing impact")
             .to_string()
             .contains("impacts must be finite"));
@@ -719,8 +708,6 @@ mod tests {
             )
             .build()
             .expect("valid model");
-
-        let analyzer = SensitivityAnalyzer::new(&model);
         let mut config = SensitivityConfig::new(SensitivityMode::FullGrid);
         config.add_parameter(ParameterSpec::new(
             "revenue",
@@ -735,7 +722,7 @@ mod tests {
             vec![100_000.0, 120_000.0],
         ));
 
-        let result = analyzer.run(&config).expect("full grid should succeed");
+        let result = run_sensitivity(&model, &config).expect("full grid should succeed");
         assert_eq!(result.scenarios.len(), 4);
         assert!(result.scenarios.iter().all(|scenario| {
             scenario.parameter_values.contains_key("revenue@2025Q1")
@@ -805,8 +792,6 @@ mod tests {
             .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
             .build()
             .expect("valid model");
-
-        let analyzer = SensitivityAnalyzer::new(&model);
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         // 2026Q1 is not in the model grid: previously a silent no-op scenario.
         config.add_parameter(ParameterSpec::new(
@@ -816,9 +801,7 @@ mod tests {
             vec![90_000.0, 110_000.0],
         ));
 
-        let err = analyzer
-            .run(&config)
-            .expect_err("period outside the grid must error");
+        let err = run_sensitivity(&model, &config).expect_err("period outside the grid must error");
         assert!(
             err.to_string().contains("not part of the model"),
             "unexpected error: {err}"
@@ -836,8 +819,6 @@ mod tests {
             .expect("valid formula")
             .build()
             .expect("valid model");
-
-        let analyzer = SensitivityAnalyzer::new(&model);
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         // The base value (100k) is NOT one of the perturbations.
         config.add_parameter(ParameterSpec::new(
@@ -848,7 +829,7 @@ mod tests {
         ));
         config.add_target_metric("gross_profit");
 
-        let result = analyzer.run(&config).expect("tornado run");
+        let result = run_sensitivity(&model, &config).expect("tornado run");
         assert!(
             result.baseline.is_some(),
             "tornado runs must carry the unperturbed baseline"
@@ -933,7 +914,6 @@ mod tests {
             )
             .build()
             .expect("model");
-        let analyzer = SensitivityAnalyzer::new(&model);
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         config.add_parameter(ParameterSpec::new(
             "revenue",
@@ -943,7 +923,7 @@ mod tests {
         ));
         config.add_target_metric("revenue");
 
-        let result = analyzer.run(&config).expect("sensitivity");
+        let result = run_sensitivity(&model, &config).expect("sensitivity");
         let shocked = result.scenarios[0]
             .results
             .get_money("revenue", &period)
@@ -961,7 +941,6 @@ mod tests {
             .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
             .build()
             .expect("valid model");
-        let analyzer = SensitivityAnalyzer::new(&model);
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         config.add_parameter(ParameterSpec::new("revenue", period, 100.0, vec![90.0]));
         for i in 0..8 {
@@ -973,7 +952,7 @@ mod tests {
             ));
         }
         for _ in 0..20 {
-            let err = analyzer.run(&config).expect_err("missing nodes must fail");
+            let err = run_sensitivity(&model, &config).expect_err("missing nodes must fail");
             assert!(
                 err.to_string().contains("'missing_0'"),
                 "expected the first missing node, got {err}"
@@ -1006,9 +985,7 @@ mod tests {
                 vec![90.0, 110.0],
             ));
         }
-        let result = SensitivityAnalyzer::new(&model)
-            .run(&config)
-            .expect("sensitivity");
+        let result = run_sensitivity(&model, &config).expect("sensitivity");
         let entries = generate_tornado_entries(&result, "revenue", Some(first)).expect("entries");
         let ids: Vec<_> = entries
             .iter()
@@ -1037,9 +1014,7 @@ mod tests {
                 vec![0.0, 1.0],
             ));
         }
-        let error = SensitivityAnalyzer::new(&model)
-            .run(&config)
-            .expect_err("oversized grid");
+        let error = run_sensitivity(&model, &config).expect_err("oversized grid");
         assert!(error.to_string().contains("10000 scenarios"), "{error}");
     }
 
@@ -1060,8 +1035,7 @@ mod tests {
                 100.0,
                 vec![100.0; MAX_SCENARIOS + 1],
             ));
-            assert!(SensitivityAnalyzer::new(&model)
-                .run(&config)
+            assert!(run_sensitivity(&model, &config)
                 .expect_err("too many scenarios")
                 .to_string()
                 .contains("10000 scenarios"));
@@ -1088,8 +1062,7 @@ mod tests {
             1.0,
             vec![1.0; MAX_SCENARIOS],
         ));
-        assert!(SensitivityAnalyzer::new(&model)
-            .run(&config)
+        assert!(run_sensitivity(&model, &config)
             .expect_err("too many evaluation cells")
             .to_string()
             .contains("evaluation cells"));
@@ -1106,10 +1079,10 @@ mod tests {
             .expect("model");
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         config.add_parameter(ParameterSpec::new("revenue", period, 100.0, vec![f64::NAN]));
-        assert!(SensitivityAnalyzer::new(&model).run(&config).is_err());
+        assert!(run_sensitivity(&model, &config).is_err());
         config.parameters[0].perturbations = vec![90.0];
         config.add_parameter(config.parameters[0].clone());
-        assert!(SensitivityAnalyzer::new(&model).run(&config).is_err());
+        assert!(run_sensitivity(&model, &config).is_err());
     }
 
     #[test]
@@ -1132,7 +1105,7 @@ mod tests {
             vec![90.0, 110.0],
         ));
         config.add_parameter(ParameterSpec::new("cost", period, 20.0, vec![10.0, 30.0]));
-        let mut result = SensitivityAnalyzer::new(&model).run(&config).expect("grid");
+        let mut result = run_sensitivity(&model, &config).expect("grid");
         assert_eq!(
             result
                 .baseline

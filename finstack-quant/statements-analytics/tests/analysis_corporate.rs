@@ -11,7 +11,7 @@ use finstack_quant_statements::checks::builtins::NonFiniteCheck;
 use finstack_quant_statements::checks::CheckSuite;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::AmountOrScalar;
-use finstack_quant_statements_analytics::analysis::{evaluate_dcf_with_market, DcfOptions};
+use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
 use finstack_quant_valuations::instruments::TerminalValueSpec;
 use time::Month;
 
@@ -51,7 +51,7 @@ fn test_dcf_evaluation_gordon_growth() {
         .build()
         .expect("valid model");
 
-    let result = evaluate_dcf_with_market(
+    let result = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -85,7 +85,7 @@ fn test_dcf_rejects_scalar_ufcf_node() {
         .build()
         .expect("model");
 
-    let error = evaluate_dcf_with_market(
+    let error = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -212,7 +212,7 @@ fn test_dcf_with_market_context() {
     let options = DcfOptions::default();
 
     // Test with None market context
-    let result_no_market = evaluate_dcf_with_market(
+    let result_no_market = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -231,7 +231,7 @@ fn test_dcf_with_market_context() {
 
     // A market without as_of must not silently drop curve lookups.
     let market = MarketContext::new();
-    let missing_as_of = evaluate_dcf_with_market(
+    let missing_as_of = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -248,7 +248,7 @@ fn test_dcf_with_market_context() {
         "market without as_of must error rather than evaluate without curves"
     );
 
-    let result_with_market = evaluate_dcf_with_market(
+    let result_with_market = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -301,7 +301,7 @@ fn test_dcf_excludes_historical_periods_from_explicit_flows() {
         .build()
         .expect("valid model");
 
-    let result = evaluate_dcf_with_market(
+    let result = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -400,7 +400,7 @@ fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
         .expect("valid model");
 
     let as_of = Date::from_calendar_date(2025, Month::August, 15).expect("valid date");
-    let result = evaluate_dcf_with_market(
+    let result = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -511,7 +511,7 @@ fn test_dcf_forecast_only_requires_opening_balance_or_override() {
         .build()
         .expect("valid model");
 
-    let result = evaluate_dcf_with_market(
+    let result = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -567,7 +567,7 @@ fn parity_orchestrator_dcf_matches_standalone() {
         stable_growth_rate: 0.02,
     };
 
-    let standalone = evaluate_dcf_with_market(
+    let standalone = evaluate_dcf(
         &model,
         0.10,
         tv.clone(),
@@ -577,7 +577,7 @@ fn parity_orchestrator_dcf_matches_standalone() {
         None,
         None,
     )
-    .expect("standalone evaluate_dcf_with_market");
+    .expect("standalone evaluate_dcf");
 
     let orchestrated = CorporateAnalysisBuilder::new(model)
         .dcf(0.10, tv)
@@ -605,7 +605,7 @@ fn parity_orchestrator_dcf_matches_standalone() {
 fn quarterly_gordon_terminal_value_uses_annualized_flow() {
     let model = make_simple_dcf_model(); // quarterly UFCF: 100k,110k,120k,130k
 
-    let result = evaluate_dcf_with_market(
+    let result = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -658,7 +658,7 @@ fn annual_gordon_terminal_value_unchanged() {
         .build()
         .expect("valid model");
 
-    let result = evaluate_dcf_with_market(
+    let result = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -695,7 +695,7 @@ fn usd_discount_curve_does_not_mix_discounting_bases() {
     let market = MarketContext::new().insert(usd_discount);
 
     let net_debt = 50_000.0;
-    let with_market = evaluate_dcf_with_market(
+    let with_market = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -709,7 +709,7 @@ fn usd_discount_curve_does_not_mix_discounting_bases() {
     )
     .expect("DCF with market");
 
-    let without_market = evaluate_dcf_with_market(
+    let without_market = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -748,7 +748,7 @@ fn usd_discount_curve_does_not_mix_discounting_bases() {
 fn nan_terminal_value_parameters_error() {
     let model = make_simple_dcf_model();
 
-    let result = evaluate_dcf_with_market(
+    let result = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -770,7 +770,7 @@ fn stable_growth_above_policy_ceiling_is_rejected() {
         max_stable_growth_rate: 0.03,
         ..DcfOptions::default()
     };
-    let error = evaluate_dcf_with_market(
+    let error = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -789,7 +789,7 @@ fn stable_growth_above_policy_ceiling_is_rejected() {
 /// Standalone DCF must evaluate statements with market + as_of so
 /// curve-dependent capital-structure nodes such as `cs.interest` resolve.
 #[test]
-fn evaluate_dcf_with_market_uses_curve_for_cs_interest() {
+fn evaluate_dcf_uses_curve_for_cs_interest() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let disc_curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -845,7 +845,7 @@ fn evaluate_dcf_with_market_uses_curve_for_cs_interest() {
         .build()
         .expect("model");
 
-    let no_market = evaluate_dcf_with_market(
+    let no_market = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -859,7 +859,7 @@ fn evaluate_dcf_with_market_uses_curve_for_cs_interest() {
     )
     .expect("a fixed-rate bond's contractual coupons need no market data");
 
-    let missing_as_of = evaluate_dcf_with_market(
+    let missing_as_of = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -876,7 +876,7 @@ fn evaluate_dcf_with_market_uses_curve_for_cs_interest() {
         "market without as_of must not silently drop CS curve lookups"
     );
 
-    let result = evaluate_dcf_with_market(
+    let result = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {

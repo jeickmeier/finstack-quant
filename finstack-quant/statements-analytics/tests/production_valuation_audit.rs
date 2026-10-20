@@ -209,7 +209,7 @@ fn working_capital_rejects_currency_change_without_metadata() {
 #[test]
 fn growth_terminal_flow_rejects_missing_calendar_quarters() {
     use finstack_quant_core::{currency::Currency, money::Money};
-    use finstack_quant_statements_analytics::analysis::{evaluate_dcf_with_market, DcfOptions};
+    use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
     use finstack_quant_valuations::instruments::TerminalValueSpec;
     let values: Vec<_> = (2025..=2026)
         .flat_map(|year| {
@@ -231,7 +231,7 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
     let terminal = TerminalValueSpec::GordonGrowth {
         stable_growth_rate: 0.02,
     };
-    let valid = evaluate_dcf_with_market(
+    let valid = evaluate_dcf(
         &model,
         0.10,
         terminal.clone(),
@@ -257,7 +257,7 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
         .unwrap()
         .shift_remove(&missing_period);
     model.validate_semantics().unwrap();
-    let error = evaluate_dcf_with_market(
+    let error = evaluate_dcf(
         &model,
         0.10,
         terminal,
@@ -274,7 +274,7 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
 #[test]
 fn growth_terminal_flow_rejects_partial_week_at_calendar_year_boundary() {
     use finstack_quant_core::{currency::Currency, money::Money};
-    use finstack_quant_statements_analytics::analysis::{evaluate_dcf_with_market, DcfOptions};
+    use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
     use finstack_quant_valuations::instruments::TerminalValueSpec;
     let values: Vec<_> = (1..=52)
         .map(|week| {
@@ -291,7 +291,7 @@ fn growth_terminal_flow_rejects_partial_week_at_calendar_year_boundary() {
         .with_meta("currency", serde_json::json!("USD"))
         .build()
         .unwrap();
-    let error = evaluate_dcf_with_market(
+    let error = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -310,7 +310,7 @@ fn growth_terminal_flow_rejects_partial_week_at_calendar_year_boundary() {
 #[test]
 fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
     use finstack_quant_core::{currency::Currency, dates::Period, money::Money};
-    use finstack_quant_statements_analytics::analysis::{evaluate_dcf_with_market, DcfOptions};
+    use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
     use finstack_quant_valuations::instruments::TerminalValueSpec;
     let period = PeriodId::annual(2025);
     let model = ModelBuilder::new("annual stub")
@@ -325,7 +325,7 @@ fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
         .with_meta("currency", serde_json::json!("USD"))
         .build()
         .unwrap();
-    let error = evaluate_dcf_with_market(
+    let error = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
@@ -344,7 +344,7 @@ fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
 #[test]
 fn growth_terminal_flow_uses_complete_year_across_annual_stub_identifiers() {
     use finstack_quant_core::{currency::Currency, dates::Period, money::Money};
-    use finstack_quant_statements_analytics::analysis::{evaluate_dcf_with_market, DcfOptions};
+    use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
     use finstack_quant_valuations::instruments::TerminalValueSpec;
     let actual = PeriodId::annual(2024);
     let forecast = PeriodId::annual(2025);
@@ -374,7 +374,7 @@ fn growth_terminal_flow_uses_complete_year_across_annual_stub_identifiers() {
         .with_meta("currency", serde_json::json!("USD"))
         .build()
         .unwrap();
-    let result = evaluate_dcf_with_market(
+    let result = evaluate_dcf(
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {

@@ -116,9 +116,8 @@ fn run_sensitivity(
     let model = extract_model_ref(model)?.into_owned();
     let config = extract_sensitivity_config(config)?;
     py.detach(move || {
-        let analyzer =
-            finstack_quant_statements_analytics::analysis::SensitivityAnalyzer::new(&model);
-        let inner = analyzer.run(&config).map_err(statements_to_py)?;
+        let inner = finstack_quant_statements_analytics::analysis::run_sensitivity(&model, &config)
+            .map_err(statements_to_py)?;
         Ok(PySensitivityResult { inner })
     })
 }
@@ -228,11 +227,12 @@ fn run_variance(
     let comparison = extract_results_ref(comparison)?.into_owned();
     let config = extract_variance_config(config)?;
     py.detach(move || {
-        let analyzer = finstack_quant_statements_analytics::analysis::VarianceAnalyzer::new(
+        let inner = finstack_quant_statements_analytics::analysis::run_variance(
             &base,
             &comparison,
-        );
-        let inner = analyzer.compute(&config).map_err(statements_to_py)?;
+            &config,
+        )
+        .map_err(statements_to_py)?;
         Ok(PyVarianceReport { inner })
     })
 }
@@ -502,20 +502,17 @@ fn variance_bridge(
     let baseline_label = baseline_label.to_string();
     let comparison_label = comparison_label.to_string();
     py.detach(move || {
-        let analyzer = finstack_quant_statements_analytics::analysis::VarianceAnalyzer::new(
+        let driver_refs: Vec<&str> = drivers.iter().map(String::as_str).collect();
+        let inner = finstack_quant_statements_analytics::analysis::variance_bridge(
             &base,
             &comparison,
-        );
-        let driver_refs: Vec<&str> = drivers.iter().map(String::as_str).collect();
-        let inner = analyzer
-            .bridge_decomposition(
-                &target_metric,
-                period,
-                &driver_refs,
-                &baseline_label,
-                &comparison_label,
-            )
-            .map_err(statements_to_py)?;
+            &target_metric,
+            period,
+            &driver_refs,
+            &baseline_label,
+            &comparison_label,
+        )
+        .map_err(statements_to_py)?;
         Ok(PyBridgeChart { inner })
     })
 }
@@ -1249,7 +1246,7 @@ impl PyExplanation {
 
     /// Human-readable multi-line explanation.
     fn to_text(&self) -> String {
-        self.inner.to_string_detailed()
+        self.inner.to_text()
     }
 
     /// Export the breakdown as a pandas ``DataFrame``.
@@ -1356,9 +1353,10 @@ fn explain_formula(
     let results = extract_results_ref(results)?;
     let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(core_to_py)?;
 
-    let explainer =
-        finstack_quant_statements_analytics::analysis::FormulaExplainer::new(&model, &results);
-    let inner = explainer.explain(node_id, &pid).map_err(statements_to_py)?;
+    let inner = finstack_quant_statements_analytics::analysis::explain_formula(
+        &model, &results, node_id, &pid,
+    )
+    .map_err(statements_to_py)?;
     Ok(PyExplanation { inner })
 }
 

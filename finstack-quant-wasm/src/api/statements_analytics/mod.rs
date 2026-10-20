@@ -52,8 +52,8 @@ pub fn run_sensitivity(model_json: JsValue, config_json: JsValue) -> Result<JsVa
     let config: finstack_quant_statements_analytics::analysis::SensitivityConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
 
-    let analyzer = finstack_quant_statements_analytics::analysis::SensitivityAnalyzer::new(&model);
-    let result = analyzer.run(&config).map_err(to_js_err)?;
+    let result = finstack_quant_statements_analytics::analysis::run_sensitivity(&model, &config)
+        .map_err(to_js_err)?;
 
     to_js_value(&result)
 }
@@ -89,9 +89,9 @@ pub fn run_variance(
     let config: finstack_quant_statements_analytics::analysis::VarianceConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
 
-    let analyzer =
-        finstack_quant_statements_analytics::analysis::VarianceAnalyzer::new(&base, &comparison);
-    let report = analyzer.compute(&config).map_err(to_js_err)?;
+    let report =
+        finstack_quant_statements_analytics::analysis::run_variance(&base, &comparison, &config)
+            .map_err(to_js_err)?;
 
     to_js_value(&report)
 }
@@ -541,9 +541,10 @@ pub fn explain_formula(
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
     let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
-    let explainer =
-        finstack_quant_statements_analytics::analysis::FormulaExplainer::new(&model, &results);
-    let explanation = explainer.explain(node_id, &pid).map_err(to_js_err)?;
+    let explanation = finstack_quant_statements_analytics::analysis::explain_formula(
+        &model, &results, node_id, &pid,
+    )
+    .map_err(to_js_err)?;
     let js = crate::utils::to_js_value_numeric(&explanation)?;
     let breakdown = js_sys::Reflect::get(&js, &JsValue::from("breakdown"))?;
     crate::utils::restore_non_finite_rows::<
@@ -578,10 +579,11 @@ pub fn explain_formula_text(
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
     let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
-    let explainer =
-        finstack_quant_statements_analytics::analysis::FormulaExplainer::new(&model, &results);
-    let explanation = explainer.explain(node_id, &pid).map_err(to_js_err)?;
-    Ok(explanation.to_string_detailed())
+    let explanation = finstack_quant_statements_analytics::analysis::explain_formula(
+        &model, &results, node_id, &pid,
+    )
+    .map_err(to_js_err)?;
+    Ok(explanation.to_text())
 }
 
 /// Generate a P&L summary report as formatted text.
@@ -796,7 +798,7 @@ pub fn render_check_report_text(report_json: JsValue) -> Result<String, JsValue>
     let report_json: &str = &json_text(&report_json, "reportJson")?;
     let report: finstack_quant_statements::checks::CheckReport =
         serde_json::from_str(report_json).map_err(to_js_err)?;
-    Ok(finstack_quant_statements_analytics::analysis::CheckReportRenderer::render_text(&report))
+    Ok(finstack_quant_statements_analytics::analysis::render_check_report_text(&report))
 }
 
 /// Render a check report as HTML.
@@ -811,7 +813,7 @@ pub fn render_check_report_html(report_json: JsValue) -> Result<String, JsValue>
     let report_json: &str = &json_text(&report_json, "reportJson")?;
     let report: finstack_quant_statements::checks::CheckReport =
         serde_json::from_str(report_json).map_err(to_js_err)?;
-    Ok(finstack_quant_statements_analytics::analysis::CheckReportRenderer::render_html(&report))
+    Ok(finstack_quant_statements_analytics::analysis::render_check_report_html(&report))
 }
 
 #[cfg(test)]
@@ -897,9 +899,9 @@ mod tests {
         // delegates to and assert the serializable shape.
         let model: finstack_quant_statements::FinancialModelSpec =
             serde_json::from_str(&model_json).expect("parse model");
-        let analyzer =
-            finstack_quant_statements_analytics::analysis::SensitivityAnalyzer::new(&model);
-        let result = analyzer.run(&config).expect("sensitivity");
+        let result =
+            finstack_quant_statements_analytics::analysis::run_sensitivity(&model, &config)
+                .expect("sensitivity");
         let parsed = serde_json::to_value(&result).expect("serialize");
         assert!(parsed.is_object() || parsed.is_array());
     }
@@ -921,9 +923,9 @@ mod tests {
         };
         let model: finstack_quant_statements::FinancialModelSpec =
             serde_json::from_str(&model_json).expect("parse model");
-        let analyzer =
-            finstack_quant_statements_analytics::analysis::SensitivityAnalyzer::new(&model);
-        let result = analyzer.run(&config).expect("sensitivity");
+        let result =
+            finstack_quant_statements_analytics::analysis::run_sensitivity(&model, &config)
+                .expect("sensitivity");
         let entries = finstack_quant_statements_analytics::analysis::generate_tornado_entries(
             &result,
             "gross_profit",
@@ -948,11 +950,12 @@ mod tests {
             periods: vec![PeriodId::quarter(2024, 1).expect("valid period fixture")],
         };
         // `run_variance` returns a `JsValue`; assert the report it serializes.
-        let analyzer = finstack_quant_statements_analytics::analysis::VarianceAnalyzer::new(
+        let report = finstack_quant_statements_analytics::analysis::run_variance(
             &base,
             &comparison,
-        );
-        let report = analyzer.compute(&config).expect("variance");
+            &config,
+        )
+        .expect("variance");
         let parsed = serde_json::to_value(&report).expect("serialize");
         assert!(parsed.is_object());
     }

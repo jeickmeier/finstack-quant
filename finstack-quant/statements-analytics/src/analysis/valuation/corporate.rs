@@ -328,7 +328,7 @@ pub(crate) struct DcfEvalContext<'a> {
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_statements_analytics::analysis::{evaluate_dcf_with_market, DcfOptions};
+/// use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
 /// use finstack_quant_statements::builder::ModelBuilder;
 /// use finstack_quant_core::{currency::Currency, dates::PeriodId, money::Money};
 /// use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
@@ -348,7 +348,7 @@ pub(crate) struct DcfEvalContext<'a> {
 ///     .with_meta("currency", serde_json::json!("USD"))
 ///     .build()?;
 ///
-/// let result = evaluate_dcf_with_market(
+/// let result = evaluate_dcf(
 ///     &model,
 ///     0.10,
 ///     TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 },
@@ -368,7 +368,7 @@ pub(crate) struct DcfEvalContext<'a> {
 ///
 /// - Discounting and terminal-value context: `docs/REFERENCES.md#hull-options-futures`
 #[allow(clippy::too_many_arguments)]
-pub fn evaluate_dcf_with_market(
+pub fn evaluate_dcf(
     model: &FinancialModelSpec,
     wacc: f64,
     terminal_value: TerminalValueSpec,
@@ -391,7 +391,7 @@ pub fn evaluate_dcf_with_market(
         (Some(market), Some(as_of)) => evaluator.evaluate_with_market(model, market, as_of)?,
         (Some(_), None) => {
             return Err(finstack_quant_statements::error::Error::Eval(
-                "evaluate_dcf_with_market requires as_of when a market context is provided; \
+                "evaluate_dcf requires as_of when a market context is provided; \
                  market is used for statement evaluation, not DCF discounting"
                     .into(),
             ));
@@ -729,7 +729,7 @@ const WACC_WEIGHT_SUM_TOLERANCE: f64 = 1e-6;
 /// means `10%`. Weights are decimal fractions of total capital and must sum to
 /// one — pass market-value weights, not book-value weights, for a valuation
 /// discount rate. The result is the rate to feed to
-/// [`evaluate_dcf_with_market`] or [`dcf_sensitivity`].
+/// [`evaluate_dcf`] or [`dcf_sensitivity`].
 ///
 /// # Arguments
 ///
@@ -1339,7 +1339,7 @@ mod tests {
             .build()
             .expect("valid model");
 
-        let result = evaluate_dcf_with_market(
+        let result = evaluate_dcf(
             &model,
             0.10,
             TerminalValueSpec::GordonGrowth {
@@ -1376,7 +1376,7 @@ mod tests {
             .build()
             .expect("valid model");
 
-        let result = evaluate_dcf_with_market(
+        let result = evaluate_dcf(
             &model,
             0.10,
             TerminalValueSpec::GordonGrowth {
@@ -1400,7 +1400,7 @@ mod tests {
         let gordon = || TerminalValueSpec::GordonGrowth {
             stable_growth_rate: 0.02,
         };
-        let plain = evaluate_dcf_with_market(
+        let plain = evaluate_dcf(
             &model,
             0.10,
             gordon(),
@@ -1413,7 +1413,7 @@ mod tests {
         .expect("plain DCF");
         assert_eq!(plain.valuation_discount.amount(), 0.0);
 
-        let discounted = evaluate_dcf_with_market(
+        let discounted = evaluate_dcf(
             &model,
             0.10,
             gordon(),
@@ -1446,7 +1446,7 @@ mod tests {
     fn dcf_detail_reconciles_to_enterprise_and_equity_value() {
         let model = sensitivity_model();
         for mid_year_convention in [false, true] {
-            let result = evaluate_dcf_with_market(
+            let result = evaluate_dcf(
                 &model,
                 0.10,
                 TerminalValueSpec::GordonGrowth {
@@ -1767,7 +1767,7 @@ mod tests {
             exit_multiple_metric_node: Some("ebitda".into()),
             ..Default::default()
         };
-        let result = evaluate_dcf_with_market(
+        let result = evaluate_dcf(
             &model,
             0.10,
             TerminalValueSpec::ExitMultiple {
@@ -1873,7 +1873,7 @@ mod tests {
             exit_multiple_metric_node: Some("missing_ebitda".into()),
             ..Default::default()
         };
-        let result = evaluate_dcf_with_market(
+        let result = evaluate_dcf(
             &model,
             0.10,
             TerminalValueSpec::ExitMultiple {
@@ -1895,7 +1895,7 @@ mod tests {
     #[test]
     fn exit_multiple_explicit_metric_used_when_node_is_none() {
         let model = exit_multiple_model();
-        let result = evaluate_dcf_with_market(
+        let result = evaluate_dcf(
             &model,
             0.10,
             TerminalValueSpec::ExitMultiple {

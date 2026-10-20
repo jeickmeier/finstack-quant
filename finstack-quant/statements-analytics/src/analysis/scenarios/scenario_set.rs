@@ -7,7 +7,7 @@
 //! supports simple parent chaining with override merging, and can:
 //! - Evaluate all scenarios into a [`ScenarioResults`] envelope.
 //! - Compute variance-style diffs between two scenarios using
-//!   [`VarianceAnalyzer`].
+//!   [`run_variance`].
 //! - Export wide comparison tables as serializable table envelopes.
 //!
 //! The wire format is intentionally simple and mirrors the design docs:
@@ -38,7 +38,7 @@
 //! scenario can change any forecast method or parameter: growth rates, curves,
 //! seeds and volatilities of stochastic methods, external series, bounds.
 
-use crate::analysis::{VarianceAnalyzer, VarianceConfig, VarianceReport};
+use crate::analysis::{run_variance, VarianceConfig, VarianceReport};
 use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::ZERO_TOLERANCE;
@@ -322,7 +322,7 @@ impl ScenarioSet {
 
     /// Compute a variance-style diff between two evaluated scenarios.
     ///
-    /// This delegates to [`VarianceAnalyzer`] under the hood so that
+    /// This delegates to [`run_variance`] under the hood so that
     /// scenario diffs share the same semantics as other variance reports.
     ///
     /// # Arguments
@@ -411,7 +411,6 @@ impl ScenarioSet {
             Error::invalid_input(format!("Unknown comparison scenario '{comparison}'"))
         })?;
 
-        let analyzer = VarianceAnalyzer::new(baseline_results, comparison_results);
         let config = VarianceConfig::new(
             baseline.to_string(),
             comparison.to_string(),
@@ -419,7 +418,7 @@ impl ScenarioSet {
             periods.to_vec(),
         );
 
-        let variance = analyzer.compute(&config)?;
+        let variance = run_variance(baseline_results, comparison_results, &config)?;
 
         Ok(ScenarioDiff {
             baseline: baseline.to_string(),

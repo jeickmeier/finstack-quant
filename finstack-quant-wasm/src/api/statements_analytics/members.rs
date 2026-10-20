@@ -29,7 +29,7 @@ fn parse_periods(periods: &JsValue) -> Result<Vec<PeriodId>, JsValue> {
 
 /// Value a company with a discounted cash flow of its unlevered free cash flow.
 ///
-/// Twin of Python `evaluate_dcf` (Rust `evaluate_dcf_with_market`). The model
+/// Twin of Python `evaluate_dcf` (Rust `evaluate_dcf`). The model
 /// is evaluated, the UFCF series is discounted at `wacc`, the terminal value
 /// is added, and the equity bridge turns enterprise value into equity value.
 /// @param model - `FinancialModelSpec` (object or JSON); its metadata must carry a `currency`.
@@ -75,7 +75,7 @@ pub fn evaluate_dcf(
     let as_of = js_opt_string(as_of.as_ref(), "asOf")?
         .map(|date| crate::utils::parse_iso_date(&date))
         .transpose()?;
-    let result = fa::evaluate_dcf_with_market(
+    let result = fa::evaluate_dcf(
         &model,
         wacc,
         terminal_value,
@@ -228,7 +228,7 @@ pub fn scenario_diff(
 /// Decompose a metric's variance between two results across named drivers.
 ///
 /// Twin of Python `variance_bridge` (Rust
-/// `VarianceAnalyzer::bridge_decomposition`). Driver contributions are raw
+/// `variance_bridge`). Driver contributions are raw
 /// deltas in driver units, not sensitivities of the target, so they need not
 /// sum to the target variance; the gap is `unexplained`.
 /// @param base - Baseline evaluated `StatementResult` (object or JSON).
@@ -261,15 +261,16 @@ pub fn variance_bridge(
     let period: PeriodId = js_string(&period, "period")?.parse().map_err(to_js_err)?;
     let drivers = js_string_seq(&drivers, "drivers")?;
     let driver_refs: Vec<&str> = drivers.iter().map(String::as_str).collect();
-    let chart = fa::VarianceAnalyzer::new(&base, &comparison)
-        .bridge_decomposition(
-            &js_string(&target_metric, "targetMetric")?,
-            period,
-            &driver_refs,
-            &js_string(&baseline_label, "baselineLabel")?,
-            &js_string(&comparison_label, "comparisonLabel")?,
-        )
-        .map_err(to_js_err)?;
+    let chart = fa::variance_bridge(
+        &base,
+        &comparison,
+        &js_string(&target_metric, "targetMetric")?,
+        period,
+        &driver_refs,
+        &js_string(&baseline_label, "baselineLabel")?,
+        &js_string(&comparison_label, "comparisonLabel")?,
+    )
+    .map_err(to_js_err)?;
     to_js_value(&chart)
 }
 
@@ -504,7 +505,7 @@ pub fn sensitivity_result_get_value(
 /// Detailed text rendering of a formula explanation.
 ///
 /// Free-function twin of Python `Explanation.to_text` (Rust
-/// `Explanation::to_string_detailed`).
+/// `Explanation::to_text`).
 /// @param explanation - `Explanation` returned by `explainFormula`. Pass the JSON form (non-finite values as `"nan"`, `"inf"`, `"-inf"`) when a value is not finite; a plain object holding `NaN` is rejected at the boundary.
 /// @returns Multi-line text: the node, period, final value, formula and each component with its value.
 ///
@@ -514,7 +515,7 @@ pub fn sensitivity_result_get_value(
 #[wasm_bindgen(js_name = explanationToText)]
 pub fn explanation_to_text(explanation: JsValue) -> Result<String, JsValue> {
     let explanation: fa::Explanation = from_js_json(&explanation, "explanation")?;
-    Ok(explanation.to_string_detailed())
+    Ok(explanation.to_text())
 }
 
 /// One-line summary of forecast accuracy metrics.

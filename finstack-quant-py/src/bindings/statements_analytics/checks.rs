@@ -805,7 +805,7 @@ fn run_credit_underwriting_checks(
 #[pyfunction]
 fn render_check_report_text(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResult<String> {
     let report = extract_check_report(py, report)?;
-    Ok(finstack_quant_statements_analytics::analysis::CheckReportRenderer::render_text(&report))
+    Ok(finstack_quant_statements_analytics::analysis::render_check_report_text(&report))
 }
 
 /// Render a check report as HTML with inline styles.
@@ -840,7 +840,7 @@ fn render_check_report_text(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResu
 #[pyfunction]
 fn render_check_report_html(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResult<String> {
     let report = extract_check_report(py, report)?;
-    Ok(finstack_quant_statements_analytics::analysis::CheckReportRenderer::render_html(&report))
+    Ok(finstack_quant_statements_analytics::analysis::render_check_report_html(&report))
 }
 
 /// Register check mappings and runners.

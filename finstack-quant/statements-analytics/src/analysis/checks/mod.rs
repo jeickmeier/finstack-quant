@@ -8,7 +8,7 @@
 //!
 //! - [`CreditMapping`] and [`ThreeStatementMapping`] — typed node-id mappings for common model patterns
 //! - [`three_statement_checks`], [`credit_underwriting_checks`], and [`lbo_model_checks`] — pre-built check suites
-//! - [`CheckReportRenderer`] — render [`finstack_quant_statements::checks::CheckReport`] as
+//! - [`render_check_report_text`] and [`render_check_report_html`] — render [`finstack_quant_statements::checks::CheckReport`] as
 //!   text or HTML
 
 pub(crate) mod consistency;
@@ -29,5 +29,5 @@ pub use reconciliation::{
 };
 
 pub use mappings::{CreditMapping, ThreeStatementMapping};
-pub use renderer::CheckReportRenderer;
+pub use renderer::{render_check_report_html, render_check_report_text};
 pub use suites::{credit_underwriting_checks, lbo_model_checks, three_statement_checks};

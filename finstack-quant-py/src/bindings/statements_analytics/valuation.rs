@@ -1249,7 +1249,7 @@ fn evaluate_dcf<'py>(
 
     let inner = py
         .detach(move || {
-            finstack_quant_statements_analytics::analysis::evaluate_dcf_with_market(
+            finstack_quant_statements_analytics::analysis::evaluate_dcf(
                 &model,
                 wacc,
                 terminal_value,

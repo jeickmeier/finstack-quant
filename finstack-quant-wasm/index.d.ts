@@ -33881,7 +33881,7 @@ export interface StatementsAnalyticsNamespace {
   /**
    * Value a company with a discounted cash flow of its unlevered free cash flow.
    *
-   * Twin of Python `evaluate_dcf` (Rust `evaluate_dcf_with_market`). The model
+   * Twin of Python `evaluate_dcf` (Rust `evaluate_dcf`). The model
    * is evaluated, the UFCF series is discounted at `wacc`, the terminal value
    * is added, and the equity bridge turns enterprise value into equity value.
    * @param model - `FinancialModelSpec` (object or JSON); its metadata must carry a `currency`.
@@ -33986,7 +33986,7 @@ export interface StatementsAnalyticsNamespace {
    * Decompose a metric's variance between two results across named drivers.
    *
    * Twin of Python `variance_bridge` (Rust
-   * `VarianceAnalyzer::bridge_decomposition`). Driver contributions are raw
+   * `variance_bridge`). Driver contributions are raw
    * deltas in driver units, not sensitivities of the target, so they need not
    * sum to the target variance; the gap is `unexplained`.
    * @param base - Baseline evaluated `StatementResult` (object or JSON).
@@ -34148,7 +34148,7 @@ export interface StatementsAnalyticsNamespace {
    * Detailed text rendering of a formula explanation.
    *
    * Free-function twin of Python `Explanation.to_text` (Rust
-   * `Explanation::to_string_detailed`).
+   * `Explanation::to_text`).
    * @param explanation - `Explanation` returned by `explainFormula`. Pass the JSON form (non-finite values as `"nan"`, `"inf"`, `"-inf"`) when a value is not finite; a plain object holding `NaN` is rejected at the boundary.
    * @returns Multi-line text: the node, period, final value, formula and each component with its value.
    * @throws Error - Throws with kind `validation` if `explanation` is malformed.

@@ -98,18 +98,18 @@ a submodule.
 
 | Area | Key exports |
 |------|-------------|
-| Valuation | `CorporateAnalysisBuilder`, `CorporateAnalysis`, `CorporateValuationResult`, `DcfPeriodRow`, `evaluate_dcf_with_market`, `DcfOptions`, `dcf_sensitivity`, `DcfSensitivityResult`, `ExitMultipleBump`, `wacc` |
+| Valuation | `CorporateAnalysisBuilder`, `CorporateAnalysis`, `CorporateValuationResult`, `DcfPeriodRow`, `evaluate_dcf`, `DcfOptions`, `dcf_sensitivity`, `DcfSensitivityResult`, `ExitMultipleBump`, `wacc` |
 | LBO | `evaluate_lbo`, `LboConfig`, `LboResult`, `LboTranche`, `LboCheckMappings` |
 | Scenarios | `ScenarioSet`, `ScenarioDefinition`, `ScenarioResults`, `ScenarioDiff` |
-| Sensitivity | `SensitivityAnalyzer`, `SensitivityConfig`, `SensitivityMode`, `SensitivityResult`, `ParameterSpec`, `TornadoEntry`, `generate_tornado_entries` |
-| Variance | `VarianceAnalyzer`, `VarianceConfig`, `VarianceReport`, `VarianceRow`, `BridgeChart`, `BridgeStep` |
+| Sensitivity | `run_sensitivity`, `SensitivityConfig`, `SensitivityMode`, `SensitivityResult`, `ParameterSpec`, `TornadoEntry`, `generate_tornado_entries` |
+| Variance | `run_variance`, `variance_bridge`, `VarianceConfig`, `VarianceReport`, `VarianceRow`, `BridgeChart`, `BridgeStep` |
 | Credit | `compute_credit_context`, `CreditContextMetrics`, `forecast_covenant`, `forecast_breaches`, `StatementsAdapter`, `to_table` |
-| Checks (`analysis::checks`) | `three_statement_checks`, `credit_underwriting_checks`, `lbo_model_checks`, `ThreeStatementMapping`, `CreditMapping`, `FormulaCheckSpec`, `CheckReportRenderer`, plus reconciliation / consistency / credit check types |
+| Checks | `three_statement_checks`, `credit_underwriting_checks`, `lbo_model_checks`, `ThreeStatementMapping`, `CreditMapping`, `FormulaCheckSpec`, `render_check_report_text`, `render_check_report_html`, plus reconciliation / consistency / credit check types |
 | ECL | `EclEngine`, `EclConfig`, `EclConfigBuilder`, `CeclEngine`, `CeclConfig`, `classify_stage`, `compute_ecl`, `compute_ecl_weighted`, `classify_stage_from_curves`, `compute_ecl_from_curve`, `compute_ecl_weighted_from_curves`, `StagingConfig`, `PdTermStructure`, `PortfolioEclResult`, `ProvisionWaterfall`, `compute_waterfall` |
 | Comps | `PeerSet`, `PeerFilter`, `PeerStats`, `compute_peer_multiples`, `compute_multiple`, `regression_fair_value`, `score_relative_value`, `percentile_rank`, `z_score` |
 | Goal seek | `goal_seek` |
 | Backtesting | `backtest_forecast`, `ForecastMetrics` |
-| Introspection | `DependencyTracer`, `DependencyTree`, `FormulaExplainer`, `Explanation`, `render_tree_ascii`, `render_tree_detailed` |
+| Introspection | `DependencyTracer`, `DependencyTree`, `explain_formula`, `Explanation`, `render_tree_ascii`, `render_tree_detailed` |
 | Reports | `PLSummaryReport`, `CreditAssessmentReport`, `CreditAssessment` |
 | `extensions` | `CorkscrewExtension` + `CorkscrewConfig`/`CorkscrewReport`/`CorkscrewAccount`/`AccountType`/`CorkscrewStatus`; `CreditScorecardExtension` + `ScorecardConfig`/`ScorecardMetric`/`ScorecardReport`/`ScorecardStatus` |
 | `templates` | the `roll_forward`, `vintage`, and `real_estate` modules (free functions over `ModelBuilder`) |
@@ -130,9 +130,9 @@ as_of)` prices market-dependent instruments;
 `diff(&results, baseline, comparison, metrics, periods)` returns a
 `ScenarioDiff`;
 `to_comparison_table` renders the set as a `TableEnvelope`.
-`VarianceAnalyzer::new(&baseline, &comparison)` then `.compute(&config)` yields a
-`VarianceReport`, and `.bridge_decomposition(...)` a `BridgeChart`.
-`SensitivityAnalyzer::new(&model).run(&config)` sweeps `ParameterSpec`s and
+`run_variance(&baseline, &comparison, &config)` yields a
+`VarianceReport`, and `variance_bridge(...)` a `BridgeChart`.
+`run_sensitivity(&model, &config)` sweeps `ParameterSpec`s and
 `generate_tornado_entries` ranks the result. Statement-model Monte Carlo lives in
 `finstack-quant-statements`, not here.
 

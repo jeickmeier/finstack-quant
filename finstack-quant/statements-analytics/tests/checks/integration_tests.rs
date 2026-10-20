@@ -8,7 +8,7 @@ use finstack_quant_statements::checks::Severity;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, NodeId};
 use finstack_quant_statements_analytics::analysis::{
-    credit_underwriting_checks, three_statement_checks, CheckReportRenderer, CreditMapping,
+    credit_underwriting_checks, render_check_report_text, three_statement_checks, CreditMapping,
     ThreeStatementMapping,
 };
 
@@ -227,7 +227,7 @@ fn integration_imbalanced_model_catches_errors_and_warnings() {
     );
 
     // --- Renderer ---
-    let text = CheckReportRenderer::render_text(&report);
+    let text = render_check_report_text(&report);
     assert!(!text.is_empty(), "rendered text should not be empty");
     assert!(
         text.contains("ERRORS"),

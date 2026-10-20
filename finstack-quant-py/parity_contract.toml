@@ -2948,7 +2948,7 @@ renames = { get = { js = "statements_analytics.companyMetricsGet", reason = "WAS
 renames = { dependency_tree_detailed = { js = "dependencyTreeDetailedText", reason = "prose-returning WASM members carry the Text suffix (Rust render_tree_detailed over DependencyTracer::dependency_tree)" } }
 
 [parity.members."finstack_quant.statements_analytics.Explanation"]
-renames = { to_text = { js = "statements_analytics.explanationToText", reason = "WASM formula explanations are plain objects; the Rust Explanation::to_string_detailed method is a free function taking the object" } }
+renames = { to_text = { js = "statements_analytics.explanationToText", reason = "WASM formula explanations are plain objects; the Rust Explanation::to_text method is a free function taking the object" } }
 
 [parity.members."finstack_quant.statements_analytics.ForecastMetrics"]
 renames = { summary = { js = "statements_analytics.forecastMetricsSummaryText", reason = "WASM forecast metrics are plain objects; the Rust ForecastMetrics::summary method is a free function taking the object, named Text because it returns prose" } }
