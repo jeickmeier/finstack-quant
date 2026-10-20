@@ -19,12 +19,18 @@ pub struct CreditFactorDetailOptions {
     pub include_per_bucket_breakdown: bool,
 }
 
+impl CreditFactorDetailOptions {
+    /// The default options: per-issuer adder breakdown off, per-bucket
+    /// breakdown on.
+    pub const DEFAULT: Self = Self {
+        include_per_issuer_adder: false,
+        include_per_bucket_breakdown: true,
+    };
+}
+
 impl Default for CreditFactorDetailOptions {
     fn default() -> Self {
-        Self {
-            include_per_issuer_adder: false,
-            include_per_bucket_breakdown: true,
-        }
+        Self::DEFAULT
     }
 }
 

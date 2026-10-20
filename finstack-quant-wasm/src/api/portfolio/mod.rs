@@ -982,7 +982,7 @@ pub fn attribute_portfolio_pnl(
     let as_of_t1 = crate::utils::parse_iso_date(&js_string(&as_of_t1, "asOfT1")?)?;
     // `js_wire`, not `from_js_json`: the unit variants are bare wire strings
     // (`"parallel"`), which `from_js_json` would parse as JSON text.
-    let method: finstack_quant_portfolio::attribution::AttributionMethod =
+    let method: finstack_quant_attribution::AttributionMethod =
         crate::utils::wire::js_wire(&method, "method")?;
     let config: finstack_quant_core::config::FinstackConfig =
         match opt_json_text(config.as_ref(), "config")? {

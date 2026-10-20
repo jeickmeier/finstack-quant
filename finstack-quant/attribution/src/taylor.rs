@@ -24,13 +24,13 @@
 //! factor-level explained/unexplained decomposition without sequential market
 //! state construction.
 
-use super::factors::{MarketRestoreFlags, MarketSnapshot};
-use super::helpers::*;
-use super::metrics_based::{extract_credit_keyrates, CreditKeyRateBucket};
-use super::model_params;
-use super::types::*;
+use crate::factors::{MarketRestoreFlags, MarketSnapshot};
+use crate::helpers::*;
+use crate::metrics_based::shifts::{extract_credit_keyrates, CreditKeyRateBucket};
+use crate::model_params;
 use crate::policy_map::map_policy;
 use crate::AttributionRequest;
+use crate::{AttributionFactor, AttributionMethod, MoveUnit, PnlAttribution};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
@@ -1410,6 +1410,7 @@ mod tests {
     }
 
     use super::*;
+    use crate::ExecutionPolicy;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::money::Money;

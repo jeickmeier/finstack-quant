@@ -64,7 +64,7 @@
 //! - [`crate::parallel`] - Parallel attribution using this module
 //! - [`crate::waterfall`] - Waterfall attribution using this module
 
-use crate::types::AttributionFactor;
+use crate::AttributionFactor;
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::market_data::dividends::DividendSchedule;
 use finstack_quant_core::market_data::scalars::InflationIndex;
@@ -163,9 +163,6 @@ impl MarketRestoreFlags {
     /// Convenience combination: restore both discount and forward curves (rates family)
     pub const RATES: Self = Self(Self::DISCOUNT_BIT | Self::FORWARD_BIT);
 
-    /// Convenience combination: restore hazard curves (credit family)
-    pub const CREDIT: Self = Self(Self::HAZARD_BIT);
-
     /// Returns flags with all market factor families enabled.
     #[inline]
     pub const fn all() -> Self {
@@ -191,7 +188,7 @@ impl MarketRestoreFlags {
         match factor {
             AttributionFactor::Carry | AttributionFactor::ModelParameters => None,
             AttributionFactor::RatesCurves => Some(Self::RATES),
-            AttributionFactor::CreditCurves => Some(Self::CREDIT),
+            AttributionFactor::CreditCurves => Some(Self::HAZARD),
             AttributionFactor::InflationCurves => Some(Self::INFLATION),
             AttributionFactor::Correlations => Some(Self::CORRELATION),
             AttributionFactor::Fx => Some(Self::FX),

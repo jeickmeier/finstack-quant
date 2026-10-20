@@ -43,15 +43,15 @@
 //! ModelParameters), set `full_cross_attribution = true` on the
 //! [`crate::AttributionRequest`].
 
-use super::credit_cascade::{
+use crate::credit_cascade::{
     build_credit_factor_attribution, note_unplanned_cascade, plan_credit_cascade, CreditCascadeStep,
 };
-use super::factors::*;
-use super::helpers::*;
-use super::model_params;
-use super::types::*;
+use crate::factors::*;
+use crate::helpers::*;
+use crate::model_params;
 use crate::policy_map::try_map_policy;
 use crate::AttributionRequest;
+use crate::{AttributionFactor, AttributionMethod, CrossFactorDetail, PnlAttribution};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -134,7 +134,7 @@ const FORWARD: FactorSpec = spec(
 );
 const CREDIT: FactorSpec = spec(
     AttributionFactor::CreditCurves,
-    MarketRestoreFlags::CREDIT,
+    MarketRestoreFlags::HAZARD,
     "Credit",
 );
 const INFLATION: FactorSpec = spec(
@@ -646,7 +646,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
                 let market_t0_credit = MarketSnapshot::restore_market(
                     market_t1,
                     &credit_snapshot,
-                    MarketRestoreFlags::CREDIT,
+                    MarketRestoreFlags::HAZARD,
                 );
 
                 // Base value for the cascade: exactly the reference point
@@ -729,6 +729,7 @@ mod tests {
     }
 
     use super::*;
+    use crate::ExecutionPolicy;
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;

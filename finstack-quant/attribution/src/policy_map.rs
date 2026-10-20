@@ -1,6 +1,6 @@
 //! Shared serial/parallel mapping over `finstack_quant_core::parallel`.
 
-use crate::types::result::ExecutionPolicy;
+use crate::ExecutionPolicy;
 
 /// Map `items` with the infallible `f`; see [`try_map_policy`].
 pub(crate) fn map_policy<T, R, F>(policy: ExecutionPolicy, items: &[T], f: F) -> Vec<R>

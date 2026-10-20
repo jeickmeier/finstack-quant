@@ -10,8 +10,13 @@ use finstack_quant_core::money::{fx::FxPolicyMeta, Money};
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
-use super::detail::*;
 use crate::taylor::TaylorAttributionConfig;
+use crate::{
+    CarryDetail, CorrelationsAttribution, CreditCarryDecomposition, CreditCurvesAttribution,
+    CreditFactorAttribution, CrossFactorDetail, FxAttribution, InflationCurvesAttribution,
+    ModelParamsAttribution, RatesCurvesAttribution, ScalarsAttribution, SensitivityStep,
+    VolAttribution, WaterfallStep,
+};
 
 /// Controls where attribution repricing work spends parallelism.
 ///
@@ -1188,6 +1193,7 @@ fn add_factor(sum: Money, value: Money, label: &str, notes: &mut Vec<String>) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{LevelPnl, SourceLine};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
     use indexmap::IndexMap;

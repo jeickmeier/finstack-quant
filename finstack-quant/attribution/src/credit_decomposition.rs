@@ -1,13 +1,13 @@
 //! Credit-factor attribution detail and carry decomposition helpers.
 
-use super::credit_cascade::{
+use crate::credit_cascade::{
     apply_curve_shape_residual, build_credit_factor_attribution, optional_single_issuer_adder,
     plan_credit_cascade, resolve_issuer, shift_credit_curves_par_spread, single_issuer_by_bucket,
     CreditStepKind,
 };
-use super::factors::{MarketRestoreFlags, MarketSnapshot};
-use super::spec::AttributionInputs;
-use super::types::PnlAttribution;
+use crate::factors::{MarketRestoreFlags, MarketSnapshot};
+use crate::spec::AttributionInputs;
+use crate::PnlAttribution;
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
@@ -67,9 +67,9 @@ impl AttributionInputs {
         };
         notes.extend(cascade.warnings.iter().cloned());
 
-        let credit_snapshot = MarketSnapshot::extract(market_t0, MarketRestoreFlags::CREDIT);
+        let credit_snapshot = MarketSnapshot::extract(market_t0, MarketRestoreFlags::HAZARD);
         let cs01_base_market =
-            MarketSnapshot::restore_market(market_t1, &credit_snapshot, MarketRestoreFlags::CREDIT);
+            MarketSnapshot::restore_market(market_t1, &credit_snapshot, MarketRestoreFlags::HAZARD);
         let cs01_bump_bp = 1.0_f64;
         let disc = cascade.discount_curve_id.as_ref();
         let recalibration_provider = CachedRecalibrationProvider::new();
@@ -174,7 +174,7 @@ impl AttributionInputs {
         attribution: &mut PnlAttribution,
     ) -> Result<()> {
         use super::credit_factor::credit_factor_model_id;
-        use super::types::{CreditCarryByLevel, CreditCarryDecomposition, LevelCarry, SourceLine};
+        use crate::{CreditCarryByLevel, CreditCarryDecomposition, LevelCarry, SourceLine};
         use finstack_quant_core::math::Compounding;
         use finstack_quant_core::money::Money;
 
@@ -394,7 +394,7 @@ impl AttributionInputs {
 #[cfg(test)]
 mod tests {
     use crate::spec::AttributionSpec;
-    use crate::types::{AttributionMethod, CarryDetail, PnlAttribution, SourceLine};
+    use crate::{AttributionMethod, CarryDetail, PnlAttribution, SourceLine};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{create_date, Date};
     use finstack_quant_core::market_data::context::MarketContext;

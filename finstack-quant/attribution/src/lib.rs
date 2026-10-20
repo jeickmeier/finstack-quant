@@ -129,6 +129,7 @@
 pub(crate) mod credit_cascade;
 pub(crate) mod credit_decomposition;
 pub(crate) mod credit_factor;
+mod detail;
 pub(crate) mod execution;
 pub(crate) mod factors;
 pub(crate) mod helpers;
@@ -137,24 +138,24 @@ pub(crate) mod metrics_based;
 pub(crate) mod model_params;
 pub(crate) mod parallel;
 pub(crate) mod policy_map;
+mod result;
 pub(crate) mod return_contribution;
 #[cfg(feature = "json-schema")]
 pub mod schema;
 pub(crate) mod spec;
 pub(crate) mod target_currency;
 pub(crate) mod taylor;
-pub(crate) mod types;
 pub(crate) mod waterfall;
 
 pub use credit_factor::CreditFactorDetailOptions;
-pub use types::detail::{
+pub use detail::{
     CarryDetail, CorrelationsAttribution, CreditCarryByLevel, CreditCarryDecomposition,
     CreditCurvesAttribution, CreditFactorAttribution, CrossFactorDetail, FxAttribution,
     InflationCurvesAttribution, LevelCarry, LevelPnl, ModelParamsAttribution, MoveUnit,
     RatesCurvesAttribution, ScalarsAttribution, SensitivityBucket, SensitivityStep, SourceLine,
     VolAttribution, WaterfallStep,
 };
-pub use types::result::{
+pub use result::{
     AttributionFactor, AttributionMeta, AttributionMethod, ExecutionPolicy, PnlAttribution,
 };
 
@@ -262,10 +263,6 @@ impl<'a> AttributionRequest<'a> {
         as_of_t1: Date,
         config: &'a FinstackConfig,
     ) -> Self {
-        static DEFAULT_DETAIL_OPTIONS: CreditFactorDetailOptions = CreditFactorDetailOptions {
-            include_per_issuer_adder: false,
-            include_per_bucket_breakdown: true,
-        };
         Self {
             instrument,
             market_t0,
@@ -278,7 +275,7 @@ impl<'a> AttributionRequest<'a> {
             full_cross_attribution: false,
             model_params_t0: None,
             credit_factor_model: None,
-            credit_factor_detail_options: &DEFAULT_DETAIL_OPTIONS,
+            credit_factor_detail_options: &CreditFactorDetailOptions::DEFAULT,
             prepared_endpoints: None,
         }
     }

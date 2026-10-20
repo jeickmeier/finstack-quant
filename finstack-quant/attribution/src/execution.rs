@@ -1,7 +1,7 @@
 //! Attribution spec execution dispatch.
 
-use super::spec::{AttributionInputs, AttributionResult, AttributionSpec};
-use super::AttributionMethod;
+use crate::spec::{AttributionInputs, AttributionResult, AttributionSpec};
+use crate::AttributionMethod;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{currency::Currency, dates::Date, money::Money, Error, Result};
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;

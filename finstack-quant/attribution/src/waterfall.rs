@@ -32,13 +32,13 @@
 //! - Residual is minimal by construction (should be within numeric precision)
 //! - Recommended for risk reporting where sum must equal total
 
-use super::credit_cascade::{
+use crate::credit_cascade::{
     build_credit_factor_attribution, note_unplanned_cascade, plan_credit_cascade, CreditCascade,
 };
-use super::factors::*;
-use super::helpers::*;
-use super::types::*;
+use crate::factors::*;
+use crate::helpers::*;
 use crate::AttributionRequest;
+use crate::{AttributionFactor, AttributionMethod, ExecutionPolicy, PnlAttribution, WaterfallStep};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;

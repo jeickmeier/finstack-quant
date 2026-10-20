@@ -181,7 +181,7 @@ impl CreditCascade {
 
 /// Record that a supplied credit-factor model produced no cascade.
 pub(crate) fn note_unplanned_cascade(
-    attribution: &mut super::types::PnlAttribution,
+    attribution: &mut crate::PnlAttribution,
     instrument_id: &str,
     method: &str,
 ) {
@@ -577,9 +577,9 @@ pub(crate) fn build_credit_factor_attribution(
     cascade: &CreditCascade,
     options: &super::credit_factor::CreditFactorDetailOptions,
     step_pnls: &[Money],
-) -> Result<super::types::CreditFactorAttribution> {
+) -> Result<crate::CreditFactorAttribution> {
     use super::credit_factor::credit_factor_model_id;
-    use super::types::{CreditFactorAttribution, LevelPnl};
+    use crate::{CreditFactorAttribution, LevelPnl};
 
     if step_pnls.len() != cascade.steps.len() {
         tracing::warn!(

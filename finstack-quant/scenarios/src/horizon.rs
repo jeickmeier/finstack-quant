@@ -61,8 +61,8 @@
 use std::sync::Arc;
 
 use finstack_quant_attribution::{
-    attribute_pnl, attribute_pnl_metrics_based, default_attribution_metrics, AttributionRequest,
-    ExecutionPolicy,
+    attribute_pnl, attribute_pnl_metrics_based, default_attribution_metrics, AttributionFactor,
+    AttributionMethod, AttributionRequest, ExecutionPolicy, PnlAttribution,
 };
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::dates::{calendar_by_id_strict, Date, HolidayCalendar};
@@ -75,10 +75,6 @@ use finstack_quant_valuations::recalibration::RecalibrationProvider;
 
 use crate::engine::ApplicationReport;
 use crate::{ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec};
-
-/// Re-export attribution types appearing in horizon-analysis public APIs so
-/// direct scenarios consumers do not need a separate attribution dependency.
-pub use finstack_quant_attribution::{AttributionFactor, AttributionMethod, PnlAttribution};
 
 /// Parse an [`AttributionMethod`] from its binding string form.
 ///
