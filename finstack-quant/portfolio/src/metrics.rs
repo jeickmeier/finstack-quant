@@ -16,7 +16,7 @@
 //! rate implied by `value_base / value_native`. Positions with near-zero
 //! native PV and no matrix quote fail closed.
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::evaluation::try_map_positions;
 use crate::types::{EntityId, PositionId};
 use crate::valuation::PortfolioValuation;
@@ -194,15 +194,40 @@ impl PortfolioMetrics {
     ///
     /// * `base` - Composite metric identifier whose decoded series components
     ///   should be collected from [`Self::aggregated`].
-    pub fn metric_series(&self, base: &MetricId) -> Vec<(Vec<String>, &AggregatedMetric)> {
+    ///
+    /// # Returns
+    ///
+    /// One [`MetricSeriesEntry`] per aggregated key that encodes a component of
+    /// `base`; empty when `base` has no series entries.
+    pub fn metric_series(&self, base: &MetricId) -> Vec<MetricSeriesEntry<'_>> {
         self.aggregated
             .iter()
             .filter_map(|(key, aggregate)| {
                 key.decode_components(base)
-                    .map(|components| (components, aggregate))
+                    .map(|components| MetricSeriesEntry {
+                        components,
+                        total: aggregate.total,
+                        by_entity: &aggregate.by_entity,
+                    })
             })
             .collect()
     }
+}
+
+/// One decoded entry of [`PortfolioMetrics::metric_series`].
+///
+/// Serializes as `{components, total, by_entity}`, the object WASM
+/// `portfolioMetricsSeries` returns.
+#[derive(Clone, Debug, Serialize)]
+pub struct MetricSeriesEntry<'a> {
+    /// Decoded key components after the base metric, e.g. `["USD-OIS", "10y"]`
+    /// for `bucketed_dv01::USD-OIS::10y`.
+    pub components: Vec<String>,
+    /// Portfolio total of this series point, in the portfolio base currency.
+    pub total: f64,
+    /// Per-entity totals of this series point in aggregation order, in the
+    /// portfolio base currency.
+    pub by_entity: &'a IndexMap<EntityId, f64>,
 }
 
 /// A metric value that was excluded from portfolio aggregation because it was
@@ -253,10 +278,10 @@ pub struct SkippedMetric {
 ///
 /// # Arguments
 ///
-/// * `valuation` - Portfolio valuation containing per-position valuation results.
-/// * `base_currency` - Portfolio base currency for aggregation.
-/// * `market` - Market context providing FX rates for zero-PV positions.
-/// * `as_of` - Valuation date used for FX rate lookups.
+/// * `valuation` - Portfolio valuation containing per-position valuation
+///   results. Its base currency (`total_base_currency`) is the aggregation
+///   currency and its `as_of` is the date of the FX spot lookups.
+/// * `market` - Market context providing FX rates for out-of-base positions.
 ///
 /// # Returns
 ///
@@ -277,28 +302,15 @@ pub struct SkippedMetric {
 ///
 /// # Errors
 ///
-/// Returns an error when `base_currency` or `as_of` differs from the valuation,
-/// or when an out-of-base position with near-zero native PV cannot obtain an
+/// Returns an error when an out-of-base position with near-zero native PV cannot obtain an
 /// FX conversion rate from `market`. Non-finite summable metric values are
 /// recorded as skipped in the result rather than failing aggregation.
 pub fn aggregate_metrics(
     valuation: &PortfolioValuation,
-    base_currency: Currency,
     market: &MarketContext,
-    as_of: finstack_quant_core::dates::Date,
 ) -> Result<PortfolioMetrics> {
-    let valuation_base_currency = valuation.total_base_currency.currency();
-    if base_currency != valuation_base_currency {
-        return Err(Error::invalid_input(format!(
-            "M-17: aggregate_metrics base_currency {base_currency} does not match valuation base currency {valuation_base_currency}"
-        )));
-    }
-    if as_of != valuation.as_of {
-        return Err(Error::invalid_input(format!(
-            "M-17: aggregate_metrics as_of {as_of} does not match valuation as_of {}",
-            valuation.as_of
-        )));
-    }
+    let base_currency = valuation.total_base_currency.currency();
+    let as_of = valuation.as_of;
 
     let position_entries: Vec<_> = valuation.position_values.iter().collect();
 
@@ -584,10 +596,10 @@ mod tests {
 
         let series = metrics.metric_series(&MetricId::BucketedDv01);
         assert_eq!(series.len(), 2);
-        assert_eq!(series[0].0, vec!["USD-OIS", "10y"]);
-        assert_eq!(series[0].1.total, -1.0);
-        assert_eq!(series[1].0, vec!["EUR/USD", ""]);
-        assert_eq!(series[1].1.total, -2.0);
+        assert_eq!(series[0].components, vec!["USD-OIS", "10y"]);
+        assert_eq!(series[0].total, -1.0);
+        assert_eq!(series[1].components, vec!["EUR/USD", ""]);
+        assert_eq!(series[1].total, -2.0);
     }
 
     #[test]
@@ -616,7 +628,7 @@ mod tests {
             metrics
                 .metric_series(&MetricId::BucketedDv01)
                 .into_iter()
-                .map(|(components, metric)| (components, metric.total))
+                .map(|entry| (entry.components, entry.total))
                 .collect::<Vec<_>>(),
             vec![
                 (vec!["curve-ray".to_string()], -1.0),
@@ -666,8 +678,7 @@ mod tests {
 
         let valuation = value_portfolio(&portfolio, &market, &config, &Default::default())
             .expect("test should succeed");
-        let metrics = aggregate_metrics(&valuation, Currency::USD, &market, as_of)
-            .expect("test should succeed");
+        let metrics = aggregate_metrics(&valuation, &market).expect("test should succeed");
 
         assert_eq!(valuation.position_values.len(), 1);
         assert!(
@@ -786,7 +797,7 @@ mod tests {
         let market =
             MarketContext::new().insert_fx(FxMatrix::new(Arc::new(SimpleFxProvider::new())));
 
-        let error = aggregate_metrics(&valuation, Currency::USD, &market, as_of)
+        let error = aggregate_metrics(&valuation, &market)
             .expect_err("both positions have missing FX quotes");
         let message = error.to_string();
         assert!(

@@ -48,16 +48,10 @@ fn dataframe_exports_have_expected_columns() {
         &Default::default(),
     )
     .unwrap();
-    let metrics = finstack_quant_portfolio::metrics::aggregate_metrics(
-        &valuation,
-        Currency::USD,
-        &market,
-        as_of,
-    )
-    .unwrap();
+    let metrics =
+        finstack_quant_portfolio::metrics::aggregate_metrics(&valuation, &market).unwrap();
 
     let table_pos = finstack_quant_portfolio::dataframe::positions_to_table(&valuation).unwrap();
-    let table_ent = finstack_quant_portfolio::dataframe::entities_to_table(&valuation).unwrap();
     let table_m = finstack_quant_portfolio::dataframe::metrics_to_table(&metrics).unwrap();
     let table_ma =
         finstack_quant_portfolio::dataframe::aggregated_metrics_to_table(&metrics).unwrap();
@@ -68,12 +62,7 @@ fn dataframe_exports_have_expected_columns() {
         .map(|column| column.name.as_str())
         .collect();
     assert!(pos_cols.contains(&"position_id") && pos_cols.contains(&"value_base"));
-    let ent_cols: Vec<&str> = table_ent
-        .columns
-        .iter()
-        .map(|column| column.name.as_str())
-        .collect();
-    assert!(ent_cols.contains(&"entity_id") && ent_cols.contains(&"total_value"));
+    assert!(pos_cols.contains(&"fx_rate") && pos_cols.contains(&"risk_error"));
     let m_cols: Vec<&str> = table_m
         .columns
         .iter()

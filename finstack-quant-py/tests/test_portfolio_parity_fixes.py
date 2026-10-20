@@ -137,7 +137,7 @@ class TestValuationAndResult:
         assert isinstance(valuation, PortfolioValuation)
         assert valuation.as_of == AS_OF
         assert valuation.degraded_positions == []
-        metrics = aggregate_metrics(valuation, "USD", _market(), AS_OF)
+        metrics = aggregate_metrics(valuation, _market())
         assert metrics.get_total("dv01") is not None
         assert metrics.get_total("theta") is None
         assert metrics.get_metric("dv01")["metric_id"] == "dv01"
@@ -159,7 +159,7 @@ class TestValuationAndResult:
 
     def test_portfolio_result_assembly(self) -> None:
         valuation = value_portfolio(_portfolio(), _market())
-        metrics = aggregate_metrics(valuation, "USD", _market(), AS_OF)
+        metrics = aggregate_metrics(valuation, _market())
         result = PortfolioResult(valuation, metrics)
         assert result.valuation.total_value == pytest.approx(valuation.total_value)
         assert isinstance(result.valuation, PortfolioValuation)
@@ -410,7 +410,7 @@ class TestOptimizationAndResultsAudit:
         from finstack_quant.core.config import FinstackConfig
 
         valuation = value_portfolio(_portfolio(), _market())
-        metrics = aggregate_metrics(valuation, "USD", _market(), AS_OF)
+        metrics = aggregate_metrics(valuation, _market())
         first = PortfolioResult(valuation, metrics)
         assert first.meta["fx_policy_applied"] == valuation.fx_collapse_policy == "cashflow_date"
         assert "timestamp" not in first.meta

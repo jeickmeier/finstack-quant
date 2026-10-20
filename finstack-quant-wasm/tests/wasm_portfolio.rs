@@ -144,9 +144,7 @@ fn aggregate_metrics_returns_a_structured_object() {
         .unwrap();
     let metrics = aggregate_metrics(
         JsValue::from(&valuation_json),
-        JsValue::from("USD"),
-        JsValue::from(&market),
-        JsValue::from("2024-01-15"),
+        &JsMarketContext::from_json(JsValue::from(&market)).expect("market"),
     )
     .unwrap();
     assert!(as_json(&metrics).is_object());
@@ -260,7 +258,7 @@ fn replay_portfolio_returns_a_structured_object() {
         serde_json::json!({"mode": "pv_only", "attribution_method": "parallel"}).to_string();
 
     let result = replay_portfolio(
-        JsValue::from(&portfolio_spec_json()),
+        &JsPortfolio::from_spec(JsValue::from(&portfolio_spec_json())).expect("portfolio"),
         JsValue::from(&snapshots_json),
         JsValue::from(&config_json),
     )

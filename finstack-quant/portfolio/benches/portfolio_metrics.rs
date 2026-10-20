@@ -12,10 +12,9 @@
 #[path = "bench_common.rs"]
 mod bench_common;
 
-use bench_common::{base_date, create_institutional_portfolio, create_market_context};
+use bench_common::{create_institutional_portfolio, create_market_context};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::config::FinstackConfig;
-use finstack_quant_core::currency::Currency;
 use finstack_quant_portfolio::metrics::aggregate_metrics;
 use finstack_quant_portfolio::valuation::{
     value_portfolio, PortfolioValuationOptions, RequestedMetrics,
@@ -36,7 +35,6 @@ fn bench_metrics_only(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_metrics_only");
     let market = create_market_context();
     let config = FinstackConfig::default();
-    let as_of = base_date();
 
     // 63/64 straddles POSITION_PARALLEL_MIN_POSITIONS; 250 is the workflow
     // default; 3,000 is the institutional control. Aggregation is cheap
@@ -50,15 +48,7 @@ fn bench_metrics_only(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("{}pos", num_positions)),
             &num_positions,
             |b, _| {
-                b.iter(|| {
-                    aggregate_metrics(
-                        black_box(&valuation),
-                        black_box(Currency::USD),
-                        black_box(&market),
-                        black_box(as_of),
-                    )
-                    .unwrap()
-                });
+                b.iter(|| aggregate_metrics(black_box(&valuation), black_box(&market)).unwrap());
             },
         );
     }
@@ -71,7 +61,6 @@ fn bench_value_and_metrics(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_value_metrics");
     let market = create_market_context();
     let config = FinstackConfig::default();
-    let as_of = base_date();
 
     {
         let num_positions = 250usize;
@@ -89,13 +78,7 @@ fn bench_value_and_metrics(c: &mut Criterion) {
                         &best_effort_metrics(),
                     )
                     .unwrap();
-                    aggregate_metrics(
-                        black_box(&valuation),
-                        black_box(Currency::USD),
-                        black_box(&market),
-                        black_box(as_of),
-                    )
-                    .unwrap()
+                    aggregate_metrics(black_box(&valuation), black_box(&market)).unwrap()
                 });
             },
         );
@@ -107,10 +90,9 @@ fn bench_metrics_export(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_metrics_export");
     let market = create_market_context();
     let config = FinstackConfig::default();
-    let as_of = base_date();
     let portfolio = create_institutional_portfolio(250);
     let valuation = value_portfolio(&portfolio, &market, &config, &best_effort_metrics()).unwrap();
-    let metrics = aggregate_metrics(&valuation, Currency::USD, &market, as_of).unwrap();
+    let metrics = aggregate_metrics(&valuation, &market).unwrap();
 
     group.bench_function("metrics_to_table_250pos", |b| {
         b.iter(|| metrics_to_table(black_box(&metrics)).unwrap());

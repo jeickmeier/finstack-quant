@@ -107,5 +107,7 @@ def test_to_arrow_positions_matches_positions_to_table_columns() -> None:
         "value_base",
         "currency_native",
         "currency_base",
+        "fx_rate",
+        "risk_error",
     ]
     assert at.num_rows == len(valuation)

@@ -208,7 +208,7 @@ def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
         by_position=True,
     )
     valuation = value_portfolio(portfolio, market_t0, metrics=["dv01"])
-    metrics = aggregate_metrics(valuation, "USD", market_t0, inputs["as_of_t0"])
+    metrics = aggregate_metrics(valuation, market_t0)
     position_metrics = metrics.get_position_metrics("POS-1")
     return {
         "allocate_weights": json.loads(allocate_weights(allocation).to_json()),

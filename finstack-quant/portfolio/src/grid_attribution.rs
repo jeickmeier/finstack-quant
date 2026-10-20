@@ -370,7 +370,7 @@ fn aggregate_side(
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_portfolio::grid_attribution::grid_attribution::{grid_attribution, GridPosition};
+/// use finstack_quant_portfolio::grid_attribution::{grid_attribution, GridPosition};
 ///
 /// let pos = |cell: &str, sector: &str, weight: f64, total_return: f64| GridPosition {
 ///     cell: cell.into(),
@@ -578,7 +578,7 @@ pub struct GridCarinoLinkedResult {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_portfolio::grid_attribution::grid_attribution::{
+/// use finstack_quant_portfolio::grid_attribution::{
 ///     grid_attribution, grid_carino_link, GridPosition,
 /// };
 ///

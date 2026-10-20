@@ -28,8 +28,15 @@ fn table_metadata(source: &str) -> IndexMap<String, serde_json::Value> {
 /// Export position values to a table envelope.
 ///
 /// Columns produced:
-/// `position_id`, `entity_id`, `value_native`, `value_base`, `currency_native`, `currency_base`.
+/// `position_id`, `entity_id`, `value_native`, `value_base`, `currency_native`,
+/// `currency_base`, `fx_rate` (base-currency units per native unit applied to
+/// the row; null when the native currency is the base currency) and
+/// `risk_error` (null unless the position degraded to a PV-only valuation).
 /// The instrument identifier can be re-joined by consumers if required.
+///
+/// The boolean diagnostics `PositionValue::fx_triangulated` and
+/// `PositionValue::risk_metrics_complete` are not exported: the table
+/// envelope has no boolean column type.
 ///
 /// # Arguments
 ///
@@ -64,6 +71,8 @@ pub fn positions_to_table(valuation: &PortfolioValuation) -> Result<TableEnvelop
     let mut values_base: Vec<f64> = Vec::with_capacity(n);
     let mut currencies_native: Vec<String> = Vec::with_capacity(n);
     let mut currencies_base: Vec<String> = Vec::with_capacity(n);
+    let mut fx_rates: Vec<Option<f64>> = Vec::with_capacity(n);
+    let mut risk_errors: Vec<Option<String>> = Vec::with_capacity(n);
 
     for (position_id, position_value) in &valuation.position_values {
         position_ids.push(position_id.to_string());
@@ -72,6 +81,8 @@ pub fn positions_to_table(valuation: &PortfolioValuation) -> Result<TableEnvelop
         values_base.push(position_value.value_base.amount());
         currencies_native.push(position_value.value_native.currency().to_string());
         currencies_base.push(position_value.value_base.currency().to_string());
+        fx_rates.push(position_value.fx_rate);
+        risk_errors.push(position_value.risk_error.clone());
     }
 
     TableEnvelope::new_with_metadata(
@@ -91,49 +102,12 @@ pub fn positions_to_table(valuation: &PortfolioValuation) -> Result<TableEnvelop
             .with_role(TableColumnRole::Attribute),
             TableColumn::new("currency_base", TableColumnData::String(currencies_base))
                 .with_role(TableColumnRole::Attribute),
-        ],
-        table_metadata("portfolio_positions"),
-    )
-}
-
-/// Export entity-level aggregates to a table envelope.
-///
-/// Columns produced: `entity_id`, `total_value`, `currency`.
-///
-/// # Arguments
-///
-/// * `valuation` - Portfolio valuation containing aggregated entity values.
-///
-/// # Returns
-///
-/// A [`Result`] containing the generated [`TableEnvelope`].
-///
-/// # Errors
-///
-/// Returns an error if the table envelope rejects the generated columns or
-/// metadata.
-pub fn entities_to_table(valuation: &PortfolioValuation) -> Result<TableEnvelope> {
-    let n = valuation.by_entity.len();
-    let mut entity_ids: Vec<String> = Vec::with_capacity(n);
-    let mut total_values: Vec<f64> = Vec::with_capacity(n);
-    let mut currencies: Vec<String> = Vec::with_capacity(n);
-
-    for (entity_id, money) in &valuation.by_entity {
-        entity_ids.push(entity_id.to_string());
-        total_values.push(money.amount());
-        currencies.push(money.currency().to_string());
-    }
-
-    TableEnvelope::new_with_metadata(
-        vec![
-            TableColumn::new("entity_id", TableColumnData::String(entity_ids))
-                .with_role(TableColumnRole::Dimension),
-            TableColumn::new("total_value", TableColumnData::Float64(total_values))
+            TableColumn::new("fx_rate", TableColumnData::NullableFloat64(fx_rates))
                 .with_role(TableColumnRole::Measure),
-            TableColumn::new("currency", TableColumnData::String(currencies))
+            TableColumn::new("risk_error", TableColumnData::NullableString(risk_errors))
                 .with_role(TableColumnRole::Attribute),
         ],
-        table_metadata("portfolio_entities"),
+        table_metadata("portfolio_positions"),
     )
 }
 
@@ -285,52 +259,7 @@ mod tests {
         assert_eq!(table.row_count, 1);
         assert!(table.column("position_id").is_some());
         assert!(table.column("value_base").is_some());
-    }
-
-    #[test]
-    fn test_entities_to_table() {
-        let as_of = date!(2024 - 01 - 01);
-
-        let deposit = Deposit::builder()
-            .id("DEP_1M".into())
-            .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .start_date(as_of)
-            .maturity(date!(2024 - 02 - 01))
-            .day_count(finstack_quant_core::dates::DayCount::Act360)
-            .discount_curve_id("USD".into())
-            .fixed_rate_opt(Some(
-                rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
-            ))
-            .build()
-            .expect("test should succeed");
-
-        let position = Position::new(
-            "POS_001",
-            "ENTITY_A",
-            "DEP_1M",
-            Arc::new(deposit),
-            1.0,
-            PositionUnit::Units,
-        )
-        .expect("test should succeed");
-
-        let portfolio = Portfolio::builder("TEST")
-            .base_currency(Currency::USD)
-            .as_of(as_of)
-            .entity(Entity::new("ENTITY_A"))
-            .position(position)
-            .build()
-            .expect("test should succeed");
-
-        let market = build_test_market();
-        let config = FinstackConfig::default();
-
-        let valuation = value_portfolio(&portfolio, &market, &config, &Default::default())
-            .expect("test should succeed");
-        let table = entities_to_table(&valuation).expect("test should succeed");
-
-        assert_eq!(table.row_count, 1);
-        assert!(table.column("entity_id").is_some());
-        assert!(table.column("total_value").is_some());
+        assert!(table.column("fx_rate").is_some());
+        assert!(table.column("risk_error").is_some());
     }
 }

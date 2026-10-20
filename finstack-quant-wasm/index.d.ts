@@ -35004,20 +35004,16 @@ export interface PortfolioNamespace {
    */
   mwrXirr(cashflowsJson: JsonInput): number;
   /**
-   * Aggregate portfolio metrics from a valuation JSON.
+   * Aggregate portfolio metrics from a valuation.
+   *
+   * Metrics are aggregated in the valuation's base currency, with FX spots
+   * read at the valuation's `as_of`.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param valuationJson - `PortfolioValuation` JSON, for example `JSON.stringify(valuePortfolio(...))`.
-   * @param baseCurrency - ISO-4217 base currency in which aggregate portfolio values are reported.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @throws Error - Throws a JavaScript exception if either JSON input is malformed, `baseCurrency` or `asOf` is invalid, valuation currency or date metadata is inconsistent, a required FX conversion is unavailable or invalid, or the metrics cannot be converted to a JavaScript value.
+   * @param valuationJson - `PortfolioValuation` object or JSON, for example the result of `valuePortfolio`.
+   * @param market - `core.MarketContext` handle supplying the FX spots that convert out-of-base metrics.
+   * @throws Error - Throws a JavaScript exception if the valuation input is malformed, a required FX conversion is unavailable or invalid, or the metrics cannot be converted to a JavaScript value.
    */
-  aggregateMetrics(
-    valuationJson: JsonInput,
-    baseCurrency: string,
-    marketJson: JsonInput,
-    asOf: string
-  ): PortfolioMetrics;
+  aggregateMetrics(valuationJson: PortfolioValuation | string, market: MarketContext): PortfolioMetrics;
   /**
    * Decoded series of one base metric from aggregated portfolio metrics (twin of Python `PortfolioMetrics.metric_series`).
    * @param metricsJson - `PortfolioMetrics` from `aggregateMetrics` (object or JSON).
@@ -35079,7 +35075,7 @@ export interface PortfolioNamespace {
   /**
    * Collapse a multi-currency cashflow ladder into the base currency per date and kind (twin of Python `PortfolioCashflows.collapse_to_base_by_date_kind_json`), converting at the CIP forward from the `asOf` spot.
    * @param cashflowsJson - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON).
-   * @param marketJson - Canonical market-context JSON supplying the FX matrix and discount curves.
+   * @param market - `core.MarketContext` handle supplying the FX matrix and discount curves.
    * @param baseCurrency - ISO-4217 reporting currency.
    * @param asOf - ISO-8601 valuation date for spot FX and the start of each discount interval.
    * @param discountCurves - Optional `{ currency: curveId }` map; a missing entry uses the ISO code as the curve id.
@@ -35088,7 +35084,7 @@ export interface PortfolioNamespace {
    */
   collapseToBaseByDateKind(
     cashflowsJson: PortfolioCashflows | string,
-    marketJson: JsonInput,
+    market: MarketContext,
     baseCurrency: string,
     asOf: string,
     discountCurves?: Record<string, string> | null
@@ -35153,16 +35149,16 @@ export interface PortfolioNamespace {
   /**
    * Replay a portfolio through dated market snapshots.
    *
-   * Accepts a portfolio spec, an array of dated market snapshots, and a
+   * Accepts a built portfolio, an array of dated market snapshots, and a
    * replay configuration. Returns a structured `ReplayResult` object.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+   * @param portfolio - Built `Portfolio` handle (from `Portfolio.fromSpec` or `Portfolio.builder`) to revalue at every snapshot.
    * @param snapshotsJson - Market-snapshot JSON array.
-   * @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
-   * @throws Error - Throws a JavaScript exception if any JSON input is malformed; the portfolio, replay configuration, or snapshot dates and ordering are invalid; valuation, attribution, or currency conversion fails; best-effort replay retains no step; or the result cannot be converted to a JavaScript value.
+   * @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from the portfolio's positions when it matters.
+   * @throws Error - Throws a JavaScript exception if any JSON input is malformed; the replay configuration or snapshot dates and ordering are invalid; valuation, attribution, or currency conversion fails; best-effort replay retains no step; or the result cannot be converted to a JavaScript value.
    */
   replayPortfolio(
-    specJson: JsonInput,
+    portfolio: Portfolio,
     snapshotsJson: JsonInput,
     configJson: JsonInput
   ): ReplayResult;

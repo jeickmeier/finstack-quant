@@ -239,7 +239,7 @@ test('valuation and metrics lookups match Python', () => {
   );
   assert.equal(portfolio.portfolioValuationGetEntityValue(valuation, 'NOPE'), undefined);
 
-  const metrics = portfolio.aggregateMetrics(valuation, 'USD', inputs.market_t0, inputs.as_of_t0);
+  const metrics = portfolio.aggregateMetrics(valuation, marketT0);
   assertClose(portfolio.portfolioMetricsGetTotal(metrics, 'dv01'), expected.metrics_total_dv01);
   assert.equal(portfolio.portfolioMetricsGetTotal(metrics, 'nope'), undefined);
   assertClose(

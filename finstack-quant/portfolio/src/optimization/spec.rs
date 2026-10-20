@@ -104,7 +104,7 @@ impl PortfolioOptimizationSpec {
 /// Propagates invalid portfolio-spec, objective, constraint, weighting, and
 /// missing-metric-policy inputs, along with optimization and market-dependent
 /// valuation failures.
-pub fn optimize_from_spec(
+pub fn optimize_portfolio(
     spec: &PortfolioOptimizationSpec,
     market: &MarketContext,
     config: &FinstackConfig,

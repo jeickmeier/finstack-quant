@@ -23,7 +23,7 @@ pub(super) fn optimize_portfolio(
     // borrow held across the GIL-release boundary. Both clones are negligible
     // next to the optimization itself.
     let result = py
-        .detach(move || opt::optimize_from_spec(&spec, &market, &config))
+        .detach(move || opt::optimize_portfolio(&spec, &market, &config))
         .map_err(crate::errors::portfolio_to_py)?;
     Ok(PyPortfolioOptimizationResult::from_inner(result))
 }

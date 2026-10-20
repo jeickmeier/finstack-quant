@@ -1,6 +1,5 @@
 //! Python bindings for metric aggregation: `aggregate_metrics` and `PortfolioMetrics`.
 
-use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::extract::extract_market_ref;
 use crate::bindings::extract::extract_valuation_ref;
@@ -192,12 +191,12 @@ impl PyPortfolioMetrics {
         self.inner
             .metric_series(&base)
             .into_iter()
-            .map(|(components, aggregate)| {
+            .map(|entry| {
                 let by_entity = PyDict::new(py);
-                for (entity, value) in &aggregate.by_entity {
+                for (entity, value) in entry.by_entity {
                     by_entity.set_item(entity.to_string(), value)?;
                 }
-                Ok((components, aggregate.total, by_entity.unbind()))
+                Ok((entry.components, entry.total, by_entity.unbind()))
             })
             .collect()
     }
@@ -258,18 +257,16 @@ impl PyPortfolioMetrics {
 
 /// Aggregate portfolio metrics from a valuation.
 ///
+/// The aggregation currency and FX date are the valuation's own base currency
+/// and ``as_of``.
+///
 /// Parameters
 /// ----------
 /// valuation : PortfolioValuation | str
 ///     A :class:`PortfolioValuation` object (fast path) or JSON string.
-/// base_currency : Currency | str
-///     Base currency (``Currency`` or ISO-4217 code); an unknown code raises
-///     ``ValueError``.
 /// market : MarketContext | str
-///     A ``MarketContext`` object or a JSON string.
-/// as_of : datetime.date | str
-///     Valuation date, either a date-like object (``datetime.date``,
-///     ``pandas.Timestamp``) or an ISO 8601 string.
+///     A ``MarketContext`` object or a JSON string supplying the FX spots used
+///     to convert out-of-base metrics.
 ///
 /// Returns
 /// -------
@@ -277,29 +274,18 @@ impl PyPortfolioMetrics {
 ///     Typed aggregate-metrics wrapper. Use :meth:`to_json`
 ///     for the raw wire string.
 #[pyfunction]
-#[pyo3(text_signature = "(valuation, base_currency, market, as_of)")]
+#[pyo3(text_signature = "(valuation, market)")]
 pub fn aggregate_metrics(
     py: Python<'_>,
     valuation: &Bound<'_, PyAny>,
-    base_currency: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
 ) -> PyResult<crate::bindings::portfolio::metrics::PyPortfolioMetrics> {
     let valuation = extract_valuation_ref(py, valuation)?;
-    let ccy = extract_currency(base_currency)?;
     let market = extract_market_ref(py, market)?;
-    let date = crate::bindings::date_utils::py_to_date(as_of)?;
     let valuation_ref: &finstack_quant_portfolio::valuation::PortfolioValuation = &valuation;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
     let metrics = py
-        .detach(|| {
-            finstack_quant_portfolio::metrics::aggregate_metrics(
-                valuation_ref,
-                ccy,
-                market_ref,
-                date,
-            )
-        })
+        .detach(|| finstack_quant_portfolio::metrics::aggregate_metrics(valuation_ref, market_ref))
         .map_err(portfolio_to_py)?;
     Ok(PyPortfolioMetrics::from_inner(metrics))
 }

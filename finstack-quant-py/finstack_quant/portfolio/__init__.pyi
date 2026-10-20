@@ -1619,19 +1619,28 @@ class PortfolioAttribution:
         """
         Export per-position native-currency attributions, one row per position.
 
+        Each row is ``position_id`` followed by the canonical Rust wide row of
+        that position's attribution, the same columns as
+        :meth:`finstack_quant.attribution.PnlAttribution.to_dataframe`.
+
         Returns
         -------
         pd.DataFrame
-            Columns ``position_id``, ``currency``, ``total_pnl``, ``carry``,
+            Columns ``position_id``, ``instrument_id``, ``method``, ``t0``,
+            ``t1``, ``currency`` (native), ``total_pnl``,
+            ``mark_to_market_pnl``, ``pv_t0``, ``pv_t1``, ``carry``,
             ``rates_curves_pnl``, ``credit_curves_pnl``,
             ``inflation_curves_pnl``, ``correlations_pnl``, ``fx_pnl``,
-            ``cross_factor_pnl``, ``vol_pnl``, ``model_params_pnl``,
-            ``market_scalars_pnl``, ``residual``, ``result_invalid``.
+            ``fx_translation_pnl``, ``vol_pnl``, ``cross_factor_pnl``,
+            ``model_params_pnl``, ``market_scalars_pnl``, ``residual``,
+            ``residual_pct``, ``num_repricings`` (int64) and
+            ``result_invalid`` (bool). Amounts are float64; optional
+            amounts are ``NaN`` when the method did not record them.
 
         Raises
         ------
         ValueError
-            If the frame cannot be built.
+            If a position attribution mixes currencies across its factors.
         """
         ...
 
@@ -2142,8 +2151,10 @@ class PortfolioValuation:
         Export per-position values via Arrow (zero-copy for consumers).
 
         Columns: ``position_id``, ``entity_id``, ``value_native``,
-        ``value_base``, ``currency_native``, ``currency_base``, ``risk_metrics_complete``, ``risk_error`` (see
-        ``finstack_quant_portfolio::positions_to_table``).
+        ``value_base``, ``currency_native``, ``currency_base``, ``fx_rate``
+        (float64, null for same-currency rows) and ``risk_error`` (string, null
+        unless the position degraded to PV-only) (see
+        ``finstack_quant_portfolio::dataframe::positions_to_table``).
 
         Returns
         -------
@@ -2162,7 +2173,7 @@ class PortfolioValuation:
 
         One row per entry of ``position_values``. Built from the same
         ``positions_to_table`` envelope that backs :meth:`to_arrow_positions`,
-        plus the per-position FX and risk diagnostics.
+        plus the two boolean risk diagnostics the Arrow table cannot carry.
 
         Columns: ``position_id``, ``entity_id``, ``value_native``,
         ``value_base``, ``currency_native``, ``currency_base``, ``fx_rate``
@@ -4151,26 +4162,23 @@ def parse_portfolio_spec_json(json_str: str) -> str:
 
 def aggregate_metrics(
     valuation: PortfolioValuation | str,
-    base_currency: Currency | str,
     market: MarketContext | str,
-    as_of: datetime.date | str,
 ) -> PortfolioMetrics:
     """
     Aggregate portfolio metrics from a valuation.
 
     Accepts a typed :class:`PortfolioValuation` (fast path) or a JSON string.
+    Metrics are aggregated in the valuation's base currency, with FX spots
+    read at the valuation's ``as_of``.
 
     Parameters
     ----------
     valuation : PortfolioValuation or str
-        Typed valuation or canonical valuation JSON to aggregate.
-    base_currency : Currency | str
-        ISO base-currency code in which aggregate values and metrics are stated.
+        Typed valuation or canonical valuation JSON to aggregate; its base
+        currency and ``as_of`` set the aggregation currency and FX date.
     market : MarketContext or str
-        Market context object or JSON supplying conversion and market inputs.
-    as_of : datetime.date | str
-        Valuation date used to resolve date-dependent market data, either a
-        date-like object or an ISO 8601 string.
+        Market context object or JSON supplying the FX spots that convert
+        out-of-base metrics.
 
     Returns
     -------
@@ -4184,10 +4192,7 @@ def aggregate_metrics(
     TypeError
         If ``valuation`` or ``market`` is neither its typed wrapper nor a JSON string.
     ValueError
-        If supplied JSON, ``base_currency``, or ``as_of`` is invalid.
-    PortfolioError
-        If the valuation base currency or date is inconsistent with the
-        requested aggregation context.
+        If supplied JSON is invalid.
     KeyError
         If an FX rate required for base-currency aggregation is unavailable.
 
@@ -4198,7 +4203,7 @@ def aggregate_metrics(
     >>> from finstack_quant.portfolio import Portfolio, aggregate_metrics, value_portfolio
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> valuation = value_portfolio(Portfolio.from_spec(spec), MarketContext())
-    >>> aggregate_metrics(valuation, "USD", MarketContext(), "2025-01-01").aggregated
+    >>> aggregate_metrics(valuation, MarketContext()).aggregated
     {}
     """
     ...

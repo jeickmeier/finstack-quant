@@ -947,7 +947,10 @@ test('portfolio.aggregateMetrics returns a structured metrics object', () => {
     false
   );
   const metrics = assertStructured(
-    portfolio.aggregateMetrics(JSON.stringify(valuation), 'USD', EMPTY_MARKET, '2024-01-15'),
+    portfolio.aggregateMetrics(
+      JSON.stringify(valuation),
+      portfolioCore.MarketContext.fromJson(EMPTY_MARKET)
+    ),
     'aggregateMetrics result'
   );
   assert.equal(typeof metrics, 'object');
@@ -961,7 +964,7 @@ test('portfolio.replayPortfolio returns a structured replay result', () => {
   ]);
   const config = JSON.stringify({ mode: 'pv_only', attribution_method: 'parallel' });
   const replay = assertStructured(
-    portfolio.replayPortfolio(EMPTY_SPEC, snapshots, config),
+    portfolio.replayPortfolio(portfolio.Portfolio.fromSpec(EMPTY_SPEC), snapshots, config),
     'replayPortfolio result'
   );
   assert.equal(replay.steps.length, 2);

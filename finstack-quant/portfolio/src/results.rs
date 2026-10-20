@@ -123,8 +123,7 @@ mod tests {
 
         let valuation = value_portfolio(&portfolio, &market, &config, &Default::default())
             .expect("test should succeed");
-        let metrics = aggregate_metrics(&valuation, Currency::USD, &market, as_of)
-            .expect("test should succeed");
+        let metrics = aggregate_metrics(&valuation, &market).expect("test should succeed");
         let results = PortfolioResult::new(valuation.clone(), metrics.clone(), &config, None);
 
         // The meta stamp names the valuation's FX policy and, without a

@@ -41,7 +41,7 @@ use crate::errors::value_error;
 /// >>> portfolio, _ = Portfolio.from_materialization(json.dumps(bundle))
 /// >>> table = value_portfolio(portfolio, MarketContext()).to_arrow_positions()
 /// >>> (len(table), table.num_columns)
-/// (0, 6)
+/// (0, 8)
 #[pyclass(module = "finstack_quant.core.table", name = "ArrowTable", frozen)]
 pub struct PyArrowTable {
     pub(crate) batch: RecordBatch,

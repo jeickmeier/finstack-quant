@@ -23,7 +23,7 @@ use std::sync::Arc;
 use time::Duration;
 
 #[test]
-fn apply_and_revalue_succeeds() {
+fn apply_scenario_and_revalue_succeeds() {
     let as_of = base_date();
     let end_date = as_of + Duration::days(30);
 
@@ -79,7 +79,7 @@ fn apply_and_revalue_succeeds() {
     let finstack_quant_portfolio::scenarios::ScenarioRevalueView {
         valuation: shocked_valuation,
         report,
-    } = finstack_quant_portfolio::scenarios::apply_and_revalue(
+    } = finstack_quant_portfolio::scenarios::apply_scenario_and_revalue(
         &portfolio, &scenario, &market, &config,
     )
     .unwrap();
@@ -196,7 +196,7 @@ fn scenario_pnl_reconciles_end_to_end() {
     let finstack_quant_portfolio::scenarios::ScenarioRevalueView {
         valuation: stressed,
         report: _,
-    } = finstack_quant_portfolio::scenarios::apply_and_revalue(
+    } = finstack_quant_portfolio::scenarios::apply_scenario_and_revalue(
         &portfolio, &scenario, &market, &config,
     )
     .unwrap();

@@ -20,7 +20,7 @@ use finstack_quant_portfolio::factor_brinson::{factor_brinson_attribution, Facto
 use finstack_quant_portfolio::fi_attribution::{
     campisi_attribution, FiAttributionConfig, FiPositionSnapshot,
 };
-use finstack_quant_portfolio::grid_attribution::grid_attribution::{
+use finstack_quant_portfolio::grid_attribution::{
     grid_attribution, GridPosition,
 };
 use finstack_quant_portfolio::grouping::aggregate_by_book;

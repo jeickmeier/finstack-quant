@@ -229,14 +229,7 @@ def test_raw_valuation_metric_aggregation_releases_gil() -> None:
     market = _market()
     valuation = value_portfolio(portfolio, market, metrics=[])
 
-    metrics_json = _assert_releases_gil(
-        lambda: aggregate_metrics(
-            valuation,
-            "USD",
-            market,
-            AS_OF.isoformat(),
-        ).to_json()
-    )
+    metrics_json = _assert_releases_gil(lambda: aggregate_metrics(valuation, market).to_json())
 
     by_position = json.loads(metrics_json)["by_position"]
     assert len(by_position) == 3_000

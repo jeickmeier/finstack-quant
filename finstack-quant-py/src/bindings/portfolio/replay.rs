@@ -115,35 +115,49 @@ fn extract_replay_config(
 /// Resolve the snapshot timeline from a JSON array string, a list of
 /// ``{"date", "market"}`` dicts, or a list of ``(date, MarketContext | str)``
 /// tuples.
+///
+/// Tuples are converted to typed `(Date, MarketContext)` pairs and passed to
+/// `ReplayTimeline::new`; JSON text and dicts go through the Rust
+/// `ReplayTimeline::from_json_snapshots` wire parser.
 fn extract_replay_timeline(
     py: Python<'_>,
     snapshots: &Bound<'_, PyAny>,
 ) -> PyResult<finstack_quant_portfolio::replay::ReplayTimeline> {
-    let json = if let Ok(json) = snapshots.extract::<String>() {
-        json
-    } else {
-        let mut entries: Vec<serde_json::Value> = Vec::new();
-        for item in snapshots.try_iter()? {
-            let item = item?;
-            if let Ok((date, market)) = item.extract::<(Bound<'_, PyAny>, Bound<'_, PyAny>)>() {
-                let date = crate::bindings::date_utils::py_to_date(&date)?;
-                let market = crate::bindings::extract::extract_market(py, &market)?;
-                entries.push(serde_json::json!({
-                    "date": date.to_string(),
-                    "market": serde_json::to_value(&market).map_err(display_to_py)?,
-                }));
-            } else {
-                entries.push(crate::bindings::module_utils::py_to_json_value(
-                    py,
-                    &item,
-                    "replay snapshot",
-                )?);
-            }
-        }
-        serde_json::Value::Array(entries).to_string()
+    use finstack_quant_portfolio::replay::ReplayTimeline;
+
+    if let Ok(json) = snapshots.extract::<String>() {
+        return py
+            .detach(move || ReplayTimeline::from_json_snapshots(&json))
+            .map_err(portfolio_to_py);
+    }
+    let items: Vec<Bound<'_, PyAny>> = snapshots.try_iter()?.collect::<PyResult<_>>()?;
+    let is_tuple = |item: &Bound<'_, PyAny>| {
+        item.extract::<(Bound<'_, PyAny>, Bound<'_, PyAny>)>()
+            .is_ok()
     };
-    py.detach(move || finstack_quant_portfolio::replay::ReplayTimeline::from_json_snapshots(&json))
-        .map_err(crate::errors::portfolio_to_py)
+    if items.first().is_some_and(is_tuple) {
+        let mut pairs = Vec::with_capacity(items.len());
+        for item in &items {
+            let (date, market) = item
+                .extract::<(Bound<'_, PyAny>, Bound<'_, PyAny>)>()
+                .map_err(|_| {
+                    crate::errors::value_error(
+                        "replay snapshots must be all (date, market) tuples or all dicts",
+                    )
+                })?;
+            let date = crate::bindings::date_utils::py_to_date(&date)?;
+            let market = crate::bindings::extract::extract_market(py, &market)?;
+            pairs.push((date, market));
+        }
+        return ReplayTimeline::new(pairs).map_err(portfolio_to_py);
+    }
+    let entries = items
+        .iter()
+        .map(|item| crate::bindings::module_utils::py_to_json_value(py, item, "replay snapshot"))
+        .collect::<PyResult<Vec<_>>>()?;
+    let json = serde_json::Value::Array(entries).to_string();
+    py.detach(move || ReplayTimeline::from_json_snapshots(&json))
+        .map_err(portfolio_to_py)
 }
 
 /// Replay a portfolio through dated market snapshots.

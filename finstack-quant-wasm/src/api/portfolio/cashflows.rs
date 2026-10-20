@@ -73,7 +73,7 @@ pub fn net_in_currency_by_date(
 /// converted at the CIP forward `F(T) = S × DF_from(T) / DF_base(T)` from the
 /// `asOf` spot.
 /// @param cashflows_json - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON).
-/// @param market_json - Canonical market-context JSON supplying the FX matrix and discount curves.
+/// @param market - `core.MarketContext` handle supplying the FX matrix and discount curves.
 /// @param base_currency - ISO-4217 reporting currency.
 /// @param as_of - ISO-8601 valuation date for spot FX and the start of each discount interval.
 /// @param discount_curves - Optional `{ currency: curveId }` map; a missing entry uses the ISO code as the curve id.
@@ -86,15 +86,13 @@ pub fn net_in_currency_by_date(
 #[wasm_bindgen(js_name = collapseToBaseByDateKind)]
 pub fn collapse_to_base_by_date_kind(
     cashflows_json: JsValue,
-    market_json: JsValue,
+    market: &JsMarketContext,
     base_currency: JsValue,
     as_of: JsValue,
     discount_curves: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let cashflows: finstack_quant_portfolio::cashflows::PortfolioCashflows =
         serde_json::from_str(&json_text(&cashflows_json, "cashflowsJson")?).map_err(to_js_err)?;
-    let market: finstack_quant_core::market_data::context::MarketContext =
-        serde_json::from_str(&json_text(&market_json, "marketJson")?).map_err(to_js_err)?;
     let base_currency: finstack_quant_core::currency::Currency =
         js_string(&base_currency, "baseCurrency")?
             .parse()
@@ -112,7 +110,12 @@ pub fn collapse_to_base_by_date_kind(
         _ => None,
     };
     let collapsed = cashflows
-        .collapse_to_base_by_date_kind(&market, base_currency, as_of, discount_curves.as_ref())
+        .collapse_to_base_by_date_kind(
+            market.inner(),
+            base_currency,
+            as_of,
+            discount_curves.as_ref(),
+        )
         .map_err(to_js_err)?;
     to_js_value(&collapsed)
 }

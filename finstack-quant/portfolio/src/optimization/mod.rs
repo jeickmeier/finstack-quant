@@ -65,6 +65,6 @@ pub use result::{
     OptimizationStatus, PortfolioOptimizationResult, PortfolioOptimizationResultWire,
     TradeDirection, TradeSpec, TradeType,
 };
-pub use spec::{optimize_from_spec, rebalance_from_spec, PortfolioOptimizationSpec};
+pub use spec::{optimize_portfolio, rebalance_from_spec, PortfolioOptimizationSpec};
 pub use types::{MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric, WeightingScheme};
 pub use universe::{CandidatePosition, PositionFilter, TradeUniverse};

@@ -29,7 +29,7 @@ pub fn optimize_portfolio(spec_json: JsValue, market_json: JsValue) -> Result<Js
         from_js_json(&market_json, "marketJson")?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     let result =
-        finstack_quant_portfolio::optimization::optimize_from_spec(&spec, &market, &config)
+        finstack_quant_portfolio::optimization::optimize_portfolio(&spec, &market, &config)
             .map_err(to_js_err)?;
     to_js_value(&result)
 }

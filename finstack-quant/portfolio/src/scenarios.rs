@@ -253,7 +253,7 @@ fn replace_portfolio_instruments(
 /// ```no_run
 /// use finstack_quant_core::config::FinstackConfig;
 /// use finstack_quant_core::market_data::context::MarketContext;
-/// use finstack_quant_portfolio::scenarios::apply_and_revalue;
+/// use finstack_quant_portfolio::scenarios::apply_scenario_and_revalue;
 /// use finstack_quant_scenarios::spec::ScenarioSpec;
 ///
 /// # fn main() -> finstack_quant_portfolio::Result<()> {
@@ -261,12 +261,12 @@ fn replace_portfolio_instruments(
 /// # let market: MarketContext = unimplemented!("Provide market data");
 /// # let scenario: ScenarioSpec = unimplemented!("Provide a scenario");
 /// let config = FinstackConfig::default();
-/// let finstack_quant_portfolio::scenarios::ScenarioRevalueView { valuation, report: _report } = apply_and_revalue(&portfolio, &scenario, &market, &config)?;
+/// let finstack_quant_portfolio::scenarios::ScenarioRevalueView { valuation, report: _report } = apply_scenario_and_revalue(&portfolio, &scenario, &market, &config)?;
 /// println!("Stressed total: {}", valuation.total_base_currency);
 /// # Ok(())
 /// # }
 /// ```
-pub fn apply_and_revalue(
+pub fn apply_scenario_and_revalue(
     portfolio: &Portfolio,
     scenario: &ScenarioSpec,
     market: &MarketContext,
@@ -406,7 +406,7 @@ fn diff_valuations(
 /// reports the difference per position and in total. Both legs require the
 /// canonical PV pricing path; a pricing failure aborts rather than switching
 /// either leg independently to `Instrument::value`. Unlike
-/// [`apply_and_revalue`], this function does not compute the standard risk set.
+/// [`apply_scenario_and_revalue`], this function does not compute the standard risk set.
 ///
 /// The arithmetic stays in [`Money`] end to end (Decimal-backed): position
 /// deltas are currency-checked subtractions of the base-currency position
@@ -784,7 +784,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_and_revalue() {
+    fn test_apply_scenario_and_revalue() {
         let as_of = date!(2024 - 01 - 01);
 
         let deposit = Deposit::builder()
@@ -831,7 +831,7 @@ mod tests {
             hazard_bump_mode: Default::default(),
         };
 
-        let result = apply_and_revalue(&portfolio, &scenario, &market, &config);
+        let result = apply_scenario_and_revalue(&portfolio, &scenario, &market, &config);
         assert!(result.is_ok());
     }
 

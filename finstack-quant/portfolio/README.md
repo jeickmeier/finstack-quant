@@ -50,7 +50,7 @@ through its module path. See the rustdoc for detail
 | `metrics::aggregate_metrics` | FX-converted metric rollup; returns `PortfolioMetrics` |
 | `grouping::aggregate_by_book` | Book-tree rollup including descendants |
 | `cashflows::aggregate_full_cashflows` | Currency-preserving cashflow ladder (`PortfolioCashflows`) |
-| `positions_to_table`, `entities_to_table`, `metrics_to_table`, `aggregated_metrics_to_table` | `core::table::TableEnvelope` exports |
+| `positions_to_table`, `metrics_to_table`, `aggregated_metrics_to_table` | `core::table::TableEnvelope` exports |
 
 ### Analytics
 
@@ -65,9 +65,9 @@ through its module path. See the rustdoc for detail
 | `performance` | `twrr_modified_dietz`, `twrr_linked`, `mwr_xirr` |
 | `factor_model` | `FactorModel` (`assign_factors` / `compute_sensitivities` / `analyze`), `decompose_factors`, `allocate_weights` |
 | `sensitivity` | `DeltaBasedEngine`, `FullRepricingEngine` + `ScenarioGrid`, `FactorSensitivityEngine` |
-| `optimization` | `PortfolioOptimizationProblem`, `optimize`, `optimize_from_spec`, `PortfolioOptimizationResult` |
+| `optimization` | `PortfolioOptimizationProblem`, `optimize`, `optimize_portfolio`, `PortfolioOptimizationResult` |
 | `margin` (re-exported at root) | `PortfolioMarginAggregator`, `PortfolioMarginResult` — see [`src/margin/README.md`](src/margin/README.md) |
-| `scenarios` | `apply_and_revalue`, `scenario_pnl`, `scenario_pnl_batch` |
+| `scenarios` | `apply_scenario_and_revalue`, `scenario_pnl`, `scenario_pnl_batch` |
 | `replay` | `replay_portfolio` over a `ReplayTimeline` of dated market snapshots |
 
 ## Quick start
@@ -152,8 +152,8 @@ A larger end-to-end program lives in
 - **Base currency.** `Portfolio::base_currency` is the reporting currency for
   totals and every portfolio-level analytic. Position values are kept in both
   native and base currency; summable risk metrics are FX-converted before
-  aggregation. `aggregate_metrics` rejects a `base_currency` or `as_of` that
-  disagrees with the valuation it was handed.
+  aggregation. `aggregate_metrics` takes the base currency and `as_of` from
+  the valuation it is handed.
 - **Spot FX for NAV, P&L, and risk.** Position PV, metric rollup, attribution,
   scenario P&L, margin, and factor endpoints convert native amounts to base
   with the market FX-matrix spot at `as_of`. `aggregate_metrics` prefers that

@@ -1,41 +1,31 @@
 //! WASM bindings for portfolio metric aggregation.
 
-use crate::utils::input::{js_string, json_text};
-
-use crate::utils::input::from_js_json;
+use crate::api::core::market_context::JsMarketContext;
+use crate::utils::input::{from_js_json, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
-/// Aggregate portfolio metrics from a valuation JSON.
-/// @param valuation_json - `PortfolioValuation` JSON, for example `JSON.stringify(valuePortfolio(...))`.
-/// @param base_currency - ISO-4217 base currency in which aggregate portfolio values are reported.
-/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// Aggregate portfolio metrics from a valuation.
+///
+/// Metrics are aggregated in the valuation's base currency, with FX spots
+/// read at the valuation's `as_of`.
+/// @param valuation_json - `PortfolioValuation` object or JSON, for example the result of `valuePortfolio`.
+/// @param market - `core.MarketContext` handle supplying the FX spots that convert out-of-base metrics.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if either JSON input is malformed,
-/// `baseCurrency` or `asOf` is invalid, valuation currency or date metadata is
-/// inconsistent, a required FX conversion is unavailable or invalid, or the
-/// metrics cannot be converted to a JavaScript value.
+/// Throws a JavaScript exception if the valuation input is malformed, a
+/// required FX conversion is unavailable or invalid, or the metrics cannot be
+/// converted to a JavaScript value.
 #[wasm_bindgen(js_name = aggregateMetrics)]
 pub fn aggregate_metrics(
     valuation_json: JsValue,
-    base_currency: JsValue,
-    market_json: JsValue,
-    as_of: JsValue,
+    market: &JsMarketContext,
 ) -> Result<JsValue, JsValue> {
-    let base_currency: &str = &js_string(&base_currency, "baseCurrency")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
     let valuation: finstack_quant_portfolio::valuation::PortfolioValuation =
         from_js_json(&valuation_json, "valuationJson")?;
-    let ccy: finstack_quant_core::currency::Currency = base_currency.parse().map_err(to_js_err)?;
-    let market: finstack_quant_core::market_data::context::MarketContext =
-        from_js_json(&market_json, "marketJson")?;
-    let date = crate::utils::parse_iso_date(as_of)?;
-    let metrics =
-        finstack_quant_portfolio::metrics::aggregate_metrics(&valuation, ccy, &market, date)
-            .map_err(to_js_err)?;
+    let metrics = finstack_quant_portfolio::metrics::aggregate_metrics(&valuation, market.inner())
+        .map_err(to_js_err)?;
     to_js_value(&metrics)
 }
 
@@ -59,22 +49,5 @@ pub fn portfolio_metrics_series(metrics_json: JsValue, base: JsValue) -> Result<
         serde_json::from_str(&json_text(&metrics_json, "metricsJson")?).map_err(to_js_err)?;
     let base: finstack_quant_valuations::metrics::MetricId =
         js_string(&base, "base")?.parse().map_err(to_js_err)?;
-    let entries: Vec<MetricSeriesEntry<'_>> = metrics
-        .metric_series(&base)
-        .into_iter()
-        .map(|(components, aggregate)| MetricSeriesEntry {
-            components,
-            total: aggregate.total,
-            by_entity: &aggregate.by_entity,
-        })
-        .collect();
-    to_js_value(&entries)
-}
-
-/// One decoded series entry returned by `portfolioMetricsSeries`.
-#[derive(serde::Serialize)]
-struct MetricSeriesEntry<'a> {
-    components: Vec<String>,
-    total: f64,
-    by_entity: &'a indexmap::IndexMap<finstack_quant_portfolio::types::EntityId, f64>,
+    to_js_value(&metrics.metric_series(&base))
 }

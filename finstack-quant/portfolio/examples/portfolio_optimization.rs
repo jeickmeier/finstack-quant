@@ -216,12 +216,8 @@ fn main() -> finstack_quant_portfolio::Result<()> {
         &config,
         &Default::default(),
     )?;
-    let metrics: finstack_quant_portfolio::metrics::PortfolioMetrics = aggregate_metrics(
-        &valuation,
-        rebalanced.base_currency,
-        &market,
-        rebalanced.as_of,
-    )?;
+    let metrics: finstack_quant_portfolio::metrics::PortfolioMetrics =
+        aggregate_metrics(&valuation, &market)?;
 
     println!("\nAggregated metrics at optimum (first few):");
     for (metric_id, metric) in metrics.aggregated.iter().take(5) {

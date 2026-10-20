@@ -14,6 +14,7 @@ use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use pyo3::types::PyDict;
+use pyo3::types::PyList;
 use pyo3::types::PyModule;
 
 /// Valuation of a single position inside a ``PortfolioValuation``.
@@ -286,7 +287,8 @@ impl PyPortfolioValuation {
     /// Export per-position values via Arrow (zero-copy for consumers).
     ///
     /// Columns: ``position_id``, ``entity_id``, ``value_native``,
-    /// ``value_base``, ``currency_native``, ``currency_base`` (see
+    /// ``value_base``, ``currency_native``, ``currency_base``, ``fx_rate``,
+    /// ``risk_error`` (see
     /// ``finstack_quant_portfolio::dataframe::positions_to_table``). Returns an
     /// :class:`finstack_quant.core.table.ArrowTable`.
     #[pyo3(text_signature = "($self)")]
@@ -300,7 +302,8 @@ impl PyPortfolioValuation {
     ///
     /// One row per entry of ``position_values``. Built from the same
     /// ``positions_to_table`` envelope that backs :meth:`to_arrow_positions`
-    /// plus the per-position risk diagnostics.
+    /// plus the two boolean risk diagnostics, which the table envelope cannot
+    /// carry (it has no boolean column type).
     ///
     /// Columns: ``position_id``, ``entity_id``, ``value_native``,
     /// ``value_base``, ``currency_native``, ``currency_base``, ``fx_rate``
@@ -316,46 +319,30 @@ impl PyPortfolioValuation {
         let table = finstack_quant_portfolio::dataframe::positions_to_table(&self.inner)
             .map_err(core_to_py)?;
         let frame = envelope_to_pandas(py, &table)?;
-        let complete: Vec<bool> = self
-            .inner
-            .position_values
-            .values()
-            .map(|v| v.risk_metrics_complete)
-            .collect();
-        let errors: Vec<Option<String>> = self
-            .inner
-            .position_values
-            .values()
-            .map(|v| v.risk_error.clone())
-            .collect();
+        let positions = self.inner.position_values.values();
+        let fx_triangulated: Vec<Option<bool>> =
+            positions.clone().map(|v| v.fx_triangulated).collect();
+        let complete: Vec<bool> = positions.map(|v| v.risk_metrics_complete).collect();
         // `assign` returns a new frame. Appending with `set_item` instead trips
         // pandas' copy-on-write heuristic (PyO3 holds an extra reference, so the
         // refcount check reads as chained assignment) and warns on every call.
-        let fx_rates: Vec<Option<f64>> = self
-            .inner
-            .position_values
-            .values()
-            .map(|v| v.fx_rate)
-            .collect();
-        let fx_triangulated: Vec<Option<bool>> = self
-            .inner
-            .position_values
-            .values()
-            .map(|v| v.fx_triangulated)
-            .collect();
         let columns = PyDict::new(py);
-        // A float Series keeps the column float64 (missing as NaN) even when
-        // every row is same-currency; a bare list of `None` would be object.
-        let fx_rate_column = py.import("pandas")?.getattr("Series")?.call1((
-            fx_rates,
-            frame.getattr("index")?,
-            "float64",
-        ))?;
-        columns.set_item("fx_rate", fx_rate_column)?;
         columns.set_item("fx_triangulated", fx_triangulated)?;
         columns.set_item("risk_metrics_complete", complete)?;
-        columns.set_item("risk_error", errors)?;
-        frame.call_method("assign", (), Some(&columns))
+        let frame = frame.call_method("assign", (), Some(&columns))?;
+        let order = [
+            "position_id",
+            "entity_id",
+            "value_native",
+            "value_base",
+            "currency_native",
+            "currency_base",
+            "fx_rate",
+            "fx_triangulated",
+            "risk_metrics_complete",
+            "risk_error",
+        ];
+        frame.get_item(PyList::new(py, order)?)
     }
 
     /// Number of position valuations in the result.

@@ -2085,7 +2085,7 @@ fn notional_weights_convert_native_currencies_before_normalizing() {
     );
     spec.weighting = problem.weighting;
     spec.constraints = problem.constraints.clone();
-    let from_spec = finstack_quant_portfolio::optimization::optimize_from_spec(
+    let from_spec = finstack_quant_portfolio::optimization::optimize_portfolio(
         &spec,
         &build_multi_currency_market(),
         &FinstackConfig::default(),
@@ -2097,7 +2097,7 @@ fn notional_weights_convert_native_currencies_before_normalizing() {
 #[test]
 fn rebalance_from_spec_matches_the_live_result_and_rejects_foreign_results() {
     use finstack_quant_portfolio::optimization::{
-        optimize_from_spec, rebalance_from_spec, Constraint, PortfolioOptimizationResultWire,
+        optimize_portfolio, rebalance_from_spec, Constraint, PortfolioOptimizationResultWire,
         PortfolioOptimizationSpec,
     };
     let as_of = create_date(2024, Month::January, 1).unwrap();
@@ -2125,7 +2125,7 @@ fn rebalance_from_spec_matches_the_live_result_and_rejects_foreign_results() {
     spec.weighting = WeightingScheme::NotionalWeight;
     spec.constraints = vec![Constraint::Budget { rhs: 1.0 }];
     let market = build_multi_currency_market();
-    let live = optimize_from_spec(&spec, &market, &FinstackConfig::default()).unwrap();
+    let live = optimize_portfolio(&spec, &market, &FinstackConfig::default()).unwrap();
     let wire: PortfolioOptimizationResultWire =
         serde_json::from_str(&serde_json::to_string(&live).unwrap()).unwrap();
 

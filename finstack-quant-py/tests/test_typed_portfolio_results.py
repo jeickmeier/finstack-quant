@@ -432,7 +432,7 @@ def test_aggregate_metrics_returns_typed_portfolio_metrics() -> None:
     market = _market()
     valuation = pf.value_portfolio(portfolio, market)
 
-    metrics = pf.aggregate_metrics(valuation, "USD", market, AS_OF)
+    metrics = pf.aggregate_metrics(valuation, market)
     expected = json.loads(metrics.to_json())
 
     assert isinstance(metrics, pf.PortfolioMetrics)
@@ -462,6 +462,24 @@ def test_replay_portfolio_returns_typed_result() -> None:
     assert result.summary["num_steps"] == expected["summary"]["num_steps"] == 2
     assert len(result.steps) == 2
     assert _frame_columns(result) == ["date", "value", "daily_mtm_pnl", "cumulative_mtm_pnl"]
+
+
+def test_replay_portfolio_typed_snapshot_tuples_match_the_json_wire() -> None:
+    portfolio = pf.Portfolio.from_spec(_portfolio_json())
+    m0, m1 = _market("2025-01-15"), _market("2025-01-16", bump=0.001)
+    config = {"mode": "pv_only"}
+    wire = [
+        {"date": "2025-01-15", "market": json.loads(m0.to_json())},
+        {"date": "2025-01-16", "market": json.loads(m1.to_json())},
+    ]
+
+    typed = pf.replay_portfolio(portfolio, [(date(2025, 1, 15), m0), ("2025-01-16", m1)], config)
+    from_dicts = pf.replay_portfolio(portfolio, wire, config)
+    from_json = pf.replay_portfolio(portfolio, json.dumps(wire), config)
+
+    assert json.loads(typed.to_json()) == json.loads(from_dicts.to_json()) == json.loads(from_json.to_json())
+    with pytest.raises(ValueError, match=r"all \(date, market\) tuples"):
+        pf.replay_portfolio(portfolio, [(date(2025, 1, 15), m0), wire[1]], config)
 
 
 # ---------------------------------------------------------------------------

@@ -37,7 +37,7 @@ pub fn apply_scenario_and_revalue(
     let scenario =
         finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
-    let out = finstack_quant_portfolio::scenarios::apply_and_revalue(
+    let out = finstack_quant_portfolio::scenarios::apply_scenario_and_revalue(
         &portfolio.inner,
         &scenario,
         market.inner(),
