@@ -9,7 +9,6 @@ use crate::{
     AttributionFactor, AttributionMethod, CarryDetail, ExecutionPolicy, MoveUnit, PnlAttribution,
     SensitivityBucket, SensitivityStep, SourceLine,
 };
-use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -22,6 +21,7 @@ use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
     df_from_yield, YieldCompounding,
 };
+use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::instruments::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::MarketDependencies;
@@ -203,6 +203,24 @@ pub(crate) fn compute_pnl_with_fx(
     val_t1_converted.checked_sub(val_t0_converted)
 }
 
+/// The instrument carrying the opening model parameters.
+///
+/// `None`, or a snapshot without parameters, reuses `instrument` itself;
+/// otherwise a clone is built with the snapshot applied.
+///
+/// # Errors
+///
+/// Returns an error when the snapshot belongs to a different instrument type.
+pub(crate) fn instrument_at_t0(
+    instrument: &Arc<dyn Instrument>,
+    model_params_t0: Option<&ModelParamsSnapshot>,
+) -> Result<Arc<dyn Instrument>> {
+    match model_params_t0 {
+        None | Some(ModelParamsSnapshot::None) => Ok(Arc::clone(instrument)),
+        Some(params) => instrument.with_model_params(params).map(Arc::from),
+    }
+}
+
 /// Price both endpoints of a repricing request.
 ///
 /// Returns the T₀-parameter instrument with the unscaled `(T₀, T₁)` values.
@@ -210,10 +228,7 @@ pub(crate) fn compute_pnl_with_fx(
 pub(crate) fn endpoint_values(
     request: &AttributionRequest<'_>,
 ) -> Result<(Arc<dyn Instrument>, Money, Money)> {
-    let instrument_t0 = match request.model_params_t0 {
-        Some(params) => crate::model_params::with_model_params(request.instrument, params)?,
-        None => Arc::clone(request.instrument),
-    };
+    let instrument_t0 = instrument_at_t0(request.instrument, request.model_params_t0)?;
     let (val_t0, val_t1) = match request.prepared_endpoints {
         Some(endpoints) => endpoints,
         None => (
@@ -244,33 +259,18 @@ pub(crate) fn seed_attribution(
         request.as_of_t0,
         request.as_of_t1,
     )?;
-    let mut attribution = init_attribution(
+    let mut attribution = PnlAttribution::new(
         total_pnl,
         request.instrument.id(),
         request.as_of_t0,
         request.as_of_t1,
         method,
-        Some(request.config),
     );
+    attribution.meta.rounding = finstack_quant_core::config::RoundingContext::from(request.config);
     stamp_endpoints(&mut attribution, val_t0, val_t1);
     // Policy-visibility invariant: results carry the parallel flag.
     attribution.meta.execution_policy = Some(execution_policy);
     Ok(attribution)
-}
-
-pub(crate) fn init_attribution(
-    total_pnl: Money,
-    instrument_id: &str,
-    as_of_t0: Date,
-    as_of_t1: Date,
-    method: AttributionMethod,
-    config: Option<&FinstackConfig>,
-) -> PnlAttribution {
-    let mut attribution = PnlAttribution::new(total_pnl, instrument_id, as_of_t0, as_of_t1, method);
-    if let Some(config) = config {
-        attribution.meta.rounding = finstack_quant_core::config::RoundingContext::from(config);
-    }
-    attribution
 }
 
 /// Record the endpoint present values the attribution was computed from.
@@ -878,6 +878,7 @@ pub(crate) fn validate_attribution_period(as_of_t0: Date, as_of_t1: Date) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
     use finstack_quant_core::Error;
     use std::sync::Arc;
@@ -1402,5 +1403,53 @@ mod tests {
         // FX translation: 1000 EUR @ 1.2 - 1000 EUR @ 1.1 = 1200 - 1100 = 100 USD
         assert_eq!(pnl.amount(), 100.0);
         assert_eq!(pnl.currency(), Currency::USD);
+    }
+
+    #[test]
+    fn instrument_at_t0_without_params_reuses_the_instrument() {
+        let instrument: Arc<dyn Instrument> = Arc::new(
+            Bond::fixed(
+                "PLAIN-BOND-002",
+                Money::from((1_000_000_i64, Currency::USD)),
+                finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
+                finstack_quant_core::dates::create_date(2024, time::Month::January, 1)
+                    .expect("valid issue date"),
+                finstack_quant_core::dates::create_date(2029, time::Month::January, 1)
+                    .expect("valid maturity date"),
+                finstack_quant_core::dates::StubKind::ShortFront,
+                "USD-OIS",
+            )
+            .expect("valid fixed bond"),
+        );
+        for params in [None, Some(&ModelParamsSnapshot::None)] {
+            let unchanged = instrument_at_t0(&instrument, params).expect("no-op parameters");
+            assert!(Arc::ptr_eq(&instrument, &unchanged));
+        }
+    }
+
+    #[test]
+    fn instrument_at_t0_rejects_parameters_of_another_instrument_type() {
+        use finstack_quant_valuations::instruments::fixed_income::convertible::{
+            AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+        };
+        use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
+
+        let instrument: Arc<dyn Instrument> =
+            Arc::new(StructuredCredit::example().expect("example"));
+        let params = ModelParamsSnapshot::Convertible {
+            conversion_spec: ConversionSpec {
+                ratio: Some(10.0),
+                price: None,
+                policy: ConversionPolicy::Voluntary,
+                anti_dilution: AntiDilutionPolicy::None,
+                dividend_adjustment: DividendAdjustment::None,
+                dilution_events: Vec::new(),
+            },
+        };
+
+        let Err(error) = instrument_at_t0(&instrument, Some(&params)) else {
+            panic!("mismatched model parameter snapshot should fail")
+        };
+        assert!(error.to_string().contains("StructuredCredit"));
     }
 }

@@ -70,10 +70,7 @@ fn translation_t0_value(
         }
     }
 
-    let t0_instrument = match model_params_t0 {
-        Some(params) => crate::model_params::with_model_params(instrument, params)?,
-        None => Arc::clone(instrument),
-    };
+    let t0_instrument = crate::helpers::instrument_at_t0(instrument, model_params_t0)?;
     let value = t0_instrument.value(market_t0, as_of_t0)?;
     *num_repricings += 1;
     Ok(value)

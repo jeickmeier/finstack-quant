@@ -1,9 +1,8 @@
 //! Credit-factor attribution detail and carry decomposition helpers.
 
 use crate::credit_cascade::{
-    apply_curve_shape_residual, build_credit_factor_attribution, optional_single_issuer_adder,
-    plan_credit_cascade, resolve_issuer, shift_credit_curves_par_spread, single_issuer_by_bucket,
-    CreditStepKind,
+    apply_curve_shape_residual, build_credit_factor_attribution, plan_credit_cascade,
+    resolve_issuer, shift_credit_curves_par_spread, single_issuer_by_bucket, CreditStepKind,
 };
 use crate::factors::{MarketRestoreFlags, MarketSnapshot};
 use crate::spec::AttributionInputs;
@@ -11,8 +10,9 @@ use crate::PnlAttribution;
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
-use finstack_quant_factor::credit::hierarchy::{dimension_key, CreditFactorModel};
+use finstack_quant_factor::credit::hierarchy::CreditFactorModel;
 use finstack_quant_valuations::instruments::Instrument;
+use std::collections::BTreeMap;
 
 impl AttributionInputs {
     /// Compute the optional `credit_factor_detail` field for a finished
@@ -332,10 +332,10 @@ impl AttributionInputs {
         } else {
             0.0
         };
+        let level_names = model.level_names();
         let mut levels_out: Vec<LevelCarry> = Vec::with_capacity(num_levels);
         for (k, level_share) in level_share_of_s.iter().enumerate() {
-            let dim = &model.hierarchy.levels[k];
-            let level_name = dimension_key(dim).to_owned();
+            let level_name = level_names[k].clone();
             let share = *level_share * scale_credit;
             let total_money = Money::new(share, ccy)?;
             let by_bucket = single_issuer_by_bucket(
@@ -362,11 +362,10 @@ impl AttributionInputs {
             credit_total
         };
 
-        let adder_by_issuer = optional_single_issuer_adder(
-            &issuer_id,
-            adder_total_money,
-            self.credit_factor_detail_options.include_per_issuer_adder,
-        );
+        let adder_by_issuer = self
+            .credit_factor_detail_options
+            .include_per_issuer_adder
+            .then(|| BTreeMap::from([(issuer_id.clone(), adder_total_money)]));
 
         // Rates and credit partition gross carry; funding is a separate overlay.
         let rates_carry_total = Money::new(

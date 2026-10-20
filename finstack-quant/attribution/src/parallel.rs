@@ -48,7 +48,6 @@ use crate::credit_cascade::{
 };
 use crate::factors::*;
 use crate::helpers::*;
-use crate::model_params;
 use crate::policy_map::try_map_policy;
 use crate::AttributionRequest;
 use crate::{AttributionFactor, AttributionMethod, CrossFactorDetail, PnlAttribution};
@@ -481,7 +480,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
             note,
         };
         if spec.factor == AttributionFactor::ModelParameters {
-            let (stage, reprice) = match model_params::with_model_params(instrument, &params_t0) {
+            let (stage, reprice) = match instrument_at_t0(instrument, Some(&params_t0)) {
                 Ok(restored) => ("repricing", restored.value(market_t1, as_of_t1)),
                 Err(e) => ("parameter modification", Err(e)),
             };

@@ -224,13 +224,12 @@ pub fn attribute_pnl_metrics_based(
         as_of_t1,
     )?;
 
-    let mut attribution = init_attribution(
+    let mut attribution = PnlAttribution::new(
         total_pnl,
         instrument.id(),
         as_of_t0,
         as_of_t1,
         AttributionMethod::MetricsBased,
-        None,
     );
 
     stamp_endpoints(&mut attribution, val_t0.value, val_t1.value);
@@ -330,10 +329,7 @@ pub(crate) fn attribute_request(
         ..
     } = *request;
     validate_attribution_period(as_of_t0, as_of_t1)?;
-    let instrument_t0 = match model_params_t0 {
-        Some(params) => crate::model_params::with_model_params(instrument, params)?,
-        None => Arc::clone(instrument),
-    };
+    let instrument_t0 = instrument_at_t0(instrument, model_params_t0)?;
     let mut metrics_instrument = instrument_t0.clone_box();
     // A zero-day window has no carry (the metrics-based carry step zeroes it),
     // so the theta horizon is only set for a real window.

@@ -27,7 +27,6 @@
 use crate::factors::{MarketRestoreFlags, MarketSnapshot};
 use crate::helpers::*;
 use crate::metrics_based::shifts::{extract_credit_keyrates, CreditKeyRateBucket};
-use crate::model_params;
 use crate::policy_map::map_policy;
 use crate::AttributionRequest;
 use crate::{AttributionFactor, AttributionMethod, MoveUnit, PnlAttribution};
@@ -800,7 +799,7 @@ fn directional_gamma_pnl(
     Ok(0.5 * (up.amount() - 2.0 * pv_t0.amount() + down.amount()) / scale.powi(2))
 }
 
-/// Triangular key-rate bump spec for bucket `i` of `KEY_RATE_BUCKETS_YEARS`.
+/// Triangular key-rate bump spec for bucket `i` of the tenor grid `tenors`.
 ///
 /// The wing buckets use the dedicated half-triangle constructors so the
 /// `Σ wᵢ(t) = 1.0` partition-of-unity invariant holds across the whole curve
@@ -809,10 +808,6 @@ fn directional_gamma_pnl(
 /// sub-3M DV01), and the last bucket is flat at 1.0 beyond 30Y (passing
 /// `next = ∞` instead produces a NaN weight for any knot past 30Y and aborts
 /// the whole factor).
-fn key_rate_bump_spec(i: usize, bump_bp: f64) -> BumpSpec {
-    key_rate_bump_on_grid(&KEY_RATE_BUCKETS_YEARS, i, bump_bp)
-}
-
 fn key_rate_bump_on_grid(tenors: &[f64], i: usize, bump_bp: f64) -> BumpSpec {
     if tenors.len() == 1 {
         return BumpSpec::parallel_bp(bump_bp);
@@ -908,14 +903,14 @@ fn compute_curve_factor(
     for (i, &move_bp) in per_tenor_move_bp.iter().enumerate() {
         let up = market_t0.bump([MarketBump::Curve {
             id: curve_id.clone(),
-            spec: key_rate_bump_spec(i, config.rate_bump_bp),
+            spec: key_rate_bump_on_grid(&KEY_RATE_BUCKETS_YEARS, i, config.rate_bump_bp),
         }])?;
         *repricings += 1;
         let pv_up = instrument.value(&up, as_of_t0)?;
 
         let down = market_t0.bump([MarketBump::Curve {
             id: curve_id.clone(),
-            spec: key_rate_bump_spec(i, -config.rate_bump_bp),
+            spec: key_rate_bump_on_grid(&KEY_RATE_BUCKETS_YEARS, i, -config.rate_bump_bp),
         }])?;
         *repricings += 1;
         let pv_down = instrument.value(&down, as_of_t0)?;
@@ -1334,7 +1329,7 @@ fn compute_model_params_factor(
     params_t0: &ModelParamsSnapshot,
     repricings: &mut usize,
 ) -> Result<TaylorFactorResult> {
-    let instrument_t0 = model_params::with_model_params(instrument, params_t0)?;
+    let instrument_t0 = instrument_at_t0(instrument, Some(params_t0))?;
     *repricings += 1;
     let pv_with_t0 = instrument_t0.value(market_t1, as_of_t1)?;
     let explained = pv_t1.amount() - pv_with_t0.amount();

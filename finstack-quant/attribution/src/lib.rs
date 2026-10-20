@@ -135,7 +135,6 @@ pub(crate) mod factors;
 pub(crate) mod helpers;
 pub mod long_rows;
 pub(crate) mod metrics_based;
-pub(crate) mod model_params;
 pub(crate) mod parallel;
 pub(crate) mod policy_map;
 mod result;

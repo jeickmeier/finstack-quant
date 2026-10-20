@@ -30,7 +30,7 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IssuerId};
 use finstack_quant_core::Result;
-use finstack_quant_factor::credit::hierarchy::{dimension_key, CreditFactorModel, IssuerBetaRow};
+use finstack_quant_factor::credit::hierarchy::{CreditFactorModel, IssuerBetaRow};
 use finstack_quant_factor::matching::{
     bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY,
 };
@@ -215,16 +215,6 @@ fn cascade_step(kind: CreditStepKind, name: &str, delta_bp: f64) -> CreditCascad
     }
 }
 
-/// Human-readable names for every level in model order.
-pub(crate) fn hierarchy_level_names(model: &CreditFactorModel) -> Vec<String> {
-    model
-        .hierarchy
-        .levels
-        .iter()
-        .map(|dimension| dimension_key(dimension).to_owned())
-        .collect()
-}
-
 /// Single-instrument bucket map for one issuer/level.
 pub(crate) fn single_issuer_by_bucket(
     model: &CreditFactorModel,
@@ -241,15 +231,6 @@ pub(crate) fn single_issuer_by_bucket(
         .bucket_path(&row.tags, level_index)
         .map(|bucket| BTreeMap::from([(bucket, total)]))
         .unwrap_or_default()
-}
-
-/// Optional single-issuer adder map used by single-instrument detail paths.
-pub(crate) fn optional_single_issuer_adder(
-    issuer_id: &IssuerId,
-    adder: Money,
-    include: bool,
-) -> Option<BTreeMap<IssuerId, Money>> {
-    include.then(|| BTreeMap::from([(issuer_id.clone(), adder)]))
 }
 
 /// Fill the `CurveShape` step with the residual needed for exact reconciliation.
@@ -343,7 +324,7 @@ pub(crate) fn plan_credit_cascade(
     }
     let ds_i = total_shift_bp / count as f64;
 
-    let level_names = hierarchy_level_names(model);
+    let level_names = model.level_names();
     let mut scalar_level_moves: Vec<(String, Option<f64>)> =
         Vec::with_capacity(model.hierarchy.levels.len());
     for k in 0..model.hierarchy.levels.len() {
@@ -631,11 +612,9 @@ pub(crate) fn build_credit_factor_attribution(
         });
     }
 
-    let adder_pnl_by_issuer = optional_single_issuer_adder(
-        &cascade.issuer_id,
-        adder_pnl,
-        options.include_per_issuer_adder,
-    );
+    let adder_pnl_by_issuer = options
+        .include_per_issuer_adder
+        .then(|| BTreeMap::from([(cascade.issuer_id.clone(), adder_pnl)]));
 
     let adder_abs = adder_pnl.amount().abs();
     let curve_shape_abs = curve_shape_pnl.amount().abs();
