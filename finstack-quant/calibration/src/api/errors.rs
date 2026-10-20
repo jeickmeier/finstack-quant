@@ -288,19 +288,6 @@ impl EnvelopeError {
             | EnvelopeError::StrictLoad { .. } => None,
         }
     }
-
-    /// Serialize to compact JSON for cross-binding consumption.
-    pub fn to_json(&self) -> String {
-        match serde_json::to_string(self) {
-            Ok(json) => json,
-            Err(err) => serde_json::json!({
-                "kind": "json_serialize",
-                "target": "EnvelopeError",
-                "message": err.to_string(),
-            })
-            .to_string(),
-        }
-    }
 }
 
 impl From<EnvelopeError> for finstack_quant_core::Error {

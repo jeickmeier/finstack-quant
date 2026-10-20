@@ -1270,7 +1270,9 @@ mod tests {
             .expect("duplicate step error");
         assert_eq!(duplicate.kind_str(), "duplicate_step_id");
         assert_eq!(duplicate.step_id(), Some("duplicate"));
-        assert!(duplicate.to_json().contains("\"duplicate_index\":1"));
+        assert!(serde_json::to_string(&duplicate)
+            .expect("error JSON")
+            .contains("\"duplicate_index\":1"));
     }
 }
 

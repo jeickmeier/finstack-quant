@@ -62,7 +62,7 @@ fn envelope_error_serializes_with_kind_tag() {
         available: vec!["set_a".to_string(), "set_b".to_string()],
         suggestion: Some("set_a".to_string()),
     };
-    let json = err.to_json();
+    let json = serde_json::to_string(&err).expect("error JSON");
     assert!(json.contains("\"kind\":\"undefined_quote_set\""));
     assert!(json.contains("\"ref_name\":\"missing_set\""));
     assert!(json.contains("\"suggestion\":\"set_a\""));
@@ -91,7 +91,9 @@ fn envelope_error_kind_str_matches_serialized_tag() {
         reason: "rate is NaN".to_string(),
     };
     assert_eq!(err.kind_str(), "quote_data_invalid");
-    assert!(err.to_json().contains("\"kind\":\"quote_data_invalid\""));
+    assert!(serde_json::to_string(&err)
+        .expect("error JSON")
+        .contains("\"kind\":\"quote_data_invalid\""));
 }
 
 #[test]

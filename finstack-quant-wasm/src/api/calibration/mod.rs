@@ -392,7 +392,10 @@ mod tests {
         assert_eq!(details.stage.as_str(), "ingestion");
         assert_eq!(details.category, "strict_load");
         assert!(!details.cause.is_empty());
-        assert!(error.to_json().contains("\"stage\":\"ingestion\""));
+        assert!(error
+            .details()
+            .to_json()
+            .contains("\"stage\":\"ingestion\""));
     }
 
     #[test]
@@ -435,7 +438,7 @@ mod tests {
         let error = engine::calibrate_from_json("{ this is not valid json")
             .expect_err("malformed envelope must error");
         let details = error.details();
-        let json = error.to_json();
+        let json = error.details().to_json();
         assert_eq!(details.stage.as_str(), "ingestion");
         assert_eq!(details.category, "strict_load");
         assert!(
