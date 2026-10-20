@@ -204,7 +204,7 @@ const cases = {
       const flows = schedule.getFlows();
       return [
         json(
-          cashflows.CashFlowSchedule.fromParts(
+          cashflows.CashFlowSchedule.fromFlows(
             flows,
             schedule.getNotional(),
             '30_360',
@@ -723,7 +723,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
   });
 });
 
-test('CFCC-008: fromFlows validates every row in Rust; fromParts does not', () => {
+test('CFCC-008: fromFlows validates every row in Rust', () => {
   const row = (overrides) => ({
     date: '2025-07-15',
     reset_date: null,
@@ -734,7 +734,6 @@ test('CFCC-008: fromFlows validates every row in Rust; fromParts does not', () =
     ...overrides,
   });
   const notional = cashflows.notionalPar(1000, 'USD');
-  const meta = cashflows.CashFlowSchedule.fromFlows([], notional, 'act_360').getMeta();
   for (const [bad, pattern] of [
     [row({ accrual_factor: -1 }), /accrual_factor must be non-negative/],
     [row({ reset_date: '2025-08-01' }), /reset_date must not be after payment date/],
@@ -743,8 +742,6 @@ test('CFCC-008: fromFlows validates every row in Rust; fromParts does not', () =
       () => cashflows.CashFlowSchedule.fromFlows([bad], notional, 'act_360'),
       kind('validation', pattern)
     );
-    const raw = cashflows.CashFlowSchedule.fromParts([bad], notional, 'act_360', meta);
-    assert.equal(raw.getFlows().length, 1);
   }
   assert.equal(
     cashflows.CashFlowSchedule.fromFlows([row({})], notional, 'act_360').getFlows().length,

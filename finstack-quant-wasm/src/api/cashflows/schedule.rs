@@ -47,7 +47,7 @@ pub(crate) fn dated_flows_arg(value: &JsValue, label: &str) -> Result<Vec<(Date,
 /// day count and metadata.
 ///
 /// Obtain one from `CashFlowSchedule.builder()`, `buildCashflowSchedule`,
-/// `CashFlowSchedule.fromJson` or `CashFlowSchedule.fromParts`. Methods that
+/// `CashFlowSchedule.fromJson` or `CashFlowSchedule.fromFlows`. Methods that
 /// return a schedule return a new handle and leave this one unchanged.
 #[wasm_bindgen(js_name = CashFlowSchedule)]
 #[derive(Clone, Debug)]
@@ -73,39 +73,12 @@ impl JsCashFlowSchedule {
         }
     }
 
-    /// Assemble a schedule from existing flows, notional, day count and metadata.
-    ///
-    /// Flows are put into the canonical schedule order; nothing is validated
-    /// until `validate()` or an analytic runs.
-    ///
-    /// @param flows - `CashFlow` wire objects.
-    /// @param notional - `Notional` wire object: initial balance and amortization rule.
-    /// @param day_count - `DayCount` wire string (for example `"act_360"`) used for accrual and year fractions.
-    /// @param meta - `CashFlowMeta` wire object: representation, calendar ids, commitment, issue date and maturity.
-    /// @returns The assembled `CashFlowSchedule`.
-    /// @throws If an argument does not match its wire type (kind `validation`).
-    #[wasm_bindgen(js_name = fromParts)]
-    pub fn from_parts(
-        flows: JsValue,
-        notional: JsValue,
-        day_count: JsValue,
-        meta: JsValue,
-    ) -> Result<JsCashFlowSchedule, JsValue> {
-        Ok(Self::from_inner(CashFlowSchedule::from_parts(
-            js_wire::<Vec<CashFlow>>(&flows, "flows")?,
-            js_wire::<Notional>(&notional, "notional")?,
-            js_wire::<DayCount>(&day_count, "dayCount")?,
-            js_wire::<CashFlowMeta>(&meta, "meta")?,
-        )))
-    }
-
     /// Assemble a schedule from externally supplied flows, validating every row
     /// (Rust `CashFlowSchedule::from_flows`).
     ///
     /// Each flow must pass `CashFlow::validate` (finite amount and rate, a
     /// finite non-negative `accrual_factor`, a reset date not after the payment
-    /// date) before the rows are sorted; use `fromParts` to assemble rows
-    /// without validation. (Python's `from_flows` also reads a pandas
+    /// date) before the rows are sorted. (Python's `from_flows` also reads a pandas
     /// DataFrame; WASM takes the flow list.)
     ///
     /// @param flows - `CashFlow` wire objects.

@@ -151,8 +151,8 @@ wire_methods!(PyCashFlowMeta, CashFlowMeta, "CashFlowMeta");
 
 /// Canonical, sorted cashflow schedule with notional, day count and metadata.
 ///
-/// Build one with ``CashFlowSchedule.builder()`` (fluent), ``from_flows`` /
-/// ``from_parts`` (explicit rows), or ``from_json``. Accessors return typed
+/// Build one with ``CashFlowSchedule.builder()`` (fluent), ``from_flows``
+/// (explicit rows, validated), or ``from_json``. Accessors return typed
 /// ``CashFlow`` rows; ``to_dataframe()`` exports a pandas frame; ``pv_by_period``
 /// discounts against a ``MarketContext``.
 ///
@@ -160,7 +160,7 @@ wire_methods!(PyCashFlowMeta, CashFlowMeta, "CashFlowMeta");
 /// --------
 /// >>> from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
 /// >>> from finstack_quant.core.dates import DayCount
-/// >>> CashFlowSchedule.from_parts([], Notional.par(1.0, "USD"), DayCount.ACT_360, CashFlowMeta()).get_notional().initial.amount
+/// >>> CashFlowSchedule.from_flows([], Notional.par(1.0, "USD"), DayCount.ACT_360, CashFlowMeta()).get_notional().initial.amount
 /// 1.0
 #[pyclass(
     name = "CashFlowSchedule",
@@ -300,53 +300,11 @@ impl PyCashFlowSchedule {
         }
     }
 
-    /// Build a schedule from explicit rows, a notional, a day count and metadata.
-    ///
-    /// Rows are sorted into canonical order. Mirrors Rust
-    /// ``CashFlowSchedule::from_parts``.
-    ///
-    /// Parameters
-    /// ----------
-    /// flows : list[CashFlow]
-    ///     Classified cashflow rows in any order.
-    /// notional : Notional
-    ///     Representative notional stamped on the schedule.
-    /// day_count : DayCount
-    ///     Representative day-count convention.
-    /// meta : CashFlowMeta
-    ///     Schedule-level metadata.
-    ///
-    /// Returns
-    /// -------
-    /// CashFlowSchedule
-    ///     Canonical schedule holding the sorted rows.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``flows`` is not a list of ``CashFlow``.
-    #[staticmethod]
-    #[pyo3(text_signature = "(flows, notional, day_count, meta)")]
-    fn from_parts(
-        flows: Vec<PyRef<'_, PyCashFlow>>,
-        notional: PyRef<'_, PyNotional>,
-        day_count: PyRef<'_, PyDayCount>,
-        meta: PyRef<'_, PyCashFlowMeta>,
-    ) -> Self {
-        Self::from_inner(CashFlowSchedule::from_parts(
-            flows.iter().map(|f| f.inner.clone()).collect(),
-            notional.inner.clone(),
-            day_count.inner,
-            meta.inner.clone(),
-        ))
-    }
-
     /// Build a schedule from ``CashFlow`` rows or a pandas DataFrame,
     /// validating every row.
     ///
     /// Both input shapes go through Rust ``CashFlowSchedule::from_flows``,
-    /// which checks each row (``CashFlow.validate``) before sorting; use
-    /// ``from_parts`` to assemble rows without validation.
+    /// which checks each row (``CashFlow.validate``) before sorting.
     ///
     /// Parameters
     /// ----------

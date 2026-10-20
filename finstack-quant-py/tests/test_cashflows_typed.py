@@ -892,7 +892,7 @@ class TestCashFlowSchedule:
             )
         else:
             row = CashFlow("2025-06-01", Money(amount, "USD"), CFKind.FIXED, 0.0)
-        schedule = CashFlowSchedule.from_parts([row], Notional.par(0, "USD"), DayCount.ACT_360, CashFlowMeta())
+        schedule = CashFlowSchedule.from_flows([row], Notional.par(0, "USD"), DayCount.ACT_360, CashFlowMeta())
         original = schedule.to_json()
         with pytest.raises(ValueError, match="conversion overflow"):
             schedule.scale_amounts(scale)
@@ -904,7 +904,7 @@ class TestCashFlowSchedule:
         from finstack_quant.core.dates import DayCount
 
         row = CashFlow("2026-01-01", Money(100, "USD"), CFKind.REVOLVING_REPAYMENT, 0.0)
-        schedule = CashFlowSchedule.from_parts([row], Notional.par(100, "USD"), DayCount.ACT_360, CashFlowMeta())
+        schedule = CashFlowSchedule.from_flows([row], Notional.par(100, "USD"), DayCount.ACT_360, CashFlowMeta())
         assert schedule.wal(dt.date(2025, 1, 1)) == pytest.approx(1.0)
 
     def test_calendar_year_ladder_rejects_mixed_currency(self) -> None:
@@ -913,7 +913,7 @@ class TestCashFlowSchedule:
         from finstack_quant.core.dates import DayCount
 
         rows = [CashFlow("2025-06-01", Money(100, currency), CFKind.FIXED, 0.0) for currency in ("USD", "EUR")]
-        schedule = CashFlowSchedule.from_parts(rows, Notional.par(0, "USD"), DayCount.ACT_360, CashFlowMeta())
+        schedule = CashFlowSchedule.from_flows(rows, Notional.par(0, "USD"), DayCount.ACT_360, CashFlowMeta())
         with pytest.raises(ValueError, match=r"[Cc]urrency"):
             schedule.calendar_year_ladder([100.0, 100.0])
 
@@ -981,7 +981,7 @@ class TestCashFlowSchedule:
             .with_principal_delta(Money(-20, "USD"))
             .with_principal_date("2025-01-05"),
         ]
-        schedule = CashFlowSchedule.from_parts(
+        schedule = CashFlowSchedule.from_flows(
             rows, Notional.par(100, "USD"), DayCount.ACT_360, CashFlowMeta(issue_date="2025-01-01")
         )
         assert schedule.to_dataframe(outstanding=True)["outstanding"].tolist() == [100.0, 80.0, 80.0]
@@ -1332,7 +1332,7 @@ class TestTypedTwinsAndWire:
         assert s2.with_representation("placeholder").get_meta().representation == "placeholder"
         s3 = CashFlowSchedule.from_flows([flow], Notional.par(1.0, "USD"), DayCount.ACT_360)
         assert pickle.loads(pickle.dumps(s3.get_meta())).representation == "contractual"  # noqa: S301 - trusted in-process round trip
-        s4 = CashFlowSchedule.from_parts([flow], Notional.par(1.0, "USD"), DayCount.ACT_360, CashFlowMeta())
+        s4 = CashFlowSchedule.from_flows([flow], Notional.par(1.0, "USD"), DayCount.ACT_360, CashFlowMeta())
         assert s4.get_flows()[0].amount.amount == 100.0
 
     def test_from_flows_accepts_dataframe(self) -> None:
@@ -1361,7 +1361,7 @@ class TestTypedTwinsAndWire:
         self, accrual_factor: float, reset_date: dt.date | None, message: str
     ) -> None:
         pd = pytest.importorskip("pandas")
-        from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
+        from finstack_quant.cashflows.builder import CashFlowSchedule, Notional
         from finstack_quant.cashflows.primitives import CashFlow, CFKind
         from finstack_quant.core.dates import DayCount
 
@@ -1378,8 +1378,6 @@ class TestTypedTwinsAndWire:
         for flows in ([row], frame):
             with pytest.raises(ValueError, match=message):
                 CashFlowSchedule.from_flows(flows, notional, DayCount.ACT_360)
-        # from_parts keeps its documented no-validation contract.
-        assert len(CashFlowSchedule.from_parts([row], notional, DayCount.ACT_360, CashFlowMeta()).get_flows()) == 1
 
     def test_from_flows_requires_accrual_factor(self) -> None:
         pd = pytest.importorskip("pandas")

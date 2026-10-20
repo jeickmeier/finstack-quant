@@ -500,7 +500,7 @@ impl PyCashFlow {
     }
 }
 
-wire_methods!(PyCashFlow, CashFlow, "CashFlow");
+wire_methods!(PyCashFlow, CashFlow, "CashFlow", validate);
 
 /// Register the `finstack_quant.cashflows.primitives` submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

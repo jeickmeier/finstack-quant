@@ -138,6 +138,11 @@ pub trait CashflowProvider: CashflowScheduleSource {
     /// Schedule signs represent instrument economics; position direction
     /// determines the portfolio-level sign.
     ///
+    /// Unlike [`CashFlowSchedule::dated_flows`], this does not run the
+    /// native-cash balance check: instrument schedules may legitimately mix
+    /// settlement currencies (FX legs) or index principal above the notional
+    /// (inflation-linked bonds).
+    ///
     /// # Errors
     ///
     /// Forwards errors from [`CashflowProvider::cashflow_schedule`].

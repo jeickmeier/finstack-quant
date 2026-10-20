@@ -70,7 +70,7 @@ def test_dated_flows_preserves_cash_and_omits_state_rows() -> None:
 
 
 def _coupon_schedule(flow: CashFlow) -> CashFlowSchedule:
-    return CashFlowSchedule.from_parts(
+    return CashFlowSchedule.from_flows(
         [flow],
         Notional.par(1_000, "USD"),
         DayCount.ACT_360,
@@ -95,18 +95,16 @@ def test_nonfinite_coupon_rates_cannot_be_erased_by_serialization(invalid: float
             projected_index_rate=invalid if field == "projected_index_rate" else 0.045,
         )
     )
-    schedule = _coupon_schedule(flow)
-
-    for value in (flow, schedule):
-        with pytest.raises(ValueError, match="finite"):
-            value.validate()
-        with pytest.raises(ValueError, match="finite"):
-            value.to_json()
-        with pytest.raises(ValueError, match="finite"):
-            pickle.dumps(value)
-
     with pytest.raises(ValueError, match="finite"):
-        accrued_interest_amount(schedule, dt.date(2025, 4, 1), AccrualConfig())
+        flow.validate()
+    with pytest.raises(ValueError, match="finite"):
+        flow.to_json()
+    with pytest.raises(ValueError, match="finite"):
+        pickle.dumps(flow)
+    # Every host schedule constructor validates its rows, so a non-finite
+    # coupon rate cannot reach a schedule (or its accrual) at all.
+    with pytest.raises(ValueError, match="finite"):
+        _coupon_schedule(flow)
 
 
 @pytest.mark.parametrize("wire_format", ["json", "pickle"])

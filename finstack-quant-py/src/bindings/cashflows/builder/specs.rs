@@ -612,7 +612,7 @@ schedule_params_presets! {
     jpy_tona_swap,
 }
 
-wire_methods!(PyScheduleParams, ScheduleParams, "ScheduleParams");
+wire_methods!(PyScheduleParams, ScheduleParams, "ScheduleParams", validate);
 
 #[pymethods]
 impl PyScheduleParams {
@@ -872,7 +872,12 @@ pub struct PyFloatingRateSpec {
     pub(crate) inner: FloatingRateSpec,
 }
 
-wire_methods!(PyFloatingRateSpec, FloatingRateSpec, "FloatingRateSpec");
+wire_methods!(
+    PyFloatingRateSpec,
+    FloatingRateSpec,
+    "FloatingRateSpec",
+    validate
+);
 
 #[pymethods]
 impl PyFloatingRateSpec {
@@ -1513,7 +1518,7 @@ impl PyNotional {
     }
 }
 
-wire_methods!(PyNotional, Notional, "Notional");
+wire_methods!(PyNotional, Notional, "Notional", validate);
 
 #[pymethods]
 impl PyNotional {
@@ -1916,7 +1921,8 @@ pub struct PyPrepaymentModelSpec {
 wire_methods!(
     PyPrepaymentModelSpec,
     PrepaymentModelSpec,
-    "PrepaymentModelSpec"
+    "PrepaymentModelSpec",
+    validate
 );
 
 #[pymethods]
@@ -2033,7 +2039,12 @@ pub struct PyDefaultModelSpec {
     pub(crate) inner: DefaultModelSpec,
 }
 
-wire_methods!(PyDefaultModelSpec, DefaultModelSpec, "DefaultModelSpec");
+wire_methods!(
+    PyDefaultModelSpec,
+    DefaultModelSpec,
+    "DefaultModelSpec",
+    validate
+);
 
 #[pymethods]
 impl PyDefaultModelSpec {
@@ -2189,7 +2200,12 @@ pub struct PyRecoveryModelSpec {
     pub(crate) inner: RecoveryModelSpec,
 }
 
-wire_methods!(PyRecoveryModelSpec, RecoveryModelSpec, "RecoveryModelSpec");
+wire_methods!(
+    PyRecoveryModelSpec,
+    RecoveryModelSpec,
+    "RecoveryModelSpec",
+    validate
+);
 
 #[pymethods]
 impl PyRecoveryModelSpec {

@@ -17,16 +17,17 @@ use finstack_quant_cashflows::builder::{
 use finstack_quant_core::currency::Currency;
 use wasm_bindgen::prelude::*;
 
-// --- CouponType / FeeBase / FeeSpec -----------------------------------------
+// --- FeeSpec -------------------------------------------------------------------
 
 /// Recurring fee quoted in basis points of a drawn or undrawn balance.
 ///
 /// The argument is the `periodic_bp` payload of `FeeSpec`, parsed by the Rust
-/// serde contract: `stub` defaults to `"short_front"` and `accrual_basis` to
-/// `"point_in_time"`; every other field is required. (Python's
+/// serde contract: `business_day_convention` defaults to `"modified_following"`,
+/// `stub` to `"short_front"` and `accrual_basis` to `"point_in_time"`; every
+/// other field is required. (Python's
 /// `FeeSpec.periodic_bp` takes the same fields positionally.)
 ///
-/// @param fields - `{ base, bp, frequency, day_count, business_day_convention, calendar_id, stub?, accrual_basis? }`: `base` is a `FeeBase`, `bp` an exact decimal string in basis points per annum (`"25"` = 0.25%), `frequency` a `Tenor`.
+/// @param fields - `{ base, bp, frequency, day_count, business_day_convention?, calendar_id, stub?, accrual_basis? }`: `base` is a `FeeBase`, `bp` an exact decimal string in basis points per annum (`"25"` = 0.25%), `frequency` a `Tenor`.
 /// @returns Canonical `FeeSpec` wire value `{ periodic_bp: { ... } }` with defaults filled in.
 /// @throws If `fields` is missing a required field, has an unknown field or a field of the wrong shape (kind `validation`).
 #[wasm_bindgen(js_name = feeSpecPeriodicBp)]

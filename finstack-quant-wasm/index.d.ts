@@ -13648,7 +13648,7 @@ export declare const margin: MarginNamespace;
  * day count and metadata.
  *
  * Obtain one from `CashFlowSchedule.builder()`, `buildCashflowSchedule`,
- * `CashFlowSchedule.fromJson` or `CashFlowSchedule.fromParts`. Methods that
+ * `CashFlowSchedule.fromJson` or `CashFlowSchedule.fromFlows`. Methods that
  * return a schedule return a new handle and leave this one unchanged.
  */
 export interface CashFlowSchedule extends WasmOwned {
@@ -13813,32 +13813,12 @@ export interface CashFlowScheduleConstructor {
    */
   builder(): CashFlowBuilder;
   /**
-   * Assemble a schedule from existing flows, notional, day count and metadata.
-   *
-   * Flows are put into the canonical schedule order; nothing is validated
-   * until `validate()` or an analytic runs.
-   *
-   * @param flows - `CashFlow` wire objects.
-   * @param notional - `Notional` wire object: initial balance and amortization rule.
-   * @param dayCount - `DayCount` wire string (for example `"act_360"`) used for accrual and year fractions.
-   * @param meta - `CashFlowMeta` wire object: representation, calendar ids, commitment, issue date and maturity.
-   * @returns The assembled `CashFlowSchedule`.
-   * @throws If an argument does not match its wire type (kind `validation`).
-   */
-  fromParts(
-    flows: readonly generated.cashflows.CashFlow[],
-    notional: generated.cashflows.Notional,
-    dayCount: generated.core.DayCount,
-    meta: generated.cashflows.CashFlowMeta
-  ): CashFlowSchedule;
-  /**
    * Assemble a schedule from externally supplied flows, validating every row
    * (Rust `CashFlowSchedule::from_flows`).
    *
    * Each flow must pass `CashFlow::validate` (finite amount and rate, a
    * finite non-negative `accrual_factor`, a reset date not after the payment
-   * date) before the rows are sorted; use `fromParts` to assemble rows
-   * without validation. (Python's `from_flows` also reads a pandas
+   * date) before the rows are sorted. (Python's `from_flows` also reads a pandas
    * DataFrame; WASM takes the flow list.)
    *
    * @param flows - `CashFlow` wire objects.
@@ -14310,7 +14290,7 @@ export interface CashflowsNamespace {
    * @param dayCount - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
    * @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
    * @returns The `CashFlowSchedule` handle, flows in canonical order.
-   * @throws If an argument does not match its wire type (kind `validation`).
+   * @throws If an argument does not match its wire type, or a flow is invalid (kind `validation`).
    */
   scheduleFromDatedFlows(
     flows: readonly DatedFlowJson[],
@@ -14326,7 +14306,7 @@ export interface CashflowsNamespace {
    * @param dayCount - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
    * @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
    * @returns The `CashFlowSchedule` handle, flows in canonical order.
-   * @throws If an argument does not match its wire type (kind `validation`).
+   * @throws If an argument does not match its wire type, or a flow is invalid (kind `validation`).
    */
   scheduleFromClassifiedFlows(
     flows: readonly generated.cashflows.CashFlow[],
@@ -14535,11 +14515,12 @@ export interface CashflowsNamespace {
    * Recurring fee quoted in basis points of a drawn or undrawn balance.
    *
    * The argument is the `periodic_bp` payload of `FeeSpec`, parsed by the Rust
-   * serde contract: `stub` defaults to `"short_front"` and `accrual_basis` to
-   * `"point_in_time"`; every other field is required. (Python's
+   * serde contract: `business_day_convention` defaults to `"modified_following"`,
+   * `stub` to `"short_front"` and `accrual_basis` to `"point_in_time"`; every
+   * other field is required. (Python's
    * `FeeSpec.periodic_bp` takes the same fields positionally.)
    *
-   * @param fields - `{ base, bp, frequency, day_count, business_day_convention, calendar_id, stub?, accrual_basis? }`: `base` is a `FeeBase`, `bp` an exact decimal string in basis points per annum (`"25"` = 0.25%), `frequency` a `Tenor`.
+   * @param fields - `{ base, bp, frequency, day_count, business_day_convention?, calendar_id, stub?, accrual_basis? }`: `base` is a `FeeBase`, `bp` an exact decimal string in basis points per annum (`"25"` = 0.25%), `frequency` a `Tenor`.
    * @returns Canonical `FeeSpec` wire value `{ periodic_bp: { ... } }` with defaults filled in.
    * @throws If `fields` is missing a required field, has an unknown field or a field of the wrong shape (kind `validation`).
    */

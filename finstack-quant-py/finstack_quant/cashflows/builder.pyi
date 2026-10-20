@@ -1640,46 +1640,6 @@ class CashFlowSchedule:
         ...
 
     @staticmethod
-    def from_parts(
-        flows: list[CashFlow],
-        notional: Notional,
-        day_count: DayCount,
-        meta: CashFlowMeta,
-    ) -> CashFlowSchedule:
-        """
-        Build a schedule from explicit rows, notional, day count and metadata.
-
-        Parameters
-        ----------
-        flows : list[CashFlow]
-            Classified rows in any order (sorted canonically).
-        notional : Notional
-            Representative notional stamped on the schedule.
-        day_count : DayCount
-            Representative day-count convention.
-        meta : CashFlowMeta
-            Schedule-level metadata.
-
-        Returns
-        -------
-        CashFlowSchedule
-            Canonical schedule holding the sorted rows.
-
-        Raises
-        ------
-        TypeError
-            If ``flows`` is not a list of ``CashFlow``.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
-        >>> from finstack_quant.core.dates import DayCount
-        >>> len(CashFlowSchedule.from_parts([], Notional.par(1.0, "USD"), DayCount.ACT_360, CashFlowMeta()).get_flows())
-        0
-        """
-        ...
-
-    @staticmethod
     def from_flows(
         flows: list[CashFlow] | pd.DataFrame,
         notional: Notional,
@@ -1691,8 +1651,7 @@ class CashFlowSchedule:
         validating every row.
 
         Both input shapes go through Rust ``CashFlowSchedule::from_flows``,
-        which checks each row (``CashFlow.validate``) before sorting; use
-        ``from_parts`` to assemble rows without validation.
+        which checks each row (``CashFlow.validate``) before sorting.
 
         Parameters
         ----------

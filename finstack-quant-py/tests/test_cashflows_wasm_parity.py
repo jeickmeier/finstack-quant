@@ -230,7 +230,7 @@ def _from_parts() -> Any:
     schedule = bond()
     flows = schedule.get_flows()
     return [
-        wire(CashFlowSchedule.from_parts(flows, schedule.get_notional(), DayCount.THIRTY_360, schedule.get_meta())),
+        wire(CashFlowSchedule.from_flows(flows, schedule.get_notional(), DayCount.THIRTY_360, schedule.get_meta())),
         wire(CashFlowSchedule.from_flows(flows[1:3], Notional.par(1000, "USD"), DayCount.ACT_365F)),
     ]
 

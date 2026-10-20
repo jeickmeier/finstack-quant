@@ -488,7 +488,7 @@
   },
   "cashflows.CashFlowSchedule": {
     "kind": "class",
-    "statics": ["builder", "fromFlows", "fromJson", "fromParts"],
+    "statics": ["builder", "fromFlows", "fromJson"],
     "methods": [
       "calendarYearLadder",
       "coupons",
