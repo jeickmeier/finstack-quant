@@ -305,7 +305,6 @@ fn bench_pv_by_period_scaling(c: &mut Criterion) {
                         black_box(&disc_id),
                         None,
                         base,
-                        Some(DayCount::Act365F),
                     )
                     .unwrap()
             });

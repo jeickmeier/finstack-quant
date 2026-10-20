@@ -217,10 +217,7 @@ def _accessors() -> Any:
 
 def _pv_by_period() -> Any:
     schedule = bond()
-    return {
-        "default_day_count": wire(schedule.pv_by_period(periods(), market(), "USD-OIS", ISSUE)),
-        "act_360": wire(schedule.pv_by_period(periods(), market(), "USD-OIS", ISSUE, DayCount.ACT_360)),
-    }
+    return wire(schedule.pv_by_period(periods(), market(), "USD-OIS", ISSUE))
 
 
 def _ladder() -> Any:

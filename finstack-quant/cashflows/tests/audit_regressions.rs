@@ -445,11 +445,7 @@ fn funding_outflow_has_no_default_recovery_payment() {
         &vec![1.0; s.get_flows().len()],
         Some(&hazard),
         Some(0.4),
-        cf::aggregation::DateContext::new(
-            date("2025-01-01"),
-            finstack_quant_core::dates::DayCount::Act365F,
-            finstack_quant_core::dates::DayCountContext::default(),
-        ),
+        date("2025-01-01"),
     )
     .expect("PV");
     close(pvs[draw_index], -80.0);

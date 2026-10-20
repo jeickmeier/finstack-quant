@@ -152,13 +152,12 @@ fn day_count_rank(day_count: DayCount) -> u8 {
 }
 
 pub(crate) fn finalize_flows(
-    flows: Vec<CashFlow>,
     fixed: &[FixedSchedule],
     floating: &[FloatSchedule],
     issue_date: Option<Date>,
     maturity_date: Option<Date>,
     mut projected_fixings: Vec<crate::fixings::ProjectedFixing>,
-) -> (Vec<CashFlow>, CashFlowMeta, DayCount) {
+) -> (CashFlowMeta, DayCount) {
     crate::fixings::normalize_projected_fixings(&mut projected_fixings);
 
     let mut cals: Vec<String> = fixed
@@ -188,7 +187,7 @@ pub(crate) fn finalize_flows(
     } else {
         DayCount::Act365F
     };
-    (flows, meta, out_day_count)
+    (meta, out_day_count)
 }
 
 /// Meaning of the emitted schedule relative to pricing and waterfall policy.
@@ -232,15 +231,19 @@ impl std::str::FromStr for CashflowRepresentation {
     type Err = finstack_quant_core::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "contractual" => Ok(Self::Contractual),
-            "projected" => Ok(Self::Projected),
-            "placeholder" => Ok(Self::Placeholder),
-            "no_residual" => Ok(Self::NoResidual),
-            _ => Err(finstack_quant_core::Error::Validation(format!(
+        [
+            Self::Contractual,
+            Self::Projected,
+            Self::Placeholder,
+            Self::NoResidual,
+        ]
+        .into_iter()
+        .find(|representation| representation.as_str() == s)
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
                 "invalid cashflow representation {s:?}; expected contractual, projected, placeholder, or no_residual"
-            ))),
-        }
+            ))
+        })
     }
 }
 
@@ -654,7 +657,7 @@ impl CashFlowSchedule {
         let mut principal_currency = None;
         let mut multiple_principal_currencies = false;
         for flow in &self.flows {
-            if let Some(delta) = flow_principal_delta(flow, false, true)? {
+            if let Some(delta) = flow_principal_delta(flow, false)? {
                 if delta.amount() != 0.0 {
                     if let Some(currency) = principal_currency {
                         multiple_principal_currencies |= currency != delta.currency();
@@ -753,7 +756,7 @@ impl CashFlowSchedule {
                 let funding =
                     is_initial_funding_flow(flow, anchor, initial.amount(), funding_skipped);
                 funding_skipped |= funding;
-                let delta = flow_principal_delta(flow, funding, true)?;
+                let delta = flow_principal_delta(flow, funding)?;
                 if flow.get_balance_date() < as_of {
                     if let Some(delta) = delta {
                         balance = balance.checked_add(delta)?;
@@ -1047,7 +1050,7 @@ impl CashFlowSchedule {
                 initial_funding_skipped,
             );
             initial_funding_skipped |= is_initial_funding;
-            apply_flow_to_outstanding(&mut outstanding, flow, is_initial_funding, true)?;
+            apply_flow_to_outstanding(&mut outstanding, flow, is_initial_funding)?;
             replay.push((idx, before, outstanding));
         }
         Ok(replay)
@@ -1260,7 +1263,6 @@ fn is_initial_funding_flow(
 fn flow_principal_delta(
     cf: &CashFlow,
     is_initial_funding: bool,
-    include_notional: bool,
 ) -> finstack_quant_core::Result<Option<Money>> {
     if let Some(delta) = cf.principal_delta {
         return Ok(Some(delta));
@@ -1273,7 +1275,7 @@ fn flow_principal_delta(
                 .map(Some)
         }
         CFKind::Notional | CFKind::RevolvingDraw | CFKind::RevolvingRepayment
-            if include_notional && !is_initial_funding =>
+            if !is_initial_funding =>
         {
             Money::from((0_i64, cf.amount.currency()))
                 .checked_sub(cf.amount)
@@ -1287,10 +1289,9 @@ fn apply_flow_to_outstanding(
     outstanding: &mut Money,
     cf: &CashFlow,
     is_initial_funding: bool,
-    include_notional: bool,
 ) -> finstack_quant_core::Result<()> {
     const NEGATIVE_BALANCE_EPSILON: f64 = 1e-9;
-    if let Some(delta) = flow_principal_delta(cf, is_initial_funding, include_notional)? {
+    if let Some(delta) = flow_principal_delta(cf, is_initial_funding)? {
         if delta.amount() != 0.0 {
             *outstanding = outstanding.checked_add(delta)?;
         }
@@ -1307,13 +1308,13 @@ fn apply_flow_to_outstanding(
 }
 
 impl CashFlowSchedule {
-    /// Periodized PVs from a market context using the default day-count context.
+    /// Periodized PVs from a market context.
     ///
     /// Cashflows are grouped into the supplied reporting periods using
-    /// half-open period boundaries. Plain discounting uses `amount * df(t)`.
-    /// Credit-adjusted discounting additionally survival-adjusts flows and
-    /// applies the hazard curve's recovery assumption to principal-like
-    /// cashflows. When `day_count` is omitted, discount times use Act/365F.
+    /// half-open period boundaries. Plain discounting uses relative discount
+    /// factors from `base`. With `credit_curve_id`, flows are also
+    /// survival-weighted and funded principal earns the hazard curve's recovery
+    /// assumption. Discount and survival times use each curve's own day count.
     ///
     /// # Arguments
     ///
@@ -1321,8 +1322,8 @@ impl CashFlowSchedule {
     /// * `market` - Market context containing the discount (and optional hazard) curves.
     /// * `disc_curve_id` - Discount curve identifier resolved against `market`.
     /// * `credit_curve_id` - Optional hazard curve identifier for credit-adjusted PV.
-    /// * `base` - Valuation date used as the day-count origin for discount times.
-    /// * `day_count` - Day-count for discount times; `None` selects Act/365F.
+    /// * `base` - Valuation date: discount factors and survival are relative to
+    ///   it, and flows on or before it have zero PV.
     ///
     /// # Returns
     ///
@@ -1331,8 +1332,9 @@ impl CashFlowSchedule {
     ///
     /// # Errors
     ///
-    /// Returns an error if curve lookup fails, day-count conversion fails, or
-    /// credit-adjusted inputs are internally inconsistent.
+    /// Returns an error if curve lookup fails, a discount factor or survival
+    /// probability is invalid, or credit-adjusted inputs are internally
+    /// inconsistent.
     pub fn pv_by_period(
         &self,
         periods: &[Period],
@@ -1340,39 +1342,20 @@ impl CashFlowSchedule {
         disc_curve_id: &CurveId,
         credit_curve_id: Option<&CurveId>,
         base: Date,
-        day_count: Option<DayCount>,
     ) -> finstack_quant_core::Result<crate::aggregation::PeriodAggregation> {
         let discount = market.get_discount(disc_curve_id.as_str())?;
-        let hazard = if let Some(hazard_id) = credit_curve_id {
-            Some(market.get_hazard(hazard_id.as_str())?)
-        } else {
-            None
-        };
-        if self.flows.is_empty() || periods.is_empty() {
-            return Ok(crate::aggregation::PeriodAggregation::default());
-        }
-        let date_ctx = crate::aggregation::DateContext::new(
+        let hazard = credit_curve_id
+            .map(|id| market.get_hazard(id.as_str()))
+            .transpose()?;
+        let hazard = hazard.as_deref();
+        crate::aggregation::pv_by_period(
+            &self.flows,
+            periods,
+            discount.as_ref(),
+            hazard,
+            hazard.map(|curve| curve.recovery_rate()),
             base,
-            day_count.unwrap_or(DayCount::Act365F),
-            DayCountContext::default(),
-        );
-        if let Some(hazard_curve) = hazard.as_deref() {
-            crate::aggregation::pv_by_period_credit_adjusted(
-                &self.flows,
-                periods,
-                discount.as_ref(),
-                Some(hazard_curve),
-                Some(hazard_curve.recovery_rate()),
-                date_ctx,
-            )
-        } else {
-            crate::aggregation::pv_by_period_cashflows_sorted_checked(
-                &self.flows,
-                periods,
-                discount.as_ref(),
-                date_ctx,
-            )
-        }
+        )
     }
 
     /// Calendar-year ladder of this schedule's flows against caller-supplied PVs.

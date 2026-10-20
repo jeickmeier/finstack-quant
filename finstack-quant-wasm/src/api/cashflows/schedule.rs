@@ -300,7 +300,6 @@ impl JsCashFlowSchedule {
     /// @param market - `MarketContext` handle holding the discount (and credit) curve.
     /// @param disc_curve_id - Identifier of the discount curve in `market`, for example `"USD-OIS"`.
     /// @param base - ISO-8601 valuation date that discounting starts from.
-    /// @param day_count - Optional `DayCount` wire string for discounting year fractions; omitted means `"act_365f"`.
     /// @param credit_curve_id - Optional identifier of a hazard curve in `market`; omitted means no credit adjustment.
     /// @returns `PeriodAggregation`: `{ periodId: { currency: Money } }` of PV per period and currency.
     /// @throws If a curve is missing from `market` (kind `not_found`), or an argument is malformed or a discount factor cannot be computed (kind `invalid_type` or `validation`).
@@ -311,7 +310,6 @@ impl JsCashFlowSchedule {
         market: &JsMarketContext,
         disc_curve_id: JsValue,
         base: JsValue,
-        day_count: Option<JsValue>,
         credit_curve_id: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let periods = js_wire::<Vec<Period>>(&periods, "periods")?;
@@ -327,7 +325,6 @@ impl JsCashFlowSchedule {
                 &disc_curve_id,
                 credit_curve_id.as_ref(),
                 js_date(&base, "base")?,
-                js_opt_wire::<DayCount>(day_count.as_ref(), "dayCount")?,
             )
             .map_err(to_js_err)?;
         to_js_value(&aggregation)

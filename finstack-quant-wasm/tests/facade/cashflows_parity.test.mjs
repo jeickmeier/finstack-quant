@@ -193,10 +193,7 @@ const cases = {
     withBond((schedule) => json(schedule.withNotional(cashflows.notionalPar(2_000_000, 'USD')))),
   'schedule.pv_by_period': () =>
     withBond((schedule) =>
-      withMarket((market) => ({
-        default_day_count: schedule.pvByPeriod(periods, market, 'USD-OIS', ISSUE),
-        act_360: schedule.pvByPeriod(periods, market, 'USD-OIS', ISSUE, 'act_360'),
-      }))
+      withMarket((market) => schedule.pvByPeriod(periods, market, 'USD-OIS', ISSUE))
     ),
   'schedule.calendar_year_ladder': () =>
     withBond((schedule) =>

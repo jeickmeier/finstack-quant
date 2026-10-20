@@ -1424,7 +1424,6 @@ class CashFlowSchedule:
         market: MarketContext,
         disc_curve_id: str,
         base: datetime.date,
-        day_count: DayCount | None = None,
         credit_curve_id: str | None = None,
     ) -> PeriodAggregation:
         """
@@ -1441,10 +1440,9 @@ class CashFlowSchedule:
         disc_curve_id : str
             Discount curve identifier.
         base : datetime.date
-            Valuation date used to convert cashflow dates into discount
-            times.
-        day_count : DayCount, optional
-            Day-count convention for discount times (default Act/365F).
+            Valuation date: discount factors and survival are relative to it,
+            and flows on or before it have zero present value. Each curve uses
+            its own day count.
         credit_curve_id : str, optional
             Hazard curve identifier for credit-adjusted present value.
 
@@ -1460,8 +1458,8 @@ class CashFlowSchedule:
         KeyError
             If the discount or hazard curve id cannot be found in *market*.
         ValueError
-            If day-count conversion fails or credit-adjusted inputs are
-            internally inconsistent.
+            If a discount factor or survival probability is invalid, or
+            credit-adjusted inputs are internally inconsistent.
 
         Notes
         -----

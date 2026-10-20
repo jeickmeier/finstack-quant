@@ -13766,7 +13766,6 @@ export interface CashFlowSchedule extends WasmOwned {
    * @param market - `MarketContext` handle holding the discount (and credit) curve.
    * @param discCurveId - Identifier of the discount curve in `market`, for example `"USD-OIS"`.
    * @param base - ISO-8601 valuation date that discounting starts from.
-   * @param dayCount - Optional `DayCount` wire string for discounting year fractions; omitted means `"act_365f"`.
    * @param creditCurveId - Optional identifier of a hazard curve in `market`; omitted means no credit adjustment.
    * @returns `PeriodAggregation`: `{ periodId: { currency: Money } }` of PV per period and currency.
    * @throws If a curve is missing from `market` (kind `not_found`), or an argument is malformed or a discount factor cannot be computed (kind `invalid_type` or `validation`).
@@ -13776,7 +13775,6 @@ export interface CashFlowSchedule extends WasmOwned {
     market: MarketContext,
     discCurveId: string,
     base: string,
-    dayCount?: generated.core.DayCount | null,
     creditCurveId?: string | null
   ): generated.cashflows.PeriodAggregation;
   /**

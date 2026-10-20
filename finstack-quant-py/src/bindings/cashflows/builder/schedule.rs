@@ -557,9 +557,8 @@ impl PyCashFlowSchedule {
     /// disc_curve_id : str
     ///     Discount curve identifier.
     /// base : datetime.date or str
-    ///     Valuation date for discount times; flows on or before it get zero PV.
-    /// day_count : DayCount, optional
-    ///     Day-count for discount times (default Act/365F).
+    ///     Valuation date for discount factors and survival; flows on or before
+    ///     it get zero PV. Each curve uses its own day count.
     /// credit_curve_id : str, optional
     ///     Hazard curve identifier for credit-adjusted PV.
     ///
@@ -575,10 +574,9 @@ impl PyCashFlowSchedule {
     ///     If a curve id is not present in ``market``.
     /// ValueError
     ///     If periods overlap or discount inputs are inconsistent.
-    #[allow(clippy::too_many_arguments)]
     #[pyo3(
-        signature = (periods, market, disc_curve_id, base, day_count=None, credit_curve_id=None),
-        text_signature = "(self, periods, market, disc_curve_id, base, day_count=None, credit_curve_id=None)"
+        signature = (periods, market, disc_curve_id, base, credit_curve_id=None),
+        text_signature = "(self, periods, market, disc_curve_id, base, credit_curve_id=None)"
     )]
     fn pv_by_period<'py>(
         &self,
@@ -587,26 +585,17 @@ impl PyCashFlowSchedule {
         market: &Bound<'_, PyAny>,
         disc_curve_id: &str,
         base: &Bound<'_, PyAny>,
-        day_count: Option<PyRef<'_, PyDayCount>>,
         credit_curve_id: Option<&str>,
     ) -> PyResult<PyPeriodAggregation> {
         let periods: Vec<finstack_quant_core::dates::Period> =
             periods.iter().map(|p| p.inner.clone()).collect();
         let market = crate::bindings::extract::extract_market(py, market)?;
         let base = py_to_date(base)?;
-        let day_count = day_count.map(|d| d.inner);
         let disc_id = CurveId::from(disc_curve_id);
         let hazard_id = credit_curve_id.map(CurveId::from);
         let schedule = self.inner.clone();
         py.detach(move || {
-            schedule.pv_by_period(
-                &periods,
-                &market,
-                &disc_id,
-                hazard_id.as_ref(),
-                base,
-                day_count,
-            )
+            schedule.pv_by_period(&periods, &market, &disc_id, hazard_id.as_ref(), base)
         })
         .map(PyPeriodAggregation::from_inner)
         .map_err(core_to_py)

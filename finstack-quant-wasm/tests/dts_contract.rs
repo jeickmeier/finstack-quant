@@ -1859,7 +1859,7 @@ fn typed_cashflows_and_covenants_surface_is_declared() {
         "build(market?: MarketContext | null): CashFlowSchedule;",
         "buildCashflowSchedule(spec: generated.cashflows.CashflowScheduleBuildSpec | string, market?: MarketContext | null): CashFlowSchedule;",
         "scaleAmounts(scale: number): CashFlowSchedule;",
-        "pvByPeriod(periods: readonly generated.statements.Period[], market: MarketContext, discCurveId: string, base: string, dayCount?: generated.core.DayCount | null, creditCurveId?: string | null): generated.cashflows.PeriodAggregation;",
+        "pvByPeriod(periods: readonly generated.statements.Period[], market: MarketContext, discCurveId: string, base: string, creditCurveId?: string | null): generated.cashflows.PeriodAggregation;",
         "fixedToFloat(switchDate: string, fixed: generated.cashflows.FixedCouponSpec, floating: generated.cashflows.FloatingCouponSpec): CashFlowBuilder;",
         "accruedInterestAmount(schedule: CashFlowSchedule, asOf: string, config?: generated.cashflows.AccrualConfig | null): MoneyValue;",
         "accruedAt(asOf: string): MoneyValue;",

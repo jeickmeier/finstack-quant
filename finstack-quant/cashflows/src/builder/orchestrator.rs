@@ -856,8 +856,8 @@ impl CompiledCashFlowPlan {
             }
         }
 
-        let (flows, meta, out_day_count) = finalize_flows(
-            state.flows,
+        let flows = state.flows;
+        let (meta, out_day_count) = finalize_flows(
             &self.fixed_schedules,
             &self.float_schedules,
             Some(self.issue),

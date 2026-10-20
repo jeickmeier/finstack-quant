@@ -219,7 +219,6 @@ fn bench_pv_by_period(c: &mut Criterion) {
                         black_box(&disc_id),
                         None,
                         black_box(base),
-                        Some(DayCount::Act365F),
                     )
                     .unwrap()
             });
@@ -263,7 +262,6 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
                         black_box(&disc_id),
                         Some(black_box(&credit_zero_id)),
                         black_box(base),
-                        Some(DayCount::Act365F),
                     )
                     .unwrap()
             });
@@ -278,7 +276,6 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
                         black_box(&disc_id),
                         Some(black_box(&credit_id)),
                         black_box(base),
-                        Some(DayCount::Act365F),
                     )
                     .unwrap()
             });

@@ -634,7 +634,6 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
         &"USD-OIS".into(),
         Some(&"USD-HZD".into()),
         base,
-        Some(DayCount::Act365F),
     );
     assert!(
         err_result.is_err(),
@@ -659,7 +658,6 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
             &"USD-OIS".into(),
             Some(&"USD-HZD".into()),
             base,
-            Some(DayCount::Act365F),
         )
         .unwrap();
 
