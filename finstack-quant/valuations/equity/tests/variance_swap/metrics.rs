@@ -5,8 +5,9 @@ use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::realized_variance;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_equity::variance_swap::{PayReceive, VarianceSwap};
+use finstack_quant_valuations_equity::variance_swap::VarianceSwap;
 
 /// Metric tests that value after inception use a complete realized history.
 fn base_context() -> MarketContext {

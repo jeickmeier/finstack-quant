@@ -61,10 +61,10 @@ impl AsianOptionHestonMcPricer {
             // Expired: use realized average
             let average = if hist_count > 0 {
                 match inst.averaging_method {
-                    crate::exotics::asian_option::types::AveragingMethod::Arithmetic => {
+                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic => {
                         hist_sum / hist_count as f64
                     }
-                    crate::exotics::asian_option::types::AveragingMethod::Geometric => {
+                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric => {
                         (hist_prod_log / hist_count as f64).exp()
                     }
                 }

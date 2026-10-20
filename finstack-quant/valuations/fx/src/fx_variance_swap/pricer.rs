@@ -925,13 +925,13 @@ mod tests {
     /// calendar-time weights do not change already fixed return contributions.
     #[test]
     fn fx_seasoned_mtm_uses_contractual_sample_normalization() {
-        use crate::fx_variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
         use finstack_quant_core::market_data::surfaces::VolSurface;
         use finstack_quant_core::math::stats::RealizedVarMethod;
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use finstack_quant_valuations_core::instruments::Attributes;
+        use finstack_quant_valuations_core::instruments::PayReceive;
 
         let start = date!(2025 - 01 - 06); // Monday
         let maturity = date!(2025 - 06 - 30); // Monday
@@ -1038,12 +1038,12 @@ mod tests {
     /// r_low for [as_of, mat]) so the two lookups diverge materially.
     #[test]
     fn fx_variance_swap_forward_recovery_is_date_based() {
-        use crate::fx_variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};
         use finstack_quant_core::market_data::surfaces::VolSurface;
         use finstack_quant_core::math::stats::RealizedVarMethod;
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use finstack_quant_valuations_core::instruments::Attributes;
+        use finstack_quant_valuations_core::instruments::PayReceive;
 
         // Three dates:
         //   base_date  = 2025-01-02  (curve anchor)
@@ -1242,12 +1242,12 @@ mod tests {
     /// is `dom.df_between_dates(as_of, maturity)`.
     #[test]
     fn fx_variance_swap_terminal_discount_is_date_based() {
-        use crate::fx_variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::market_data::surfaces::VolSurface;
         use finstack_quant_core::math::stats::RealizedVarMethod;
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use finstack_quant_valuations_core::instruments::Attributes;
+        use finstack_quant_valuations_core::instruments::PayReceive;
 
         // Curve base date is well before the valuation date (a stale-but-valid
         // curve). `df(t)` is anchored at base_date, so feeding it

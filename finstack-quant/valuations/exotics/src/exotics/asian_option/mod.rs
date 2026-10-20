@@ -35,5 +35,6 @@ pub(crate) mod types;
 
 pub(crate) mod heston_mc_pricer;
 
+pub use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 pub use pricer::{AsianOptionAnalyticalGeometricPricer, AsianOptionSemiAnalyticalTwPricer};
-pub use types::{AsianOption, AsianOptionBuilder, AveragingMethod};
+pub use types::{AsianOption, AsianOptionBuilder};

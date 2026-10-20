@@ -258,10 +258,10 @@ impl AsianOptionMcPricer {
             // Expired: use realized average
             let average = if hist_count > 0 {
                 match inst.averaging_method {
-                    crate::exotics::asian_option::types::AveragingMethod::Arithmetic => {
+                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic => {
                         hist_sum / hist_count as f64
                     }
-                    crate::exotics::asian_option::types::AveragingMethod::Geometric => {
+                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric => {
                         (hist_prod_log / hist_count as f64).exp()
                     }
                 }
@@ -346,7 +346,7 @@ impl AsianOptionMcPricer {
         // If arithmetic averaging, apply geometric-Asian control variate for variance reduction
         let result_money = if matches!(
             inst.averaging_method,
-            crate::exotics::asian_option::types::AveragingMethod::Arithmetic
+            finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic
         ) {
             // Use path capture to get per-path discounted payoffs for covariance
             let mut cfg_cap = config;
@@ -634,10 +634,10 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             // Handle expired option using realized average
             let average = if count > 0 {
                 match asian.averaging_method {
-                    crate::exotics::asian_option::types::AveragingMethod::Arithmetic => {
+                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic => {
                         sum / count as f64
                     }
-                    crate::exotics::asian_option::types::AveragingMethod::Geometric => {
+                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric => {
                         (log_prod / count as f64).exp()
                     }
                 }

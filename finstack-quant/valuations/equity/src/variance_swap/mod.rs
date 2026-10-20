@@ -74,6 +74,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-pub use types::{EquityPriceSeriesPolicy, PayReceive, VarianceSwap};
-
-pub use finstack_quant_core::math::stats::RealizedVarMethod;
+pub use types::{EquityPriceSeriesPolicy, VarianceSwap};

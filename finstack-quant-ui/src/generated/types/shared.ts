@@ -6874,7 +6874,8 @@ export type Date99 = string;
  * # Example
  *
  * ```rust
- * use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
+ * use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource};
+ * use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;
@@ -42503,7 +42504,8 @@ export interface ScenarioPricingOverrides41 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations_fx::ndf::{Ndf, NdfQuoteConvention};
+ * use finstack_quant_valuations_fx::ndf::Ndf;
+ * use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;
@@ -49237,9 +49239,8 @@ export interface Tenor25 {
  * };
  * use finstack_quant_cashflows::builder::ScheduleParams;
  * use finstack_quant_valuations_core::instruments::{Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive};
- * use finstack_quant_valuations_equity::equity_trs::{
- *     EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec,
- * };
+ * use finstack_quant_valuations_equity::equity_trs::{EquityTotalReturnSwap, TrsDividendSettlement};
+ * use finstack_quant_valuations_core::instruments::TrsScheduleSpec;
  * use rust_decimal::Decimal;
  * use time::macros::date;
  *

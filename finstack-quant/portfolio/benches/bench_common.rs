@@ -22,6 +22,7 @@ use finstack_quant_core::market_data::term_structures::{
     BaseCorrelationCurve, CreditIndexData, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve,
 };
 use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::stats::RealizedVarMethod;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
@@ -36,9 +37,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::Cds
 use finstack_quant_valuations::instruments::equity::equity_option::{
     EquityOption, EquityOptionParams,
 };
-use finstack_quant_valuations::instruments::equity::variance_swap::{
-    RealizedVarMethod, VarianceSwap,
-};
+use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
 use finstack_quant_valuations::instruments::equity::Equity;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
@@ -915,9 +914,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .price_series_policy(
                 finstack_quant_valuations::instruments::EquityPriceSeriesPolicy::Adjusted,
             )
-            .side(
-                finstack_quant_valuations::instruments::equity::variance_swap::PayReceive::Receive,
-            )
+            .side(finstack_quant_valuations::instruments::PayReceive::Receive)
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
             .instrument_pricing_overrides(

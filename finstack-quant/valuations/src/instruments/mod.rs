@@ -206,9 +206,7 @@ pub use equity::{
 };
 
 pub use fx::FxVarianceSwap;
-pub use fx::{
-    BarrierDirection, DigitalPayoutType, FxDigitalOption, FxTouchOption, PayoutTiming, TouchType,
-};
+pub use fx::{DigitalPayoutType, FxDigitalOption, FxTouchOption, TouchType};
 pub use fx::{
     FxBarrierOption, FxForward, FxFuture, FxFutureOption, FxOption, FxSpot, FxSwap, Ndf,
     QuantoOption,

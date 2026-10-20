@@ -20,5 +20,3 @@ pub(crate) mod pricer;
 mod types;
 
 pub use types::{EquityTotalReturnSwap, TrsDividendSettlement};
-
-pub use finstack_quant_valuations_core::instruments::TrsScheduleSpec;
