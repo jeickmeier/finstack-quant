@@ -302,8 +302,8 @@ impl Pricer for SnowballDiscountingPricer {
             InstrumentType::Snowball,
         )?;
         let value = self.price_internal(snowball, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(
-                e.to_string(),
+            PricingError::from_core(
+                e,
                 PricingErrorContext::from_instrument(instrument)
                     .model(ModelKey::Discounting)
                     .curve_ids([
@@ -328,8 +328,8 @@ impl Pricer for SnowballDiscountingPricer {
         self.price_internal(snowball, market, as_of)
             .map(|m| m.amount())
             .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
+                PricingError::from_core(
+                    e,
                     PricingErrorContext::from_instrument(instrument).model(ModelKey::Discounting),
                 )
             })
@@ -549,8 +549,8 @@ impl Pricer for SnowballHw1fMcPricer {
             InstrumentType::Snowball,
         )?;
         let estimate = self.price_estimate(snowball, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(
-                e.to_string(),
+            PricingError::from_core(
+                e,
                 PricingErrorContext::from_instrument(instrument)
                     .model(ModelKey::MonteCarloHullWhite1F)
                     .curve_ids([
@@ -581,8 +581,8 @@ impl Pricer for SnowballHw1fMcPricer {
         self.price_internal(snowball, market, as_of)
             .map(|m| m.amount())
             .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
+                PricingError::from_core(
+                    e,
                     PricingErrorContext::from_instrument(instrument)
                         .model(ModelKey::MonteCarloHullWhite1F),
                 )
@@ -1221,5 +1221,44 @@ mod tests {
             .price_estimate(&inst_3m, &market, as_of)
             .expect_err("3M instrument must reject a 6M forward curve");
         assert!(err.to_string().contains("does not match forward curve"));
+    }
+
+    #[test]
+    fn missing_discount_curve_surfaces_as_not_found() {
+        let as_of = date(2025, Month::January, 1);
+        let market = market(as_of, 0.02, 0.03);
+        let snowball = Snowball {
+            discount_curve_id: CurveId::new("MISSING-DISC"),
+            ..test_snowball()
+        };
+        let inverse_floater = Snowball {
+            discount_curve_id: CurveId::new("MISSING-DISC"),
+            ..test_inverse_floater()
+        };
+        let mc = deterministic_mc_pricer(16);
+        let errors = [
+            SnowballDiscountingPricer
+                .price_dyn(&inverse_floater, &market, as_of)
+                .expect_err("missing curve"),
+            SnowballDiscountingPricer
+                .price_raw_dyn(&inverse_floater, &market, as_of)
+                .expect_err("missing curve"),
+            mc.price_dyn(&snowball, &market, as_of)
+                .expect_err("missing curve"),
+            mc.price_raw_dyn(&snowball, &market, as_of)
+                .expect_err("missing curve"),
+        ];
+        for err in errors {
+            let err = finstack_quant_core::Error::from(err);
+            assert!(
+                matches!(
+                    err,
+                    finstack_quant_core::Error::Input(
+                        finstack_quant_core::InputError::NotFound { .. }
+                    )
+                ),
+                "missing discount curve must stay NotFound, got {err:?}"
+            );
+        }
     }
 }

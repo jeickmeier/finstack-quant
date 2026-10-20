@@ -372,7 +372,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FiIndexTotalReturnSwap
         context: &MarketContext,
         as_of: Date,
     ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        let flows = super::pricer::net_cashflows(self, context, as_of)?;
+        let (flows, projected_fixings) = super::pricer::net_cashflows(self, context, as_of)?;
 
         let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
@@ -383,6 +383,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FiIndexTotalReturnSwap
                 meta: finstack_quant_cashflows::builder::CashFlowMeta {
                     representation:
                         finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+                    projected_fixings,
                     ..Default::default()
                 },
             },

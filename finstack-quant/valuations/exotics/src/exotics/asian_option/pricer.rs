@@ -266,11 +266,7 @@ impl AsianOptionMcPricer {
                     }
                 }
             } else {
-                let spot_scalar = curves.get_price(&inst.spot_id)?;
-                match spot_scalar {
-                    finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-                    finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-                }
+                resolve_spot(inst, curves)?
             };
 
             let intrinsic = match inst.option_type {
@@ -296,11 +292,7 @@ impl AsianOptionMcPricer {
                 "AsianOption discount curve",
             )?;
 
-        let spot_scalar = curves.get_price(&inst.spot_id)?;
-        let spot = match spot_scalar {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-        };
+        let spot = resolve_spot(inst, curves)?;
 
         let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
             curves,
@@ -542,7 +534,59 @@ pub(crate) fn compute_pv(
 }
 
 use finstack_quant_models::closed_form::asian::arithmetic_asian_tw_price_times;
-use finstack_quant_valuations_core::instruments::common_impl::helpers::collect_black_scholes_inputs;
+use finstack_quant_valuations_core::instruments::common_impl::helpers::BlackScholesInputsDf;
+
+/// Underlying spot from `spot_id`, in the option currency when quoted as a price.
+pub(crate) fn resolve_spot(
+    inst: &AsianOption,
+    curves: &MarketContext,
+) -> finstack_quant_core::Result<f64> {
+    finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+        curves.get_price(&inst.spot_id)?,
+        inst.currency,
+    )
+}
+
+/// Inputs of the analytic Asian pricers: the dated discount factor to expiry,
+/// spot, dividend yield, and σ at the strike (implied-vol override, else the
+/// vol source) on the instrument day count, which is also the returned `t`.
+fn analytic_inputs(
+    inst: &AsianOption,
+    market: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<BlackScholesInputsDf> {
+    let disc_curve = market.get_discount(inst.discount_curve_id.as_str())?;
+    let t = inst
+        .day_count
+        .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
+    let df = disc_curve.df_between_dates(as_of, inst.expiry)?;
+    if !df.is_finite() || df <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Invalid discount factor ({df:.6e}) between {as_of} and {}",
+            inst.expiry
+        )));
+    }
+    let spot = resolve_spot(inst, market)?;
+    let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+        market,
+        inst.div_yield_id.as_ref(),
+    )?;
+    let sigma =
+        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
+            &inst.instrument_pricing_overrides.market_quotes,
+            market,
+            inst.vol_surface_id.as_str(),
+            t,
+            inst.strike,
+        )?;
+    Ok(BlackScholesInputsDf {
+        spot,
+        df,
+        q,
+        sigma,
+        t,
+    })
+}
 
 /// Geometric Asian option analytical pricer.
 pub struct AsianOptionAnalyticalGeometricPricer;
@@ -573,18 +617,14 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let asian = expect_inst::<AsianOption>(instrument, InstrumentType::AsianOption)?;
 
-        // Use standardized input collection
-        let (spot, r, q, sigma, t) = collect_black_scholes_inputs(
-            &asian.spot_id,
-            &asian.discount_curve_id,
-            asian.div_yield_id.as_ref(),
-            &asian.vol_surface_id,
-            asian.strike,
-            asian.expiry,
-            asian.day_count,
-            market,
-            as_of,
-        )?;
+        let inputs = analytic_inputs(asian, market, as_of)?;
+        let (spot, r, q, sigma, t) = (
+            inputs.spot,
+            inputs.r_eff(),
+            inputs.q,
+            inputs.sigma,
+            inputs.t,
+        );
 
         asian.validate_past_fixings(as_of)?;
         let (sum, log_prod, count) = asian.accumulated_state(as_of);
@@ -726,22 +766,10 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
-        use finstack_quant_valuations_core::instruments::common_impl::helpers::collect_black_scholes_inputs_df;
-
         let asian = expect_inst::<AsianOption>(instrument, InstrumentType::AsianOption)?;
 
-        // Use DF-based input collection for time-consistent discounting
-        let bs_inputs = collect_black_scholes_inputs_df(
-            &asian.spot_id,
-            &asian.discount_curve_id,
-            asian.div_yield_id.as_ref(),
-            &asian.vol_surface_id,
-            asian.strike,
-            asian.expiry,
-            asian.day_count,
-            market,
-            as_of,
-        )?;
+        // Date-based DF for time-consistent discounting
+        let bs_inputs = analytic_inputs(asian, market, as_of)?;
 
         let spot = bs_inputs.spot;
         let df_expiry = bs_inputs.df;
@@ -2151,6 +2179,111 @@ mod tests {
                     )
                 ),
                 "{averaging:?}: missing discount curve must stay NotFound, got {err:?}"
+            );
+        }
+    }
+
+    fn quarterly_asian(averaging: AveragingMethod) -> AsianOption {
+        let expiry = date(2026, 1, 2);
+        asian_option(
+            averaging,
+            OptionType::Call,
+            expiry,
+            100.0,
+            vec![
+                date(2025, 4, 2),
+                date(2025, 7, 2),
+                date(2025, 10, 2),
+                expiry,
+            ],
+        )
+    }
+
+    #[test]
+    fn spot_price_in_another_currency_is_rejected() {
+        let as_of = date(2025, 1, 2);
+        let eur_spot = market(as_of, 100.0, 0.20, 0.05, 0.0).insert_price(
+            "SPX-SPOT",
+            MarketScalar::Price(Money::new(100.0, Currency::EUR).expect("money")),
+        );
+        let arithmetic = quarterly_asian(AveragingMethod::Arithmetic);
+        let geometric = quarterly_asian(AveragingMethod::Geometric);
+
+        let mismatch = |err: finstack_quant_core::Error| {
+            assert!(
+                matches!(
+                    err,
+                    finstack_quant_core::Error::CurrencyMismatch {
+                        expected: Currency::USD,
+                        actual: Currency::EUR,
+                    }
+                ),
+                "{err:?}"
+            );
+        };
+        mismatch(
+            AsianOptionMcPricer::new()
+                .price_internal(&arithmetic, &eur_spot, as_of)
+                .expect_err("MC spot"),
+        );
+        mismatch(
+            arithmetic
+                .theta_observed_state(&eur_spot, as_of, date(2025, 4, 3))
+                .err()
+                .expect("theta spot"),
+        );
+        let registry_errors = [
+            AsianOptionAnalyticalGeometricPricer::new()
+                .price_dyn(&geometric, &eur_spot, as_of)
+                .expect_err("geometric spot")
+                .to_string(),
+            AsianOptionSemiAnalyticalTwPricer::new()
+                .price_dyn(&arithmetic, &eur_spot, as_of)
+                .expect_err("TW spot")
+                .to_string(),
+            super::super::heston_mc_pricer::AsianOptionHestonMcPricer::new()
+                .price_dyn(&arithmetic, &eur_spot, as_of)
+                .expect_err("Heston spot")
+                .to_string(),
+            arithmetic
+                .value(&eur_spot, as_of)
+                .expect_err("default model spot")
+                .to_string(),
+        ];
+        for err in registry_errors {
+            assert!(err.contains("Currency mismatch"), "{err}");
+        }
+    }
+
+    #[test]
+    fn analytic_pricers_honour_the_implied_volatility_override() {
+        let as_of = date(2025, 1, 2);
+        let surface_20 = market(as_of, 100.0, 0.20, 0.05, 0.01);
+        let surface_40 = market(as_of, 100.0, 0.40, 0.05, 0.01);
+        let geometric_pricer = AsianOptionAnalyticalGeometricPricer::new();
+        let tw_pricer = AsianOptionSemiAnalyticalTwPricer::new();
+        let price = |pricer: &dyn Pricer, option: &AsianOption, curves: &MarketContext| {
+            pricer
+                .price_dyn(option, curves, as_of)
+                .expect("price")
+                .value
+                .amount()
+        };
+
+        for (pricer, averaging) in [
+            (&geometric_pricer as &dyn Pricer, AveragingMethod::Geometric),
+            (&tw_pricer as &dyn Pricer, AveragingMethod::Arithmetic),
+        ] {
+            let mut option = quarterly_asian(averaging);
+            let expected = price(pricer, &option, &surface_40);
+            option
+                .instrument_pricing_overrides
+                .market_quotes
+                .implied_volatility = Some(0.40);
+            let actual = price(pricer, &option, &surface_20);
+            assert!(
+                (actual - expected).abs() < 1e-12,
+                "{averaging:?}: override {actual} vs 40% surface {expected}"
             );
         }
     }

@@ -6,7 +6,7 @@
 //! For a CDS index, we use the index-level hazard curve and average recovery rate,
 //! which represents the expected loss across all constituents assuming equal weighting.
 
-use crate::cds_index::CdsIndex;
+use crate::cds_index::{CdsIndex, IndexPricing};
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::constants::credit;
@@ -29,7 +29,7 @@ impl MetricCalculator for ExpectedLossCalculator {
         let scale = index.index_factor;
         let notional = index.notional.amount() * scale;
 
-        if !index.constituents.is_empty() {
+        if index.pricing == IndexPricing::Constituents {
             // Defaulted constituents have already been settled and are
             // removed from forward exposure (their notional is captured by
             // `index_factor`). Exclude them from the forward EL and weight

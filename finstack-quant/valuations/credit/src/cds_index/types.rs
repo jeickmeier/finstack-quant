@@ -533,7 +533,8 @@ impl CdsIndex {
         pricer.risky_pv01(self, market, as_of)
     }
 
-    /// Calculate CS01
+    /// Calculate CS01 under the default parallel credit-spread bump; the
+    /// `Cs01` metric uses the configured `credit_spread_bump_bp` instead.
     pub fn cs01(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -541,7 +542,9 @@ impl CdsIndex {
         provider: &dyn finstack_quant_valuations_core::recalibration::RecalibrationProvider,
     ) -> finstack_quant_core::Result<f64> {
         let pricer = CdsIndexPricer::new();
-        pricer.cs01(self, market, as_of, provider)
+        let bump_bp = finstack_quant_valuations_core::metrics::sensitivities::config::SensitivitiesConfig::default()
+            .credit_spread_bump_bp;
+        pricer.cs01(self, market, as_of, provider, bump_bp)
     }
 }
 
