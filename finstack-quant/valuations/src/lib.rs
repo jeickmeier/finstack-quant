@@ -94,8 +94,6 @@
 //! # }
 //! ```
 
-extern crate self as finstack_quant_valuations;
-
 // The framework crate's exported macros keep their `finstack_quant_valuations::` paths.
 pub use finstack_quant_valuations_core::{
     impl_empty_cashflow_provider, impl_focused_pricing_overrides, impl_future_option_instrument,

@@ -46,8 +46,6 @@
 //! assert_ne!(asian.id(), forward.id());
 //! ```
 
-extern crate self as finstack_quant_valuations_exotics;
-
 /// Commodity derivatives.
 pub mod commodity;
 /// Exotic and path-dependent options.

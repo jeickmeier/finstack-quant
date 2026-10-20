@@ -2,7 +2,7 @@
 
 use crate::instruments::equity::real_estate::RealEstateAsset;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::Error as CoreError;
+use finstack_quant_core::Error;
 
 /// Going-in cap rate.
 ///
@@ -17,15 +17,13 @@ impl MetricCalculator for GoingInCapRate {
             .instrument
             .as_any()
             .downcast_ref::<RealEstateAsset>()
-            .ok_or_else(|| {
-                CoreError::Validation("GoingInCapRate: instrument type mismatch".into())
-            })?;
+            .ok_or_else(|| Error::Validation("GoingInCapRate: instrument type mismatch".into()))?;
 
         let noi_1 = asset.first_noi(context.as_of)?;
 
         let denom = if let Some(px) = asset.purchase_price {
             if px.currency() != asset.currency {
-                return Err(CoreError::Validation(
+                return Err(Error::Validation(
                     "purchase_price currency does not match instrument currency".into(),
                 ));
             }
@@ -35,7 +33,7 @@ impl MetricCalculator for GoingInCapRate {
         };
 
         if denom <= 0.0 {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "GoingInCapRate: denominator must be positive".into(),
             ));
         }
@@ -57,10 +55,10 @@ impl MetricCalculator for ExitCapRate {
             .instrument
             .as_any()
             .downcast_ref::<RealEstateAsset>()
-            .ok_or_else(|| CoreError::Validation("ExitCapRate: instrument type mismatch".into()))?;
+            .ok_or_else(|| Error::Validation("ExitCapRate: instrument type mismatch".into()))?;
 
         asset
             .terminal_cap_rate
-            .ok_or_else(|| CoreError::Validation("ExitCapRate requires terminal_cap_rate".into()))
+            .ok_or_else(|| Error::Validation("ExitCapRate requires terminal_cap_rate".into()))
     }
 }

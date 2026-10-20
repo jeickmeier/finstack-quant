@@ -212,9 +212,7 @@ mod expected_variance_tests {
             .observation_frequency(Tenor::daily())
             .observation_calendar_id("USNY".into())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
-            .price_series_policy(
-                finstack_quant_valuations_equity::EquityPriceSeriesPolicy::Adjusted,
-            )
+            .price_series_policy(crate::EquityPriceSeriesPolicy::Adjusted)
             .side(PayReceive::Receive)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)

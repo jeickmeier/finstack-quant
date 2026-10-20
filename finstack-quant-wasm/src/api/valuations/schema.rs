@@ -9,7 +9,7 @@
 
 use crate::utils::input::{from_js_json, js_string};
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_valuations::schema as canonical;
+use finstack_quant_valuations::schema;
 use wasm_bindgen::prelude::*;
 
 /// JSON Schema of the canonical instrument envelope.
@@ -21,7 +21,7 @@ use wasm_bindgen::prelude::*;
 /// @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
 #[wasm_bindgen(js_name = instrumentEnvelopeSchema)]
 pub fn instrument_envelope_schema() -> Result<JsValue, JsValue> {
-    to_js_value(canonical::instrument_envelope_schema().map_err(to_js_err)?)
+    to_js_value(schema::instrument_envelope_schema().map_err(to_js_err)?)
 }
 
 /// Canonical instrument type discriminators, in registry order.
@@ -29,7 +29,7 @@ pub fn instrument_envelope_schema() -> Result<JsValue, JsValue> {
 /// @throws Error - Throws if the instrument registry cannot be read (does not occur for a released build).
 #[wasm_bindgen(js_name = instrumentTypes)]
 pub fn instrument_types() -> Result<Vec<String>, JsValue> {
-    canonical::instrument_types().map_err(to_js_err)
+    schema::instrument_types().map_err(to_js_err)
 }
 
 /// JSON Schema of one instrument type.
@@ -39,7 +39,7 @@ pub fn instrument_types() -> Result<Vec<String>, JsValue> {
 #[wasm_bindgen(js_name = instrumentSchema)]
 pub fn instrument_schema(instrument_type: JsValue) -> Result<JsValue, JsValue> {
     let instrument_type = js_string(&instrument_type, "instrumentType")?;
-    to_js_value(&canonical::instrument_schema(&instrument_type).map_err(to_js_err)?)
+    to_js_value(&schema::instrument_schema(&instrument_type).map_err(to_js_err)?)
 }
 
 /// JSON Schema of the `ValuationResult` envelope returned by the pricing entry points.
@@ -47,7 +47,7 @@ pub fn instrument_schema(instrument_type: JsValue) -> Result<JsValue, JsValue> {
 /// @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
 #[wasm_bindgen(js_name = valuationResultSchema)]
 pub fn valuation_result_schema() -> Result<JsValue, JsValue> {
-    to_js_value(canonical::valuation_result_schema().map_err(to_js_err)?)
+    to_js_value(schema::valuation_result_schema().map_err(to_js_err)?)
 }
 
 /// Canonical compact JSON of a validated instrument payload.
@@ -65,7 +65,7 @@ fn canonical_json(instance: &serde_json::Value) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = validateInstrumentEnvelopeJson)]
 pub fn validate_instrument_envelope_json(instrument_json: JsValue) -> Result<String, JsValue> {
     let instance: serde_json::Value = from_js_json(&instrument_json, "instrumentJson")?;
-    canonical::validate_instrument_envelope_json(&instance).map_err(to_js_err)?;
+    schema::validate_instrument_envelope_json(&instance).map_err(to_js_err)?;
     canonical_json(&instance)
 }
 
@@ -81,6 +81,6 @@ pub fn validate_instrument_type_json(
 ) -> Result<String, JsValue> {
     let instrument_type = js_string(&instrument_type, "instrumentType")?;
     let instance: serde_json::Value = from_js_json(&instrument_json, "instrumentJson")?;
-    canonical::validate_instrument_type_json(&instrument_type, &instance).map_err(to_js_err)?;
+    schema::validate_instrument_type_json(&instrument_type, &instance).map_err(to_js_err)?;
     canonical_json(&instance)
 }

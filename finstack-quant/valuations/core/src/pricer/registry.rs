@@ -4,9 +4,9 @@
 //! downcast helper used by all pricer implementations.
 
 use super::{InstrumentType, ModelKey, PricerKey, PricingError, PricingErrorContext};
-use crate::instruments::common_impl::traits::Instrument as Priceable;
+use crate::instruments::Instrument;
 use finstack_quant_core::config::{results_meta, FinstackConfig};
-use finstack_quant_core::market_data::context::MarketContext as Market;
+use finstack_quant_core::market_data::context::MarketContext;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -28,8 +28,8 @@ use std::sync::Arc;
 ///
 /// Returns [`PricingError::TypeMismatch`] when `inst.key() != expected` or
 /// when the concrete type is not `T`.
-pub fn expect_inst<T: Priceable + 'static>(
-    inst: &dyn Priceable,
+pub fn expect_inst<T: Instrument + 'static>(
+    inst: &dyn Instrument,
     expected: InstrumentType,
 ) -> std::result::Result<&T, PricingError> {
     if inst.key() != expected {
@@ -69,16 +69,16 @@ pub trait Pricer: Send + Sync {
     /// Price an instrument using this pricer's model.
     ///
     /// This is a low-level dispatch hook that assumes the instrument has already
-    /// passed [`Priceable::validate_for_pricing`] and `as_of` has already been
-    /// resolved through [`Priceable::resolve_pricing_as_of`]. Canonical callers
+    /// passed [`Instrument::validate_for_pricing`] and `as_of` has already been
+    /// resolved through [`Instrument::resolve_pricing_as_of`]. Canonical callers
     /// must enter through [`PricerRegistry::price_with_metrics`] or its internal
     /// raw path.
     /// Implementations must return an unshocked result because the registry owns
     /// exactly-once scenario application.
     fn price_dyn(
         &self,
-        instrument: &dyn Priceable,
-        market: &Market,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<crate::results::ValuationResult, PricingError>;
 
@@ -91,8 +91,8 @@ pub trait Pricer: Send + Sync {
     /// through the registry's raw-pricing path.
     fn price_raw_dyn(
         &self,
-        instrument: &dyn Priceable,
-        market: &Market,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<f64, PricingError> {
         Ok(self.price_dyn(instrument, market, as_of)?.value.amount())
@@ -187,8 +187,8 @@ impl PricingDispatch {
     ///   by `InstrumentDefault`, which calls `Instrument::value` directly.
     pub(crate) fn price_money(
         &self,
-        instrument: &dyn Priceable,
-        market: &Market,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
         options: crate::instruments::PricingOptions,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
@@ -210,8 +210,8 @@ impl PricingDispatch {
     #[doc(hidden)]
     pub fn price_raw(
         &self,
-        instrument: &dyn Priceable,
-        market: &Market,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         match self {
@@ -278,14 +278,14 @@ impl PricerRegistry {
     /// invalid input before model lookup or any market-dependent computation.
     fn validated_pricer<'registry, 'instrument>(
         &'registry self,
-        instrument: &'instrument dyn Priceable,
+        instrument: &'instrument dyn Instrument,
         model: ModelKey,
         instrument_validated: bool,
     ) -> std::result::Result<
         (
             crate::instruments::common_impl::helpers::ValidatedPricingLifecycle<
                 'instrument,
-                dyn Priceable + 'instrument,
+                dyn Instrument + 'instrument,
             >,
             &'registry dyn Pricer,
         ),
@@ -406,9 +406,9 @@ impl PricerRegistry {
     )]
     pub fn price_with_metrics(
         &self,
-        instrument: &dyn Priceable,
+        instrument: &dyn Instrument,
         model: ModelKey,
-        market: &Market,
+        market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
         metrics: &[crate::metrics::MetricId],
         options: crate::instruments::PricingOptions,
@@ -501,9 +501,9 @@ impl PricerRegistry {
     #[doc(hidden)]
     pub fn price_raw(
         &self,
-        instrument: &dyn Priceable,
+        instrument: &dyn Instrument,
         model: ModelKey,
-        market: &Market,
+        market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<f64, PricingError> {
         let (lifecycle, pricer) = self.validated_pricer(instrument, model, false)?;
@@ -534,7 +534,7 @@ impl PricerRegistry {
 /// Record how a result was produced: model, requested date, declared market
 /// dependencies, scenario adjustment and (for metric requests) bump sizes.
 fn valuation_provenance(
-    instrument: &dyn Priceable,
+    instrument: &dyn Instrument,
     model: ModelKey,
     requested_as_of: finstack_quant_core::dates::Date,
     cfg: &FinstackConfig,
@@ -569,7 +569,7 @@ fn valuation_provenance(
 #[doc(hidden)]
 pub fn stamp_results_meta(
     cfg: &FinstackConfig,
-    instrument: &dyn Priceable,
+    instrument: &dyn Instrument,
     market: &finstack_quant_core::market_data::context::MarketContext,
     result: &mut crate::results::ValuationResult,
 ) {
@@ -601,7 +601,7 @@ pub(super) fn attach_metric_measures(
 /// curve carries a stamp, or dependency lookup fails. Stamps are de-duplicated
 /// in source order.
 fn collect_fx_policy_from_curves(
-    instrument: &dyn Priceable,
+    instrument: &dyn Instrument,
     market: &finstack_quant_core::market_data::context::MarketContext,
 ) -> Option<String> {
     let deps = instrument.market_dependencies().ok()?;
@@ -655,7 +655,7 @@ mod tests {
         finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
     );
 
-    impl Priceable for InvalidTestInstrument {
+    impl Instrument for InvalidTestInstrument {
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,
@@ -675,7 +675,7 @@ mod tests {
 
         fn base_value(
             &self,
-            _market: &Market,
+            _market: &MarketContext,
             _as_of: finstack_quant_core::dates::Date,
         ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
             self.base_calls.fetch_add(1, Ordering::SeqCst);
@@ -687,7 +687,7 @@ mod tests {
 
         fn base_value_raw(
             &self,
-            _market: &Market,
+            _market: &MarketContext,
             _as_of: finstack_quant_core::dates::Date,
         ) -> finstack_quant_core::Result<f64> {
             self.raw_calls.fetch_add(1, Ordering::SeqCst);
@@ -710,7 +710,7 @@ mod tests {
         finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
     );
 
-    impl Priceable for RawLifecycleInstrument {
+    impl Instrument for RawLifecycleInstrument {
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,
@@ -724,7 +724,7 @@ mod tests {
 
         fn resolve_pricing_as_of(
             &self,
-            _market: &Market,
+            _market: &MarketContext,
             _requested: finstack_quant_core::dates::Date,
         ) -> finstack_quant_core::dates::Date {
             self.effective_as_of
@@ -732,7 +732,7 @@ mod tests {
 
         fn base_value(
             &self,
-            _market: &Market,
+            _market: &MarketContext,
             as_of: finstack_quant_core::dates::Date,
         ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
             assert_eq!(as_of, self.effective_as_of);
@@ -745,7 +745,7 @@ mod tests {
 
         fn base_value_raw(
             &self,
-            _market: &Market,
+            _market: &MarketContext,
             as_of: finstack_quant_core::dates::Date,
         ) -> finstack_quant_core::Result<f64> {
             assert_eq!(as_of, self.effective_as_of);
@@ -755,7 +755,7 @@ mod tests {
 
         fn base_value_raw_with_currency(
             &self,
-            _market: &Market,
+            _market: &MarketContext,
             as_of: finstack_quant_core::dates::Date,
         ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
             assert_eq!(as_of, self.effective_as_of);
@@ -781,8 +781,8 @@ mod tests {
 
         fn price_dyn(
             &self,
-            instrument: &dyn Priceable,
-            _market: &Market,
+            instrument: &dyn Instrument,
+            _market: &MarketContext,
             as_of: finstack_quant_core::dates::Date,
         ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
             self.calls.fetch_add(1, Ordering::SeqCst);
@@ -811,7 +811,7 @@ mod tests {
             base_calls: Arc::clone(&base_calls),
             raw_calls: Arc::clone(&raw_calls),
         };
-        let market = Market::new();
+        let market = MarketContext::new();
         let as_of = date!(2025 - 01 - 15);
         let mut registry = PricerRegistry::new();
         registry
@@ -925,7 +925,7 @@ mod tests {
             scenario: crate::instruments::ScenarioPricingOverrides::default()
                 .with_scenario_price_shock_decimal(-0.10),
         };
-        let market = Market::new();
+        let market = MarketContext::new();
         let mut registry = PricerRegistry::new();
         registry
             .register(crate::instruments::pricing::GenericInstrumentPricer::<

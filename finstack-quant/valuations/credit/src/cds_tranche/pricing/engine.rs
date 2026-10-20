@@ -12,7 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::{Error as CoreError, Result};
+use finstack_quant_core::{Error, Result};
 use finstack_quant_models::correlation::copula::{Copula, CopulaSpec, GaussianCopula};
 use finstack_quant_valuations_core::instruments::PayReceive;
 
@@ -68,7 +68,7 @@ impl CdsTranchePricer {
     pub fn with_copula(copula_spec: CopulaSpec) -> Result<Self> {
         let copula = copula_spec
             .build()
-            .map_err(|error| CoreError::Validation(error.to_string()))?;
+            .map_err(|error| Error::Validation(error.to_string()))?;
         Ok(Self {
             copula_spec,
             copula,

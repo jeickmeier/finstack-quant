@@ -42,7 +42,7 @@ use crate::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
-use finstack_quant_core::{Error as CoreError, Result};
+use finstack_quant_core::{Error, Result};
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::RandomStream;
@@ -225,7 +225,7 @@ fn mc_step_schedule(
         let seasoning = mbs.seasoning_months(period_end);
         let base_smm = mbs.prepayment_spec.smm(seasoning)?;
         if !base_smm.is_finite() || !(0.0..=1.0).contains(&base_smm) {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "MBS prepayment model returned invalid SMM={base_smm} at seasoning {seasoning} months on MC path; expected finite value in [0.0, 1.0]"
             )));
         }
@@ -465,7 +465,7 @@ pub(crate) fn calculate_mc_oas(
     // no OAS bracketed the target market price (likely far-from-feasible
     // bounds, or a market price outside the model's reachable PV range).
     result.map_err(|e| {
-        CoreError::Validation(format!(
+        Error::Validation(format!(
             "MC OAS Brent solver failed to converge within bounds [-10%, 20%]: {e}. \
              Check that market price {market_price_pct} pct is within the model's reachable PV range."
         ))

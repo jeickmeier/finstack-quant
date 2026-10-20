@@ -12,7 +12,7 @@ use finstack_quant_valuations_core::pricer::{
 use finstack_quant_valuations_core::results::ValuationResult;
 
 // MC-specific imports
-use finstack_quant_models::monte_carlo::payoff::barrier::BarrierMonitoring as McBarrierMonitoring;
+use finstack_quant_models::monte_carlo::payoff::barrier::BarrierMonitoring;
 use finstack_quant_models::monte_carlo::payoff::lookback::{FloatingStrikeLookback, Lookback};
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
@@ -101,7 +101,7 @@ impl LookbackOptionMcPricer {
                     ((t * base_cfg.steps_per_year).round() as usize).max(base_cfg.min_steps);
                 (
                     finstack_quant_models::monte_carlo::TimeGrid::uniform(t, num_steps)?,
-                    McBarrierMonitoring::Continuous { start_step: 0 },
+                    BarrierMonitoring::Continuous { start_step: 0 },
                 )
             }
             discrete @ finstack_quant_valuations_core::instruments::Monitoring::Discrete {

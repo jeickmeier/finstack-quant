@@ -4,7 +4,7 @@ use crate::instruments::equity::real_estate::LeveredRealEstateEquity;
 use crate::instruments::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::cashflow::xirr_with_daycount;
-use finstack_quant_core::Error as CoreError;
+use finstack_quant_core::Error;
 
 /// Levered equity IRR (XIRR-style) from the levered equity cashflow schedule.
 #[derive(Debug, Default)]
@@ -16,7 +16,7 @@ impl MetricCalculator for LeveredIrr {
             .instrument
             .as_any()
             .downcast_ref::<LeveredRealEstateEquity>()
-            .ok_or_else(|| CoreError::Validation("LeveredIrr: instrument type mismatch".into()))?;
+            .ok_or_else(|| Error::Validation("LeveredIrr: instrument type mismatch".into()))?;
 
         let flows = inst.equity_cashflows(&context.curves, context.as_of)?;
         xirr_with_daycount(flows.as_slice(), inst.irr_day_count(), None)
@@ -33,9 +33,7 @@ impl MetricCalculator for EquityMultiple {
             .instrument
             .as_any()
             .downcast_ref::<LeveredRealEstateEquity>()
-            .ok_or_else(|| {
-                CoreError::Validation("EquityMultiple: instrument type mismatch".into())
-            })?;
+            .ok_or_else(|| Error::Validation("EquityMultiple: instrument type mismatch".into()))?;
 
         let flows = inst.equity_cashflows(&context.curves, context.as_of)?;
         let mut inflows = 0.0;
@@ -48,7 +46,7 @@ impl MetricCalculator for EquityMultiple {
             }
         }
         if outflows <= 0.0 {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "EquityMultiple: total outflows must be positive".into(),
             ));
         }
@@ -69,12 +67,12 @@ impl MetricCalculator for LoanToValue {
             .instrument
             .as_any()
             .downcast_ref::<LeveredRealEstateEquity>()
-            .ok_or_else(|| CoreError::Validation("LoanToValue: type mismatch".into()))?;
+            .ok_or_else(|| Error::Validation("LoanToValue: type mismatch".into()))?;
 
         let asset_pv = inst.asset.value(&context.curves, context.as_of)?;
         let denom = asset_pv.amount();
         if denom <= 0.0 {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "LoanToValue: asset PV must be positive".into(),
             ));
         }
@@ -114,14 +112,14 @@ fn min_dscr(
         .instrument
         .as_any()
         .downcast_ref::<LeveredRealEstateEquity>()
-        .ok_or_else(|| CoreError::Validation(format!("{metric_name}: type mismatch")))?;
+        .ok_or_else(|| Error::Validation(format!("{metric_name}: type mismatch")))?;
 
     let as_of = context.as_of;
     let exit = inst.resolve_exit_date(as_of)?;
 
     let noi = inst.asset.noi_flows(as_of)?;
     if noi.is_empty() {
-        return Err(CoreError::Validation(format!(
+        return Err(Error::Validation(format!(
             "{metric_name}: missing NOI flows"
         )));
     }
@@ -155,7 +153,7 @@ fn min_dscr(
     }
 
     if !min_dscr.is_finite() {
-        return Err(CoreError::Validation(format!(
+        return Err(Error::Validation(format!(
             "{metric_name}: could not compute (no qualifying debt service)"
         )));
     }
@@ -199,20 +197,18 @@ impl MetricCalculator for LoanToValueAtOrigination {
             .instrument
             .as_any()
             .downcast_ref::<LeveredRealEstateEquity>()
-            .ok_or_else(|| {
-                CoreError::Validation("LoanToValueAtOrigination: type mismatch".into())
-            })?;
+            .ok_or_else(|| Error::Validation("LoanToValueAtOrigination: type mismatch".into()))?;
 
         let purchase = inst.asset.purchase_price.ok_or_else(|| {
-            CoreError::Validation("LoanToValueAtOrigination: purchase_price is required".into())
+            Error::Validation("LoanToValueAtOrigination: purchase_price is required".into())
         })?;
         if purchase.currency() != inst.currency {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "LoanToValueAtOrigination: purchase_price currency mismatch".into(),
             ));
         }
         if purchase.amount() <= 0.0 {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "LoanToValueAtOrigination: purchase_price must be positive".into(),
             ));
         }
@@ -245,7 +241,7 @@ impl MetricCalculator for LoanToValueAtOrigination {
             }
         }
         if drawn <= 0.0 {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "LoanToValueAtOrigination: no financing draw found on/after as_of".into(),
             ));
         }
@@ -264,7 +260,7 @@ impl MetricCalculator for DebtPayoffAtExit {
             .instrument
             .as_any()
             .downcast_ref::<LeveredRealEstateEquity>()
-            .ok_or_else(|| CoreError::Validation("DebtPayoffAtExit: type mismatch".into()))?;
+            .ok_or_else(|| Error::Validation("DebtPayoffAtExit: type mismatch".into()))?;
 
         let payoff = inst.financing_payoff_at_exit(&context.curves, context.as_of)?;
         Ok(payoff.amount())

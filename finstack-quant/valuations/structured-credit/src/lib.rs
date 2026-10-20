@@ -51,8 +51,6 @@
 //! assert_ne!(deal.id(), cmo.id());
 //! ```
 
-extern crate self as finstack_quant_valuations_structured_credit;
-
 /// Asset-backed facility module - warehouse lines against collateral pools.
 pub mod asset_backed_facility;
 /// CMO module - Collateralized Mortgage Obligations.

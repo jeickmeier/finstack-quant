@@ -6,7 +6,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Error as CoreError;
+use finstack_quant_core::Error;
 use std::collections::BTreeMap;
 
 pub(crate) fn compute_pv(
@@ -17,7 +17,7 @@ pub(crate) fn compute_pv(
     validate_currency(inst)?;
     let asset_pv = inst.asset.value(market, as_of)?;
     if asset_pv.currency() != inst.currency {
-        return Err(CoreError::Validation("asset PV currency mismatch".into()));
+        return Err(Error::Validation("asset PV currency mismatch".into()));
     }
     Money::new(
         asset_pv.amount() - financing_pv(inst, market, as_of)?,
@@ -35,9 +35,7 @@ pub(crate) fn financing_pv(
     for financing in &inst.financing {
         let pv = financing.as_instrument().value(market, as_of)?;
         if pv.currency() != inst.currency {
-            return Err(CoreError::Validation(
-                "financing PV currency mismatch".into(),
-            ));
+            return Err(Error::Validation("financing PV currency mismatch".into()));
         }
         total += pv.amount();
     }
@@ -46,7 +44,7 @@ pub(crate) fn financing_pv(
 
 pub(crate) fn validate_currency(inst: &LeveredRealEstateEquity) -> finstack_quant_core::Result<()> {
     if inst.asset.currency != inst.currency {
-        return Err(CoreError::Validation(
+        return Err(Error::Validation(
             "asset currency must match levered equity currency".into(),
         ));
     }
@@ -69,7 +67,7 @@ pub(crate) fn asset_sale_proceeds_at(
     exit: Date,
 ) -> finstack_quant_core::Result<f64> {
     let Some((_d, proceeds)) = inst.asset.sale_proceeds_at(as_of, exit)? else {
-        return Err(CoreError::Validation(
+        return Err(Error::Validation(
             "sale_price or terminal_cap_rate is required to compute sale proceeds".into(),
         ));
     };
@@ -115,9 +113,9 @@ pub(crate) fn equity_cashflows(
     let purchase = inst
         .asset
         .purchase_price
-        .ok_or_else(|| CoreError::Validation("purchase_price is required".into()))?;
+        .ok_or_else(|| Error::Validation("purchase_price is required".into()))?;
     if purchase.currency() != inst.currency {
-        return Err(CoreError::Validation(
+        return Err(Error::Validation(
             "purchase_price currency must match instrument currency".into(),
         ));
     }

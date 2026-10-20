@@ -101,8 +101,6 @@ pub enum EquityPathModel {
     AtmTermGbm,
 }
 
-extern crate self as finstack_quant_valuations_equity;
-
 /// Autocallable module - Autocallable structured notes.
 pub mod autocallable;
 /// Cliquet option module - Cliquet/ratchet options.

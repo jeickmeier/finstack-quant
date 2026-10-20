@@ -14,7 +14,7 @@ use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_models::correlation::RecoverySpec as StochasticRecoverySpec;
+use finstack_quant_models::correlation::RecoverySpec;
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
 };
@@ -260,10 +260,8 @@ impl StructuredCredit {
         tree_config.default_spec = default;
         tree_config.recovery_spec = match &self.credit_model.stochastic_recovery_spec {
             Some(spec) => spec.clone(),
-            None => {
-                StochasticRecoverySpec::constant(self.validated_credit_model()?.recovery_spec.rate)
-                    .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?
-            }
+            None => RecoverySpec::constant(self.validated_credit_model()?.recovery_spec.rate)
+                .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?,
         };
         // Explicit deal correlation overrides the copula spec's scalar.
         // The engine consumes only this scalar override; per-pair
@@ -667,7 +665,7 @@ mod production_structured_assumptions {
                 < 1e-14
         );
         assert!(
-            matches!(config.recovery_spec, StochasticRecoverySpec::Constant { rate } if (rate - 0.71).abs() < 1e-14)
+            matches!(config.recovery_spec, RecoverySpec::Constant { rate } if (rate - 0.71).abs() < 1e-14)
         );
     }
 
