@@ -86,7 +86,6 @@ pub mod builder;
 
 mod traits;
 
-/// Generic schedule-driven interest accrual engine.
 pub mod accrual;
 mod json;
 #[cfg(feature = "json-schema")]

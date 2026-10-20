@@ -12,8 +12,11 @@
 //!
 //! ## API
 //!
-//! - [`project_floating_rate`]: Primary function taking a resolved forward curve and params
-//! - A test-only market-context wrapper exercises the same projection path after curve lookup.
+//! - [`project_floating_rate`]: all-in coupon rate from a resolved forward curve and params
+//! - [`project_index_rate`] / [`project_overnight_rate`]: the raw term or overnight index rate
+//! - [`observed_term_fixing`]: the realized fixing for a reset already in the past
+//! - [`calculate_floating_rate`]: gearing, spread, floors and caps applied to an index rate
+//! - [`apply_bp_bounds`]: basis-point floor and cap on a decimal rate
 //!
 //! ## Formulas
 //!

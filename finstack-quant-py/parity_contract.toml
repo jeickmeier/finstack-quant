@@ -307,7 +307,7 @@ note = "Typed submodules (builder/accrual/aggregation/fixings/schema; the CashFl
 [crates.cashflows.modules]
 fixings     = { python = "finstack_quant.cashflows.fixings",     status = "exists", note = "Typed raw rate/FX observations and atomic crossed-fixing materialization. Scenario rolls invoke the same Rust helper; WASM binds it as cashflows.materializeFixings over CashFlowSchedule handles or schedule JSON." }
 accrual     = { python = "finstack_quant.cashflows.accrual",     status = "exists", note = "Typed accrual engine" }
-aggregation = { python = "finstack_quant.cashflows.aggregation", status = "exists", note = "Typed period rollups and currency-checked totals. In Python, aggregation.calendar_year_ladder returns list[tuple[int, float, float, float]] over parallel arrays while CashFlowSchedule.calendar_year_ladder returns a pandas.DataFrame view alongside to_dataframe(). Rust-only (deliberately unbound): credit_adjusted_cashflow_pvs, the survival-weighted PV kernel consumed by valuations pricers." }
+aggregation = { python = "finstack_quant.cashflows.aggregation", status = "exists", note = "Typed period rollups and currency-checked totals. In Python, aggregation.calendar_year_ladder returns list[tuple[int, float, float, float]] over parallel arrays while CashFlowSchedule.calendar_year_ladder returns a pandas.DataFrame view alongside to_dataframe(). Rust-only (deliberately unbound): credit_adjusted_cashflow_pvs, the survival-weighted PV kernel consumed by valuations pricers, and weighted_average_life_from_principal, the Act/365F WAL kernel behind CashFlowSchedule.wal and the structured-credit WAL metric." }
 builder     = { python = "finstack_quant.cashflows.builder",     status = "exists", note = "Typed spec + builder + schedule surface; the JSON program bridge remains available on finstack_quant.cashflows" }
 schema      = { python = "finstack_quant.cashflows.schema",      status = "exists", note = "Compiled-in JSON Schema resources; package_cashflow_schema is doc(hidden) generator plumbing and stays Rust-only" }
 
@@ -325,8 +325,7 @@ python_package = "finstack_quant.cashflows.builder"
 # apply_bp_bounds} (pricer coupon-replay plumbing; raw observations are exposed
 # through fixings.ProjectedFixing); periods {SchedulePeriod, BuildPeriodsParams,
 # build_periods, build_single_period, period_accrual, compute_reset_date};
-# emit_inflation_coupons (inflation-linked bond leg kernel);
-# weighted_average_life_from_principal; CashflowRepresentation (credit metadata
+# CashflowRepresentation (credit metadata
 # carried inside schedule JSON); evaluate_fee_tiers / FeeTier / RateSpec /
 # PrincipalEventSpec (spec internals reachable through the spec types); and the
 # credit-rate helpers clamped_cpr_to_smm / clamped_cdr_to_mdr / psa_cpr /

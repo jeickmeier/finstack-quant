@@ -16,7 +16,7 @@
 //!
 //! - [`DdtlSpec`]: Delayed-draw term loan features
 //! - [`TermLoanCovenantEvents`]: Covenant-driven events
-//! - [`AmortizationSpec`]: Principal repayment schedules (the shared cashflows
+//! - `AmortizationSpec`: Principal repayment schedules (the shared cashflows
 //!   type; term loans accept every variant except `LinearTo` and
 //!   `StepRemaining`)
 //! - [`LoanCallSchedule`]: Borrower prepayment options

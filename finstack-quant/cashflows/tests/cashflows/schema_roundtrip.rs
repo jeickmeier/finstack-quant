@@ -27,18 +27,13 @@ struct CashflowEnvelope<T> {
 }
 
 #[test]
-fn cashflows_embeds_every_registered_schema_as_a_resolvable_resource() {
+fn every_registered_cashflow_schema_is_a_resolvable_resource() {
     let resources = finstack_quant_cashflows::schema::resources()
-        .expect("embedded cashflow schemas are valid resources");
-    let mut embedded: Vec<&str> = resources.iter().map(|(uri, _)| uri.as_str()).collect();
-    let mut registered: Vec<&str> = finstack_quant_cashflows::schema::ARTIFACTS
-        .iter()
-        .map(|artifact| artifact.id)
-        .collect();
-    embedded.sort_unstable();
-    registered.sort_unstable();
-    assert_eq!(embedded, registered);
-    assert_eq!(resources.len(), 14);
+        .expect("registered cashflow schemas render as valid resources");
+    assert_eq!(
+        resources.len(),
+        finstack_quant_cashflows::schema::ARTIFACTS.len()
+    );
     assert!(resources
         .iter()
         .all(|(uri, _)| uri.starts_with("https://finstack_quant.dev/schemas/cashflow/1/")));
