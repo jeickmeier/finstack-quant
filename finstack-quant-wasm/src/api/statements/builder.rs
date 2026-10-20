@@ -78,7 +78,7 @@ fn iso_date(value: &JsValue, label: &str) -> Result<Date, JsValue> {
 /// const builder = new statements.ModelBuilder("acme");
 /// builder.periods("2025Q1..Q4", "2025Q1");
 /// builder.valueScalar("revenue", { "2025Q1": 100 });
-/// builder.forecast("revenue", statements.forecastSpecGrowth(0.05));
+/// builder.forecast("revenue", { method: "growth_pct", params: { rate: 0.05 } });
 /// builder.compute("gross_profit", "revenue * 0.6");
 /// const model = builder.build();   // plain FinancialModelSpec object
 /// statements.modelNodeIds(model);  // ["revenue", "gross_profit"]
@@ -373,7 +373,7 @@ impl JsModelBuilder {
     /// Twin of Python `ModelBuilder.forecast` (Rust `ModelBuilder::forecast`).
     ///
     /// @param node_id - Node whose forecast periods the spec fills.
-    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`), e.g. from `forecastSpecGrowth` (object or JSON).
+    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
     /// @throws Error with kind `validation` if `forecastSpec` is malformed, periods were not set, or the builder was consumed.
     pub fn forecast(&mut self, node_id: JsValue, forecast_spec: JsValue) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
@@ -738,7 +738,7 @@ impl JsModelBuilder {
 /// builder.periods("2025Q1..Q2", "2025Q1");
 /// const mixed = builder.mixed("revenue");
 /// mixed.values({ "2025Q1": 100 });
-/// mixed.forecast(statements.forecastSpecGrowth(0.05));
+/// mixed.forecast({ method: "growth_pct", params: { rate: 0.05 } });
 /// const model = mixed.build().build();
 /// new statements.Evaluator().evaluate(model).nodes.revenue["2025Q2"];  // 105
 /// ```
@@ -795,7 +795,7 @@ impl JsMixedNodeBuilder {
     /// Twin of Python `MixedNodeBuilder.forecast` (Rust
     /// `MixedNodeBuilder::forecast`).
     ///
-    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`), e.g. from `forecastSpecGrowth` (object or JSON).
+    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
     /// @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
     pub fn forecast(&mut self, forecast_spec: JsValue) -> Result<(), JsValue> {
         let spec: ForecastSpec = from_js_json(&forecast_spec, "forecastSpec")?;

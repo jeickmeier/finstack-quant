@@ -34,7 +34,7 @@ fn parse_periods(periods: &JsValue) -> Result<Vec<PeriodId>, JsValue> {
 /// is added, and the equity bridge turns enterprise value into equity value.
 /// @param model - `FinancialModelSpec` (object or JSON); its metadata must carry a `currency`.
 /// @param wacc - Weighted average cost of capital as a decimal (`0.10` = 10%).
-/// @param terminal_value - `TerminalValueSpec`, e.g. from `terminalValueSpecGordonGrowth` (object or JSON).
+/// @param terminal_value - `TerminalValueSpec`, e.g. `{ type: "gordon_growth", stable_growth_rate: 0.02 }` (object or JSON).
 /// @param ufcf_node - Node holding unlevered free cash flow; omitted uses the Rust default `"ufcf"`.
 /// @param net_debt_override - Flat net debt in model currency used instead of the model-derived equity bridge.
 /// @param options - Optional Rust `DcfOptions`; every field is optional and a missing one takes its Rust default (`mid_year_convention`, `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `exit_multiple_metric_node`, ...). Unknown keys are rejected (object or JSON).
@@ -119,70 +119,6 @@ pub fn run_corporate_analysis(
         .map(|market| from_js_json(&market, "market"))
         .transpose()?;
     to_js_value(&fa::run_corporate_analysis(model, options, market).map_err(to_js_err)?)
-}
-
-/// Gordon-growth terminal value: a perpetuity growing at a stable rate.
-///
-/// Free-function twin of Python `TerminalValueSpec.gordon_growth` (Rust
-/// `TerminalValueSpec::GordonGrowth`).
-/// @param stable_growth_rate - Perpetual growth rate as a decimal (`0.02` = 2%); must be below the WACC when valued.
-/// @returns Plain `TerminalValueSpec` object (`{type: "gordon_growth", stable_growth_rate}`).
-///
-/// # Errors
-///
-/// Throws with kind `invalid_type` if `stableGrowthRate` is not a number.
-#[wasm_bindgen(js_name = terminalValueSpecGordonGrowth)]
-pub fn terminal_value_spec_gordon_growth(stable_growth_rate: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&TerminalValueSpec::GordonGrowth {
-        stable_growth_rate: js_f64(&stable_growth_rate, "stableGrowthRate")?,
-    })
-}
-
-/// Exit-multiple terminal value: a terminal metric times a multiple.
-///
-/// Free-function twin of Python `TerminalValueSpec.exit_multiple` (Rust
-/// `TerminalValueSpec::ExitMultiple`).
-/// @param multiple - Exit multiple in turns (`8.5` = 8.5x the terminal metric).
-/// @param terminal_metric - Terminal-year metric (for example EBITDA) in model currency; pass `0` when `DcfOptions.exit_multiple_metric_node` supplies the metric from the model.
-/// @returns Plain `TerminalValueSpec` object (`{type: "exit_multiple", terminal_metric, multiple}`).
-///
-/// # Errors
-///
-/// Throws with kind `invalid_type` if an argument is not a number.
-#[wasm_bindgen(js_name = terminalValueSpecExitMultiple)]
-pub fn terminal_value_spec_exit_multiple(
-    multiple: JsValue,
-    terminal_metric: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(&TerminalValueSpec::ExitMultiple {
-        terminal_metric: js_f64(&terminal_metric, "terminalMetric")?,
-        multiple: js_f64(&multiple, "multiple")?,
-    })
-}
-
-/// H-model terminal value: growth fades linearly from a high to a stable rate.
-///
-/// Free-function twin of Python `TerminalValueSpec.h_model` (Rust
-/// `TerminalValueSpec::HModel`).
-/// @param high_growth_rate - Initial growth rate as a decimal (`0.08` = 8%).
-/// @param stable_growth_rate - Long-run growth rate as a decimal; must be below the WACC when valued.
-/// @param half_life_years - Half-life of the growth fade in years (`5` = growth is halfway to stable after five years).
-/// @returns Plain `TerminalValueSpec` object (`{type: "h_model", ...}`).
-///
-/// # Errors
-///
-/// Throws with kind `invalid_type` if an argument is not a number.
-#[wasm_bindgen(js_name = terminalValueSpecHModel)]
-pub fn terminal_value_spec_h_model(
-    high_growth_rate: JsValue,
-    stable_growth_rate: JsValue,
-    half_life_years: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(&TerminalValueSpec::HModel {
-        high_growth_rate: js_f64(&high_growth_rate, "highGrowthRate")?,
-        stable_growth_rate: js_f64(&stable_growth_rate, "stableGrowthRate")?,
-        half_life_years: js_f64(&half_life_years, "halfLifeYears")?,
-    })
 }
 
 /// Variance between two evaluated scenarios of a scenario set.
@@ -415,29 +351,6 @@ pub fn scenario_set_trace(scenario_set: JsValue, scenario: JsValue) -> Result<Js
             .trace(&js_string(&scenario, "scenario")?)
             .map_err(to_js_err)?,
     )
-}
-
-/// Copy of a sensitivity configuration with one more parameter.
-///
-/// Free-function twin of Python `SensitivityConfig.add_parameter` (Rust
-/// `SensitivityConfig::add_parameter`). Python builds the `ParameterSpec`
-/// from keyword arguments; here it is passed as an object, e.g. from
-/// `parameterSpecWithPercentages`.
-/// @param config - `SensitivityConfig` (object or JSON).
-/// @param parameter - `ParameterSpec`: `node_id`, `period_id`, `base_value` and absolute `perturbations` (object or JSON).
-/// @returns New plain `SensitivityConfig` object.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if an input is malformed.
-#[wasm_bindgen(js_name = sensitivityConfigAddParameter)]
-pub fn sensitivity_config_add_parameter(
-    config: JsValue,
-    parameter: JsValue,
-) -> Result<JsValue, JsValue> {
-    let mut config: fa::SensitivityConfig = from_js_json(&config, "config")?;
-    config.add_parameter(from_js_json(&parameter, "parameter")?);
-    to_js_value(&config)
 }
 
 /// Value a parameter took in one sensitivity scenario.

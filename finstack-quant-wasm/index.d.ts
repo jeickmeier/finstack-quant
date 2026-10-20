@@ -31565,7 +31565,7 @@ export interface RegistryConstructor {
  * const builder = new statements.ModelBuilder("acme");
  * builder.periods("2025Q1..Q4", "2025Q1");
  * builder.valueScalar("revenue", { "2025Q1": 100 });
- * builder.forecast("revenue", statements.forecastSpecGrowth(0.05));
+ * builder.forecast("revenue", { method: "growth_pct", params: { rate: 0.05 } });
  * builder.compute("gross_profit", "revenue * 0.6");
  * const model = builder.build();   // plain FinancialModelSpec object
  * statements.modelNodeIds(model);  // ["revenue", "gross_profit"]
@@ -31667,7 +31667,7 @@ export interface ModelBuilder extends WasmOwned {
    *
    * Twin of Python `ModelBuilder.forecast` (Rust `ModelBuilder::forecast`).
    * @param nodeId - Node whose forecast periods the spec fills.
-   * @param forecastSpec - `ForecastSpec` (`method` plus `params`), e.g. from `forecastSpecGrowth` (object or JSON).
+   * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
    * @throws Error with kind `validation` if `forecastSpec` is malformed, periods were not set, or the builder was consumed.
    */
   forecast(nodeId: string, forecastSpec: generated.statements.ForecastSpec | string): void;
@@ -31874,7 +31874,7 @@ export interface ModelBuilder extends WasmOwned {
  * const builder = new statements.ModelBuilder("acme");
  * builder.periods("2025Q1..Q4", "2025Q1");
  * builder.valueScalar("revenue", { "2025Q1": 100 });
- * builder.forecast("revenue", statements.forecastSpecGrowth(0.05));
+ * builder.forecast("revenue", { method: "growth_pct", params: { rate: 0.05 } });
  * builder.compute("gross_profit", "revenue * 0.6");
  * const model = builder.build();   // plain FinancialModelSpec object
  * statements.modelNodeIds(model);  // ["revenue", "gross_profit"]
@@ -31914,7 +31914,7 @@ export interface ModelBuilderConstructor {
  * builder.periods("2025Q1..Q2", "2025Q1");
  * const mixed = builder.mixed("revenue");
  * mixed.values({ "2025Q1": 100 });
- * mixed.forecast(statements.forecastSpecGrowth(0.05));
+ * mixed.forecast({ method: "growth_pct", params: { rate: 0.05 } });
  * const model = mixed.build().build();
  * new statements.Evaluator().evaluate(model).nodes.revenue["2025Q2"];  // 105
  * ```
@@ -31942,7 +31942,7 @@ export interface MixedNodeBuilder extends WasmOwned {
    *
    * Twin of Python `MixedNodeBuilder.forecast` (Rust
    * `MixedNodeBuilder::forecast`).
-   * @param forecastSpec - `ForecastSpec` (`method` plus `params`), e.g. from `forecastSpecGrowth` (object or JSON).
+   * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
    * @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
    */
   forecast(forecastSpec: generated.statements.ForecastSpec | string): void;
@@ -31990,7 +31990,7 @@ export interface MixedNodeBuilder extends WasmOwned {
  * builder.periods("2025Q1..Q2", "2025Q1");
  * const mixed = builder.mixed("revenue");
  * mixed.values({ "2025Q1": 100 });
- * mixed.forecast(statements.forecastSpecGrowth(0.05));
+ * mixed.forecast({ method: "growth_pct", params: { rate: 0.05 } });
  * const model = mixed.build().build();
  * new statements.Evaluator().evaluate(model).nodes.revenue["2025Q2"];  // 105
  * ```
@@ -32616,229 +32616,6 @@ export interface StatementsNamespace {
     instrumentId: string,
     period: string
   ): number;
-  /**
-   * Forecast that carries the last value forward unchanged.
-   *
-   * Free-function twin of Python `ForecastSpec.forward_fill` (Rust
-   * `ForecastSpec::forward_fill`).
-   * @returns Plain `ForecastSpec` object (`{method: "forward_fill"}`).
-   * @throws Error - Throws only if the spec cannot be converted to a JavaScript object.
-   */
-  forecastSpecForwardFill(): generated.statements.ForecastSpec;
-  /**
-   * Forecast that compounds the last value at one rate per period.
-   *
-   * Free-function twin of Python `ForecastSpec.growth` (Rust
-   * `ForecastSpec::growth`): `v[t] = v[t-1] * (1 + rate)`.
-   * @param rate - Growth per model period as a decimal (`0.05` = 5%), not annualised.
-   * @returns Plain `ForecastSpec` object with method `growth_pct`.
-   * @throws Error - Throws with kind `invalid_type` if `rate` is not a number.
-   */
-  forecastSpecGrowth(rate: number): generated.statements.ForecastSpec;
-  /**
-   * Forecast that applies a period-specific growth curve.
-   *
-   * Free-function twin of Python `ForecastSpec.curve` (Rust
-   * `ForecastSpec::curve`).
-   * @param curve - One growth rate per forecast period, as decimals per period (`0.05` = 5%), in timeline order.
-   * @returns Plain `ForecastSpec` object with method `curve_pct`.
-   * @throws Error - Throws with kind `invalid_type` if `curve` is not an array of numbers.
-   */
-  forecastSpecCurve(curve: number[] | Float64Array): generated.statements.ForecastSpec;
-  /**
-   * Forecast drawn from a seeded normal distribution.
-   *
-   * Free-function twin of Python `ForecastSpec.normal` (Rust
-   * `ForecastSpec::normal`).
-   * @param mean - Mean of each period's draw, in the node's own units.
-   * @param stdDev - Standard deviation of each draw, in the node's own units; must be non-negative when the model is evaluated.
-   * @param seed - Random seed (non-negative integer or BigInt); the same seed reproduces the same draws.
-   * @returns Plain `ForecastSpec` object with method `normal`.
-   * @throws Error - Throws with kind `invalid_type` if a number argument is not a number or `seed` is not a non-negative integer.
-   */
-  forecastSpecNormal(
-    mean: number,
-    stdDev: number,
-    seed: number | bigint
-  ): generated.statements.ForecastSpec;
-  /**
-   * Forecast drawn from a seeded log-normal distribution.
-   *
-   * Free-function twin of Python `ForecastSpec.log_normal` (Rust
-   * `ForecastSpec::log_normal`).
-   * @param mean - Mean of the underlying normal (log space).
-   * @param stdDev - Standard deviation of the underlying normal (log space); must be non-negative when the model is evaluated.
-   * @param seed - Random seed (non-negative integer or BigInt); the same seed reproduces the same draws.
-   * @returns Plain `ForecastSpec` object with method `log_normal`.
-   * @throws Error - Throws with kind `invalid_type` if a number argument is not a number or `seed` is not a non-negative integer.
-   */
-  forecastSpecLogNormal(
-    mean: number,
-    stdDev: number,
-    seed: number | bigint
-  ): generated.statements.ForecastSpec;
-  /**
-   * Forecast with explicit per-period override values.
-   *
-   * Free-function twin of Python `ForecastSpec.override` (Rust
-   * `ForecastSpec::overrides`). Periods without an override carry the previous
-   * value forward.
-   * @param overrides - Object mapping period id (e.g. `"2025Q3"`) to the value for that period, in the node's own units.
-   * @returns Plain `ForecastSpec` object with method `override`.
-   * @throws Error - Throws with kind `validation` if `overrides` is not an object of numbers keyed by valid period identifiers.
-   */
-  forecastSpecOverride(
-    overrides: Record<string, number> | string
-  ): generated.statements.ForecastSpec;
-  /**
-   * Forecast that repeats a seasonal pattern taken from history.
-   *
-   * Free-function twin of Python `ForecastSpec.seasonal` (Rust
-   * `ForecastSpec::seasonal`).
-   * @param historical - Historical observations in timeline order, in the node's own units.
-   * @param seasonLength - Number of periods in one season (e.g. `4` for quarterly data with an annual cycle).
-   * @param mode - `"additive"` or `"multiplicative"`.
-   * @returns Plain `ForecastSpec` object with method `seasonal`.
-   * @throws Error - Throws with kind `invalid_type` if an argument has the wrong JavaScript type, and kind `validation` if `mode` is not a seasonal mode.
-   */
-  forecastSpecSeasonal(
-    historical: number[] | Float64Array,
-    seasonLength: number,
-    mode: 'additive' | 'multiplicative'
-  ): generated.statements.ForecastSpec;
-  /**
-   * Forecast fitted to a historical time series.
-   *
-   * Free-function twin of Python `ForecastSpec.time_series` (Rust
-   * `ForecastSpec::time_series`).
-   * @param historical - Historical observations in timeline order, in the node's own units.
-   * @returns Plain `ForecastSpec` object with method `time_series`.
-   * @throws Error - Throws with kind `invalid_type` if `historical` is not an array of numbers.
-   */
-  forecastSpecTimeSeries(historical: number[] | Float64Array): generated.statements.ForecastSpec;
-  /**
-   * Forecast that fades the last value toward a target level.
-   *
-   * Free-function twin of Python `ForecastSpec.fade_to_target` (Rust
-   * `ForecastSpec::fade_to_target`).
-   * @param target - Level the node converges to, in the node's own units.
-   * @returns Plain `ForecastSpec` object with method `fade_to_target`.
-   * @throws Error - Throws with kind `invalid_type` if `target` is not a number.
-   */
-  forecastSpecFadeToTarget(target: number): generated.statements.ForecastSpec;
-  /**
-   * Forecast following a seeded mean-reverting process.
-   *
-   * Free-function twin of Python `ForecastSpec.mean_reverting` (Rust
-   * `ForecastSpec::mean_reverting`).
-   * @param longRunMean - Level the process reverts to, in the node's own units.
-   * @param reversionSpeed - Fraction of the gap to the mean closed each period, as a decimal in `[0, 1]`.
-   * @param stdDev - Standard deviation of each period's shock, in the node's own units.
-   * @param seed - Random seed (non-negative integer or BigInt); the same seed reproduces the same path.
-   * @returns Plain `ForecastSpec` object with method `mean_reverting`.
-   * @throws Error - Throws with kind `invalid_type` if a number argument is not a number or `seed` is not a non-negative integer.
-   */
-  forecastSpecMeanReverting(
-    longRunMean: number,
-    reversionSpeed: number,
-    stdDev: number,
-    seed: number | bigint
-  ): generated.statements.ForecastSpec;
-  /**
-   * Forecast that resamples historical observations with a seed.
-   *
-   * Free-function twin of Python `ForecastSpec.bootstrap` (Rust
-   * `ForecastSpec::bootstrap`).
-   * @param historical - Historical observations to resample, in the node's own units.
-   * @param seed - Random seed (non-negative integer or BigInt); the same seed reproduces the same draws.
-   * @returns Plain `ForecastSpec` object with method `bootstrap`.
-   * @throws Error - Throws with kind `invalid_type` if `historical` is not an array of numbers or `seed` is not a non-negative integer.
-   */
-  forecastSpecBootstrap(
-    historical: number[] | Float64Array,
-    seed: number | bigint
-  ): generated.statements.ForecastSpec;
-  /**
-   * Adjustment with fixed amounts per period.
-   *
-   * Free-function twin of Python `Adjustment.fixed` (Rust `Adjustment::fixed`).
-   * @param id - Adjustment identifier, unique within a normalization configuration.
-   * @param name - Human-readable name shown in reports.
-   * @param amounts - Object mapping period id (e.g. `"2025Q1"`) to the signed amount for that period, in the target node's units (positive adds back, negative deducts).
-   * @returns Plain `Adjustment` object.
-   * @throws Error - Throws with kind `validation` if `amounts` is not an object of numbers keyed by valid period identifiers.
-   */
-  adjustmentFixed(
-    id: string,
-    name: string,
-    amounts: Record<string, number> | string
-  ): generated.statements.Adjustment;
-  /**
-   * Adjustment sized as a fraction of another node's value each period.
-   *
-   * Free-function twin of Python `Adjustment.percentage` (Rust
-   * `Adjustment::percentage`).
-   * @param id - Adjustment identifier, unique within a normalization configuration.
-   * @param name - Human-readable name shown in reports.
-   * @param nodeId - Reference node whose per-period value is scaled.
-   * @param percentage - Fraction as a signed decimal (`0.05` = 5%; negative for a deduction).
-   * @returns Plain `Adjustment` object.
-   * @throws Error - Throws with kind `invalid_type` if an argument has the wrong JavaScript type.
-   */
-  adjustmentPercentage(
-    id: string,
-    name: string,
-    nodeId: string,
-    percentage: number
-  ): generated.statements.Adjustment;
-  /**
-   * Copy of an adjustment with a cap measured on the reported base.
-   *
-   * Free-function twin of Python `Adjustment.with_cap` (Rust
-   * `Adjustment::with_cap`).
-   * @param adjustment - `Adjustment` (object or JSON).
-   * @param baseNode - Node the cap is a fraction of; `null` makes `value` an absolute cap in the target node's units.
-   * @param value - Cap as a decimal fraction of `baseNode` (`0.20` = 20%), or an absolute amount when `baseNode` is `null`.
-   * @returns New plain `Adjustment` object with the cap set.
-   * @throws Error - Throws with kind `validation` if `adjustment` is malformed, and kind `invalid_type` if another argument has the wrong JavaScript type.
-   */
-  adjustmentWithCap(
-    adjustment: generated.statements.Adjustment | string,
-    baseNode: string | null | undefined,
-    value: number
-  ): generated.statements.Adjustment;
-  /**
-   * Copy of an adjustment with a cap and an explicit cap-base mode.
-   *
-   * Free-function twin of Python `Adjustment.with_cap_mode` (Rust
-   * `Adjustment::with_cap_mode`).
-   * @param adjustment - `Adjustment` (object or JSON).
-   * @param baseNode - Node the cap is a fraction of; `null` makes `value` an absolute cap in the target node's units.
-   * @param value - Cap as a decimal fraction of `baseNode` (`0.20` = 20%), or an absolute amount when `baseNode` is `null`.
-   * @param baseMode - `"reported"` (cap measured on the reported base) or `"progressive"` (base grows with the adjustments already applied).
-   * @returns New plain `Adjustment` object with the cap set.
-   * @throws Error - Throws with kind `validation` if `adjustment` is malformed or `baseMode` is not a cap-base mode, and kind `invalid_type` if another argument has the wrong JavaScript type.
-   */
-  adjustmentWithCapMode(
-    adjustment: generated.statements.Adjustment | string,
-    baseNode: string | null | undefined,
-    value: number,
-    baseMode: generated.statements.CapBaseMode
-  ): generated.statements.Adjustment;
-  /**
-   * Copy of an adjustment with a grouping category.
-   *
-   * Free-function twin of Python `Adjustment.with_category` (Rust
-   * `Adjustment::with_category`).
-   * @param adjustment - `Adjustment` (object or JSON).
-   * @param category - Grouping label used by reports, e.g. `"one_time"` or `"run_rate"`.
-   * @returns New plain `Adjustment` object with the category set.
-   * @throws Error - Throws with kind `validation` if `adjustment` is malformed, and kind `invalid_type` if `category` is not a string.
-   */
-  adjustmentWithCategory(
-    adjustment: generated.statements.Adjustment | string,
-    category: string
-  ): generated.statements.Adjustment;
   /**
    * Copy of a normalization configuration with one more adjustment.
    *
@@ -33871,7 +33648,7 @@ export interface StatementsAnalyticsNamespace {
    * is added, and the equity bridge turns enterprise value into equity value.
    * @param model - `FinancialModelSpec` (object or JSON); its metadata must carry a `currency`.
    * @param wacc - Weighted average cost of capital as a decimal (`0.10` = 10%).
-   * @param terminalValue - `TerminalValueSpec`, e.g. from `terminalValueSpecGordonGrowth` (object or JSON).
+   * @param terminalValue - `TerminalValueSpec`, e.g. `{ type: "gordon_growth", stable_growth_rate: 0.02 }` (object or JSON).
    * @param ufcfNode - Node holding unlevered free cash flow; omitted uses the Rust default `"ufcf"`.
    * @param netDebtOverride - Flat net debt in model currency used instead of the model-derived equity bridge.
    * @param options - Optional Rust `DcfOptions`; every field is optional and a missing one takes its Rust default (`mid_year_convention`, `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `exit_multiple_metric_node`, ...). Unknown keys are rejected (object or JSON).
@@ -33906,46 +33683,6 @@ export interface StatementsAnalyticsNamespace {
     options?: generated.statements_analytics.CorporateAnalysisOptions | string | null,
     market?: JsonInput | null
   ): generated.statements_analytics.CorporateAnalysis;
-  /**
-   * Gordon-growth terminal value: a perpetuity growing at a stable rate.
-   *
-   * Free-function twin of Python `TerminalValueSpec.gordon_growth` (Rust
-   * `TerminalValueSpec::GordonGrowth`).
-   * @param stableGrowthRate - Perpetual growth rate as a decimal (`0.02` = 2%); must be below the WACC when valued.
-   * @returns Plain `TerminalValueSpec` object (`{type: "gordon_growth", stable_growth_rate}`).
-   * @throws Error - Throws with kind `invalid_type` if `stableGrowthRate` is not a number.
-   */
-  terminalValueSpecGordonGrowth(stableGrowthRate: number): generated.valuations.TerminalValueSpec;
-  /**
-   * Exit-multiple terminal value: a terminal metric times a multiple.
-   *
-   * Free-function twin of Python `TerminalValueSpec.exit_multiple` (Rust
-   * `TerminalValueSpec::ExitMultiple`).
-   * @param multiple - Exit multiple in turns (`8.5` = 8.5x the terminal metric).
-   * @param terminalMetric - Terminal-year metric (for example EBITDA) in model currency; pass `0` when `DcfOptions.exit_multiple_metric_node` supplies the metric from the model.
-   * @returns Plain `TerminalValueSpec` object (`{type: "exit_multiple", terminal_metric, multiple}`).
-   * @throws Error - Throws with kind `invalid_type` if an argument is not a number.
-   */
-  terminalValueSpecExitMultiple(
-    multiple: number,
-    terminalMetric: number
-  ): generated.valuations.TerminalValueSpec;
-  /**
-   * H-model terminal value: growth fades linearly from a high to a stable rate.
-   *
-   * Free-function twin of Python `TerminalValueSpec.h_model` (Rust
-   * `TerminalValueSpec::HModel`).
-   * @param highGrowthRate - Initial growth rate as a decimal (`0.08` = 8%).
-   * @param stableGrowthRate - Long-run growth rate as a decimal; must be below the WACC when valued.
-   * @param halfLifeYears - Half-life of the growth fade in years (`5` = growth is halfway to stable after five years).
-   * @returns Plain `TerminalValueSpec` object (`{type: "h_model", ...}`).
-   * @throws Error - Throws with kind `invalid_type` if an argument is not a number.
-   */
-  terminalValueSpecHModel(
-    highGrowthRate: number,
-    stableGrowthRate: number,
-    halfLifeYears: number
-  ): generated.valuations.TerminalValueSpec;
   /**
    * Variance between two evaluated scenarios of a scenario set.
    *
@@ -34079,22 +33816,6 @@ export interface StatementsAnalyticsNamespace {
     scenarioSet: generated.statements_analytics.ScenarioSet | string,
     scenario: string
   ): string[];
-  /**
-   * Copy of a sensitivity configuration with one more parameter.
-   *
-   * Free-function twin of Python `SensitivityConfig.add_parameter` (Rust
-   * `SensitivityConfig::add_parameter`). Python builds the `ParameterSpec`
-   * from keyword arguments; here it is passed as an object, e.g. from
-   * `parameterSpecWithPercentages`.
-   * @param config - `SensitivityConfig` (object or JSON).
-   * @param parameter - `ParameterSpec`: `node_id`, `period_id`, `base_value` and absolute `perturbations` (object or JSON).
-   * @returns New plain `SensitivityConfig` object.
-   * @throws Error - Throws with kind `validation` if an input is malformed.
-   */
-  sensitivityConfigAddParameter(
-    config: generated.statements_analytics.SensitivityConfig | string,
-    parameter: generated.statements_analytics.ParameterSpec | string
-  ): generated.statements_analytics.SensitivityConfig;
   /**
    * Value a parameter took in one sensitivity scenario.
    *
