@@ -466,6 +466,11 @@ impl TermLoanValuator {
             // Each call entry is an effective-dated provision. It remains active
             // at every subsequent exercise step until the next entry replaces it.
             // Make-whole entries replace prior hard/soft provisions identically.
+            let claims = if call_boundaries.is_empty() {
+                None
+            } else {
+                Some(super::call::ExerciseClaims::new(&loan, &schedule)?)
+            };
             let mut boundary_index = 0usize;
             let mut active_call = None;
             for step in 0..num_steps {
@@ -475,7 +480,7 @@ impl TermLoanValuator {
                     active_call = Some(call_boundaries[boundary_index].1);
                     boundary_index += 1;
                 }
-                let Some(call) = active_call else {
+                let (Some(call), Some(claims)) = (active_call, &claims) else {
                     continue;
                 };
                 let step_date = step_dates[step];
@@ -485,7 +490,7 @@ impl TermLoanValuator {
                 if step_date >= loan.maturity {
                     continue;
                 }
-                let (out, accrued) = super::call::exercise_claim(&loan, &schedule, step_date)?;
+                let (out, accrued) = claims.at(step_date)?;
                 let clean = super::call::clean_call_price(
                     call, &schedule, market, step_date, out, accrued,
                 )?;

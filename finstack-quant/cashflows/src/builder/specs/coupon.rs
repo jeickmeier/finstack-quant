@@ -266,14 +266,12 @@ impl std::fmt::Display for FloatingLegCompounding {
     }
 }
 
-/// Default gearing for floating rates.
 fn default_gearing() -> Decimal {
-    Decimal::ONE
+    FloatingRateSpec::DEFAULT_GEARING
 }
 
-/// Default reset lag for floating rates (T-2 standard).
 fn default_reset_lag() -> i32 {
-    2
+    FloatingRateSpec::DEFAULT_RESET_LAG_DAYS
 }
 
 /// Policy for handling floating rate projection failures.
@@ -670,10 +668,19 @@ impl FloatingRateSpec {
 }
 
 fn default_gearing_includes_spread() -> bool {
-    true
+    FloatingRateSpec::DEFAULT_GEARING_INCLUDES_SPREAD
 }
 
 impl FloatingRateSpec {
+    /// Gearing applied when a spec omits it: `1` (the index passes through).
+    pub const DEFAULT_GEARING: Decimal = Decimal::ONE;
+
+    /// Whether gearing scales the spread when a spec omits it: `true`.
+    pub const DEFAULT_GEARING_INCLUDES_SPREAD: bool = true;
+
+    /// Reset lag in business days when a spec omits it: `2` (T-2).
+    pub const DEFAULT_RESET_LAG_DAYS: i32 = 2;
+
     /// Shared preset skeleton: unit gearing, no floors/caps, `Error` fallback.
     fn preset(
         forward_curve_id: &str,

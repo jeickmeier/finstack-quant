@@ -11,7 +11,7 @@ use crate::structured_credit::pricing::simulation_engine::{
 use crate::structured_credit::types::{
     StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority,
 };
-use finstack_quant_cashflows::builder::weighted_average_life_from_principal;
+use finstack_quant_cashflows::aggregation::weighted_average_life_from_principal;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::OnlineStats;

@@ -44,7 +44,7 @@ pub enum FeeSpec {
         /// Business-day convention applied to generated fee dates
         /// (`ModifiedFollowing` when omitted from the wire form, as for
         /// [`ScheduleParams`](crate::builder::ScheduleParams)).
-        #[serde(default = "crate::serde_defaults::bdc_modified_following")]
+        #[serde(default)]
         business_day_convention: BusinessDayConvention,
         /// Holiday calendar identifier used with `business_day_convention`.
         ///
@@ -52,7 +52,7 @@ pub enum FeeSpec {
         calendar_id: String,
         /// Stub-handling rule for irregular first or last fee periods
         /// (`ShortFront` when omitted from the wire form).
-        #[serde(default = "crate::serde_defaults::stub_short_front")]
+        #[serde(default = "crate::builder::specs::schedule::stub_short_front")]
         stub: StubKind,
         /// How the outstanding balance is sampled for fee calculation.
         #[serde(default, skip_serializing_if = "FeeAccrualBasis::is_default")]

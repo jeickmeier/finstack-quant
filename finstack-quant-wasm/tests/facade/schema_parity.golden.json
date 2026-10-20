@@ -3402,7 +3402,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
             "type_name": "PoolStats",
             "kind": "output",
-            "bytes": 2449
+            "bytes": 2491
           },
           {
             "path": "schemas/results/1/scenario_table.schema.json",
@@ -5529,7 +5529,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
             "type_name": "PoolStats",
             "kind": "output",
-            "bytes": 2449
+            "bytes": 2491
           },
           {
             "domain": "valuations",

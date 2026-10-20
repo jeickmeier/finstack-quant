@@ -88,10 +88,8 @@ pub(crate) fn period_snapshot_date(period: &Period) -> Date {
 /// Whether a flow returns principal to the lender: amortization, prepayment,
 /// revolver repayment, or a positive notional (redemption) row.
 fn is_principal_repayment(flow: &CashFlow) -> bool {
-    matches!(
-        flow.kind,
-        CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment
-    ) || (flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
+    flow.kind.is_principal_repayment()
+        && (flow.kind != CFKind::Notional || flow.amount.amount() > 0.0)
 }
 
 /// Preserve the cash and economic dates of this period's principal claims.

@@ -520,8 +520,8 @@ pub struct PoolStats {
     pub weighted_avg_spread_bp: f64,
     /// Weighted average maturity (WAM) in years.
     ///
-    /// For weighted average life use
-    /// [`finstack_quant_cashflows::builder::weighted_average_life_from_principal`].
+    /// For weighted average life, which weights principal cashflows rather
+    /// than maturities, use the `wal` metric.
     pub weighted_avg_maturity: f64,
     /// Diversity score (Moody's methodology)
     pub diversity_score: f64,

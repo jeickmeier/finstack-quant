@@ -671,12 +671,66 @@ fn validate_recovery(
     Ok(())
 }
 
+/// Calculate Act/365F weighted average life from dated principal reductions.
+///
+/// Only positive principal amounts strictly after `as_of` contribute. Each
+/// contribution is weighted by its Act/365F year fraction, and the result is
+/// expressed in years. Non-positive or already-realized entries are ignored;
+/// when no eligible principal remains, this returns `0.0`.
+///
+/// # Arguments
+///
+/// * `principal` - Dated principal reductions as `(payment_date, amount)`
+///   pairs; only positive amounts strictly after `as_of` contribute.
+/// * `as_of` - Valuation date from which Act/365F time weights are measured.
+///
+/// # Errors
+///
+/// Returns an error if eligible principal reductions use more than one
+/// currency or the Act/365F year-fraction calculation fails. Currencies of
+/// ignored entries are not examined.
+pub fn weighted_average_life_from_principal<I>(
+    principal: I,
+    as_of: Date,
+) -> finstack_quant_core::Result<f64>
+where
+    I: IntoIterator<Item = (Date, Money)>,
+{
+    let mut currency = None;
+    let mut weighted = NeumaierAccumulator::default();
+    let mut total = NeumaierAccumulator::default();
+    for (date, amount) in principal {
+        if date <= as_of || amount.amount() <= 0.0 {
+            continue;
+        }
+        if let Some(expected) = currency {
+            if amount.currency() != expected {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected,
+                    actual: amount.currency(),
+                });
+            }
+        } else {
+            currency = Some(amount.currency());
+        }
+        let years = finstack_quant_core::dates::DayCount::Act365F.year_fraction(
+            as_of,
+            date,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
+        weighted.add(amount.amount() * years);
+        total.add(amount.amount());
+    }
+    let principal_total = total.total();
+    Ok(if principal_total > 0.0 {
+        weighted.total() / principal_total
+    } else {
+        0.0
+    })
+}
+
 fn principal_repayment_amount(cf: &CashFlow, base: Date) -> finstack_quant_core::Result<f64> {
-    if !matches!(
-        cf.kind,
-        CFKind::Amortization | CFKind::Notional | CFKind::PrePayment | CFKind::RevolvingRepayment
-    ) || cf.amount.amount() <= 0.0
-    {
+    if !cf.kind.is_principal_repayment() || cf.amount.amount() <= 0.0 {
         return Ok(0.0);
     }
     if cf.get_balance_date() < base {

@@ -77,8 +77,7 @@ pub use rate_helpers::{
     project_index_rate, project_overnight_rate, FloatingRateParams,
 };
 pub use schedule::{
-    merge_cashflow_schedules, weighted_average_life_from_principal, CashFlowMeta, CashFlowSchedule,
-    CashflowRepresentation,
+    merge_cashflow_schedules, CashFlowMeta, CashFlowSchedule, CashflowRepresentation,
 };
 pub use specs::{
     evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase,

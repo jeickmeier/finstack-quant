@@ -310,7 +310,7 @@ fn test_wal_golden_uniform_amortization() {
         ), // Year 4
     ];
 
-    let wal = finstack_quant_cashflows::builder::weighted_average_life_from_principal(
+    let wal = finstack_quant_cashflows::aggregation::weighted_average_life_from_principal(
         cashflows.iter().copied(),
         as_of,
     )
@@ -353,7 +353,7 @@ fn test_wal_golden_front_loaded() {
         ), // Year 3: 10%
     ];
 
-    let wal = finstack_quant_cashflows::builder::weighted_average_life_from_principal(
+    let wal = finstack_quant_cashflows::aggregation::weighted_average_life_from_principal(
         cashflows.iter().copied(),
         as_of,
     )
@@ -396,7 +396,7 @@ fn test_wal_golden_back_loaded() {
         ), // Year 3: 70%
     ];
 
-    let wal = finstack_quant_cashflows::builder::weighted_average_life_from_principal(
+    let wal = finstack_quant_cashflows::aggregation::weighted_average_life_from_principal(
         cashflows.iter().copied(),
         as_of,
     )

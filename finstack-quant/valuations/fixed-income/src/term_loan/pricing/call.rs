@@ -2,40 +2,62 @@
 
 use crate::bond::pricing::engine::tree::BondValuator;
 use crate::term_loan::{LoanCall, LoanCallType, TermLoan};
+use finstack_quant_cashflows::accrual::AccrualIndex;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 
-/// Remaining principal and cash accrual after scheduled exercise-date events.
-/// Earned but not yet capitalized PIK belongs to the principal exercise claim.
-pub(crate) fn exercise_claim(
-    loan: &TermLoan,
-    schedule: &CashFlowSchedule,
-    exercise: Date,
-) -> Result<(f64, f64)> {
-    let principal = schedule
-        .outstanding_by_date()?
-        .iter()
-        .take_while(|(date, _)| *date <= exercise)
-        .last()
-        .map_or(0.0, |(_, amount)| amount.amount());
-    let mut config = loan.accrual_config();
-    let cash =
-        finstack_quant_cashflows::accrual::accrued_interest_amount(schedule, exercise, &config)?;
-    config.include_pik = true;
-    let total =
-        finstack_quant_cashflows::accrual::accrued_interest_amount(schedule, exercise, &config)?;
-    let capitalized_pending: f64 = schedule
-        .get_flows()
-        .iter()
-        .filter(|flow| {
-            flow.kind == CFKind::Pik && flow.get_balance_date() <= exercise && exercise < flow.date
+/// Exercise-date claims on one loan schedule. The outstanding path and both
+/// accrual indexes are built once, so pricing every tree step or candidate
+/// exercise date does not rebuild them.
+pub(crate) struct ExerciseClaims<'a> {
+    schedule: &'a CashFlowSchedule,
+    outstanding: DatedFlows,
+    cash: AccrualIndex,
+    total: AccrualIndex,
+}
+
+impl<'a> ExerciseClaims<'a> {
+    pub(crate) fn new(loan: &TermLoan, schedule: &'a CashFlowSchedule) -> Result<Self> {
+        let mut config = loan.accrual_config();
+        let cash = AccrualIndex::build(schedule, &config)?;
+        config.include_pik = true;
+        let total = AccrualIndex::build(schedule, &config)?;
+        Ok(Self {
+            schedule,
+            outstanding: schedule.outstanding_by_date()?,
+            cash,
+            total,
         })
-        .map(|flow| flow.amount.amount())
-        .sum();
-    Ok((principal + total - cash - capitalized_pending, cash))
+    }
+
+    /// Remaining principal and cash accrual after scheduled exercise-date events.
+    /// Earned but not yet capitalized PIK belongs to the principal exercise claim.
+    pub(crate) fn at(&self, exercise: Date) -> Result<(f64, f64)> {
+        let principal = self
+            .outstanding
+            .iter()
+            .take_while(|(date, _)| *date <= exercise)
+            .last()
+            .map_or(0.0, |(_, amount)| amount.amount());
+        let cash = self.cash.accrued_at(exercise)?;
+        let total = self.total.accrued_at(exercise)?;
+        let capitalized_pending: f64 = self
+            .schedule
+            .get_flows()
+            .iter()
+            .filter(|flow| {
+                flow.kind == CFKind::Pik
+                    && flow.get_balance_date() <= exercise
+                    && exercise < flow.date
+            })
+            .map(|flow| flow.amount.amount())
+            .sum();
+        Ok((principal + total - cash - capitalized_pending, cash))
+    }
 }
 
 /// Clean call redemption; the caller adds accrued cash interest once.
@@ -106,18 +128,26 @@ mod tests {
         let schedule =
             crate::term_loan::cashflows::generate_cashflows(&loan, &market).expect("schedule");
         assert_eq!(
-            exercise_claim(&loan, &schedule, date!(2026 - 01 - 01)).expect("anniversary"),
+            ExerciseClaims::new(&loan, &schedule)
+                .expect("claims")
+                .at(date!(2026 - 01 - 01))
+                .expect("anniversary"),
             (110.0, 0.0)
         );
-        let (principal, cash) =
-            exercise_claim(&loan, &schedule, date!(2025 - 07 - 01)).expect("off-cycle");
+        let (principal, cash) = ExerciseClaims::new(&loan, &schedule)
+            .expect("claims")
+            .at(date!(2025 - 07 - 01))
+            .expect("off-cycle");
         assert!((principal - 105.0).abs() < 1e-10);
         assert_eq!(cash, 0.0);
         loan.amortization = AmortizationSpec::PercentOfRemainingPerPeriod { pct: 0.5 };
         let schedule =
             crate::term_loan::cashflows::generate_cashflows(&loan, &market).expect("schedule");
         assert_eq!(
-            exercise_claim(&loan, &schedule, date!(2026 - 01 - 01)).expect("after amort"),
+            ExerciseClaims::new(&loan, &schedule)
+                .expect("claims")
+                .at(date!(2026 - 01 - 01))
+                .expect("after amort"),
             (55.0, 0.0)
         );
     }

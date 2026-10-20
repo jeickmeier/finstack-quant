@@ -3,10 +3,11 @@
 //! Provides the canonical `CashFlowSchedule` type and helpers for sorting and
 //! deriving schedule metadata. Downstream pricing/risk code consumes this shape.
 
+use crate::aggregation::weighted_average_life_from_principal;
 use crate::builder::Notional;
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
-use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Period};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, Period};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
@@ -817,14 +818,7 @@ impl CashFlowSchedule {
             self.flows
                 .iter()
                 .filter(|cf| {
-                    matches!(
-                        cf.kind,
-                        CFKind::Amortization
-                            | CFKind::Notional
-                            | CFKind::PrePayment
-                            | CFKind::RevolvingRepayment
-                    ) && cf.date > as_of
-                        && cf.amount.amount() > 0.0
+                    cf.kind.is_principal_repayment() && cf.date > as_of && cf.amount.amount() > 0.0
                 })
                 .map(|cf| (cf.date, cf.amount)),
             as_of,
@@ -1023,60 +1017,6 @@ impl CashFlowSchedule {
             })
             .collect()
     }
-}
-
-/// Calculate Act/365F weighted average life from dated principal reductions.
-///
-/// Only positive principal amounts strictly after `as_of` contribute. Each
-/// contribution is weighted by its Act/365F year fraction, and the result is
-/// expressed in years. Non-positive or already-realized entries are ignored;
-/// when no eligible principal remains, this returns `0.0`.
-///
-/// # Arguments
-///
-/// * `principal` - Dated principal reductions as `(payment_date, amount)`
-///   pairs; only positive amounts strictly after `as_of` contribute.
-/// * `as_of` - Valuation date from which Act/365F time weights are measured.
-///
-/// # Errors
-///
-/// Returns an error if eligible principal reductions use more than one
-/// currency or the Act/365F year-fraction calculation fails. Currencies of
-/// ignored entries are not examined.
-pub fn weighted_average_life_from_principal<I>(
-    principal: I,
-    as_of: Date,
-) -> finstack_quant_core::Result<f64>
-where
-    I: IntoIterator<Item = (Date, Money)>,
-{
-    let mut currency = None;
-    let mut weighted = finstack_quant_core::math::summation::NeumaierAccumulator::default();
-    let mut total = finstack_quant_core::math::summation::NeumaierAccumulator::default();
-    for (date, amount) in principal {
-        if date <= as_of || amount.amount() <= 0.0 {
-            continue;
-        }
-        if let Some(expected) = currency {
-            if amount.currency() != expected {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected,
-                    actual: amount.currency(),
-                });
-            }
-        } else {
-            currency = Some(amount.currency());
-        }
-        let years = DayCount::Act365F.year_fraction(as_of, date, DayCountContext::default())?;
-        weighted.add(amount.amount() * years);
-        total.add(amount.amount());
-    }
-    let principal_total = total.total();
-    Ok(if principal_total > 0.0 {
-        weighted.total() / principal_total
-    } else {
-        0.0
-    })
 }
 
 fn merge_representation(
@@ -1409,6 +1349,7 @@ mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::dates::DayCountContext;
     use time::Month;
 
     fn flow(date: Date, amount: f64, kind: CFKind) -> CashFlow {

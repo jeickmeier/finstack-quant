@@ -199,7 +199,7 @@ mod tests {
         ];
 
         // Calculate WAL using market-standard cashflow-based method
-        let wal = finstack_quant_cashflows::builder::weighted_average_life_from_principal(
+        let wal = finstack_quant_cashflows::aggregation::weighted_average_life_from_principal(
             cashflows.iter().copied(),
             as_of,
         )
@@ -339,7 +339,7 @@ mod tests {
         ];
 
         // Calculate true WAL from cashflows
-        let wal = finstack_quant_cashflows::builder::weighted_average_life_from_principal(
+        let wal = finstack_quant_cashflows::aggregation::weighted_average_life_from_principal(
             amortizing_cashflows.iter().copied(),
             as_of,
         )
