@@ -231,7 +231,7 @@ pub enum ComparisonOp {
 }
 
 impl std::str::FromStr for ComparisonOp {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     /// Parse a comparison operator from its serde name or symbol alias.
     ///
@@ -254,7 +254,7 @@ impl std::str::FromStr for ComparisonOp {
             "le" | "<=" => Ok(Self::Le),
             "gt" | ">" => Ok(Self::Gt),
             "ge" | ">=" => Ok(Self::Ge),
-            other => Err(crate::error::Error::invalid_input(format!(
+            other => Err(crate::Error::invalid_input(format!(
                 "Unknown comparison operator {other:?}; expected one of eq/ne/lt/le/gt/ge \
                  or ==/!=/</<=/>/>="
             ))),

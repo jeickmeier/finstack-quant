@@ -9,11 +9,11 @@ use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
 use crate::evaluation::{
     supported_metrics, EvaluationProfile, PortfolioEvaluationPlan, PositionExecution,
 };
-use crate::portfolio::Portfolio;
 use crate::types::PositionId;
 use crate::valuation::{
     PortfolioValuation, PortfolioValuationOptions, PositionValue, RequestedMetrics,
 };
+use crate::Portfolio;
 use finstack_quant_attribution::{
     attribute_pnl_metrics_based, default_attribution_metrics, AttributionRequest,
 };

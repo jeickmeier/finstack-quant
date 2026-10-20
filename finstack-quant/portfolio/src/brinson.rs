@@ -618,7 +618,7 @@ pub(crate) fn check_weights_sum(side_name: &str, total: f64) -> Result<()> {
 /// It caps how *explosive* an accepted bucket's rate can become; it is not a
 /// promise that the reconstructed effects reconcile to `active_return` within
 /// any particular tolerance — see the "Telescoping identity" section of
-/// [`crate::grid_attribution`] for measured residuals as large as `~5.7e-8`
+/// [`crate::grid_attribution::grid_attribution`] for measured residuals as large as `~5.7e-8`
 /// (on a ~1% return spread) for an accepted bucket sitting right at this
 /// tolerance. Reaching a `1e-12`-tight reconciliation guarantee across
 /// realistic return spreads would require a bound near `1e-3`, which would

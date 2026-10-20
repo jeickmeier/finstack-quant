@@ -1,6 +1,6 @@
 //! Strategy-level allocation JSON API tests.
 
-use finstack_quant_portfolio::allocate_weights_json;
+use finstack_quant_portfolio::allocation::allocate_weights_json;
 use serde_json::{json, Value};
 
 #[test]

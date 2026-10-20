@@ -4,9 +4,9 @@ use crate::error::{Error, Result};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
 use crate::fx::convert_to_base;
-use crate::portfolio::Portfolio;
 use crate::position::Position;
 use crate::types::PositionId;
+use crate::Portfolio;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;

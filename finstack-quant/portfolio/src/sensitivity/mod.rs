@@ -8,7 +8,7 @@
 //! - `FactorSensitivityEngine`: shared trait.
 //!
 //! The engines return [`finstack_quant_factor::SensitivityMatrix`]; its one
-//! wire form is [`SensitivityMatrixJson`](crate::sensitivity::SensitivityMatrixJson),
+//! wire form is [`SensitivityMatrixJson`],
 //! shared by both hosts in both directions.
 //!
 //! The `json` submodule holds the JSON-facing helpers used by Python and WASM

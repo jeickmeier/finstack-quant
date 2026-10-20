@@ -13,9 +13,9 @@ use finstack_quant_margin::{
 
 use crate::margin::netting_set::NettingSet;
 use crate::margin::results::{NettingSetMargin, PortfolioMarginResult};
-use crate::portfolio::Portfolio;
 use crate::position::{Position, PositionUnit};
 use crate::types::PositionId;
+use crate::Portfolio;
 use crate::{Error, Result};
 
 /// Aggregates margin requirements across a portfolio.

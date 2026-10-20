@@ -23,7 +23,7 @@
 //!   [`LboConfig::exit_net_debt_node`]; [`LboConfig::sources`] carries only the
 //!   day-one funded amounts.
 //! - **IRR.** Money-weighted return on the sponsor's dated cash flows is owned
-//!   by `finstack_quant_portfolio::mwr_xirr`, which takes the equity outflow at
+//!   by `finstack_quant_portfolio::performance::mwr_xirr`, which takes the equity outflow at
 //!   close and the [`LboResult::exit_equity_proceeds`] inflow at exit. MOIC (a
 //!   date-free proceeds-to-invested ratio) is returned here; IRR is not
 //!   duplicated.
@@ -178,7 +178,7 @@ pub struct LboResult {
 /// ```
 ///
 /// IRR is deliberately out of scope: pair `exit_equity_proceeds` with the
-/// equity outflow at close and call `finstack_quant_portfolio::mwr_xirr`.
+/// equity outflow at close and call `finstack_quant_portfolio::performance::mwr_xirr`.
 ///
 /// # Arguments
 ///

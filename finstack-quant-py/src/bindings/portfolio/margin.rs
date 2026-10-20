@@ -14,7 +14,7 @@ use crate::bindings::margin::types::{PyImCollateralResult, PyImMethodology, PyNe
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::errors::portfolio_to_py;
 use finstack_quant_portfolio::{
-    NettingSetMargin, PortfolioMarginAggregator, PortfolioMarginResult,
+    margin::NettingSetMargin, margin::PortfolioMarginAggregator, margin::PortfolioMarginResult,
 };
 
 /// Column schema for [`PyPortfolioMarginResult::to_dataframe`].

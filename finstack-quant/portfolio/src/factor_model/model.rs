@@ -21,11 +21,11 @@
 //!
 
 use super::assignment::{assign_position_factors, FactorAssignmentReport};
-use super::dependencies::flatten as flatten_dependencies;
+use super::dependencies::factor_dependencies;
 use super::whatif::{StressPnl, StressResult};
 use crate::error::{Error, Result};
 use crate::sensitivity::{exact_factor_market_keys, DeltaBasedEngine, FactorSensitivityEngine};
-use crate::{MarketFactorKey, Portfolio};
+use crate::{dependencies::MarketFactorKey, Portfolio};
 use finstack_quant_calibration::api::schema::HazardCurveParams;
 use finstack_quant_calibration::recalibration::bump_hazard_spreads;
 use finstack_quant_core::currency::Currency;
@@ -151,7 +151,7 @@ impl FactorModel {
 
         for position in &portfolio.positions {
             let dependencies =
-                flatten_dependencies(&position.instrument.market_dependencies()?, market)?;
+                factor_dependencies(&position.instrument.market_dependencies()?, market)?;
             let (assignment, position_unmatched) = assign_position_factors(
                 &position.position_id,
                 &dependencies,
@@ -489,7 +489,7 @@ impl FactorModel {
             if idio_variance <= 0.0 {
                 continue;
             }
-            let dependencies = flatten_dependencies(
+            let dependencies = factor_dependencies(
                 &position.instrument.market_dependencies()?,
                 credit_exposures.bump_contexts.base,
             )?;
@@ -623,7 +623,7 @@ impl FactorModel {
     /// Run a position remove/resize what-if against this model's baseline.
     ///
     /// Decomposes the portfolio's baseline risk with
-    /// [`Self::analyze_with_sensitivities`], then applies `changes` to that
+    /// the same sensitivities [`Self::analyze`] uses, then applies `changes` to that
     /// baseline: a removal zeroes the position's sensitivity row and a resize
     /// scales it in proportion to the original nonzero quantity.
     ///
@@ -746,7 +746,7 @@ impl FactorModel {
         let mut curve_betas: BTreeMap<finstack_quant_core::types::CurveId, f64> = BTreeMap::new();
         for position in &portfolio.positions {
             let dependencies =
-                flatten_dependencies(&position.instrument.market_dependencies()?, market)?;
+                factor_dependencies(&position.instrument.market_dependencies()?, market)?;
             for dependency in &dependencies {
                 let Some(curve_id) = credit_curve_id(dependency) else {
                     continue;

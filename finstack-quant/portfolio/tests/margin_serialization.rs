@@ -7,7 +7,7 @@ use finstack_quant_margin::{
     ImMethodology, NettingSetId, SimmCreditSector, SimmRiskClass, SimmSensitivities,
 };
 use finstack_quant_portfolio::types::PositionId;
-use finstack_quant_portfolio::{NettingSetMargin, PortfolioMarginResult};
+use finstack_quant_portfolio::{margin::NettingSetMargin, margin::PortfolioMarginResult};
 use time::macros::date;
 
 fn roundtrip_json<T>(value: &T) -> T

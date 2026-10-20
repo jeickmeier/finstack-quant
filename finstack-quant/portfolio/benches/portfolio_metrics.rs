@@ -20,7 +20,7 @@ use finstack_quant_portfolio::metrics::aggregate_metrics;
 use finstack_quant_portfolio::valuation::{
     value_portfolio, PortfolioValuationOptions, RequestedMetrics,
 };
-use finstack_quant_portfolio::{metrics_to_table, positions_to_table};
+use finstack_quant_portfolio::{dataframe::metrics_to_table, dataframe::positions_to_table};
 use std::hint::black_box;
 
 fn best_effort_metrics() -> PortfolioValuationOptions {

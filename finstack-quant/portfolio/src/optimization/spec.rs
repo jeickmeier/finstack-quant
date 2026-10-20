@@ -7,8 +7,8 @@ use super::{
     PortfolioOptimizationProblem, PortfolioOptimizationResult, PortfolioOptimizationResultWire,
     TradeUniverse, WeightingScheme,
 };
-use crate::error::Result;
 use crate::portfolio::{Portfolio, PortfolioSpec};
+use crate::Result;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::market_data::context::MarketContext;
 use serde::{Deserialize, Serialize};

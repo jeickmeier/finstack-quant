@@ -16,8 +16,7 @@ use pyo3::prelude::*;
 pub fn parse_portfolio_spec_json(py: Python<'_>, json_str: &str) -> PyResult<String> {
     let json_str = json_str.to_owned();
     py.detach(move || {
-        let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
-            serde_json::from_str(&json_str)?;
+        let spec: finstack_quant_portfolio::PortfolioSpec = serde_json::from_str(&json_str)?;
         serde_json::to_string(&spec)
     })
     .map_err(display_to_py)

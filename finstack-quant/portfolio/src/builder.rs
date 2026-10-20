@@ -3,7 +3,7 @@
 //! This module provides a fluent interface for constructing validated portfolios.
 //! The builder keeps track of entities, positions, metadata and validates the resulting
 //! [`Portfolio`] to ensure it is internally consistent.
-//! Typical usage starts by creating a builder with [`Portfolio::builder`](crate::portfolio::Portfolio::builder), chaining
+//! Typical usage starts by creating a builder with [`Portfolio::builder`](crate::Portfolio::builder), chaining
 //! configuration methods, and finalizing with [`PortfolioBuilder::build`].
 //!
 //! # Error Handling Best Practices
@@ -38,9 +38,9 @@
 
 use crate::book::{Book, BookId};
 use crate::error::{Error, Result};
-use crate::portfolio::Portfolio;
 use crate::position::Position;
 use crate::types::{Entity, EntityId, DUMMY_ENTITY_ID};
+use crate::Portfolio;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use indexmap::IndexMap;
@@ -231,7 +231,7 @@ impl PortfolioBuilder {
     /// 1. Ensures the base currency and valuation date are configured.
     /// 2. Injects a dummy entity when positions reference [`DUMMY_ENTITY_ID`].
     /// 3. Adds each position's book membership when supplied via `Position::with_book`.
-    /// 4. Delegates to [`Portfolio::validate`](crate::portfolio::Portfolio::validate) to confirm
+    /// 4. Delegates to [`Portfolio::validate`](crate::Portfolio::validate) to confirm
     ///    entity references and portfolio structure.
     ///
     /// # Returns
@@ -244,11 +244,11 @@ impl PortfolioBuilder {
     /// or validation fails.
     pub fn build(mut self) -> Result<Portfolio> {
         let base_currency = self.base_currency.ok_or_else(|| {
-            crate::error::Error::ValidationFailed("Base currency must be set".to_string())
+            crate::Error::ValidationFailed("Base currency must be set".to_string())
         })?;
 
         let as_of = self.as_of.ok_or_else(|| {
-            crate::error::Error::ValidationFailed("Valuation date (as_of) must be set".to_string())
+            crate::Error::ValidationFailed("Valuation date (as_of) must be set".to_string())
         })?;
 
         let needs_dummy = self

@@ -138,128 +138,54 @@ macro_rules! define_string_id {
     };
 }
 
-/// Portfolio-level PnL attribution and breakdowns.
-pub mod attribution;
-/// Book hierarchy and identifiers.
-pub mod book;
-/// Brinson-Fachler three-way benchmark-relative attribution with
-/// Carino linking.
-pub mod brinson;
-/// Fluent portfolio construction helpers.
-pub mod builder;
-/// Tabular exports for portfolio results.
-pub(crate) mod dataframe;
-/// Error types for portfolio operations.
-pub mod error;
-/// Duration-cell base-return tables from a reference universe (Lehman App. B).
-pub mod excess_return;
-/// Factor-Brinson unified attribution over continuous factor exposures
-/// (Jeet & Partani 2023).
-pub mod factor_brinson;
-/// Factor-model portfolio risk decomposition outputs and engines.
-pub mod factor_model;
-/// Campisi-style benchmark-relative fixed-income attribution
-/// (carry / treasury / spread / selection with Carino linking).
-pub mod fi_attribution;
-/// Shared FX conversion helpers (e.g. converting position values to base currency).
-pub(crate) mod fx;
-/// Hierarchical duration-cell x sector grid attribution (Lehman/Dynkin-Hyman-Vankudre 1998).
-pub mod grid_attribution;
-/// Grouping and aggregation by attributes or books.
-pub mod grouping;
-/// Portfolio margin and netting set utilities.
-pub(crate) mod margin;
-/// Metrics aggregation and reporting.
-pub mod metrics;
-/// Portfolio optimization engines and constraints.
-pub mod optimization;
-/// TWRR / MWRR / GIPS-style return linking.
-pub mod performance;
-/// Portfolio container and state management.
-pub mod portfolio;
-/// Position primitives and units.
-pub mod position;
-/// Primitive exposure and overlapping-concentration reports.
-pub mod primitive;
-#[cfg(feature = "json-schema")]
-pub mod schema;
-
-/// Result envelopes for portfolio operations.
-pub mod results;
-/// Factor sensitivity engines (delta-based + full-repricing) and JSON façade.
-pub mod sensitivity;
-/// Core portfolio entity and ID types.
-pub mod types;
-/// Portfolio valuation APIs.
-pub mod valuation;
-
-/// Cashflow ladder and schedule aggregation utilities.
-pub mod cashflows;
-/// Market-factor dependency index for selective repricing.
-pub(crate) mod dependencies;
-/// Request-scoped portfolio evaluation planning and execution.
-pub(crate) mod evaluation;
-
-#[cfg(test)]
-mod test_utils;
-
-/// Scenario application for portfolios.
-pub mod scenarios;
-
-/// Historical scenario replay for portfolios.
-pub mod replay;
+// One public path per item: the four modules below hold the crate-defining
+// types and stay private, so `Error`, `Result`, `Portfolio`, `PortfolioSpec`,
+// `PortfolioBuilder` and `PortfolioResult` live at the crate root only. Every
+// other item is reached through its public module and is not re-exported here.
+mod builder;
+mod error;
+mod portfolio;
+mod results;
 
 pub use builder::PortfolioBuilder;
 pub use error::{Error, Result};
-pub use portfolio::Portfolio;
-pub use types::{AttributeTest, AttributeValue, ComparisonOp, Entity, PositionId};
-
-pub use brinson::{
-    brinson_fachler, carino_link, carino_link_from_sector_periods, BrinsonPeriodResult,
-    CarinoLinkedAttribution, SectorPeriod,
-};
-pub use dataframe::{
-    aggregated_metrics_to_table, entities_to_table, metrics_to_table, positions_to_table,
-};
-pub use dependencies::{flatten_dependencies, DependencyIndex, MarketFactorKey};
-pub use excess_return::{
-    cell_returns_from_curves, cell_returns_from_reference, excess_returns, CellConfig,
-    DurationCellTable, ExcessReturnPosition, ExcessReturnResult, ReferenceReturn,
-};
-pub use factor_brinson::{
-    factor_brinson_attribution, FactorBrinsonContribution, FactorBrinsonInput, FactorBrinsonResult,
-};
-pub use factor_model::{
-    allocate_weights, allocate_weights_json, validate_allocation_json, WeightAllocationResult,
-    WeightAllocationSpec,
-};
-pub use fi_attribution::{
-    campisi_attribution, campisi_carino_link, campisi_carino_link_from_snapshots,
-    FiAttributionConfig, FiAttributionResult, FiCarinoLinkedResult, FiPeriodInput,
-    FiPositionSnapshot, FiReconciliationReport,
-};
-pub use grid_attribution::{
-    grid_attribution, grid_carino_link, GridAttributionResult, GridCarinoLinkedResult, GridPosition,
-};
-pub use margin::{NettingSetMargin, PortfolioMarginAggregator, PortfolioMarginResult};
-pub use performance::{
-    mwr_xirr, twrr_linked, twrr_modified_dietz, DatedCashflow, LinkedReturn, TwrrPeriod,
-};
-pub use portfolio::PortfolioSpec;
-pub use position::{Position, PositionUnit};
-pub use primitive::primitive_exposures;
+pub use portfolio::{Portfolio, PortfolioSpec};
 pub use results::PortfolioResult;
-pub use valuation::{
-    value_portfolio, PortfolioValuation, PortfolioValuationOptions, RequestedMetrics,
-};
 
-/// Strict versioned portfolio materialization bundles and native bulk loading.
+pub mod allocation;
+pub mod attribution;
+pub mod book;
+pub mod brinson;
+pub mod cashflows;
+pub mod dataframe;
+pub mod dependencies;
+pub(crate) mod evaluation;
+pub mod excess_return;
+pub mod factor_brinson;
+pub mod factor_model;
+pub mod fi_attribution;
+pub(crate) mod fx;
+pub mod grid_attribution;
+pub mod grouping;
+pub mod margin;
 pub mod materialization;
-pub use materialization::{
-    InstrumentArtifact, InstrumentArtifactCache, MaterializationPhases, MaterializationReport,
-    MaterializedPosition, MaterializerInfo, PortfolioHeader, PortfolioMaterializationEnvelope,
-    PortfolioMaterializationSchema,
-};
+pub mod metrics;
+/// Portfolio optimization engines and constraints.
+pub mod optimization;
+pub mod performance;
+pub mod position;
+pub mod primitive;
+pub mod replay;
+pub mod scenarios;
+/// JSON Schema registry for the portfolio wire contracts.
+#[cfg(feature = "json-schema")]
+pub mod schema;
+pub mod sensitivity;
+pub mod types;
+pub mod valuation;
+
+#[cfg(test)]
+mod test_utils;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

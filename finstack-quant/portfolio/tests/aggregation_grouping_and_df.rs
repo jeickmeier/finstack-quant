@@ -56,10 +56,11 @@ fn dataframe_exports_have_expected_columns() {
     )
     .unwrap();
 
-    let table_pos = finstack_quant_portfolio::positions_to_table(&valuation).unwrap();
-    let table_ent = finstack_quant_portfolio::entities_to_table(&valuation).unwrap();
-    let table_m = finstack_quant_portfolio::metrics_to_table(&metrics).unwrap();
-    let table_ma = finstack_quant_portfolio::aggregated_metrics_to_table(&metrics).unwrap();
+    let table_pos = finstack_quant_portfolio::dataframe::positions_to_table(&valuation).unwrap();
+    let table_ent = finstack_quant_portfolio::dataframe::entities_to_table(&valuation).unwrap();
+    let table_m = finstack_quant_portfolio::dataframe::metrics_to_table(&metrics).unwrap();
+    let table_ma =
+        finstack_quant_portfolio::dataframe::aggregated_metrics_to_table(&metrics).unwrap();
 
     let pos_cols: Vec<&str> = table_pos
         .columns

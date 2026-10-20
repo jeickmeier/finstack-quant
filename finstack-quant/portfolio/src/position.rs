@@ -68,7 +68,7 @@ pub enum PositionUnit {
 }
 
 impl std::str::FromStr for PositionUnit {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     /// Parse a unit-only position unit from its serde name.
     ///
@@ -90,7 +90,7 @@ impl std::str::FromStr for PositionUnit {
             "units" => Ok(Self::Units),
             "face_value" => Ok(Self::FaceValue),
             "percentage" => Ok(Self::Percentage),
-            other => Err(crate::error::Error::invalid_input(format!(
+            other => Err(crate::Error::invalid_input(format!(
                 "unknown position unit {other:?}; expected one of units, face_value, \
                  percentage, or the mapping {{\"notional\": <currency or null>}}"
             ))),

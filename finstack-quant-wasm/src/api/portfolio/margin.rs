@@ -18,7 +18,7 @@ use wasm_bindgen::prelude::*;
 /// one are counted in `positions_without_margin`.
 #[wasm_bindgen(js_name = PortfolioMarginAggregator)]
 pub struct JsPortfolioMarginAggregator {
-    inner: finstack_quant_portfolio::PortfolioMarginAggregator,
+    inner: finstack_quant_portfolio::margin::PortfolioMarginAggregator,
 }
 
 #[wasm_bindgen(js_class = PortfolioMarginAggregator)]
@@ -33,9 +33,11 @@ impl JsPortfolioMarginAggregator {
     /// netting set carry conflicting margin specifications.
     #[wasm_bindgen(js_name = fromPortfolio)]
     pub fn from_portfolio(portfolio: &JsPortfolio) -> Result<JsPortfolioMarginAggregator, JsValue> {
-        finstack_quant_portfolio::PortfolioMarginAggregator::from_portfolio(&portfolio.inner)
-            .map(|inner| Self { inner })
-            .map_err(to_js_err)
+        finstack_quant_portfolio::margin::PortfolioMarginAggregator::from_portfolio(
+            &portfolio.inner,
+        )
+        .map(|inner| Self { inner })
+        .map_err(to_js_err)
     }
 
     /// Calculate margin requirements for the portfolio.

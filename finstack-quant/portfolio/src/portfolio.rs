@@ -119,17 +119,17 @@ pub struct PortfolioSpec {
 }
 
 impl Portfolio {
-    /// Create a [`crate::builder::PortfolioBuilder`] for constructing a portfolio.
+    /// Create a [`crate::PortfolioBuilder`] for constructing a portfolio.
     ///
     /// This is the single canonical entry point for portfolio construction.
-    /// The builder validates invariants on [`crate::builder::PortfolioBuilder::build`].
+    /// The builder validates invariants on [`crate::PortfolioBuilder::build`].
     ///
     /// # Arguments
     ///
     /// * `id` - Stable string identifier used for lookup and serialization of this object
     #[must_use]
-    pub fn builder(id: impl Into<String>) -> crate::builder::PortfolioBuilder {
-        crate::builder::PortfolioBuilder::new(id)
+    pub fn builder(id: impl Into<String>) -> crate::PortfolioBuilder {
+        crate::PortfolioBuilder::new(id)
     }
 
     /// Rebuild both derived caches: the position-ID lookup and the

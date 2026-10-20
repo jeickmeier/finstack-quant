@@ -278,7 +278,7 @@ pub struct ReplayResult {
     pub skipped_dates: Vec<(Date, String)>,
 }
 
-use crate::portfolio::Portfolio;
+use crate::Portfolio;
 use finstack_quant_core::config::FinstackConfig;
 
 /// Phase-A valuation profile, widened so its results can also serve as the

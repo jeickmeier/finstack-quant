@@ -47,10 +47,10 @@ fn table_metadata(source: &str) -> IndexMap<String, serde_json::Value> {
 /// # Examples
 ///
 /// ```no_run
-/// use finstack_quant_portfolio::positions_to_table;
+/// use finstack_quant_portfolio::dataframe::positions_to_table;
 ///
 /// # fn main() -> finstack_quant_core::Result<()> {
-/// # let valuation: finstack_quant_portfolio::PortfolioValuation = unimplemented!("Provide a valuation");
+/// # let valuation: finstack_quant_portfolio::valuation::PortfolioValuation = unimplemented!("Provide a valuation");
 /// let table = positions_to_table(&valuation)?;
 /// assert!(table.column("position_id").is_some());
 /// # Ok(())

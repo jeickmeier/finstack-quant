@@ -395,7 +395,7 @@ fn fx_rate_for_position(
         return Ok(base_amount / native_amount);
     }
 
-    Err(crate::error::Error::FxConversionFailed {
+    Err(crate::Error::FxConversionFailed {
         from: native_currency,
         to: base_currency,
     })

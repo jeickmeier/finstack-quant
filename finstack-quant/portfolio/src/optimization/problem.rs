@@ -3,7 +3,7 @@
 use super::constraints::Constraint;
 use super::types::{MissingMetricPolicy, Objective, WeightingScheme};
 use super::universe::TradeUniverse;
-use crate::portfolio::Portfolio;
+use crate::Portfolio;
 
 /// Complete optimization problem specification.
 #[derive(Clone, Debug)]

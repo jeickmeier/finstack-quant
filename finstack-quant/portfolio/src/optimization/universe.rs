@@ -201,13 +201,11 @@ struct CandidatePositionSpec {
 }
 
 impl TryFrom<CandidatePositionSpec> for CandidatePosition {
-    type Error = crate::error::Error;
+    type Error = crate::Error;
 
     fn try_from(spec: CandidatePositionSpec) -> Result<Self, Self::Error> {
         let instrument = spec.instrument_spec.into_boxed().map_err(|e| {
-            crate::error::Error::invalid_input(format!(
-                "Failed to convert candidate instrument JSON: {e}"
-            ))
+            crate::Error::invalid_input(format!("Failed to convert candidate instrument JSON: {e}"))
         })?;
         Ok(Self {
             id: spec.id,

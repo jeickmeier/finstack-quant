@@ -75,7 +75,7 @@ come from `finstack-quant-margin`.
 
 ```rust,no_run
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_portfolio::{Portfolio, PortfolioMarginAggregator};
+use finstack_quant_portfolio::{Portfolio, margin::PortfolioMarginAggregator};
 use time::macros::date;
 
 fn report(

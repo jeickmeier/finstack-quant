@@ -217,7 +217,7 @@ pub(super) fn factor_stress_pnl(
         .map(|changed_factor_keys| -> Result<Option<Vec<usize>>> {
             if changed_factor_keys
                 .iter()
-                .any(|key| matches!(key, crate::MarketFactorKey::Fx { .. }))
+                .any(|key| matches!(key, crate::dependencies::MarketFactorKey::Fx { .. }))
             {
                 // Translation through bumped spot FX can move every cross-currency
                 // position, including instruments that do not declare an FX

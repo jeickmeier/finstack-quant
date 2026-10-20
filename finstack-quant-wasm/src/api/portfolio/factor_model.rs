@@ -9,9 +9,8 @@ use crate::utils::date::parse_iso_date;
 use crate::utils::input::{from_js_json, js_bool, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_factor::{FactorId, FactorModelConfig};
-use finstack_quant_portfolio::factor_model::{
-    self as fm, FactorModel, PositionChange, WeightAllocationSpec,
-};
+use finstack_quant_portfolio::allocation::{self, WeightAllocationSpec};
+use finstack_quant_portfolio::factor_model::{self as fm, FactorModel, PositionChange};
 use finstack_quant_portfolio::sensitivity::SensitivityMatrixJson;
 use wasm_bindgen::prelude::*;
 
@@ -256,7 +255,7 @@ impl JsFactorModel {
 #[wasm_bindgen(js_name = allocateWeights)]
 pub fn allocate_weights(spec: JsValue) -> Result<JsValue, JsValue> {
     let spec: WeightAllocationSpec = from_js_json(&spec, "spec")?;
-    let result = fm::allocate_weights(&spec).map_err(to_js_err)?;
+    let result = allocation::allocate_weights(&spec).map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -275,7 +274,7 @@ pub fn allocate_weights(spec: JsValue) -> Result<JsValue, JsValue> {
 #[wasm_bindgen(js_name = allocateWeightsJson)]
 pub fn allocate_weights_json(spec_json: JsValue) -> Result<String, JsValue> {
     let spec_json = json_text(&spec_json, "specJson")?;
-    fm::allocate_weights_json(&spec_json).map_err(to_js_err)
+    allocation::allocate_weights_json(&spec_json).map_err(to_js_err)
 }
 
 /// Validate a strategy allocation specification and return its canonical JSON.
@@ -294,7 +293,7 @@ pub fn allocate_weights_json(spec_json: JsValue) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = validateAllocationJson)]
 pub fn validate_allocation_json(spec_json: JsValue) -> Result<String, JsValue> {
     let spec_json = json_text(&spec_json, "specJson")?;
-    fm::validate_allocation_json(&spec_json).map_err(to_js_err)
+    allocation::validate_allocation_json(&spec_json).map_err(to_js_err)
 }
 
 /// Build a credit volatility report from a risk decomposition and a credit factor model.

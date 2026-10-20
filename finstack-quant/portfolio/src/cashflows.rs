@@ -14,8 +14,8 @@
 use crate::error::{Error, Result};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
-use crate::portfolio::Portfolio;
 use crate::types::PositionId;
+use crate::Portfolio;
 #[cfg(test)]
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_cashflows::builder::CashflowRepresentation;

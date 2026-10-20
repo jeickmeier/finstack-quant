@@ -99,16 +99,16 @@ pub(super) fn materialization_report() -> Result<Vec<Value>> {
 // Brinson-Fachler
 // ---------------------------------------------------------------------------
 
-fn sector_periods(shift: f64) -> Vec<crate::SectorPeriod> {
+fn sector_periods(shift: f64) -> Vec<crate::brinson::SectorPeriod> {
     vec![
-        crate::SectorPeriod {
+        crate::brinson::SectorPeriod {
             sector: "Technology".to_string(),
             portfolio_weight: 0.60,
             benchmark_weight: 0.50,
             portfolio_return: 0.040 + shift,
             benchmark_return: 0.030 + shift,
         },
-        crate::SectorPeriod {
+        crate::brinson::SectorPeriod {
             sector: "Utilities".to_string(),
             portfolio_weight: 0.40,
             benchmark_weight: 0.50,
@@ -125,47 +125,49 @@ pub(super) fn sector_period() -> Result<Vec<Value>> {
 /// Two periods of [`sector_period`]-style inputs, attributed and linked.
 pub(super) fn carino_linked_attribution() -> Result<Vec<Value>> {
     let periods = [
-        crate::brinson_fachler(&sector_periods(0.0))?,
-        crate::brinson_fachler(&sector_periods(-0.02))?,
+        crate::brinson::brinson_fachler(&sector_periods(0.0))?,
+        crate::brinson::brinson_fachler(&sector_periods(-0.02))?,
     ];
-    example(&crate::carino_link(&periods)?)
+    example(&crate::brinson::carino_link(&periods)?)
 }
 
 // ---------------------------------------------------------------------------
 // Duration-matched excess returns
 // ---------------------------------------------------------------------------
 
-fn cell_config_value() -> crate::CellConfig {
-    crate::CellConfig { width: 1.0 }
+fn cell_config_value() -> crate::excess_return::CellConfig {
+    crate::excess_return::CellConfig { width: 1.0 }
 }
 
-fn reference_returns() -> Vec<crate::ReferenceReturn> {
+fn reference_returns() -> Vec<crate::excess_return::ReferenceReturn> {
     [(2.0, 0.004), (5.0, 0.009), (10.0, 0.015)]
         .into_iter()
-        .map(|(duration, total_return)| crate::ReferenceReturn {
-            duration,
-            total_return,
-        })
+        .map(
+            |(duration, total_return)| crate::excess_return::ReferenceReturn {
+                duration,
+                total_return,
+            },
+        )
         .collect()
 }
 
-fn duration_cell_table_value() -> Result<crate::DurationCellTable> {
-    Ok(crate::cell_returns_from_reference(
+fn duration_cell_table_value() -> Result<crate::excess_return::DurationCellTable> {
+    Ok(crate::excess_return::cell_returns_from_reference(
         &reference_returns(),
         "UST",
         &cell_config_value(),
     )?)
 }
 
-fn excess_return_positions() -> Vec<crate::ExcessReturnPosition> {
+fn excess_return_positions() -> Vec<crate::excess_return::ExcessReturnPosition> {
     vec![
-        crate::ExcessReturnPosition {
+        crate::excess_return::ExcessReturnPosition {
             id: "ACME 4.25 2030".to_string(),
             weight: 0.6,
             duration: 4.6,
             total_return: 0.0112,
         },
-        crate::ExcessReturnPosition {
+        crate::excess_return::ExcessReturnPosition {
             id: "GLOBEX 5.5 2034".to_string(),
             weight: 0.4,
             duration: 7.4,
@@ -191,7 +193,7 @@ pub(super) fn excess_return_position() -> Result<Vec<Value>> {
 }
 
 pub(super) fn excess_return_result() -> Result<Vec<Value>> {
-    example(&crate::excess_returns(
+    example(&crate::excess_return::excess_returns(
         &excess_return_positions(),
         &duration_cell_table_value()?,
     )?)
@@ -207,11 +209,11 @@ fn fi_snapshot(
     spread: f64,
     modified_duration: f64,
     delta_spread: f64,
-) -> crate::FiPositionSnapshot {
+) -> crate::fi_attribution::FiPositionSnapshot {
     let yield_annual = 0.04 + spread;
     let spread_duration = modified_duration - 0.2;
     let delta_treasury_yield = -0.0010;
-    crate::FiPositionSnapshot {
+    crate::fi_attribution::FiPositionSnapshot {
         sector: sector.to_string(),
         weight,
         // Carry plus the first-order treasury and spread price effects.
@@ -228,8 +230,8 @@ fn fi_snapshot(
 }
 
 /// A portfolio overweight Industrials and longer in duration than its benchmark.
-fn fi_period_input_value(delta_spread: f64) -> crate::FiPeriodInput {
-    crate::FiPeriodInput {
+fn fi_period_input_value(delta_spread: f64) -> crate::fi_attribution::FiPeriodInput {
+    crate::fi_attribution::FiPeriodInput {
         portfolio: vec![
             fi_snapshot("Industrials", 0.6, 0.012, 5.6, delta_spread),
             fi_snapshot("Financials", 0.4, 0.015, 4.4, 0.0),
@@ -241,8 +243,8 @@ fn fi_period_input_value(delta_spread: f64) -> crate::FiPeriodInput {
     }
 }
 
-fn fi_config_value() -> crate::FiAttributionConfig {
-    crate::FiAttributionConfig {
+fn fi_config_value() -> crate::fi_attribution::FiAttributionConfig {
+    crate::fi_attribution::FiAttributionConfig {
         period_years: 1.0 / 12.0,
     }
 }
@@ -256,7 +258,7 @@ pub(super) fn fi_period_input() -> Result<Vec<Value>> {
 }
 
 pub(super) fn fi_carino_linked_result() -> Result<Vec<Value>> {
-    example(&crate::campisi_carino_link_from_snapshots(
+    example(&crate::fi_attribution::campisi_carino_link_from_snapshots(
         &[
             fi_period_input_value(-0.0005),
             fi_period_input_value(0.0003),
@@ -267,8 +269,11 @@ pub(super) fn fi_carino_linked_result() -> Result<Vec<Value>> {
 
 pub(super) fn fi_reconciliation_report() -> Result<Vec<Value>> {
     let period = fi_period_input_value(-0.0005);
-    let result =
-        crate::campisi_attribution(&period.portfolio, &period.benchmark, &fi_config_value())?;
+    let result = crate::fi_attribution::campisi_attribution(
+        &period.portfolio,
+        &period.benchmark,
+        &fi_config_value(),
+    )?;
     example(&result.reconciliation_check(1e-9))
 }
 
@@ -276,12 +281,14 @@ pub(super) fn fi_reconciliation_report() -> Result<Vec<Value>> {
 // Curve x sector grid attribution
 // ---------------------------------------------------------------------------
 
-fn grid_positions(tilt: f64, alpha: f64) -> Vec<crate::GridPosition> {
-    let position = |cell: &str, sector: &str, weight: f64, total_return: f64| crate::GridPosition {
-        cell: cell.to_string(),
-        sector: sector.to_string(),
-        weight,
-        total_return,
+fn grid_positions(tilt: f64, alpha: f64) -> Vec<crate::grid_attribution::GridPosition> {
+    let position = |cell: &str, sector: &str, weight: f64, total_return: f64| {
+        crate::grid_attribution::GridPosition {
+            cell: cell.to_string(),
+            sector: sector.to_string(),
+            weight,
+            total_return,
+        }
     };
     vec![
         position("0-5y", "Industrials", 0.5 + tilt, 0.008 + alpha),
@@ -295,16 +302,22 @@ pub(super) fn grid_position() -> Result<Vec<Value>> {
 }
 
 pub(super) fn grid_carino_linked_result() -> Result<Vec<Value>> {
-    let period = crate::grid_attribution(&grid_positions(0.1, 0.001), &grid_positions(0.0, 0.0))?;
-    example(&crate::grid_carino_link(&[period.clone(), period])?)
+    let period = crate::grid_attribution::grid_attribution(
+        &grid_positions(0.1, 0.001),
+        &grid_positions(0.0, 0.0),
+    )?;
+    example(&crate::grid_attribution::grid_carino_link(&[
+        period.clone(),
+        period,
+    ])?)
 }
 
 // ---------------------------------------------------------------------------
 // Factor Brinson
 // ---------------------------------------------------------------------------
 
-fn factor_brinson_input_value() -> crate::FactorBrinsonInput {
-    crate::FactorBrinsonInput {
+fn factor_brinson_input_value() -> crate::factor_brinson::FactorBrinsonInput {
+    crate::factor_brinson::FactorBrinsonInput {
         asset_ids: vec!["AAPL".to_string(), "XOM".to_string()],
         asset_returns: vec![0.030, 0.010],
         // Row-major assets x factors.
@@ -324,7 +337,7 @@ pub(super) fn factor_brinson_input() -> Result<Vec<Value>> {
 /// The factor returns leave the benchmark no residual, which the Brinson
 /// identification of allocation and selection requires.
 pub(super) fn factor_brinson_result() -> Result<Vec<Value>> {
-    example(&crate::factor_brinson_attribution(
+    example(&crate::factor_brinson::factor_brinson_attribution(
         &factor_brinson_input_value(),
         &[0.0225, -0.005],
     )?)
@@ -335,7 +348,7 @@ pub(super) fn factor_brinson_result() -> Result<Vec<Value>> {
 // ---------------------------------------------------------------------------
 
 pub(super) fn twrr_period() -> Result<Vec<Value>> {
-    example_from_json::<crate::TwrrPeriod>(json!({
+    example_from_json::<crate::performance::TwrrPeriod>(json!({
         "beginning_market_value": 1_000_000.0,
         "ending_market_value": 1_062_000.0,
         "cashflows": [{"amount": 50_000.0, "fraction_of_period_remaining": 0.5}]
@@ -344,11 +357,11 @@ pub(super) fn twrr_period() -> Result<Vec<Value>> {
 
 /// Three annual returns linked over a three-year horizon.
 pub(super) fn linked_return() -> Result<Vec<Value>> {
-    example(&crate::twrr_linked(&[0.08, -0.03, 0.11], 3.0)?)
+    example(&crate::performance::twrr_linked(&[0.08, -0.03, 0.11], 3.0)?)
 }
 
 pub(super) fn dated_cashflow() -> Result<Vec<Value>> {
-    example_from_json::<crate::DatedCashflow>(json!({
+    example_from_json::<crate::performance::DatedCashflow>(json!({
         "date": "2024-01-01",
         "amount": -1_000_000.0
     }))
@@ -358,7 +371,7 @@ pub(super) fn dated_cashflow() -> Result<Vec<Value>> {
 // Strategy weight allocation
 // ---------------------------------------------------------------------------
 
-fn weight_allocation_spec_value() -> Result<crate::WeightAllocationSpec> {
+fn weight_allocation_spec_value() -> Result<crate::allocation::WeightAllocationSpec> {
     serde_json::from_value(json!({
         "scheme": "inverse_volatility",
         "total_capital": 10_000_000.0,
@@ -378,7 +391,7 @@ pub(super) fn weight_allocation_spec() -> Result<Vec<Value>> {
 }
 
 pub(super) fn weight_allocation_result() -> Result<Vec<Value>> {
-    example(&crate::factor_model::allocate_weights(
+    example(&crate::allocation::allocate_weights(
         &weight_allocation_spec_value()?,
     )?)
 }
@@ -444,7 +457,7 @@ pub(super) fn portfolio_cashflows() -> Result<Vec<Value>> {
 }
 
 pub(super) fn portfolio_margin_result() -> Result<Vec<Value>> {
-    example_from_json::<crate::PortfolioMarginResult>(json!({
+    example_from_json::<crate::margin::PortfolioMarginResult>(json!({
         "as_of": "2024-01-01",
         "base_currency": "USD",
         "total_initial_margin": usd("2500000"),
@@ -516,7 +529,7 @@ pub(super) fn portfolio_primitive_exposure_report() -> Result<Vec<Value>> {
 }
 
 pub(super) fn market_factor_key() -> Result<Vec<Value>> {
-    example(&crate::MarketFactorKey::Fx {
+    example(&crate::dependencies::MarketFactorKey::Fx {
         base: finstack_quant_core::currency::Currency::EUR,
         quote: finstack_quant_core::currency::Currency::USD,
     })

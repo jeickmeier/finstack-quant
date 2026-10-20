@@ -314,7 +314,7 @@ impl PyPortfolioOptimizationSpec {
         portfolio: &Bound<'_, PyAny>,
         objective: PyObjective,
     ) -> PyResult<Self> {
-        let portfolio: finstack_quant_portfolio::portfolio::PortfolioSpec =
+        let portfolio: finstack_quant_portfolio::PortfolioSpec =
             if let Ok(built) = portfolio.cast::<crate::bindings::portfolio::types::PyPortfolio>() {
                 built.borrow().inner.to_spec()
             } else {

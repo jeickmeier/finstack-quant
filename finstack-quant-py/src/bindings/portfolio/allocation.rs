@@ -27,12 +27,12 @@ const ALLOCATION_COLUMNS: &[ColumnSchema<'static>] = &[
 )]
 #[derive(Clone)]
 pub struct PyWeightAllocationResult {
-    pub(crate) inner: finstack_quant_portfolio::WeightAllocationResult,
+    pub(crate) inner: finstack_quant_portfolio::allocation::WeightAllocationResult,
 }
 
 crate::bindings::macros::wire_methods!(
     PyWeightAllocationResult,
-    finstack_quant_portfolio::WeightAllocationResult,
+    finstack_quant_portfolio::allocation::WeightAllocationResult,
     "WeightAllocationResult"
 );
 
@@ -109,8 +109,9 @@ fn allocate_weights(
     let spec_json = crate::bindings::extract::extract_records_json(py, spec_json, "spec")?;
     let inner = py
         .detach(move || {
-            let spec = finstack_quant_portfolio::WeightAllocationSpec::from_json(&spec_json)?;
-            finstack_quant_portfolio::allocate_weights(&spec)
+            let spec =
+                finstack_quant_portfolio::allocation::WeightAllocationSpec::from_json(&spec_json)?;
+            finstack_quant_portfolio::allocation::allocate_weights(&spec)
         })
         .map_err(portfolio_to_py)?;
     Ok(PyWeightAllocationResult { inner })
@@ -141,7 +142,7 @@ fn allocate_weights(
 #[pyo3(text_signature = "(spec_json)")]
 fn allocate_weights_json(py: Python<'_>, spec_json: &Bound<'_, PyAny>) -> PyResult<String> {
     let spec_json = crate::bindings::extract::extract_records_json(py, spec_json, "spec")?;
-    py.detach(move || finstack_quant_portfolio::allocate_weights_json(&spec_json))
+    py.detach(move || finstack_quant_portfolio::allocation::allocate_weights_json(&spec_json))
         .map_err(portfolio_to_py)
 }
 
@@ -169,7 +170,7 @@ fn allocate_weights_json(py: Python<'_>, spec_json: &Bound<'_, PyAny>) -> PyResu
 #[pyo3(text_signature = "(spec_json)")]
 fn validate_allocation_json(py: Python<'_>, spec_json: &Bound<'_, PyAny>) -> PyResult<String> {
     let spec_json = crate::bindings::extract::extract_records_json(py, spec_json, "spec")?;
-    py.detach(move || finstack_quant_portfolio::validate_allocation_json(&spec_json))
+    py.detach(move || finstack_quant_portfolio::allocation::validate_allocation_json(&spec_json))
         .map_err(portfolio_to_py)
 }
 

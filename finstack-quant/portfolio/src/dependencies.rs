@@ -215,7 +215,7 @@ pub(crate) fn resolved_dependencies(
 
 /// Inverted index mapping market factor keys to affected position indices.
 ///
-/// Stored alongside the `position_index` on [`Portfolio`](crate::portfolio::Portfolio)
+/// Stored alongside the `position_index` on [`Portfolio`](crate::Portfolio)
 /// as a derived, non-serialized cache.  The index maps each [`MarketFactorKey`]
 /// to the position indices whose instruments depend on that key.
 ///

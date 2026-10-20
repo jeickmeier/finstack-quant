@@ -122,7 +122,59 @@ pub struct AllocationDiagnostics {
 /// * `spec` - [`WeightAllocationSpec`] selecting the allocation scheme,
 ///   strategy inputs, and any required covariance data.
 pub fn allocate_weights(spec: &WeightAllocationSpec) -> Result<WeightAllocationResult> {
-    spec.execute()
+    spec.validate_common()?;
+    let covariance = if spec.scheme == AllocationScheme::RiskBudget {
+        Some(spec.covariance_matrix()?)
+    } else {
+        None
+    };
+    let mut volatilities = vec![None; spec.strategies.len()];
+    let weights = match spec.scheme {
+        AllocationScheme::Equal => equal_weights(spec.strategies.len()),
+        AllocationScheme::Fixed => fixed_weights(&spec.strategies)?,
+        AllocationScheme::InverseVolatility => {
+            let (weights, vols) = inverse_volatility_weights(&spec.strategies)?;
+            volatilities = vols;
+            weights
+        }
+        AllocationScheme::RiskBudget => {
+            let covariance = covariance.as_ref().ok_or_else(|| {
+                Error::validation("allocation covariance is required for risk_budget scheme")
+            })?;
+            risk_budget_weights(&spec.strategies, covariance)?
+        }
+    };
+
+    let risk_contributions = if let Some(covariance) = covariance.as_ref() {
+        Some(risk_contribution_fractions(&weights, covariance)?)
+    } else {
+        None
+    };
+    let capitals = rounded_capitals(spec.total_capital, &weights, spec.money_decimal_places)?;
+
+    let allocations = spec
+        .strategies
+        .iter()
+        .enumerate()
+        .map(|(idx, strategy)| StrategyAllocation {
+            id: strategy.id.clone(),
+            weight: weights[idx],
+            capital: capitals[idx],
+            volatility: volatilities[idx],
+            risk_contribution: risk_contributions
+                .as_ref()
+                .map(|contributions| contributions[idx]),
+        })
+        .collect();
+
+    Ok(WeightAllocationResult {
+        scheme: spec.scheme,
+        allocations,
+        diagnostics: AllocationDiagnostics {
+            weights_sum: neumaier_sum(weights.iter().copied()),
+            leverage: neumaier_sum(weights.iter().map(|weight| weight.abs())),
+        },
+    })
 }
 
 /// Allocate strategy weights from a JSON specification.
@@ -162,7 +214,7 @@ pub fn allocate_weights_json(spec_json: &str) -> Result<String> {
 /// The canonical compact JSON re-serialization of the accepted spec.
 pub fn validate_allocation_json(spec_json: &str) -> Result<String> {
     let spec = WeightAllocationSpec::from_json(spec_json)?;
-    spec.execute()?;
+    allocate_weights(&spec)?;
     serde_json::to_string(&spec).map_err(|err| {
         Error::InvalidInput(format!("failed to canonicalize allocation spec: {err}"))
     })
@@ -187,62 +239,6 @@ impl WeightAllocationSpec {
     pub fn from_json(spec_json: &str) -> Result<Self> {
         serde_json::from_str(spec_json)
             .map_err(|err| Error::validation(format!("invalid allocation JSON: {err}")))
-    }
-
-    fn execute(&self) -> Result<WeightAllocationResult> {
-        self.validate_common()?;
-        let covariance = if self.scheme == AllocationScheme::RiskBudget {
-            Some(self.covariance_matrix()?)
-        } else {
-            None
-        };
-        let mut volatilities = vec![None; self.strategies.len()];
-        let weights = match self.scheme {
-            AllocationScheme::Equal => equal_weights(self.strategies.len()),
-            AllocationScheme::Fixed => fixed_weights(&self.strategies)?,
-            AllocationScheme::InverseVolatility => {
-                let (weights, vols) = inverse_volatility_weights(&self.strategies)?;
-                volatilities = vols;
-                weights
-            }
-            AllocationScheme::RiskBudget => {
-                let covariance = covariance.as_ref().ok_or_else(|| {
-                    Error::validation("allocation covariance is required for risk_budget scheme")
-                })?;
-                risk_budget_weights(&self.strategies, covariance)?
-            }
-        };
-
-        let risk_contributions = if let Some(covariance) = covariance.as_ref() {
-            Some(risk_contribution_fractions(&weights, covariance)?)
-        } else {
-            None
-        };
-        let capitals = rounded_capitals(self.total_capital, &weights, self.money_decimal_places)?;
-
-        let allocations = self
-            .strategies
-            .iter()
-            .enumerate()
-            .map(|(idx, strategy)| StrategyAllocation {
-                id: strategy.id.clone(),
-                weight: weights[idx],
-                capital: capitals[idx],
-                volatility: volatilities[idx],
-                risk_contribution: risk_contributions
-                    .as_ref()
-                    .map(|contributions| contributions[idx]),
-            })
-            .collect();
-
-        Ok(WeightAllocationResult {
-            scheme: self.scheme,
-            allocations,
-            diagnostics: AllocationDiagnostics {
-                weights_sum: neumaier_sum(weights.iter().copied()),
-                leverage: neumaier_sum(weights.iter().map(|weight| weight.abs())),
-            },
-        })
     }
 
     fn validate_common(&self) -> Result<()> {

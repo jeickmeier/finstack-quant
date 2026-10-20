@@ -1,8 +1,8 @@
 //! Portfolio valuation and aggregation.
 
-use crate::error::Result;
-use crate::portfolio::Portfolio;
 use crate::types::{EntityId, PositionId};
+use crate::Portfolio;
+use crate::Result;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -340,14 +340,14 @@ impl Default for PortfolioValuationOptions {
 ///
 /// # Errors
 ///
-/// Returns [`crate::error::Error`] in the following cases:
+/// Returns [`crate::Error`] in the following cases:
 ///
-/// - [`crate::error::Error::ValuationError`] - Instrument pricing failed for a
+/// - [`crate::Error::ValuationError`] - Instrument pricing failed for a
 ///   position, or a requested risk metric failed while `strict_risk` is `true`
 ///   (the default)
-/// - [`crate::error::Error::MissingMarketData`] - FX matrix unavailable for cross-currency conversion
-/// - [`crate::error::Error::FxConversionFailed`] - Required FX rate not found in the matrix
-/// - [`crate::error::Error::Core`] - Monetary arithmetic overflow during aggregation
+/// - [`crate::Error::MissingMarketData`] - FX matrix unavailable for cross-currency conversion
+/// - [`crate::Error::FxConversionFailed`] - Required FX rate not found in the matrix
+/// - [`crate::Error::Core`] - Monetary arithmetic overflow during aggregation
 ///
 /// # Parallelism
 ///

@@ -94,7 +94,7 @@ impl JsPortfolio {
     #[wasm_bindgen(js_name = fromSpec)]
     pub fn from_spec(spec_json: JsValue) -> Result<JsPortfolio, JsValue> {
         let spec_json: &str = &json_text(&spec_json, "specJson")?;
-        let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
+        let spec: finstack_quant_portfolio::PortfolioSpec =
             serde_json::from_str(spec_json).map_err(to_js_err)?;
         let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
         Ok(Self { inner: portfolio })
@@ -212,7 +212,7 @@ impl JsPortfolio {
 #[wasm_bindgen(js_name = parsePortfolioSpecJson)]
 pub fn parse_portfolio_spec_json(json_str: JsValue) -> Result<String, JsValue> {
     let json_str: &str = &json_text(&json_str, "jsonStr")?;
-    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
+    let spec: finstack_quant_portfolio::PortfolioSpec =
         serde_json::from_str(json_str).map_err(to_js_err)?;
 
     serde_json::to_string(&spec).map_err(to_js_err)
@@ -232,9 +232,9 @@ pub fn parse_portfolio_spec_json(json_str: JsValue) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = brinsonFachler)]
 pub fn brinson_fachler(sectors_json: JsValue) -> Result<JsValue, JsValue> {
     let sectors_json: &str = &json_text(&sectors_json, "sectorsJson")?;
-    let sectors: Vec<finstack_quant_portfolio::SectorPeriod> =
+    let sectors: Vec<finstack_quant_portfolio::brinson::SectorPeriod> =
         serde_json::from_str(sectors_json).map_err(to_js_err)?;
-    let result = finstack_quant_portfolio::brinson_fachler(&sectors).map_err(to_js_err)?;
+    let result = finstack_quant_portfolio::brinson::brinson_fachler(&sectors).map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -255,9 +255,9 @@ pub fn brinson_fachler(sectors_json: JsValue) -> Result<JsValue, JsValue> {
 #[wasm_bindgen(js_name = carinoLink)]
 pub fn carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
     let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
-    let periods: Vec<finstack_quant_portfolio::BrinsonPeriodResult> =
+    let periods: Vec<finstack_quant_portfolio::brinson::BrinsonPeriodResult> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
-    let result = finstack_quant_portfolio::carino_link(&periods).map_err(to_js_err)?;
+    let result = finstack_quant_portfolio::brinson::carino_link(&periods).map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -277,10 +277,10 @@ pub fn carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
 #[wasm_bindgen(js_name = carinoLinkFromSectorPeriods)]
 pub fn carino_link_from_sector_periods(periods_json: JsValue) -> Result<JsValue, JsValue> {
     let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
-    let periods: Vec<Vec<finstack_quant_portfolio::SectorPeriod>> =
+    let periods: Vec<Vec<finstack_quant_portfolio::brinson::SectorPeriod>> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
-    let result =
-        finstack_quant_portfolio::carino_link_from_sector_periods(&periods).map_err(to_js_err)?;
+    let result = finstack_quant_portfolio::brinson::carino_link_from_sector_periods(&periods)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -323,14 +323,16 @@ pub fn campisi_attribution(
     let portfolio_json: &str = &json_text(&portfolio_json, "portfolioJson")?;
     let benchmark_json: &str = &json_text(&benchmark_json, "benchmarkJson")?;
     let config_json: &str = &json_text(&config_json, "configJson")?;
-    let portfolio: Vec<finstack_quant_portfolio::FiPositionSnapshot> =
+    let portfolio: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
         serde_json::from_str(portfolio_json).map_err(to_js_err)?;
-    let benchmark: Vec<finstack_quant_portfolio::FiPositionSnapshot> =
+    let benchmark: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
         serde_json::from_str(benchmark_json).map_err(to_js_err)?;
-    let config: finstack_quant_portfolio::FiAttributionConfig =
+    let config: finstack_quant_portfolio::fi_attribution::FiAttributionConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
-    let result = finstack_quant_portfolio::campisi_attribution(&portfolio, &benchmark, &config)
-        .map_err(to_js_err)?;
+    let result = finstack_quant_portfolio::fi_attribution::campisi_attribution(
+        &portfolio, &benchmark, &config,
+    )
+    .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -361,9 +363,10 @@ pub fn campisi_attribution(
 #[wasm_bindgen(js_name = campisiCarinoLink)]
 pub fn campisi_carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
     let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
-    let periods: Vec<finstack_quant_portfolio::FiAttributionResult> =
+    let periods: Vec<finstack_quant_portfolio::fi_attribution::FiAttributionResult> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
-    let result = finstack_quant_portfolio::campisi_carino_link(&periods).map_err(to_js_err)?;
+    let result = finstack_quant_portfolio::fi_attribution::campisi_carino_link(&periods)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -388,12 +391,14 @@ pub fn campisi_carino_link_from_snapshots(
 ) -> Result<JsValue, JsValue> {
     let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
     let config_json: &str = &json_text(&config_json, "configJson")?;
-    let periods: Vec<finstack_quant_portfolio::FiPeriodInput> =
+    let periods: Vec<finstack_quant_portfolio::fi_attribution::FiPeriodInput> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
-    let config: finstack_quant_portfolio::FiAttributionConfig =
+    let config: finstack_quant_portfolio::fi_attribution::FiAttributionConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
-    let result = finstack_quant_portfolio::campisi_carino_link_from_snapshots(&periods, &config)
-        .map_err(to_js_err)?;
+    let result = finstack_quant_portfolio::fi_attribution::campisi_carino_link_from_snapshots(
+        &periods, &config,
+    )
+    .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -420,7 +425,7 @@ pub fn campisi_reconciliation_check(
 ) -> Result<JsValue, JsValue> {
     let tolerance = js_f64(&tolerance, "tolerance")?;
     let result_json: &str = &json_text(&result_json, "resultJson")?;
-    let result: finstack_quant_portfolio::FiAttributionResult =
+    let result: finstack_quant_portfolio::fi_attribution::FiAttributionResult =
         serde_json::from_str(result_json).map_err(to_js_err)?;
     to_js_value(&result.reconciliation_check(tolerance))
 }
@@ -452,13 +457,14 @@ pub fn cell_returns_from_reference(
     let reference_json: &str = &json_text(&reference_json, "referenceJson")?;
     let base_label: &str = &js_string(&base_label, "baseLabel")?;
     let config_json: &str = &json_text(&config_json, "configJson")?;
-    let reference: Vec<finstack_quant_portfolio::ReferenceReturn> =
+    let reference: Vec<finstack_quant_portfolio::excess_return::ReferenceReturn> =
         serde_json::from_str(reference_json).map_err(to_js_err)?;
-    let config: finstack_quant_portfolio::CellConfig =
+    let config: finstack_quant_portfolio::excess_return::CellConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
-    let table =
-        finstack_quant_portfolio::cell_returns_from_reference(&reference, base_label, &config)
-            .map_err(to_js_err)?;
+    let table = finstack_quant_portfolio::excess_return::cell_returns_from_reference(
+        &reference, base_label, &config,
+    )
+    .map_err(to_js_err)?;
     to_js_value(&table)
 }
 
@@ -498,9 +504,9 @@ pub fn cell_returns_from_curves(
     let max_duration = js_f64(&max_duration, "maxDuration")?;
     let base_label: &str = &js_string(&base_label, "baseLabel")?;
     let config_json: &str = &json_text(&config_json, "configJson")?;
-    let config: finstack_quant_portfolio::CellConfig =
+    let config: finstack_quant_portfolio::excess_return::CellConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
-    let table = finstack_quant_portfolio::cell_returns_from_curves(
+    let table = finstack_quant_portfolio::excess_return::cell_returns_from_curves(
         &start.inner,
         &end.inner,
         horizon_years,
@@ -534,11 +540,12 @@ pub fn cell_returns_from_curves(
 pub fn excess_returns(positions_json: JsValue, table_json: JsValue) -> Result<JsValue, JsValue> {
     let positions_json: &str = &json_text(&positions_json, "positionsJson")?;
     let table_json: &str = &json_text(&table_json, "tableJson")?;
-    let positions: Vec<finstack_quant_portfolio::ExcessReturnPosition> =
+    let positions: Vec<finstack_quant_portfolio::excess_return::ExcessReturnPosition> =
         serde_json::from_str(positions_json).map_err(to_js_err)?;
-    let table: finstack_quant_portfolio::DurationCellTable =
+    let table: finstack_quant_portfolio::excess_return::DurationCellTable =
         serde_json::from_str(table_json).map_err(to_js_err)?;
-    let result = finstack_quant_portfolio::excess_returns(&positions, &table).map_err(to_js_err)?;
+    let result = finstack_quant_portfolio::excess_return::excess_returns(&positions, &table)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -570,12 +577,13 @@ pub fn grid_attribution(
 ) -> Result<JsValue, JsValue> {
     let portfolio_json: &str = &json_text(&portfolio_json, "portfolioJson")?;
     let benchmark_json: &str = &json_text(&benchmark_json, "benchmarkJson")?;
-    let portfolio: Vec<finstack_quant_portfolio::GridPosition> =
+    let portfolio: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
         serde_json::from_str(portfolio_json).map_err(to_js_err)?;
-    let benchmark: Vec<finstack_quant_portfolio::GridPosition> =
+    let benchmark: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
         serde_json::from_str(benchmark_json).map_err(to_js_err)?;
     let result =
-        finstack_quant_portfolio::grid_attribution(&portfolio, &benchmark).map_err(to_js_err)?;
+        finstack_quant_portfolio::grid_attribution::grid_attribution(&portfolio, &benchmark)
+            .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -598,9 +606,10 @@ pub fn grid_attribution(
 #[wasm_bindgen(js_name = gridCarinoLink)]
 pub fn grid_carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
     let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
-    let periods: Vec<finstack_quant_portfolio::GridAttributionResult> =
+    let periods: Vec<finstack_quant_portfolio::grid_attribution::GridAttributionResult> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
-    let result = finstack_quant_portfolio::grid_carino_link(&periods).map_err(to_js_err)?;
+    let result = finstack_quant_portfolio::grid_attribution::grid_carino_link(&periods)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -628,10 +637,13 @@ pub fn factor_brinson_attribution(
 ) -> Result<JsValue, JsValue> {
     let factor_returns = js_f64_seq(&factor_returns, "factorReturns")?;
     let input_json: &str = &json_text(&input_json, "inputJson")?;
-    let input: finstack_quant_portfolio::FactorBrinsonInput =
+    let input: finstack_quant_portfolio::factor_brinson::FactorBrinsonInput =
         serde_json::from_str(input_json).map_err(to_js_err)?;
-    let result = finstack_quant_portfolio::factor_brinson_attribution(&input, &factor_returns)
-        .map_err(to_js_err)?;
+    let result = finstack_quant_portfolio::factor_brinson::factor_brinson_attribution(
+        &input,
+        &factor_returns,
+    )
+    .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -646,9 +658,9 @@ pub fn factor_brinson_attribution(
 #[wasm_bindgen(js_name = twrrModifiedDietz)]
 pub fn twrr_modified_dietz(period_json: JsValue) -> Result<f64, JsValue> {
     let period_json: &str = &json_text(&period_json, "periodJson")?;
-    let period: finstack_quant_portfolio::TwrrPeriod =
+    let period: finstack_quant_portfolio::performance::TwrrPeriod =
         serde_json::from_str(period_json).map_err(to_js_err)?;
-    finstack_quant_portfolio::twrr_modified_dietz(&period).map_err(to_js_err)
+    finstack_quant_portfolio::performance::twrr_modified_dietz(&period).map_err(to_js_err)
 }
 
 /// Geometrically link TWRR sub-period returns from returns JSON.
@@ -666,8 +678,8 @@ pub fn twrr_linked(returns_json: JsValue, horizon_years: JsValue) -> Result<JsVa
     let horizon_years = js_f64(&horizon_years, "horizonYears")?;
     let returns_json: &str = &json_text(&returns_json, "returnsJson")?;
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
-    let result =
-        finstack_quant_portfolio::twrr_linked(&returns, horizon_years).map_err(to_js_err)?;
+    let result = finstack_quant_portfolio::performance::twrr_linked(&returns, horizon_years)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -693,9 +705,9 @@ pub fn twrr_linked(returns_json: JsValue, horizon_years: JsValue) -> Result<JsVa
 #[wasm_bindgen(js_name = mwrXirr)]
 pub fn mwr_xirr(cashflows_json: JsValue) -> Result<f64, JsValue> {
     let cashflows_json: &str = &json_text(&cashflows_json, "cashflowsJson")?;
-    let cashflows: Vec<finstack_quant_portfolio::DatedCashflow> =
+    let cashflows: Vec<finstack_quant_portfolio::performance::DatedCashflow> =
         serde_json::from_str(cashflows_json).map_err(to_js_err)?;
-    finstack_quant_portfolio::mwr_xirr(&cashflows).map_err(to_js_err)
+    finstack_quant_portfolio::performance::mwr_xirr(&cashflows).map_err(to_js_err)
 }
 /// Aggregate portfolio metrics from a valuation JSON.
 /// @param valuation_json - `PortfolioValuation` JSON, for example `JSON.stringify(valuePortfolio(...))`.
@@ -1204,7 +1216,7 @@ pub fn replay_portfolio(
     let spec_json: &str = &json_text(&spec_json, "specJson")?;
     let snapshots_json: &str = &json_text(&snapshots_json, "snapshotsJson")?;
     let config_json: &str = &json_text(&config_json, "configJson")?;
-    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
+    let spec: finstack_quant_portfolio::PortfolioSpec =
         serde_json::from_str(spec_json).map_err(to_js_err)?;
     let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
     let config: finstack_quant_portfolio::replay::ReplayConfig =

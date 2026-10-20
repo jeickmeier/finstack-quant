@@ -1,6 +1,6 @@
 //! Versioned, content-addressed portfolio materialization fast path.
 //!
-//! [`crate::portfolio::PortfolioSpec`] remains the portable embedded
+//! [`crate::PortfolioSpec`] remains the portable embedded
 //! interchange format. This module is the native bulk-loading path for
 //! normalized stores: an allocation-free preflight enforces collection limits,
 //! then the outer document is parsed once into its canonical serde type. Unique
@@ -15,10 +15,10 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::dependencies::DependencyIndex;
-use crate::error::Error;
-use crate::portfolio::Portfolio;
 use crate::position::Position;
 use crate::types::PositionId;
+use crate::Error;
+use crate::Portfolio;
 use cache::{CacheKey, CachedArtifact};
 use finstack_quant_core::canonical::CANONICAL_VERSION;
 use finstack_quant_core::contract::{

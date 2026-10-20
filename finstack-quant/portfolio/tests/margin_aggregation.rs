@@ -12,7 +12,8 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_margin::{Marginable, NettingSetId, SimmSensitivities};
 use finstack_quant_portfolio::types::DUMMY_ENTITY_ID;
 use finstack_quant_portfolio::{
-    Entity, Portfolio, PortfolioMarginAggregator, PortfolioMarginResult, Position, PositionUnit,
+    margin::PortfolioMarginAggregator, margin::PortfolioMarginResult, position::Position,
+    position::PositionUnit, types::Entity, Portfolio,
 };
 use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
 use finstack_quant_valuations::pricer::InstrumentType;

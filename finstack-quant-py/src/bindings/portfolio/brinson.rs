@@ -34,12 +34,12 @@ const SECTOR_EFFECT_COLUMNS: &[ColumnSchema<'static>] = &[
 )]
 #[derive(Clone)]
 pub struct PyBrinsonPeriodResult {
-    pub(crate) inner: finstack_quant_portfolio::BrinsonPeriodResult,
+    pub(crate) inner: finstack_quant_portfolio::brinson::BrinsonPeriodResult,
 }
 
 crate::bindings::macros::wire_methods!(
     PyBrinsonPeriodResult,
-    finstack_quant_portfolio::BrinsonPeriodResult,
+    finstack_quant_portfolio::brinson::BrinsonPeriodResult,
     "BrinsonPeriodResult"
 );
 
@@ -115,12 +115,12 @@ impl PyBrinsonPeriodResult {
 )]
 #[derive(Clone)]
 pub struct PyCarinoLinkedAttribution {
-    pub(crate) inner: finstack_quant_portfolio::CarinoLinkedAttribution,
+    pub(crate) inner: finstack_quant_portfolio::brinson::CarinoLinkedAttribution,
 }
 
 crate::bindings::macros::wire_methods!(
     PyCarinoLinkedAttribution,
-    finstack_quant_portfolio::CarinoLinkedAttribution,
+    finstack_quant_portfolio::brinson::CarinoLinkedAttribution,
     "CarinoLinkedAttribution"
 );
 
@@ -189,13 +189,13 @@ impl PyCarinoLinkedAttribution {
 fn run_brinson_fachler(
     py: Python<'_>,
     sectors_json: &str,
-) -> PyResult<finstack_quant_portfolio::BrinsonPeriodResult> {
+) -> PyResult<finstack_quant_portfolio::brinson::BrinsonPeriodResult> {
     let sectors_json = sectors_json.to_owned();
     py.detach(move || {
-        let sectors: Vec<finstack_quant_portfolio::SectorPeriod> =
+        let sectors: Vec<finstack_quant_portfolio::brinson::SectorPeriod> =
             serde_json::from_str(&sectors_json)
                 .map_err(|err| serde_json_to_py(err, "invalid Brinson sectors JSON"))?;
-        finstack_quant_portfolio::brinson_fachler(&sectors).map_err(portfolio_to_py)
+        finstack_quant_portfolio::brinson::brinson_fachler(&sectors).map_err(portfolio_to_py)
     })
 }
 
@@ -203,13 +203,13 @@ fn run_brinson_fachler(
 fn run_carino_link(
     py: Python<'_>,
     periods_json: &str,
-) -> PyResult<finstack_quant_portfolio::CarinoLinkedAttribution> {
+) -> PyResult<finstack_quant_portfolio::brinson::CarinoLinkedAttribution> {
     let periods_json = periods_json.to_owned();
     py.detach(move || {
-        let periods: Vec<finstack_quant_portfolio::BrinsonPeriodResult> =
+        let periods: Vec<finstack_quant_portfolio::brinson::BrinsonPeriodResult> =
             serde_json::from_str(&periods_json)
                 .map_err(|err| serde_json_to_py(err, "invalid Brinson period results JSON"))?;
-        finstack_quant_portfolio::carino_link(&periods).map_err(portfolio_to_py)
+        finstack_quant_portfolio::brinson::carino_link(&periods).map_err(portfolio_to_py)
     })
 }
 
@@ -217,13 +217,14 @@ fn run_carino_link(
 fn run_carino_link_from_sector_periods(
     py: Python<'_>,
     periods_json: &str,
-) -> PyResult<finstack_quant_portfolio::CarinoLinkedAttribution> {
+) -> PyResult<finstack_quant_portfolio::brinson::CarinoLinkedAttribution> {
     let periods_json = periods_json.to_owned();
     py.detach(move || {
-        let periods: Vec<Vec<finstack_quant_portfolio::SectorPeriod>> =
+        let periods: Vec<Vec<finstack_quant_portfolio::brinson::SectorPeriod>> =
             serde_json::from_str(&periods_json)
                 .map_err(|err| serde_json_to_py(err, "invalid Carino sector periods JSON"))?;
-        finstack_quant_portfolio::carino_link_from_sector_periods(&periods).map_err(portfolio_to_py)
+        finstack_quant_portfolio::brinson::carino_link_from_sector_periods(&periods)
+            .map_err(portfolio_to_py)
     })
 }
 

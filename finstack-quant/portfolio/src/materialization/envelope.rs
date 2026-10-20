@@ -21,7 +21,7 @@ pub enum PortfolioMaterializationSchema {
 
 /// Strict, versioned portfolio materialization bundle.
 ///
-/// Unlike [`crate::portfolio::PortfolioSpec`], this database-oriented format
+/// Unlike [`crate::PortfolioSpec`], this database-oriented format
 /// stores each instrument artifact once and lets ordered lightweight positions
 /// reference the artifact by ID.
 #[derive(Clone, Debug, Serialize, Deserialize)]

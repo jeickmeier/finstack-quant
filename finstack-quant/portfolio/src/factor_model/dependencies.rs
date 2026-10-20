@@ -4,7 +4,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_factor::{CurveType, MarketDependency};
 use finstack_quant_valuations::instruments::MarketDependencies;
 
-pub(super) fn flatten(
+pub(super) fn factor_dependencies(
     deps: &MarketDependencies,
     market: &MarketContext,
 ) -> finstack_quant_core::Result<Vec<MarketDependency>> {
@@ -28,11 +28,15 @@ pub(super) fn flatten(
     for id in &deps.credit_index_ids {
         for key in crate::dependencies::credit_index_keys(market, id)? {
             let dependency = match key {
-                crate::MarketFactorKey::Curve { id, .. } => MarketDependency::CreditCurve { id },
-                crate::MarketFactorKey::BaseCorrelation(id) => MarketDependency::Curve {
-                    id,
-                    curve_type: CurveType::BaseCorrelation,
-                },
+                crate::dependencies::MarketFactorKey::Curve { id, .. } => {
+                    MarketDependency::CreditCurve { id }
+                }
+                crate::dependencies::MarketFactorKey::BaseCorrelation(id) => {
+                    MarketDependency::Curve {
+                        id,
+                        curve_type: CurveType::BaseCorrelation,
+                    }
+                }
                 _ => continue,
             };
             if !result.contains(&dependency) {
@@ -76,6 +80,6 @@ mod tests {
         let mut deps = MarketDependencies::new();
         deps.add_credit_index("CDX.NA.IG.42");
 
-        assert!(flatten(&deps, &MarketContext::new()).is_err());
+        assert!(factor_dependencies(&deps, &MarketContext::new()).is_err());
     }
 }

@@ -369,7 +369,7 @@ pub fn extract_portfolio_ref<'py>(
         return Ok(PortfolioAccess::Borrowed(p.borrow()));
     }
     let json: String = obj.extract()?;
-    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec = py
+    let spec: finstack_quant_portfolio::PortfolioSpec = py
         .detach(move || serde_json::from_str(&json))
         .map_err(to_py)?;
     let portfolio = py

@@ -18,7 +18,7 @@ pub enum Inequality {
 }
 
 impl std::str::FromStr for Inequality {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     /// Parse an inequality from its serde name or symbol alias.
     ///
@@ -36,7 +36,7 @@ impl std::str::FromStr for Inequality {
             "le" | "<=" => Ok(Self::Le),
             "ge" | ">=" => Ok(Self::Ge),
             "eq" | "==" => Ok(Self::Eq),
-            other => Err(crate::error::Error::invalid_input(format!(
+            other => Err(crate::Error::invalid_input(format!(
                 "Unknown inequality {other:?}; expected one of le/ge/eq or <=/>=/=="
             ))),
         }
@@ -124,14 +124,14 @@ impl Constraint {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::InvalidInput`] if `max_share` is not in `[0, 1]`.
+    /// Returns [`crate::Error::InvalidInput`] if `max_share` is not in `[0, 1]`.
     pub fn exposure_limit(
         key: impl Into<String>,
         value: impl Into<String>,
         max_share: f64,
-    ) -> crate::error::Result<Self> {
+    ) -> crate::Result<Self> {
         if !(0.0..=1.0).contains(&max_share) {
-            return Err(crate::error::Error::invalid_input(format!(
+            return Err(crate::Error::invalid_input(format!(
                 "max_share must be in [0, 1], got {max_share}"
             )));
         }
@@ -156,14 +156,14 @@ impl Constraint {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::InvalidInput`] if `min_share` is not in `[0, 1]`.
+    /// Returns [`crate::Error::InvalidInput`] if `min_share` is not in `[0, 1]`.
     pub fn exposure_minimum(
         key: impl Into<String>,
         value: impl Into<String>,
         min_share: f64,
-    ) -> crate::error::Result<Self> {
+    ) -> crate::Result<Self> {
         if !(0.0..=1.0).contains(&min_share) {
-            return Err(crate::error::Error::invalid_input(format!(
+            return Err(crate::Error::invalid_input(format!(
                 "min_share must be in [0, 1], got {min_share}"
             )));
         }
@@ -194,10 +194,10 @@ impl Constraint {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::InvalidInput`] if `min > max`.
-    pub fn weight_bounds(filter: PositionFilter, min: f64, max: f64) -> crate::error::Result<Self> {
+    /// Returns [`crate::Error::InvalidInput`] if `min > max`.
+    pub fn weight_bounds(filter: PositionFilter, min: f64, max: f64) -> crate::Result<Self> {
         if min > max {
-            return Err(crate::error::Error::invalid_input(format!(
+            return Err(crate::Error::invalid_input(format!(
                 "weight bounds min ({min}) must be <= max ({max})"
             )));
         }
@@ -217,10 +217,10 @@ impl Constraint {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::InvalidInput`] if `max_turnover` is negative.
-    pub fn max_turnover(max_turnover: f64) -> crate::error::Result<Self> {
+    /// Returns [`crate::Error::InvalidInput`] if `max_turnover` is negative.
+    pub fn max_turnover(max_turnover: f64) -> crate::Result<Self> {
         if max_turnover < 0.0 {
-            return Err(crate::error::Error::invalid_input(format!(
+            return Err(crate::Error::invalid_input(format!(
                 "max_turnover must be non-negative, got {max_turnover}"
             )));
         }
@@ -238,10 +238,10 @@ impl Constraint {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::InvalidInput`] if `rhs` is NaN, infinite, or negative.
-    pub fn budget(rhs: f64) -> crate::error::Result<Self> {
+    /// Returns [`crate::Error::InvalidInput`] if `rhs` is NaN, infinite, or negative.
+    pub fn budget(rhs: f64) -> crate::Result<Self> {
         if !rhs.is_finite() || rhs < 0.0 {
-            return Err(crate::error::Error::invalid_input(format!(
+            return Err(crate::Error::invalid_input(format!(
                 "budget rhs must be finite and non-negative, got {rhs}"
             )));
         }

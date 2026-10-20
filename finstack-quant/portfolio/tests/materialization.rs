@@ -131,7 +131,13 @@ fn load(
     envelope: &PortfolioMaterializationEnvelope,
     cache: &InstrumentArtifactCache,
     limits: &LoadLimits,
-) -> Result<(Portfolio, finstack_quant_portfolio::MaterializationReport), Error> {
+) -> Result<
+    (
+        Portfolio,
+        finstack_quant_portfolio::materialization::MaterializationReport,
+    ),
+    Error,
+> {
     let bytes = serde_json::to_vec(envelope).expect("serialize fixture");
     Portfolio::from_materialization(&bytes, cache, limits)
 }

@@ -1,13 +1,13 @@
 //! Scenario application for portfolios.
 //!
-//! Applies [`ScenarioSpec`](finstack_quant_scenarios::spec::ScenarioSpec) to a
+//! Applies [`finstack_quant_scenarios::spec::ScenarioSpec`] to a
 //! cloned market context and a borrowed-or-owned portfolio state, then
 //! optionally re-values with the stressed data.
 
 use crate::error::{Error, Result};
-use crate::portfolio::Portfolio;
 use crate::types::PositionId;
-use crate::{evaluation::PositionInvalidation, MarketFactorKey};
+use crate::Portfolio;
+use crate::{dependencies::MarketFactorKey, evaluation::PositionInvalidation};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;

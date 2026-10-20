@@ -24,9 +24,9 @@ use crate::bindings::pandas_utils::{dict_to_dataframe, serde_to_py};
 use crate::errors::{core_to_py, display_to_py, portfolio_to_py, value_error};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_portfolio::builder::PortfolioBuilder;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::{AttributeValue, Entity, DUMMY_ENTITY_ID};
+use finstack_quant_portfolio::PortfolioBuilder;
 
 /// Built runtime portfolio: entities, positions with live instruments, and
 /// the derived lookup indices.
@@ -117,7 +117,7 @@ impl PyPortfolio {
     #[pyo3(text_signature = "(spec_json)")]
     fn from_spec(py: Python<'_>, spec_json: &str) -> PyResult<Self> {
         let spec_json = spec_json.to_owned();
-        let spec: finstack_quant_portfolio::portfolio::PortfolioSpec = py
+        let spec: finstack_quant_portfolio::PortfolioSpec = py
             .detach(move || serde_json::from_str(&spec_json))
             .map_err(display_to_py)?;
         let inner = py
@@ -797,11 +797,11 @@ impl PyPortfolioValuation {
     ///
     /// Columns: ``position_id``, ``entity_id``, ``value_native``,
     /// ``value_base``, ``currency_native``, ``currency_base`` (see
-    /// ``finstack_quant_portfolio::positions_to_table``). Returns an
+    /// ``finstack_quant_portfolio::dataframe::positions_to_table``). Returns an
     /// :class:`finstack_quant.core.table.ArrowTable`.
     #[pyo3(text_signature = "($self)")]
     fn to_arrow_positions(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
-        let table = finstack_quant_portfolio::positions_to_table(&self.inner)
+        let table = finstack_quant_portfolio::dataframe::positions_to_table(&self.inner)
             .map_err(crate::errors::core_to_py)?;
         crate::bindings::core::table::PyArrowTable::from_envelope(&table)
     }
@@ -823,8 +823,8 @@ impl PyPortfolioValuation {
     /// matters more than pandas ergonomics.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let table =
-            finstack_quant_portfolio::positions_to_table(&self.inner).map_err(core_to_py)?;
+        let table = finstack_quant_portfolio::dataframe::positions_to_table(&self.inner)
+            .map_err(core_to_py)?;
         let frame = envelope_to_pandas(py, &table)?;
         let complete: Vec<bool> = self
             .inner
@@ -908,11 +908,11 @@ impl PyPortfolioValuation {
 )]
 #[derive(Clone)]
 pub struct PyPortfolioResult {
-    pub(crate) inner: finstack_quant_portfolio::results::PortfolioResult,
+    pub(crate) inner: finstack_quant_portfolio::PortfolioResult,
 }
 
 impl PyPortfolioResult {
-    pub(crate) fn from_inner(inner: finstack_quant_portfolio::results::PortfolioResult) -> Self {
+    pub(crate) fn from_inner(inner: finstack_quant_portfolio::PortfolioResult) -> Self {
         Self { inner }
     }
 }
@@ -960,7 +960,7 @@ impl PyPortfolioResult {
                 &default_config
             }
         };
-        Self::from_inner(finstack_quant_portfolio::results::PortfolioResult::new(
+        Self::from_inner(finstack_quant_portfolio::PortfolioResult::new(
             valuation.inner.clone(),
             metrics.inner.clone(),
             config,
@@ -984,7 +984,7 @@ impl PyPortfolioResult {
     #[pyo3(text_signature = "(result_json)")]
     fn from_json(py: Python<'_>, result_json: &str) -> PyResult<Self> {
         let result_json = result_json.to_owned();
-        let inner: finstack_quant_portfolio::results::PortfolioResult = py
+        let inner: finstack_quant_portfolio::PortfolioResult = py
             .detach(move || serde_json::from_str(&result_json))
             .map_err(display_to_py)?;
         Ok(Self::from_inner(inner))
@@ -1227,7 +1227,7 @@ impl PyPortfolioMetrics {
     ///
     /// One row per entry of the ``aggregated`` map, in canonical Rust
     /// ``IndexMap`` insertion order. Built from the canonical
-    /// ``finstack_quant_portfolio::aggregated_metrics_to_table`` envelope so
+    /// ``finstack_quant_portfolio::dataframe::aggregated_metrics_to_table`` envelope so
     /// the frame cannot drift from the Rust table export. The per-entity
     /// breakdown is not flattened here — reach it through
     /// :meth:`metric_series`.
@@ -1236,7 +1236,7 @@ impl PyPortfolioMetrics {
     /// metrics are aggregated).
     #[pyo3(text_signature = "(self)")]
     fn to_aggregated_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let table = finstack_quant_portfolio::aggregated_metrics_to_table(&self.inner)
+        let table = finstack_quant_portfolio::dataframe::aggregated_metrics_to_table(&self.inner)
             .map_err(core_to_py)?;
         envelope_to_pandas(py, &table)
     }
@@ -1248,14 +1248,15 @@ impl PyPortfolioMetrics {
     /// number of metric values across positions, not the number of positions.
     /// Pivot with ``df.pivot(index="position_id", columns="metric_id",
     /// values="value")`` for a wide view. Built from the canonical
-    /// ``finstack_quant_portfolio::metrics_to_table`` envelope so the frame
+    /// ``finstack_quant_portfolio::dataframe::metrics_to_table`` envelope so the frame
     /// cannot drift from the Rust table export.
     ///
     /// Columns: ``metric_id``, ``position_id``, ``currency`` (the position's
     /// native currency; non-summable metrics are quoted in it), ``value``.
     #[pyo3(text_signature = "(self)")]
     fn to_position_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let table = finstack_quant_portfolio::metrics_to_table(&self.inner).map_err(core_to_py)?;
+        let table = finstack_quant_portfolio::dataframe::metrics_to_table(&self.inner)
+            .map_err(core_to_py)?;
         envelope_to_pandas(py, &table)
     }
 

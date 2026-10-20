@@ -9,8 +9,8 @@ use finstack_quant_portfolio::cashflows::{
     CashflowExtractionIssue, CashflowExtractionIssueKind, CashflowFxPolicy, PortfolioCashflowEvent,
     PortfolioCashflowPositionSummary, PortfolioCashflows,
 };
+use finstack_quant_portfolio::dependencies::MarketFactorKey;
 use finstack_quant_portfolio::types::PositionId;
-use finstack_quant_portfolio::MarketFactorKey;
 use finstack_quant_valuations::instruments::RatesCurveKind;
 use finstack_quant_valuations::pricer::InstrumentType;
 use indexmap::IndexMap;

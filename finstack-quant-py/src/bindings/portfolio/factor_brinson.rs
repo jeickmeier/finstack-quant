@@ -1,6 +1,6 @@
 //! Python bindings for Factor-Brinson unified attribution (Jeet & Partani 2023).
 //!
-//! Binds `finstack_quant_portfolio::factor_brinson_attribution`. The typed
+//! Binds `finstack_quant_portfolio::factor_brinson::factor_brinson_attribution`. The typed
 //! entry point returns a `Py*` wrapper; the paired `*_json` function keeps
 //! the exact JSON wire string. `factor_returns` is a plain numeric list
 //! rather than embedded in the JSON payload because it is typically produced
@@ -43,12 +43,12 @@ const ASSET_CONTRIBUTION_COLUMNS: &[ColumnSchema<'static>] = &[
 )]
 #[derive(Clone)]
 pub struct PyFactorBrinsonResult {
-    pub(crate) inner: finstack_quant_portfolio::FactorBrinsonResult,
+    pub(crate) inner: finstack_quant_portfolio::factor_brinson::FactorBrinsonResult,
 }
 
 crate::bindings::macros::wire_methods!(
     PyFactorBrinsonResult,
-    finstack_quant_portfolio::FactorBrinsonResult,
+    finstack_quant_portfolio::factor_brinson::FactorBrinsonResult,
     "FactorBrinsonResult"
 );
 
@@ -143,19 +143,23 @@ fn run_factor_brinson_attribution(
     py: Python<'_>,
     input_json: &str,
     factor_returns: Vec<f64>,
-) -> PyResult<finstack_quant_portfolio::FactorBrinsonResult> {
+) -> PyResult<finstack_quant_portfolio::factor_brinson::FactorBrinsonResult> {
     let input_json = input_json.to_owned();
     py.detach(move || {
-        let input: finstack_quant_portfolio::FactorBrinsonInput = serde_json::from_str(&input_json)
-            .map_err(|err| serde_json_to_py(err, "invalid factor-Brinson input JSON"))?;
-        finstack_quant_portfolio::factor_brinson_attribution(&input, &factor_returns)
-            .map_err(portfolio_to_py)
+        let input: finstack_quant_portfolio::factor_brinson::FactorBrinsonInput =
+            serde_json::from_str(&input_json)
+                .map_err(|err| serde_json_to_py(err, "invalid factor-Brinson input JSON"))?;
+        finstack_quant_portfolio::factor_brinson::factor_brinson_attribution(
+            &input,
+            &factor_returns,
+        )
+        .map_err(portfolio_to_py)
     })
 }
 
 /// Compute Jeet-Partani (2023) factor-Brinson unified attribution.
 ///
-/// Binds Rust `finstack_quant_portfolio::factor_brinson_attribution`:
+/// Binds Rust `finstack_quant_portfolio::factor_brinson::factor_brinson_attribution`:
 /// generalizes classical Brinson-Fachler allocation/selection to continuous
 /// factor exposures by replacing the sector partition with a factor-exposure
 /// matrix and a caller-supplied benchmark factor-return vector.
