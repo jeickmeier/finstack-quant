@@ -34,11 +34,6 @@ impl XccyQuote {
         &self.id
     }
 
-    /// Get the primary value of the quote (basis spread in bp).
-    pub fn value(&self) -> f64 {
-        self.basis_spread_bp
-    }
-
     /// Validate that the basis spread is finite and any spot FX is positive.
     pub fn validate(&self) -> Result<()> {
         validate_f64_finite(self.basis_spread_bp, "basis_spread_bp")?;
