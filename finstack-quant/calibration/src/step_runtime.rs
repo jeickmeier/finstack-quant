@@ -217,7 +217,7 @@ fn prepare_hw_cap_schedule(
     maturity: finstack_quant_core::dates::Date,
 ) -> Result<CapFloorSchedule> {
     use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
-    use finstack_quant_core::dates::{adjust, DateExt, StubKind};
+    use finstack_quant_core::dates::StubKind;
     use finstack_quant_models::rates::clock::model_time;
     use finstack_quant_valuations_core::market::conventions::{ConventionRegistry, RateIndexKind};
     let convention = ConventionRegistry::try_global()?.require_rate_index(&params.index_id)?;
@@ -232,14 +232,11 @@ fn prepare_hw_cap_schedule(
             "cap/floor HW calibration requires a term index; compounded overnight quote calibration is not supported".into(),
         ));
     }
-    let calendar =
-        finstack_quant_core::dates::calendar_by_id_strict(&convention.market_calendar_id)?;
-    let start = adjust(
-        params
-            .base_date
-            .add_business_days(convention.market_settlement_days, calendar)?,
+    let start = crate::build::helpers::resolve_spot_date(
+        params.base_date,
+        &convention.market_calendar_id,
+        convention.market_settlement_days,
         convention.market_business_day_convention,
-        calendar,
     )?;
     let periods = build_periods(BuildPeriodsParams {
         start,
