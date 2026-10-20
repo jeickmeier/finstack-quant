@@ -15,7 +15,7 @@ fn tag_filter_matching_parent_and_child_shocks_each_curve_once() {
         HierarchyTarget, MarketDataHierarchy, TagFilter, TagPredicate,
     };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_scenarios::engine::ScenarioMarketTarget;
+    use finstack_quant_scenarios::ScenarioMarketTarget;
     use finstack_quant_scenarios::{
         AppliedShockTarget, CurveKind, ExecutionContext, ScenarioEngine,
     };
@@ -226,7 +226,7 @@ fn cumulative_mode_stacks_shocks_down_tree() {
     use finstack_quant_core::market_data::hierarchy::MarketDataHierarchy;
     use finstack_quant_core::market_data::hierarchy::ResolutionMode;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_scenarios::engine::ScenarioMarketTarget;
+    use finstack_quant_scenarios::ScenarioMarketTarget;
     use finstack_quant_scenarios::{CurveKind, ExecutionContext, ScenarioEngine};
     use finstack_quant_statements::FinancialModelSpec;
     use time::macros::date;

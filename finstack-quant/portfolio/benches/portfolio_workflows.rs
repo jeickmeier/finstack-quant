@@ -18,7 +18,7 @@ use finstack_quant_portfolio::replay::{
 };
 use finstack_quant_portfolio::scenarios::{scenario_pnl, scenario_pnl_batch};
 use finstack_quant_portfolio::valuation::{PortfolioValuationOptions, RequestedMetrics};
-use finstack_quant_scenarios::spec::{CurveKind, OperationSpec, ScenarioSpec};
+use finstack_quant_scenarios::{CurveKind, OperationSpec, ScenarioSpec};
 use std::hint::black_box;
 
 fn full_workflow_matrix_enabled() -> bool {

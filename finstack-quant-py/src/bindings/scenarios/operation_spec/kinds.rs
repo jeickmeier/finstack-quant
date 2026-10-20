@@ -5,7 +5,7 @@
 //! value semantics (``==`` / ``hash``).
 
 use finstack_quant_core::math::Compounding;
-use finstack_quant_scenarios::spec::{CurveKind, TenorMatchMode, TimeRollMode};
+use finstack_quant_scenarios::{CurveKind, TenorMatchMode, TimeRollMode};
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 

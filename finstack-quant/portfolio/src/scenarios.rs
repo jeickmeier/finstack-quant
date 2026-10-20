@@ -1,6 +1,6 @@
 //! Scenario application for portfolios.
 //!
-//! Applies [`ScenarioSpec`](finstack_quant_scenarios::spec::ScenarioSpec) to a
+//! Applies [`ScenarioSpec`](finstack_quant_scenarios::ScenarioSpec) to a
 //! cloned market context and a borrowed-or-owned portfolio state, then
 //! optionally re-values with the stressed data.
 
@@ -11,11 +11,11 @@ use crate::{evaluation::PositionInvalidation, MarketFactorKey};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_scenarios::engine::{
+use finstack_quant_scenarios::{
     ApplicationReport, ExecutionContext, ScenarioChangeManifest, ScenarioEngine,
     ScenarioMarketTarget,
 };
-use finstack_quant_scenarios::spec::{CurveKind, ScenarioSpec};
+use finstack_quant_scenarios::{CurveKind, ScenarioSpec};
 use finstack_quant_valuations::instruments::{Instrument, RatesCurveKind};
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
 use indexmap::IndexMap;
@@ -147,7 +147,7 @@ fn selective_invalidation(
 /// ```no_run
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_portfolio::scenarios::apply_and_revalue;
-/// use finstack_quant_scenarios::spec::ScenarioSpec;
+/// use finstack_quant_scenarios::ScenarioSpec;
 ///
 /// # fn main() -> finstack_quant_portfolio::Result<()> {
 /// # let portfolio: finstack_quant_portfolio::Portfolio = unimplemented!("Provide a portfolio");
@@ -277,7 +277,7 @@ fn replace_portfolio_instruments(
 /// use finstack_quant_core::config::FinstackConfig;
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_portfolio::scenarios::apply_and_revalue;
-/// use finstack_quant_scenarios::spec::ScenarioSpec;
+/// use finstack_quant_scenarios::ScenarioSpec;
 ///
 /// # fn main() -> finstack_quant_portfolio::Result<()> {
 /// # let portfolio: finstack_quant_portfolio::Portfolio = unimplemented!("Provide a portfolio");
@@ -478,7 +478,7 @@ fn diff_valuations(
 /// use finstack_quant_core::config::FinstackConfig;
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_portfolio::scenarios::scenario_pnl;
-/// use finstack_quant_scenarios::spec::ScenarioSpec;
+/// use finstack_quant_scenarios::ScenarioSpec;
 ///
 /// # fn main() -> finstack_quant_portfolio::Result<()> {
 /// # let portfolio: finstack_quant_portfolio::Portfolio = unimplemented!("Provide a portfolio");
@@ -639,7 +639,7 @@ mod tests {
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
-    use finstack_quant_scenarios::spec::{CurveKind, OperationSpec};
+    use finstack_quant_scenarios::{CurveKind, OperationSpec};
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use finstack_quant_valuations::instruments::{Attributes, Instrument};
     use finstack_quant_valuations::pricer::InstrumentType;

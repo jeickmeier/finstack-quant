@@ -2,7 +2,7 @@
 
 use crate::errors::{display_to_py, scenarios_to_py};
 use finstack_quant_core::types::CurveId;
-use finstack_quant_scenarios::spec::OperationSpec;
+use finstack_quant_scenarios::OperationSpec;
 use finstack_quant_statements::types::NodeId;
 use pyo3::prelude::*;
 use pyo3::types::PyType;

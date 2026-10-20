@@ -340,13 +340,12 @@ pub fn compute_horizon_return(
 
     let attribution_method = method
         .as_deref()
-        .map(finstack_quant_scenarios::horizon::attribution_method_from_str)
+        .map(finstack_quant_scenarios::attribution_method_from_str)
         .transpose()
         .map_err(to_js_err)?
         .unwrap_or_default();
 
-    let mut analyzer =
-        finstack_quant_scenarios::horizon::HorizonAnalysis::new(attribution_method, config);
+    let mut analyzer = finstack_quant_scenarios::HorizonAnalysis::new(attribution_method, config);
     if let Some(id) = calendar_id.as_deref() {
         analyzer = analyzer.with_calendar_id(id);
     }

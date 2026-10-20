@@ -1157,7 +1157,7 @@ pub enum TimeRollMode {
 ///
 /// # Examples
 /// ```rust
-/// use finstack_quant_scenarios::spec::RateBindingSpec;
+/// use finstack_quant_scenarios::RateBindingSpec;
 /// use finstack_quant_core::math::Compounding;
 ///
 /// let binding = RateBindingSpec {

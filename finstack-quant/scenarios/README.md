@@ -151,7 +151,7 @@ Five historical stress templates are embedded as JSON from
 can take the whole scenario or just one leg.
 
 ```rust
-use finstack_quant_scenarios::templates::TemplateRegistry;
+use finstack_quant_scenarios::TemplateRegistry;
 
 fn rates_leg() -> finstack_quant_scenarios::Result<()> {
     let registry = TemplateRegistry::embedded_builtins()?;
