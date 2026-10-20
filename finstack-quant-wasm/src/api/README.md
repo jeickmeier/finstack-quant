@@ -234,13 +234,15 @@ mise run rust-lint     # clippy --workspace covers this crate
 mise run wasm-lint     # prettier + eslint + the to_js_value serializer check
 mise run wasm-doc      # @param completeness on every JS-facing callable
 mise run wasm-test     # wasm-pack test --node, then build web+node, then the facade tests
-cargo nextest run -p finstack-quant-wasm --lib --test dts_contract
-cargo nextest run -p finstack-quant-wasm --test wasm return_shapes # no mise task selects this
+mise run rust-test-integration -- finstack-quant-wasm dts_contract
+mise run rust-test-filter -- finstack-quant-wasm return_shapes --integration wasm
 ```
 
-`mise run rust-test` runs only the `--lib` and `dts_contract` targets for this
-crate; the `wasm_*.rs` suites need a wasm runtime and come in through
-`mise run wasm-test`. Never run `cargo test` directly in this workspace.
+`mise run rust-test` runs this crate's lib tests and both native test targets:
+`dts_contract`, and the `wasm` binary, whose only host-runnable modules are
+`return_shapes` and `boundary_signatures`. The `wasm_*.rs` suites need a wasm
+runtime and come in through `mise run wasm-test`. Never run `cargo test`
+directly in this workspace.
 
 ## Related
 
