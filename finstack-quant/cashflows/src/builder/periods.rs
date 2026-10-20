@@ -202,11 +202,7 @@ pub(crate) fn period_day_count_context<'a>(
             period.unadjusted_start,
             period.unadjusted_end,
             frequency,
-            if matches!(roll_rule, RollRule::None) {
-                stub
-            } else {
-                StubKind::ShortBack
-            },
+            stub,
             end_of_month,
             roll_rule,
         )

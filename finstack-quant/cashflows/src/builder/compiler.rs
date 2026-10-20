@@ -517,9 +517,6 @@ pub(super) fn compute_coupon_schedules(
     for w in grid.windows(2) {
         let s = w[0];
         let e = w[1];
-        if s >= e {
-            continue;
-        }
 
         let chosen_coupon = select_coupon_piece(&coupon_pieces, s, e)?;
         let split = select_payment_split(&payment_pieces, s, e, chosen_coupon.split)?;

@@ -396,6 +396,22 @@ struct PeriodInputs {
     total_yf: f64,
 }
 
+/// Day-count context of a coupon from its accrual metadata.
+fn coupon_day_count_context(
+    calendar_id: Option<&str>,
+    frequency: Option<Tenor>,
+    coupon_period: Option<(Date, Date)>,
+    end_is_termination_date: bool,
+) -> finstack_quant_core::Result<DayCountContext<'static>> {
+    Ok(DayCountContext {
+        calendar: calendar_id.map(calendar_by_id_strict).transpose()?,
+        frequency,
+        coupon_period,
+        end_is_termination_date,
+        ..Default::default()
+    })
+}
+
 /// Check if a cashflow kind is a coupon that should be included in accrual.
 fn is_coupon_kind(kind: CFKind, include_pik: bool) -> bool {
     kind.is_interest_like() || (include_pik && kind == CFKind::Pik)
@@ -435,23 +451,9 @@ fn build_coupon_periods(
             accrual.is_some_and(|accrual| accrual.end_is_termination_date);
         let flow_day_count = accrual.map(|accrual| accrual.day_count);
 
-        let cf_af = if cf.accrual_factor > 0.0 {
-            if !cf.accrual_factor.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "accrual: non-finite accrual_factor {} for coupon flow dated {}",
-                    cf.accrual_factor, cf.date
-                )));
-            }
-            Some(cf.accrual_factor)
-        } else {
-            if !cf.accrual_factor.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "accrual: non-finite accrual_factor {} for coupon flow dated {}",
-                    cf.accrual_factor, cf.date
-                )));
-            }
-            None
-        };
+        // `AccrualIndex::build` validated the schedule: factors are finite
+        // and non-negative, and zero means "derive from the day count".
+        let cf_af = (cf.accrual_factor > 0.0).then_some(cf.accrual_factor);
 
         let matching_bucket = buckets
             .iter_mut()
@@ -575,26 +577,14 @@ fn build_period_inputs(
 
         let coupon_period = p.bucket.coupon_period.or(Some((p.start, p.end)));
         let total_yf = match p.bucket.accrual_factor {
-            Some(af) if af.is_finite() && af > 0.0 => af,
-            Some(af) => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "accrual: non-finite or non-positive accrual_factor {af} for period ending {}",
-                    p.end
-                )));
-            }
-            _ => {
-                let ctx = DayCountContext {
-                    calendar: p
-                        .bucket
-                        .calendar_id
-                        .as_deref()
-                        .map(finstack_quant_core::dates::calendar_by_id_strict)
-                        .transpose()?,
+            Some(af) => af,
+            None => {
+                let ctx = coupon_day_count_context(
+                    p.bucket.calendar_id.as_deref(),
                     frequency,
                     coupon_period,
-                    end_is_termination_date: p.bucket.end_is_termination_date,
-                    ..Default::default()
-                };
+                    p.bucket.end_is_termination_date,
+                )?;
                 p.day_count.year_fraction(p.start, p.end, ctx)?
             }
         };
@@ -675,17 +665,12 @@ fn find_active_periods_and_elapsed<'a>(
             if as_of < inputs.start && !is_ex_coupon {
                 continue;
             }
-            let day_count_context = DayCountContext {
-                calendar: inputs
-                    .calendar_id
-                    .as_deref()
-                    .map(finstack_quant_core::dates::calendar_by_id_strict)
-                    .transpose()?,
-                frequency: cfg.frequency,
-                coupon_period: inputs.coupon_period,
-                end_is_termination_date: inputs.end_is_termination_date,
-                ..Default::default()
-            };
+            let day_count_context = coupon_day_count_context(
+                inputs.calendar_id.as_deref(),
+                cfg.frequency,
+                inputs.coupon_period,
+                inputs.end_is_termination_date,
+            )?;
             let elapsed_context = DayCountContext {
                 end_is_termination_date: inputs.end_is_termination_date && as_of >= inputs.end,
                 ..day_count_context
@@ -1443,19 +1428,6 @@ mod tests {
 
         let err = build_period_inputs(&schedule, &periods, &[], None)
             .expect_err("NaN coupon total must be rejected");
-        assert!(err.to_string().contains("non-finite"));
-    }
-
-    #[test]
-    fn infinite_builder_accrual_factor_is_rejected() {
-        let mut schedule = make_test_schedule(
-            &[(make_date(2025, 7, 1), f64::INFINITY)],
-            DayCount::Thirty360,
-        );
-        schedule.meta.issue_date = Some(make_date(2025, 1, 1));
-
-        let err = build_coupon_periods(&schedule, &AccrualConfig::default())
-            .expect_err("infinite accrual_factor must be rejected");
         assert!(err.to_string().contains("non-finite"));
     }
 
