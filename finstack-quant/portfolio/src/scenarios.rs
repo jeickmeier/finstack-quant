@@ -9,6 +9,7 @@ use crate::portfolio::Portfolio;
 use crate::types::PositionId;
 use crate::{evaluation::PositionInvalidation, MarketFactorKey};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
+use finstack_quant_core::error::ErrorKind;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_scenarios::{
@@ -200,15 +201,16 @@ fn apply_scenario_with_provider<'a>(
     };
     let report = engine
         .apply(scenario, &mut ctx)
-        .map_err(|e| Error::ScenarioError(e.to_string()))?;
+        .map_err(|e| Error::scenario(e.kind(), e.to_string()))?;
     let as_of = ctx.as_of;
     drop(ctx);
 
     let portfolio = if scenario.mutates_instruments() {
         let mut portfolio_copy = portfolio.clone();
         let instruments = instruments.ok_or_else(|| {
-            Error::ScenarioError(
-                "scenario classified as instrument-mutating without instrument state".to_string(),
+            Error::scenario(
+                ErrorKind::Validation,
+                "scenario classified as instrument-mutating without instrument state",
             )
         })?;
         replace_portfolio_instruments(&mut portfolio_copy, instruments)?;
@@ -233,7 +235,7 @@ fn replace_portfolio_instruments(
     let position_count = portfolio.positions.len();
     let instrument_count = instruments.len();
     if position_count != instrument_count {
-        return Err(Error::ScenarioError(format!(
+        return Err(Error::scenario(ErrorKind::Validation, format!(
             "MO-16: scenario engine returned {instrument_count} instruments for {position_count} portfolio positions"
         )));
     }
@@ -497,9 +499,9 @@ pub fn scenario_pnl(
 ) -> Result<ScenarioPnlView> {
     let mut results =
         scenario_pnl_batch(portfolio, std::slice::from_ref(scenario), market, config)?;
-    let result = results
-        .pop()
-        .ok_or_else(|| Error::ScenarioError("scenario batch returned no result".to_string()))?;
+    let result = results.pop().ok_or_else(|| {
+        Error::scenario(ErrorKind::Validation, "scenario batch returned no result")
+    })?;
     Ok(ScenarioPnlView {
         pnl: result.pnl,
         report: result.report,
@@ -807,6 +809,44 @@ mod tests {
     }
 
     #[test]
+    fn missing_curve_scenario_error_keeps_not_found_kind() {
+        let portfolio = Portfolio::builder("TEST")
+            .base_currency(Currency::USD)
+            .as_of(date!(2024 - 01 - 01))
+            .build()
+            .expect("test should succeed");
+        let scenario = ScenarioSpec {
+            id: "missing_curve".to_string(),
+            name: None,
+            description: None,
+            operations: vec![OperationSpec::CurveParallelBp {
+                curve_kind: CurveKind::Discount,
+                curve_id: "NO-SUCH-CURVE".into(),
+                discount_curve_id: None,
+                bp: 50.0,
+            }],
+            priority: 0,
+            resolution_mode: Default::default(),
+            hazard_bump_mode: Default::default(),
+        };
+
+        let err = apply_scenario(
+            &portfolio,
+            &scenario,
+            &build_test_market(),
+            &FinstackConfig::default(),
+        )
+        .err()
+        .expect("a shock on a missing curve must fail");
+        assert!(matches!(err, Error::ScenarioError { .. }), "{err}");
+        assert_eq!(err.kind(), ErrorKind::NotFound, "{err}");
+        assert_eq!(
+            finstack_quant_core::Error::from(err).kind(),
+            ErrorKind::NotFound
+        );
+    }
+
+    #[test]
     fn test_apply_and_revalue() {
         let as_of = date!(2024 - 01 - 01);
 
@@ -896,7 +936,7 @@ mod tests {
         let err = replace_portfolio_instruments(&mut portfolio, Vec::new())
             .expect_err("MO-16: mismatched scenario result length must fail");
         assert!(
-            matches!(err, Error::ScenarioError(_)),
+            matches!(err, Error::ScenarioError { .. }),
             "unexpected error: {err}"
         );
     }
