@@ -124,6 +124,19 @@ test('clean and dirty targets share coupon-crossing settlement', () => {
   );
   assert.ok(Math.abs(metrics.z_spread_bp) < 1e-6);
   assert.ok(Math.abs(metrics.spread_duration + metrics.cs01 / (dirty * 1e-4)) < 1e-10);
+  assert.ok(Math.abs(metrics.accrued - accrued) < 1e-6);
+  assert.equal(typeof metrics.ytm, 'number');
+  assert.equal(metrics.metrics, undefined);
+  const withRegistry = valuations.instruments.structuredCreditTrancheMetrics(
+    JSON.stringify(f.instrument),
+    id,
+    JSON.stringify(f.market),
+    asOf,
+    clean,
+    ['dv01']
+  );
+  assert.deepEqual(Object.keys(withRegistry.metrics), ['dv01']);
+  assert.ok(Number.isFinite(withRegistry.metrics.dv01));
   const config = {
     num_paths: 1,
     stochastic_rates: false,

@@ -47,7 +47,7 @@ pub struct ScenarioCell {
     /// Clean settlement price as a percentage of the tranche's CURRENT
     /// balance (the factor-adjusted quote basis): the model dirty value at
     /// buyer settlement less accrued, the same figure as
-    /// `TrancheMetrics::price_pct`.
+    /// `TrancheMetrics::clean_price_pct`.
     pub price: f64,
     /// Weighted-average life in years.
     pub wal: f64,

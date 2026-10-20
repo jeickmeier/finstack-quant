@@ -30,6 +30,7 @@ pub(crate) mod utils;
 
 pub use utils::{validate_tiers, ValidationError};
 
+pub use types::MarketConditions;
 pub use types::{
     calculate_pool_stats, AdvanceRate, AdvancingPolicy, AfcSpec, AllocationMode, AssetPool,
     AssetType, BalloonSpec, BorrowingBaseReport, BorrowingBaseRules, CallAssumption,
@@ -48,10 +49,9 @@ pub use types::{
     SpecialServicingSpec, StepDownSpec, StepDownTrigger, StructuredCredit, StructuredCreditBuilder,
     SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche, TrancheAccrualPeriod,
     TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance, TrancheSeniority,
-    TrancheStructure, TrancheValuation, TriggerConsequence, Waterfall, WaterfallBuilder,
-    WaterfallDistribution, WaterfallRules, WaterfallTier,
+    TrancheStructure, TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution,
+    WaterfallRules, WaterfallTier,
 };
-pub use types::{MarketConditions, StructuredCreditTranche};
 
 pub use pricing::{execute_waterfall, run_simulation};
 

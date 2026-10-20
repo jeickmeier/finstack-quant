@@ -131,8 +131,15 @@ fn simulate(deal: &StructuredCredit) -> HashMap<String, TrancheCashflows> {
 }
 
 fn metrics(deal: &StructuredCredit, id: &str) -> TrancheMetrics {
-    calculate_tranche_metrics(deal, id, &market_with_curves(close()), close(), Some(99.0))
-        .expect("tranche metrics")
+    calculate_tranche_metrics(
+        deal,
+        id,
+        &market_with_curves(close()),
+        close(),
+        Some(99.0),
+        &[],
+    )
+    .expect("tranche metrics")
 }
 
 fn last_flow_date(results: &HashMap<String, TrancheCashflows>, id: &str) -> Option<Date> {

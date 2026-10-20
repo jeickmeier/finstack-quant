@@ -76,8 +76,8 @@ pub use waterfall::{
 };
 
 pub(crate) use results::DealAccruals;
-pub use results::{TrancheAccrualPeriod, TrancheCashflows, TrancheValuation};
-pub use tranche_view::StructuredCreditTranche;
+pub use results::{TrancheAccrualPeriod, TrancheCashflows};
+pub(crate) use tranche_view::StructuredCreditTranche;
 
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,

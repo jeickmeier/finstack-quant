@@ -46,7 +46,7 @@ pub(crate) mod summary;
 
 /// Reprice a (bumped) deal on the scope of the metric context: the named
 /// tranche when the context carries one tranche's cashflows (set by
-/// `StructuredCredit::value_tranche_with_metrics`), else the whole deal
+/// [`calculate_tranche_metrics`]'s registry pass), else the whole deal
 /// through the context's pricing dispatch. Keeps the bump metrics
 /// (Default01, Prepayment01, Recovery01, Severity01) per tranche.
 ///

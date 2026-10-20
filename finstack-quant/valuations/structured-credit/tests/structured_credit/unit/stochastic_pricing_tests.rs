@@ -385,16 +385,10 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         (sc).tranche_cashflows("missing", &market, closing_date())
             .expect_err("invalid tranche cashflows")
             .to_string(),
-        (sc).tranche_cashflows("missing", &market, closing_date())
-            .expect_err("invalid tranche helper")
-            .to_string(),
         sc.value_tranche("missing", &market, closing_date())
             .expect_err("invalid tranche value")
             .to_string(),
-        sc.value_tranche_with_metrics("missing", &market, closing_date(), &[])
-            .expect_err("invalid tranche metrics value")
-            .to_string(),
-        calculate_tranche_metrics(&sc, "missing", &market, closing_date(), None)
+        calculate_tranche_metrics(&sc, "missing", &market, closing_date(), None, &[])
             .expect_err("invalid tranche metrics")
             .to_string(),
         calculate_tranche_breakeven_cdr(&sc, "missing", &market, closing_date())
