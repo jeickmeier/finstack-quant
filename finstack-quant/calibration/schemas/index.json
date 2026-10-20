@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_validation_report.schema.json",
-      "bytes": 15420,
+      "bytes": 14848,
       "kind": "output",
       "path": "schemas/calibration/1/calibration_validation_report.schema.json",
       "summary": "Dry-run findings for a calibration envelope; nothing is solved.",

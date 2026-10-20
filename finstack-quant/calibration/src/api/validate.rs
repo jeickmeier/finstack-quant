@@ -138,7 +138,6 @@ fn contract_diagnostic(error: &EnvelopeError) -> Diagnostic {
         EnvelopeError::QuoteIdNotInMarketData { quote_set, .. } => {
             format!("/plan/quote_sets/{}", escape_json_pointer(quote_set))
         }
-        EnvelopeError::ConflictingMarketDatum { .. } => "/market_data".to_string(),
         EnvelopeError::JsonSerialize { .. }
         | EnvelopeError::StrictLoad { .. }
         | EnvelopeError::SolverNotConverged { .. } => "/".to_string(),
@@ -718,41 +717,6 @@ mod tests {
             }
             _ => unreachable!(),
         }
-    }
-
-    fn deposit(id: &str, rate: f64) -> MarketDatum {
-        MarketDatum::RateQuote(RateQuote::Deposit {
-            id: QuoteId::new(id),
-            index: IndexId::new("USD-SOFR-1M"),
-            pillar: Pillar::Tenor("1M".parse().expect("tenor")),
-            rate,
-        })
-    }
-
-    #[test]
-    fn with_market_data_dedups_identical_and_rejects_conflicting_data() {
-        let inputs = || {
-            CalibrationEnvelope::new(
-                empty_envelope("p").plan,
-                vec![deposit("Q1", 0.05), deposit("Q2", 0.06)],
-                Vec::new(),
-            )
-        };
-        let merged = inputs()
-            .with_market_data(vec![deposit("Q1", 0.05), deposit("Q3", 0.07)])
-            .expect("identical repeat merges");
-        assert_eq!(
-            merged
-                .market_data
-                .iter()
-                .map(MarketDatum::id)
-                .collect::<Vec<_>>(),
-            ["Q1", "Q2", "Q3"]
-        );
-        assert!(matches!(
-            inputs().with_market_data(vec![deposit("Q1", 0.055)]),
-            Err(EnvelopeError::ConflictingMarketDatum { .. })
-        ));
     }
 
     #[test]

@@ -370,34 +370,6 @@ pub struct CalibrationEnvelope {
     pub prior_market: Vec<PriorMarketObject>,
 }
 
-/// Serialized payloads of the market data collected so far, keyed by `(kind, id)`.
-type DatumPayloads = IndexMap<(&'static str, String), serde_json::Value>;
-
-/// Append `datum` unless an identical datum of the same kind and id is already collected.
-fn push_distinct_datum(
-    market_data: &mut Vec<MarketDatum>,
-    payloads: &mut DatumPayloads,
-    datum: MarketDatum,
-) -> Result<(), super::errors::EnvelopeError> {
-    use super::errors::EnvelopeError;
-    let payload = serde_json::to_value(&datum).map_err(|error| EnvelopeError::JsonSerialize {
-        target: "MarketDatum".to_string(),
-        message: error.to_string(),
-    })?;
-    let key = (datum.kind_name(), datum.id().to_string());
-    match payloads.get(&key) {
-        Some(existing) if existing != &payload => Err(EnvelopeError::ConflictingMarketDatum {
-            id: datum.id().to_string(),
-        }),
-        Some(_) => Ok(()),
-        None => {
-            payloads.insert(key, payload);
-            market_data.push(datum);
-            Ok(())
-        }
-    }
-}
-
 impl CalibrationEnvelope {
     /// Create a current-version calibration request envelope.
     ///
@@ -421,35 +393,6 @@ impl CalibrationEnvelope {
             market_data,
             prior_market,
         }
-    }
-
-    /// Append market data, collecting identical repeats once.
-    ///
-    /// Each datum is appended in order unless a datum of the same kind and id
-    /// with an identical payload is already present (in the envelope or
-    /// earlier in `market_data`), in which case it is collected once. Extra data can therefore repeat an existing input without duplication.
-    ///
-    /// # Arguments
-    ///
-    /// * `market_data` - Additional flat market-data inputs, in the order they
-    ///   should follow the envelope's existing `market_data`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`super::errors::EnvelopeError::ConflictingMarketDatum`] when a
-    /// datum repeats the kind and id of one already present with a different
-    /// payload, and [`super::errors::EnvelopeError::JsonSerialize`] if a datum
-    /// cannot be serialized for the comparison.
-    pub fn with_market_data(
-        mut self,
-        market_data: Vec<MarketDatum>,
-    ) -> Result<Self, super::errors::EnvelopeError> {
-        let mut payloads = DatumPayloads::new();
-        let existing = std::mem::take(&mut self.market_data);
-        for datum in existing.into_iter().chain(market_data) {
-            push_distinct_datum(&mut self.market_data, &mut payloads, datum)?;
-        }
-        Ok(self)
     }
 
     /// Compute the versioned SHA-256 hash of this request envelope's canonical JSON.

@@ -2967,14 +2967,6 @@ export type EnvelopeError =
     }
   | {
       /**
-       * The datum identifier supplied with conflicting payloads.
-       */
-      id: string;
-      kind: "conflicting_market_datum";
-      [k: string]: unknown;
-    }
-  | {
-      /**
        * Structured contract diagnostics retained by the bounded loader;
        * empty when the failure carried no per-pointer findings.
        */

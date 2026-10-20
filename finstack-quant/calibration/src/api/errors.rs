@@ -211,13 +211,6 @@ pub enum EnvelopeError {
         /// The unresolved quote identifier.
         id: String,
     },
-    /// One market-datum id of a kind is attached to steps, or merged into an
-    /// envelope, with two different payloads.
-    #[error("market datum id '{id}' has conflicting payloads")]
-    ConflictingMarketDatum {
-        /// The datum identifier supplied with conflicting payloads.
-        id: String,
-    },
     /// Strict bounded contract loading rejected the request or result.
     ///
     /// `message` already lists every retained diagnostic (JSON pointer and
@@ -257,7 +250,6 @@ impl EnvelopeError {
             EnvelopeError::QuoteDataInvalid { .. } => "quote_data_invalid",
             EnvelopeError::DuplicateMarketDatumId { .. } => "duplicate_market_datum_id",
             EnvelopeError::QuoteIdNotInMarketData { .. } => "quote_id_not_in_market_data",
-            EnvelopeError::ConflictingMarketDatum { .. } => "conflicting_market_datum",
             EnvelopeError::JsonSerialize { .. } => "json_serialize",
             EnvelopeError::StrictLoad { .. } => "strict_load",
         }
@@ -276,7 +268,6 @@ impl EnvelopeError {
             | EnvelopeError::QuoteDataInvalid { step_id, .. } => Some(step_id),
             EnvelopeError::DuplicateMarketDatumId { .. }
             | EnvelopeError::QuoteIdNotInMarketData { .. }
-            | EnvelopeError::ConflictingMarketDatum { .. }
             | EnvelopeError::JsonSerialize { .. }
             | EnvelopeError::StrictLoad { .. } => None,
         }

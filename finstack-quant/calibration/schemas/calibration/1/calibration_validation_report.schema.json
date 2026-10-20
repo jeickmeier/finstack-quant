@@ -320,24 +320,6 @@
           "type": "object"
         },
         {
-          "description": "One market-datum id of a kind is attached to steps, or merged into an\nenvelope, with two different payloads.",
-          "properties": {
-            "id": {
-              "description": "The datum identifier supplied with conflicting payloads.",
-              "type": "string"
-            },
-            "kind": {
-              "const": "conflicting_market_datum",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "id"
-          ],
-          "type": "object"
-        },
-        {
           "description": "Strict bounded contract loading rejected the request or result.\n\n`message` already lists every retained diagnostic (JSON pointer and\nmessage); `diagnostics` carries the same findings structurally so hosts\ncan surface them as records without parsing the message.",
           "properties": {
             "diagnostics": {
