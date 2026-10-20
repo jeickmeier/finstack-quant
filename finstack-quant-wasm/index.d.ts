@@ -35213,7 +35213,7 @@ export interface PortfolioNamespace {
    * @param model - `models.factor.credit.CreditFactorModel` handle whose hierarchy names the levels.
    * @param byPosition - `true` to include the per-position breakdown; `false` leaves `by_position` `null`.
    * @returns The `CreditVolReport`.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `decomposition` is not a JSON string or plain object or `byPosition` is not a boolean, and a `FinstackError` (kind `validation`) if `decomposition` does not match the `RiskDecomposition` schema.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `decomposition` is not a JSON string or plain object or `byPosition` is not a boolean, and a `FinstackError` (kind `validation`) if `decomposition` does not match the `RiskDecomposition` schema or holds a factor contribution that is neither the generic credit factor nor a bucket of one of `model`'s hierarchy levels.
    */
   buildCreditVolReport(
     decomposition: RiskDecomposition | string,

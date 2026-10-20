@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::error::{Error, Result};
 use crate::types::PositionId;
 use finstack_quant_factor::credit::hierarchy::{dimension_key, CreditFactorModel};
 use finstack_quant_factor::matching::{parse_bucket_factor_id, CREDIT_GENERIC_FACTOR_ID};
@@ -61,12 +62,24 @@ pub struct PositionVolContribution {
 /// * `decomposition` - Factor and residual contributions to aggregate.
 /// * `model` - Credit factor model whose hierarchy supplies level names.
 /// * `by_position` - Whether to include position-level contribution rows.
-#[must_use]
+///
+/// # Returns
+///
+/// The [`CreditVolReport`]; `generic` plus every level total accounts for all
+/// of the decomposition's factor contributions.
+///
+/// # Errors
+///
+/// Returns [`Error::InvalidInput`] when a factor contribution is neither the
+/// generic credit factor nor a credit bucket factor of one of `model`'s
+/// hierarchy levels (for example a non-credit factor id, or a bucket id whose
+/// level index the hierarchy does not have), since its risk could not be
+/// reported.
 pub fn build_credit_vol_report(
     decomposition: &RiskDecomposition,
     model: &CreditFactorModel,
     by_position: bool,
-) -> CreditVolReport {
+) -> Result<CreditVolReport> {
     let mut by_level: Vec<LevelVolContribution> = model
         .hierarchy
         .levels
@@ -85,11 +98,14 @@ pub fn build_credit_vol_report(
             generic += contribution.absolute_risk;
             continue;
         }
-        let Some((level, bucket)) = parse_bucket_factor_id(&contribution.factor_id) else {
-            continue;
-        };
-        let Some(output) = by_level.get_mut(level) else {
-            continue;
+        let output = parse_bucket_factor_id(&contribution.factor_id)
+            .and_then(|(level, bucket)| by_level.get_mut(level).map(|output| (output, bucket)));
+        let Some((output, bucket)) = output else {
+            return Err(Error::invalid_input(format!(
+                "credit vol report cannot attribute factor '{id}': it is neither the generic \
+                 credit factor nor a bucket of the model's {} hierarchy levels",
+                model.hierarchy.levels.len()
+            )));
         };
         output.total += contribution.absolute_risk;
         *output.by_bucket.entry(bucket.to_owned()).or_insert(0.0) += contribution.absolute_risk;
@@ -138,19 +154,95 @@ pub fn build_credit_vol_report(
             .collect()
     });
 
-    CreditVolReport {
+    Ok(CreditVolReport {
         total: decomposition.total_risk,
         measure: decomposition.measure,
         generic,
         by_level,
         idiosyncratic_total: decomposition.residual_risk,
         by_position: position_rows,
-    }
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn two_level_model() -> CreditFactorModel {
+        serde_json::from_value(serde_json::json!({
+            "schema": "finstack_quant.credit_factor_model/1",
+            "as_of": "2024-03-29",
+            "calibration_window": {"start": "2022-03-29", "end": "2024-03-29"},
+            "policy": "globally_off",
+            "generic_factor": {"name": "CDX IG", "series_id": "cdx.ig.5y"},
+            "hierarchy": {"levels": ["rating", "region"]},
+            "panel_frequency": "monthly",
+            "use_returns_or_levels": "returns",
+            "bucket_weighting": "equal",
+            "config": {
+                "factors": [],
+                "covariance": {"n": 0, "factor_ids": [], "data": []},
+                "matching": {"mapping_table": []}
+            },
+            "issuer_betas": [],
+            "anchor_state": {"pc": 0.0, "by_level": []},
+            "static_correlation": {"factor_ids": [], "data": []},
+            "vol_state": {"factors": {}, "idiosyncratic": {}},
+            "factor_histories": null,
+            "diagnostics": {
+                "mode_counts": {},
+                "bucket_sizes_per_level": [],
+                "fold_ups": [],
+                "r_squared_histogram": null,
+                "tag_taxonomy": {}
+            }
+        }))
+        .expect("two-level credit factor model")
+    }
+
+    fn decomposition_with(factor_id: &str) -> RiskDecomposition {
+        serde_json::from_value(serde_json::json!({
+            "total_risk": 1.0,
+            "measure": "variance",
+            "factor_contributions": [
+                {"factor_id": "credit::generic", "absolute_risk": 0.4,
+                 "relative_risk": 0.4, "marginal_risk": 0.0},
+                {"factor_id": factor_id, "absolute_risk": 0.6,
+                 "relative_risk": 0.6, "marginal_risk": 0.0}
+            ],
+            "residual_risk": 0.0,
+            "position_factor_contributions": [],
+            "position_residual_contributions": []
+        }))
+        .expect("risk decomposition")
+    }
+
+    #[test]
+    fn credit_vol_report_rejects_contributions_it_cannot_attribute() {
+        // Dropping these silently made `generic + by_level` fall short of the
+        // decomposition's factor risk with no signal to the caller.
+        let model = two_level_model();
+        for factor_id in [
+            "usd_rates",
+            "credit::levelX::rating::IG",
+            "credit::level2::a.b.c::x.y.z",
+        ] {
+            let error = build_credit_vol_report(&decomposition_with(factor_id), &model, false)
+                .expect_err("unattributable credit factor must be rejected");
+            assert!(
+                error.to_string().contains(factor_id),
+                "error must name '{factor_id}', got: {error}"
+            );
+        }
+
+        let report = build_credit_vol_report(
+            &decomposition_with("credit::level1::rating.region::IG.EU"),
+            &model,
+            false,
+        )
+        .expect("known credit bucket");
+        assert_eq!(report.by_level[1].by_bucket["IG.EU"], 0.6);
+    }
 
     #[test]
     fn credit_vol_report_round_trips_through_json() {

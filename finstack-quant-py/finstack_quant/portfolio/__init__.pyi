@@ -9588,9 +9588,14 @@ def build_credit_vol_report(
         CreditVolReport with total, generic, level, idiosyncratic, and optional
         position-level volatility contribution fields.
 
-    Notes
-    -----
-    This helper does not raise; it aggregates the supplied decomposition in-process.
+    Raises
+    ------
+    TypeError
+        If ``decomposition`` or ``model`` is not the expected wrapper type.
+    PortfolioError
+        A ``ValueError`` subclass raised when a factor contribution is neither
+        the generic credit factor nor a bucket of one of ``model``'s hierarchy
+        levels, so its risk could not be reported.
 
     Examples
     --------

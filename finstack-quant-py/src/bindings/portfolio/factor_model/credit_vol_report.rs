@@ -7,6 +7,7 @@ use finstack_quant_portfolio::factor_model::{
 
 use crate::bindings::models::factor::credit::PyCreditFactorModel;
 use crate::bindings::pandas_utils::dict_to_dataframe;
+use crate::errors::portfolio_to_py;
 
 use crate::bindings::models::factor::risk::PyRiskDecomposition;
 
@@ -277,7 +278,7 @@ pub(super) fn build_credit_vol_report(
 ) -> PyResult<PyCreditVolReport> {
     let decomposition = decomposition.inner.clone();
     let model = model.inner.clone();
-    let report =
-        py.detach(move || fm::build_credit_vol_report(&decomposition, &model, by_position));
-    Ok(PyCreditVolReport::from_inner(report))
+    py.detach(move || fm::build_credit_vol_report(&decomposition, &model, by_position))
+        .map(PyCreditVolReport::from_inner)
+        .map_err(portfolio_to_py)
 }

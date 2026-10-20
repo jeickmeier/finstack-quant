@@ -275,7 +275,8 @@ pub fn allocate_weights(spec: JsValue) -> Result<JsValue, JsValue> {
 /// Throws a `TypeError` (kind `invalid_type`) if `decomposition` is not a JSON
 /// string or plain object or `byPosition` is not a boolean, and a
 /// `FinstackError` (kind `validation`) if `decomposition` does not match the
-/// `RiskDecomposition` schema.
+/// `RiskDecomposition` schema or holds a factor contribution that is neither
+/// the generic credit factor nor a bucket of one of `model`'s hierarchy levels.
 #[wasm_bindgen(js_name = buildCreditVolReport)]
 pub fn build_credit_vol_report(
     decomposition: JsValue,
@@ -285,6 +286,7 @@ pub fn build_credit_vol_report(
     let decomposition: finstack_quant_factor::risk::RiskDecomposition =
         from_js_json(&decomposition, "decomposition")?;
     let by_position = js_bool(&by_position, "byPosition")?;
-    let report = fm::build_credit_vol_report(&decomposition, &model.inner, by_position);
+    let report = fm::build_credit_vol_report(&decomposition, &model.inner, by_position)
+        .map_err(to_js_err)?;
     to_js_value(&report)
 }

@@ -220,6 +220,16 @@ test('buildCreditVolReport matches Python', () => {
     () => portfolio.buildCreditVolReport(inputs.credit_decomposition, model, 1),
     TypeError
   );
+  const unattributable = {
+    ...inputs.credit_decomposition,
+    factor_contributions: [
+      { factor_id: 'usd_rates', absolute_risk: 1, relative_risk: 1, marginal_risk: 0 },
+    ],
+  };
+  assert.throws(
+    () => portfolio.buildCreditVolReport(unattributable, model, false),
+    (error) => error.kind === 'validation' && /usd_rates/.test(error.message)
+  );
   model.free();
 });
 
