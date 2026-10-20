@@ -302,7 +302,7 @@ fn schedule_from_projection(
         }
     }
 
-    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+    finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         mbs.day_count,
         finstack_quant_cashflows::ScheduleBuildOpts {
@@ -317,7 +317,7 @@ fn schedule_from_projection(
                 maturity: None,
             },
         },
-    ))
+    )
 }
 
 fn end_of_month(date: Date) -> Result<Date> {

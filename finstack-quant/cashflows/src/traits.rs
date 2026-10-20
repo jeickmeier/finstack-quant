@@ -63,7 +63,7 @@ pub trait CashflowScheduleSource: Send + Sync {
     ///         _curves: &MarketContext,
     ///         _as_of: Date,
     ///     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-    ///         Ok(schedule_from_dated_flows(
+    ///         schedule_from_dated_flows(
     ///             vec![],
     ///             CFKind::Fixed,
     ///             DayCount::Act365F,
@@ -71,7 +71,7 @@ pub trait CashflowScheduleSource: Send + Sync {
     ///                 notional_hint: Some(self.notional),
     ///                 ..Default::default()
     ///             },
-    ///         ))
+    ///         )
     ///     }
     ///
     ///     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
@@ -153,17 +153,6 @@ pub trait CashflowProvider: CashflowScheduleSource {
 
 impl<T> CashflowProvider for T where T: CashflowScheduleSource + ?Sized {}
 
-fn resolve_schedule_notional(
-    notional_hint: Option<Money>,
-    fallback_currency: Option<Currency>,
-) -> Notional {
-    let currency = fallback_currency.unwrap_or(Currency::USD);
-    Notional {
-        initial: notional_hint.unwrap_or_else(|| Money::from((0_i64, currency))),
-        amort: crate::builder::AmortizationSpec::None,
-    }
-}
-
 /// Build a [`CashFlowSchedule`] from instrument-signed `(Date, Money)` flows.
 ///
 /// Schedule metadata and an optional notional hint are configured through
@@ -178,6 +167,10 @@ fn resolve_schedule_notional(
 ///   to avoid incorrect yield/accrual calculations.
 /// * `opts` - See [`ScheduleBuildOpts`]. Pass [`Default::default()`] for
 ///   the standard contractual schedule.
+///
+/// # Errors
+///
+/// Returns an error when a flow fails [`CashFlow::validate`].
 ///
 /// # Example
 ///
@@ -197,7 +190,8 @@ fn resolve_schedule_notional(
 ///     finstack_quant_core::cashflow::CFKind::Fixed,
 ///     DayCount::Thirty360,
 ///     ScheduleBuildOpts::default(),
-/// );
+/// )
+/// .expect("valid flows");
 /// assert_eq!(schedule.get_day_count(), DayCount::Thirty360);
 /// ```
 pub fn schedule_from_dated_flows(
@@ -205,18 +199,12 @@ pub fn schedule_from_dated_flows(
     kind: CFKind,
     day_count: DayCount,
     opts: ScheduleBuildOpts,
-) -> CashFlowSchedule {
-    let first_currency = flows.first().map(|(_, amount)| amount.currency());
+) -> finstack_quant_core::Result<CashFlowSchedule> {
     let classified = flows
         .into_iter()
         .map(|(date, amount)| CashFlow::new(date, None, amount, kind, 0.0, None))
         .collect();
-    CashFlowSchedule::from_parts(
-        classified,
-        resolve_schedule_notional(opts.notional_hint, first_currency),
-        day_count,
-        opts.meta,
-    )
+    schedule_from_classified_flows(classified, day_count, opts)
 }
 
 /// Build a [`CashFlowSchedule`] from pre-classified [`CashFlow`] values.
@@ -235,6 +223,10 @@ pub fn schedule_from_dated_flows(
 ///   explicitly specified** to avoid incorrect downstream yield/accrual
 ///   calculations.
 /// * `opts` - See [`ScheduleBuildOpts`].
+///
+/// # Errors
+///
+/// Returns an error when a flow fails [`CashFlow::validate`].
 ///
 /// # Returns
 ///
@@ -263,7 +255,8 @@ pub fn schedule_from_dated_flows(
 ///         notional_hint: Some(Money::from((1_000_000_i64, Currency::USD))),
 ///         ..Default::default()
 ///     },
-/// );
+/// )
+/// .expect("valid flows");
 /// assert_eq!(schedule.get_flows().len(), 2);
 /// // Original CFKind values are preserved.
 /// assert_eq!(schedule.get_flows()[0].kind, CFKind::Fixed);
@@ -273,14 +266,19 @@ pub fn schedule_from_classified_flows(
     flows: Vec<CashFlow>,
     day_count: DayCount,
     opts: ScheduleBuildOpts,
-) -> CashFlowSchedule {
-    let first_currency = flows.first().map(|cf| cf.amount.currency());
-    CashFlowSchedule::from_parts(
-        flows,
-        resolve_schedule_notional(opts.notional_hint, first_currency),
-        day_count,
-        opts.meta,
-    )
+) -> finstack_quant_core::Result<CashFlowSchedule> {
+    // Without a hint the notional is zero in the first flow's currency (USD
+    // for an empty stream, which has no currency to inherit).
+    let currency = flows
+        .first()
+        .map_or(Currency::USD, |cf| cf.amount.currency());
+    let notional = Notional {
+        initial: opts
+            .notional_hint
+            .unwrap_or_else(|| Money::from((0_i64, currency))),
+        amort: crate::builder::AmortizationSpec::None,
+    };
+    CashFlowSchedule::from_flows(flows, notional, day_count, opts.meta)
 }
 
 #[cfg(test)]
@@ -303,7 +301,8 @@ mod tests {
                 notional_hint: Some(Money::from((100_i64, Currency::USD))),
                 ..Default::default()
             },
-        );
+        )
+        .expect("valid schedule");
 
         let error = schedule
             .dated_flows()
@@ -353,7 +352,8 @@ mod tests {
                 notional_hint: Some(Money::from((100_i64, Currency::USD))),
                 ..Default::default()
             },
-        );
+        )
+        .expect("valid schedule");
         assert!(matches!(
             schedule.validate(),
             Err(finstack_quant_core::Error::CurrencyMismatch { .. })
@@ -405,7 +405,8 @@ mod tests {
                 notional_hint: Some(Money::from((100_i64, Currency::USD))),
                 ..Default::default()
             },
-        );
+        )
+        .expect("valid schedule");
 
         let typed = schedule.dated_flows().expect("valid schedule");
         assert_eq!(typed, vec![(date, Money::from((10_i64, Currency::USD)))]);
@@ -439,7 +440,7 @@ mod tests {
                 (d1, Money::from((100_i64, Currency::USD))),
                 (d2, Money::from((250_i64, Currency::USD))),
             ];
-            Ok(schedule_from_dated_flows(
+            schedule_from_dated_flows(
                 flows,
                 CFKind::Fixed,
                 DayCount::Act365F,
@@ -447,7 +448,7 @@ mod tests {
                     notional_hint: self.notional().expect("valid notional"),
                     ..Default::default()
                 },
-            ))
+            )
         }
     }
 
@@ -517,7 +518,7 @@ mod tests {
                     None,
                 ),
             ];
-            Ok(schedule_from_classified_flows(
+            schedule_from_classified_flows(
                 flows,
                 DayCount::Act365F,
                 ScheduleBuildOpts {
@@ -527,7 +528,7 @@ mod tests {
                         ..Default::default()
                     },
                 },
-            ))
+            )
         }
     }
 
@@ -575,7 +576,8 @@ mod tests {
                     ..Default::default()
                 },
             },
-        );
+        )
+        .expect("valid schedule");
         assert!(schedule.flows.is_empty());
         assert_eq!(
             schedule.meta.representation,
@@ -598,7 +600,8 @@ mod tests {
                 notional_hint: Some(notional),
                 ..Default::default()
             },
-        );
+        )
+        .expect("valid schedule");
         assert_eq!(schedule.notional.initial.amount(), 5_000_000.0);
         assert_eq!(schedule.notional.initial.currency(), Currency::USD);
     }
@@ -614,7 +617,8 @@ mod tests {
             CFKind::Fixed,
             DayCount::Thirty360,
             ScheduleBuildOpts::default(),
-        );
+        )
+        .expect("valid schedule");
         assert_eq!(schedule.notional.initial.amount(), 0.0);
         assert_eq!(schedule.notional.initial.currency(), Currency::EUR);
         assert_eq!(schedule.day_count, DayCount::Thirty360);
@@ -649,7 +653,8 @@ mod tests {
                 notional_hint: Some(Money::from((100_i64, Currency::USD))),
                 ..Default::default()
             },
-        );
+        )
+        .expect("valid schedule");
 
         assert_eq!(schedule.flows.len(), 2);
         assert_eq!(schedule.flows[0].kind, CFKind::PrePayment);
@@ -671,7 +676,8 @@ mod tests {
                 notional_hint: Some(Money::from((100_i64, Currency::USD))),
                 ..Default::default()
             },
-        );
+        )
+        .expect("valid schedule");
 
         assert_eq!(schedule.flows.len(), 1);
         assert_eq!(schedule.flows[0].kind, CFKind::Notional);
@@ -705,7 +711,8 @@ mod tests {
                 notional_hint: Some(notional.initial),
                 meta: meta.clone(),
             },
-        );
+        )
+        .expect("valid schedule");
 
         assert_eq!(
             schedule.notional.initial.amount(),

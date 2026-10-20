@@ -69,7 +69,7 @@ impl JsCashFlowSchedule {
     #[wasm_bindgen]
     pub fn builder() -> JsCashFlowBuilder {
         JsCashFlowBuilder {
-            inner: CashFlowBuilder::default(),
+            inner: CashFlowSchedule::builder(),
         }
     }
 
@@ -713,7 +713,7 @@ pub fn dated_flows(schedule: &JsCashFlowSchedule) -> Result<JsValue, JsValue> {
 /// @param day_count - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
 /// @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
 /// @returns The `CashFlowSchedule` handle, flows in canonical order.
-/// @throws If an argument does not match its wire type (kind `validation`).
+/// @throws If an argument does not match its wire type, or a flow is invalid (kind `validation`).
 #[wasm_bindgen(js_name = scheduleFromDatedFlows)]
 pub fn schedule_from_dated_flows(
     flows: JsValue,
@@ -727,7 +727,8 @@ pub fn schedule_from_dated_flows(
             js_wire::<CFKind>(&kind, "kind")?,
             js_wire::<DayCount>(&day_count, "dayCount")?,
             js_opt_wire::<ScheduleBuildOpts>(opts.as_ref(), "opts")?.unwrap_or_default(),
-        ),
+        )
+        .map_err(to_js_err)?,
     ))
 }
 
@@ -737,7 +738,7 @@ pub fn schedule_from_dated_flows(
 /// @param day_count - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
 /// @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
 /// @returns The `CashFlowSchedule` handle, flows in canonical order.
-/// @throws If an argument does not match its wire type (kind `validation`).
+/// @throws If an argument does not match its wire type, or a flow is invalid (kind `validation`).
 #[wasm_bindgen(js_name = scheduleFromClassifiedFlows)]
 pub fn schedule_from_classified_flows(
     flows: JsValue,
@@ -749,7 +750,8 @@ pub fn schedule_from_classified_flows(
             js_wire::<Vec<CashFlow>>(&flows, "flows")?,
             js_wire::<DayCount>(&day_count, "dayCount")?,
             js_opt_wire::<ScheduleBuildOpts>(opts.as_ref(), "opts")?.unwrap_or_default(),
-        ),
+        )
+        .map_err(to_js_err)?,
     ))
 }
 

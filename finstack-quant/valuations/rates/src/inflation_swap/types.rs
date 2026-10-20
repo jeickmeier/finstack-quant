@@ -589,7 +589,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))
@@ -1084,7 +1084,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for YoYInflationSwap {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))

@@ -896,7 +896,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
         if crate::shared::event_has_occurred(self.maturity, as_of) {
-            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+            return finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 finstack_quant_core::dates::DayCount::Act365F,
                 finstack_quant_cashflows::ScheduleBuildOpts {
@@ -907,7 +907,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
                         ..Default::default()
                     },
                 },
-            ));
+            );
         }
         let settlement_amount = self.settlement_amount(market, as_of)?;
         let ccy = self.settlement_currency;
@@ -923,7 +923,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule)
     }
 }

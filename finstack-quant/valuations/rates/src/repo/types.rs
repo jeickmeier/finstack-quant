@@ -703,7 +703,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
                 notional_hint: self.notional()?,
                 ..Default::default()
             },
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Contractual,
         ))

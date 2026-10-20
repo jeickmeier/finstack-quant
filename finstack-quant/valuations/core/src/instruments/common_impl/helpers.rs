@@ -797,7 +797,7 @@ mod tests {
             _curves: &MarketContext,
             as_of: Date,
         ) -> finstack_quant_core::Result<CashFlowSchedule> {
-            Ok(schedule_from_dated_flows(
+            schedule_from_dated_flows(
                 vec![
                     (as_of, Money::from((10_000_i64, Currency::USD))),
                     (
@@ -811,7 +811,7 @@ mod tests {
                     notional_hint: self.notional().expect("valid notional"),
                     ..Default::default()
                 },
-            ))
+            )
         }
     }
 

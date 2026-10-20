@@ -1131,7 +1131,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DiscountedCashFlow {
             .map(|(date, amount)| Money::new(*amount, self.currency).map(|money| (*date, money)))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-        Ok(finstack_quant_cashflows::schedule_from_dated_flows(
+        finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
             finstack_quant_core::cashflow::CFKind::Fixed,
             finstack_quant_core::dates::DayCount::Act365F,
@@ -1143,7 +1143,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DiscountedCashFlow {
                 },
                 ..Default::default()
             },
-        ))
+        )
     }
 }
 

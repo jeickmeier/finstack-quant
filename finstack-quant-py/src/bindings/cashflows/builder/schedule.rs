@@ -295,7 +295,9 @@ impl PyCashFlowSchedule {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn builder() -> PyCashFlowBuilder {
-        PyCashFlowBuilder::new_default()
+        PyCashFlowBuilder {
+            inner: CashFlowSchedule::builder(),
+        }
     }
 
     /// Build a schedule from explicit rows, a notional, a day count and metadata.

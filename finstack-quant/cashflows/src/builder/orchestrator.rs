@@ -24,7 +24,6 @@ use super::compiler::{
 };
 use super::emission::ResolvedFloatMarket;
 use super::specs::FeeSpec;
-use smallvec::SmallVec;
 use tracing::debug;
 
 /// Internal state accumulated during schedule building.
@@ -428,15 +427,13 @@ fn collect_all_dates(inputs: &DateCollectionInputs<'_>) -> finstack_quant_core::
 /// Fluent methods are split across `principal` (notional and amortization) and
 /// `coupon_api` (coupons, fees, payment splits). Build orchestration lives in
 /// this module.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CashFlowBuilder {
     pub(super) initial_principal: Option<Money>,
     pub(super) amortization: AmortizationSpec,
     pub(super) issue: Option<Date>,
     pub(super) maturity: Option<Date>,
-    /// Fee specifications. SmallVec<4> avoids heap allocation for typical instruments
-    /// with ≤4 fee specs (commitment fee, facility fee, usage fee, admin fee).
-    pub(super) fees: SmallVec<[FeeSpec; 4]>,
+    pub(super) fees: Vec<FeeSpec>,
     pub(super) principal_events: Vec<PrincipalEventSpec>,
     pub(super) coupon_program: Vec<CouponProgramPiece>,
     pub(super) payment_program: Vec<PaymentProgramPiece>,
@@ -480,23 +477,6 @@ impl CashFlowBuilder {
     #[must_use]
     pub fn get_principal_event_count(&self) -> usize {
         self.principal_events.len()
-    }
-}
-
-impl Default for CashFlowBuilder {
-    fn default() -> Self {
-        Self {
-            initial_principal: None,
-            amortization: AmortizationSpec::None,
-            issue: None,
-            maturity: None,
-            fees: SmallVec::new(),
-            principal_events: Vec::new(),
-            coupon_program: Vec::new(),
-            payment_program: Vec::new(),
-            principal_exchange: PrincipalExchange::InitialAndFinal,
-            pending_error: None,
-        }
     }
 }
 

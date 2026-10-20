@@ -30,15 +30,6 @@ pub struct PyCashFlowBuilder {
     pub(crate) inner: CashFlowBuilder,
 }
 
-impl PyCashFlowBuilder {
-    /// Fresh default builder (used by `CashFlowSchedule.builder()`).
-    pub(crate) fn new_default() -> Self {
-        Self {
-            inner: CashFlowBuilder::default(),
-        }
-    }
-}
-
 #[pymethods]
 impl PyCashFlowBuilder {
     /// Set principal details and instrument horizon.

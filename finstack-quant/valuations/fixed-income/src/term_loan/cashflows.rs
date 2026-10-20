@@ -5,8 +5,8 @@
 //! floating-rate conventions stay consistent across instruments.
 
 use crate::term_loan::types::TermLoan;
+use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule};
-use finstack_quant_cashflows::builder::{CashFlowBuilder, ScheduleParams};
 use finstack_quant_cashflows::builder::{
     CouponType, FeeBase, FeeSpec, FloatingCouponSpec, FloatingRateSpec, PrincipalEventSpec,
     StepUpCouponSpec,
@@ -258,7 +258,7 @@ pub(crate) fn generate_cashflows(
         }
     }
 
-    let mut builder = CashFlowBuilder::default();
+    let mut builder = CashFlowSchedule::builder();
     let _ = builder
         .principal(
             Money::from((0_i64, loan.currency)),
@@ -444,7 +444,7 @@ pub(crate) fn generate_cashflows(
                         notional_hint: Some(notional.initial),
                         meta: schedule.get_meta().clone(),
                     },
-                )
+                )?
                 .with_notional(notional.clone());
                 schedule = merge_cashflow_schedules([schedule, fee_schedule], notional, day_count);
             }

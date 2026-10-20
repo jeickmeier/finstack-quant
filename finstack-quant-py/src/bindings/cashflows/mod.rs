@@ -346,7 +346,8 @@ fn schedule_from_dated_flows(
     let kind = extract_cf_kind(kind)?;
     let opts = opts.map_or_else(ScheduleBuildOpts::default, |o| o.inner.clone());
     Ok(PyCashFlowSchedule::from_inner(
-        finstack_quant_cashflows::schedule_from_dated_flows(flows, kind, day_count.inner, opts),
+        finstack_quant_cashflows::schedule_from_dated_flows(flows, kind, day_count.inner, opts)
+            .map_err(crate::errors::core_to_py)?,
     ))
 }
 
@@ -386,14 +387,12 @@ fn schedule_from_classified_flows(
     flows: Vec<PyRef<'_, PyCashFlow>>,
     day_count: PyRef<'_, PyDayCount>,
     opts: Option<PyRef<'_, PyScheduleBuildOpts>>,
-) -> PyCashFlowSchedule {
+) -> PyResult<PyCashFlowSchedule> {
     let flows = flows.iter().map(|f| f.inner.clone()).collect();
     let opts = opts.map_or_else(ScheduleBuildOpts::default, |o| o.inner.clone());
-    PyCashFlowSchedule::from_inner(finstack_quant_cashflows::schedule_from_classified_flows(
-        flows,
-        day_count.inner,
-        opts,
-    ))
+    finstack_quant_cashflows::schedule_from_classified_flows(flows, day_count.inner, opts)
+        .map(PyCashFlowSchedule::from_inner)
+        .map_err(crate::errors::core_to_py)
 }
 
 /// Register the `finstack_quant.cashflows` Python namespace.

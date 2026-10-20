@@ -192,7 +192,7 @@ fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedule {
                 ..Default::default()
             },
         },
-    )
+    )?
 }
 
 // Benchmark: pv_by_period (plain, no credit)

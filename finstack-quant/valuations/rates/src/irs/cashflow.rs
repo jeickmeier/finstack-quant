@@ -148,14 +148,14 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })?;
     if periods.is_empty() {
-        return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+        return finstack_quant_cashflows::schedule_from_classified_flows(
             Vec::new(),
             float.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(irs.notional),
                 ..Default::default()
             },
-        ));
+        );
     }
 
     let cal = resolve_compounded_fixing_calendar(irs)?;
@@ -246,7 +246,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         ));
     }
 
-    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+    finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         float.day_count,
         finstack_quant_cashflows::ScheduleBuildOpts {
@@ -256,7 +256,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
                 ..Default::default()
             },
         },
-    ))
+    )
 }
 
 /// Build an unsigned fixed-leg cashflow schedule for an IRS.
@@ -324,14 +324,14 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
             ))
         })
         .collect::<Result<Vec<_>>>()?;
-    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+    finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         fixed.day_count,
         finstack_quant_cashflows::ScheduleBuildOpts {
             notional_hint: Some(irs.notional),
             ..Default::default()
         },
-    ))
+    )
 }
 
 /// Build an unsigned floating-leg cashflow schedule for an IRS with market curves.

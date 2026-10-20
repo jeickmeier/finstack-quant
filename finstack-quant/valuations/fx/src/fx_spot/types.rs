@@ -612,7 +612,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
         let settle_date = self.effective_settlement_date(as_of)?;
 
         if crate::shared::event_has_occurred(settle_date, as_of) {
-            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+            return finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 finstack_quant_core::dates::DayCount::Act365F,
                 finstack_quant_cashflows::ScheduleBuildOpts {
@@ -623,7 +623,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                         ..Default::default()
                     },
                 },
-            ));
+            );
         }
 
         let flows = {
@@ -656,7 +656,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule)
     }
 }

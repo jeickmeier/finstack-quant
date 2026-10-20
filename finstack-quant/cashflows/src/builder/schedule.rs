@@ -957,7 +957,7 @@ impl CashFlowSchedule {
     ///     CFKind::Fixed,
     ///     DayCount::Act360,
     ///     ScheduleBuildOpts::default(),
-    /// );
+    /// )?;
     /// assert_eq!(schedule.dated_flows()?[0].1.currency(), Currency::USD);
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
