@@ -113,6 +113,12 @@ run = ["cargo clean", "python3 scripts/clean_workspace.py"]
 # Whole-workspace tasks exclude finstack-quant-py: its test target links
 # libpython, which plain cargo cannot find. pytest covers the bindings, and
 # rust-lint still type-checks the crate.
+#
+# rust-test, rust-gen-schemas, rust-check-schemas and the generate_contracts
+# runs in gen-write and gen-check all select `--workspace --exclude
+# finstack-quant-py`, so each reuses the others' build. Cargo turns on a
+# crate's `default` feature only when the crate is selected, so a
+# `-p finstack-quant-wasm` build compiles every workspace crate a second time.
 
 [tasks.rust-build]
 description = "Build the Rust library crates"
@@ -144,8 +150,7 @@ if [ "${usage_coverage:-false}" = "true" ]; then
 else
   run_tests() { cargo nextest run "$@"; }
 fi
-run_tests --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' $ignored --no-fail-fast
-run_tests -p finstack-quant-wasm --lib --test dts_contract --test wasm $ignored --no-fail-fast
+run_tests --workspace --exclude finstack-quant-py --lib --test '*' $ignored --no-fail-fast
 if [ "${usage_coverage:-false}" = "true" ]; then
   mkdir -p coverage/rust
   exclude='(tests?/|test-support/|target/|\.cargo/|finstack-quant-py/)'
@@ -289,7 +294,7 @@ cargo bench -p "${usage_package?}" --bench "${usage_bench?}" -- \
 # The rust-test build already holds every gen_* binary, so this reuses it.
 description = "Regenerate the JSON schemas from Rust types"
 run = [
-  "cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' --no-run",
+  "cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' --no-run",
   "uv run --no-sync python scripts/check_schema_generation.py --write",
 ]
 
@@ -301,12 +306,16 @@ run = [
   "uv run --no-sync pytest scripts/tests/test_check_schema_residue.py -q",
   "uv run --no-sync python scripts/check_schema_residue.py",
   # Locally the rust-test build holds every gen_* binary (a no-op right after
-  # rust-test). CI's Lint job has no test build, so it builds only the bins.
+  # rust-test). CI's Lint job has no test build, so it builds the bins plus
+  # gen-check's generate_contracts example: an example build turns on
+  # dev-dependency features, so building the two apart compiles the workspace
+  # twice.
   '''
   if [ -n "${CI:-}" ]; then
-    cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --bins
+    cargo build --workspace --exclude finstack-quant-py --bins \
+      --example generate_contracts --features finstack-quant-wasm/contract-generation
   else
-    cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' --no-run
+    cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' --no-run
   fi
   ''',
   "uv run --no-sync pytest scripts/tests/test_check_schema_generation.py -q",
@@ -319,7 +328,7 @@ run = [
     echo "CI: schema-contract tests run in rust-test --coverage"
     exit 0
   fi
-  cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' \
+  cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' \
     --no-fail-fast -E '\
     (binary_id(finstack-quant-analytics::analytics) & test(/schema_contract::/)) | \
     (binary_id(finstack-quant-covenants::covenants) & test(/schema_contract::/)) | \
@@ -349,7 +358,12 @@ description = "Regenerate checked-in reference data, schemas and TypeScript bind
 run = [
   "uv run --no-project python finstack-quant/core/build/generate_reference_data.py",
   { task = "rust-gen-schemas" },
-  "cargo run -p finstack-quant-wasm --example generate_contracts --features contract-generation -- --write",
+  # `cargo run` cannot select the workspace, so build, then run the binary.
+  '''
+  cargo build --workspace --exclude finstack-quant-py --example generate_contracts \
+    --features finstack-quant-wasm/contract-generation
+  "${CARGO_TARGET_DIR:-target}/debug/examples/generate_contracts" --write
+  ''',
   "node finstack-quant-wasm/scripts/generate-contract-types.mjs",
   "uv run --no-sync python scripts/sync_generated_ts_index.py",
   "npm --prefix finstack-quant-ui run generate",
@@ -365,7 +379,9 @@ before_digest=$(uv run --no-sync python scripts/generation_digest.py)
 uv run --no-sync pytest scripts/tests/test_generate_core_reference_data.py -q
 uv run --no-project python finstack-quant/core/build/generate_reference_data.py --check
 mise run rust-check-schemas
-cargo run -p finstack-quant-wasm --example generate_contracts --features contract-generation -- --check
+cargo build --workspace --exclude finstack-quant-py --example generate_contracts \
+  --features finstack-quant-wasm/contract-generation
+"${CARGO_TARGET_DIR:-target}/debug/examples/generate_contracts" --check
 node finstack-quant-wasm/scripts/generate-contract-types.mjs --check
 uv run --no-sync python scripts/sync_generated_ts_index.py --check \
   || (echo 'Generated TypeScript index is out of date'; exit 1)
