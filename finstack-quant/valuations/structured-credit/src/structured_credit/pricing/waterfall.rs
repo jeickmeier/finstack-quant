@@ -15,7 +15,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Error as CoreError;
+use finstack_quant_core::Error;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
 
@@ -35,19 +35,19 @@ fn currency_scale_factor(currency: Currency) -> f64 {
 #[inline]
 fn to_currency_units(amount: f64, scale: f64) -> Result<i64> {
     if !amount.is_finite() || !scale.is_finite() || scale <= 0.0 {
-        return Err(CoreError::Validation(
+        return Err(Error::Validation(
             "Invalid amount or scale for currency unit conversion".to_string(),
         ));
     }
     let scaled = amount * scale;
     if !scaled.is_finite() || scaled.abs() > i64::MAX as f64 {
-        return Err(CoreError::Validation(
+        return Err(Error::Validation(
             "Tier amount exceeds penny-safe allocation capacity".to_string(),
         ));
     }
     let rounded = scaled.round();
     if rounded > i64::MAX as f64 || rounded < i64::MIN as f64 {
-        return Err(CoreError::Validation(
+        return Err(Error::Validation(
             "Tier amount exceeds penny-safe allocation capacity".to_string(),
         ));
     }
@@ -176,7 +176,7 @@ pub fn execute_waterfall(
     tiers.sort_by_key(|tier| tier.priority);
     for pair in tiers.windows(2) {
         if pair[0].priority == pair[1].priority {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "waterfall tiers '{}' and '{}' have duplicate priority {}",
                 pair[0].id, pair[1].id, pair[0].priority
             )));
@@ -191,7 +191,7 @@ pub fn execute_waterfall(
             > (context.available_cash.amount().abs() * f64::EPSILON * 8.0).max(1e-8)
         || classified_cash.currency() != waterfall.currency
     {
-        return Err(CoreError::Validation(format!(
+        return Err(Error::Validation(format!(
             "waterfall available cash must equal nonnegative interest plus principal in its base currency: available={}, interest={}, principal={}",
             context.available_cash.amount(), interest_remaining.amount(), principal_remaining.amount()
         )));
@@ -1281,7 +1281,7 @@ fn calculate_payment_amount(
             rounding,
         } => {
             let idx = *tranche_index.get(tranche_id.as_str()).ok_or_else(|| {
-                CoreError::from(finstack_quant_core::InputError::NotFound {
+                Error::from(finstack_quant_core::InputError::NotFound {
                     id: format!("tranche:{}", tranche_id),
                 })
             })?;
@@ -1322,7 +1322,7 @@ fn calculate_payment_amount(
             rounding,
         } => {
             let idx = *tranche_index.get(tranche_id.as_str()).ok_or_else(|| {
-                CoreError::from(finstack_quant_core::InputError::NotFound {
+                Error::from(finstack_quant_core::InputError::NotFound {
                     id: format!("tranche:{}", tranche_id),
                 })
             })?;
@@ -1365,7 +1365,7 @@ fn calculate_payment_amount(
             rounding,
         } => {
             let idx = *tranche_index.get(tranche_id.as_str()).ok_or_else(|| {
-                CoreError::from(finstack_quant_core::InputError::NotFound {
+                Error::from(finstack_quant_core::InputError::NotFound {
                     id: format!("tranche:{}", tranche_id),
                 })
             })?;
@@ -1402,7 +1402,7 @@ fn calculate_payment_amount(
 
         PaymentCalculation::IncentiveFee { hurdle_irr, share } => {
             if !share.is_finite() || !(0.0..=1.0).contains(share) {
-                return Err(CoreError::Validation(format!(
+                return Err(Error::Validation(format!(
                     "waterfall recipient calculation IncentiveFee.share must be a decimal \
                      fraction in [0, 1] (0.2 = 20%), got {share}"
                 )));

@@ -11,7 +11,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::Attributes;
-use finstack_quant_valuations_core::instruments::Instrument as InstrumentTrait;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 
 fn default_observation_business_day_convention() -> BusinessDayConvention {
@@ -390,7 +390,7 @@ impl FxVarianceSwap {
     }
 }
 
-impl InstrumentTrait for FxVarianceSwap {
+impl Instrument for FxVarianceSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::FxVarianceSwap,
         crate::FX

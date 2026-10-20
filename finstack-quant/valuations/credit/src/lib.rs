@@ -91,8 +91,6 @@ pub use cds_index::CdsIndex;
 pub use cds_option::{CdsOption, CdsOptionStrike, CdsOptionStrikeKind};
 pub use cds_tranche::CdsTranche;
 
-extern crate self as finstack_quant_valuations_credit;
-
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///
 /// The README is *not* included in the rendered crate documentation — this

@@ -3,7 +3,7 @@
 //! Defines [`PricingError`] and [`PricingErrorContext`].
 
 use super::{InstrumentType, ModelKey, PricerKey};
-use crate::instruments::common_impl::traits::Instrument as Priceable;
+use crate::instruments::Instrument;
 
 /// Context for pricing operations, providing actionable debugging information.
 ///
@@ -56,7 +56,7 @@ impl PricingErrorContext {
     /// assert_eq!(ctx.instrument_type, Some(InstrumentType::Bond));
     /// assert_eq!(ctx.curve_ids, vec!["USD-OIS".to_string()]);
     /// ```
-    pub fn from_instrument(instrument: &dyn Priceable) -> Self {
+    pub fn from_instrument(instrument: &dyn Instrument) -> Self {
         Self {
             instrument_id: Some(instrument.id().to_string()),
             instrument_type: Some(instrument.key()),

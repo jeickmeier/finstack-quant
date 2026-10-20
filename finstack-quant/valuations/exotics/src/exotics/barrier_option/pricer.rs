@@ -503,7 +503,6 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_core::types::BarrierType as AnalyticalBarrierType;
     use finstack_quant_core::types::InstrumentId;
     use finstack_quant_core::types::{BarrierType, PayoutTiming};
     use finstack_quant_models::closed_form::barrier::{
@@ -690,18 +689,14 @@ mod tests {
         let expected_at_hit = finstack_quant_models::closed_form::barrier::barrier_rebate(
             &p,
             rebate,
-            AnalyticalBarrierType::UpAndOut,
+            BarrierType::UpAndOut,
             finstack_quant_core::types::PayoutTiming::AtHit,
         );
         assert!(((rebate_pv - base_pv) - expected_at_hit).abs() < 1e-12);
 
         // Explicit AtExpiry reproduces the legacy pay-at-expiry value.
-        let expected_at_expiry = barrier_rebate(
-            &p,
-            rebate,
-            AnalyticalBarrierType::UpAndOut,
-            PayoutTiming::AtExpiry,
-        );
+        let expected_at_expiry =
+            barrier_rebate(&p, rebate, BarrierType::UpAndOut, PayoutTiming::AtExpiry);
         assert!(((rebate_pv_at_expiry - base_pv) - expected_at_expiry).abs() < 1e-12);
 
         // At-hit must dominate at-expiry under positive rates.
@@ -923,7 +918,7 @@ mod tests {
         let df = (-rate * t).exp();
         let p = BarrierParams::with_df(spot, strike, barrier, t, df, div_yield, vol)
             .expect("positive df constructs");
-        let expected = barrier_price(&p, AnalyticalBarrierType::UpAndOut, OptionType::Put);
+        let expected = barrier_price(&p, BarrierType::UpAndOut, OptionType::Put);
 
         assert!((pv - expected).abs() < 1e-12);
     }

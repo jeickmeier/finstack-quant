@@ -3,7 +3,7 @@
 use super::RealEstateAsset;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Error as CoreError;
+use finstack_quant_core::Error;
 
 pub(crate) fn compute_pv(
     asset: &RealEstateAsset,
@@ -11,7 +11,7 @@ pub(crate) fn compute_pv(
 ) -> finstack_quant_core::Result<Money> {
     if let Some(appraisal) = &asset.appraisal_value {
         if appraisal.currency() != asset.currency {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "Appraisal currency {} does not match instrument currency {}",
                 appraisal.currency(),
                 asset.currency
@@ -40,7 +40,7 @@ pub(crate) fn pv_with_rf_bump(
 ) -> finstack_quant_core::Result<f64> {
     if let Some(appraisal) = &asset.appraisal_value {
         if appraisal.currency() != asset.currency {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "Appraisal currency {} does not match instrument currency {}",
                 appraisal.currency(),
                 asset.currency
@@ -67,9 +67,9 @@ pub(crate) fn pv_with_rf_bump_dcf(
 ) -> finstack_quant_core::Result<f64> {
     let rate = asset
         .discount_rate
-        .ok_or_else(|| CoreError::Validation("Missing discount_rate for DCF".into()))?;
+        .ok_or_else(|| Error::Validation("Missing discount_rate for DCF".into()))?;
     if rate <= -1.0 {
-        return Err(CoreError::Validation(
+        return Err(Error::Validation(
             "discount_rate must be greater than -100%".into(),
         ));
     }
@@ -80,7 +80,7 @@ pub(crate) fn pv_with_rf_bump_dcf(
 
     let terminal_at_horizon = sale_proceeds_at(asset, as_of, horizon)?;
     if flows.is_empty() && terminal_at_horizon.is_none() {
-        return Err(CoreError::Validation(
+        return Err(Error::Validation(
             "No cashflows on/before horizon date and no terminal proceeds configured".into(),
         ));
     }
@@ -114,9 +114,9 @@ pub(crate) fn compute_npv_direct_cap(
 ) -> finstack_quant_core::Result<f64> {
     let cap_rate = asset
         .cap_rate
-        .ok_or_else(|| CoreError::Validation("Missing cap_rate for direct cap".into()))?;
+        .ok_or_else(|| Error::Validation("Missing cap_rate for direct cap".into()))?;
     if cap_rate <= 0.0 {
-        return Err(CoreError::Validation("cap_rate must be positive".into()));
+        return Err(Error::Validation("cap_rate must be positive".into()));
     }
 
     let noi = if let Some(noi) = asset.stabilized_noi {
@@ -125,7 +125,7 @@ pub(crate) fn compute_npv_direct_cap(
         future_noi_flows(asset, as_of)?
             .first()
             .map(|(_, amount)| *amount)
-            .ok_or_else(|| CoreError::Validation("NOI schedule is empty".into()))?
+            .ok_or_else(|| Error::Validation("NOI schedule is empty".into()))?
     };
 
     Ok(noi / cap_rate)
@@ -140,9 +140,7 @@ pub(crate) fn horizon_date(
 ) -> finstack_quant_core::Result<Date> {
     if let Some(sale_date) = asset.sale_date {
         if sale_date < as_of {
-            return Err(CoreError::Validation(
-                "sale_date must be on/after as_of".into(),
-            ));
+            return Err(Error::Validation("sale_date must be on/after as_of".into()));
         }
         return Ok(sale_date);
     }
@@ -160,7 +158,7 @@ pub(crate) fn future_noi_flows(
         .filter(|(date, _)| *date >= as_of)
         .collect();
     if flows.is_empty() {
-        return Err(CoreError::Validation(
+        return Err(Error::Validation(
             "NOI schedule must include at least one flow on/after as_of".into(),
         ));
     }
@@ -212,7 +210,7 @@ pub(crate) fn acquisition_cost_total(asset: &RealEstateAsset) -> finstack_quant_
     let mut total = 0.0;
     for money in &asset.acquisition_costs {
         if money.currency() != asset.currency {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "acquisition_costs currency must match instrument currency".into(),
             ));
         }
@@ -225,7 +223,7 @@ pub(crate) fn disposition_cost_total(asset: &RealEstateAsset) -> finstack_quant_
     let mut total = 0.0;
     for money in &asset.disposition_costs {
         if money.currency() != asset.currency {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "disposition_costs currency must match instrument currency".into(),
             ));
         }
@@ -240,21 +238,19 @@ pub(crate) fn sale_proceeds_at(
     horizon: Date,
 ) -> finstack_quant_core::Result<Option<(Date, f64)>> {
     if horizon < as_of {
-        return Err(CoreError::Validation(
-            "horizon must be on/after as_of".into(),
-        ));
+        return Err(Error::Validation("horizon must be on/after as_of".into()));
     }
 
     let gross = if let Some(sale_price) = asset.sale_price {
         if sale_price.currency() != asset.currency {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "sale_price currency must match instrument currency".into(),
             ));
         }
         sale_price.amount()
     } else if let Some(cap_rate) = asset.terminal_cap_rate {
         if cap_rate <= 0.0 {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "terminal_cap_rate must be positive".into(),
             ));
         }
@@ -264,11 +260,11 @@ pub(crate) fn sale_proceeds_at(
             .rfind(|(date, _)| *date <= horizon)
             .map(|(_, amount)| amount)
             .ok_or_else(|| {
-                CoreError::Validation("No NOI on/before horizon for terminal value".into())
+                Error::Validation("No NOI on/before horizon for terminal value".into())
             })?;
         let growth = asset.terminal_growth_rate.unwrap_or(0.0);
         if !(-1.0..=0.20).contains(&growth) {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "terminal_growth_rate must be in [-100%, 20%], got {growth}"
             )));
         }
@@ -281,7 +277,7 @@ pub(crate) fn sale_proceeds_at(
     let mut net = gross;
     if let Some(pct) = asset.disposition_cost_decimal {
         if !(0.0..1.0).contains(&pct) {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "disposition_cost_decimal must be in [0, 1)".into(),
             ));
         }
@@ -296,7 +292,7 @@ pub(crate) fn first_noi(asset: &RealEstateAsset, as_of: Date) -> finstack_quant_
     future_noi_flows(asset, as_of)?
         .first()
         .map(|(_, amount)| *amount)
-        .ok_or_else(|| CoreError::Validation("NOI schedule is empty".into()))
+        .ok_or_else(|| Error::Validation("NOI schedule is empty".into()))
 }
 
 pub(crate) fn last_noi(
@@ -306,7 +302,7 @@ pub(crate) fn last_noi(
     future_noi_flows(asset, as_of)?
         .last()
         .copied()
-        .ok_or_else(|| CoreError::Validation("NOI schedule is empty".into()))
+        .ok_or_else(|| Error::Validation("NOI schedule is empty".into()))
 }
 
 pub(crate) fn terminal_sale_proceeds(

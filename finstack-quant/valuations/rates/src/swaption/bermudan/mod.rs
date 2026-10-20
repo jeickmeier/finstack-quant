@@ -26,7 +26,7 @@ use std::sync::Arc;
 use crate::swaption::pricing::hw_cashflows::{
     value_with_exercise_today, HwExerciseTerms, HwSwaptionCashflows,
 };
-use crate::swaption::pricing::monte_carlo_lsmc::SwaptionLsmcPricer as SharedSwaptionLsmcPricer;
+use crate::swaption::pricing::monte_carlo_lsmc::SwaptionLsmcPricer;
 use crate::swaption::pricing::swap_rate_utils::HullWhiteBondPrice;
 use crate::swaption::CashSettlementMethod;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
@@ -632,7 +632,7 @@ impl BermudanSwaptionPricer {
             ..self.config.mc
         };
 
-        let lsmc_pricer = SharedSwaptionLsmcPricer::with_config(lsmc_config, hw_process);
+        let lsmc_pricer = SwaptionLsmcPricer::with_config(lsmc_config, hw_process);
 
         let basis = PolynomialBasis::new(self.config.mc.basis_degree).map_err(|e| {
             PricingError::from_core(

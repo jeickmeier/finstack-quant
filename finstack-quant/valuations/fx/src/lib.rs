@@ -79,8 +79,6 @@
 //! - [`FxBarrierOption`] for barrier options
 //! - [`Ndf`] for non-deliverable forwards
 
-extern crate self as finstack_quant_valuations_fx;
-
 /// FX barrier option module.
 pub mod fx_barrier_option;
 /// FX digital (binary) option module.

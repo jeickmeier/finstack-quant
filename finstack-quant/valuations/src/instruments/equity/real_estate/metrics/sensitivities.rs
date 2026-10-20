@@ -15,7 +15,7 @@ use crate::instruments::equity::real_estate::{
 use crate::instruments::Instrument;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::Error as CoreError;
+use finstack_quant_core::Error;
 
 /// `real_estate::cap_rate01`: PV change per 1bp cap-rate move.
 ///
@@ -27,14 +27,14 @@ impl CapRate01Calculator {
     fn ensure_applicable(asset: &RealEstateAsset) -> finstack_quant_core::Result<()> {
         match asset.valuation_method {
             RealEstateValuationMethod::DirectCap if asset.cap_rate.is_none() => {
-                Err(CoreError::Validation(
+                Err(Error::Validation(
                     "real_estate::cap_rate01: not applicable for DirectCap without cap_rate".into(),
                 ))
             }
             RealEstateValuationMethod::Dcf
                 if asset.sale_price.is_some() || asset.terminal_cap_rate.is_none() =>
             {
-                Err(CoreError::Validation(
+                Err(Error::Validation(
                     "real_estate::cap_rate01: not applicable for DCF with explicit sale_price \
                      or missing terminal_cap_rate"
                         .into(),
@@ -53,13 +53,13 @@ impl CapRate01Calculator {
             RealEstateValuationMethod::Dcf => ("terminal_cap_rate", &mut bumped.terminal_cap_rate),
         };
         let Some(value) = rate.as_mut() else {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "real_estate::cap_rate01: missing {field}"
             )));
         };
         *value += bump;
         if *value <= 0.0 {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "real_estate::cap_rate01: bumped {field} must be positive"
             )));
         }
@@ -103,7 +103,7 @@ impl MetricCalculator for CapRate01Calculator {
                 down.value(market, as_of)?.amount(),
             )
         } else {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "real_estate::cap_rate01: instrument type mismatch".into(),
             ));
         };

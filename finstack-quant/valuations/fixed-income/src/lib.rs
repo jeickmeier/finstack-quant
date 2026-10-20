@@ -111,8 +111,6 @@ pub use revolving_credit::RevolvingCredit;
 pub use tba::{AgencyTba, TbaTerm};
 pub use term_loan::TermLoan;
 
-extern crate self as finstack_quant_valuations_fixed_income;
-
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///
 /// The README is *not* included in the rendered crate documentation — this

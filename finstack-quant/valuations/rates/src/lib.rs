@@ -174,6 +174,8 @@ pub use repo::{CollateralSpec, CollateralType, Repo, RepoType};
 pub use swaption::{BermudanSwaption, Swaption};
 pub use xccy_swap::XccySwap;
 
+// `irs::marginable`'s unit tests `include!` the integration-test helper
+// `tests/support/rates.rs`, which names this crate from outside.
 extern crate self as finstack_quant_valuations_rates;
 
 /// Compiles the crate `README.md` Rust samples as doctests.

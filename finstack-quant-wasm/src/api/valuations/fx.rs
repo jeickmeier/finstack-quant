@@ -159,17 +159,22 @@ macro_rules! fx_option_class {
     };
 }
 
-use finstack_quant_valuations::instruments as fxi;
+use finstack_quant_valuations::instruments;
 
-fx_class!(JsFxSpot, "FxSpot", "fx_spot", fxi::FxSpot);
-fx_class!(JsFxForward, "FxForward", "fx_forward", fxi::FxForward);
-fx_class!(JsFxSwap, "FxSwap", "fx_swap", fxi::FxSwap);
-fx_class!(JsNdf, "Ndf", "ndf", fxi::Ndf);
+fx_class!(JsFxSpot, "FxSpot", "fx_spot", instruments::FxSpot);
+fx_class!(
+    JsFxForward,
+    "FxForward",
+    "fx_forward",
+    instruments::FxForward
+);
+fx_class!(JsFxSwap, "FxSwap", "fx_swap", instruments::FxSwap);
+fx_class!(JsNdf, "Ndf", "ndf", instruments::Ndf);
 fx_class!(
     JsFxVarianceSwap,
     "FxVarianceSwap",
     "fx_variance_swap",
-    fxi::FxVarianceSwap
+    instruments::FxVarianceSwap
 );
 
 macro_rules! fx_option_with_all_greeks {
@@ -196,7 +201,7 @@ fx_option_with_all_greeks!(
     JsFxOption,
     "FxOption",
     "fx_option",
-    fxi::FxOption,
+    instruments::FxOption,
     FxOption,
     "@returns Model theta per day: annual analytic theta divided by the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days); not annualized."
 );
@@ -204,7 +209,7 @@ fx_option_with_all_greeks!(
     JsQuantoOption,
     "QuantoOption",
     "quanto_option",
-    fxi::QuantoOption,
+    instruments::QuantoOption,
     QuantoOption,
     "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
 );
@@ -212,7 +217,7 @@ fx_option_class!(
     JsFxDigitalOption,
     "FxDigitalOption",
     "fx_digital_option",
-    fxi::FxDigitalOption,
+    instruments::FxDigitalOption,
     FxDigitalOption,
     [
         (
@@ -256,7 +261,7 @@ fx_option_class!(
     JsFxTouchOption,
     "FxTouchOption",
     "fx_touch_option",
-    fxi::FxTouchOption,
+    instruments::FxTouchOption,
     FxTouchOption,
     [
         (
@@ -300,7 +305,7 @@ fx_option_class!(
     JsFxBarrierOption,
     "FxBarrierOption",
     "fx_barrier_option",
-    fxi::FxBarrierOption,
+    instruments::FxBarrierOption,
     FxBarrierOption,
     [
         (
@@ -371,7 +376,7 @@ impl JsFxForward {
     /// @returns The example forward.
     /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
     pub fn example() -> Result<JsFxForward, JsValue> {
-        fxi::FxForward::example()
+        instruments::FxForward::example()
             .map(|inner| JsFxForward { inner })
             .map_err(to_js_err)
     }
@@ -386,7 +391,7 @@ impl JsFxForward {
     /// @throws Error - Throws with kind `validation` if a currency code is not ISO-4217.
     #[wasm_bindgen(js_name = standardSettlementDays)]
     pub fn standard_settlement_days(base: JsValue, quote: JsValue) -> Result<u32, JsValue> {
-        Ok(fxi::FxForward::standard_settlement_days(
+        Ok(instruments::FxForward::standard_settlement_days(
             parse_currency(&base, "base")?,
             parse_currency(&quote, "quote")?,
         ))
@@ -429,7 +434,7 @@ impl JsFxForward {
             }
             _ => FromTradeDateOptions::default(),
         };
-        let inner = fxi::FxForward::from_trade_date(
+        let inner = instruments::FxForward::from_trade_date(
             js_string(&id, "id")?,
             parse_currency(&base_currency, "baseCurrency")?,
             parse_currency(&quote_currency, "quoteCurrency")?,
@@ -541,7 +546,7 @@ impl JsFxOption {
     /// @returns The example option.
     /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
     pub fn example() -> Result<JsFxOption, JsValue> {
-        fxi::FxOption::example()
+        instruments::FxOption::example()
             .map(|inner| JsFxOption { inner })
             .map_err(to_js_err)
     }
@@ -578,7 +583,7 @@ impl JsFxOption {
         premium_currency: JsValue,
         venue: JsValue,
     ) -> Result<JsFxOption, JsValue> {
-        let delta_convention = fxi::fx::fx_option::FxDeltaConvention::new(
+        let delta_convention = instruments::fx::fx_option::FxDeltaConvention::new(
             js_string(&delta_convention_kind, "deltaConventionKind")?
                 .parse()
                 .map_err(to_js_err)?,
@@ -586,7 +591,7 @@ impl JsFxOption {
             js_string(&venue, "venue")?,
         )
         .map_err(to_js_err)?;
-        let inner = fxi::FxOption::european(
+        let inner = instruments::FxOption::european(
             js_string(&id, "id")?,
             parse_currency(&base_currency, "baseCurrency")?,
             parse_currency(&quote_currency, "quoteCurrency")?,
@@ -638,7 +643,7 @@ mod tests {
             .price("{}")
             .is_err());
         assert!(option_greeks_object(
-            Box::new(fxi::FxOption::example().expect("example")),
+            Box::new(instruments::FxOption::example().expect("example")),
             "not-market-json",
             "not-a-date",
             Some("not-a-model"),

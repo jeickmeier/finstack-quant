@@ -276,7 +276,7 @@ fn validate_monitoring_state(
     Ok(())
 }
 
-use finstack_quant_core::types::BarrierType as AnalyticalBarrierType;
+use finstack_quant_core::types::BarrierType;
 use finstack_quant_models::closed_form::barrier::{barrier_price, barrier_rebate, BarrierParams};
 
 fn expired_barrier_value_per_unit(
@@ -454,7 +454,7 @@ fn bs_barrier_price_per_unit(
     r_for: f64,
     sigma: f64,
     t: f64,
-    analytical_barrier_type: AnalyticalBarrierType,
+    analytical_barrier_type: BarrierType,
 ) -> f64 {
     let params = BarrierParams::new(
         fx_spot,

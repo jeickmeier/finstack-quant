@@ -444,7 +444,7 @@ pub fn generate_three_factor_paths(
 }
 
 // Use centralized constants from parent module
-use super::super::MIN_CIR_SPREAD as CIR_MIN_SPREAD;
+use super::super::MIN_CIR_SPREAD;
 
 /// Build credit spread parameters from MC config.
 ///
@@ -481,15 +481,15 @@ pub fn build_credit_spread_params(
             initial,
         } => {
             // Apply stability guards for CIR parameters
-            let stable_initial = initial.max(CIR_MIN_SPREAD);
-            let stable_theta = theta.max(CIR_MIN_SPREAD);
-            let stable_kappa = kappa.max(CIR_MIN_SPREAD);
+            let stable_initial = initial.max(MIN_CIR_SPREAD);
+            let stable_theta = theta.max(MIN_CIR_SPREAD);
+            let stable_kappa = kappa.max(MIN_CIR_SPREAD);
 
             // Check Feller condition: 2κθ > σ²
             // When satisfied, the process is guaranteed to stay positive
             let feller_lhs = 2.0 * stable_kappa * stable_theta;
             let feller_rhs = sigma * sigma;
-            let feller_ratio = feller_lhs / feller_rhs.max(CIR_MIN_SPREAD);
+            let feller_ratio = feller_lhs / feller_rhs.max(MIN_CIR_SPREAD);
 
             if feller_ratio < 1.0 {
                 // Feller condition violated; QE discretization will still clip to zero.
@@ -539,11 +539,11 @@ pub fn build_credit_spread_params(
                     facility.maturity,
                     DayCountContext::default(),
                 )?
-                .max(CIR_MIN_SPREAD);
+                .max(MIN_CIR_SPREAD);
             let t = tenor_years
                 .unwrap_or(remaining)
                 .min(remaining)
-                .max(CIR_MIN_SPREAD);
+                .max(MIN_CIR_SPREAD);
 
             // Conditional survival and average hazard over [anchor, anchor+T],
             // and the hazard↔spread mapping, both from the shared
@@ -561,12 +561,12 @@ pub fn build_credit_spread_params(
             // rate for consistency with pricing. The `1e-6` guard keeps a
             // recovery of exactly 1 from collapsing the spread scale.
             let one_minus_r = (1.0 - facility.recovery_rate).max(1e-6);
-            let s0 = (one_minus_r * lambda0).max(CIR_MIN_SPREAD);
-            let s_bar = (one_minus_r * avg_lambda).max(CIR_MIN_SPREAD);
+            let s0 = (one_minus_r * lambda0).max(MIN_CIR_SPREAD);
+            let s_bar = (one_minus_r * avg_lambda).max(MIN_CIR_SPREAD);
 
             // Mean-anchored CIR params
-            let k = kappa.max(CIR_MIN_SPREAD);
-            let a = if (k * t).abs() < CIR_MIN_SPREAD {
+            let k = kappa.max(MIN_CIR_SPREAD);
+            let a = if (k * t).abs() < MIN_CIR_SPREAD {
                 1.0 - 0.5 * k * t
             } else {
                 (1.0 - (-k * t).exp()) / (k * t)
@@ -574,20 +574,20 @@ pub fn build_credit_spread_params(
             let theta = if (1.0 - a).abs() < 1e-12 {
                 s_bar
             } else {
-                ((s_bar - a * s0) / (1.0 - a)).max(CIR_MIN_SPREAD)
+                ((s_bar - a * s0) / (1.0 - a)).max(MIN_CIR_SPREAD)
             };
 
             // CIR diffusion coefficient matching the local fractional vol at
             // the anchored spread: σ_CIR·√s_ref = σ_fractional·s_ref.
             let sigma = finstack_quant_models::credit::market_anchored::cir_diffusion_coefficient(
                 *implied_vol,
-                s_bar.max(CIR_MIN_SPREAD),
+                s_bar.max(MIN_CIR_SPREAD),
             )?;
 
             // Check Feller condition: 2κθ > σ²
             let feller_lhs = 2.0 * k * theta;
             let feller_rhs = sigma * sigma;
-            let feller_ratio = feller_lhs / feller_rhs.max(CIR_MIN_SPREAD);
+            let feller_ratio = feller_lhs / feller_rhs.max(MIN_CIR_SPREAD);
 
             if feller_ratio < 1.0 {
                 tracing::warn!(
