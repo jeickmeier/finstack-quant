@@ -10,9 +10,9 @@
 //! implied volatilities. Calling this metric on a `Cap` or `Floor` instrument
 //! will return an error directing the caller to the appropriate workflow.
 
-use crate::cap_floor::pricing::payoff::CapletFloorletInputs;
 use crate::cap_floor::pricing::pricer::{price_caplet_quote, resolve_caplet_volatility};
 use crate::cap_floor::pricing::projection::resolve_optioned_caplet_inputs;
+use crate::cap_floor::pricing::CapletFloorletInputs;
 use crate::cap_floor::{CapFloor, RateOptionType};
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;

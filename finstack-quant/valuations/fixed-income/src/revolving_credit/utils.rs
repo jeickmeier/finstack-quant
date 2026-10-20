@@ -530,8 +530,8 @@ mod tests {
             lc: None,
             scheduled_fees: Vec::new(),
             oid_eir: None,
-            fees: super::super::types::RevolvingCreditFees::default(),
-            draw_repay_spec: super::super::types::DrawRepaySpec::Deterministic(vec![]),
+            fees: crate::revolving_credit::types::RevolvingCreditFees::default(),
+            draw_repay_spec: crate::revolving_credit::types::DrawRepaySpec::Deterministic(vec![]),
             discount_curve_id: "USD-OIS".into(),
             credit_curve_id: None,
             recovery_rate: 0.0,
@@ -980,7 +980,7 @@ mod tests {
 
     #[test]
     fn test_apply_draw_repay_event_draw() {
-        use super::super::types::DrawRepayEvent;
+        use crate::revolving_credit::types::DrawRepayEvent;
 
         let balance = Money::from((5_000_000_i64, Currency::USD));
         let commitment = Money::from((10_000_000_i64, Currency::USD));
@@ -999,7 +999,7 @@ mod tests {
 
     #[test]
     fn test_apply_draw_repay_event_repay() {
-        use super::super::types::DrawRepayEvent;
+        use crate::revolving_credit::types::DrawRepayEvent;
 
         let balance = Money::from((5_000_000_i64, Currency::USD));
         let commitment = Money::from((10_000_000_i64, Currency::USD));
@@ -1018,7 +1018,7 @@ mod tests {
 
     #[test]
     fn test_apply_draw_repay_event_exceeds_commitment() {
-        use super::super::types::DrawRepayEvent;
+        use crate::revolving_credit::types::DrawRepayEvent;
 
         let balance = Money::from((8_000_000_i64, Currency::USD));
         let commitment = Money::from((10_000_000_i64, Currency::USD));

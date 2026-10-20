@@ -4,8 +4,8 @@
 //! `MetricCalculator` that can be registered and computed alongside other
 //! risk metrics like DV01, Theta, etc.
 
-use crate::metrics::core::traits::{MetricCalculator, MetricContext};
 use crate::metrics::risk::{calculate_var, VarConfig, VarResult};
+use crate::metrics::traits::{MetricCalculator, MetricContext};
 use crate::metrics::MetricId;
 use finstack_quant_core::Result;
 

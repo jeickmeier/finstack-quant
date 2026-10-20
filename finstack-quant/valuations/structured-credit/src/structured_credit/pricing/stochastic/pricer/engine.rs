@@ -1414,7 +1414,7 @@ fn expected_shortfall(losses: &mut [f64], confidence: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
+    use crate::structured_credit::pricing::stochastic::pricer::ScenarioTreeConfig;
     use crate::structured_credit::{
         AssetPool, DealType, PoolAsset, Tranche, TrancheCashflows, TrancheSeniority,
         TrancheStructure,
@@ -1666,7 +1666,7 @@ mod tests {
         // Extract the deal-level variance directly via the finalize path.
         // We use a minimal StochasticPricer config just to call finalize.
         use crate::structured_credit::pricing::stochastic::pricer::config::StochasticPricerConfig;
-        use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
+        use crate::structured_credit::pricing::stochastic::pricer::ScenarioTreeConfig;
         let config = StochasticPricerConfig::new(
             test_date(),
             test_discount_curve(),
@@ -1977,7 +1977,7 @@ mod per_name_copula_tests {
     }
 
     use super::*;
-    use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
+    use crate::structured_credit::pricing::stochastic::pricer::ScenarioTreeConfig;
     use crate::structured_credit::{
         AssetPool, DealType, PoolAsset, Tranche, TrancheSeniority, TrancheStructure,
     };

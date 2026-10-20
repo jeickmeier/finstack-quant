@@ -125,7 +125,6 @@ pub mod cap_floor;
 /// Reference-swap resolution shared by the CMS instruments.
 pub(crate) mod cms_common;
 /// Historical CMS (par swap rate) fixing lookups for seasoned CMS trades.
-pub(crate) mod cms_fixings;
 /// CMS option module - Constant maturity swap options.
 pub mod cms_option;
 /// CMS spread option module - Option on spread between two CMS rates.

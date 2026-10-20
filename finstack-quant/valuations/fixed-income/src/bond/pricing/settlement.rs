@@ -11,12 +11,14 @@
 //!   is set, otherwise `as_of`).
 //! - Accrued interest for market quotes is computed at the quote date.
 
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{adjust, Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
-use super::super::CashflowSpec;
-use crate::bond::Bond;
+use crate::bond::{Bond, CashflowSpec};
 
 /// Compute the settlement date from a trade/valuation date.
 ///
@@ -248,6 +250,27 @@ pub(crate) fn quote_dirty_at_as_of(
     Ok(dirty_at_quote * carry.settlement_df + carry.detached_pv_as_of)
 }
 
+/// Replay principal claims on cash dates, retaining economic PIK/default dates.
+///
+/// Recovery exposure runs until actual cash repayment, so amortization,
+/// prepayment, notional and revolving rows drop their economic principal date.
+pub(crate) fn recovery_principal_path(schedule: &CashFlowSchedule) -> Result<Vec<(Date, Money)>> {
+    let mut cash_schedule = schedule.clone();
+    cash_schedule.update_flows(|flow| {
+        if matches!(
+            flow.kind,
+            CFKind::Amortization
+                | CFKind::PrePayment
+                | CFKind::Notional
+                | CFKind::RevolvingDraw
+                | CFKind::RevolvingRepayment
+        ) {
+            flow.principal_date = None;
+        }
+    });
+    cash_schedule.outstanding_by_date()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267,7 +290,7 @@ mod tests {
             "USD-OIS",
         )
         .expect("bond");
-        bond.settlement_convention = Some(super::super::super::types::BondSettlementConvention {
+        bond.settlement_convention = Some(crate::bond::BondSettlementConvention {
             settlement_days: 2,
             ..Default::default()
         });
@@ -352,7 +375,7 @@ mod tests {
             "USD-OIS",
         )
         .expect("bond");
-        bond.settlement_convention = Some(super::super::super::types::BondSettlementConvention {
+        bond.settlement_convention = Some(crate::bond::BondSettlementConvention {
             settlement_days: 1,
             ex_coupon_days: 7,
             ex_coupon_calendar_id: None,

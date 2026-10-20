@@ -735,7 +735,7 @@ mod cases {
         let fixing_date = start_date
             .add_business_days(-curve.reset_lag(), calendar)
             .expect("fixing date");
-        let reset_end = crate::structured_credit::utils::rate_helpers::try_tenor_to_period_end(
+        let reset_end = crate::structured_credit::pricing::simulation_engine::period_helpers::try_tenor_to_period_end(
             fixing_date,
             curve.tenor(),
             curve.day_count(),

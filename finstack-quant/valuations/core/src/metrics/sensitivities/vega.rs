@@ -3,7 +3,7 @@
 //! Provides parallel and key-rate vega calculators for instruments with volatility surfaces.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::metrics::core::finite_difference::{
+use crate::metrics::finite_difference::{
     apply_parallel_surface_bumps_in_place, bumped_volatility_override, min_grid_vol,
     revert_scratch_bumps, volatility_override, VOL_POINTS_PER_ABSOLUTE_VOL,
 };

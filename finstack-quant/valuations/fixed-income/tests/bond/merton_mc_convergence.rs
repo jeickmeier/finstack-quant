@@ -13,7 +13,7 @@ use finstack_quant_models::credit::{
     AssetDynamics, DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel,
 };
 use finstack_quant_valuations_core::instruments::{MertonMcConfig, PikMode, PikSchedule};
-use finstack_quant_valuations_fixed_income::bond::pricing::engine::merton_mc::{
+use finstack_quant_valuations_fixed_income::bond::pricing::merton_mc::{
     MertonMcEngine, MertonMcRun,
 };
 

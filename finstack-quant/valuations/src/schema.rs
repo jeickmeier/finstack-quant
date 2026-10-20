@@ -1069,7 +1069,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
     .with_examples(examples::facility_projection),
-        SchemaArtifact::new::<crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcResult>(
+        SchemaArtifact::new::<crate::instruments::fixed_income::bond::pricing::merton_mc::MertonMcResult>(
             "schemas/results/1/merton_mc_result.schema.json",
             "https://finstack_quant.dev/schemas/results/1/merton_mc_result.schema.json",
             "MertonMcResult",

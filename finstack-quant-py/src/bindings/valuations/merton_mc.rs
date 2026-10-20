@@ -4,7 +4,7 @@ use crate::bindings::models::credit::{
     PyDynamicRecoverySpec, PyEndogenousHazardSpec, PyMertonModel, PyToggleExerciseModel,
 };
 use crate::errors::{core_to_py, display_to_py};
-use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{
+use finstack_quant_valuations::instruments::fixed_income::bond::pricing::merton_mc::{
     MertonMcResult, PathStatistics,
 };
 use finstack_quant_valuations::instruments::{

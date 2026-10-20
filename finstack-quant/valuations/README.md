@@ -50,7 +50,7 @@ and the closed world around them.
 | [`fx/`](fx/README.md) | `finstack-quant-valuations-fx`: the FX family (spot, forwards, swaps, NDFs, listed futures, vanilla/barrier/digital/touch/variance/quanto options) with its `FX` registration static; re-exported as `instruments::fx` |
 | [`src/instruments/`](src/instruments/README.md) | The façade modules of the family crates; the umbrella-resident instruments — `exotics::basket` and `equity::real_estate` (both register with `STANDARD`); `composite`; `json_loader` (`InstrumentJson`, the closed world); the JSON cashflow-export entry points |
 | `src/pricer/` | `FAMILIES`, the `STANDARD` family and `standard_pricer_registry()`, and the JSON pricing entry points in `pricer::json` |
-| `src/metrics/mod.rs`, `src/results.rs` | Façades over the core modules; `metrics::standard_registry()` |
+| `src/metrics.rs`, `src/results.rs` | Façades over the core modules; `metrics::standard_registry()` |
 | `src/schema.rs` | Accessors and validators for the checked-in JSON Schema artifacts |
 | `src/bin/gen_schemas.rs` | `gen_schemas` binary that writes/checks [`schemas/`](schemas/README.md) |
 

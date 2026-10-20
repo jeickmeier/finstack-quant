@@ -71,8 +71,8 @@ conversion and greeks types, and everything the four README'd leaves export.
 Inside a leaf, `metrics/`, `pricer.rs`/`pricing/` and `types.rs`/`types/` are
 `pub(crate)` or private; their supported items surface through the leaf's
 `pub use` list. The exceptions — genuinely public submodules — are
-`cmo::tranches` (the PAC schedule only), `cmo::waterfall`, `dollar_roll::carry`,
-`bond::cashflow_spec`, `bond::cashflows`, `bond::pricing`,
+`cmo::waterfall`, `dollar_roll::carry`,
+`bond::cashflow_spec`, `bond::pricing`,
 `revolving_credit::cashflow_engine`, `structured_credit::waterfall`,
 `term_loan::spec` and `term_loan::overrides`.
 

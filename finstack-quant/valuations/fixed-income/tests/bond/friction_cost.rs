@@ -8,7 +8,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::{ShortRateTree, ShortRateTreeConfig};
 use finstack_quant_valuations_core::instruments::{InstrumentPricingOverrides, ShortRateTreeModel};
-use finstack_quant_valuations_fixed_income::bond::pricing::engine::tree::BondValuator;
+use finstack_quant_valuations_fixed_income::bond::pricing::tree::BondValuator;
 use finstack_quant_valuations_fixed_income::bond::{Bond, CallPut, CallPutSchedule};
 use time::macros::date;
 

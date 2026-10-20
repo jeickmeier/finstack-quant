@@ -59,6 +59,7 @@ mod specs;
 mod stochastic_result;
 mod structured_credit;
 mod tranche;
+pub(crate) mod tranche_analytics;
 mod tranche_cashflows;
 mod tranche_structure;
 mod waterfall;

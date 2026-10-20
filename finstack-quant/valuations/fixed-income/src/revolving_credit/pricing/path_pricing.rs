@@ -1,6 +1,5 @@
 //! Deterministic single-path revolving-credit pricing.
 
-use super::components::compute_upfront_fee_pv;
 use super::results::PathResult;
 use super::unified::RevolvingCreditPricer;
 use crate::revolving_credit::cashflow_engine::{
@@ -11,6 +10,7 @@ use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
@@ -82,7 +82,7 @@ impl RevolvingCreditPricer {
                 &cashflow_dates,
                 facility.recovery_rate,
                 facility.issue_date,
-                super::super::MC_CLOCK_DAY_COUNT,
+                crate::revolving_credit::MC_CLOCK_DAY_COUNT,
             )?
         } else if let Some(ref hazard_id) = facility.credit_curve_id {
             // Static survival from hazard curve
@@ -114,7 +114,7 @@ impl RevolvingCreditPricer {
                 &[as_of],
                 facility.recovery_rate,
                 facility.issue_date,
-                super::super::MC_CLOCK_DAY_COUNT,
+                crate::revolving_credit::MC_CLOCK_DAY_COUNT,
             )?[0]
         } else if let Some(ref hazard_id) = facility.credit_curve_id {
             let hazard = market.get_hazard(hazard_id.as_str())?;
@@ -147,14 +147,14 @@ impl RevolvingCreditPricer {
             .filter(|p| p.stochastic_rates);
         // Signed so pre-commitment valuation dates do not error; only the
         // pathwise branch consumes this.
-        let t_asof_path = super::super::MC_CLOCK_DAY_COUNT.signed_year_fraction(
+        let t_asof_path = crate::revolving_credit::MC_CLOCK_DAY_COUNT.signed_year_fraction(
             facility.issue_date,
             as_of,
             finstack_quant_core::dates::DayCountContext::default(),
         )?;
         let df_asof_to = |date: Date| -> Result<f64> {
             if let Some(p) = pathwise_rates {
-                let t = super::super::MC_CLOCK_DAY_COUNT.signed_year_fraction(
+                let t = crate::revolving_credit::MC_CLOCK_DAY_COUNT.signed_year_fraction(
                     facility.issue_date,
                     date,
                     finstack_quant_core::dates::DayCountContext::default(),
@@ -218,7 +218,7 @@ impl RevolvingCreditPricer {
                         &future_grid,
                         facility.recovery_rate,
                         facility.issue_date,
-                        super::super::MC_CLOCK_DAY_COUNT,
+                        crate::revolving_credit::MC_CLOCK_DAY_COUNT,
                     )?
                 } else if let Some(ref hazard_id) = facility.credit_curve_id {
                     let hazard = market.get_hazard(hazard_id.as_str())?;
@@ -342,7 +342,7 @@ impl RevolvingCreditPricer {
             dates,
             facility.recovery_rate,
             facility.issue_date,
-            super::super::MC_CLOCK_DAY_COUNT,
+            crate::revolving_credit::MC_CLOCK_DAY_COUNT,
         )?;
 
         // Risky annuity of the accrual periods after each observation.
@@ -431,7 +431,8 @@ impl RevolvingCreditPricer {
 
             let hazard_at_cf = if let Some(idx) = time_points.iter().position(|&t| t >= t_cf) {
                 if idx == 0
-                    || (time_points[idx] - t_cf).abs() < super::super::INTERPOLATION_TOLERANCE
+                    || (time_points[idx] - t_cf).abs()
+                        < crate::revolving_credit::INTERPOLATION_TOLERANCE
                 {
                     // At or before first point
                     cumulative_hazards[idx.min(cumulative_hazards.len() - 1)]
@@ -442,7 +443,8 @@ impl RevolvingCreditPricer {
                     let h0 = cumulative_hazards[idx - 1];
                     let h1 = cumulative_hazards[idx];
 
-                    let alpha = (t_cf - t0) / (t1 - t0).max(super::super::INTERPOLATION_TOLERANCE);
+                    let alpha = (t_cf - t0)
+                        / (t1 - t0).max(crate::revolving_credit::INTERPOLATION_TOLERANCE);
                     h0 + alpha * (h1 - h0)
                 }
             } else {
@@ -473,7 +475,9 @@ impl RevolvingCreditPricer {
         if let Some(ref path_data) = path_schedule.path_data {
             dates.extend(path_data.payment_dates.iter().copied());
         } else {
-            dates.extend(super::super::utils::build_payment_dates(facility)?);
+            dates.extend(crate::revolving_credit::utils::build_payment_dates(
+                facility,
+            )?);
         }
 
         // Seed with deterministic draw/repay event dates (exposure jumps)
@@ -514,7 +518,7 @@ impl RevolvingCreditPricer {
                     let util = Self::interpolate_utilization_at_date(
                         date,
                         facility.issue_date,
-                        super::super::MC_CLOCK_DAY_COUNT,
+                        crate::revolving_credit::MC_CLOCK_DAY_COUNT,
                         &path_data.time_points,
                         &path_data.utilization_path,
                     )?;
@@ -534,7 +538,7 @@ impl RevolvingCreditPricer {
                         finstack_quant_core::Error::Validation("Recovery date underflow".into())
                     })?;
                     let balance = |date| {
-                        super::super::cashflow_engine::calculate_drawn_balance_at_date(
+                        crate::revolving_credit::cashflow_engine::calculate_drawn_balance_at_date(
                             facility, as_of, date,
                         )
                         .map(|amount| amount.amount())
@@ -628,4 +632,31 @@ impl RevolvingCreditPricer {
         let util = utilization_path[i] + alpha * (utilization_path[i + 1] - utilization_path[i]);
         Ok(util.clamp(0.0, 1.0))
     }
+}
+
+/// Present value of the upfront fee at `as_of`.
+///
+/// Only includes the fee when the commitment date is strictly after the
+/// valuation date, consistent with "PV of remaining cashflows" semantics.
+/// When `issue_date <= as_of` the fee has already been paid and is
+/// excluded from the mark-to-market valuation.
+///
+/// # Arguments
+///
+/// * `upfront_fee` - Fee amount in the facility currency (the percentage
+///   form already resolved against the opening commitment).
+/// * `issue_date` - Date the fee is paid.
+/// * `as_of` - Valuation date.
+/// * `disc_curve` - Curve discounting the fee from the commitment date.
+fn compute_upfront_fee_pv(
+    upfront_fee: Money,
+    issue_date: Date,
+    as_of: Date,
+    disc_curve: &dyn Discounting,
+) -> Result<f64> {
+    if upfront_fee.amount() == 0.0 || issue_date <= as_of {
+        return Ok(0.0);
+    }
+    let df = disc_curve.df_between_dates(as_of, issue_date)?;
+    Ok(upfront_fee.amount() * df)
 }

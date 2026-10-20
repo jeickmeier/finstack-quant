@@ -1,7 +1,7 @@
 //! Tranche measures on `CdsTranchePricer` — model upfront, par spread, spread
 //! DV01, expected loss, correlation delta, jump-to-default — and their helpers.
 
-use super::config::{
+use super::pricer::{
     CdsTranchePricer, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION, NUMERICAL_TOLERANCE,
     PAR_SPREAD_TOLERANCE,
 };
@@ -362,7 +362,7 @@ impl CdsTranchePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<(
-        Vec<super::config::ProjectedDiscountedRow>,
+        Vec<super::pricer::ProjectedDiscountedRow>,
         std::sync::Arc<finstack_quant_core::market_data::term_structures::DiscountCurve>,
     )> {
         tranche.validate()?;

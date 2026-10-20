@@ -1,7 +1,7 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
-use crate::cap_floor::pricing::payoff::CapletFloorletInputs;
 use crate::cap_floor::pricing::projection::resolve_optioned_caplet_inputs;
+use crate::cap_floor::pricing::CapletFloorletInputs;
 use crate::cap_floor::{CapFloor, CapFloorVolType, RateOptionType};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

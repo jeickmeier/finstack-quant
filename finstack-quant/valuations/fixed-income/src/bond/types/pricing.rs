@@ -82,7 +82,7 @@ impl Bond {
         model: finstack_quant_valuations_core::pricer::ModelKey,
         curves: &finstack_quant_core::market_data::context::MarketContext,
     ) -> Result<()> {
-        use crate::bond::pricing::engine::hazard::HazardBondEngine;
+        use crate::bond::pricing::hazard::HazardBondEngine;
         use finstack_quant_valuations_core::pricer::ModelKey;
 
         if model == ModelKey::RatesCredit && self.credit_curve_id.is_none() {
@@ -125,8 +125,8 @@ impl Bond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         oas_quote_decimal: f64,
-    ) -> Result<crate::bond::pricing::engine::tree::TreePriceOutcome> {
-        use crate::bond::pricing::engine::{
+    ) -> Result<crate::bond::pricing::tree::TreePriceOutcome> {
+        use crate::bond::pricing::{
             discount::BondEngine,
             hazard::HazardBondEngine,
             tree::{bond_tree_config, bond_tree_settings, TreePriceOutcome, TreePricer},
@@ -169,8 +169,8 @@ impl Bond {
         model: finstack_quant_valuations_core::pricer::ModelKey,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-    ) -> Result<crate::bond::pricing::engine::tree::TreePriceOutcome> {
-        use crate::bond::pricing::engine::tree::TreePriceOutcome;
+    ) -> Result<crate::bond::pricing::tree::TreePriceOutcome> {
+        use crate::bond::pricing::tree::TreePriceOutcome;
         use crate::bond::pricing::{quote_conversions, settlement};
         use finstack_quant_valuations_core::pricer::ModelKey;
 
@@ -818,10 +818,9 @@ mod tests {
             "native inference must select the joint model when joint controls are attached"
         );
 
-        let expected = crate::bond::pricing::engine::hazard::HazardBondEngine::price_raw(
-            &bond, &market, as_of,
-        )
-        .expect("scalar FRP price");
+        let expected =
+            crate::bond::pricing::hazard::HazardBondEngine::price_raw(&bond, &market, as_of)
+                .expect("scalar FRP price");
         let actual = bond
             .price_for_model_raw(ModelKey::HazardRate, &market, as_of)
             .expect("explicit hazard-rate price");

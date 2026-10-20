@@ -32,8 +32,8 @@ use finstack_quant_models::monte_carlo::TimeGrid;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use finstack_quant_models::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
 
-use super::super::cashflow_engine::ThreeFactorPathData;
-use super::super::types::{
+use crate::revolving_credit::cashflow_engine::ThreeFactorPathData;
+use crate::revolving_credit::types::{
     CreditSpreadProcessSpec, InterestRateProcessSpec, McConfig, RevolvingCredit,
     RevolvingCreditMcRun, StochasticUtilizationSpec, UtilizationProcess,
 };
@@ -89,7 +89,7 @@ pub fn generate_three_factor_paths(
 
     // Simulation time runs on the ACT/365F model clock (the clock the rate and
     // credit processes are calibrated on); accrual keeps the facility day count.
-    let day_count = super::super::MC_CLOCK_DAY_COUNT;
+    let day_count = crate::revolving_credit::MC_CLOCK_DAY_COUNT;
     // All stochastic factors start at the valuation date for seasoned
     // facilities.  Keep path time on the facility axis, but retain the
     // simulation anchor so curve-fitted models can use their own t=0.
@@ -444,7 +444,7 @@ pub fn generate_three_factor_paths(
 }
 
 // Use centralized constants from parent module
-use super::super::MIN_CIR_SPREAD;
+use crate::revolving_credit::MIN_CIR_SPREAD;
 
 /// Credit-spread process parameters for one facility.
 ///
@@ -852,7 +852,7 @@ mod tests {
             antithetic: false,
         };
         let dates =
-            super::super::super::utils::build_accrual_boundary_dates(&facility).expect("dates");
+            crate::revolving_credit::utils::build_accrual_boundary_dates(&facility).expect("dates");
 
         let paths = generate_three_factor_paths(
             &stochastic,

@@ -190,7 +190,7 @@ fn bump_market_for_target(
             // 1/100th of a vol point per unit, making the iterative implied-vol
             // breakeven ~100x the Linear value.)
             let bump_abs = delta * 0.01;
-            crate::metrics::core::finite_difference::bump_surfaces_vol_absolute(
+            crate::metrics::finite_difference::bump_surfaces_vol_absolute(
                 base,
                 &vol_surface_ids,
                 bump_abs,

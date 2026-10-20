@@ -212,7 +212,7 @@ impl RevolvingCreditPricer {
             ));
         }
 
-        use super::super::types::{CreditSpreadProcessSpec, McConfig};
+        use crate::revolving_credit::types::{CreditSpreadProcessSpec, McConfig};
         let mc_config_to_use;
         let mc_config = if let Some(ref mc_config) = stoch_spec.mc_config {
             mc_config.validate()?;
@@ -272,7 +272,7 @@ impl RevolvingCreditPricer {
         let engine = CashflowEngine::new(facility, Some(market), as_of, fixings)?;
         // Factor state is observed on accrual boundaries plus term-index
         // reset dates so intra-period resets re-fix the coupon.
-        let observation_dates = super::super::utils::build_observation_dates(facility)?;
+        let observation_dates = crate::revolving_credit::utils::build_observation_dates(facility)?;
 
         // Generate 3-factor paths (simulation starts at as_of for seasoned facilities)
         let paths = generate_three_factor_paths(

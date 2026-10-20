@@ -3,10 +3,10 @@ use crate::structured_credit::pricing::stochastic::calibrations::{
     abs_auto_correlation_structure, clo_correlation_structure, cmbs_correlation_structure,
     rmbs_correlation_structure,
 };
+use crate::structured_credit::pricing::stochastic::pricer::ScenarioTreeConfig;
 use crate::structured_credit::pricing::stochastic::pricer::{
     StochasticPricer, StochasticPricerConfig,
 };
-use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;

@@ -1540,8 +1540,9 @@ mod tests {
                 let deterministic = engine
                     .generate_deterministic()
                     .expect("deterministic schedule");
-                let observations = super::super::utils::build_observation_dates(&facility)
-                    .expect("observation dates");
+                let observations =
+                    crate::revolving_credit::utils::build_observation_dates(&facility)
+                        .expect("observation dates");
                 let n = observations.len();
                 let time_points = observations
                     .iter()

@@ -3,7 +3,7 @@
 //! This pricing path is used when cap/floor volatility is quoted in normal terms
 //! (absolute rate units), which is common in low/negative-rate environments.
 
-use super::payoff::CapletFloorletInputs;
+use super::CapletFloorletInputs;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::{bachelier_delta_call, bachelier_delta_put};
 use finstack_quant_models::volatility::bachelier_price_with_annuity;

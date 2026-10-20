@@ -8,7 +8,7 @@
 use finstack_quant_wasm::api::valuations::pricing::{
     instrument_cashflows, list_standard_metrics, price_instrument,
 };
-use finstack_quant_wasm::api::valuations::structured_credit::*;
+use finstack_quant_wasm::api::valuations::typed::structured::*;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_test::*;
 
@@ -253,7 +253,7 @@ fn registered_term_loan_metrics_cross_wasm_json_boundary() {
 
 #[wasm_bindgen_test]
 fn public_json_routes_validate_instrument_before_malformed_market() {
-    use finstack_quant_wasm::api::valuations::structured_credit::{
+    use finstack_quant_wasm::api::valuations::typed::structured::{
         structured_credit_tranche_breakeven_cdr, structured_credit_tranche_discount_margin,
         structured_credit_tranche_metrics, structured_credit_tranche_oas,
         structured_credit_tranche_scenario_table,
@@ -346,7 +346,7 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
 
 #[wasm_bindgen_test]
 fn fx_price_with_metrics_validates_merged_overrides_before_market() {
-    use finstack_quant_wasm::api::valuations::fx::JsFxOption;
+    use finstack_quant_wasm::api::valuations::typed::fx::JsFxOption;
 
     let option = JsFxOption::from_json(JsValue::from(&fx_option_instrument_json())).unwrap();
     let metrics = serde_wasm_bindgen::to_value(&Vec::<String>::new()).unwrap();
@@ -443,7 +443,7 @@ fn js_object_to_json(value: &wasm_bindgen::JsValue) -> serde_json::Value {
 
 #[wasm_bindgen_test]
 fn structured_credit_tranche_metrics_through_json() {
-    use finstack_quant_wasm::api::valuations::structured_credit::{
+    use finstack_quant_wasm::api::valuations::typed::structured::{
         structured_credit_tranche_breakeven_cdr, structured_credit_tranche_discount_margin,
         structured_credit_tranche_metrics, structured_credit_tranche_oas,
         structured_credit_tranche_scenario_table,

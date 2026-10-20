@@ -78,7 +78,6 @@
 mod config;
 mod engine;
 mod helpers;
-mod integration;
 mod metrics;
 
 #[cfg(test)]

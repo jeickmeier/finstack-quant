@@ -24,10 +24,10 @@
 //!   Chapter 3: One-factor Short-Rate Models, Section 3.3.2 (Gaussian forward-rate
 //!   dynamics underpinning the closed-form caplet normal volatility). `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
 
-use crate::cap_floor::pricing::payoff::CapletFloorletInputs;
 use crate::cap_floor::pricing::projection::{
     resolve_optioned_caplet_inputs, OptionedCouponProjection,
 };
+use crate::cap_floor::pricing::CapletFloorletInputs;
 use crate::cap_floor::types::{CapFloor, RateOptionType};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;

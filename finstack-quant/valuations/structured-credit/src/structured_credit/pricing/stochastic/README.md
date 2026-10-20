@@ -11,9 +11,9 @@ finite-pool copula engines live in
 ```text
 stochastic/
 ├── calibrations.rs  # registry-backed RMBS/CLO/CMBS/ABS presets
-├── tree/config.rs   # valuation-owned scenario configuration (horizon, specs, seed)
 └── pricer/
-    ├── config.rs    # StructuredCreditPricingMode and internal pricer configuration
+    ├── config.rs    # pricer configuration and the scenario configuration
+    │                # (horizon, specs, seed) it carries
     ├── engine.rs    # path generation plus waterfall orchestration
     └── result.rs    # StochasticPricingResult and TranchePricingResult
 ```

@@ -246,7 +246,7 @@ impl CommoditySwaption {
 
     fn swap_periods(&self) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
         self.validate()?;
-        super::super::averaging::commodity_periods(
+        crate::commodity::averaging::commodity_periods(
             self.underlying_start_date,
             self.underlying_maturity,
             self.swap_frequency,
@@ -274,7 +274,7 @@ impl CommoditySwaption {
     /// where `F̄_i` is the business-day average of the forward curve over the
     /// half-open period `[T_{i-1}, T_i)` (the final period also observes the
     /// swap end date) — exactly the quantity the underlying
-    /// [`super::super::commodity_swap::CommoditySwap`] floating leg settles on
+    /// [`crate::commodity::commodity_swap::CommoditySwap`] floating leg settles on
     /// — and `DF_i = DF(as_of, payment_date_i)`.
     ///
     /// Sampling `F(payment_date_i)` instead of the period average moves the
@@ -344,7 +344,7 @@ impl CommoditySwaption {
         let mut weight_total = 0.0;
         for period in &periods {
             let include_end = period.accrual_end == self.underlying_maturity;
-            let fwd = super::super::averaging::business_day_average_price(
+            let fwd = crate::commodity::averaging::business_day_average_price(
                 get_price,
                 is_business_day,
                 period.accrual_start,
@@ -1139,7 +1139,7 @@ mod tests {
             .amount();
 
         // Underlying pay-fixed swap with the same schedule parameters.
-        let swap = super::super::super::commodity_swap::CommoditySwap::builder()
+        let swap = crate::commodity::commodity_swap::CommoditySwap::builder()
             .id(InstrumentId::new("NG-SWAP-PAR"))
             .underlying(CommodityUnderlyingParams::new(
                 "Energy",

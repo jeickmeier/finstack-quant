@@ -61,8 +61,10 @@ fn cached_schedule(context: &mut MetricContext) -> Result<Arc<CashFlowSchedule>>
 fn drawn_at(facility: &RevolvingCredit, as_of: Date, date: Date) -> Result<f64> {
     if facility.is_deterministic() {
         Ok(
-            super::super::cashflow_engine::calculate_drawn_balance_at_date(facility, as_of, date)?
-                .amount(),
+            crate::revolving_credit::cashflow_engine::calculate_drawn_balance_at_date(
+                facility, as_of, date,
+            )?
+            .amount(),
         )
     } else {
         Ok(facility.drawn.amount())
@@ -78,7 +80,7 @@ pub(crate) fn accrued_interest(
     schedule: &CashFlowSchedule,
     settlement: Date,
 ) -> Result<f64> {
-    let periods = super::super::utils::build_payment_periods(facility)?;
+    let periods = crate::revolving_credit::utils::build_payment_periods(facility)?;
     let Some(period) = periods
         .iter()
         .find(|p| p.accrual_start <= settlement && settlement < p.accrual_end)

@@ -1,7 +1,7 @@
 //! Expected tranche loss and the expected loss/write-down curve, with the
 //! equity-tranche capped expectations they are built from.
 
-use super::config::{CdsTranchePricer, ElWdPoint, PoolExposure, INTEGRATION_TOLERANCE};
+use super::pricer::{CdsTranchePricer, ElWdPoint, PoolExposure, INTEGRATION_TOLERANCE};
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;

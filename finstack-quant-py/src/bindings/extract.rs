@@ -24,8 +24,9 @@ use crate::bindings::valuations::instruments::{
     serialize_typed_instrument_json, PyBond, PyTermLoan,
 };
 use crate::bindings::valuations::typed_asset_backed_facility::PyAssetBackedFacility;
+use crate::bindings::valuations::typed_convertible::PyConvertibleBond;
 use crate::bindings::valuations::typed_credit::{
-    PyCdsIndex, PyCdsOption, PyCdsTranche, PyConvertibleBond, PyCreditDefaultSwap,
+    PyCdsIndex, PyCdsOption, PyCdsTranche, PyCreditDefaultSwap,
 };
 use crate::bindings::valuations::typed_equity::PyEquityOption;
 use crate::bindings::valuations::typed_fx::{PyFxForward, PyFxOption};

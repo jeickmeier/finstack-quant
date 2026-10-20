@@ -6,7 +6,7 @@
 //! a four-corner central mixed difference.
 
 use crate::instruments::common_impl::dependencies::FxPair;
-use crate::metrics::core::finite_difference::{
+use crate::metrics::finite_difference::{
     bump_scalar_price, central_mixed, min_grid_vol, volatility_override,
 };
 use crate::metrics::sensitivities::config as sens_config;

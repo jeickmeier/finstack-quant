@@ -1,6 +1,6 @@
 //! Unit tests for the CDS tranche pricing engine.
 
-use super::config::{
+use super::pricer::{
     DiscountAt, PoolExposure, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION,
 };
 use super::*;
@@ -439,7 +439,7 @@ fn concentration_test_loss(pricer: &CdsTranchePricer, index: &CreditIndexData) -
                 0.3,
                 index,
                 maturity,
-                super::config::PoolExposure::Loss,
+                super::pricer::PoolExposure::Loss,
             )
             .expect("capped loss")
     };
@@ -469,7 +469,7 @@ fn heterogeneous_work_limit_preflights_large_pools() {
             0.3,
             &index,
             Date::from_calendar_date(2026, Month::January, 1).expect("date"),
-            super::config::PoolExposure::Loss,
+            super::pricer::PoolExposure::Loss,
         )
         .expect_err("preflight must reject excessive conditional work");
     assert!(error.to_string().contains("issuer-grid visits"));
@@ -2625,7 +2625,7 @@ fn heterogeneous_tail_loss_matches_independent_state_enumeration_and_factor_grid
                     rho,
                     &index,
                     maturity,
-                    super::config::PoolExposure::Loss,
+                    super::pricer::PoolExposure::Loss,
                 )
                 .unwrap();
             let budget = cap * 1e-5;

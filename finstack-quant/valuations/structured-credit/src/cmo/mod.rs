@@ -101,12 +101,12 @@
 //! ```
 
 pub(crate) mod metrics;
+mod pac_support;
 pub(crate) mod pricer;
-pub mod tranches;
 mod types;
 pub mod waterfall;
 
 pub use types::{AgencyCmo, CmoTranche, CmoTrancheType, CmoWaterfall, PacCollar};
 
 // Dated contract data shared by JSON hosts and Rust constructors.
-pub use tranches::pac_support::{PacPayment, PacSchedule};
+pub use pac_support::{PacPayment, PacSchedule};

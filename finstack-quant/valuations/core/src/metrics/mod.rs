@@ -54,27 +54,32 @@
 // Internal submodules (organized by concern)
 
 mod aggregation;
-mod core;
+pub(crate) mod finite_difference;
+pub(crate) mod ids;
+pub(crate) mod registration_macro;
+pub(crate) mod registry;
 pub mod risk;
 #[doc(hidden)]
 pub mod sensitivities;
+pub(crate) mod traits;
+pub(crate) mod universal;
 
 // Core surface (supported)
 pub use aggregation::is_additive_metric;
-pub use core::finite_difference::bump_surface_vol_absolute;
+pub use finite_difference::bump_surface_vol_absolute;
 #[doc(hidden)]
-pub use core::ids::closest_metric_names;
-pub use core::ids::{MetricGroup, MetricId, MetricUnit};
-pub use core::registry::{MetricRegistry, MetricRegistryError};
-pub use core::traits::{MetricCalculator, MetricContext};
-#[doc(hidden)]
-pub use core::universal::{register_universal_metrics, PricerPublishedMetric};
+pub use ids::closest_metric_names;
+pub use ids::{MetricGroup, MetricId, MetricUnit};
+pub use registry::{MetricRegistry, MetricRegistryError};
 pub use sensitivities::config::{
     format_bucket_label, format_key_rate_label, parse_key_rate_label, STANDARD_BUCKETS_YEARS,
     STANDARD_BUCKET_LABELS,
 };
 pub use sensitivities::cross_factor::CrossFactorPair;
 pub use sensitivities::theta::{collect_period_cash, PeriodCash};
+pub use traits::{MetricCalculator, MetricContext};
+#[doc(hidden)]
+pub use universal::{register_universal_metrics, PricerPublishedMetric};
 
 // Family-facing finite-difference helpers.
 //
@@ -82,7 +87,7 @@ pub use sensitivities::theta::{collect_period_cash, PeriodCash};
 // and stay out of the rendered documentation. The family-facing calculators
 // live at `metrics::sensitivities::<module>`.
 #[doc(hidden)]
-pub use core::finite_difference::{
+pub use finite_difference::{
     bump_active_volatility, bump_discount_curve_parallel, bump_scalar_price,
     central_diff_by_half_bump, central_diff_by_width, central_diff_scalar_relative,
     replace_scalar_value, scalar_numeric_value, scaled_central_diff_by_width, CORRELATION_BUMP,

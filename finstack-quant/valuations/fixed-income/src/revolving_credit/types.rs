@@ -1405,7 +1405,7 @@ mod dependency_tests {
         facility
             .validate()
             .expect("chronologically valid events must not depend on input order");
-        let balance = super::super::cashflow_engine::calculate_drawn_balance_at_date(
+        let balance = crate::revolving_credit::cashflow_engine::calculate_drawn_balance_at_date(
             &facility,
             facility.issue_date,
             date!(2025 - 12 - 31),
