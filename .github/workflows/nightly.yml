@@ -6,7 +6,7 @@ name: Nightly
 # `--slow`, and release.yml runs those variants. Every job runs a
 # canonical mise task, so a failure reproduces locally with the same command
 # (`mise run all-ci` runs the set). release.yml calls this workflow as the base
-# gate for a tagged release.
+# gate for a tagged release, and pr.yml calls it for every pull request.
 #
 # No workflow-level `concurrency`: as a called workflow it would share the
 # caller's group and cancel or deadlock the release run.
@@ -123,7 +123,8 @@ jobs:
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: lint
-          # Only master runs save; a release tag restores master's cache.
+          # Only master runs save; release tags and pull requests restore
+          # master's cache.
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install uv

@@ -2,12 +2,14 @@
 
 CI workflows and issue templates for finstack-quant.
 
-There are two workflows. `nightly.yml` is the minimal check set and runs every
+There are three workflows. `nightly.yml` is the minimal check set and runs every
 night: lint, the standard fast tests, and audits, with no doctests or slow
-tests. `release.yml` runs when a `vX.Y.Z` tag is pushed. It runs the nightly
-set plus the release-only gates (docs, the `--doctest` and `--slow` test
-variants, publish checks, semver), then builds and publishes the release. Pull requests
-and pushes to `master` trigger nothing; run `mise run all-ci` before merging.
+tests. `pr.yml` runs the same set on every pull request into `master`; its
+`PR gate` check must pass before the pull request can merge.
+`release.yml` runs when a `vX.Y.Z` tag is pushed. It runs the nightly set plus
+the release-only gates (docs, the `--doctest` and `--slow` test variants,
+publish checks, semver), then builds and publishes the release. Branching, pull
+request, and release practice is in [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md).
 
 CI does not reimplement the build. Almost every job provisions the pinned
 toolchain with `jdx/mise-action@v4` and then runs a canonical `mise` task, so
@@ -18,7 +20,8 @@ in [`../../mise.toml`](../../mise.toml); nothing here pins a compiler.
 
 | File | Triggers | What it runs |
 | --- | --- | --- |
-| `nightly.yml` | daily 06:00 UTC; manual; called by `release.yml` | Lint, the fast tests on all three surfaces, supply-chain audit, and the SonarQube scan. |
+| `nightly.yml` | daily 06:00 UTC; manual; called by `pr.yml` and `release.yml` | Lint, the fast tests on all three surfaces, supply-chain audit, and the SonarQube scan. |
+| `pr.yml` | pull request into `master` | The nightly set (SonarQube skipped), then the `PR gate` check the `master` ruleset requires. |
 | `release.yml` | push of a `vX.Y.Z` tag | Version metadata check, the nightly set, docs and doctests, the slow Rust and Python suites, publish checks, and semver. If all pass, it builds wheels, sdist and WASM packages, then creates the GitHub Release. |
 
 ### nightly.yml
@@ -48,6 +51,30 @@ Three details worth knowing before editing:
   the key flips and the job builds cold. The builds use the toolchain mise pins.
 - `nightly.yml` has no workflow-level `concurrency`. As a called workflow it
   would share the release run's group and cancel or deadlock it.
+
+### pr.yml
+
+`pr.yml` calls `nightly.yml` unchanged, coverage included, so every job builds
+exactly what the `master` run built and restores the cache that run saved. Pull
+request runs never save a cache of their own. Do not add a pull-request-only
+build variant: `cargo llvm-cov` builds into `target/llvm-cov-target` with
+`-C instrument-coverage`, so an uninstrumented Test Rust on pull requests would
+find nothing usable in `master`'s cache and compile every dependency cold. The
+SonarQube job is `master`-only and skips.
+
+A new push to a pull request cancels that pull request's run in progress;
+`pr.yml` owns the `concurrency` group because `nightly.yml` cannot.
+
+The `PR gate` job is the only status check the `master` ruleset requires, so
+jobs in `nightly.yml` can be added or renamed without editing the ruleset. It
+runs unless the run was cancelled and fails unless the called checks passed. A
+required check that is skipped counts as passing, so do not give it a condition
+that a failed check can skip.
+
+The `master` ruleset also requires a pull request with linear history (squash
+merges only) and blocks force-pushes and deletion. It requires no approving
+review while the project has one maintainer; `CONTRIBUTING.md` lists the steps
+for adding reviewers.
 
 ### release.yml
 
