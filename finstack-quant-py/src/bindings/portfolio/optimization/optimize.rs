@@ -40,10 +40,10 @@ pub(super) fn optimize_portfolio(
 pub(super) fn rebalance_from_spec(
     spec: &PyPortfolioOptimizationSpec,
     result: &PyPortfolioOptimizationResult,
-) -> PyResult<crate::bindings::portfolio::types::PyPortfolio> {
+) -> PyResult<crate::bindings::portfolio::container::PyPortfolio> {
     let portfolio = opt::rebalance_from_spec(&spec.inner, &result.inner)
         .map_err(crate::errors::portfolio_to_py)?;
-    Ok(crate::bindings::portfolio::types::PyPortfolio {
+    Ok(crate::bindings::portfolio::container::PyPortfolio {
         inner: std::sync::Arc::new(portfolio),
     })
 }

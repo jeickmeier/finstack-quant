@@ -79,8 +79,8 @@ impl PyCandidatePosition {
         min_weight: f64,
         attributes: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        let boxed = crate::bindings::portfolio::types::extract_position_instrument(instrument)?;
-        let unit = crate::bindings::portfolio::types::extract_position_unit(py, unit)?;
+        let boxed = crate::bindings::portfolio::container::extract_position_instrument(instrument)?;
+        let unit = crate::bindings::portfolio::container::extract_position_unit(py, unit)?;
         let mut inner = CandidatePosition::new(id, entity_id, std::sync::Arc::from(boxed), unit)
             .with_max_weight(max_weight)
             .with_min_weight(min_weight);
@@ -314,17 +314,18 @@ impl PyPortfolioOptimizationSpec {
         portfolio: &Bound<'_, PyAny>,
         objective: PyObjective,
     ) -> PyResult<Self> {
-        let portfolio: finstack_quant_portfolio::PortfolioSpec =
-            if let Ok(built) = portfolio.cast::<crate::bindings::portfolio::types::PyPortfolio>() {
-                built.borrow().inner.to_spec()
-            } else {
-                let json: String = portfolio.extract().map_err(|_| {
-                    pyo3::exceptions::PyTypeError::new_err(
-                        "expected a Portfolio or a canonical PortfolioSpec JSON string",
-                    )
-                })?;
-                deserialize_json(&json)?
-            };
+        let portfolio: finstack_quant_portfolio::PortfolioSpec = if let Ok(built) =
+            portfolio.cast::<crate::bindings::portfolio::container::PyPortfolio>()
+        {
+            built.borrow().inner.to_spec()
+        } else {
+            let json: String = portfolio.extract().map_err(|_| {
+                pyo3::exceptions::PyTypeError::new_err(
+                    "expected a Portfolio or a canonical PortfolioSpec JSON string",
+                )
+            })?;
+            deserialize_json(&json)?
+        };
         Ok(Self::from_inner(PortfolioOptimizationSpec::new(
             portfolio,
             objective.inner,

@@ -8,6 +8,8 @@
 mod allocation;
 mod attribution;
 mod brinson;
+pub(crate) mod cashflows;
+pub(crate) mod container;
 mod excess_return;
 mod factor_brinson;
 pub(crate) mod factor_model;
@@ -15,16 +17,16 @@ mod fi_attribution;
 mod grid_attribution;
 mod margin;
 mod materialization;
-mod optimization_spec;
+mod metrics;
+mod optimization;
 mod performance;
-mod pipeline;
 mod primitive;
 mod replay;
-mod scenario_pnl;
+mod results;
+mod scenarios;
 mod schema;
 mod sensitivity;
-mod spec;
-pub(crate) mod types;
+pub(crate) mod valuation;
 
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -68,12 +70,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         py.get_type::<crate::errors::ContractLimitExceededError>(),
     )?;
 
-    types::register(py, &m)?;
+    container::register(py, &m)?;
+    valuation::register(py, &m)?;
+    results::register(py, &m)?;
+    metrics::register(py, &m)?;
+    cashflows::register(py, &m)?;
+    scenarios::register(py, &m)?;
     materialization::register(py, &m)?;
-    spec::register(py, &m)?;
-    pipeline::register(py, &m)?;
     attribution::register(py, &m)?;
-    optimization_spec::register(py, &m)?;
+    optimization::register(py, &m)?;
     allocation::register(py, &m)?;
     replay::register(py, &m)?;
     factor_model::register(py, &m)?;

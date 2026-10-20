@@ -12,7 +12,7 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyByteArray, PyBytes, PyDict, PyModule, PyString};
 
-use super::types::PyPortfolio;
+use super::container::PyPortfolio;
 use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
 use crate::errors::{diagnostics_to_py, display_to_py, materialization_to_py};
 
