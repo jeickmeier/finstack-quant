@@ -744,6 +744,17 @@ impl finstack_quant_valuations_core::instruments::Instrument for CdsOption {
         super::pricer::npv(self, curves, as_of)
     }
 
+    fn valuation_details(
+        &self,
+        _market: &finstack_quant_core::market_data::context::MarketContext,
+        _as_of: finstack_quant_core::dates::Date,
+    ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
+        crate::family::credit_derivative_details(
+            finstack_quant_valuations_core::pricer::ModelKey::BloombergCdso,
+            None,
+        )
+    }
+
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.expiry)
     }

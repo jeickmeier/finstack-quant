@@ -1,12 +1,10 @@
 //! The fixed-income family: bonds, loans, agency MBS and their derivatives.
 //!
 //! Structured credit, CMOs and asset-backed facilities register with the
-//! `STRUCTURED_CREDIT` family in the umbrella crate.
-
-use std::sync::Arc;
+//! `STRUCTURED_CREDIT` family in the structured-credit crate.
 
 use finstack_quant_valuations_core::metrics::{
-    MetricId, MetricRegistry, MetricRegistryError, PricerPublishedMetric,
+    MetricRegistry, MetricRegistryError, PricerPublishedMetric,
 };
 use finstack_quant_valuations_core::pricer::{
     Family, InstrumentType, ModelKey, PricerRegistry, PricingError,
@@ -82,10 +80,13 @@ fn register_metrics(registry: &mut MetricRegistry) -> Result<(), MetricRegistryE
     // The Merton-MC bond engine publishes `expected_loss` (path-simulated
     // credit loss) from its own pricing pass; the entry records that
     // ownership so the applicability table stays truthful.
-    registry.register_metric(
-        MetricId::ExpectedLoss,
-        Arc::new(PricerPublishedMetric::new(MetricId::ExpectedLoss)),
-        &[InstrumentType::Bond],
-    )?;
+    finstack_quant_valuations_core::register_metrics! {
+        registry: registry,
+        instrument: InstrumentType::Bond,
+        metrics: [(
+            ExpectedLoss,
+            PricerPublishedMetric::new(finstack_quant_valuations_core::metrics::MetricId::ExpectedLoss)
+        )]
+    }
     Ok(())
 }

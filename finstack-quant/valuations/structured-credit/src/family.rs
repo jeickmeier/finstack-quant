@@ -1,8 +1,6 @@
 //! The structured-credit family: deal-level securitisations and their
 //! tranche views.
 
-use std::sync::Arc;
-
 use indexmap::IndexMap;
 
 use crate::structured_credit::{StochasticPricingResult, StructuredCredit};
@@ -25,8 +23,6 @@ pub static STRUCTURED_CREDIT: Family =
 fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     register_generic!(registry, InstrumentType::StructuredCredit, StructuredCredit);
     registry.register(StructuredCreditStochasticPricer)?;
-    // CMOs and asset-backed facilities stay in the umbrella with structured
-    // credit until the structured-credit crate exists; they register here.
     register_generic!(registry, InstrumentType::AgencyCmo, crate::cmo::AgencyCmo);
     register_generic!(
         registry,
@@ -45,16 +41,14 @@ fn register_metrics(registry: &mut MetricRegistry) -> Result<(), MetricRegistryE
     // that ownership: `expected_shortfall` has a universal historical-
     // simulation owner, so the instrument-specific entry points at the
     // published value instead.
-    registry.register_metric(
-        MetricId::ExpectedLoss,
-        Arc::new(PricerPublishedMetric::new(MetricId::ExpectedLoss)),
-        &[InstrumentType::StructuredCredit],
-    )?;
-    registry.register_metric(
-        MetricId::ExpectedShortfall,
-        Arc::new(PricerPublishedMetric::new(MetricId::ExpectedShortfall)),
-        &[InstrumentType::StructuredCredit],
-    )?;
+    finstack_quant_valuations_core::register_metrics! {
+        registry: registry,
+        instrument: InstrumentType::StructuredCredit,
+        metrics: [
+            (ExpectedLoss, PricerPublishedMetric::new(MetricId::ExpectedLoss)),
+            (ExpectedShortfall, PricerPublishedMetric::new(MetricId::ExpectedShortfall)),
+        ]
+    }
     Ok(())
 }
 

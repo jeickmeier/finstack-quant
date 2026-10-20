@@ -893,8 +893,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for TermLoan {
     ) -> finstack_quant_core::Result<Money> {
         match self.default_model() {
             finstack_quant_valuations_core::pricer::ModelKey::Tree => {
-                crate::term_loan::pricing::TermLoanTreePricer::new()
-                    .price_callable(self, curves, as_of)
+                crate::term_loan::pricing::TermLoanTreePricer.price_callable(self, curves, as_of)
             }
             finstack_quant_valuations_core::pricer::ModelKey::Discounting => {
                 crate::term_loan::pricing::TermLoanDiscountingPricer::price(self, curves, as_of)

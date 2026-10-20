@@ -389,19 +389,6 @@ fn price_arithmetic_tw_commodity(
 /// Commodity Asian option analytical pricer (Turnbull-Wakeman / Kemna-Vorst).
 pub struct CommodityAsianOptionAnalyticalPricer;
 
-impl CommodityAsianOptionAnalyticalPricer {
-    /// Create a new commodity Asian option pricer.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for CommodityAsianOptionAnalyticalPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Pricer for CommodityAsianOptionAnalyticalPricer {
     fn key(&self) -> PricerKey {
         PricerKey::new(
@@ -799,7 +786,7 @@ mod tests {
         let option = base_option(fixing_dates, settlement);
         let market = build_commodity_market(as_of, 80.0, 0.25, 0.05);
 
-        let pricer = CommodityAsianOptionAnalyticalPricer::new();
+        let pricer = CommodityAsianOptionAnalyticalPricer;
         let result = pricer
             .price_dyn(&option, &market, as_of)
             .expect("registry pricer should succeed");

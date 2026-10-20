@@ -37,7 +37,7 @@ cds_option/
 ├── parameters.rs             # CdsOptionParams (call/put constructors)
 ├── strike.rs                 # CdsOptionStrike, CdsOptionStrikeKind
 ├── bloomberg_quadrature.rs   # crate-private DOCS 2055833 quadrature kernel
-├── pricer.rs                 # crate-private registry adapter and pricing primitives
+├── pricer.rs                 # crate-private pricing primitives
 └── metrics/                  # delta, gamma, vega, theta, dv01, spread_dv01, par_spread,
                               # implied_vol, recovery01
 ```
@@ -46,8 +46,8 @@ The quadrature kernel and synthetic-underlying builder are crate-private.
 Callers enter through `Instrument::value`, `CdsOption` analytics, or registered
 metrics so validation, volatility resolution, and lifecycle policy are applied.
 
-Registered as `(InstrumentType::CdsOption, ModelKey::BloombergCdso)` →
-`BloombergCdsoPricer` in [`../family.rs`](../family.rs) (`CREDIT`).
+Registered as `(InstrumentType::CdsOption, ModelKey::BloombergCdso)` through
+`register_generic!` in [`../family.rs`](../family.rs) (`CREDIT`).
 
 ## Strike conventions
 

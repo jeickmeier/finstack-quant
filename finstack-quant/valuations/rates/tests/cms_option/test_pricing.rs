@@ -450,7 +450,7 @@ fn test_seasoned_cms_option_replication_uses_historical_fixing() {
     let market = standard_market(as_of);
 
     // Missing fixing series → hard error.
-    let err = CmsReplicationPricer::new()
+    let err = CmsReplicationPricer
         .price_dyn(&inst, &market, as_of)
         .expect_err("missing CMS fixing series must be a hard error");
     assert!(
@@ -461,7 +461,7 @@ fn test_seasoned_cms_option_replication_uses_historical_fixing() {
     // Recorded fixing → intrinsic on the observed rate, discounted from payment.
     let observed = 0.05;
     let market = with_cms_fixing(market, fixing, observed);
-    let pv = CmsReplicationPricer::new()
+    let pv = CmsReplicationPricer
         .price_dyn(&inst, &market, as_of)
         .expect("seasoned replication pricing")
         .value
@@ -566,7 +566,7 @@ fn replication_greeks_reprice_with_the_replication_pricer() {
     let market = skewed_vol_market(as_of, 0.20, 0.35);
     let inst = CmsOption::example().expect("example");
     let replication = |market: &MarketContext| {
-        CmsReplicationPricer::new()
+        CmsReplicationPricer
             .price_dyn(&inst, market, as_of)
             .expect("replication price")
             .value

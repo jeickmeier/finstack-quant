@@ -29,19 +29,6 @@ use finstack_quant_valuations_core::pricer::PricingError;
 /// Equity option Heston semi-analytical pricer (Fourier inversion).
 pub(crate) struct EquityOptionHestonFourierPricer;
 
-impl EquityOptionHestonFourierPricer {
-    /// Create a new Heston Fourier transform pricer
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for EquityOptionHestonFourierPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionHestonFourierPricer {
     fn key(&self) -> finstack_quant_valuations_core::pricer::PricerKey {
         finstack_quant_valuations_core::pricer::PricerKey::new(
@@ -498,7 +485,7 @@ mod tests {
         let mut opt = option(expiry, OptionType::Call, ExerciseStyle::European);
         opt.discrete_dividends = vec![(date(2025, 7, 1), 2.0)];
 
-        let err = EquityOptionHestonFourierPricer::new()
+        let err = EquityOptionHestonFourierPricer
             .price_dyn(&opt, &market(as_of, 100.0, 0.20, 0.03, 0.0), as_of)
             .expect_err("Heston Fourier must reject discrete dividends");
         let msg = err.to_string();

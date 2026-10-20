@@ -25,10 +25,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
-use finstack_quant_valuations_core::pricer::expect_inst;
 
 /// Price the CDS option at `as_of` under the Bloomberg CDSO numerical
 /// quadrature model.
@@ -298,62 +296,6 @@ pub(crate) fn cds_with_bloomberg_protection_end_extension(
     let mut extended = cds.clone();
     extended.premium_leg.end += time::Duration::days(1);
     extended
-}
-
-// Registry pricer adapter
-
-/// Registry adapter that exposes the Bloomberg CDSO pricer to the
-/// instrument/model dispatcher.
-pub(crate) struct BloombergCdsoPricer;
-
-impl finstack_quant_valuations_core::pricer::Pricer for BloombergCdsoPricer {
-    fn key(&self) -> finstack_quant_valuations_core::pricer::PricerKey {
-        finstack_quant_valuations_core::pricer::PricerKey::new(
-            finstack_quant_valuations_core::pricer::InstrumentType::CdsOption,
-            finstack_quant_valuations_core::pricer::ModelKey::BloombergCdso,
-        )
-    }
-
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> std::result::Result<
-        finstack_quant_valuations_core::results::ValuationResult,
-        finstack_quant_valuations_core::pricer::PricingError,
-    > {
-        let option = expect_inst::<CdsOption>(
-            instrument,
-            finstack_quant_valuations_core::pricer::InstrumentType::CdsOption,
-        )?;
-
-        let pv = npv(option, market, as_of).map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::from_core(
-                e,
-                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                    option,
-                )
-                .model(finstack_quant_valuations_core::pricer::ModelKey::BloombergCdso),
-            )
-        })?;
-
-        Ok(
-            finstack_quant_valuations_core::results::ValuationResult::stamped(
-                option.id(),
-                as_of,
-                pv,
-            )
-            .with_details(
-                finstack_quant_valuations_core::results::ValuationDetails::CreditDerivative(
-                    finstack_quant_valuations_core::results::CreditDerivativeValuationDetails {
-                        model_key: finstack_quant_valuations_core::pricer::ModelKey::BloombergCdso,
-                        integration_method: None,
-                    },
-                ),
-            ),
-        )
-    }
 }
 
 #[cfg(test)]

@@ -28,9 +28,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::credit;
-use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_core::pricer::expect_inst;
 use finstack_quant_valuations_core::recalibration::{
     HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
 };
@@ -752,64 +750,6 @@ fn settlement_date_with_delay(default_date: Date, settlement_delay: u16) -> Resu
         return Ok(default_date);
     }
     default_date.add_weekdays(i32::from(settlement_delay))
-}
-
-/// Registry pricer for CDS Index using the engine
-pub(crate) struct SimpleCdsIndexHazardPricer;
-
-impl finstack_quant_valuations_core::pricer::Pricer for SimpleCdsIndexHazardPricer {
-    fn key(&self) -> finstack_quant_valuations_core::pricer::PricerKey {
-        finstack_quant_valuations_core::pricer::PricerKey::new(
-            finstack_quant_valuations_core::pricer::InstrumentType::CdsIndex,
-            finstack_quant_valuations_core::pricer::ModelKey::HazardRate,
-        )
-    }
-
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> std::result::Result<
-        finstack_quant_valuations_core::results::ValuationResult,
-        finstack_quant_valuations_core::pricer::PricingError,
-    > {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
-        // Type-safe downcasting
-        let cds_index = expect_inst::<crate::cds_index::CdsIndex>(
-            instrument,
-            finstack_quant_valuations_core::pricer::InstrumentType::CdsIndex,
-        )?;
-
-        // Use the provided as_of date for valuation
-        // Compute present value using the engine
-        let pv = cds_index.npv(market, as_of).map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::from_core(
-                e,
-                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                    cds_index,
-                )
-                .model(finstack_quant_valuations_core::pricer::ModelKey::HazardRate),
-            )
-        })?;
-
-        Ok(
-            finstack_quant_valuations_core::results::ValuationResult::stamped(
-                cds_index.id(),
-                as_of,
-                pv,
-            )
-            .with_details(
-                finstack_quant_valuations_core::results::ValuationDetails::CreditDerivative(
-                    finstack_quant_valuations_core::results::CreditDerivativeValuationDetails {
-                        model_key: finstack_quant_valuations_core::pricer::ModelKey::HazardRate,
-                        integration_method: Some("isda_standard_model".to_string()),
-                    },
-                ),
-            ),
-        )
-    }
 }
 
 #[cfg(test)]

@@ -98,7 +98,7 @@ fn single_curve_cms(
 
 /// Price a `CmsOption` using `CmsReplicationPricer` directly.
 fn replication_price(inst: &CmsOption, mkt: &MarketContext, as_of: Date) -> f64 {
-    CmsReplicationPricer::new()
+    CmsReplicationPricer
         .price_dyn(inst, mkt, as_of)
         .expect("replication pricing should succeed")
         .value

@@ -21,8 +21,6 @@
 //! together by `+1%` (then `−1%`) in the same reprice. The result is the
 //! joint sensitivity to a simultaneous 1% move across all pairs.
 
-use std::sync::Arc;
-
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::Result;
 
@@ -83,9 +81,4 @@ impl MetricCalculator for GenericFx01Calculator {
         // denominator is 2 (PV per 1% relative spot move).
         Ok((pv_up - pv_dn) / 2.0)
     }
-}
-
-/// Wrap the generic FX01 calculator in an `Arc` for registry insertion.
-pub fn arc_generic_fx01() -> Arc<dyn MetricCalculator> {
-    Arc::new(GenericFx01Calculator)
 }

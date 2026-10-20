@@ -4,6 +4,7 @@
 
 use super::bond_valuator::BondValuator;
 use super::tree_pricer::TreePricer;
+use super::TreePricerConfig;
 use crate::bond::types::{Bond, CallPut, CallPutSchedule};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -218,7 +219,7 @@ fn test_windowed_call_lowers_pv_vs_endpoint_only_exercise() {
     // so the windowed callable PV must be <= the single-endpoint callable PV.
     let market_context = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let pricer = TreePricer::new();
+    let pricer = TreePricer::with_config(TreePricerConfig::default());
 
     let mut single = create_test_bond();
     let mut call_put = CallPutSchedule::default();

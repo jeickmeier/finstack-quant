@@ -1,9 +1,11 @@
 //! Pricers for snowball and inverse-floater structured notes.
 
+use crate::exotics::hw1f_note::{Hw1fNote, Hw1fNotePricer};
 use crate::exotics::snowball::{Snowball, SnowballVariant};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
@@ -15,10 +17,8 @@ use finstack_quant_models::rates::hw1f::curve::{
     initial_short_rate_from_curve, prepare_hw1f_params, Hw1fTermForward, PeriodForwardCoeffs,
 };
 use finstack_quant_models::rates::hw1f::mc::Hw1fMcPricer;
-use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
-    resolve_hw1f_params, Hw1fParamFamily,
-};
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::ModelConfig;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -337,72 +337,38 @@ impl Pricer for SnowballDiscountingPricer {
 }
 
 /// Hull-White 1F Monte Carlo pricer for path-dependent snowballs.
-#[derive(Debug, Clone)]
-pub struct SnowballHw1fMcPricer {
-    hw_params: Option<HullWhiteCalibrationParams>,
-    config: Hw1fMcConfig,
-}
+pub type SnowballHw1fMcPricer = Hw1fNotePricer<Snowball>;
 
-impl SnowballHw1fMcPricer {
-    /// Create a snowball pricer requiring explicit or pre-calibrated HW1F parameters.
-    pub fn new() -> Self {
-        Self {
-            hw_params: None,
-            config: Hw1fMcConfig::default(),
-        }
+impl Hw1fNote for Snowball {
+    const INSTRUMENT_TYPE: InstrumentType = InstrumentType::Snowball;
+    const LABEL: &'static str = "Snowball";
+
+    fn note_id(&self) -> &InstrumentId {
+        &self.id
     }
 
-    /// Create a snowball MC pricer with explicit HW1F parameters.
-    pub fn with_hw_params(hw_params: HullWhiteCalibrationParams) -> Self {
-        Self {
-            hw_params: Some(hw_params),
-            config: Hw1fMcConfig::default(),
-        }
+    fn hw1f_curve_id(&self) -> &str {
+        self.discount_curve_id.as_str()
     }
 
-    /// Set the Monte Carlo configuration (paths, seed, antithetic flag, time
-    /// steps) used by this pricer; instrument overrides still apply on top.
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - Base Hull-White Monte Carlo configuration.
-    pub fn with_config(mut self, config: Hw1fMcConfig) -> Self {
-        self.config = config;
-        self
+    fn model_config(&self) -> &ModelConfig {
+        &self.instrument_pricing_overrides.model_config
     }
 
-    fn effective_hw_params(
+    fn error_curve_ids(&self) -> Vec<String> {
+        vec![
+            self.discount_curve_id.as_str().to_string(),
+            self.forward_curve_id.as_str().to_string(),
+        ]
+    }
+
+    fn hw1f_estimate(
         &self,
-        inst: &Snowball,
-        market: &MarketContext,
-    ) -> Result<HullWhiteCalibrationParams> {
-        resolve_hw1f_params(
-            Hw1fParamFamily::CapFloor,
-            inst.discount_curve_id.as_str(),
-            &inst.instrument_pricing_overrides.model_config,
-            self.hw_params,
-            &format!("Snowball {}", inst.id),
-            market,
-        )
-    }
-
-    fn effective_config(&self, inst: &Snowball) -> Hw1fMcConfig {
-        self.config.with_instrument_overrides(
-            &inst.id,
-            inst.instrument_pricing_overrides.model_config.mc_paths,
-            inst.instrument_pricing_overrides
-                .model_config
-                .mc_seed_scenario
-                .as_deref(),
-        )
-    }
-
-    fn price_estimate(
-        &self,
-        inst: &Snowball,
+        pricer: &SnowballHw1fMcPricer,
         market: &MarketContext,
         as_of: Date,
     ) -> Result<MoneyEstimate> {
+        let inst = self;
         inst.validate()?;
         ensure_not_callable(inst)?;
 
@@ -434,7 +400,7 @@ impl SnowballHw1fMcPricer {
         }
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
         let _forward_curve = market.get_forward(inst.forward_curve_id.as_ref())?;
-        let hw_params = self.effective_hw_params(inst, market)?;
+        let hw_params = pricer.effective_hw_params(inst, market)?;
         // HW1F bond-reconstruction built from the discount curve; turns the
         // short rate sampled at each coupon's in-advance fixing date into that
         // coupon's term forward.
@@ -478,7 +444,7 @@ impl SnowballHw1fMcPricer {
             coupon_floor: inst.coupon_floor,
             coupon_cap: inst.coupon_cap,
         };
-        let config = self.effective_config(inst);
+        let config = pricer.effective_config(inst);
 
         let event_times = event_times(inst, as_of)?;
         // No forward-starting coupon: every fixing is the deterministic
@@ -515,78 +481,6 @@ impl SnowballHw1fMcPricer {
 
         let payoff = SnowballPayoff::new(spec, inst.notional.amount(), events, true);
         mc.price(|| payoff.clone())
-    }
-
-    pub(crate) fn price_internal(
-        &self,
-        inst: &Snowball,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        Ok(self.price_estimate(inst, market, as_of)?.mean)
-    }
-}
-
-impl Default for SnowballHw1fMcPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Pricer for SnowballHw1fMcPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::Snowball, ModelKey::MonteCarloHullWhite1F)
-    }
-
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> std::result::Result<ValuationResult, PricingError> {
-        let snowball = finstack_quant_valuations_core::pricer::expect_inst::<Snowball>(
-            instrument,
-            InstrumentType::Snowball,
-        )?;
-        let estimate = self.price_estimate(snowball, market, as_of).map_err(|e| {
-            PricingError::from_core(
-                e,
-                PricingErrorContext::from_instrument(instrument)
-                    .model(ModelKey::MonteCarloHullWhite1F)
-                    .curve_ids([
-                        snowball.discount_curve_id.as_str().to_string(),
-                        snowball.forward_curve_id.as_str().to_string(),
-                    ]),
-            )
-        })?;
-
-        let mut result = ValuationResult::stamped(snowball.id.as_str(), as_of, estimate.mean);
-        finstack_quant_valuations_core::instruments::common_impl::helpers::attach_mc_diagnostics(
-            &mut result,
-            &estimate,
-        );
-        Ok(result)
-    }
-
-    fn price_raw_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> std::result::Result<f64, PricingError> {
-        let snowball = finstack_quant_valuations_core::pricer::expect_inst::<Snowball>(
-            instrument,
-            InstrumentType::Snowball,
-        )?;
-        self.price_internal(snowball, market, as_of)
-            .map(|m| m.amount())
-            .map_err(|e| {
-                PricingError::from_core(
-                    e,
-                    PricingErrorContext::from_instrument(instrument)
-                        .model(ModelKey::MonteCarloHullWhite1F),
-                )
-            })
     }
 }
 

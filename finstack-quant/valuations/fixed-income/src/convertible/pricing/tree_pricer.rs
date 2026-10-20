@@ -10,19 +10,6 @@ use super::engine::price_convertible_bond;
 /// Registry pricer for Convertible Bond using a defaultable-equity tree with recovery of principal.
 pub(crate) struct ConvertibleTreePricer;
 
-impl ConvertibleTreePricer {
-    /// Create a new convertible bond tree pricer.
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for ConvertibleTreePricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl finstack_quant_valuations_core::pricer::Pricer for ConvertibleTreePricer {
     fn key(&self) -> finstack_quant_valuations_core::pricer::PricerKey {
         finstack_quant_valuations_core::pricer::PricerKey::new(

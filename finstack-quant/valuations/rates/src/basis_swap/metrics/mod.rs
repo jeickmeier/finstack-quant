@@ -12,9 +12,8 @@ use crate::basis_swap::types::BasisSwap;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
-use finstack_quant_valuations_core::metrics::{MetricId, MetricRegistry};
+use finstack_quant_valuations_core::metrics::MetricRegistry;
 use finstack_quant_valuations_core::pricer::InstrumentType;
-use std::sync::Arc;
 
 /// Registers all basis swap metrics in the standard metric registry.
 ///
@@ -26,30 +25,17 @@ use std::sync::Arc;
 pub(crate) fn register_basis_swap_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    // Leg-specific metrics with primary/reference constructors
-    for (id, calculator) in [
-        (
-            MetricId::AnnuityPrimary,
-            Arc::new(AnnuityCalculator::primary())
-                as Arc<dyn finstack_quant_valuations_core::metrics::MetricCalculator>,
-        ),
-        (
-            MetricId::AnnuityReference,
-            Arc::new(AnnuityCalculator::reference()),
-        ),
-        (MetricId::PvPrimary, Arc::new(PvCalculator::primary())),
-        (MetricId::PvReference, Arc::new(PvCalculator::reference())),
-    ] {
-        registry.register_metric(id, calculator, &[InstrumentType::BasisSwap])?;
-    }
-
-    // DV01 using GenericParallelDv01 in PerCurve mode
-    // This bumps each curve individually (discount, primary forward, reference forward)
-    // and stores the results in a bucketed series under BucketedDv01
     finstack_quant_valuations_core::register_metrics! {
         registry: registry,
         instrument: InstrumentType::BasisSwap,
         metrics: [
+            // Leg-specific metrics with primary/reference constructors.
+            (AnnuityPrimary, AnnuityCalculator::primary()),
+            (AnnuityReference, AnnuityCalculator::reference()),
+            (PvPrimary, PvCalculator::primary()),
+            (PvReference, PvCalculator::reference()),
+            // DV01 in per-curve mode bumps each curve individually (discount,
+            // primary forward, reference forward).
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_per_curve())),
             (BasisParSpread, ParSpreadCalculator),
             (IncrementalParSpread, IncrementalParSpreadCalculator),

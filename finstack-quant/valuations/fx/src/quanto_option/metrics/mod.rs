@@ -13,8 +13,7 @@ use finstack_quant_valuations_core::metrics::bump_scalar_price;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
-use finstack_quant_valuations_core::metrics::{MetricId, MetricRegistry};
-use std::sync::Arc;
+use finstack_quant_valuations_core::metrics::MetricRegistry;
 
 /// Register quanto option metrics with the registry.
 pub(crate) fn register_quanto_option_metrics(
@@ -36,23 +35,11 @@ pub(crate) fn register_quanto_option_metrics(
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (Vanna, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::vanna()),
             (Volga, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::volga()),
+            // FX-specific and correlation metrics.
+            (FxDelta, FxDeltaCalculator),
+            (FxVega, fx_vega::FxVegaCalculator),
+            (Correlation01, correlation01::Correlation01Calculator),
         ]
-    }
-
-    // FX-specific and correlation metrics (custom MetricIds).
-    for (id, calculator) in [
-        (
-            MetricId::FxDelta,
-            Arc::new(FxDeltaCalculator)
-                as Arc<dyn finstack_quant_valuations_core::metrics::MetricCalculator>,
-        ),
-        (MetricId::FxVega, Arc::new(fx_vega::FxVegaCalculator)),
-        (
-            MetricId::Correlation01,
-            Arc::new(correlation01::Correlation01Calculator),
-        ),
-    ] {
-        registry.register_metric(id, calculator, &[InstrumentType::QuantoOption])?;
     }
     Ok(())
 }

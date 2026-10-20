@@ -328,19 +328,6 @@ use finstack_quant_models::closed_form::barrier::{barrier_price, barrier_rebate,
 /// Discrete observation dates require the Monte Carlo or PDE engine.
 pub(crate) struct BarrierOptionAnalyticalPricer;
 
-impl BarrierOptionAnalyticalPricer {
-    /// Create a new analytical barrier option pricer
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for BarrierOptionAnalyticalPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Pricer for BarrierOptionAnalyticalPricer {
     fn key(&self) -> PricerKey {
         PricerKey::new(InstrumentType::BarrierOption, ModelKey::BarrierBSContinuous)
@@ -755,7 +742,7 @@ mod tests {
             observation_dates: vec![expiry],
         };
         let market = market(as_of, 100.0, 0.2, 0.05, 0.0);
-        let error = BarrierOptionAnalyticalPricer::new()
+        let error = BarrierOptionAnalyticalPricer
             .price_dyn(&option, &market, as_of)
             .expect_err("discrete contract cannot use continuous formula");
         assert!(error.to_string().contains("continuous monitoring"));

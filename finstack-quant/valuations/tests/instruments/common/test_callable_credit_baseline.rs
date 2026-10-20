@@ -198,7 +198,7 @@ fn callable_credit_bond_pv_baseline() {
 fn callable_credit_term_loan_pv_and_oas_baseline() {
     let loan = callable_credit_loan();
     let market = market();
-    let pricer = TermLoanTreePricer::new();
+    let pricer = TermLoanTreePricer;
 
     let pv = pricer
         .price_callable(&loan, &market, as_of())
@@ -451,7 +451,7 @@ fn removing_calls_recovers_the_straight_credit_risky_value() {
 #[test]
 fn callable_credit_term_loan_structural_baselines() {
     let market = market();
-    let pricer = TermLoanTreePricer::new();
+    let pricer = TermLoanTreePricer;
     let base = callable_credit_loan();
     let base_pv = pricer
         .price_callable(&base, &market, as_of())

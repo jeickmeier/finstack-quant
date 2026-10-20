@@ -460,6 +460,17 @@ impl Instrument for CdsTranche {
         pricer.price_tranche(self, curves, as_of)
     }
 
+    fn valuation_details(
+        &self,
+        _market: &finstack_quant_core::market_data::context::MarketContext,
+        _as_of: finstack_quant_core::dates::Date,
+    ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
+        crate::family::credit_derivative_details(
+            finstack_quant_valuations_core::pricer::ModelKey::HazardRate,
+            Some("isda_standard_model"),
+        )
+    }
+
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.maturity)
     }

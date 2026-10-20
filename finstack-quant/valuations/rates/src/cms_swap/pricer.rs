@@ -34,11 +34,6 @@ use finstack_quant_valuations_core::results::ValuationResult;
 pub struct CmsSwapPricer;
 
 impl CmsSwapPricer {
-    /// Create a new CMS swap pricer.
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Price the CMS swap with an adjustable convexity scale.
     ///
     /// `convexity_scale = 1.0` for full convexity, `0.0` for linear (no convexity).
@@ -130,13 +125,7 @@ impl crate::cms_common::CmsConvexityPricing for CmsSwap {
         as_of: Date,
         convexity_scale: f64,
     ) -> Result<Money> {
-        CmsSwapPricer::new().price_internal_with_convexity(self, market, as_of, convexity_scale)
-    }
-}
-
-impl Default for CmsSwapPricer {
-    fn default() -> Self {
-        Self::new()
+        CmsSwapPricer.price_internal_with_convexity(self, market, as_of, convexity_scale)
     }
 }
 
@@ -201,11 +190,6 @@ impl Pricer for CmsSwapPricer {
 pub struct CmsSwapReplicationPricer;
 
 impl CmsSwapReplicationPricer {
-    /// Create a new CMS swap static-replication pricer.
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Core pricing: replicated CMS leg minus/plus funding leg by side.
     pub(crate) fn price_internal(
         &self,
@@ -215,7 +199,7 @@ impl CmsSwapReplicationPricer {
     ) -> Result<Money> {
         inst.validate()?;
         let pv_cms = self.pv_cms_leg_replication(inst, market, as_of)?;
-        let pv_funding = CmsSwapPricer::new().pv_funding_leg(inst, market, as_of)?;
+        let pv_funding = CmsSwapPricer.pv_funding_leg(inst, market, as_of)?;
 
         let npv = match inst.side {
             finstack_quant_valuations_core::instruments::PayReceive::Pay => pv_funding - pv_cms,
@@ -311,12 +295,6 @@ impl CmsSwapReplicationPricer {
         }
 
         Ok(total_pv)
-    }
-}
-
-impl Default for CmsSwapReplicationPricer {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -649,7 +627,7 @@ mod tests {
         assert!((flow.amount.amount() - expected_cashflow).abs() < 1e-7);
         let discount = market.get_discount("USD-OIS").expect("discount");
         let df = discount.as_ref().df_between_dates(as_of, end).expect("df");
-        let pv = CmsSwapPricer::new()
+        let pv = CmsSwapPricer
             .pv_funding_leg(&swap, &market, as_of)
             .expect("funding pv");
         assert!((pv - expected_cashflow * df).abs() < 1e-7);
@@ -710,7 +688,7 @@ mod tests {
                     .df_between_dates(as_of, flow.date)
                     .expect("df");
         }
-        let actual = CmsSwapPricer::new()
+        let actual = CmsSwapPricer
             .pv_funding_leg(&swap, &market, as_of)
             .expect("pv");
         assert!((actual - expected_pv).abs() < 1e-7);
@@ -754,7 +732,7 @@ mod tests {
         let swap = floating_leg_swap();
         let market =
             MarketContext::new().insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0));
-        let pv = CmsSwapPricer::new()
+        let pv = CmsSwapPricer
             .pv_funding_leg(&swap, &market, as_of)
             .expect("all funding payments excluded before projecting coupons");
         assert_eq!(pv, 0.0);
@@ -768,7 +746,7 @@ mod tests {
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.0, 1.0))
             .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.05, 1.0));
 
-        let pv = CmsSwapPricer::new()
+        let pv = CmsSwapPricer
             .pv_funding_leg(&swap, &market, as_of)
             .expect("funding leg PV should compute");
 
@@ -890,10 +868,10 @@ mod tests {
         let uncapped = capped_cms_swap(None);
         let capped = capped_cms_swap(Some(0.06));
 
-        let pv_uncapped = CmsSwapPricer::new()
+        let pv_uncapped = CmsSwapPricer
             .pv_cms_leg(&uncapped, &market, as_of, 1.0)
             .expect("uncapped CMS leg");
-        let pv_capped = CmsSwapPricer::new()
+        let pv_capped = CmsSwapPricer
             .pv_cms_leg(&capped, &market, as_of, 1.0)
             .expect("capped CMS leg");
 
@@ -919,7 +897,7 @@ mod tests {
             2.0,
         ));
 
-        let error = CmsSwapPricer::new()
+        let error = CmsSwapPricer
             .pv_cms_leg(&swap, &market, as_of, 1.0)
             .expect_err("lognormal convexity requires positive forward");
         assert!(error.to_string().contains("positive forward"));
@@ -941,10 +919,10 @@ mod tests {
         // still priced with time value here because the *vol* is unaffected by
         // convexity_scale, so capped is still below uncapped. The meaningful
         // invariant: both legs remain finite and positive and ordered.
-        let pv_uncapped = CmsSwapPricer::new()
+        let pv_uncapped = CmsSwapPricer
             .pv_cms_leg(&uncapped, &market, as_of, 0.0)
             .expect("uncapped CMS leg");
-        let pv_capped = CmsSwapPricer::new()
+        let pv_capped = CmsSwapPricer
             .pv_cms_leg(&capped, &market, as_of, 0.0)
             .expect("capped CMS leg");
 
@@ -994,7 +972,7 @@ mod tests {
         let market = cms_market_with_vol(as_of, 0.25);
 
         // Without the fixing series the seasoned coupon must hard-error.
-        let err = CmsSwapPricer::new()
+        let err = CmsSwapPricer
             .pv_cms_leg(&swap, &market, as_of, 1.0)
             .expect_err("missing CMS fixing series must be a hard error");
         assert!(
@@ -1013,7 +991,7 @@ mod tests {
         .expect("fixing series");
         let market = market.insert_series(series);
 
-        let pv = CmsSwapPricer::new()
+        let pv = CmsSwapPricer
             .pv_cms_leg(&swap, &market, as_of, 1.0)
             .expect("seasoned CMS leg PV");
         let df = market
@@ -1083,10 +1061,10 @@ mod tests {
         let unfloored = floored_cms_swap(None);
         let floored = floored_cms_swap(Some(0.04));
 
-        let pv_unfloored = CmsSwapPricer::new()
+        let pv_unfloored = CmsSwapPricer
             .pv_cms_leg(&unfloored, &market, as_of, 1.0)
             .expect("unfloored CMS leg");
-        let pv_floored = CmsSwapPricer::new()
+        let pv_floored = CmsSwapPricer
             .pv_cms_leg(&floored, &market, as_of, 1.0)
             .expect("floored CMS leg");
 
@@ -1154,11 +1132,11 @@ mod tests {
         let swap = single_fixing_cms_swap(20, date(2030, 1, 1), date(2030, 4, 1));
         let market = cms_market_with_vol(as_of, 0.30);
 
-        let linear = CmsSwapPricer::new()
+        let linear = CmsSwapPricer
             .price_internal_with_convexity(&swap, &market, as_of, 0.0)
             .expect("linear PV")
             .amount();
-        let repl = CmsSwapReplicationPricer::new()
+        let repl = CmsSwapReplicationPricer
             .price_internal(&swap, &market, as_of)
             .expect("replication PV")
             .amount();
@@ -1178,11 +1156,11 @@ mod tests {
         let swap = single_fixing_cms_swap(2, date(2026, 1, 1), date(2026, 4, 1));
         let market = cms_market_with_vol(as_of, 0.10);
 
-        let hagan = CmsSwapPricer::new()
+        let hagan = CmsSwapPricer
             .price_internal_with_convexity(&swap, &market, as_of, 1.0)
             .expect("hagan PV")
             .amount();
-        let repl = CmsSwapReplicationPricer::new()
+        let repl = CmsSwapReplicationPricer
             .price_internal(&swap, &market, as_of)
             .expect("replication PV")
             .amount();
@@ -1203,11 +1181,11 @@ mod tests {
         let swap = single_fixing_cms_swap(20, date(2030, 1, 1), date(2030, 4, 1));
         let market = cms_market_with_vol(as_of, 0.30);
 
-        let hagan = CmsSwapPricer::new()
+        let hagan = CmsSwapPricer
             .price_internal_with_convexity(&swap, &market, as_of, 1.0)
             .expect("hagan PV")
             .amount();
-        let repl = CmsSwapReplicationPricer::new()
+        let repl = CmsSwapReplicationPricer
             .price_internal(&swap, &market, as_of)
             .expect("replication PV")
             .amount();
@@ -1243,11 +1221,11 @@ mod tests {
         .expect("fixing series");
         let market = cms_market_with_vol(as_of, 0.30).insert_series(fixing_series);
 
-        let hagan = CmsSwapPricer::new()
+        let hagan = CmsSwapPricer
             .price_internal_with_convexity(&swap, &market, as_of, 1.0)
             .expect("hagan PV")
             .amount();
-        let repl = CmsSwapReplicationPricer::new()
+        let repl = CmsSwapReplicationPricer
             .price_internal(&swap, &market, as_of)
             .expect("replication PV")
             .amount();
@@ -1272,7 +1250,7 @@ mod tests {
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.0, 1.0))
             .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, -0.01, 1.0));
 
-        let result = CmsSwapReplicationPricer::new().price_internal(&swap, &market, as_of);
+        let result = CmsSwapReplicationPricer.price_internal(&swap, &market, as_of);
         assert!(
             result.is_err(),
             "replication must reject non-positive forwards like the CmsOption \
@@ -1303,14 +1281,14 @@ mod tests {
         let option = CmsOption::example().unwrap();
         market = market.insert_surface(surface(option.vol_surface_id.clone()));
         for result in [
-            CmsSwapPricer::new().price_internal_with_convexity(&swap, &market, as_of, 1.0),
-            CmsSwapReplicationPricer::new().price_internal(&swap, &market, as_of),
-            CmsOptionPricer::new().price_internal_with_convexity(&option, &market, as_of, 1.0),
+            CmsSwapPricer.price_internal_with_convexity(&swap, &market, as_of, 1.0),
+            CmsSwapReplicationPricer.price_internal(&swap, &market, as_of),
+            CmsOptionPricer.price_internal_with_convexity(&option, &market, as_of, 1.0),
         ] {
             let error = result.unwrap_err().to_string();
             assert!(error.contains("axis"), "{error}");
         }
-        let error = CmsReplicationPricer::new()
+        let error = CmsReplicationPricer
             .price_dyn(&option, &market, as_of)
             .unwrap_err()
             .to_string();
