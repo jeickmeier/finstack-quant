@@ -122,6 +122,14 @@ impl Constraint {
 
     /// Shorthand for attribute exposure limit: `sum w_i * I[attr == value] <= max_share`.
     ///
+    /// # Arguments
+    ///
+    /// * `key` - Position attribute key to test, such as `rating` or `sector`.
+    /// * `value` - Text attribute value that marks a position as in the bucket
+    ///   (exact match).
+    /// * `max_share` - Weight share of the bucket, as a decimal fraction of the
+    ///   portfolio in `[0, 1]`; the bucket weight must be at most this.
+    ///
     /// # Errors
     ///
     /// Returns [`crate::Error::InvalidInput`] if `max_share` is not in `[0, 1]`.
@@ -134,6 +142,14 @@ impl Constraint {
     }
 
     /// Shorthand for attribute exposure minimum: `sum w_i * I[attr == value] >= min_share`.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Position attribute key to test, such as `rating` or `sector`.
+    /// * `value` - Text attribute value that marks a position as in the bucket
+    ///   (exact match).
+    /// * `min_share` - Weight share of the bucket, as a decimal fraction of the
+    ///   portfolio in `[0, 1]`; the bucket weight must be at least this.
     ///
     /// # Errors
     ///
