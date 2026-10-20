@@ -144,34 +144,14 @@ impl VarianceSwap {
     /// * `as_of` - Valuation date; scheduled observations on this date are included. Dates before inception return zero and dates at or after the final observation return one.
     pub fn realized_fraction_by_observations(&self, as_of: Date) -> Result<f64> {
         let all = self.observation_dates()?;
-        if all.is_empty() {
-            return Ok(0.0);
-        }
         if as_of < self.start_date {
             return Ok(0.0);
         }
-        if as_of >= all.last().copied().unwrap_or(self.maturity) {
-            return Ok(1.0);
-        }
-        // Close-to-close and Yang-Zhang need the first level as an anchor;
-        // the other OHLC estimators count each bar as one sample.
-        let anchor = usize::from(
-            !self.realized_var_method.requires_ohlc()
-                || self.realized_var_method
-                    == finstack_quant_core::math::stats::RealizedVarMethod::YangZhang,
-        );
-        let total = all.len().saturating_sub(anchor);
-        let realized = all
-            .iter()
-            .filter(|&&d| d <= as_of)
-            .count()
-            .saturating_sub(anchor);
-        if total == 0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "variance swap has no return samples".into(),
-            ));
-        }
-        Ok(realized as f64 / total as f64)
+        finstack_quant_valuations_core::instruments::pricing::variance_observations::realized_sample_fraction(
+            &all,
+            as_of,
+            self.realized_var_method,
+        )
     }
 
     /// Get historical prices aligned to observation dates when available.

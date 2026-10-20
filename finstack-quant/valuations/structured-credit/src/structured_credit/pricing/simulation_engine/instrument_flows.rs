@@ -28,6 +28,7 @@ use finstack_quant_cashflows::builder::{CashFlowSchedule, FloatingRateParams};
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_models::monte_carlo::process::cir::CirProcess;
 use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
 use finstack_quant_valuations_fixed_income::revolving_credit::pricing::path_generator::build_credit_spread_params;
@@ -1280,7 +1281,7 @@ fn build_schedule(
             margins: (0..period_dates.len())
                 .map(|k| {
                     let start = if k == 0 { as_of } else { period_dates[k - 1] };
-                    let delta = facility.margin_delta_bp_at(start) / 10_000.0;
+                    let delta = facility.margin_delta_bp_at(start) / BASIS_POINTS_PER_UNIT;
                     match &facility.rate {
                         RateSpec::Fixed { rate } => MarginTerms::FixedRate(*rate + delta),
                         RateSpec::Floating(_) => MarginTerms::Spread,

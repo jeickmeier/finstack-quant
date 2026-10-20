@@ -88,7 +88,7 @@ pub(crate) fn solve_ytm_timed(
                 YieldCompounding::Rate(Compounding::Annual) => ratio.powf(1.0 / years) - 1.0,
                 YieldCompounding::Rate(Compounding::Continuous) => ratio.ln() / years,
                 YieldCompounding::Street => {
-                    let m = super::quote_conversions::periods_per_year(spec.frequency)?.max(1.0);
+                    let m = spec.frequency.payments_per_year().max(1.0);
                     m * (ratio.powf(1.0 / (m * years)) - 1.0)
                 }
                 YieldCompounding::Rate(Compounding::Periodic(periods)) => {

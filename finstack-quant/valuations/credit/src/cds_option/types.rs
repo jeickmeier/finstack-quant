@@ -36,7 +36,6 @@ use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::CreditParams;
 use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType, SettlementType};
 use rust_decimal::Decimal;
-use time::Month;
 
 use super::parameters::CdsOptionParams;
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -566,9 +565,15 @@ impl CdsOption {
             return date;
         }
         match self.protection_start_convention {
-            ProtectionStartConvention::Spot => prior_cds_roll_on_or_before(as_of)
-                .saturating_add(time::Duration::days(1))
-                .min(as_of),
+            ProtectionStartConvention::Spot => {
+                // Quarterly CDS roll (20 Mar/Jun/Sep/Dec) on or before `as_of`.
+                let roll = if finstack_quant_core::dates::is_cds_date(as_of) {
+                    as_of
+                } else {
+                    finstack_quant_core::dates::prev_cds_date(as_of).unwrap_or(as_of)
+                };
+                roll.saturating_add(time::Duration::days(1)).min(as_of)
+            }
             ProtectionStartConvention::Forward => self.expiry,
         }
     }
@@ -687,21 +692,6 @@ impl CdsOption {
         finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         super::pricer::implied_vol(self, market, as_of, target_price, initial_guess)
     }
-}
-
-pub(crate) fn prior_cds_roll_on_or_before(date: Date) -> Date {
-    const CDS_ROLL_MONTHS: [Month; 4] =
-        [Month::March, Month::June, Month::September, Month::December];
-
-    for month in CDS_ROLL_MONTHS.iter().rev().copied() {
-        if let Ok(candidate) = Date::from_calendar_date(date.year(), month, 20) {
-            if candidate <= date {
-                return candidate;
-            }
-        }
-    }
-
-    Date::from_calendar_date(date.year().saturating_sub(1), Month::December, 20).unwrap_or(date)
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for CdsOption {

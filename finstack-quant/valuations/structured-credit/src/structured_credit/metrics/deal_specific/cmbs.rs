@@ -7,6 +7,7 @@ use crate::structured_credit::utils::amortization::{
 use crate::structured_credit::{DealType, PoolAsset, StructuredCredit};
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_valuations_core::metrics::MetricContext;
 
 /// Debt service per annum of one loan on its live terms as of `as_of`: the
@@ -33,10 +34,10 @@ fn loan_debt_service(
             let next_reset = as_of.add_business_days(curve.reset_lag(), calendar)?;
             let projected =
                 term_rate_for_period(curve.as_ref(), market, next_reset, asset.day_count)?;
-            let floored = asset
-                .index_floor_bp
-                .map_or(projected, |floor_bp| projected.max(floor_bp / 10_000.0));
-            (floored + asset.spread_bp.unwrap_or(0.0) / 10_000.0).max(0.0)
+            let floored = asset.index_floor_bp.map_or(projected, |floor_bp| {
+                projected.max(floor_bp / BASIS_POINTS_PER_UNIT)
+            });
+            (floored + asset.spread_bp.unwrap_or(0.0) / BASIS_POINTS_PER_UNIT).max(0.0)
         }
         None => asset.rate,
     };

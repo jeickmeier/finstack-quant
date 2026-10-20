@@ -197,55 +197,14 @@ impl Equity {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
         let price = match scalar {
-            MarketScalar::Price(m) => self.convert_price_to_currency(*m, market, as_of),
-            MarketScalar::Unitless(v) => Ok(Money::new(*v, self.currency)?),
-        }?;
+            MarketScalar::Price(m) => market.convert_money(*m, self.currency, as_of)?.amount,
+            MarketScalar::Unitless(v) => Money::new(*v, self.currency)?,
+        };
         finstack_quant_core::validation::validate_f64_non_negative(
             price.amount(),
             "Equity market price",
         )?;
         Ok(price)
-    }
-
-    fn convert_price_to_currency(
-        &self,
-        price: Money,
-        market: &MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<Money> {
-        if price.currency() == self.currency {
-            return Ok(price);
-        }
-
-        let matrix = market.fx_required()?;
-
-        struct MatrixProvider<'a> {
-            m: &'a finstack_quant_core::money::fx::FxMatrix,
-        }
-        impl finstack_quant_core::money::fx::FxProvider for MatrixProvider<'_> {
-            fn rate(
-                &self,
-                from: finstack_quant_core::currency::Currency,
-                to: finstack_quant_core::currency::Currency,
-                on: finstack_quant_core::dates::Date,
-                policy: finstack_quant_core::money::fx::FxConversionPolicy,
-            ) -> finstack_quant_core::Result<f64> {
-                let r = self
-                    .m
-                    .rate(finstack_quant_core::money::fx::FxQuery::with_policy(
-                        from, to, on, policy,
-                    ))?;
-                Ok(r.rate)
-            }
-        }
-
-        let provider = MatrixProvider { m: matrix.as_ref() };
-        price.convert(
-            self.currency,
-            as_of,
-            &provider,
-            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
-        )
     }
 
     /// Get the effective number of shares held (defaults to 1).

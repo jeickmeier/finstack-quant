@@ -689,23 +689,6 @@ fn implied_carry(spot: f64, forward: f64, r: f64, t: f64) -> f64 {
     }
 }
 
-fn black76_unit_price(
-    forward: f64,
-    strike: f64,
-    sigma: f64,
-    t: f64,
-    df: f64,
-    option_type: OptionType,
-) -> f64 {
-    let undiscounted = match option_type {
-        OptionType::Call => {
-            finstack_quant_models::closed_form::black_call(forward, strike, sigma, t)
-        }
-        OptionType::Put => finstack_quant_models::closed_form::black_put(forward, strike, sigma, t),
-    };
-    undiscounted * df
-}
-
 impl Instrument for CommoditySpotOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommoditySpotOption,
@@ -760,14 +743,14 @@ impl Instrument for CommoditySpotOption {
                         self.id, inputs.forward
                     )));
                 }
-                black76_unit_price(
+                finstack_quant_models::closed_form::black76_price(
                     inputs.forward,
                     self.strike,
+                    inputs.df,
                     inputs.sigma,
                     inputs.t,
-                    inputs.df,
                     self.option_type,
-                )
+                )?
             }
             ExerciseStyle::American => {
                 let steps = self

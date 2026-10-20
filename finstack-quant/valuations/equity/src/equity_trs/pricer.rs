@@ -6,14 +6,12 @@
 use super::types::{EquityTotalReturnSwap, TrsDividendSettlement};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::math::neumaier_sum;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::pricing::{
     FinancingLegFlows, PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
 };
-use finstack_quant_valuations_core::instruments::PayReceive;
 
 /// Extracts spot price and dividend yield from market data.
 ///
@@ -36,26 +34,11 @@ fn extract_underlying_data(
     // When a dividend yield ID is explicitly provided, we require the lookup to succeed
     // and return a unitless scalar. Silent fallback to 0.0 would mask market data
     // configuration errors.
-    let div_yield = if let Some(ref div_id) = trs.underlying.div_yield_id {
-        let ms = context.get_price(div_id.as_str()).map_err(|e| {
-            finstack_quant_core::Error::Validation(format!(
-                "Failed to fetch dividend yield '{}': {}",
-                div_id, e
-            ))
-        })?;
-        match ms {
-            MarketScalar::Unitless(v) => *v,
-            MarketScalar::Price(m) => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Dividend yield '{}' should be a unitless scalar, got Price({})",
-                    div_id,
-                    m.currency()
-                )));
-            }
-        }
-    } else {
-        0.0
-    };
+    let div_yield =
+        finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+            context,
+            trs.underlying.div_yield_id.as_ref(),
+        )?;
 
     Ok((spot, div_yield))
 }
@@ -272,10 +255,7 @@ pub(crate) fn net_cashflows(
 ) -> Result<FinancingLegFlows> {
     trs.validate()?;
     let (params, model) = total_return_leg(trs, context, as_of)?;
-    let sign = match trs.side {
-        PayReceive::Receive => 1.0,
-        PayReceive::Pay => -1.0,
-    };
+    let sign = trs.side.sign();
     let mut flows = std::collections::BTreeMap::<Date, f64>::new();
     for (date, amount) in
         TrsEngine::cashflows_total_return_leg_with_model(params, context, as_of, &model)?

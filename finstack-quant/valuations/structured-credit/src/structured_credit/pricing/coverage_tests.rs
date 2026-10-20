@@ -7,6 +7,7 @@ use crate::structured_credit::types::{
     Tranche, TrancheStructure,
 };
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_core::Error;
@@ -422,7 +423,7 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
             finstack_quant_cashflows::builder::RateSpec::Fixed { rate } => *rate,
             finstack_quant_cashflows::builder::RateSpec::Floating(spec) => {
                 use rust_decimal::prelude::ToPrimitive;
-                spec.spread_bp.to_f64().unwrap_or_default() / 10_000.0
+                spec.spread_bp.to_f64().unwrap_or_default() / BASIS_POINTS_PER_UNIT
             }
         }
     };

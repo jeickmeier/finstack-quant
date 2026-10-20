@@ -120,9 +120,7 @@ fn register_metrics(registry: &mut MetricRegistry) -> Result<(), MetricRegistryE
     )?;
     crate::commodity::commodity_forward::metrics::register_commodity_forward_metrics(registry)?;
     crate::commodity::commodity_future::metrics::register_commodity_future_metrics(registry)?;
-    crate::commodity::commodity_future_option::metrics::register_commodity_future_option_metrics(
-        registry,
-    )?;
+    crate::commodity::commodity_future_option::register_commodity_future_option_metrics(registry)?;
     crate::commodity::commodity_swap::metrics::register_commodity_swap_metrics(registry)?;
     crate::commodity::commodity_spot_option::metrics::register_commodity_spot_option_metrics(
         registry,

@@ -1,5 +1,6 @@
 use super::*;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 
 /// Resolve a collateral index fixing or project its contractual term rate.
 ///
@@ -70,7 +71,7 @@ pub(crate) fn collateral_asset_rate_for_period(
 ) -> Result<f64> {
     let calendar = finstack_quant_core::dates::calendar_by_id_strict("weekends_only")?;
     let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
-    let spread = coupon.spread_bp.unwrap_or(0.0) / 10_000.0;
+    let spread = coupon.spread_bp.unwrap_or(0.0) / BASIS_POINTS_PER_UNIT;
     // The floor applies to the index before the spread (`FloatingRateSpec`
     // convention), so a floored loan pays `max(index, floor) + spread`.
     let floored = |index: f64| {
@@ -174,7 +175,7 @@ pub(super) fn live_afc_cap_rate(
         .and_then(|rules| rules.afc.as_ref())
     {
         Some(afc) => Ok((current_collateral_wac(state, context, period_start)?
-            - afc.net_wac_fee_bp.unwrap_or(0.0) / 10_000.0)
+            - afc.net_wac_fee_bp.unwrap_or(0.0) / BASIS_POINTS_PER_UNIT)
             .max(0.0)),
         None => Ok(0.0),
     }

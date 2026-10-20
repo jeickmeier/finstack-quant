@@ -38,12 +38,7 @@ impl ZSpreadCs01 for TermLoan {
 
         // Compounding frequency for the z-spread shift = coupon payments/year,
         // mirroring the bond z-spread convention.
-        let years = self.frequency.to_years();
-        let compounds_per_year = if years > 0.0 && years.is_finite() {
-            (1.0 / years).round().max(1.0)
-        } else {
-            1.0
-        };
+        let compounds_per_year = self.frequency.compounding_frequency();
 
         Ok(ZSpreadCs01Inputs {
             settlement,

@@ -2,6 +2,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_fixed_income::bond::Bond;
@@ -15,7 +16,6 @@ use super::collateral::{InstrumentCollateral, ReserveInterestDestination};
 use super::enums::{AssetType, DealType};
 use super::npl::LiquidationSpec;
 use super::tranches::TrancheStructure;
-use crate::structured_credit::types::constants::BASIS_POINTS_DIVISOR;
 use finstack_quant_core::types::CreditRating;
 
 /// Individual asset held in a structured-credit collateral pool.
@@ -290,7 +290,7 @@ impl PoolAsset {
             id: id.into(),
             asset_type: AssetType::FirstLienLoan {},
             balance,
-            rate: spread_bp / BASIS_POINTS_DIVISOR, // Initialize with spread only
+            rate: spread_bp / BASIS_POINTS_PER_UNIT, // Initialize with spread only
             spread_bp: Some(spread_bp),
             forward_curve_id: Some(forward_curve_id.into().as_str().to_string()),
             maturity,
@@ -378,7 +378,7 @@ impl PoolAsset {
     ///
     /// Returns the explicit spread if available, otherwise derives from rate.
     pub fn spread_bp(&self) -> f64 {
-        self.spread_bp.unwrap_or(self.rate * BASIS_POINTS_DIVISOR)
+        self.spread_bp.unwrap_or(self.rate * BASIS_POINTS_PER_UNIT)
     }
 
     /// Remaining term to maturity in years
@@ -713,7 +713,7 @@ impl RepLine {
 
     /// Get effective spread in basis points
     pub fn spread_bp(&self) -> f64 {
-        self.spread_bp.unwrap_or(self.rate * BASIS_POINTS_DIVISOR)
+        self.spread_bp.unwrap_or(self.rate * BASIS_POINTS_PER_UNIT)
     }
 }
 

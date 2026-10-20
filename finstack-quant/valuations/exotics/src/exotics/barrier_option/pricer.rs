@@ -66,18 +66,11 @@ pub(crate) fn resolve_spot(
     inst: &BarrierOption,
     curves: &MarketContext,
 ) -> finstack_quant_core::Result<f64> {
-    let spot = match curves.get_price(&inst.spot_id)? {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(value) => {
-            if value.currency() != inst.currency {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: inst.currency,
-                    actual: value.currency(),
-                });
-            }
-            value.amount()
-        }
-    };
+    let spot =
+        finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+            curves.get_price(&inst.spot_id)?,
+            inst.currency,
+        )?;
     finstack_quant_core::validation::validate_f64_positive(spot, "BarrierOption asset spot")?;
     Ok(spot)
 }
@@ -281,9 +274,7 @@ pub(crate) fn price_expired_barrier(
         )));
     };
 
-    let ccy = inst.currency;
     let quantity = inst.quantity;
-    let is_knock_out = inst.barrier_type.is_knock_out();
 
     let barrier_breached = inst.observed_barrier_breached.ok_or_else(|| {
         finstack_quant_core::Error::Validation(
@@ -302,25 +293,15 @@ pub(crate) fn price_expired_barrier(
     };
     let rebate = inst.rebate.map(|m| m.amount()).unwrap_or(0.0);
 
-    let pv = if is_knock_out {
-        if barrier_breached {
-            match inst.rebate_timing {
-                finstack_quant_core::types::PayoutTiming::AtHit => 0.0,
-                finstack_quant_core::types::PayoutTiming::AtExpiry => rebate,
-            }
-        } else {
-            intrinsic
-        }
-    } else {
-        // Knock-in
-        if barrier_breached {
-            intrinsic
-        } else {
-            rebate
-        }
-    };
+    let pv = finstack_quant_models::closed_form::barrier::expired_barrier_payoff(
+        inst.barrier_type,
+        barrier_breached,
+        inst.rebate_timing,
+        intrinsic,
+        rebate,
+    );
 
-    Money::new(pv, ccy)
+    Money::new(pv, inst.currency)
 }
 
 use finstack_quant_models::closed_form::barrier::{barrier_price, barrier_rebate, BarrierParams};

@@ -290,14 +290,8 @@ fn key_rate_bp_bump(curve_id: &CurveId, tenor_years: f64, shift: f64) -> (CurveI
     // Wing buckets use the dedicated half-triangle constructors so the
     // partition-of-unity invariant holds and no infinite sentinel reaches the
     // curve bump paths (non-finite bounds are rejected there).
-    let spec = match find_triangular_neighbors(tenor_years) {
-        (Some(prev), Some(next)) => {
-            BumpSpec::triangular_key_rate_bp(prev, tenor_years, next, shift_bp)
-        }
-        (None, Some(next)) => BumpSpec::triangular_key_rate_first_bp(tenor_years, next, shift_bp),
-        (Some(prev), None) => BumpSpec::triangular_key_rate_last_bp(prev, tenor_years, shift_bp),
-        (None, None) => BumpSpec::parallel_bp(shift_bp),
-    };
+    let (prev, next) = find_triangular_neighbors(tenor_years);
+    let spec = BumpSpec::triangular_key_rate_bucket_bp(prev, tenor_years, next, shift_bp);
     (curve_id.clone(), spec)
 }
 
