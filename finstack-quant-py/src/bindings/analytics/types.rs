@@ -87,11 +87,12 @@ impl PyPeriodStats {
     ///
     /// Streak counts are cast to ``float`` so the Series stays ``float64``.
     fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let labels: Vec<String> = PERIOD_STATS_COLUMNS
-            .iter()
-            .map(|name| (*name).to_owned())
-            .collect();
-        labeled_values_to_series(py, &labels, self.values(), "period_stats")
+        let (labels, values): (Vec<String>, Vec<f64>) = self
+            .fields()
+            .into_iter()
+            .map(|(name, value)| (name.to_owned(), value))
+            .unzip();
+        labeled_values_to_series(py, &labels, values, "period_stats")
     }
 
     /// The twelve statistics as a single-row ``pandas.DataFrame``.
@@ -103,26 +104,13 @@ impl PyPeriodStats {
     /// tickers. Non-finite ratios remain native ``NaN`` / ``inf`` in
     /// ``float64`` columns; streak counts remain integers.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let s = &self.inner;
         let data = PyDict::new(py);
-        data.set_item("best", PyArray1::from_slice(py, &[s.best]))?;
-        data.set_item("worst", PyArray1::from_slice(py, &[s.worst]))?;
-        data.set_item("consecutive_wins", vec![s.consecutive_wins])?;
-        data.set_item("consecutive_losses", vec![s.consecutive_losses])?;
-        data.set_item("win_rate", PyArray1::from_slice(py, &[s.win_rate]))?;
-        data.set_item("avg_return", PyArray1::from_slice(py, &[s.avg_return]))?;
-        data.set_item("avg_win", PyArray1::from_slice(py, &[s.avg_win]))?;
-        data.set_item("avg_loss", PyArray1::from_slice(py, &[s.avg_loss]))?;
-        data.set_item("payoff_ratio", PyArray1::from_slice(py, &[s.payoff_ratio]))?;
-        data.set_item(
-            "profit_factor",
-            PyArray1::from_slice(py, &[s.profit_factor]),
-        )?;
-        data.set_item("cpc_ratio", PyArray1::from_slice(py, &[s.cpc_ratio]))?;
-        data.set_item(
-            "kelly_criterion",
-            PyArray1::from_slice(py, &[s.kelly_criterion]),
-        )?;
+        for (name, value) in self.fields() {
+            data.set_item(name, PyArray1::from_slice(py, &[value]))?;
+        }
+        // Streak counts stay integer columns; re-setting a key keeps its position.
+        data.set_item("consecutive_wins", vec![self.inner.consecutive_wins])?;
+        data.set_item("consecutive_losses", vec![self.inner.consecutive_losses])?;
         dict_to_dataframe(py, &data, None)
     }
 
@@ -135,41 +123,26 @@ impl PyPeriodStats {
 }
 
 impl PyPeriodStats {
-    /// Statistic values in `PERIOD_STATS_COLUMNS` order.
-    fn values(&self) -> Vec<f64> {
+    /// Statistic names and values in `PeriodStats` field order (streak
+    /// counts as `f64`).
+    fn fields(&self) -> [(&'static str, f64); 12] {
         let s = &self.inner;
-        vec![
-            s.best,
-            s.worst,
-            s.consecutive_wins as f64,
-            s.consecutive_losses as f64,
-            s.win_rate,
-            s.avg_return,
-            s.avg_win,
-            s.avg_loss,
-            s.payoff_ratio,
-            s.profit_factor,
-            s.cpc_ratio,
-            s.kelly_criterion,
+        [
+            ("best", s.best),
+            ("worst", s.worst),
+            ("consecutive_wins", s.consecutive_wins as f64),
+            ("consecutive_losses", s.consecutive_losses as f64),
+            ("win_rate", s.win_rate),
+            ("avg_return", s.avg_return),
+            ("avg_win", s.avg_win),
+            ("avg_loss", s.avg_loss),
+            ("payoff_ratio", s.payoff_ratio),
+            ("profit_factor", s.profit_factor),
+            ("cpc_ratio", s.cpc_ratio),
+            ("kelly_criterion", s.kelly_criterion),
         ]
     }
 }
-
-/// Column order shared by `PeriodStats.to_series` / `to_dataframe`.
-const PERIOD_STATS_COLUMNS: &[&str] = &[
-    "best",
-    "worst",
-    "consecutive_wins",
-    "consecutive_losses",
-    "win_rate",
-    "avg_return",
-    "avg_win",
-    "avg_loss",
-    "payoff_ratio",
-    "profit_factor",
-    "cpc_ratio",
-    "kelly_criterion",
-];
 
 /// Regression beta with confidence interval.
 #[pyclass(name = "BetaResult", module = "finstack_quant.analytics", frozen)]
