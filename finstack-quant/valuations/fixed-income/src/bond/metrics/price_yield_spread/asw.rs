@@ -658,15 +658,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
 
         // Dirty market value in currency
         let dirty_currency = if let Some(clean_px) = quoted_clean_price_pct {
-            let accrued = context
-                .computed
-                .get(&MetricId::Accrued)
-                .copied()
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                        id: "metric:Accrued".to_string(),
-                    })
-                })?;
+            let accrued = context.computed_metric(&MetricId::Accrued)?;
             clean_px * notional_amt / 100.0 + accrued
         } else {
             context.base_value.amount()

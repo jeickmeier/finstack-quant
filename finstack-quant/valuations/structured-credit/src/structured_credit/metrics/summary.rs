@@ -295,16 +295,7 @@ pub fn calculate_tranche_metrics(
 ) -> Result<TrancheMetrics> {
     let lifecycle = ValidatedPricingLifecycle::new(deal)?;
     let valuation_date = lifecycle.effective_as_of(market, as_of);
-    let tranche = deal
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: format!("tranche:{tranche_id}"),
-            })
-        })?;
+    let tranche = deal.tranches.require(tranche_id)?;
     // Prices are per CURRENT face: the secondary market quotes a seasoned note
     // on its factor-adjusted balance, and `Tranche.current_balance` is the
     // balance the projection starts from.
@@ -494,16 +485,7 @@ fn registry_metrics(
         Some(_) => deal.tranche_cashflows(tranche_id, market, as_of)?,
         None => to_maturity.clone(),
     };
-    let tranche = deal
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: format!("tranche:{tranche_id}"),
-            })
-        })?;
+    let tranche = deal.tranches.require(tranche_id)?;
     let pv = deal.value_tranche_cashflows(&flows, market, valuation_date)?;
     let mut context = MetricContext::new(
         std::sync::Arc::new(

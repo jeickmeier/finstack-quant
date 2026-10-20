@@ -329,6 +329,59 @@ impl MetricContext {
         self.metric_pricing_overrides.as_ref()
     }
 
+    /// Read a metric already computed for this request.
+    ///
+    /// Calculators that declare `id` as a dependency read its value here; the
+    /// registry computes dependencies first, so a miss means the dependency was
+    /// not requested or failed.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Metric to look up in [`Self::computed`]; its value is returned
+    ///   in the metric's own unit (see [`MetricId::unit`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::InputError::NotFound`] built by
+    /// [`crate::metrics::metric_not_found`] when `id` has no computed value.
+    #[inline]
+    pub fn computed_metric(&self, id: &MetricId) -> finstack_quant_core::Result<f64> {
+        self.computed
+            .get(id)
+            .copied()
+            .ok_or_else(|| crate::metrics::metric_not_found(id.clone()))
+    }
+
+    /// Borrow the instrument's cached holder-view cashflows.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::InputError::NotFound`] with id
+    /// `context.cashflows` when the pricer did not populate
+    /// [`Self::cashflows`].
+    #[inline]
+    pub fn require_cashflows(&self) -> finstack_quant_core::Result<&[(Date, Money)]> {
+        self.cashflows
+            .as_deref()
+            .ok_or_else(|| crate::metrics::context_not_found("cashflows"))
+    }
+
+    /// Borrow the discount curve identifier the pricer recorded for this request.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::InputError::NotFound`] with id
+    /// `discount_curve_id` when [`Self::discount_curve_id`] is unset.
+    #[inline]
+    pub fn require_discount_curve_id(&self) -> finstack_quant_core::Result<&CurveId> {
+        self.discount_curve_id.as_ref().ok_or_else(|| {
+            finstack_quant_core::InputError::NotFound {
+                id: "discount_curve_id".to_string(),
+            }
+            .into()
+        })
+    }
+
     /// Returns a reference to the market history, if set.
     #[inline]
     pub fn get_market_history(&self) -> Option<&MarketHistory> {

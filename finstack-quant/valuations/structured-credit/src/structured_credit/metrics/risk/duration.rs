@@ -38,17 +38,9 @@ impl MetricCalculator for MacaulayDurationCalculator {
             context.instrument_as::<crate::structured_credit::StructuredCredit>()?,
             context.as_of,
         )?;
-        let flows = context.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "context.cashflows".to_string(),
-            })
-        })?;
+        let flows = context.require_cashflows()?;
 
-        let disc_curve_id = context.discount_curve_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "discount_curve_id".to_string(),
-            })
-        })?;
+        let disc_curve_id = context.require_discount_curve_id()?;
 
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
 

@@ -17,10 +17,10 @@
 //! an effective measure would reprice through the cashflow engine at ±Δy. Units
 //! are years².
 
-use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 
@@ -51,7 +51,7 @@ pub(crate) const DEFAULT_CONVEXITY_YTM_BUMP_BP: f64 = 10.0;
 /// Returns an error if a cashflow date cannot be converted to a year fraction
 /// or a discount factor cannot be computed.
 pub fn calculate_tranche_convexity(
-    cashflows: &DatedFlows,
+    cashflows: &[(Date, Money)],
     discount_curve: &DiscountCurve,
     as_of: Date,
     ytm_bump_bp: f64,
@@ -109,17 +109,9 @@ pub struct ConvexityCalculator;
 
 impl MetricCalculator for ConvexityCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let flows = context.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "context.cashflows".to_string(),
-            })
-        })?;
+        let flows = context.require_cashflows()?;
 
-        let disc_curve_id = context.discount_curve_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "discount_curve_id".to_string(),
-            })
-        })?;
+        let disc_curve_id = context.require_discount_curve_id()?;
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
 
         let settlement = super::super::quote::settlement_date(

@@ -61,25 +61,9 @@ impl MetricCalculator for ModifiedDurationCalculator {
         };
         let bond: &Bond = context.instrument_as()?;
 
-        let ytm = context
-            .computed
-            .get(&MetricId::Ytm)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:Ytm".to_string(),
-                })
-            })?;
+        let ytm = context.computed_metric(&MetricId::Ytm)?;
 
-        let d_mac = context
-            .computed
-            .get(&MetricId::DurationMac)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:DurationMac".to_string(),
-                })
-            })?;
+        let d_mac = context.computed_metric(&MetricId::DurationMac)?;
 
         let denominator_yield = if has_options {
             workout.map_or(ytm, |(workout_yield, _, _)| workout_yield)

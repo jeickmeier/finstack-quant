@@ -64,10 +64,7 @@ impl CdsOptionDv01Calculator {
 impl MetricCalculator for CdsOptionDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &CdsOption = context.instrument_as()?;
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
         let bump_bp = defaults.rate_bump_bp;
         if bump_bp.abs() <= MIN_BUMP_BP {
             return Ok(0.0);

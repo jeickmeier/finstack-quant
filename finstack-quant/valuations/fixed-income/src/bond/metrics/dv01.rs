@@ -70,20 +70,8 @@ impl MetricCalculator for BondDv01Calculator {
             // and curve-bumped that bullet, which silently discarded the
             // option and reported a curve sensitivity inconsistent in both
             // methodology and units with the rest of the Workout-basis family.
-            let duration_mod = context
-                .computed
-                .get(&MetricId::DurationMod)
-                .copied()
-                .ok_or_else(|| {
-                    finstack_quant_valuations_core::metrics::metric_not_found(MetricId::DurationMod)
-                })?;
-            let ytm = context
-                .computed
-                .get(&MetricId::Ytm)
-                .copied()
-                .ok_or_else(|| {
-                    finstack_quant_valuations_core::metrics::metric_not_found(MetricId::Ytm)
-                })?;
+            let duration_mod = context.computed_metric(&MetricId::DurationMod)?;
+            let ytm = context.computed_metric(&MetricId::Ytm)?;
             return super::yield_dv01::yield_basis_dv01(context, duration_mod, ytm);
         }
 
@@ -120,10 +108,7 @@ fn curve_bump_dv01(
     curve_id: &CurveId,
 ) -> finstack_quant_core::Result<f64> {
     let defaults =
-        finstack_quant_valuations_core::metrics::sensitivities::config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        finstack_quant_valuations_core::metrics::sensitivities::config::resolve(context)?;
     let bump_bp = defaults.rate_bump_bp;
     if bump_bp.abs() <= f64::EPSILON {
         return Ok(0.0);

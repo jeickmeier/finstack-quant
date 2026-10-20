@@ -96,11 +96,7 @@ impl MetricCalculator for YtmCalculator {
             context.discount_curve_id = Some(discount_curve_id);
             context.day_count = Some(day_count);
         }
-        let flows = context.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "cashflows".to_string(),
-            })
-        })?;
+        let flows = context.require_cashflows()?;
 
         // Solve for YTM using shared solver with Street compounding (default)
         // Time origin is the quote_date (settlement date) to match market convention

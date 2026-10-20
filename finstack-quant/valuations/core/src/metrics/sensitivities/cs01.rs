@@ -466,11 +466,7 @@ impl MetricCalculator for GenericParallelCs01 {
             finstack_quant_core::Error::Validation("CS01 requires a credit curve identifier".into())
         })?;
 
-        let bump_bp = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?
-        .credit_spread_bump_bp;
+        let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
 
         let reval = cs01_reval(context);
 
@@ -503,10 +499,7 @@ impl MetricCalculator for GenericBucketedCs01 {
             finstack_quant_core::Error::Validation("CS01 requires a credit curve identifier".into())
         })?;
 
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
         let bump_bp = defaults.credit_spread_bump_bp;
 
         let reval = cs01_reval(context);

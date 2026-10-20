@@ -56,11 +56,7 @@ impl MetricCalculator for MoosmullerYtmCalculator {
             context.discount_curve_id = Some(discount_curve_id);
             context.day_count = Some(day_count);
         }
-        let flows = context.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "cashflows".to_string(),
-            })
-        })?;
+        let flows = context.require_cashflows()?;
 
         let bond: &Bond = context.instrument_as()?;
         crate::bond::pricing::ytm_solver::solve_bond_ytm(

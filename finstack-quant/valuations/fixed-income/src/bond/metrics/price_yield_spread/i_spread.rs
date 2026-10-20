@@ -38,15 +38,7 @@ impl MetricCalculator for ISpreadCalculator {
         let workout = crate::bond::metrics::context_workout_path(context)?;
         let bond: &Bond = context.instrument_as()?;
 
-        let ytm = context
-            .computed
-            .get(&MetricId::Ytm)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:Ytm".to_string(),
-                })
-            })?;
+        let ytm = context.computed_metric(&MetricId::Ytm)?;
 
         let disc = context.curves.get_discount(&bond.discount_curve_id)?;
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;

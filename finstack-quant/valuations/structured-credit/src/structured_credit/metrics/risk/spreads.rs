@@ -138,27 +138,11 @@ pub struct Cs01Calculator;
 
 impl MetricCalculator for Cs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let base_spread = context
-            .computed
-            .get(&MetricId::ZSpread)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:ZSpread".to_string(),
-                })
-            })?;
+        let base_spread = context.computed_metric(&MetricId::ZSpread)?;
 
-        let flows = context.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "context.cashflows".to_string(),
-            })
-        })?;
+        let flows = context.require_cashflows()?;
 
-        let disc_curve_id = context.discount_curve_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "discount_curve_id".to_string(),
-            })
-        })?;
+        let disc_curve_id = context.require_discount_curve_id()?;
 
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
         let as_of = super::super::quote::settlement_date(
@@ -211,15 +195,7 @@ pub struct SpreadDurationCalculator;
 
 impl MetricCalculator for SpreadDurationCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let cs01 = context
-            .computed
-            .get(&MetricId::Cs01)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:Cs01".to_string(),
-                })
-            })?;
+        let cs01 = context.computed_metric(&MetricId::Cs01)?;
         if !cs01.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "structured-credit Z-spread CS01 must be finite; got {cs01}"
@@ -345,7 +321,7 @@ pub fn calculate_tranche_z_spread(
 /// Sign convention follows the workspace canonical reference: long tranche /
 /// sell protection → negative; short tranche / buy protection → positive.
 pub fn calculate_tranche_cs01(
-    cashflows: &DatedFlows,
+    cashflows: &[(Date, Money)],
     discount_curve: &DiscountCurve,
     z_spread: f64,
     as_of: Date,
@@ -479,16 +455,7 @@ pub fn calculate_tranche_discount_margin(
     market_price_pct: f64,
 ) -> Result<f64> {
     deal.validate_for_pricing()?;
-    let tranche = deal
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: format!("tranche:{tranche_id}"),
-            })
-        })?;
+    let tranche = deal.tranches.require(tranche_id)?;
 
     let RateSpec::Floating(_) = &tranche.coupon else {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -589,36 +556,20 @@ impl MetricCalculator for BucketedCs01Calculator {
             format_bucket_label, STANDARD_BUCKETS_YEARS,
         };
 
-        let base_spread = context
-            .computed
-            .get(&MetricId::ZSpread)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:ZSpread".to_string(),
-                })
-            })?;
+        let base_spread = context.computed_metric(&MetricId::ZSpread)?;
         let bumped_spread = base_spread + ONE_BASIS_POINT;
         let as_of = super::super::quote::settlement_date(
             context.instrument_as::<StructuredCredit>()?,
             context.as_of,
         )?;
 
-        let disc_curve_id = context.discount_curve_id.clone().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "discount_curve_id".to_string(),
-            })
-        })?;
+        let disc_curve_id = context.require_discount_curve_id().cloned()?;
 
         // Collect (year_fraction, discount_factor, amount) for surviving flows
         // into owned data, so no borrow of `context` outlives the curve/cashflow
         // reads — `store_bucketed_series` below needs `&mut context`.
         let cached: Vec<(f64, f64, f64)> = {
-            let flows = context.cashflows.as_ref().ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "context.cashflows".to_string(),
-                })
-            })?;
+            let flows = context.require_cashflows()?;
             let disc = context.curves.get_discount(disc_curve_id.as_str())?;
             let day_count = crate::structured_credit::metrics::METRIC_TIME_BASIS;
             // Discount from `as_of` (settlement) so bucketed CS01 reconciles to the

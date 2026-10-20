@@ -53,11 +53,7 @@ impl MetricCalculator for IrsDv01Calculator {
                 .calculate(context);
         }
 
-        let bump_bp = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?
-        .rate_bump_bp;
+        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
         let bumped_market = |bp: f64| {
             if single_curve_ois {
                 context.bump_single_ois_rate_market_cached(&discount_id, bp)

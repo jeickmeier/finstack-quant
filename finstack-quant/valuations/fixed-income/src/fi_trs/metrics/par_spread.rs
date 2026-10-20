@@ -34,13 +34,7 @@ impl MetricCalculator for ParSpreadCalculator {
                  model, not a full fixed-income index mark-to-market model"
             );
         });
-        let annuity = context
-            .computed
-            .get(&MetricId::FinancingAnnuity)
-            .copied()
-            .ok_or_else(|| finstack_quant_core::InputError::NotFound {
-                id: "metric:financing_annuity".into(),
-            })?;
+        let annuity = context.computed_metric(&MetricId::FinancingAnnuity)?;
         let trs: &FiIndexTotalReturnSwap = context.instrument_as()?;
         let curves = context.curves.as_ref();
         let as_of = context.as_of;

@@ -114,7 +114,7 @@ pub use core::finite_difference::{
 #[inline]
 pub fn metric_not_found(metric: MetricId) -> finstack_quant_core::Error {
     finstack_quant_core::InputError::NotFound {
-        id: format!("metric:{metric:?}"),
+        id: format!("metric:{metric}"),
     }
     .into()
 }

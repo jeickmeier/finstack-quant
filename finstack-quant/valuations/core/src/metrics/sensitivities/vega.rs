@@ -58,10 +58,7 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
 
         let dependencies = instrument.market_dependencies()?;
         let vol_surface_ids = dependencies.present_vol_surface_ids(&context.curves);

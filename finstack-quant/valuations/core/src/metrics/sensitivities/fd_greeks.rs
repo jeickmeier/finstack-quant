@@ -174,14 +174,19 @@ fn min_dependency_surface_vol(
 
 /// Resolve every distinct declared volatility surface that is actually present.
 ///
+/// A quoted implied-vol override replaces the surfaces, so none is bumped then.
 /// Some instruments declare ordered fallback candidates. Missing candidates are
 /// therefore not errors when another candidate is present, but an empty resolved
 /// set is an actionable missing-market-data error.
-fn present_vol_surface_ids(
+fn bumped_vol_surface_ids(
+    instrument: &dyn Instrument,
     dependencies: &MarketDependencies,
     market: &MarketContext,
     metric_name: &str,
 ) -> Result<Vec<CurveId>> {
+    if volatility_override(instrument).is_some() {
+        return Ok(Vec::new());
+    }
     if dependencies.volatility_dependencies.is_empty() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Instrument missing volatility dependencies for {metric_name} calculation"
@@ -204,6 +209,32 @@ fn present_vol_surface_ids(
         .into());
     }
     Ok(present)
+}
+
+// First market scalar of the instrument: the spot the spot-bumped greeks move.
+fn spot_id<'a>(dependencies: &'a MarketDependencies, greek_name: &str) -> Result<&'a String> {
+    dependencies.market_scalar_ids.first().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "Instrument missing spot_id for {greek_name} calculation"
+        ))
+    })
+}
+
+// Validated level of `spot_id` in `market`.
+fn current_spot(market: &MarketContext, spot_id: &str, greek_name: &str) -> Result<f64> {
+    let spot = scalar_numeric_value(market.get_price(spot_id)?);
+    validate_spot(spot, greek_name)?;
+    Ok(spot)
+}
+
+// Whether the option has expired at `as_of`; its FD higher-order greeks are then zero.
+fn is_expired(instrument: &dyn Instrument, as_of: Date) -> Result<bool> {
+    let expiry = instrument.expiry().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "Instrument missing expiry for finite-difference option Greeks".into(),
+        )
+    })?;
+    Ok(as_of >= expiry)
 }
 
 // Keep central higher-order differences inside the positive-volatility domain.
@@ -350,22 +381,11 @@ where
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
         let as_of = context.as_of;
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
 
         let dependencies = instrument.market_dependencies()?;
-        let spot_id = dependencies.market_scalar_ids.first().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "Instrument missing spot_id for delta calculation".to_string(),
-            )
-        })?;
-
-        let spot_scalar = context.curves.get_price(spot_id)?;
-        let current_spot = scalar_numeric_value(spot_scalar);
-
-        validate_spot(current_spot, "delta")?;
+        let spot_id = spot_id(&dependencies, "delta")?;
+        let current_spot = current_spot(&context.curves, spot_id, "delta")?;
 
         // Fixed bump size from `FinstackConfig` (user-facing, reproducible).
         let bump_pct = defaults.spot_bump_decimal;
@@ -432,22 +452,11 @@ where
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
         let as_of = context.as_of;
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
 
         let dependencies = instrument.market_dependencies()?;
-        let spot_id = dependencies.market_scalar_ids.first().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "Instrument missing spot_id for gamma calculation".to_string(),
-            )
-        })?;
-
-        let spot_scalar = context.curves.get_price(spot_id)?;
-        let current_spot = scalar_numeric_value(spot_scalar);
-
-        validate_spot(current_spot, "gamma")?;
+        let spot_id = spot_id(&dependencies, "gamma")?;
+        let current_spot = current_spot(&context.curves, spot_id, "gamma")?;
 
         // Fixed bump size from `FinstackConfig` (user-facing, reproducible).
         let bump_pct = defaults.spot_bump_decimal;
@@ -513,17 +522,11 @@ where
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
         let as_of = context.as_of;
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
 
         let dependencies = instrument.market_dependencies()?;
-        let vol_surface_ids = if volatility_override(instrument).is_some() {
-            Vec::new()
-        } else {
-            present_vol_surface_ids(&dependencies, &context.curves, "vega")?
-        };
+        let vol_surface_ids =
+            bumped_vol_surface_ids(instrument, &dependencies, &context.curves, "vega")?;
         // Fixed bump size from `FinstackConfig` (user-facing, reproducible).
         // Interpreted as an **absolute** implied vol bump in decimal units (e.g., 0.01 = +1 vol point).
         let bump_abs = defaults.vol_bump_decimal;
@@ -632,29 +635,18 @@ where
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
         let as_of = context.as_of;
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
 
         // If expired, volga is zero — mirror vanna's guard. On an expired
         // option, vega ≈ 0, so volga = (vega(σ+h) - vega(σ-h))/h^2 amplifies
         // near-zero noise into NaN/garbage.
-        let expiry = instrument.expiry().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "Instrument missing expiry for finite-difference option Greeks".into(),
-            )
-        })?;
-        if as_of >= expiry {
+        if is_expired(instrument, as_of)? {
             return Ok(0.0);
         }
 
         let dependencies = instrument.market_dependencies()?;
-        let vol_surface_ids = if volatility_override(instrument).is_some() {
-            Vec::new()
-        } else {
-            present_vol_surface_ids(&dependencies, &context.curves, "volga")?
-        };
+        let vol_surface_ids =
+            bumped_vol_surface_ids(instrument, &dependencies, &context.curves, "volga")?;
 
         // Common Random Numbers: same seed for all scenarios ensures variance reduction.
         let seeded_instrument = clone_with_crn_seed(instrument)?;
@@ -722,38 +714,20 @@ where
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
         let as_of = context.as_of;
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
 
         // If expired, vanna is zero (avoid bumping / repricing beyond expiry).
-        let expiry = instrument.expiry().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "Instrument missing expiry for finite-difference option Greeks".into(),
-            )
-        })?;
-        if as_of >= expiry {
+        if is_expired(instrument, as_of)? {
             return Ok(0.0);
         }
 
         let dependencies = instrument.market_dependencies()?;
-        let spot_id = dependencies.market_scalar_ids.first().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "Instrument missing spot_id for vanna calculation".to_string(),
-            )
-        })?;
-        let vol_surface_ids = if volatility_override(instrument).is_some() {
-            Vec::new()
-        } else {
-            present_vol_surface_ids(&dependencies, &context.curves, "vanna")?
-        };
+        let spot_id = spot_id(&dependencies, "vanna")?;
+        let vol_surface_ids =
+            bumped_vol_surface_ids(instrument, &dependencies, &context.curves, "vanna")?;
 
         // Spot level for bump sizing
-        let spot_scalar = context.curves.get_price(spot_id)?;
-        let current_spot = scalar_numeric_value(spot_scalar);
-
-        validate_spot(current_spot, "vanna")?;
+        let current_spot = current_spot(&context.curves, spot_id, "vanna")?;
 
         // Bump sizes with minimum floor for numerical stability
         let (spot_bump_decimal, vol_bump_abs) =

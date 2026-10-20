@@ -69,16 +69,11 @@ fn model_z_spread_bumped_pvs(context: &MetricContext) -> finstack_quant_core::Re
     let base_spread = base_z_spread(context)?;
     let bond: &Bond = context.instrument_as()?;
     let quote_date = crate::bond::pricing::settlement::settlement_date(bond, context.as_of)?;
-    let mut base_bond = bond.clone();
-    crate::bond::pricing::quote_conversions::clear_price_driving_overrides(&mut base_bond);
-    base_bond
-        .instrument_pricing_overrides
-        .market_quotes
-        .quoted_z_spread = Some(base_spread);
+    let base_bond = super::z_pinned(bond.clone(), base_spread);
     let base_at_as_of =
         context.reprice_instrument_raw(&base_bond, context.curves.as_ref(), context.as_of)?;
 
-    let mut bumped_bond = base_bond.clone();
+    let mut bumped_bond = base_bond;
     bumped_bond
         .instrument_pricing_overrides
         .market_quotes
@@ -105,15 +100,7 @@ fn model_z_spread_bumped_pvs(context: &MetricContext) -> finstack_quant_core::Re
 }
 
 fn base_z_spread(context: &MetricContext) -> finstack_quant_core::Result<f64> {
-    let base_spread = context
-        .computed
-        .get(&MetricId::ZSpread)
-        .copied()
-        .ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "metric:ZSpread".to_string(),
-            })
-        })?;
+    let base_spread = context.computed_metric(&MetricId::ZSpread)?;
     if !base_spread.is_finite() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "bond spread risk requires a finite quote-reproducing Z-spread; got {base_spread}"
@@ -152,16 +139,11 @@ fn oas_bumped_pvs(context: &MetricContext) -> finstack_quant_core::Result<(f64, 
             "bond option spread risk requires a finite OAS; got {base_oas}"
         )));
     }
-    let mut base_bond = bond.clone();
-    crate::bond::pricing::quote_conversions::clear_price_driving_overrides(&mut base_bond);
-    base_bond
-        .instrument_pricing_overrides
-        .market_quotes
-        .quoted_oas = Some(base_oas);
+    let base_bond = super::oas_pinned(bond.clone(), base_oas);
     let base_npv =
         context.reprice_instrument_raw(&base_bond, context.curves.as_ref(), context.as_of)?;
 
-    let mut bumped_bond = base_bond.clone();
+    let mut bumped_bond = base_bond;
     bumped_bond
         .instrument_pricing_overrides
         .market_quotes
@@ -270,15 +252,7 @@ impl MetricCalculator for BondBucketedCs01Calculator {
             });
         }
 
-        let cs01 = context
-            .computed
-            .get(&MetricId::Cs01)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:Cs01".to_string(),
-                })
-            })?;
+        let cs01 = context.computed_metric(&MetricId::Cs01)?;
 
         Ok(cs01)
     }

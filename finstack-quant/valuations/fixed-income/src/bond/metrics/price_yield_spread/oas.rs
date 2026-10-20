@@ -20,9 +20,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
         return Ok(Some(oas));
     }
 
-    let model = context
-        .pricing_model()
-        .unwrap_or_else(|| bond.default_pricing_model());
+    let model = crate::bond::metrics::active_model(context, bond);
     let pricing_dispatch = context.clone_pricer_dispatch();
     let Some(dirty_at_quote) =
         crate::bond::pricing::quote_conversions::settlement_dirty_from_quote_overrides(
@@ -97,15 +95,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
         } else {
             let mut trial = trial_template.clone();
             trial.instrument_pricing_overrides.market_quotes.quoted_oas = Some(oas_bp / 10_000.0);
-            if context.pricing_model().is_some() {
-                context.reprice_instrument_raw(
-                    &trial,
-                    context.curves.as_ref(),
-                    quote_context.quote_date,
-                )
-            } else {
-                trial.price_for_model_raw(model, context.curves.as_ref(), quote_context.quote_date)
-            }
+            crate::bond::metrics::reprice_selected(context, &trial, model, quote_context.quote_date)
         };
         match priced {
             Ok(value) => value - dirty_at_quote,
@@ -141,19 +131,12 @@ pub(crate) fn oas_decimal_from_quote_overrides(
             .instrument_pricing_overrides
             .market_quotes
             .quoted_oas = Some(oas_decimal);
-        if context.pricing_model().is_some() {
-            context.reprice_instrument_raw(
-                &final_trial,
-                context.curves.as_ref(),
-                quote_context.quote_date,
-            )?;
-        } else {
-            final_trial.price_for_model_raw(
-                model,
-                context.curves.as_ref(),
-                quote_context.quote_date,
-            )?;
-        }
+        crate::bond::metrics::reprice_selected(
+            context,
+            &final_trial,
+            model,
+            quote_context.quote_date,
+        )?;
     }
 
     Ok(Some(oas_decimal))

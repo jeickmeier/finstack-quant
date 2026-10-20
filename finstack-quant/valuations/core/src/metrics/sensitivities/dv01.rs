@@ -203,10 +203,7 @@ impl UnifiedDv01Calculator {
 impl MetricCalculator for UnifiedDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         // Resolve bump size from config, then layer instrument overrides.
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
         let bump_bp = defaults.rate_bump_bp;
 
         let curves = self.collect_curves(context.instrument.as_ref(), context.curves.as_ref())?;

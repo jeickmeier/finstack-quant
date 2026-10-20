@@ -13,7 +13,7 @@ use crate::instruments::common_impl::traits::{
     GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
     OptionGreeksRequest,
 };
-use crate::metrics::{metric_not_found, MetricCalculator, MetricContext, MetricId};
+use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::Result;
 
 /// Selected-model derivative to parallel decimal curve rates. HW single-curve
@@ -131,11 +131,7 @@ where
             },
         )?;
         store_available_greeks(context, greeks);
-        context
-            .computed
-            .get(&metric_id)
-            .copied()
-            .ok_or_else(|| metric_not_found(metric_id))
+        context.computed_metric(&metric_id)
     }
 }
 
