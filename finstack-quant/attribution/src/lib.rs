@@ -176,7 +176,7 @@ pub use target_currency::translate_to_target_currency;
 pub use taylor::TaylorAttributionConfig;
 pub use waterfall::default_waterfall_order;
 
-use finstack_quant_core::config::FinstackConfig;
+use finstack_quant_core::config::{FinstackConfig, RoundingContext};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -184,6 +184,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_factor::credit::hierarchy::CreditFactorModel;
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
 
 /// Inputs shared by the repricing-based attribution methods.
@@ -224,21 +225,39 @@ pub struct AttributionRequest<'a> {
     /// Opening model-parameter snapshot; `None` takes parameters from
     /// `instrument`, so model-parameter P&L is zero.
     pub model_params_t0: Option<&'a ModelParamsSnapshot>,
-    /// Credit-factor model driving the per-issuer hierarchy cascade for the
-    /// waterfall and parallel methods.
+    /// Credit-factor model for the per-issuer hierarchy detail: the
+    /// waterfall and parallel methods reprice a cascade, the metrics-based
+    /// and Taylor methods back-solve it from a measured CS01, and every
+    /// method splits the carry into rates and credit parts.
     pub credit_factor_model: Option<&'a CreditFactorModel>,
     /// Detail options for the credit-factor cascade output.
     pub credit_factor_detail_options: &'a CreditFactorDetailOptions,
     /// Unscaled instrument values at `(T₀, T₁)` already priced by a portfolio
     /// engine; when `Some`, the two ordinary endpoint repricings are skipped.
     pub prepared_endpoints: Option<(Money, Money)>,
+    /// Reporting currency. When it differs from the instrument's pricing
+    /// currency the result is translated with
+    /// [`translate_to_target_currency`]; `None` reports in the pricing
+    /// currency.
+    pub target_currency: Option<Currency>,
+    /// Absolute residual tolerance stamped into `meta.tolerance_abs`;
+    /// `None` keeps the method's default.
+    pub tolerance_abs: Option<f64>,
+    /// Percentage residual tolerance stamped into `meta.tolerance_pct`;
+    /// `None` keeps the method's default.
+    pub tolerance_pct: Option<f64>,
+    /// Metrics-based only: the metrics to price at T₀. `None` prices the
+    /// default menu narrowed to what the instrument supports; a named
+    /// metric is not narrowed and errors if it is inapplicable.
+    pub metrics: Option<&'a [MetricId]>,
 }
 
 impl<'a> AttributionRequest<'a> {
     /// Build a request with default optional fields: serial execution,
     /// strict waterfall validation, no cross-factor detail, no model-parameter
-    /// snapshot, no credit-factor model, default detail options, and no
-    /// prepared endpoints.
+    /// snapshot, no credit-factor model, default detail options, no
+    /// prepared endpoints, the pricing currency, the method's default
+    /// tolerances and the default metric menu.
     ///
     /// # Arguments
     ///
@@ -274,40 +293,116 @@ impl<'a> AttributionRequest<'a> {
             credit_factor_model: None,
             credit_factor_detail_options: &CreditFactorDetailOptions::DEFAULT,
             prepared_endpoints: None,
+            target_currency: None,
+            tolerance_abs: None,
+            tolerance_pct: None,
+            metrics: None,
         }
     }
 }
 
 /// Run one attribution method on a request.
 ///
+/// After the method runs, the result carries the request's rounding
+/// context and tolerances and a freshly computed residual; with a
+/// credit-factor model it gains the credit-factor detail and the
+/// carry's rates/credit split, and with a `target_currency` it is
+/// translated into that currency. [`AttributionSpec::execute`] and the
+/// language bindings run this same pipeline.
+///
 /// # Arguments
 ///
 /// * `method` - Attribution methodology. `MetricsBased` prices both endpoints
-///   with the default metric menu the instrument supports; call
-///   [`attribute_pnl_metrics_based`] directly when the
+///   with `request.metrics` or the default metric menu the instrument
+///   supports; call [`attribute_pnl_metrics_based`] directly when the
 ///   [`finstack_quant_valuations::results::ValuationResult`]s are already priced.
 /// * `request` - Instrument, market states, dates, configuration and the
 ///   optional overrides described on [`AttributionRequest`].
 ///
 /// # Errors
 ///
-/// Returns method-specific validation, market-data, repricing, and currency
-/// errors.
+/// Returns method-specific validation, market-data, repricing, currency and
+/// FX-translation errors, and an error when the residual cannot be
+/// computed (factor amounts in mixed currencies).
 pub fn attribute_pnl(
     method: &AttributionMethod,
     request: &AttributionRequest<'_>,
 ) -> finstack_quant_core::Result<PnlAttribution> {
     helpers::validate_attribution_period(request.as_of_t0, request.as_of_t1)?;
-    match method {
-        AttributionMethod::Parallel => parallel::attribute_pnl_parallel(request),
+    let mut attribution = match method {
+        AttributionMethod::Parallel => parallel::attribute_pnl_parallel(request)?,
         AttributionMethod::Waterfall(order) => {
-            waterfall::attribute_pnl_waterfall(request, order.clone())
+            waterfall::attribute_pnl_waterfall(request, order.clone())?
         }
         AttributionMethod::Taylor(taylor_config) => {
-            taylor::attribute_pnl_taylor(request, taylor_config)
+            taylor::attribute_pnl_taylor(request, taylor_config)?
         }
-        AttributionMethod::MetricsBased => metrics_based::attribute_request(request, None),
+        AttributionMethod::MetricsBased => metrics_based::attribute_request(request)?,
+    };
+    attribution.meta.rounding = RoundingContext::from(request.config);
+    attribution.compute_residual()?;
+    if let Some(tolerance) = request.tolerance_abs {
+        attribution.meta.tolerance_abs = tolerance;
     }
+    if let Some(tolerance) = request.tolerance_pct {
+        attribution.meta.tolerance_pct = tolerance;
+    }
+
+    if let Some(model) = request.credit_factor_model {
+        // Repricing methods fill the detail inside their cascade; the linear
+        // methods back-solve it here. Additive: `credit_curves_pnl` is unchanged.
+        if matches!(
+            method,
+            AttributionMethod::MetricsBased | AttributionMethod::Taylor(_)
+        ) {
+            let mut notes = Vec::new();
+            match credit_decomposition::credit_factor_detail(
+                request,
+                model,
+                &attribution,
+                &mut notes,
+            ) {
+                Ok(Some(detail)) => {
+                    attribution.credit_factor_detail = Some(detail);
+                    attribution.meta.num_repricings += 2;
+                }
+                Ok(None) => {}
+                Err(e) => notes.push(format!("credit_factor_detail computation failed: {e}")),
+            }
+            attribution.meta.notes.extend(notes);
+        }
+        if let Err(e) =
+            credit_decomposition::carry_credit_decomposition(request, model, &mut attribution)
+        {
+            attribution.meta.notes.push(format!(
+                "credit_carry_decomposition computation failed: {e}"
+            ));
+        }
+    }
+
+    if let Some(target_currency) = request
+        .target_currency
+        .filter(|target| *target != attribution.total_pnl.currency())
+    {
+        let val_t0 = match attribution.pv_t0 {
+            Some(value) => value,
+            None => {
+                attribution.meta.num_repricings += 1;
+                helpers::instrument_at_t0(request.instrument, request.model_params_t0)?
+                    .value(request.market_t0, request.as_of_t0)?
+            }
+        };
+        translate_to_target_currency(
+            &mut attribution,
+            val_t0,
+            target_currency,
+            request.market_t0,
+            request.market_t1,
+            request.as_of_t0,
+            request.as_of_t1,
+        )?;
+    }
+    Ok(attribution)
 }
 
 /// Minimal, no-frills P&L bridge: `value(T₁) − value(T₀)`.

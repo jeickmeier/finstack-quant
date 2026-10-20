@@ -103,7 +103,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{collect_cashflows_in_period, MetricId};
+use finstack_quant_valuations::metrics::collect_cashflows_in_period;
 use finstack_quant_valuations::results::ValuationResult;
 use std::sync::Arc;
 
@@ -315,10 +315,7 @@ pub fn attribute_pnl_metrics_based(
 /// narrowed to what the instrument type supports: that menu is a superset, not
 /// a request. Prepared endpoints on the request are not used, because the
 /// method needs priced measures.
-pub(crate) fn attribute_request(
-    request: &crate::AttributionRequest<'_>,
-    metrics: Option<Vec<MetricId>>,
-) -> Result<PnlAttribution> {
+pub(crate) fn attribute_request(request: &crate::AttributionRequest<'_>) -> Result<PnlAttribution> {
     let crate::AttributionRequest {
         instrument,
         market_t0,
@@ -348,12 +345,13 @@ pub(crate) fn attribute_request(
         }
     }
     let metrics_instrument: Arc<dyn Instrument> = Arc::from(metrics_instrument);
-    let metrics = metrics.unwrap_or_else(|| {
-        finstack_quant_valuations::metrics::standard_registry().applicable_subset(
+    let metrics = match request.metrics {
+        Some(metrics) => metrics.to_vec(),
+        None => finstack_quant_valuations::metrics::standard_registry().applicable_subset(
             &crate::default_attribution_metrics(),
             metrics_instrument.key(),
-        )
-    });
+        ),
+    };
 
     // Attach FinstackConfig so sensitivity bump knobs (e.g. rate_bump_bp)
     // reach the producer instead of silently falling back to defaults.

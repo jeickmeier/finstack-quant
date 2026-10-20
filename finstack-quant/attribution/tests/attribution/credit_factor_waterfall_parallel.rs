@@ -882,3 +882,47 @@ fn reprice_methods_surface_the_factor_unit_mismatch_note() {
         );
     }
 }
+
+/// `attribute_pnl` called directly (not through a spec) runs the same
+/// pipeline: the linear methods back-solve the credit-factor detail from the
+/// request's credit model.
+#[test]
+fn request_path_back_solves_credit_detail_for_linear_methods() {
+    use finstack_quant_attribution::{attribute_pnl, AttributionRequest, TaylorAttributionConfig};
+    use finstack_quant_core::config::FinstackConfig;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_valuations::instruments::Instrument;
+    use std::sync::Arc;
+
+    let (as_of_t0, as_of_t1) = standard_period();
+    let market_t0 =
+        MarketContext::try_from(flat_market_state(as_of_t0, 0.01)).expect("opening market");
+    let market_t1 =
+        MarketContext::try_from(flat_market_state(as_of_t1, 0.02)).expect("closing market");
+    let instrument: Arc<dyn Instrument> = Arc::new(make_bond());
+    let model = make_model(vec![HierarchyDimension::Rating]);
+    let config = FinstackConfig::default();
+
+    for method in [
+        AttributionMethod::MetricsBased,
+        AttributionMethod::Taylor(TaylorAttributionConfig::default()),
+    ] {
+        let request = AttributionRequest {
+            credit_factor_model: Some(&model),
+            ..AttributionRequest::new(
+                &instrument,
+                &market_t0,
+                &market_t1,
+                as_of_t0,
+                as_of_t1,
+                &config,
+            )
+        };
+        let attribution = attribute_pnl(&method, &request).expect("attribution");
+        assert!(
+            attribution.credit_factor_detail.is_some(),
+            "{method:?}: no credit_factor_detail; notes = {:?}",
+            attribution.meta.notes
+        );
+    }
+}
