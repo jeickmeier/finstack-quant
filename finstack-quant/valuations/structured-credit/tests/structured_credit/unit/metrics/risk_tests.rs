@@ -389,7 +389,8 @@ mod discount_margin_tests {
         let price = clean_pct(&sc, pv.amount() * 0.97);
 
         let dm = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), price).unwrap();
-        let summary = calculate_tranche_metrics(&sc, "SR", &mkt, closing(), Some(price)).unwrap();
+        let summary =
+            calculate_tranche_metrics(&sc, "SR", &mkt, closing(), Some(price), &[]).unwrap();
         let summary_dm_bp = summary
             .dm_bp
             .expect("floating tranche has a discount margin");
@@ -431,12 +432,12 @@ mod discount_margin_tests {
     #[test]
     fn effective_duration_of_a_floater_is_short_while_spread_duration_is_not() {
         let mkt = market();
-        let floater = calculate_tranche_metrics(&deal(true), "SR", &mkt, closing(), None)
+        let floater = calculate_tranche_metrics(&deal(true), "SR", &mkt, closing(), None, &[])
             .expect("floater metrics");
         assert!(
-            floater.modified_duration < 0.5,
+            floater.effective_duration < 0.5,
             "a quarterly floater resets with the curve: {}",
-            floater.modified_duration
+            floater.effective_duration
         );
         assert!(
             floater.spread_duration > 1.0,
@@ -448,23 +449,24 @@ mod discount_margin_tests {
             .expect("floating tranches carry a discount margin");
         assert!(dm.abs() < 1e-3, "zero margin at the model price: {dm}");
 
-        let fixed = calculate_tranche_metrics(&deal(false), "SR", &mkt, closing(), None)
+        let fixed = calculate_tranche_metrics(&deal(false), "SR", &mkt, closing(), None, &[])
             .expect("fixed metrics");
         assert!(fixed.dm_bp.is_none());
         assert!(
-            (fixed.modified_duration - fixed.spread_duration).abs() < 0.02,
+            (fixed.effective_duration - fixed.spread_duration).abs() < 0.02,
             "rate-independent flows: effective {} vs spread {}",
-            fixed.modified_duration,
+            fixed.effective_duration,
             fixed.spread_duration
         );
-        assert!(fixed.convexity > 0.0 && fixed.spread_convexity > 0.0);
+        assert!(fixed.effective_convexity > 0.0 && fixed.spread_convexity > 0.0);
         assert!(
-            (fixed.convexity - fixed.spread_convexity).abs() < 0.05 * fixed.spread_convexity,
+            (fixed.effective_convexity - fixed.spread_convexity).abs()
+                < 0.05 * fixed.spread_convexity,
             "effective convexity {} vs spread convexity {}",
-            fixed.convexity,
+            fixed.effective_convexity,
             fixed.spread_convexity
         );
-        assert!(fixed.modified_duration > floater.modified_duration + 1.0);
+        assert!(fixed.effective_duration > floater.effective_duration + 1.0);
     }
 }
 

@@ -19,6 +19,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_oas, scenario_table, OasConfig, OasResult, ScenarioGrid, ScenarioTable,
     StructuredCredit, TrancheMetrics,
 };
+use finstack_quant_valuations::metrics::MetricId;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use std::collections::BTreeMap;
@@ -212,7 +213,12 @@ fn structured_credit_tranche_oas(
     Ok(PyOasResult { inner })
 }
 
-/// Compute the summary risk/pricing metrics for a tranche.
+/// Compute the per-tranche valuation, yield, spread and risk metrics.
+///
+/// The one per-note analytics entry point: prices, accrued, yield, spreads
+/// and durations come from the tranche's own to-maturity cashflows, and
+/// ``metrics`` adds registry metrics (DV01, Default01, …) valued on the note
+/// so tranche sensitivities sum to the deal's.
 ///
 /// Parameters
 /// ----------
@@ -230,16 +236,28 @@ fn structured_credit_tranche_oas(
 ///     Clean settlement price as a percentage of current balance. When omitted,
 ///     the deal's market quote is used, or its model clean settlement price
 ///     if no quote is supplied. PV remains measured at valuation.
+/// metrics : list[str], optional
+///     Registry metric ids (for example ``"dv01"``, ``"default01"``) to value
+///     on this note; returned in ``TrancheMetrics.metrics``. Omitted or empty
+///     computes none.
 ///
 /// Returns
 /// -------
 /// TrancheMetrics
 ///     Typed metrics bundle. Call ``to_json`` on it for the wire payload.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If a metric id is unknown, the deal fails validation, the tranche is
+///     missing, or a solve fails.
+/// KeyError
+///     If a required curve is missing from ``market``.
 #[pyfunction]
 #[pyo3(
     name = "structured_credit_tranche_metrics",
-    signature = (instrument, tranche_id, market, as_of, market_price_pct=None),
-    text_signature = "(instrument, tranche_id, market, as_of, market_price_pct=None)"
+    signature = (instrument, tranche_id, market, as_of, market_price_pct=None, metrics=None),
+    text_signature = "(instrument, tranche_id, market, as_of, market_price_pct=None, metrics=None)"
 )]
 fn structured_credit_tranche_metrics(
     py: Python<'_>,
@@ -248,14 +266,28 @@ fn structured_credit_tranche_metrics(
     market: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
     market_price_pct: Option<f64>,
+    metrics: Option<Vec<String>>,
 ) -> PyResult<PyTrancheMetrics> {
     let deal = extract_structured_credit(py, instrument)?;
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
+    let metric_ids = metrics
+        .unwrap_or_default()
+        .iter()
+        .map(|id| MetricId::parse_strict(id))
+        .collect::<finstack_quant_core::Result<Vec<_>>>()
+        .map_err(core_to_py)?;
     let inner = py
         .detach(move || {
-            calculate_tranche_metrics(&deal, &tranche_id, &market, as_of, market_price_pct)
+            calculate_tranche_metrics(
+                &deal,
+                &tranche_id,
+                &market,
+                as_of,
+                market_price_pct,
+                &metric_ids,
+            )
         })
         .map_err(core_to_py)?;
     Ok(PyTrancheMetrics { inner })
@@ -501,9 +533,11 @@ impl PyTrancheMetrics {
     /// >>> from finstack_quant.valuations.instruments import TrancheMetrics
     /// >>> payload = json.dumps({
     /// ...     "tranche_id": "A", "currency": "USD", "pv": 1000.0,
-    /// ...     "price_pct": 100.0, "factor": 1.0, "wal": 3.0, "z_spread_bp": 0.0,
+    /// ...     "clean_price_pct": 100.0, "dirty_price_pct": 100.0, "accrued": 0.0,
+    /// ...     "factor": 1.0, "wal": 3.0, "ytm": 0.05, "z_spread_bp": 0.0,
     /// ...     "cs01": -1.0, "spread_duration": 3.0, "spread_convexity": 12.0,
-    /// ...     "modified_duration": 3.0, "convexity": 12.0, "target_price_pct": 100.0,
+    /// ...     "effective_duration": 3.0, "effective_convexity": 12.0,
+    /// ...     "target_price_pct": 100.0,
     /// ... })
     /// >>> metrics = TrancheMetrics.from_json(payload)
     /// >>> metrics.tranche_id
@@ -532,7 +566,8 @@ impl PyTrancheMetrics {
         &self.inner.tranche_id
     }
 
-    /// ISO-4217 code of the currency ``pv`` and ``cs01`` are denominated in.
+    /// ISO-4217 code of the currency ``pv``, ``accrued`` and ``cs01`` are
+    /// denominated in.
     #[getter]
     fn currency(&self) -> String {
         self.inner.currency.to_string()
@@ -544,15 +579,28 @@ impl PyTrancheMetrics {
         self.inner.pv
     }
 
-    /// Model clean price, as a percentage of the tranche's current balance
-    /// (the factor-adjusted secondary-market quote basis).
+    /// Model clean settlement price, as a percentage of the tranche's current
+    /// balance (the factor-adjusted secondary-market quote basis).
     #[getter]
-    fn price_pct(&self) -> f64 {
-        self.inner.price_pct
+    fn clean_price_pct(&self) -> f64 {
+        self.inner.clean_price_pct
+    }
+
+    /// Model dirty settlement price (clean plus accrued), as a percentage of
+    /// the tranche's current balance.
+    #[getter]
+    fn dirty_price_pct(&self) -> f64 {
+        self.inner.dirty_price_pct
+    }
+
+    /// Accrued coupon at buyer settlement, in ``currency`` units.
+    #[getter]
+    fn accrued(&self) -> f64 {
+        self.inner.accrued
     }
 
     /// Pool factor of the note: current balance over original balance, so a
-    /// price on original face is ``price_pct * factor``.
+    /// price on original face is ``clean_price_pct * factor``.
     #[getter]
     fn factor(&self) -> f64 {
         self.inner.factor
@@ -562,6 +610,14 @@ impl PyTrancheMetrics {
     #[getter]
     fn wal(&self) -> f64 {
         self.inner.wal
+    }
+
+    /// Decimal yield reproducing the ``target_price_pct`` dirty value,
+    /// compounded at the note's coupon frequency in its own day count;
+    /// ``None`` for an impaired note.
+    #[getter]
+    fn ytm(&self) -> Option<f64> {
+        self.inner.ytm
     }
 
     /// Z-spread to ``target_price_pct``, in basis points.
@@ -593,15 +649,15 @@ impl PyTrancheMetrics {
     /// with every rate curve bumped ±1 bp, so a floater's coupon resets move
     /// with the curve and its duration is short.
     #[getter]
-    fn modified_duration(&self) -> f64 {
-        self.inner.modified_duration
+    fn effective_duration(&self) -> f64 {
+        self.inner.effective_duration
     }
 
     /// Effective convexity from the same ±1 bp re-projection, in years
     /// squared.
     #[getter]
-    fn convexity(&self) -> f64 {
-        self.inner.convexity
+    fn effective_convexity(&self) -> f64 {
+        self.inner.effective_convexity
     }
 
     /// Discount margin to maturity at ``target_price_pct`` for a
@@ -612,8 +668,8 @@ impl PyTrancheMetrics {
         self.inner.dm_bp
     }
 
-    /// Price the z-spread/CS01 were solved against, as a percentage of
-    /// current balance.
+    /// Price the yield, z-spread and CS01 were solved against, as a
+    /// percentage of current balance.
     #[getter]
     fn target_price_pct(&self) -> f64 {
         self.inner.target_price_pct
@@ -640,15 +696,28 @@ impl PyTrancheMetrics {
         self.inner.dm_to_call_bp
     }
 
+    /// Requested registry metrics valued on this note, keyed by metric id
+    /// (empty when none were requested); units follow each metric.
+    #[getter]
+    fn metrics(&self) -> BTreeMap<String, f64> {
+        self.inner
+            .metrics
+            .iter()
+            .map(|(id, value)| (id.to_string(), *value))
+            .collect()
+    }
+
     /// Export as a single-row pandas ``DataFrame``.
     ///
-    /// Columns: ``tranche_id``, ``currency``, ``pv``, ``price_pct``,
-    /// ``factor``, ``wal``, ``z_spread_bp``, ``cs01``, ``spread_duration``,
-    /// ``spread_convexity``, ``modified_duration``, ``convexity``,
-    /// ``target_price_pct``, ``wal_to_call``, ``z_spread_to_call_bp``,
-    /// ``dm_to_call_bp``, ``dm_bp`` — the same fields and units as the
-    /// getters of the same name (the ``*_to_call`` columns are ``NaN``
-    /// without a call, ``dm_bp`` for fixed-rate tranches).
+    /// Columns: ``tranche_id``, ``currency``, ``pv``, ``clean_price_pct``,
+    /// ``dirty_price_pct``, ``accrued``, ``factor``, ``wal``, ``ytm``,
+    /// ``z_spread_bp``, ``cs01``, ``spread_duration``, ``spread_convexity``,
+    /// ``effective_duration``, ``effective_convexity``, ``target_price_pct``,
+    /// ``wal_to_call``, ``z_spread_to_call_bp``, ``dm_to_call_bp``, ``dm_bp``
+    /// — the same fields and units as the getters of the same name (``ytm``
+    /// is ``NaN`` for an impaired note, the ``*_to_call`` columns without a
+    /// call, ``dm_bp`` for fixed-rate tranches). Requested registry metrics
+    /// stay in the ``metrics`` getter.
     ///
     /// One row per tranche, so a capital structure stacks with
     /// ``pd.concat([m.to_dataframe() for m in metrics])``. ``pv`` and ``cs01``
@@ -663,15 +732,18 @@ impl PyTrancheMetrics {
                 "tranche_id",
                 "currency",
                 "pv",
-                "price_pct",
+                "clean_price_pct",
+                "dirty_price_pct",
+                "accrued",
                 "factor",
                 "wal",
+                "ytm",
                 "z_spread_bp",
                 "cs01",
                 "spread_duration",
                 "spread_convexity",
-                "modified_duration",
-                "convexity",
+                "effective_duration",
+                "effective_convexity",
                 "target_price_pct",
                 "wal_to_call",
                 "z_spread_to_call_bp",
@@ -684,8 +756,8 @@ impl PyTrancheMetrics {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "TrancheMetrics(tranche_id={:?}, pv={}, price_pct={})",
-            self.inner.tranche_id, self.inner.pv, self.inner.price_pct
+            "TrancheMetrics(tranche_id={:?}, pv={}, clean_price_pct={})",
+            self.inner.tranche_id, self.inner.pv, self.inner.clean_price_pct
         )
     }
 }

@@ -1055,7 +1055,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
-      "bytes": 2531,
+      "bytes": 2537,
       "kind": "output",
       "path": "schemas/results/1/scenario_table.schema.json",
       "summary": "Structured-credit scenario grid results for one tranche.",
@@ -1082,7 +1082,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/tranche_metrics.schema.json",
-      "bytes": 4847,
+      "bytes": 6278,
       "kind": "output",
       "path": "schemas/results/1/tranche_metrics.schema.json",
       "summary": "Per-tranche risk and spread metrics from the tranche's own projected cashflows.",

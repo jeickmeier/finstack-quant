@@ -9,7 +9,9 @@
 //! JS surface lives under `valuations.instruments`.
 
 use super::pricing::parse_market_json;
-use crate::utils::input::{js_f64, js_opt_f64, js_string, json_text, opt_json_text};
+use crate::utils::input::{
+    js_f64, js_opt_f64, js_opt_string_seq, js_string, json_text, opt_json_text,
+};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
@@ -193,31 +195,36 @@ pub fn structured_credit_tranche_scenario_table(
     to_js_value(&result)
 }
 
-/// Per-tranche risk/spread metrics (PV, price, WAL, z-spread, CS01, spread/
-/// modified duration, convexity) computed from one tranche's own cashflows.
+/// Per-tranche valuation, yield, spread and risk metrics computed from one
+/// tranche's own cashflows — the one per-note analytics entry point.
 ///
 /// `marketPricePct` is a clean settlement quote (% of CURRENT balance). The
 /// deal's `quote_settlement_date` defaults to valuation; accrued interest is
 /// added once and seller-owned payments are excluded. When omitted the deal
-/// quote is used, or its model clean settlement price if no quote is supplied. Returns a typed `TrancheMetrics` object —
-/// a plain JavaScript object with the same snake_case fields (`tranche_id`,
-/// `currency`, `pv`, `price_pct`, `wal`, `z_spread_bp`, `cs01`,
-/// `spread_duration`, `spread_convexity`, `modified_duration`, `convexity`,
-/// `target_price_pct`, `dm_bp` for floaters)
-/// Python exposes through its typed `TrancheMetrics` wrapper. Pass it to
-/// `JSON.stringify` if a wire string is needed.
+/// quote is used, or its model clean settlement price if no quote is supplied.
+/// `metrics` lists registry metric ids (`"dv01"`, `"default01"`, …) valued on
+/// this note and returned in `metrics`, so tranche sensitivities sum to the
+/// deal's. Returns a typed `TrancheMetrics` object — a plain JavaScript object
+/// with the same snake_case fields (`tranche_id`, `currency`, `pv`,
+/// `clean_price_pct`, `dirty_price_pct`, `accrued`, `factor`, `wal`, `ytm`,
+/// `z_spread_bp`, `cs01`, `spread_duration`, `spread_convexity`,
+/// `effective_duration`, `effective_convexity`, `target_price_pct`, `dm_bp`
+/// for floaters, `metrics`) Python exposes through its typed `TrancheMetrics`
+/// wrapper. Pass it to `JSON.stringify` if a wire string is needed.
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if the instrument or market JSON is
-/// malformed; the instrument fails pricing validation; `as_of` is invalid;
-/// the tranche or discount curve is missing; a metric fails or is non-finite;
-/// or the result cannot be converted to a JavaScript value.
+/// malformed; a metric id is unknown; the instrument fails pricing
+/// validation; `as_of` is invalid; the tranche or discount curve is missing;
+/// a metric fails or is non-finite; or the result cannot be converted to a
+/// JavaScript value.
 /// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param market_price_pct - Optional clean settlement quote as a percentage of CURRENT balance; omit to use the deal quote, or its model clean price when no quote is supplied.
+/// @param metrics - Optional registry metric ids to value on this note; omit or pass an empty array for none.
 #[wasm_bindgen(js_name = structuredCreditTrancheMetrics)]
 pub fn structured_credit_tranche_metrics(
     instrument_json: JsValue,
@@ -225,8 +232,15 @@ pub fn structured_credit_tranche_metrics(
     market_json: JsValue,
     as_of: JsValue,
     market_price_pct: Option<JsValue>,
+    metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let market_price_pct = js_opt_f64(market_price_pct.as_ref(), "marketPricePct")?;
+    let metric_ids = js_opt_string_seq(metrics.as_ref(), "metrics")?
+        .unwrap_or_default()
+        .iter()
+        .map(|id| finstack_quant_valuations::metrics::MetricId::parse_strict(id))
+        .collect::<finstack_quant_core::Result<Vec<_>>>()
+        .map_err(to_js_err)?;
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
     let market_json: &str = &json_text(&market_json, "marketJson")?;
@@ -234,7 +248,14 @@ pub fn structured_credit_tranche_metrics(
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market_json(market_json)?;
     let as_of = parse_iso_date(as_of)?;
-    let result = calculate_tranche_metrics(&deal, tranche_id, &market, as_of, market_price_pct)
-        .map_err(to_js_err)?;
+    let result = calculate_tranche_metrics(
+        &deal,
+        tranche_id,
+        &market,
+        as_of,
+        market_price_pct,
+        &metric_ids,
+    )
+    .map_err(to_js_err)?;
     to_js_value(&result)
 }

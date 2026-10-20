@@ -218,9 +218,9 @@ fn seasoned_note_prices_per_current_face() {
     tranche_mut(&mut seasoned, "SR").current_balance =
         Money::new(400_000.0, Currency::USD).expect("money");
 
-    let fresh = calculate_tranche_metrics(&new_issue, "SR", &market, as_of(), None)
+    let fresh = calculate_tranche_metrics(&new_issue, "SR", &market, as_of(), None, &[])
         .expect("new-issue metrics");
-    let aged = calculate_tranche_metrics(&seasoned, "SR", &market, as_of(), None)
+    let aged = calculate_tranche_metrics(&seasoned, "SR", &market, as_of(), None, &[])
         .expect("seasoned metrics");
     assert!(
         (aged.pv / fresh.pv - 0.5).abs() < 1e-9,
@@ -229,12 +229,12 @@ fn seasoned_note_prices_per_current_face() {
         fresh.pv
     );
     assert!(
-        (aged.price_pct - fresh.price_pct).abs() < 1e-6,
+        (aged.clean_price_pct - fresh.clean_price_pct).abs() < 1e-6,
         "price per current face is unchanged by seasoning: {} vs {}",
-        aged.price_pct,
-        fresh.price_pct
+        aged.clean_price_pct,
+        fresh.clean_price_pct
     );
-    assert!(aged.price_pct > 95.0 && aged.price_pct < 110.0);
+    assert!(aged.clean_price_pct > 95.0 && aged.clean_price_pct < 110.0);
 }
 
 /// Audit probe 2 — the loss-allocation policy reaches the notes: under

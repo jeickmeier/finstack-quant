@@ -668,7 +668,7 @@ fn structured_credit_tranche_analytics_declare_typed_results() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheMetrics(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct?: number | null): TrancheMetrics;",
+        "structuredCreditTrancheMetrics(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct?: number | null, metrics?: string[] | null): TrancheMetrics;",
     ));
     assert!(contains_ignoring_ws(
         &dts,

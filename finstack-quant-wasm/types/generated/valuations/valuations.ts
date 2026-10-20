@@ -19978,7 +19978,7 @@ export interface ScenarioCell {
    * Clean settlement price as a percentage of the tranche's CURRENT
    * balance (the factor-adjusted quote basis): the model dirty value at
    * buyer settlement less accrued, the same figure as
-   * `TrancheMetrics::price_pct`.
+   * `TrancheMetrics::clean_price_pct`.
    */
   price: number;
   /**
@@ -20042,18 +20042,28 @@ export interface SwaptionConventions {
  */
 export interface TrancheMetrics {
   /**
-   * Effective convexity (years²) from the same ±1 bp re-projection.
+   * Accrued coupon at buyer settlement (currency units).
    */
-  convexity: number;
+  accrued: number;
+  /**
+   * Model clean settlement price as a percentage of the tranche's CURRENT
+   * balance.
+   */
+  clean_price_pct: number;
   /**
    * Credit-spread DV01 — currency change for a +1 bp z-spread shock. Negative
    * for a long tranche (wider spreads reduce PV).
    */
   cs01: number;
   /**
-   * ISO-4217 code of the currency `pv` and `cs01` are denominated in.
+   * ISO-4217 code of the currency `pv`, `accrued` and `cs01` are denominated in.
    */
   currency: Currency;
+  /**
+   * Model dirty settlement price (clean plus accrued) as a percentage of
+   * the tranche's CURRENT balance.
+   */
+  dirty_price_pct: number;
   /**
    * Discount margin to maturity at `target_price_pct` (basis points): the
    * constant spread over the deal discount curve that reprices the
@@ -20066,10 +20076,9 @@ export interface TrancheMetrics {
    */
   dm_to_call_bp?: number | null;
   /**
-   * Pool factor of the note: `current_balance / original_balance`, so a
-   * price on original face is `price_pct * factor`.
+   * Effective convexity (years²) from the same ±1 bp re-projection.
    */
-  factor: number;
+  effective_convexity: number;
   /**
    * Effective (rate) duration (years): the tranche is re-projected with
    * every rate curve in the market (discount and forward) bumped ±1 bp in
@@ -20077,14 +20086,24 @@ export interface TrancheMetrics {
    * coupon resets move with the curve and its duration is short, while a
    * fixed-coupon note's equals its modified duration.
    */
-  modified_duration: number;
+  effective_duration: number;
   /**
-   * Model clean settlement price as a percentage of the tranche's CURRENT
-   * balance (the factor-adjusted secondary-market quote basis).
+   * Pool factor of the note: `current_balance / original_balance`, so a
+   * price on original face is `clean_price_pct * factor`.
    */
-  price_pct: number;
+  factor: number;
   /**
-   * Present value of the tranche (currency units).
+   * Registry metrics requested by the caller, valued on this note: every
+   * reprice (DV01, theta, Default01, Prepayment01, Recovery01,
+   * Severity01, …) values the tranche, not the deal, so the senior and
+   * the equity carry their own sensitivities that sum to the deal's.
+   * Units follow each metric's registry definition.
+   */
+  metrics?: {
+    [k: string]: number;
+  };
+  /**
+   * Present value of the tranche at valuation (currency units).
    */
   pv: number;
   /**
@@ -20098,8 +20117,9 @@ export interface TrancheMetrics {
    */
   spread_duration: number;
   /**
-   * Price the z-spread/CS01 were solved against (% of current balance) —
-   * the supplied market price, or the model price when none was given.
+   * Price the yield, z-spread and CS01 were solved against (% of current
+   * balance) — the supplied market price, else the deal's quote override,
+   * else the model price.
    */
   target_price_pct: number;
   /**
@@ -20115,6 +20135,13 @@ export interface TrancheMetrics {
    * without a `call_assumption` covering this tranche.
    */
   wal_to_call?: number | null;
+  /**
+   * Decimal yield reproducing the `target_price_pct` dirty settlement
+   * value, compounded at the note's coupon frequency with time in the
+   * note's day count (a par note yields its coupon); `None` for an
+   * impaired note.
+   */
+  ytm?: number | null;
   /**
    * Z-spread to `target_price_pct` (basis points): the constant spread over the
    * discount curve equating the tranche's PV to that price. Zero when solved

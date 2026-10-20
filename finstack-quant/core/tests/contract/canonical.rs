@@ -270,10 +270,6 @@ fn persisted_contract_fields_do_not_use_fx_hash_maps() {
             "MarketConditions",
         ),
         (
-            "valuations/structured-credit/src/structured_credit/types/results.rs",
-            "TrancheValuation",
-        ),
-        (
             "valuations/structured-credit/src/structured_credit/types/waterfall/mod.rs",
             "WaterfallDistribution",
         ),

@@ -101,9 +101,10 @@ fn fixture(seasoned: bool) -> (StructuredCredit, Date) {
 fn seasoned_tranche_price_is_per_current_face() {
     let (deal, as_of) = fixture(true);
     let market = market(as_of);
-    let metrics = calculate_tranche_metrics(&deal, "A", &market, as_of, None).expect("metrics");
-    let new_issue =
-        calculate_tranche_metrics(&fixture(false).0, "A", &market, as_of, None).expect("metrics");
+    let metrics =
+        calculate_tranche_metrics(&deal, "A", &market, as_of, None, &[]).expect("metrics");
+    let new_issue = calculate_tranche_metrics(&fixture(false).0, "A", &market, as_of, None, &[])
+        .expect("metrics");
 
     // Same coupon, curve and schedule: the note at factor 0.5 has half the PV
     // of the unamortized note and the SAME clean price per current face.
@@ -114,15 +115,15 @@ fn seasoned_tranche_price_is_per_current_face() {
         new_issue.pv
     );
     assert!(
-        (metrics.price_pct - new_issue.price_pct).abs() < 1e-6,
+        (metrics.clean_price_pct - new_issue.clean_price_pct).abs() < 1e-6,
         "price_pct must be per current face: seasoned {} vs new issue {}",
-        metrics.price_pct,
-        new_issue.price_pct
+        metrics.clean_price_pct,
+        new_issue.clean_price_pct
     );
     assert!(
-        metrics.price_pct > 95.0 && metrics.price_pct < 110.0,
+        metrics.clean_price_pct > 95.0 && metrics.clean_price_pct < 110.0,
         "a par-coupon senior note at factor 0.5 prices near par, got {}",
-        metrics.price_pct
+        metrics.clean_price_pct
     );
     assert!(
         (metrics.factor - 0.5).abs() < 1e-12,
@@ -134,7 +135,7 @@ fn seasoned_tranche_price_is_per_current_face() {
         "an unamortized note has factor 1"
     );
     assert!(
-        (metrics.target_price_pct - metrics.price_pct).abs() < 1e-9,
+        (metrics.target_price_pct - metrics.clean_price_pct).abs() < 1e-9,
         "with no quote the target is the model price on the same basis"
     );
 }
@@ -144,7 +145,7 @@ fn desk_quote_per_current_face_solves_a_sane_spread() {
     let (deal, as_of) = fixture(true);
     let market = market(as_of);
     let quoted =
-        calculate_tranche_metrics(&deal, "A", &market, as_of, Some(99.0)).expect("metrics");
+        calculate_tranche_metrics(&deal, "A", &market, as_of, Some(99.0), &[]).expect("metrics");
     assert!(
         (quoted.target_price_pct - 99.0).abs() < 1e-9,
         "the quote is echoed as the target on the current-face basis"
@@ -172,17 +173,17 @@ fn scenario_table_price_is_per_current_face() {
         recovery_lag: None,
     };
     let table = scenario_table(&deal, "A", &market, as_of, &grid).expect("table");
-    let model = calculate_tranche_metrics(&deal, "A", &market, as_of, None).expect("metrics");
+    let model = calculate_tranche_metrics(&deal, "A", &market, as_of, None, &[]).expect("metrics");
     let cell = &table.cells[0];
     // The grid cell reprices at the deal's own assumptions here, so the cell
     // quotes the model's clean settlement price on current face.
     assert!(
-        (cell.price - model.price_pct).abs() < 1e-6,
+        (cell.price - model.clean_price_pct).abs() < 1e-6,
         "scenario price {} must be the clean settlement price {}",
         cell.price,
-        model.price_pct
+        model.clean_price_pct
     );
-    assert!(model.price_pct > 0.0);
+    assert!(model.clean_price_pct > 0.0);
 }
 
 /// A note that is fully written down in the projection has no settlement
@@ -195,18 +196,15 @@ fn fully_written_down_class_prices_at_zero_without_a_yield() {
     // sees no cash at all.
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(1.0);
     let market = market(as_of);
-    let equity = deal
-        .value_tranche_with_metrics("EQ", &market, as_of, &[])
+    let equity = calculate_tranche_metrics(&deal, "EQ", &market, as_of, None, &[])
         .expect("an impaired note still values");
-    assert_eq!(equity.pv.amount(), 0.0);
-    assert_eq!(equity.clean_price, 0.0);
-    assert_eq!(equity.dirty_price, 0.0);
+    assert_eq!(equity.pv, 0.0);
+    assert_eq!(equity.clean_price_pct, 0.0);
+    assert_eq!(equity.dirty_price_pct, 0.0);
     assert!(equity.ytm.is_none(), "no yield on a worthless note");
     assert_eq!(equity.z_spread_bp, 0.0);
     assert_eq!(equity.cs01, 0.0);
-    let senior = deal
-        .value_tranche_with_metrics("A", &market, as_of, &[])
-        .expect("senior");
+    let senior = calculate_tranche_metrics(&deal, "A", &market, as_of, None, &[]).expect("senior");
     assert!(senior.ytm.is_some());
 }
 
@@ -226,16 +224,14 @@ fn par_quarterly_note_yields_its_coupon() {
         .market_quotes
         .quoted_clean_price_pct = Some(100.0);
     let market = market(as_of);
-    let senior = deal
-        .value_tranche_with_metrics("A", &market, as_of, &[])
-        .expect("senior");
+    let senior = calculate_tranche_metrics(&deal, "A", &market, as_of, None, &[]).expect("senior");
     let ytm = senior.ytm.expect("yield");
     assert!(
         (ytm - 0.05).abs() < 1e-6,
         "a par 5% quarterly note yields 5.00%, got {ytm}"
     );
     // `clean_price` stays the MODEL price; the quote only sets the yield's target.
-    assert!(senior.clean_price > 0.0);
+    assert!(senior.clean_price_pct > 0.0);
 }
 
 #[test]

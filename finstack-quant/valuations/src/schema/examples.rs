@@ -172,17 +172,21 @@ pub(super) fn tranche_metrics() -> Result<Vec<Value>> {
         "tranche_id": "A",
         "currency": "USD",
         "pv": 248_750_000.0,
-        "price_pct": 99.5,
+        "clean_price_pct": 99.5,
+        "dirty_price_pct": 99.9,
+        "accrued": 1_000_000.0,
         "factor": 1.0,
         "wal": 4.6,
+        "ytm": 0.0612,
         "z_spread_bp": 142.0,
         "cs01": 108_500.0,
         "spread_duration": 4.36,
         "spread_convexity": 0.24,
-        "modified_duration": 0.24,
-        "convexity": 0.001,
+        "effective_duration": 0.24,
+        "effective_convexity": 0.001,
         "target_price_pct": 99.5,
-        "dm_bp": 139.0
+        "dm_bp": 139.0,
+        "metrics": {"dv01": 5_970.0, "default01": -41_200.0}
     }))
 }
 

@@ -3402,7 +3402,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
             "type_name": "ScenarioTable",
             "kind": "output",
-            "bytes": 2531
+            "bytes": 2537
           },
           {
             "path": "schemas/results/1/simulation_diagnostics.schema.json",
@@ -3423,7 +3423,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/tranche_metrics.schema.json",
             "type_name": "TrancheMetrics",
             "kind": "output",
-            "bytes": 4847
+            "bytes": 6278
           },
           {
             "path": "schemas/results/1/valuation_result.schema.json",
@@ -5522,7 +5522,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
             "type_name": "ScenarioTable",
             "kind": "output",
-            "bytes": 2531
+            "bytes": 2537
           },
           {
             "domain": "valuations",
@@ -5546,7 +5546,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/tranche_metrics.schema.json",
             "type_name": "TrancheMetrics",
             "kind": "output",
-            "bytes": 4847
+            "bytes": 6278
           },
           {
             "domain": "valuations",

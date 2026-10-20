@@ -24,14 +24,14 @@ use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
 
 /// A deal plus the identifier of the note the metrics are computed for.
 ///
-/// Built by [`StructuredCredit::value_tranche_with_metrics`]; direct callers
-/// can place it in a `MetricContext` to obtain per-tranche registry metrics.
+/// Built by [`calculate_tranche_metrics`](crate::structured_credit::calculate_tranche_metrics)
+/// for its registry `metrics` pass.
 #[derive(Clone, Debug)]
-pub struct StructuredCreditTranche {
+pub(crate) struct StructuredCreditTranche {
     /// The deal that owns the note.
-    pub deal: StructuredCredit,
+    pub(crate) deal: StructuredCredit,
     /// Identifier of the priced note.
-    pub tranche_id: String,
+    pub(crate) tranche_id: String,
 }
 
 impl StructuredCreditTranche {
@@ -41,7 +41,7 @@ impl StructuredCreditTranche {
     ///
     /// * `deal` - The structured-credit deal the note belongs to.
     /// * `tranche_id` - Exact identifier of one of `deal.tranches`.
-    pub fn new(deal: StructuredCredit, tranche_id: impl Into<String>) -> Self {
+    pub(crate) fn new(deal: StructuredCredit, tranche_id: impl Into<String>) -> Self {
         Self {
             deal,
             tranche_id: tranche_id.into(),

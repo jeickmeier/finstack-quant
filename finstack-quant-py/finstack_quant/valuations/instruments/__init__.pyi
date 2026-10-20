@@ -33259,8 +33259,11 @@ class OasResult:
 
 class TrancheMetrics:
     """
-    Summary risk/pricing metrics for a structured-credit tranche
+    Per-tranche valuation, yield, spread and risk metrics
     (``structured_credit_tranche_metrics``'s return value).
+
+    Prices are quoted per the tranche's current balance; an impaired note
+    reports zero prices and spreads and ``ytm`` ``None``.
 
     Examples
     --------
@@ -33270,15 +33273,18 @@ class TrancheMetrics:
     ...     "tranche_id": "A",
     ...     "currency": "USD",
     ...     "pv": 1000.0,
-    ...     "price_pct": 100.0,
+    ...     "clean_price_pct": 100.0,
+    ...     "dirty_price_pct": 100.0,
+    ...     "accrued": 0.0,
     ...     "factor": 1.0,
     ...     "wal": 3.0,
+    ...     "ytm": 0.05,
     ...     "z_spread_bp": 0.0,
     ...     "cs01": -1.0,
     ...     "spread_duration": 3.0,
     ...     "spread_convexity": 12.0,
-    ...     "modified_duration": 3.0,
-    ...     "convexity": 12.0,
+    ...     "effective_duration": 3.0,
+    ...     "effective_convexity": 12.0,
     ...     "target_price_pct": 100.0,
     ... })
     >>> metrics = TrancheMetrics.from_json(payload)
@@ -33314,15 +33320,18 @@ class TrancheMetrics:
         ...     "tranche_id": "A",
         ...     "currency": "USD",
         ...     "pv": 1000.0,
-        ...     "price_pct": 100.0,
+        ...     "clean_price_pct": 100.0,
+        ...     "dirty_price_pct": 100.0,
+        ...     "accrued": 0.0,
         ...     "factor": 1.0,
         ...     "wal": 3.0,
+        ...     "ytm": 0.05,
         ...     "z_spread_bp": 0.0,
         ...     "cs01": -1.0,
         ...     "spread_duration": 3.0,
         ...     "spread_convexity": 12.0,
-        ...     "modified_duration": 3.0,
-        ...     "convexity": 12.0,
+        ...     "effective_duration": 3.0,
+        ...     "effective_convexity": 12.0,
         ...     "target_price_pct": 100.0,
         ... }
         >>> metrics = TrancheMetrics.from_json(json.dumps(payload))
@@ -33367,13 +33376,13 @@ class TrancheMetrics:
     @property
     def currency(self) -> str:
         """
-        ISO-4217 code of the currency ``pv`` and ``cs01`` are denominated in.
-        Empty when decoded from a legacy payload that predates this field.
+        ISO-4217 code of the currency ``pv``, ``accrued`` and ``cs01`` are
+        denominated in.
 
         Returns
         -------
         str
-            The ISO-4217 currency code, or an empty string for legacy payloads.
+            The ISO-4217 currency code.
 
         Notes
         -----
@@ -33398,15 +33407,48 @@ class TrancheMetrics:
         ...
 
     @property
-    def price_pct(self) -> float:
+    def clean_price_pct(self) -> float:
         """
-        Model clean price, as a percentage of the tranche's current balance
-        (the factor-adjusted secondary-market quote basis).
+        Model clean settlement price, as a percentage of the tranche's current
+        balance (the factor-adjusted secondary-market quote basis).
 
         Returns
         -------
         float
-            The model price.
+            The model clean price.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def dirty_price_pct(self) -> float:
+        """
+        Model dirty settlement price (clean plus accrued), as a percentage of
+        the tranche's current balance.
+
+        Returns
+        -------
+        float
+            The model dirty price.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def accrued(self) -> float:
+        """
+        Accrued coupon at buyer settlement, in ``currency`` units.
+
+        Returns
+        -------
+        float
+            The accrued interest.
 
         Notes
         -----
@@ -33418,7 +33460,7 @@ class TrancheMetrics:
     def factor(self) -> float:
         """
         Pool factor of the note: current balance over original balance, so a
-        price on original face is ``price_pct * factor``.
+        price on original face is ``clean_price_pct * factor``.
 
         Returns
         -------
@@ -33441,6 +33483,24 @@ class TrancheMetrics:
         -------
         float
             The weighted-average life.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def ytm(self) -> float | None:
+        """
+        Decimal yield reproducing the ``target_price_pct`` dirty value,
+        compounded at the note's coupon frequency with time in the note's own
+        day count (a par note yields its coupon).
+
+        Returns
+        -------
+        float | None
+            ``None`` for an impaired note.
 
         Notes
         -----
@@ -33515,7 +33575,7 @@ class TrancheMetrics:
         ...
 
     @property
-    def modified_duration(self) -> float:
+    def effective_duration(self) -> float:
         """
         Effective (rate) duration of the tranche.
 
@@ -33534,7 +33594,7 @@ class TrancheMetrics:
         ...
 
     @property
-    def convexity(self) -> float:
+    def effective_convexity(self) -> float:
         """
         Effective convexity of the tranche.
 
@@ -33542,7 +33602,7 @@ class TrancheMetrics:
         -------
         float
             Years squared, from the same ±1 bp re-projection as
-            ``modified_duration``.
+            ``effective_duration``.
 
         Notes
         -----
@@ -33553,8 +33613,8 @@ class TrancheMetrics:
     @property
     def target_price_pct(self) -> float:
         """
-        Price the z-spread/CS01 were solved against, as a percentage of
-        current balance.
+        Price the yield, z-spread and CS01 were solved against, as a
+        percentage of current balance.
 
         Returns
         -------
@@ -33633,16 +33693,37 @@ class TrancheMetrics:
         """
         ...
 
+    @property
+    def metrics(self) -> dict[str, float]:
+        """
+        Requested registry metrics valued on this note.
+
+        Returns
+        -------
+        dict[str, float]
+            Keyed by metric id; empty when none were requested. Every reprice
+            values this tranche, so tranche sensitivities sum to the deal's.
+            Units follow each metric.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export as a single-row pandas DataFrame.
 
-        Columns: ``tranche_id``, ``currency``, ``pv``, ``price_pct``, ``factor``, ``wal``,
+        Columns: ``tranche_id``, ``currency``, ``pv``, ``clean_price_pct``,
+        ``dirty_price_pct``, ``accrued``, ``factor``, ``wal``, ``ytm``,
         ``z_spread_bp``, ``cs01``, ``spread_duration``, ``spread_convexity``,
-        ``modified_duration``, ``convexity``, ``target_price_pct``, ``wal_to_call``,
-        ``z_spread_to_call_bp``, ``dm_to_call_bp``, ``dm_bp`` -- the same fields and
-        units as the properties of the same name (the ``*_to_call`` columns are
-        ``NaN`` without a call, ``dm_bp`` for fixed-rate tranches).
+        ``effective_duration``, ``effective_convexity``, ``target_price_pct``,
+        ``wal_to_call``, ``z_spread_to_call_bp``, ``dm_to_call_bp``, ``dm_bp`` --
+        the same fields and units as the properties of the same name (``ytm`` is
+        ``NaN`` for an impaired note, the ``*_to_call`` columns without a call,
+        ``dm_bp`` for fixed-rate tranches). Requested registry metrics stay in
+        :attr:`metrics`.
 
         Returns
         -------
@@ -33987,8 +34068,14 @@ def structured_credit_tranche_metrics(
     market: MarketContext | str,
     as_of: datetime.date | str,
     market_price_pct: float | None = None,
+    metrics: list[str] | None = None,
 ) -> TrancheMetrics:
-    """Summary risk/pricing metrics for a tranche. Returns a ``TrancheMetrics``.
+    """Per-tranche valuation, yield, spread and risk metrics. Returns a ``TrancheMetrics``.
+
+    The one per-note analytics entry point: prices, accrued, yield, spreads
+    and durations come from the tranche's own to-maturity cashflows, and
+    ``metrics`` adds registry metrics valued on the note so tranche
+    sensitivities sum to the deal's.
 
     Parameters
     ----------
@@ -34006,6 +34093,10 @@ def structured_credit_tranche_metrics(
         Clean settlement price as a percentage of current balance. When omitted,
         the deal's market quote is used, or its model clean settlement price
         if no quote is supplied. PV remains measured at valuation.
+    metrics : list[str] or None, optional
+        Registry metric ids (for example ``"dv01"``, ``"default01"``) to value
+        on this note; returned in :attr:`TrancheMetrics.metrics`. Omitted or
+        empty computes none.
 
     Returns
     -------
@@ -34019,7 +34110,8 @@ def structured_credit_tranche_metrics(
         If ``tranche_id`` is not part of the deal.
     ValueError
         If the instrument JSON is malformed, the deal fails validation, the
-        tranche id is not part of the deal, or required market data is missing.
+        tranche id is not part of the deal, required market data is missing, or a
+        ``metrics`` id is unknown.
 
     Examples
     --------

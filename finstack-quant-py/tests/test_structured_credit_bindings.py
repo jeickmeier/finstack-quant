@@ -120,6 +120,23 @@ def test_tranche_metrics_happy_path_uses_model_price() -> None:
     assert math.isfinite(metrics.pv)
     assert metrics.pv > 0.0
     assert metrics.z_spread_bp == pytest.approx(0.0, abs=1e-4)
+    assert metrics.ytm is not None
+    assert metrics.accrued >= 0.0
+    assert metrics.dirty_price_pct >= metrics.clean_price_pct
+    assert metrics.metrics == {}
+
+
+def test_tranche_metrics_values_requested_registry_metrics_on_the_note() -> None:
+    """``metrics`` adds registry metrics valued on the tranche; unknown ids raise."""
+    metrics = instruments.structured_credit_tranche_metrics(
+        _valid_deal_json(), "CLONOTES-A", _market(), "2024-01-01", metrics=["dv01"]
+    )
+    assert set(metrics.metrics) == {"dv01"}
+    assert math.isfinite(metrics.metrics["dv01"])
+    with pytest.raises(ValueError, match="Unknown metric 'not_a_metric'"):
+        instruments.structured_credit_tranche_metrics(
+            _valid_deal_json(), "CLONOTES-A", _market(), "2024-01-01", metrics=["not_a_metric"]
+        )
 
 
 def test_tranche_metrics_returns_typed_wrapper() -> None:
@@ -149,7 +166,7 @@ def test_tranche_oas_returns_typed_wrapper() -> None:
     # inside its bracket; this test is about the return type, not the level.
     model_price_pct = instruments.structured_credit_tranche_metrics(
         deal_json, "CLONOTES-A", market, "2024-01-01"
-    ).price_pct
+    ).clean_price_pct
 
     result = instruments.structured_credit_tranche_oas(
         deal_json,

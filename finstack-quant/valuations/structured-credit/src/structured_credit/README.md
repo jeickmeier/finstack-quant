@@ -48,7 +48,7 @@ There is **no `prelude` module** — import the names you need directly.
 | `run_simulation` | Deterministic projection entry point (per-tranche cashflows). |
 | `execute_waterfall`, `WaterfallContext`, `WaterfallDistribution` | Waterfall execution. |
 | `CoverageTest`, `TestContext`, `TestResult` | Coverage-test evaluation. |
-| `calculate_tranche_metrics`, `TrancheMetrics`, `scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | Tranche summary (price, WAL, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters) and scenario grids (one projection per cell, clean settlement price per current face). |
+| `calculate_tranche_metrics`, `TrancheMetrics`, `scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | The one per-tranche API (clean/dirty price, accrued, WAL, yield, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters, plus requested registry metrics valued on the note) and scenario grids (one projection per cell, clean settlement price per current face). |
 | `calculate_tranche_wal`, `_duration`, `_convexity`, `_spread_convexity`, `_z_spread`, `_discount_margin`, `_oas` (+ `OasConfig`, `OasResult`), `_cs01`, `_breakeven_cdr` | Individual tranche analytics, the same functions the Python/WASM `structured_credit_tranche_*` entry points wrap. |
 | `clamped_cpr_to_smm`, `clamped_smm_to_cpr`, `clamped_cdr_to_mdr`, `clamped_mdr_to_cdr`, `psa_to_cpr` | Rate conversions. |
 | `validate_tiers`, `ValidationError` | Waterfall validation. |
@@ -163,6 +163,7 @@ against the path's fair spread; see
 ## Valuation
 
 ```rust
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::calculate_tranche_metrics;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::metrics::MetricId;
@@ -180,11 +181,15 @@ let result = deal.price_with_metrics(
 
 // Per-tranche.
 let tranche_pv = deal.value_tranche("CLASS_A", &context, as_of)?;
-let tranche_valuation = deal.value_tranche_with_metrics(
+// Prices, yield, spreads and durations of one note, plus registry metrics
+// (DV01, Default01, ...) valued on that note.
+let class_a = calculate_tranche_metrics(
+    &deal,
     "CLASS_A",
     &context,
     as_of,
-    &[MetricId::WAL, MetricId::ZSpread],
+    None,
+    &[MetricId::Dv01, MetricId::Default01],
 )?;
 ```
 
@@ -754,10 +759,10 @@ Registered for `InstrumentType::StructuredCredit`:
 `Theta` is registered universally by `metrics::standard_registry()`.
 
 **Price basis**: note prices, quotes and spread solves are per CURRENT face
-(`Tranche::current_balance`); `TrancheMetrics::factor` and
-`TrancheValuation::factor` report `current / original`, and the deal-level
-notional is the sum of current balances. A note paid down to factor 0.5 that is
-worth par prints `price_pct ≈ 100`, not 50, and a desk quote of 99.0 solves a
+(`Tranche::current_balance`); `TrancheMetrics::factor` reports
+`current / original`, and the deal-level notional is the sum of current
+balances. A note paid down to factor 0.5 that is worth par prints
+`clean_price_pct ≈ 100`, not 50, and a desk quote of 99.0 solves a
 sensible spread on a seasoned trade.
 
 **Metric time basis**: every structured-credit risk metric measures time on
@@ -766,14 +771,14 @@ so duration and convexity are quoted
 against the same yield unit the bump metrics define their shocks in. Do not
 introduce a metric on the discount curve's own day count.
 
-**Yield convention**: a note's `ytm` (`TrancheValuation::ytm`, the `Ytm`
+**Yield convention**: a note's `ytm` (`TrancheMetrics::ytm`, the `Ytm`
 metric) compounds at the note's coupon frequency and measures time in the
 note's own day count, so a par 5% quarterly 30/360 note yields 5.00%; the
 `valuations.structured_credit.ytm.v1` extension's `compounding` overrides the
 frequency. An impaired note (no current face, or fully written down in the
 projection) prices at zero with `ytm: None` and zero spreads instead of
-failing the solves. `TrancheMetrics::modified_duration` / `convexity` are
-EFFECTIVE: the note is re-projected with every discount and forward curve
+failing the solves. `TrancheMetrics::effective_duration` /
+`effective_convexity` are EFFECTIVE: the note is re-projected with every discount and forward curve
 bumped ±1 bp, so a floater's resets shorten its duration while
 `spread_duration` / `spread_convexity` keep the spread-DV01 life; `dm_bp` is
 the floater's discount margin to maturity at `target_price_pct`.

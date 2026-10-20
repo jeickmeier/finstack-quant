@@ -23721,29 +23721,33 @@ export interface ValuationInstrumentsNamespace {
     grid: string
   ): ScenarioTable;
   /**
-   * Per-tranche risk/spread metrics (PV, price, WAL, z-spread, CS01, spread/
-   * modified duration, convexity) computed from one tranche's own cashflows.
+   * Per-tranche valuation, yield, spread and risk metrics computed from one
+   * tranche's own cashflows — the one per-note analytics entry point.
    *
    * `marketPricePct`, when provided, is the quoted clean price (% of CURRENT balance)
-   * the z-spread and CS01 are solved against; otherwise the tranche's own model
-   * price is used (zero z-spread). Returns a typed `TrancheMetrics` object —
-   * a plain object with the same snake_case fields Python exposes through its
-   * typed `TrancheMetrics` wrapper. Pass it to `JSON.stringify` if a wire
-   * string is needed.
-   * @returns Typed `TrancheMetrics` object (PV, price, WAL, z-spread, CS01, duration, convexity).
+   * the yield, z-spread and CS01 are solved against; otherwise the deal quote,
+   * or the tranche's own model price (zero z-spread). `metrics` lists registry
+   * metric ids (`"dv01"`, `"default01"`, …) valued on this note and returned
+   * in `metrics`, so tranche sensitivities sum to the deal's. Returns a typed
+   * `TrancheMetrics` object — a plain object with the same snake_case fields
+   * Python exposes through its typed `TrancheMetrics` wrapper. Pass it to
+   * `JSON.stringify` if a wire string is needed.
+   * @returns Typed `TrancheMetrics` object (PV, clean/dirty price, accrued, WAL, yield, z-spread, CS01, effective duration and convexity, requested registry metrics).
    * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param marketPricePct - Optional clean settlement quote as a percentage of CURRENT balance; omit to use the deal quote, or its model clean price when no quote is supplied.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.
+   * @param metrics - Optional registry metric ids to value on this note; omit or pass an empty array for none.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON is malformed; a metric id is unknown; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.
    */
   structuredCreditTrancheMetrics(
     instrumentJson: JsonInput,
     trancheId: string,
     marketJson: JsonInput,
     asOf: string,
-    marketPricePct?: number | null
+    marketPricePct?: number | null,
+    metrics?: string[] | null
   ): TrancheMetrics;
   /**
    * Fluent `BondBuilder` class (see `BondBuilderConstructor`).

@@ -19,9 +19,8 @@ and ordinary Rust callers should stay on `price_with_metrics` /
 - `StructuredCredit::price_stochastic` / `price_stochastic_with_mode` — covered
   by `ModelKey::StructuredCreditStochastic` (`StructuredCreditStochasticPricer`
   already calls `price_stochastic_base`).
-- `StructuredCredit::value_tranche` / `value_tranche_with_metrics` — per-tranche
-  convenience for tests and scenario metrics; deal-level PV still goes through
-  the registry.
+- `StructuredCredit::value_tranche` and `calculate_tranche_metrics` — per-tranche
+  valuation and analytics; deal-level PV still goes through the registry.
 - `Bond::price_merton_mc` — covered by `ModelKey::MertonMc`.
 
 Those methods run their own lifecycle and return typed result structs, not a
