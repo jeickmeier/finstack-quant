@@ -243,8 +243,8 @@
       "name": "statements-workbench",
       "type": "registry:block",
       "title": "Statements workbench",
-      "description": "Financial statements workbench: inline editing, forecasts, roll forward, calculated metrics and checks.",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. The schema editor and JSON import are in Advanced. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "description": "Financial statements workbench: inline editing, forecasts, scenarios, annual roll-up, roll forward, calculated metrics and checks.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "blocks/statements-workbench/statements-workbench.tsx",
@@ -260,6 +260,16 @@
           "path": "blocks/statements-workbench/metric-editor.tsx",
           "type": "registry:block",
           "target": "components/finstack/statements/blocks/statements-workbench/metric-editor.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/scenario-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/scenario-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/rollup.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/rollup.tsx"
         }
       ],
       "registryDependencies": [

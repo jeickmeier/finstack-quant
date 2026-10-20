@@ -4032,6 +4032,7 @@
       "statementResultGetOr",
       "statementResultGetScalar",
       "statementResultNodeIds",
+      "statementResultRollup",
       "statementResultToTableLong",
       "statementResultToTableWide",
       "validateCapitalStructureSpecJson",
@@ -4161,6 +4162,9 @@
     "kind": "function"
   },
   "statements.statementResultAllPeriods": {
+    "kind": "function"
+  },
+  "statements.statementResultRollup": {
     "kind": "function"
   },
   "statements.statementResultGetNode": {
@@ -4355,6 +4359,7 @@
       "evaluateDcf",
       "evaluateLbo",
       "evaluateScenarioSet",
+      "evaluateScenarioSetWithMarket",
       "explainFormula",
       "explainFormulaText",
       "explanationToText",
@@ -4429,6 +4434,9 @@
     "kind": "function"
   },
   "statements_analytics.evaluateScenarioSet": {
+    "kind": "function"
+  },
+  "statements_analytics.evaluateScenarioSetWithMarket": {
     "kind": "function"
   },
   "statements_analytics.scenarioComparisonTable": {

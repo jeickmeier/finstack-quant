@@ -188,6 +188,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "evaluate_dcf",
             "evaluate_lbo",
             "evaluate_scenario_set",
+            "evaluate_scenario_set_with_market",
             "explain_formula",
             "explain_formula_text",
             "generate_tornado_entries",

@@ -189,9 +189,13 @@ reports debt coupon accrual; derivative accrual valuation is outside this contra
 Placeholder option schedules are rejected because their contingent payouts are
 not modeled.
 
-`cs.*` requires market data, so these models must be evaluated with
-`Evaluator::evaluate_with_market(&model, &market_ctx, as_of)`; plain `evaluate`
-cannot resolve them.
+Plain `Evaluator::evaluate` evaluates the capital structure from an empty
+market as of the first period's start, which serves fixed-rate debt: contractual
+coupons, amortization and balances need no curves. Instruments whose cashflows
+need market data (floating coupons, swaps, caps, swaptions) fail there with a
+missing-data error naming the instrument and must be evaluated with
+`Evaluator::evaluate_with_market(&model, &market_ctx, as_of)`, which also hides
+actuals not yet available at `as_of`.
 
 Rust callers using `execute_waterfall` directly can supply dated principal
 claims through `CapitalStructureState::set_period_principal_flows`. Each
@@ -226,7 +230,10 @@ Built-ins: `BalanceSheetArticulation`, `RetainedEarningsReconciliation`,
 `CashReconciliation`, `MissingValueCheck`, `NonFiniteCheck`,
 `SignConventionCheck`. `FormulaCheckSpec` evaluates an arbitrary DSL predicate per
 period. Findings carry `Severity`, `CheckCategory`, `PeriodScope`, and a
-`Materiality` tolerance.
+`Materiality` tolerance. A formula-check period whose same-period input is
+missing or non-finite, or whose formula consumes a non-finite value (a `lag`
+before the first period), reports insufficient data as a warning instead of
+failing; a division by zero over finite inputs still fails.
 
 Identity checks treat a missing operand and a non-finite operand the same way —
 both skip with a warning rather than passing, because `NaN > tolerance` is
@@ -254,6 +261,13 @@ folds the adjusted series back into a `StatementResult` as a new node.
 `cs_cashflows`, an optional `check_report`, and `meta: EvalStats` (timings,
 graph size, numeric mode, parallel flag, warnings). Accessors: `get`,
 `get_money`, `get_scalar`, `get_node`, `get_or`, `all_periods`.
+
+`rollup(&model, &RollupSpec)` rolls results up to a coarser frequency
+(monthly or quarterly into quarterly, semi-annual or annual, or semi-annual into
+annual). Nodes sum by
+default (flows); list balances and trailing metrics as `period_end` and ratios
+as `formula`, which re-evaluates the formula on the rolled-up values. Every
+target period must be complete.
 
 Tabular export returns `finstack_quant_core::table::TableEnvelope`:
 

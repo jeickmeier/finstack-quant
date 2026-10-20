@@ -31353,18 +31353,22 @@ export interface Evaluator extends WasmOwned {
    * Twin of Python `Evaluator.evaluate` (Rust `Evaluator::evaluate`).
    * Non-finite node values and warning values use the canonical strings
    * `"nan"`, `"inf"` and `"-inf"`, so a `JSON.stringify`/parse round trip
-   * preserves missing-data semantics.
+   * preserves missing-data semantics. A capital structure is evaluated
+   * from an empty market as of the first period's start, so fixed-rate
+   * debt yields `cs_cashflows`; instruments that need market data need
+   * `evaluateWithMarket`.
    * @param model - `FinancialModelSpec` to evaluate (object or JSON).
-   * @returns `StatementResult` plain object: node values per period, value types, evaluation metadata and the optional check report.
-   * @throws Error with kind `validation` if the model is malformed, fails semantic validation, or a formula fails to evaluate; kind `not_found` if a formula references a missing node; kind `computation` for a dependency cycle or a capital-structure failure.
+   * @returns `StatementResult` plain object: node values per period, value types, evaluation metadata, capital-structure cashflows and the optional check report.
+   * @throws Error with kind `validation` if the model is malformed, fails semantic validation, or a formula fails to evaluate; kind `not_found` if a formula references a missing node or a capital-structure instrument needs market data; kind `computation` for a dependency cycle or a capital-structure failure.
    */
   evaluate(model: JsonInput): StatementResult;
   /**
    * Evaluate a model against a market context as of a valuation date.
    *
    * Twin of Python `Evaluator.evaluate_with_market` (Rust
-   * `Evaluator::evaluate_with_market`). Required for models with a capital
-   * structure, whose instruments are priced from the market.
+   * `Evaluator::evaluate_with_market`). Required when capital-structure
+   * instruments need market data (floating coupons, swaps, caps) or
+   * explicit values need an as-of cutoff.
    * @param model - `FinancialModelSpec` to evaluate (object or JSON).
    * @param market - `MarketContext` state supplying curves, quotes and FX (object or JSON).
    * @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility. An actual whose availability date falls after `asOf` is hidden, so the node falls back to its forecast or formula, and a value-only node then fails.
@@ -32243,6 +32247,26 @@ export interface StatementsNamespace {
     resultJson: StatementResult | string,
     nodeId: string
   ): [string, number][];
+  /**
+   * Roll a statement result up to a coarser frequency, such as quarterly to annual.
+   *
+   * Free-function twin of Python `StatementResult.rollup` (Rust
+   * `StatementResult::rollup`). Each target period combines its source
+   * periods node by node: summed by default (flows), the last source value
+   * for `period_end` nodes (balances, LTM metrics), and the node's formula
+   * re-evaluated on the rolled-up values for `formula` nodes (ratios). Every
+   * target period must be complete.
+   * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
+   * @param model - The `FinancialModelSpec` the result was evaluated from (object or JSON); it supplies the period dates and the formulas of `formula` nodes.
+   * @param spec - `RollupSpec`: target `frequency` (`"quarterly"`, `"semi_annual"` or `"annual"`) and per-node `methods` (`"sum"` default, `"period_end"`, `"formula"`) (object or JSON).
+   * @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), without `node_sources`, capital-structure cashflows or a check report.
+   * @throws Error - Throws with kind `validation` if an input is malformed, the target frequency is not a whole multiple of the model's, a target period is incomplete, a method names an unknown node, a `formula` node has no formula or reads `cs.*` values, or a re-evaluated formula fails.
+   */
+  statementResultRollup(
+    resultJson: StatementResult | string,
+    model: JsonInput,
+    spec: generated.statements.RollupSpec | string
+  ): StatementResult;
   /**
    * Period-to-value map of one node.
    *
@@ -33224,13 +33248,39 @@ export interface StatementsAnalyticsNamespace {
    * Evaluate all scenarios in a scenario set against a base model.
    *
    * Returns a structured JavaScript object mapping scenario names to their
-   * statement results.
+   * statement results. Like `Evaluator.evaluate`, a capital structure is
+   * evaluated from an empty market, which serves fixed-rate instruments; use
+   * `evaluateScenarioSetWithMarket` for instruments that need market data.
+   * A scenario's `forecast_overrides` replace whole node forecast specs.
    * @returns Statement results keyed by scenario name.
    * @param modelJson - Financial-model specification JSON.
    * @param scenarioSetJson - Scenario-set JSON keyed by scenario name.
-   * @throws Error - Rejects malformed model or scenario-set JSON, an empty scenario set, invalid parent chains, overrides of missing nodes, failure to evaluate any scenario, or failure to serialize the result map to JavaScript.
+   * @throws Error - Rejects malformed model or scenario-set JSON, an empty scenario set, invalid parent chains, overrides of missing nodes, invalid forecast overrides, a capital-structure instrument needing market data (kind `not_found`), failure to evaluate any scenario, or failure to serialize the result map to JavaScript.
    */
   evaluateScenarioSet(modelJson: JsonInput, scenarioSetJson: JsonInput): ScenarioResults;
+  /**
+   * Evaluate all scenarios in a scenario set against a market as of a date.
+   *
+   * Twin of Python `evaluate_scenario_set_with_market` (Rust
+   * `ScenarioSet::evaluate_all_with_market`). Each scenario is evaluated like
+   * `Evaluator.evaluateWithMarket`: capital-structure instruments are priced
+   * from `market` as of `asOf` (floating coupons, swaps, caps), so every result
+   * carries `cs_cashflows`, and explicit actuals not yet available at `asOf`
+   * are hidden. `evaluateScenarioSet` evaluates the capital structure from an
+   * empty market, which serves fixed-rate instruments only.
+   * @param modelJson - Financial-model specification JSON.
+   * @param scenarioSetJson - Scenario-set JSON keyed by scenario name.
+   * @param market - `MarketContext` state supplying curves, fixings and FX (object or JSON), shared by every scenario.
+   * @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility.
+   * @returns Map of scenario name to `StatementResult` plain object.
+   * @throws Error - Rejects malformed model, scenario-set or market input, an `asOf` that is not an ISO date, an empty scenario set, invalid parent chains, overrides of missing or incompatible nodes, invalid forecast overrides, an instrument needing market data `market` lacks (kind `not_found`), or a failure to evaluate any scenario.
+   */
+  evaluateScenarioSetWithMarket(
+    modelJson: JsonInput,
+    scenarioSetJson: JsonInput,
+    market: JsonInput,
+    asOf: string
+  ): ScenarioResults;
   /**
    * Scenario comparison table with a `<scenario>_vs_<baseline>_frac` column per non-baseline scenario (twin of Python `ScenarioResults.to_comparison_table`). The baseline is `"base"` when present, otherwise the first scenario.
    * @param scenarioResultsJson - The scenario map returned by `evaluateScenarioSet` (object or JSON).

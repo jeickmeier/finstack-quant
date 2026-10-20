@@ -1314,6 +1314,7 @@ public = [
     "PaymentClassSpec",
     "PikToggleSpec",
     "Registry",
+    "RollupSpec",
     "StatementResult",
     "WaterfallSpec",
     "merge_into_results",
@@ -1462,6 +1463,7 @@ public = [
     "evaluate_dcf",
     "evaluate_lbo",
     "evaluate_scenario_set",
+    "evaluate_scenario_set_with_market",
     "explain_formula",
     "explain_formula_text",
     "generate_tornado_entries",
@@ -2104,7 +2106,7 @@ js = "schema"
 
 [parity.modules."finstack_quant.statements"]
 js = "statements"
-types = { Adjustment = "Adjustment", AppliedAdjustment = "AppliedAdjustment", CapitalStructureCashflows = "CapitalStructureCashflows", CheckConfig = "CheckConfig", CheckFinding = "CheckFinding", CheckReport = "CheckReport", CheckSuiteSpec = "CheckSuiteSpec", EcfSweepSpec = "EcfSweepSpec", FinancialModelSpec = "FinancialModelSpec", ForecastMethod = "ForecastMethod", ForecastSpec = "ForecastSpec", FormulaCheckSpec = "FormulaCheckSpec", MetricDefinition = "MetricDefinition", MonteCarloConfig = "MonteCarloConfig", MonteCarloResults = "MonteCarloResults", NodeId = "Id", NodeSpec = "NodeSpec", NodeType = "NodeType", NormalizationConfig = "NormalizationConfig", NormalizationResult = "NormalizationResult", NumericMode = "StatementNumericMode", PaymentClassSpec = "PaymentClassSpec", PikToggleSpec = "PikToggleSpec", StatementResult = "StatementResult", WaterfallSpec = "WaterfallSpec" }
+types = { Adjustment = "Adjustment", AppliedAdjustment = "AppliedAdjustment", CapitalStructureCashflows = "CapitalStructureCashflows", CheckConfig = "CheckConfig", CheckFinding = "CheckFinding", CheckReport = "CheckReport", CheckSuiteSpec = "CheckSuiteSpec", EcfSweepSpec = "EcfSweepSpec", FinancialModelSpec = "FinancialModelSpec", ForecastMethod = "ForecastMethod", ForecastSpec = "ForecastSpec", FormulaCheckSpec = "FormulaCheckSpec", MetricDefinition = "MetricDefinition", MonteCarloConfig = "MonteCarloConfig", MonteCarloResults = "MonteCarloResults", NodeId = "Id", NodeSpec = "NodeSpec", NodeType = "NodeType", NormalizationConfig = "NormalizationConfig", NormalizationResult = "NormalizationResult", NumericMode = "StatementNumericMode", PaymentClassSpec = "PaymentClassSpec", PikToggleSpec = "PikToggleSpec", RollupSpec = "RollupSpec", StatementResult = "StatementResult", WaterfallSpec = "WaterfallSpec" }
 
 [parity.modules."finstack_quant.statements.schema"]
 js = "statements.schema"
@@ -2425,6 +2427,7 @@ statementResultGetMoney = "free-function twin of Python StatementResult.get_mone
 statementResultGetScalar = "free-function twin of Python StatementResult.get_scalar (WASM data types are plain objects)"
 statementResultGetOr = "free-function twin of Python StatementResult.get_or (WASM data types are plain objects)"
 statementResultAllPeriods = "free-function twin of Python StatementResult.all_periods (WASM data types are plain objects)"
+statementResultRollup = "free-function twin of Python StatementResult.rollup (WASM data types are plain objects)"
 statementResultGetNode = "free-function twin of Python StatementResult.get_node (WASM data types are plain objects)"
 statementResultNodeIds = "free-function twin of Python StatementResult.node_ids (WASM data types are plain objects)"
 financialModelHasNode = "free-function twin of Python FinancialModelSpec.has_node (WASM data types are plain objects)"
@@ -2929,7 +2932,7 @@ renames = { add_adjustment = { js = "statements.normalizationConfigAddAdjustment
 renames = { validate = { js = "statements.validatePikToggleSpecJson", reason = "WASM specs are plain objects; the Rust PikToggleSpec::validate method runs inside the JSON validation function" } }
 
 [parity.members."finstack_quant.statements.StatementResult"]
-renames = { get = { js = "statements.statementResultGet", reason = "WASM statement results are plain objects; the Rust StatementResult::get method is a free function taking the object" }, get_money = { js = "statements.statementResultGetMoney", reason = "WASM statement results are plain objects; the Rust StatementResult::get_money method is a free function taking the object" }, get_scalar = { js = "statements.statementResultGetScalar", reason = "WASM statement results are plain objects; the Rust StatementResult::get_scalar method is a free function taking the object" }, get_or = { js = "statements.statementResultGetOr", reason = "WASM statement results are plain objects; the Rust StatementResult::get_or method is a free function taking the object" }, all_periods = { js = "statements.statementResultAllPeriods", reason = "WASM statement results are plain objects; the Rust StatementResult::all_periods method is a free function taking the object" }, get_node = { js = "statements.statementResultGetNode", reason = "WASM statement results are plain objects; the Rust StatementResult::get_node method is a free function taking the object" }, node_ids = { js = "statements.statementResultNodeIds", reason = "WASM statement results are plain objects; the Rust StatementResult node-id accessor is a free function taking the object" }, to_dated_schedule = { js = "statements.nodeToDatedSchedule", reason = "WASM statement results are plain objects; the Rust evaluator::node_to_dated_schedule function is a free function taking the object" }, to_arrow_long = { js = "statements.statementResultToTableLong", reason = "WASM statement results are plain objects; Rust StatementResult::to_table_long returns the TableEnvelope that Python wraps as an Arrow table" }, to_arrow_wide = { js = "statements.statementResultToTableWide", reason = "WASM statement results are plain objects; Rust StatementResult::to_table_wide returns the TableEnvelope that Python wraps as an Arrow table" } }
+renames = { rollup = { js = "statements.statementResultRollup", reason = "WASM statement results are plain objects; the Rust StatementResult::rollup method is a free function taking the object" }, get = { js = "statements.statementResultGet", reason = "WASM statement results are plain objects; the Rust StatementResult::get method is a free function taking the object" }, get_money = { js = "statements.statementResultGetMoney", reason = "WASM statement results are plain objects; the Rust StatementResult::get_money method is a free function taking the object" }, get_scalar = { js = "statements.statementResultGetScalar", reason = "WASM statement results are plain objects; the Rust StatementResult::get_scalar method is a free function taking the object" }, get_or = { js = "statements.statementResultGetOr", reason = "WASM statement results are plain objects; the Rust StatementResult::get_or method is a free function taking the object" }, all_periods = { js = "statements.statementResultAllPeriods", reason = "WASM statement results are plain objects; the Rust StatementResult::all_periods method is a free function taking the object" }, get_node = { js = "statements.statementResultGetNode", reason = "WASM statement results are plain objects; the Rust StatementResult::get_node method is a free function taking the object" }, node_ids = { js = "statements.statementResultNodeIds", reason = "WASM statement results are plain objects; the Rust StatementResult node-id accessor is a free function taking the object" }, to_dated_schedule = { js = "statements.nodeToDatedSchedule", reason = "WASM statement results are plain objects; the Rust evaluator::node_to_dated_schedule function is a free function taking the object" }, to_arrow_long = { js = "statements.statementResultToTableLong", reason = "WASM statement results are plain objects; Rust StatementResult::to_table_long returns the TableEnvelope that Python wraps as an Arrow table" }, to_arrow_wide = { js = "statements.statementResultToTableWide", reason = "WASM statement results are plain objects; Rust StatementResult::to_table_wide returns the TableEnvelope that Python wraps as an Arrow table" } }
 
 [parity.members."finstack_quant.statements.WaterfallSpec"]
 renames = { validate = { js = "statements.validateWaterfallSpecJson", reason = "WASM specs are plain objects; the Rust WaterfallSpec::validate method runs inside the JSON validation function" } }
