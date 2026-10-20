@@ -1,0 +1,1019 @@
+[
+  {
+    "components": [
+      {
+        "description": null,
+        "id": "gfc_2008_rates",
+        "name": "GFC 2008 - Rates",
+        "operations": [
+          {
+            "bp": -200.0,
+            "curve_id": "USD-SOFR",
+            "curve_kind": "discount",
+            "kind": "curve_parallel_bp"
+          },
+          {
+            "curve_id": "USD-SOFR",
+            "curve_kind": "discount",
+            "kind": "curve_node_bp",
+            "match_mode": "interpolate",
+            "nodes": [
+              [
+                "2Y",
+                -50.0
+              ],
+              [
+                "5Y",
+                0.0
+              ],
+              [
+                "10Y",
+                50.0
+              ],
+              [
+                "30Y",
+                75.0
+              ]
+            ]
+          }
+        ],
+        "priority": 0,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "gfc_2008_credit",
+        "name": "GFC 2008 - Credit",
+        "operations": [
+          {
+            "bp": 300.0,
+            "curve_id": "USD-IG",
+            "curve_kind": "par_cds",
+            "kind": "curve_parallel_bp"
+          },
+          {
+            "bp": 800.0,
+            "curve_id": "USD-HY",
+            "curve_kind": "par_cds",
+            "kind": "curve_parallel_bp"
+          }
+        ],
+        "priority": 1,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "gfc_2008_equity",
+        "name": "GFC 2008 - Equity",
+        "operations": [
+          {
+            "ids": [
+              "SPX"
+            ],
+            "kind": "equity_price_pct",
+            "pct": -50.0
+          },
+          {
+            "ids": [
+              "RTY"
+            ],
+            "kind": "equity_price_pct",
+            "pct": -55.0
+          }
+        ],
+        "priority": 2,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "gfc_2008_vol",
+        "name": "GFC 2008 - Volatility",
+        "operations": [
+          {
+            "kind": "vol_surface_parallel_pct",
+            "pct": 200.0,
+            "vol_surface_id": "SPX_VOL"
+          }
+        ],
+        "priority": 3,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "gfc_2008_fx",
+        "name": "GFC 2008 - FX",
+        "operations": [
+          {
+            "base": "EUR",
+            "kind": "market_fx_pct",
+            "pct": -10.0,
+            "quote": "USD"
+          },
+          {
+            "base": "GBP",
+            "kind": "market_fx_pct",
+            "pct": -25.0,
+            "quote": "USD"
+          }
+        ],
+        "priority": 4,
+        "resolution_mode": "most_specific_wins"
+      }
+    ],
+    "metadata": {
+      "asset_classes": [
+        "rates",
+        "credit",
+        "equity",
+        "volatility",
+        "fx"
+      ],
+      "components": [
+        "gfc_2008_rates",
+        "gfc_2008_credit",
+        "gfc_2008_equity",
+        "gfc_2008_vol",
+        "gfc_2008_fx"
+      ],
+      "description": "Lehman Brothers collapse and ensuing global credit crisis. Severe flight-to-quality in rates, massive credit spread widening, equity crash, and volatility spike. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; override them via ScenarioSpecBuilder::override_curve to match your market data.",
+      "event_date": "2008-09-15",
+      "id": "gfc_2008",
+      "name": "Global Financial Crisis 2008",
+      "severity": "severe",
+      "tags": [
+        "systemic",
+        "credit",
+        "liquidity",
+        "historical"
+      ]
+    },
+    "scenario": {
+      "description": "Lehman collapse - rates rally, credit blowout, equity crash, vol spike",
+      "id": "gfc_2008",
+      "name": "Global Financial Crisis 2008",
+      "operations": [
+        {
+          "bp": -200.0,
+          "curve_id": "USD-SOFR",
+          "curve_kind": "discount",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "curve_id": "USD-SOFR",
+          "curve_kind": "discount",
+          "kind": "curve_node_bp",
+          "match_mode": "interpolate",
+          "nodes": [
+            [
+              "2Y",
+              -50.0
+            ],
+            [
+              "5Y",
+              0.0
+            ],
+            [
+              "10Y",
+              50.0
+            ],
+            [
+              "30Y",
+              75.0
+            ]
+          ]
+        },
+        {
+          "bp": 300.0,
+          "curve_id": "USD-IG",
+          "curve_kind": "par_cds",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "bp": 800.0,
+          "curve_id": "USD-HY",
+          "curve_kind": "par_cds",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "ids": [
+            "SPX"
+          ],
+          "kind": "equity_price_pct",
+          "pct": -50.0
+        },
+        {
+          "ids": [
+            "RTY"
+          ],
+          "kind": "equity_price_pct",
+          "pct": -55.0
+        },
+        {
+          "kind": "vol_surface_parallel_pct",
+          "pct": 200.0,
+          "vol_surface_id": "SPX_VOL"
+        },
+        {
+          "base": "EUR",
+          "kind": "market_fx_pct",
+          "pct": -10.0,
+          "quote": "USD"
+        },
+        {
+          "base": "GBP",
+          "kind": "market_fx_pct",
+          "pct": -25.0,
+          "quote": "USD"
+        }
+      ],
+      "priority": 0,
+      "resolution_mode": "most_specific_wins"
+    }
+  },
+  {
+    "components": [
+      {
+        "description": null,
+        "id": "covid_2020_rates",
+        "name": "COVID 2020 - Rates",
+        "operations": [
+          {
+            "bp": -150.0,
+            "curve_id": "USD-SOFR",
+            "curve_kind": "discount",
+            "kind": "curve_parallel_bp"
+          },
+          {
+            "curve_id": "USD-SOFR",
+            "curve_kind": "discount",
+            "kind": "curve_node_bp",
+            "match_mode": "interpolate",
+            "nodes": [
+              [
+                "2Y",
+                -30.0
+              ],
+              [
+                "10Y",
+                10.0
+              ],
+              [
+                "30Y",
+                20.0
+              ]
+            ]
+          }
+        ],
+        "priority": 0,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "covid_2020_credit",
+        "name": "COVID 2020 - Credit",
+        "operations": [
+          {
+            "bp": 200.0,
+            "curve_id": "USD-IG",
+            "curve_kind": "par_cds",
+            "kind": "curve_parallel_bp"
+          },
+          {
+            "bp": 600.0,
+            "curve_id": "USD-HY",
+            "curve_kind": "par_cds",
+            "kind": "curve_parallel_bp"
+          }
+        ],
+        "priority": 1,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "covid_2020_equity",
+        "name": "COVID 2020 - Equity",
+        "operations": [
+          {
+            "ids": [
+              "SPX"
+            ],
+            "kind": "equity_price_pct",
+            "pct": -34.0
+          }
+        ],
+        "priority": 2,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "covid_2020_vol",
+        "name": "COVID 2020 - Volatility",
+        "operations": [
+          {
+            "kind": "vol_surface_parallel_pct",
+            "pct": 250.0,
+            "vol_surface_id": "SPX_VOL"
+          }
+        ],
+        "priority": 3,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "covid_2020_fx",
+        "name": "COVID 2020 - FX",
+        "operations": [
+          {
+            "base": "EUR",
+            "kind": "market_fx_pct",
+            "pct": -5.0,
+            "quote": "USD"
+          },
+          {
+            "base": "BRL",
+            "kind": "market_fx_pct",
+            "pct": -15.0,
+            "quote": "USD"
+          }
+        ],
+        "priority": 4,
+        "resolution_mode": "most_specific_wins"
+      }
+    ],
+    "metadata": {
+      "asset_classes": [
+        "rates",
+        "credit",
+        "equity",
+        "volatility",
+        "fx"
+      ],
+      "components": [
+        "covid_2020_rates",
+        "covid_2020_credit",
+        "covid_2020_equity",
+        "covid_2020_vol",
+        "covid_2020_fx"
+      ],
+      "description": "Pandemic-driven market dislocation in March 2020. Emergency rate cuts, sharp credit widening, an equity crash, volatility spike, and broad USD strength. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; override them via ScenarioSpecBuilder::override_curve to match your market data.",
+      "event_date": "2020-03-16",
+      "id": "covid_2020",
+      "name": "COVID 2020 Market Shock",
+      "severity": "severe",
+      "tags": [
+        "systemic",
+        "pandemic",
+        "liquidity",
+        "historical"
+      ]
+    },
+    "scenario": {
+      "description": "Pandemic panic - emergency easing, spread widening, equity crash, vol spike",
+      "id": "covid_2020",
+      "name": "COVID 2020 Market Shock",
+      "operations": [
+        {
+          "bp": -150.0,
+          "curve_id": "USD-SOFR",
+          "curve_kind": "discount",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "curve_id": "USD-SOFR",
+          "curve_kind": "discount",
+          "kind": "curve_node_bp",
+          "match_mode": "interpolate",
+          "nodes": [
+            [
+              "2Y",
+              -30.0
+            ],
+            [
+              "10Y",
+              10.0
+            ],
+            [
+              "30Y",
+              20.0
+            ]
+          ]
+        },
+        {
+          "bp": 200.0,
+          "curve_id": "USD-IG",
+          "curve_kind": "par_cds",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "bp": 600.0,
+          "curve_id": "USD-HY",
+          "curve_kind": "par_cds",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "ids": [
+            "SPX"
+          ],
+          "kind": "equity_price_pct",
+          "pct": -34.0
+        },
+        {
+          "kind": "vol_surface_parallel_pct",
+          "pct": 250.0,
+          "vol_surface_id": "SPX_VOL"
+        },
+        {
+          "base": "EUR",
+          "kind": "market_fx_pct",
+          "pct": -5.0,
+          "quote": "USD"
+        },
+        {
+          "base": "BRL",
+          "kind": "market_fx_pct",
+          "pct": -15.0,
+          "quote": "USD"
+        }
+      ],
+      "priority": 0,
+      "resolution_mode": "most_specific_wins"
+    }
+  },
+  {
+    "components": [
+      {
+        "description": null,
+        "id": "rate_shock_2022_rates",
+        "name": "2022 Rate Shock - Rates",
+        "operations": [
+          {
+            "bp": 300.0,
+            "curve_id": "USD-SOFR",
+            "curve_kind": "discount",
+            "kind": "curve_parallel_bp"
+          }
+        ],
+        "priority": 0,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "rate_shock_2022_credit",
+        "name": "2022 Rate Shock - Credit",
+        "operations": [
+          {
+            "bp": 100.0,
+            "curve_id": "USD-IG",
+            "curve_kind": "par_cds",
+            "kind": "curve_parallel_bp"
+          },
+          {
+            "bp": 200.0,
+            "curve_id": "USD-HY",
+            "curve_kind": "par_cds",
+            "kind": "curve_parallel_bp"
+          }
+        ],
+        "priority": 1,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "rate_shock_2022_equity",
+        "name": "2022 Rate Shock - Equity",
+        "operations": [
+          {
+            "ids": [
+              "SPX"
+            ],
+            "kind": "equity_price_pct",
+            "pct": -25.0
+          },
+          {
+            "ids": [
+              "NDX"
+            ],
+            "kind": "equity_price_pct",
+            "pct": -33.0
+          }
+        ],
+        "priority": 2,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "rate_shock_2022_vol",
+        "name": "2022 Rate Shock - Volatility",
+        "operations": [
+          {
+            "kind": "vol_surface_parallel_pct",
+            "pct": 50.0,
+            "vol_surface_id": "SPX_VOL"
+          }
+        ],
+        "priority": 3,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "rate_shock_2022_fx",
+        "name": "2022 Rate Shock - FX",
+        "operations": [
+          {
+            "base": "EUR",
+            "kind": "market_fx_pct",
+            "pct": -15.0,
+            "quote": "USD"
+          }
+        ],
+        "priority": 4,
+        "resolution_mode": "most_specific_wins"
+      }
+    ],
+    "metadata": {
+      "asset_classes": [
+        "rates",
+        "credit",
+        "equity",
+        "volatility",
+        "fx"
+      ],
+      "components": [
+        "rate_shock_2022_rates",
+        "rate_shock_2022_credit",
+        "rate_shock_2022_equity",
+        "rate_shock_2022_vol",
+        "rate_shock_2022_fx"
+      ],
+      "description": "Inflation-driven 2022 hiking cycle. Sharp rate repricing, wider credit spreads, equity drawdowns, higher volatility, and a stronger USD. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; override them via ScenarioSpecBuilder::override_curve to match your market data.",
+      "event_date": "2022-06-15",
+      "id": "rate_shock_2022",
+      "name": "2022 Fed Hiking Cycle",
+      "severity": "moderate",
+      "tags": [
+        "historical",
+        "rates",
+        "inflation",
+        "systemic"
+      ]
+    },
+    "scenario": {
+      "description": "Inflation shock - rates surge, credit widens, equities fall, vol rises",
+      "id": "rate_shock_2022",
+      "name": "2022 Fed Hiking Cycle",
+      "operations": [
+        {
+          "bp": 300.0,
+          "curve_id": "USD-SOFR",
+          "curve_kind": "discount",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "bp": 100.0,
+          "curve_id": "USD-IG",
+          "curve_kind": "par_cds",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "bp": 200.0,
+          "curve_id": "USD-HY",
+          "curve_kind": "par_cds",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "ids": [
+            "SPX"
+          ],
+          "kind": "equity_price_pct",
+          "pct": -25.0
+        },
+        {
+          "ids": [
+            "NDX"
+          ],
+          "kind": "equity_price_pct",
+          "pct": -33.0
+        },
+        {
+          "kind": "vol_surface_parallel_pct",
+          "pct": 50.0,
+          "vol_surface_id": "SPX_VOL"
+        },
+        {
+          "base": "EUR",
+          "kind": "market_fx_pct",
+          "pct": -15.0,
+          "quote": "USD"
+        }
+      ],
+      "priority": 0,
+      "resolution_mode": "most_specific_wins"
+    }
+  },
+  {
+    "components": [
+      {
+        "description": null,
+        "id": "svb_2023_rates",
+        "name": "SVB 2023 - Rates",
+        "operations": [
+          {
+            "bp": -100.0,
+            "curve_id": "USD-SOFR",
+            "curve_kind": "discount",
+            "kind": "curve_parallel_bp"
+          },
+          {
+            "curve_id": "USD-SOFR",
+            "curve_kind": "discount",
+            "kind": "curve_node_bp",
+            "match_mode": "interpolate",
+            "nodes": [
+              [
+                "2Y",
+                -50.0
+              ],
+              [
+                "10Y",
+                25.0
+              ]
+            ]
+          }
+        ],
+        "priority": 0,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "svb_2023_credit",
+        "name": "SVB 2023 - Credit",
+        "operations": [
+          {
+            "attrs": {
+              "sector": "regional_banks"
+            },
+            "bp": 150.0,
+            "kind": "instrument_spread_bp_by_attr"
+          }
+        ],
+        "priority": 1,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "svb_2023_equity",
+        "name": "SVB 2023 - Equity",
+        "operations": [
+          {
+            "ids": [
+              "KRE"
+            ],
+            "kind": "equity_price_pct",
+            "pct": -20.0
+          },
+          {
+            "ids": [
+              "SPX"
+            ],
+            "kind": "equity_price_pct",
+            "pct": -5.0
+          }
+        ],
+        "priority": 2,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "svb_2023_vol",
+        "name": "SVB 2023 - Volatility",
+        "operations": [
+          {
+            "kind": "vol_surface_parallel_pct",
+            "pct": 75.0,
+            "vol_surface_id": "SPX_VOL"
+          }
+        ],
+        "priority": 3,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "svb_2023_fx",
+        "name": "SVB 2023 - FX",
+        "operations": [
+          {
+            "base": "EUR",
+            "kind": "market_fx_pct",
+            "pct": -1.0,
+            "quote": "USD"
+          }
+        ],
+        "priority": 4,
+        "resolution_mode": "most_specific_wins"
+      }
+    ],
+    "metadata": {
+      "asset_classes": [
+        "rates",
+        "credit",
+        "equity",
+        "volatility",
+        "fx"
+      ],
+      "components": [
+        "svb_2023_rates",
+        "svb_2023_credit",
+        "svb_2023_equity",
+        "svb_2023_vol",
+        "svb_2023_fx"
+      ],
+      "description": "March 2023 regional banking stress after Silicon Valley Bank failed. Front-end rates rallied, regional bank spreads widened, equities sold off, volatility rose, and the USD strengthened modestly. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; override them via ScenarioSpecBuilder::override_curve to match your market data. The credit component is an instrument-level spread shock and requires a portfolio of instruments in the execution context to take effect.",
+      "event_date": "2023-03-10",
+      "id": "svb_2023",
+      "name": "SVB / Regional Banking Crisis 2023",
+      "severity": "moderate",
+      "tags": [
+        "historical",
+        "banking",
+        "liquidity",
+        "regional"
+      ]
+    },
+    "scenario": {
+      "description": "Regional banking stress - front-end rally, bank spread widening, volatility jump",
+      "id": "svb_2023",
+      "name": "SVB / Regional Banking Crisis 2023",
+      "operations": [
+        {
+          "bp": -100.0,
+          "curve_id": "USD-SOFR",
+          "curve_kind": "discount",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "curve_id": "USD-SOFR",
+          "curve_kind": "discount",
+          "kind": "curve_node_bp",
+          "match_mode": "interpolate",
+          "nodes": [
+            [
+              "2Y",
+              -50.0
+            ],
+            [
+              "10Y",
+              25.0
+            ]
+          ]
+        },
+        {
+          "attrs": {
+            "sector": "regional_banks"
+          },
+          "bp": 150.0,
+          "kind": "instrument_spread_bp_by_attr"
+        },
+        {
+          "ids": [
+            "KRE"
+          ],
+          "kind": "equity_price_pct",
+          "pct": -20.0
+        },
+        {
+          "ids": [
+            "SPX"
+          ],
+          "kind": "equity_price_pct",
+          "pct": -5.0
+        },
+        {
+          "kind": "vol_surface_parallel_pct",
+          "pct": 75.0,
+          "vol_surface_id": "SPX_VOL"
+        },
+        {
+          "base": "EUR",
+          "kind": "market_fx_pct",
+          "pct": -1.0,
+          "quote": "USD"
+        }
+      ],
+      "priority": 0,
+      "resolution_mode": "most_specific_wins"
+    }
+  },
+  {
+    "components": [
+      {
+        "description": null,
+        "id": "ltcm_1998_rates",
+        "name": "LTCM 1998 - Rates",
+        "operations": [
+          {
+            "bp": -75.0,
+            "curve_id": "USD-SOFR",
+            "curve_kind": "discount",
+            "kind": "curve_parallel_bp"
+          },
+          {
+            "curve_id": "USD-SOFR",
+            "curve_kind": "discount",
+            "kind": "curve_node_bp",
+            "match_mode": "interpolate",
+            "nodes": [
+              [
+                "2Y",
+                -25.0
+              ],
+              [
+                "30Y",
+                50.0
+              ]
+            ]
+          },
+          {
+            "bp": 200.0,
+            "curve_id": "EM-SOVEREIGN",
+            "curve_kind": "par_cds",
+            "kind": "curve_parallel_bp"
+          }
+        ],
+        "priority": 0,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "ltcm_1998_credit",
+        "name": "LTCM 1998 - Credit",
+        "operations": [
+          {
+            "bp": 100.0,
+            "curve_id": "USD-IG",
+            "curve_kind": "par_cds",
+            "kind": "curve_parallel_bp"
+          },
+          {
+            "bp": 200.0,
+            "curve_id": "EM-CORPORATE",
+            "curve_kind": "par_cds",
+            "kind": "curve_parallel_bp"
+          }
+        ],
+        "priority": 1,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "ltcm_1998_equity",
+        "name": "LTCM 1998 - Equity",
+        "operations": [
+          {
+            "ids": [
+              "SPX"
+            ],
+            "kind": "equity_price_pct",
+            "pct": -20.0
+          }
+        ],
+        "priority": 2,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "ltcm_1998_vol",
+        "name": "LTCM 1998 - Volatility",
+        "operations": [
+          {
+            "kind": "vol_surface_parallel_pct",
+            "pct": 100.0,
+            "vol_surface_id": "SPX_VOL"
+          }
+        ],
+        "priority": 3,
+        "resolution_mode": "most_specific_wins"
+      },
+      {
+        "description": null,
+        "id": "ltcm_1998_fx",
+        "name": "LTCM 1998 - FX",
+        "operations": [
+          {
+            "base": "BRL",
+            "kind": "market_fx_pct",
+            "pct": -30.0,
+            "quote": "USD"
+          },
+          {
+            "base": "RUB",
+            "kind": "market_fx_pct",
+            "pct": -50.0,
+            "quote": "USD"
+          }
+        ],
+        "priority": 4,
+        "resolution_mode": "most_specific_wins"
+      }
+    ],
+    "metadata": {
+      "asset_classes": [
+        "rates",
+        "credit",
+        "equity",
+        "volatility",
+        "fx"
+      ],
+      "components": [
+        "ltcm_1998_rates",
+        "ltcm_1998_credit",
+        "ltcm_1998_equity",
+        "ltcm_1998_vol",
+        "ltcm_1998_fx"
+      ],
+      "description": "August 1998 LTCM crisis and Russian default. Flight-to-quality in rates, EM spread blowouts, an equity selloff, higher volatility, and sharp USD strength versus EM FX. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; override them via ScenarioSpecBuilder::override_curve to match your market data.",
+      "event_date": "1998-08-17",
+      "id": "ltcm_1998",
+      "name": "LTCM / Russian Default 1998",
+      "severity": "severe",
+      "tags": [
+        "historical",
+        "credit",
+        "liquidity",
+        "emerging_markets"
+      ]
+    },
+    "scenario": {
+      "description": "Flight to quality - rates rally, EM spread blowout, equity decline, vol spike",
+      "id": "ltcm_1998",
+      "name": "LTCM / Russian Default 1998",
+      "operations": [
+        {
+          "bp": -75.0,
+          "curve_id": "USD-SOFR",
+          "curve_kind": "discount",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "curve_id": "USD-SOFR",
+          "curve_kind": "discount",
+          "kind": "curve_node_bp",
+          "match_mode": "interpolate",
+          "nodes": [
+            [
+              "2Y",
+              -25.0
+            ],
+            [
+              "30Y",
+              50.0
+            ]
+          ]
+        },
+        {
+          "bp": 200.0,
+          "curve_id": "EM-SOVEREIGN",
+          "curve_kind": "par_cds",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "bp": 100.0,
+          "curve_id": "USD-IG",
+          "curve_kind": "par_cds",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "bp": 200.0,
+          "curve_id": "EM-CORPORATE",
+          "curve_kind": "par_cds",
+          "kind": "curve_parallel_bp"
+        },
+        {
+          "ids": [
+            "SPX"
+          ],
+          "kind": "equity_price_pct",
+          "pct": -20.0
+        },
+        {
+          "kind": "vol_surface_parallel_pct",
+          "pct": 100.0,
+          "vol_surface_id": "SPX_VOL"
+        },
+        {
+          "base": "BRL",
+          "kind": "market_fx_pct",
+          "pct": -30.0,
+          "quote": "USD"
+        },
+        {
+          "base": "RUB",
+          "kind": "market_fx_pct",
+          "pct": -50.0,
+          "quote": "USD"
+        }
+      ],
+      "priority": 0,
+      "resolution_mode": "most_specific_wins"
+    }
+  }
+]
