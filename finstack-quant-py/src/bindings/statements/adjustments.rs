@@ -521,20 +521,6 @@ fn normalize(
         .collect())
 }
 
-/// Run normalization and return compact wire JSON.
-///
-/// The JSON twin of :func:`normalize`: a JSON array of normalization
-/// results, one per period.
-#[pyfunction]
-#[pyo3(text_signature = "(results, config)")]
-fn normalize_json(results: &PyStatementResult, config: &PyNormalizationConfig) -> PyResult<String> {
-    let norm_results =
-        finstack_quant_statements::adjustments::normalize(&results.inner, &config.inner)
-            .map_err(statements_to_py)?;
-    serde_json::to_string(&norm_results)
-        .map_err(|e| serde_json_to_py(e, "failed to serialize normalization results"))
-}
-
 /// Write normalized values back into statement results as a node.
 ///
 /// Wraps Rust ``adjustments::merge_into_results``: the normalization
@@ -606,7 +592,6 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyNormalizationConfig>()?;
     m.add_class::<PyNormalizationResult>()?;
     m.add_function(pyo3::wrap_pyfunction!(normalize, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(normalize_json, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(merge_into_results, m)?)?;
     Ok(())
 }

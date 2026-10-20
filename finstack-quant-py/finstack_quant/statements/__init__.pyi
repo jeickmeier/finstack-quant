@@ -60,7 +60,6 @@ __all__ = [
     "StatementResult",
     "WaterfallSpec",
     "normalize",
-    "normalize_json",
     "parse_and_compile",
     "parse_formula",
     "schema",
@@ -4720,38 +4719,6 @@ def merge_into_results(
     >>> merged = merge_into_results(results, normalize(results, NormalizationConfig("ebitda")), "adj")
     >>> merged.get("adj", "2025Q2")
     110.0
-    """
-    ...
-
-def normalize_json(results: StatementResult, config: NormalizationConfig) -> str:
-    """Run normalization and return compact canonical JSON.
-
-    Parameters
-    ----------
-    results:
-        Evaluated statement output.
-    config:
-        Target node and adjustment definitions.
-
-    Returns
-    -------
-    str
-        JSON array encoding normalization results.
-
-    Raises
-    ------
-    ValueError
-        If normalization or serialization fails.
-
-    Examples
-    --------
-    >>> from finstack_quant.statements import Evaluator, ModelBuilder, NormalizationConfig, normalize_json
-    >>> builder = ModelBuilder("demo")
-    >>> _ = builder.periods("2025Q1..Q1")
-    >>> _ = builder.value("ebitda", [("2025Q1", 25.0)])
-    >>> result = Evaluator().evaluate(builder.build())
-    >>> '"final_value":25.0' in normalize_json(result, NormalizationConfig("ebitda"))
-    True
     """
     ...
 

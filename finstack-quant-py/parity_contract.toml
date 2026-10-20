@@ -1318,7 +1318,6 @@ public = [
     "WaterfallSpec",
     "merge_into_results",
     "normalize",
-    "normalize_json",
     "parse_and_compile",
     "parse_formula",
 ]

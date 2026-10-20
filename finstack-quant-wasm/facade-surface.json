@@ -4029,7 +4029,6 @@
       "nodeToDatedSchedule",
       "normalizationConfigAddAdjustment",
       "normalize",
-      "normalizeJson",
       "parseAndCompile",
       "parseFormula",
       "schema",
@@ -4299,9 +4298,6 @@
     "kind": "function"
   },
   "statements.normalize": {
-    "kind": "function"
-  },
-  "statements.normalizeJson": {
     "kind": "function"
   },
   "statements.mergeIntoResults": {

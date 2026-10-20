@@ -32878,19 +32878,6 @@ export interface StatementsNamespace {
     config: generated.statements.NormalizationConfig | string
   ): generated.statements.NormalizationResult[];
   /**
-   * Normalize a target metric and return the results as JSON text.
-   *
-   * JSON wire twin of `normalize` (Python `normalize_json`).
-   * @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
-   * @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
-   * @returns JSON array of `NormalizationResult` objects, one per period.
-   * @throws Error - Throws with kind `validation` if an input is malformed, the target node or a referenced node is absent from the results, the configuration is invalid, or the target and a reference node have incompatible units.
-   */
-  normalizeJson(
-    results: StatementResult | string,
-    config: generated.statements.NormalizationConfig | string
-  ): string;
-  /**
    * Write normalized values back into statement results as a node.
    *
    * Twin of Python `merge_into_results` (Rust

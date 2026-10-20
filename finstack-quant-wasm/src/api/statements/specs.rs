@@ -435,23 +435,6 @@ pub fn normalize(results: JsValue, config: JsValue) -> Result<JsValue, JsValue> 
     to_js_value(&normalized(&results, &config)?)
 }
 
-/// Normalize a target metric and return the results as JSON text.
-///
-/// JSON wire twin of [`normalize`] (Python `normalize_json`).
-/// @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
-/// @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
-/// @returns JSON array of `NormalizationResult` objects, one per period.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if an input is malformed, the target node or
-/// a referenced node is absent from the results, the configuration is
-/// invalid, or the target and a reference node have incompatible units.
-#[wasm_bindgen(js_name = normalizeJson)]
-pub fn normalize_json(results: JsValue, config: JsValue) -> Result<String, JsValue> {
-    serde_json::to_string(&normalized(&results, &config)?).map_err(to_js_err)
-}
-
 /// Write normalized values back into statement results as a node.
 ///
 /// Twin of Python `merge_into_results` (Rust

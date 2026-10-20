@@ -183,7 +183,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "WaterfallSpec",
             "merge_into_results",
             "normalize",
-            "normalize_json",
             "parse_and_compile",
             "parse_formula",
             "schema",

@@ -72,7 +72,6 @@ export const statements = {
   normalizationConfigAddAdjustment: wasm.normalizationConfigAddAdjustment,
   validateNormalizationConfigJson: wasm.validateNormalizationConfigJson,
   normalize: wasm.normalize,
-  normalizeJson: wasm.normalizeJson,
   mergeIntoResults: wasm.mergeIntoResults,
   checkSuiteSpecBuiltinCheckNames: wasm.checkSuiteSpecBuiltinCheckNames,
   checkConfigValidate: wasm.checkConfigValidate,

@@ -108,7 +108,6 @@ test('statements matches the cross-host golden', () => {
       statements.statementResultGet(builtResult, 'capex', Q2),
     ],
     normalize: statements.normalize(result, config),
-    normalize_json: JSON.parse(statements.normalizeJson(result, config)),
     forecast_specs: [
       statements.forecastSpecForwardFill(),
       statements.forecastSpecGrowth(0.05),
