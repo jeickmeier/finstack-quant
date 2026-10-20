@@ -291,7 +291,7 @@ impl_repr_html_via_dataframe!(PyVolSurface);
 /// -------
 /// >>> from finstack_quant.core.market_data import FxDeltaVolSurface
 /// >>> surface = FxDeltaVolSurface("EURUSD", [0.25, 1.0], [0.08, 0.09], [0.01, 0.015], [0.005, 0.007])
-/// >>> surface.num_expiries
+/// >>> len(surface.expiries)
 /// 2
 #[pyclass(
     name = "FxDeltaVolSurface",
@@ -398,12 +398,6 @@ impl PyFxDeltaVolSurface {
         self.inner.expiries().to_vec()
     }
 
-    /// Number of expiry pillars.
-    #[getter]
-    fn num_expiries(&self) -> usize {
-        self.inner.num_expiries()
-    }
-
     /// ATM delta-neutral straddle vols per expiry (decimal).
     #[getter]
     fn atm_vols(&self) -> Vec<f64> {
@@ -438,7 +432,7 @@ impl PyFxDeltaVolSurface {
         format!(
             "FxDeltaVolSurface(id='{}', num_expiries={}, has_10d={})",
             self.inner.id().as_str(),
-            self.inner.num_expiries(),
+            self.inner.expiries().len(),
             if self.inner.rr_10d().is_some() {
                 "True"
             } else {

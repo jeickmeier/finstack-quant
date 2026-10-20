@@ -35,9 +35,6 @@
 //! # }
 //! ```
 
-/// Lightweight storage for time series data.
-mod storage;
-
 /// Generic market primitives: scalars and ad-hoc time series.
 mod primitives;
 

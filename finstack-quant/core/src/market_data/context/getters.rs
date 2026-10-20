@@ -2,12 +2,11 @@
 
 use std::sync::Arc;
 
-use crate::market_data::dividends::DividendSchedule;
 use crate::market_data::scalars::{InflationIndex, MarketScalar, ScalarTimeSeries};
 use crate::market_data::surfaces::{FxDeltaVolSurface, VolCube, VolSurface};
 use crate::market_data::term_structures::{
-    BaseCorrelationCurve, BasisSpreadCurve, CreditIndexData, DiscountCurve, ForwardCurve,
-    HazardCurve, InflationCurve, ParametricCurve, PriceCurve, PriceCurveKind,
+    BaseCorrelationCurve, CreditIndexData, DiscountCurve, ForwardCurve, HazardCurve,
+    InflationCurve, PriceCurve, PriceCurveKind,
 };
 use crate::types::CurveId;
 use crate::FxHashMap;
@@ -191,34 +190,6 @@ impl MarketContext {
         })
     }
 
-    /// Get a basis spread curve by identifier.
-    ///
-    /// Basis spread curves store cross-currency or multi-curve spread data.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the identifier is missing or refers to a different curve type.
-    pub fn get_basis_spread(&self, id: impl AsRef<str>) -> Result<Arc<BasisSpreadCurve>> {
-        let id_str = id.as_ref();
-        self.get_curve_with_type_check(id_str, "BasisSpread", |storage| {
-            storage.basis_spread().map(Arc::clone)
-        })
-    }
-
-    /// Get a parametric curve by identifier.
-    ///
-    /// Parametric curves use Nelson-Siegel or Nelson-Siegel-Svensson models.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the identifier is missing or refers to a different curve type.
-    pub fn get_parametric(&self, id: impl AsRef<str>) -> Result<Arc<ParametricCurve>> {
-        let id_str = id.as_ref();
-        self.get_curve_with_type_check(id_str, "Parametric", |storage| {
-            storage.parametric().map(Arc::clone)
-        })
-    }
-
     /// Iterate over all stored discount curves without cloning the context.
     ///
     /// Yields `(curve_id, Arc<DiscountCurve>)` pairs in arbitrary order. Use this
@@ -366,7 +337,8 @@ impl MarketContext {
     /// #     None,
     /// #     None,
     /// # ).expect("surface should build");
-    /// # let ctx = MarketContext::new().insert_fx_delta_vol_surface(surface);
+    /// # let mut ctx = MarketContext::new();
+    /// # ctx.insert_fx_delta_vol_surface_mut(surface);
     /// let surf = ctx.get_fx_delta_vol_surface("EURUSD-DELTA-VOL")
     ///     .expect("surface should exist");
     /// assert_eq!(surf.id().as_str(), "EURUSD-DELTA-VOL");
@@ -377,15 +349,6 @@ impl MarketContext {
     /// * `id` - Identifier used when the surface was inserted.
     pub fn get_fx_delta_vol_surface(&self, id: impl AsRef<str>) -> Result<Arc<FxDeltaVolSurface>> {
         self.get_cloned(&self.fx_delta_vol_surfaces, id.as_ref())
-    }
-
-    /// Clone a dividend schedule by identifier.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the identifier is not present.
-    pub fn get_dividend_schedule(&self, id: impl AsRef<str>) -> Result<Arc<DividendSchedule>> {
-        self.get_cloned(&self.dividends, id.as_ref())
     }
 
     /// Clone a credit index aggregate by identifier.

@@ -315,13 +315,13 @@ test('core.FxDeltaVolSurface constructs from 25-delta quotes', () => {
     [0.002, 0.0025, 0.003]
   );
   assert.equal(surface.id, 'EURUSD-VOL');
-  assert.equal(surface.numExpiries, 3);
+  assert.equal(surface.expiries.length, 3);
 });
 
 test('core FX delta surface absent wings use omitted arguments, not empty arrays', () => {
   const surface = new core.FxDeltaVolSurface('EURUSD', [1], [0.1], [0], [0], undefined, undefined);
   try {
-    assert.equal(surface.numExpiries, 1);
+    assert.equal(surface.expiries.length, 1);
   } finally {
     surface.free();
   }

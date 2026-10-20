@@ -109,15 +109,6 @@ impl HierarchyNode {
         &self.curve_ids
     }
 
-    /// Collect all `CurveId`s in this subtree (this node + all descendants).
-    pub fn all_curve_ids(&self) -> Vec<CurveId> {
-        let mut ids = self.curve_ids.clone();
-        for child in self.children.values() {
-            ids.extend(child.all_curve_ids());
-        }
-        ids
-    }
-
     /// Set a tag on this node.
     pub(crate) fn set_tag(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.tags.insert(key.into(), value.into());
@@ -173,20 +164,10 @@ impl<'de> Deserialize<'de> for MarketDataHierarchy {
 }
 
 impl MarketDataHierarchy {
-    /// Create an empty hierarchy.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Start building a hierarchy with the fluent builder API.
     #[must_use]
     pub fn builder() -> HierarchyBuilder {
         HierarchyBuilder::new()
-    }
-
-    /// Root nodes of the hierarchy.
-    pub fn roots(&self) -> &IndexMap<String, HierarchyNode> {
-        &self.roots
     }
 
     /// Look up a node by path. Returns `None` if the path doesn't exist.
@@ -211,19 +192,8 @@ impl MarketDataHierarchy {
         Some(current)
     }
 
-    /// Collect all `CurveId`s across the entire hierarchy.
-    pub fn all_curve_ids(&self) -> Vec<CurveId> {
-        let mut ids = Vec::new();
-        for root in self.roots.values() {
-            ids.extend(root.all_curve_ids());
-        }
-        ids
-    }
-
-    /// Validate structural hierarchy invariants.
-    ///
-    /// This is primarily useful after performing low-level manual mutations via
-    /// `get_node_mut`, `get_or_create_child`, or `add_curve_id`.
+    /// Validate structural hierarchy invariants; run by deserialization and by
+    /// [`HierarchyBuilder::build`].
     ///
     /// A valid hierarchy has non-empty names which agree with their containing
     /// map keys, and each [`CurveId`] appears at most once across every root
@@ -234,7 +204,7 @@ impl MarketDataHierarchy {
     /// Returns an error for an empty node name, a child whose name does not
     /// match its map key, or a curve identifier assigned to more than one
     /// hierarchy path. The diagnostic identifies the conflicting paths.
-    pub fn validate(&self) -> crate::Result<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         fn visit(
             node: &HierarchyNode,
             expected_name: &str,

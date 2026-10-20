@@ -466,17 +466,6 @@ impl ParametricCurve {
         self.day_count
     }
 
-    /// Create a builder from this curve with a new ID (for rebuildable-with-id pattern).
-    pub fn to_builder_with_id(&self, id: CurveId) -> ParametricCurveBuilder {
-        ParametricCurveBuilder {
-            id,
-            base_date: Some(self.base_date),
-            day_count: self.day_count,
-            model: Some(self.model.clone()),
-            time_offset: self.time_offset,
-        }
-    }
-
     /// Roll the curve forward, retaining its source parameters and realizing
     /// the forward discount-factor ratio `D(t + h) / D(h)`.
     ///
@@ -780,11 +769,6 @@ mod tests {
             let restored: ParametricCurve =
                 serde_json::from_str(&serde_json::to_string(&rolled).unwrap()).unwrap();
             assert!((restored.df(0.5) - rolled.df(0.5)).abs() < 1e-14);
-            let rebuilt = rolled
-                .to_builder_with_id("NS-ROLL-REBUILT".into())
-                .build()
-                .unwrap();
-            assert!((rebuilt.df(0.5) - rolled.df(0.5)).abs() < 1e-14);
 
             let twice = restored.roll_forward(180).unwrap();
             let source_time = 1.0 + 180.0 / 365.0;

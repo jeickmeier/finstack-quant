@@ -258,7 +258,9 @@ fn market_context_manages_fx_and_scalars() {
         Some(Currency::USD)
     );
     assert!(ctx.get_inflation_index("US-CPI").is_ok());
-    assert!(ctx.get_dividend_schedule("AAPL-DIVS").is_ok());
+    assert!(ctx
+        .dividends_iter()
+        .any(|(id, _)| id.as_str() == "AAPL-DIVS"));
     assert!(ctx.get_credit_index("CDX").is_ok());
 
     let ids: Vec<_> = ctx
@@ -924,12 +926,12 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
         .insert(sample_forward_curve("USD-LIBOR"))
         .insert_surface(sample_vol_surface())
         .insert_vol_cube(cube)
-        .insert_fx_delta_vol_surface(fx_delta)
         .insert_price("SPOT", MarketScalar::Unitless(100.0))
         .insert_series(series_keep)
         .insert_series(series_drop)
         .insert_inflation_index(index)
         .insert_dividends(divs);
+    ctx.insert_fx_delta_vol_surface_mut(fx_delta);
 
     ctx.retain_curves_mut(|id, _| id.as_str() == "USD-OIS");
     ctx.retain_series_mut(|id, _| id.as_str() == "KEEP")
@@ -988,7 +990,7 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
     assert!(ctx.get_price("SPOT").is_err());
     assert!(ctx.get_series("KEEP").is_err());
     assert!(ctx.get_inflation_index("US-CPI").is_err());
-    assert!(ctx.get_dividend_schedule("DIVS").is_err());
+    assert!(ctx.dividends_iter().all(|(id, _)| id.as_str() != "DIVS"));
 }
 
 #[test]
@@ -1026,8 +1028,8 @@ fn market_context_getters_type_mismatch_and_not_found() {
     assert!(ctx.get_credit_index("MISSING").is_err());
     assert!(ctx.get_inflation_index("MISSING").is_err());
     assert!(ctx.get_inflation_index("MISSING").is_err());
-    assert!(ctx.get_dividend_schedule("MISSING").is_err());
-    assert!(ctx.get_dividend_schedule("MISSING").is_err());
+    assert!(ctx.dividends_iter().all(|(id, _)| id.as_str() != "MISSING"));
+    assert!(ctx.dividends_iter().all(|(id, _)| id.as_str() != "MISSING"));
 
     // Type mismatch cases (ensure the "mismatch" branches are exercised)
     assert!(ctx.get_forward("USD-OIS").is_err());
@@ -1056,7 +1058,11 @@ fn market_context_surface_and_dividends_arc_variants_preserve_identity() {
     let got_surface = ctx.get_surface("EQ-VOL").unwrap();
     assert_eq!(got_surface.id(), surface.id());
 
-    let got_divs = ctx.get_dividend_schedule("AAPL-DIVS").unwrap();
+    let got_divs = ctx
+        .dividends_iter()
+        .find(|(id, _)| id.as_str() == "AAPL-DIVS")
+        .map(|(_, schedule)| schedule)
+        .unwrap();
     assert_eq!(got_divs.get_id(), dividends.get_id());
 }
 

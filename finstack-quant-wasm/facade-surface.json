@@ -1553,7 +1553,7 @@
     "kind": "class",
     "statics": ["fromJson"],
     "methods": ["free", "toJson"],
-    "getters": ["atmVols", "bf10d", "bf25d", "expiries", "id", "numExpiries", "rr10d", "rr25d"]
+    "getters": ["atmVols", "bf10d", "bf25d", "expiries", "id", "rr10d", "rr25d"]
   },
   "core.ScalarTimeSeries": {
     "kind": "class",

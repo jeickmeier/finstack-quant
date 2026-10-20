@@ -9,7 +9,6 @@
 //! Both are integrated into the [`crate::market_data::context::MarketContext`]
 //! so downstream code can reference them by `CurveId` alongside other curves.
 
-use super::storage::TimeSeriesStorage;
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpUnits, Bumpable};
@@ -180,6 +179,80 @@ impl From<MarketScalar> for MarketScalarWire {
             MarketScalar::Unitless(value) => Self::Unitless(value),
             MarketScalar::Price(value) => Self::Price(value),
         }
+    }
+}
+
+/// Columnar date-indexed storage behind [`ScalarTimeSeries`].
+///
+/// Stores dates (days since 1970-01-01) and values in parallel arrays,
+/// sorted ascending with no duplicate dates.
+#[derive(Clone, Debug)]
+struct TimeSeriesStorage {
+    /// Dates as days since epoch (1970-01-01), sorted ascending, no duplicates
+    dates: Box<[i32]>,
+    /// Values aligned with dates
+    values: Box<[f64]>,
+}
+
+impl TimeSeriesStorage {
+    /// Create from unsorted `(days_since_epoch, value)` observations, sorting
+    /// them and rejecting empty input, non-finite values and duplicate dates.
+    fn new(mut observations: Vec<(i32, f64)>) -> Result<Self> {
+        if observations.is_empty() {
+            return Err(crate::Error::Input(InputError::TooFewPoints));
+        }
+        if observations.iter().any(|(_, value)| !value.is_finite()) {
+            return Err(crate::Error::Validation(
+                "time-series observation values must be finite".to_string(),
+            ));
+        }
+
+        observations.sort_by_key(|(date, _)| *date);
+
+        for window in observations.windows(2) {
+            if window[0].0 == window[1].0 {
+                return Err(crate::Error::Input(InputError::NonMonotonicKnots));
+            }
+        }
+
+        let (dates, values): (Vec<_>, Vec<_>) = observations.into_iter().unzip();
+
+        Ok(Self {
+            dates: dates.into_boxed_slice(),
+            values: values.into_boxed_slice(),
+        })
+    }
+
+    /// Length of series.
+    #[inline]
+    fn len(&self) -> usize {
+        self.dates.len()
+    }
+
+    /// Check if empty.
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.dates.is_empty()
+    }
+
+    /// Get all dates as a slice.
+    #[inline]
+    fn dates(&self) -> &[i32] {
+        &self.dates
+    }
+
+    /// Get all values as a slice.
+    #[inline]
+    fn values(&self) -> &[f64] {
+        &self.values
+    }
+
+    /// Iterator over (date, value) pairs.
+    fn iter(&self) -> impl Iterator<Item = (i32, f64)> + '_ {
+        self.dates
+            .iter()
+            .zip(self.values.iter())
+            .map(|(&d, &v)| (d, v))
     }
 }
 
@@ -653,6 +726,20 @@ impl Bumpable for ScalarTimeSeries {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn storage_sorts_observations() {
+        let storage = TimeSeriesStorage::new(vec![(2, 20.0), (0, 10.0), (1, 15.0), (3, 25.0)])
+            .expect("TimeSeriesStorage creation should succeed in test");
+        assert_eq!(storage.len(), 4);
+        assert_eq!(storage.dates(), &[0, 1, 2, 3]);
+        assert_eq!(storage.values(), &[10.0, 15.0, 20.0, 25.0]);
+    }
+
+    #[test]
+    fn storage_rejects_duplicate_dates() {
+        assert!(TimeSeriesStorage::new(vec![(0, 10.0), (1, 15.0), (1, 20.0)]).is_err());
+    }
 
     #[test]
     fn unitless_constructor_rejects_non_finite_values() {

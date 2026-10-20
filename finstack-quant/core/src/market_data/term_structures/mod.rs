@@ -144,13 +144,12 @@ pub use base_correlation::{
 };
 pub use basis_spread_curve::{BasisSpreadCurve, BasisSpreadCurveBuilder};
 pub use credit_index::{CreditIndexData, CreditIndexDataBuilder};
-pub use discount_curve::{
-    DiscountCurve, DiscountCurveBuilder, ValidationMode, DEFAULT_MIN_FORWARD_TENOR,
-};
+pub use discount_curve::{DiscountCurve, DiscountCurveBuilder, ValidationMode};
 pub use forward_curve::{ForwardCurve, ForwardCurveBuilder};
 pub use forward_variance::ForwardVarianceCurve;
 pub use hazard_calibration::{HazardCalibrationInput, HazardCalibrationRecipe};
-pub use hazard_curve::{HazardBumpTarget, HazardCurve, HazardCurveBuilder, ParInterp, Seniority};
+pub(crate) use hazard_curve::HazardBumpTarget;
+pub use hazard_curve::{HazardCurve, HazardCurveBuilder, ParInterp, Seniority};
 pub use inflation::{InflationCurve, InflationCurveBuilder};
 pub use parametric_curve::{NelsonSiegelModel, NsVariant, ParametricCurve, ParametricCurveBuilder};
 pub use price_curve::{PriceCurve, PriceCurveBuilder, PriceCurveKind};

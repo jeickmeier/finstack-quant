@@ -180,7 +180,7 @@ impl HazardCurve {
     }
     /// Create a curve with every model hazard rate shifted in basis-point units.
     ///
-    /// This is the hazard-curve equivalent of `DiscountCurve::with_parallel_bump`:
+    /// This is the hazard-curve equivalent of a parallel `BumpSpec::parallel_bp` shock on `DiscountCurve`:
     /// a direct intensity shock that keeps the curve ID and all credit
     /// metadata; it does not replay CDS par quotes. Stored par-spread and
     /// calibration recipes are intentionally removed because they describe

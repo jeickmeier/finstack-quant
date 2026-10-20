@@ -940,7 +940,21 @@ mod tests {
                     .expect("shifted surface"),
                 "black_lognormal",
             ),
-            (base.with_secondary_axis(VolSurfaceAxis::Tenor), "strike"),
+            (
+                finstack_quant_core::market_data::surfaces::VolSurface::from_grid_opts(
+                    base.id(),
+                    base.expiries(),
+                    base.strikes(),
+                    base.vols(),
+                    finstack_quant_core::market_data::surfaces::VolGridOpts {
+                        secondary_axis: VolSurfaceAxis::Tenor,
+                        ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                    },
+                    None,
+                )
+                .expect("tenor surface"),
+                "strike",
+            ),
         ];
         for (surface, expected) in incompatible {
             let invalid_market = market.clone().insert_surface(surface);

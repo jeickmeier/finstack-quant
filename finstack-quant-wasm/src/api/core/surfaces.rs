@@ -327,12 +327,6 @@ impl JsFxDeltaVolSurface {
         self.inner.expiries().into()
     }
 
-    /// Number of expiry pillars.
-    #[wasm_bindgen(getter, js_name = numExpiries)]
-    pub fn num_expiries(&self) -> usize {
-        self.inner.num_expiries()
-    }
-
     /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
     ///
     /// @returns Compact JSON text.

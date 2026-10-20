@@ -11,6 +11,7 @@
 
 use super::super::test_helpers::{sample_base_date, sample_discount_curve};
 use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::market_data::bumps::{BumpSpec, Bumpable};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use proptest::prelude::*;
@@ -545,7 +546,7 @@ fn monotone_convex_forward_continuity_at_knots() {
 #[test]
 fn parallel_bump_lowers_discount_factors() {
     let curve = sample_discount_curve("USD-OIS");
-    let bumped = curve.with_parallel_bump(15.0).unwrap();
+    let bumped = curve.apply_bump(BumpSpec::parallel_bp(15.0)).unwrap();
     assert_eq!(bumped.id().as_str(), "USD-OIS_bump_15bp");
 
     let times = [0.5, 1.0, 2.0];
@@ -564,7 +565,7 @@ fn triangular_key_rate_bump_targets_bucket() {
 
     // Triangular bump centered at 1.0, with neighbors at 0.0 and 2.0
     let bumped = curve
-        .with_triangular_key_rate_bump_neighbors(Some(0.0), 1.0, Some(2.0), 25.0)
+        .apply_bump(BumpSpec::triangular_key_rate_bp(0.0, 1.0, 2.0, 25.0))
         .unwrap();
 
     // DF at t=0 is unchanged (weight = 0 at t=0)
@@ -603,8 +604,8 @@ fn discount_stress_is_independent_of_construction_policy() {
             .build()
             .unwrap();
         for result in [
-            curve.with_parallel_bump(-100.0),
-            curve.with_triangular_key_rate_bump_neighbors(None, 0.5, Some(1.0), 100.0),
+            curve.apply_bump(BumpSpec::parallel_bp(-100.0)),
+            curve.apply_bump(BumpSpec::triangular_key_rate_first_bp(0.5, 1.0, 100.0)),
         ] {
             let bumped = result.expect("stress permits negative forwards");
             assert!(bumped.df(1.0) > bumped.df(0.5));
@@ -626,11 +627,11 @@ fn discount_bumps_reject_zero_discount_factors_in_raw_mode() {
         })
         .build()
         .unwrap();
-    assert!(curve.with_parallel_bump(1e8).is_err());
+    assert!(curve.apply_bump(BumpSpec::parallel_bp(1e8)).is_err());
 }
 
 #[test]
-fn with_parallel_bump_returns_error_on_invalid_curve() {
+fn parallel_bump_returns_error_on_invalid_curve() {
     let curve = DiscountCurve::builder("VALID")
         .base_date(sample_base_date())
         .knots([(0.0, 1.0), (1.0, 0.98), (5.0, 0.85)])
@@ -638,7 +639,7 @@ fn with_parallel_bump_returns_error_on_invalid_curve() {
         .unwrap();
 
     // Normal bump should succeed
-    let bumped_ok = curve.with_parallel_bump(10.0);
+    let bumped_ok = curve.apply_bump(BumpSpec::parallel_bp(10.0));
     assert!(
         bumped_ok.is_ok(),
         "Valid curve bump should succeed: {:?}",
@@ -646,7 +647,7 @@ fn with_parallel_bump_returns_error_on_invalid_curve() {
     );
 
     // Extreme bump should still succeed (exponential bumping preserves monotonicity)
-    let bumped_extreme = curve.with_parallel_bump(500.0);
+    let bumped_extreme = curve.apply_bump(BumpSpec::parallel_bp(500.0));
     assert!(
         bumped_extreme.is_ok(),
         "Extreme parallel bump should succeed (preserves monotonicity): {:?}",
@@ -663,7 +664,7 @@ fn triangular_key_rate_bump_error_handling() {
         .unwrap();
 
     // Normal triangular key-rate bump should succeed
-    let bumped_ok = curve.with_triangular_key_rate_bump_neighbors(Some(0.5), 1.5, Some(2.5), 15.0);
+    let bumped_ok = curve.apply_bump(BumpSpec::triangular_key_rate_bp(0.5, 1.5, 2.5, 15.0));
     assert!(
         bumped_ok.is_ok(),
         "Valid triangular key-rate bump should succeed: {:?}",
@@ -671,8 +672,7 @@ fn triangular_key_rate_bump_error_handling() {
     );
 
     // Extreme bump should either succeed or return typed error - no panic
-    let bumped_extreme =
-        curve.with_triangular_key_rate_bump_neighbors(Some(0.0), 1.0, Some(2.0), 1000.0);
+    let bumped_extreme = curve.apply_bump(BumpSpec::triangular_key_rate_bp(0.0, 1.0, 2.0, 1000.0));
     match bumped_extreme {
         Ok(_) => {}
         Err(e) => {
@@ -693,7 +693,7 @@ fn triangular_key_rate_bump_error_handling() {
 fn parallel_bump_magnitude_verification() {
     let curve = sample_discount_curve("USD-OIS");
     let bp = 25.0;
-    let bumped = curve.with_parallel_bump(bp).unwrap();
+    let bumped = curve.apply_bump(BumpSpec::parallel_bp(bp)).unwrap();
 
     // Verify bump formula at KNOT POINTS only
     // DF_bumped(t) = DF(t) * exp(-bp/10000 * t)
@@ -735,7 +735,7 @@ fn triangular_key_rate_bump_weight_verification() {
 
     let bp = 25.0;
     let bumped = curve
-        .with_triangular_key_rate_bump_neighbors(Some(0.0), 1.0, Some(2.0), bp)
+        .apply_bump(BumpSpec::triangular_key_rate_bp(0.0, 1.0, 2.0, bp))
         .unwrap();
 
     // At target (t=1.0): weight=1.0
@@ -1487,7 +1487,7 @@ mod continuous_transform_regressions {
     fn sparse_curve_key_rate_shock_acts_at_every_maturity() {
         let source = DiscountCurve::flat("SPARSE", sample_base_date(), 0.05).expect("flat");
         let shocked = source
-            .with_triangular_key_rate_bump_neighbors(Some(3.0), 5.0, Some(7.0), 10.0)
+            .apply_bump(BumpSpec::triangular_key_rate_bp(3.0, 5.0, 7.0, 10.0))
             .expect("continuous key-rate shock");
         for (time, weight) in [
             (0.5, 0.0),
@@ -1515,7 +1515,9 @@ mod continuous_transform_regressions {
             InterpStyle::PiecewiseQuadraticForward,
         ] {
             let source = shaped(style);
-            let shocked = source.with_parallel_bump(25.0).expect("parallel shock");
+            let shocked = source
+                .apply_bump(BumpSpec::parallel_bp(25.0))
+                .expect("parallel shock");
             for t in [0.0, 0.2, 0.75, 1.5, 3.5, 7.5] {
                 close(shocked.df(t), source.df(t) * (-0.0025_f64 * t).exp());
             }
@@ -1526,15 +1528,17 @@ mod continuous_transform_regressions {
     fn sparse_bucket_shocks_partition_the_parallel_log_discount_shift() {
         let source = DiscountCurve::flat("BUCKETS", sample_base_date(), 0.05).expect("flat");
         let first = source
-            .with_triangular_key_rate_bump_neighbors(None, 1.0, Some(5.0), 1.0)
+            .apply_bump(BumpSpec::triangular_key_rate_first_bp(1.0, 5.0, 1.0))
             .expect("first");
         let middle = first
-            .with_triangular_key_rate_bump_neighbors(Some(1.0), 5.0, Some(10.0), 1.0)
+            .apply_bump(BumpSpec::triangular_key_rate_bp(1.0, 5.0, 10.0, 1.0))
             .expect("middle");
         let all = middle
-            .with_triangular_key_rate_bump_neighbors(Some(5.0), 10.0, None, 1.0)
+            .apply_bump(BumpSpec::triangular_key_rate_last_bp(5.0, 10.0, 1.0))
             .expect("last");
-        let parallel = source.with_parallel_bump(1.0).expect("parallel");
+        let parallel = source
+            .apply_bump(BumpSpec::parallel_bp(1.0))
+            .expect("parallel");
         for t in [0.0, 0.1, 0.5, 2.0, 4.5, 5.0, 7.5, 15.0] {
             close(all.df(t), parallel.df(t));
         }
@@ -1544,15 +1548,15 @@ mod continuous_transform_regressions {
     fn transformed_curves_preserve_roll_shock_serde_and_rename_composition() {
         let source = shaped(InterpStyle::MonotoneConvex);
         let shocked = source
-            .with_triangular_key_rate_bump_neighbors(Some(0.25), 1.0, Some(3.0), 17.0)
+            .apply_bump(BumpSpec::triangular_key_rate_bp(0.25, 1.0, 3.0, 17.0))
             .expect("shock");
         let rolled = shocked.roll_forward(73).expect("roll");
         let twice_rolled = rolled.roll_forward(146).expect("second roll");
         let rerolled = shocked.roll_forward(219).expect("combined roll");
         let final_curve = twice_rolled
-            .with_triangular_key_rate_bump_neighbors(None, 0.3, Some(1.3), -6.0)
+            .apply_bump(BumpSpec::triangular_key_rate_first_bp(0.3, 1.3, -6.0))
             .expect("shock after roll")
-            .with_parallel_bump(3.0)
+            .apply_bump(BumpSpec::parallel_bp(3.0))
             .expect("parallel after roll");
         let restored: DiscountCurve =
             serde_json::from_str(&serde_json::to_string(&final_curve).expect("serialize"))
@@ -1585,12 +1589,12 @@ mod continuous_transform_regressions {
         let source = shaped(InterpStyle::CubicHermite)
             .roll_forward(100)
             .expect("roll");
-        let zero = source.with_parallel_bump(0.0).expect("zero");
+        let zero = source.apply_bump(BumpSpec::parallel_bp(0.0)).expect("zero");
         let up = source
-            .with_triangular_key_rate_bump_neighbors(Some(0.1), 0.4, Some(2.0), 50.0)
+            .apply_bump(BumpSpec::triangular_key_rate_bp(0.1, 0.4, 2.0, 50.0))
             .expect("up");
         let restored = up
-            .with_triangular_key_rate_bump_neighbors(Some(0.1), 0.4, Some(2.0), -50.0)
+            .apply_bump(BumpSpec::triangular_key_rate_bp(0.1, 0.4, 2.0, -50.0))
             .expect("down");
         for t in [0.0, 0.05, 0.3, 0.4, 1.0, 2.0, 5.0] {
             close(zero.df(t), source.df(t));
@@ -1602,12 +1606,12 @@ mod continuous_transform_regressions {
     fn repeated_shocks_merge_instead_of_accumulating_a_serialized_history() {
         let source = shaped(InterpStyle::LogLinear);
         let first = source
-            .with_triangular_key_rate_bump_neighbors(Some(1.0), 3.0, Some(5.0), 1.0)
+            .apply_bump(BumpSpec::triangular_key_rate_bp(1.0, 3.0, 5.0, 1.0))
             .expect("first");
         let mut repeated = first.clone();
         for _ in 0..99 {
             repeated = repeated
-                .with_triangular_key_rate_bump_neighbors(Some(1.0), 3.0, Some(5.0), 1.0)
+                .apply_bump(BumpSpec::triangular_key_rate_bp(1.0, 3.0, 5.0, 1.0))
                 .expect("repeat");
         }
         let first_json = serde_json::to_value(&first).expect("serialize");
@@ -1624,7 +1628,7 @@ mod continuous_transform_regressions {
         );
         for t in [0.5, 2.0, 3.0, 4.0, 6.0] {
             let once = source
-                .with_triangular_key_rate_bump_neighbors(Some(1.0), 3.0, Some(5.0), 100.0)
+                .apply_bump(BumpSpec::triangular_key_rate_bp(1.0, 3.0, 5.0, 100.0))
                 .expect("equivalent");
             close(repeated.df(t), once.df(t));
         }

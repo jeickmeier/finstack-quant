@@ -136,11 +136,8 @@ pub struct CreditIndexState {
 
 // Market Context State (complete snapshot)
 
-/// Current schema version for [`MarketContextState`].
-pub const MARKET_CONTEXT_STATE_VERSION: u32 = 1;
-
 /// Persistence contract for [`MarketContextState`].
-pub const MARKET_CONTEXT_STATE_CONTRACT: ContractDescriptor =
+pub(crate) const MARKET_CONTEXT_STATE_CONTRACT: ContractDescriptor =
     ContractDescriptor::new("finstack_quant.market_context_state");
 
 fn deserialize_required_hierarchy<'de, D>(
@@ -637,11 +634,7 @@ fn restore_market_context(
 
     ctx.hierarchy = state.hierarchy;
 
-    if report.has_errors() {
-        Err(ContractError::Report(Box::new(report)))
-    } else {
-        Ok((ctx, report))
-    }
+    Ok((ctx, report))
 }
 
 impl TryFrom<MarketContextState> for MarketContext {

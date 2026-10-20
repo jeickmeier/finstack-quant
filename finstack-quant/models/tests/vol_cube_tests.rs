@@ -5,17 +5,16 @@ use finstack_quant_core::market_data::surfaces::{VolCube, VolInterpolationMode};
 use finstack_quant_models::volatility::SabrParameters;
 
 #[test]
-fn test_vol_cube_builder_basic() {
+fn test_vol_cube_from_grid_axes() {
     let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
-    let cube = VolCube::builder("USD-SWAPTION")
-        .expiries(&[1.0, 5.0])
-        .tenors(&[2.0, 10.0])
-        .node(p, 0.03)
-        .node(p, 0.035)
-        .node(p, 0.04)
-        .node(p, 0.045)
-        .build()
-        .unwrap();
+    let cube = VolCube::from_grid(
+        "USD-SWAPTION",
+        &[1.0, 5.0],
+        &[2.0, 10.0],
+        &[p; 4],
+        &[0.03, 0.035, 0.04, 0.045],
+    )
+    .unwrap();
 
     assert_eq!(cube.id().as_str(), "USD-SWAPTION");
     assert_eq!(cube.expiries(), &[1.0, 5.0]);

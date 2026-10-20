@@ -2,6 +2,7 @@
 
 #[test]
 fn b8_cached_hw_risk_rebuilds_the_active_grid() {
+    use finstack_quant_core::market_data::bumps::{BumpSpec, Bumpable};
     use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
     use finstack_quant_valuations::instruments::rates::swaption::{
         BermudanSwaption, BermudanSwaptionPricer, BermudanSwaptionPricerConfig,
@@ -73,7 +74,9 @@ fn b8_cached_hw_risk_rebuilds_the_active_grid() {
         // Rebuilding nominally equivalent flat-curve knots changes floating
         // interpolation/derivative rounding and tests curve reconstruction,
         // rather than reuse of this deliberately nonstandard tree grid.
-        let curve = curve.with_parallel_bump(bump_bp).expect("bumped curve");
+        let curve = curve
+            .apply_bump(BumpSpec::parallel_bp(bump_bp))
+            .expect("bumped curve");
         let model = prepare(&curve, sigma);
         BermudanSwaptionTreeValuator::new(&swaption, &model, &curve, as_of)
             .expect("bumped valuator")

@@ -1936,7 +1936,7 @@ export interface D_7Fbd5A62C7C39Ad98666 {
  *     None,
  * ).expect("surface should build");
  *
- * assert_eq!(surface.num_expiries(), 3);
+ * assert_eq!(surface.expiries().len(), 3);
  * assert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);
  * ```
  */

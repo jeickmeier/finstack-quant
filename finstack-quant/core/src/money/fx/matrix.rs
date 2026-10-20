@@ -344,11 +344,6 @@ impl FxMatrix {
         }
     }
 
-    /// Access the underlying FX provider reference.
-    pub fn provider(&self) -> Arc<dyn FxProvider> {
-        Arc::clone(&self.provider)
-    }
-
     /// Return the matrix configuration.
     pub fn config(&self) -> FxConfig {
         self.config

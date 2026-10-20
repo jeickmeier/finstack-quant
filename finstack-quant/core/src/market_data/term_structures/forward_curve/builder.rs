@@ -28,7 +28,6 @@ pub struct ForwardCurveBuilder {
     pub(super) points: Vec<(f64, f64)>,
     pub(super) projection_grid: Option<Vec<f64>>,
     pub(super) style: InterpStyle,
-    pub(super) min_forward_rate: Option<f64>,
     pub(super) extrapolation: ExtrapolationPolicy,
     pub(super) rate_calibration: Option<crate::market_data::term_structures::RateCalibrationRecipe>,
     pub(super) fx_policy: Option<String>,
@@ -95,16 +94,6 @@ impl ForwardCurveBuilder {
         self
     }
 
-    /// Enforce a minimum forward rate across the provided knot points.
-    ///
-    /// # Arguments
-    ///
-    /// * `min_rate` - Minimum permitted rate in decimal units.
-    pub fn min_forward_rate(mut self, min_rate: f64) -> Self {
-        self.min_forward_rate = Some(min_rate);
-        self
-    }
-
     /// Attach the typed calibration recipe used to bootstrap this curve.
     pub fn rate_calibration(
         mut self,
@@ -141,8 +130,7 @@ impl ForwardCurveBuilder {
     /// The curve requires an explicit base date, a strictly positive finite
     /// index tenor, a non-negative reset lag, and at least two strictly
     /// increasing finite knot times. Forward rates may be negative to support
-    /// negative-rate markets. Set [`Self::min_forward_rate`] when a particular
-    /// application needs a lower bound.
+    /// negative-rate markets.
     ///
     /// If supplied, `projection_grid` represents contractual reset/end
     /// boundaries for projection-discount-factor chaining. It must start at
@@ -152,7 +140,7 @@ impl ForwardCurveBuilder {
     /// # Errors
     ///
     /// Returns an error if any of those structural conditions fails, a forward
-    /// rate is below the optional minimum, the projection grid is invalid, or
+    /// the projection grid is invalid, or
     /// the requested interpolation style cannot be built from the knots and
     /// forward values.
     pub fn build(self) -> crate::Result<ForwardCurve> {
@@ -176,16 +164,6 @@ impl ForwardCurveBuilder {
         let (kvec, fvec): (Vec<f64>, Vec<f64>) = self.points.into_iter().unzip();
         crate::math::interp::validate_knots(&kvec)?;
         crate::math::interp::validate_finite_series(&fvec)?;
-        if let Some(min_fwd) = self.min_forward_rate {
-            for (i, &f) in fvec.iter().enumerate() {
-                if f < min_fwd {
-                    return Err(crate::Error::Validation(format!(
-                        "Forward rate below minimum at t={:.6}: fwd={:.8} < min={:.8} (index {})",
-                        kvec[i], f, min_fwd, i
-                    )));
-                }
-            }
-        }
         let projection_grid = self
             .projection_grid
             .map(|grid| {

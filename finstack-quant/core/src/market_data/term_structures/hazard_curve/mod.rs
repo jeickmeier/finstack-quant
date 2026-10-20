@@ -139,7 +139,7 @@ pub struct HazardCurve {
 
 /// What a hazard-curve bump shifts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HazardBumpTarget {
+pub(crate) enum HazardBumpTarget {
     /// The CDS par spread: the hazard shift is `s / (1 - R)` (credit triangle).
     ParSpread,
     /// The hazard intensity itself, in the bump's rate units.

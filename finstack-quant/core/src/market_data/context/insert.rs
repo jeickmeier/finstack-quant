@@ -71,40 +71,6 @@ impl MarketContext {
         self
     }
 
-    /// Insert an FX delta-quoted volatility surface.
-    ///
-    /// Accepts either an owned [`FxDeltaVolSurface`] or an `Arc<FxDeltaVolSurface>`.
-    /// When passing an owned value, it will be wrapped in an `Arc` automatically.
-    /// When passing an `Arc`, it is used directly (enabling surface sharing between contexts).
-    ///
-    /// # Examples
-    /// ```rust
-    /// # use finstack_quant_core::market_data::context::MarketContext;
-    /// # use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
-    /// let surface = FxDeltaVolSurface::new(
-    ///     "EURUSD-DELTA-VOL",
-    ///     vec![0.25, 0.5, 1.0],
-    ///     vec![0.08, 0.085, 0.09],
-    ///     vec![0.01, 0.012, 0.015],
-    ///     vec![0.005, 0.006, 0.007],
-    ///     None,
-    ///     None,
-    /// ).expect("surface should build");
-    /// let ctx = MarketContext::new().insert_fx_delta_vol_surface(surface);
-    /// assert!(ctx.get_fx_delta_vol_surface("EURUSD-DELTA-VOL").is_ok());
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `surface` - Owned or shared FX delta-vol surface stored under `surface.id()`.
-    pub fn insert_fx_delta_vol_surface(
-        mut self,
-        surface: impl Into<Arc<FxDeltaVolSurface>>,
-    ) -> Self {
-        self.insert_fx_delta_vol_surface_mut(surface);
-        self
-    }
-
     /// Insert a SABR volatility cube.
     ///
     /// Accepts either an owned [`VolCube`] or an `Arc<VolCube>`.
@@ -375,7 +341,30 @@ impl MarketContext {
 
     /// Insert an FX delta-quoted volatility surface, mutating in place.
     ///
-    /// Mirrors [`Self::insert_fx_delta_vol_surface`] but takes `&mut self`.
+    /// Accepts either an owned [`FxDeltaVolSurface`] or an `Arc<FxDeltaVolSurface>`;
+    /// an owned value is wrapped in an `Arc`, a shared one is stored as is.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use finstack_quant_core::market_data::context::MarketContext;
+    /// # use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
+    /// let surface = FxDeltaVolSurface::new(
+    ///     "EURUSD-DELTA-VOL",
+    ///     vec![0.25, 0.5, 1.0],
+    ///     vec![0.08, 0.085, 0.09],
+    ///     vec![0.01, 0.012, 0.015],
+    ///     vec![0.005, 0.006, 0.007],
+    ///     None,
+    ///     None,
+    /// ).expect("surface should build");
+    /// let mut ctx = MarketContext::new();
+    /// ctx.insert_fx_delta_vol_surface_mut(surface);
+    /// assert!(ctx.get_fx_delta_vol_surface("EURUSD-DELTA-VOL").is_ok());
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `surface` - Owned or shared FX delta-vol surface stored under `surface.id()`.
     pub fn insert_fx_delta_vol_surface_mut(
         &mut self,
         surface: impl Into<Arc<FxDeltaVolSurface>>,

@@ -541,12 +541,7 @@ fn test_restore_preserves_families_outside_the_snapshot_model() {
         .build()
         .unwrap();
     let sabr = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
-    let cube = VolCube::builder("USD-SWAPTION")
-        .expiries(&[1.0])
-        .tenors(&[5.0])
-        .node(sabr, 0.03)
-        .build()
-        .unwrap();
+    let cube = VolCube::from_grid("USD-SWAPTION", &[1.0], &[5.0], &[sabr], &[0.03]).unwrap();
 
     let market_t1 = MarketContext::new()
         .insert(create_test_discount_curve("USD-OIS", as_of))

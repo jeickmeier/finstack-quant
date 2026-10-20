@@ -432,7 +432,11 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
         let report = &result.result.step_reports["ns"];
         assert!(report.success, "{}", report.convergence_reason);
         let context = MarketContext::try_from(result.result.final_market).expect("market");
-        let delivered = context.get_parametric("USD-NS").expect("delivered model");
+        let delivered = context
+            .curve("USD-NS")
+            .and_then(|c| c.parametric())
+            .cloned()
+            .expect("delivered model");
         for (id, start, end, accrual, rate) in contracts {
             // Independent deposit economics evaluated directly on the delivered
             // analytical object, without the calibration's DiscountCurve adapter.
@@ -619,7 +623,9 @@ fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
     assert!(report.max_residual < 1e-8);
     let context = MarketContext::try_from(result.result.final_market).expect("market");
     let delivered = context
-        .get_parametric("USD-NS-OIS")
+        .curve("USD-NS-OIS")
+        .and_then(|c| c.parametric())
+        .cloned()
         .expect("delivered model");
     for (id, terms, par_rate) in contracts {
         let (floating, annuity) = legs_pv(delivered.as_ref(), &terms);

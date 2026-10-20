@@ -3477,7 +3477,7 @@ class FxDeltaVolSurface:
     --------
     >>> from finstack_quant.core.market_data import FxDeltaVolSurface
     >>> surface = FxDeltaVolSurface("EURUSD", [0.25, 1.0], [0.08, 0.09], [0.01, 0.015], [0.005, 0.007])
-    >>> (surface.num_expiries, surface.rr_10d)
+    >>> (len(surface.expiries), surface.rr_10d)
     (2, None)
 
     """
@@ -3615,22 +3615,6 @@ class FxDeltaVolSurface:
         -------
         list[float]
             Ascending expiry year fractions; they index the rows of the stored volatility grid.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def num_expiries(self) -> int:
-        """
-        How many expiries the surface carries.
-
-        Returns
-        -------
-        int
-            Count of expiry pillars; every quote list on the surface has this length.
 
         Notes
         -----

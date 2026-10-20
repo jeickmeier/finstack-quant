@@ -34,7 +34,6 @@ impl ForwardCurve {
             points: Vec::new(),
             projection_grid: None,
             style: InterpStyle::Linear,
-            min_forward_rate: None,
             extrapolation: ExtrapolationPolicy::FlatForward,
             rate_calibration: None,
             fx_policy: None,

@@ -370,7 +370,9 @@ fn restore_market_moves_all_nine_curve_storage_families() {
     );
 
     let spread = restored
-        .get_basis_spread("BASIS-3M6M")
+        .curve("BASIS-3M6M")
+        .and_then(|c| c.basis_spread())
+        .cloned()
         .expect("basis spread curve present")
         .spread(1.0);
     assert!(
@@ -379,7 +381,9 @@ fn restore_market_moves_all_nine_curve_storage_families() {
     );
 
     let long_rate = match restored
-        .get_parametric("USD-NS")
+        .curve("USD-NS")
+        .and_then(|c| c.parametric())
+        .cloned()
         .expect("parametric curve present")
         .params()
     {

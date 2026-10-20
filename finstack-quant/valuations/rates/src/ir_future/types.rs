@@ -1119,10 +1119,19 @@ mod tests {
         for surface in [
             base.clone(),
             base.clone().with_displacements(&[0.02]).unwrap(),
-            base.clone()
-                .with_quote_type(VolQuoteType::Normal)
-                .unwrap()
-                .with_secondary_axis(VolSurfaceAxis::Tenor),
+            finstack_quant_core::market_data::surfaces::VolSurface::from_grid_opts(
+                base.id(),
+                base.expiries(),
+                base.strikes(),
+                base.vols(),
+                finstack_quant_core::market_data::surfaces::VolGridOpts {
+                    secondary_axis: VolSurfaceAxis::Tenor,
+                    quote_type: VolQuoteType::Normal,
+                    ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                },
+                None,
+            )
+            .expect("tenor surface"),
         ] {
             assert!(future
                 .calculate_convexity_adjusted_rate(

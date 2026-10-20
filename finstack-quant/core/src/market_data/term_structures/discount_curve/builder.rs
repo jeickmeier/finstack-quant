@@ -144,8 +144,7 @@ impl DiscountCurveBuilder {
     ///
     /// # Default
     ///
-    /// The default value is [`DEFAULT_MIN_FORWARD_TENOR`](crate::market_data::term_structures::DEFAULT_MIN_FORWARD_TENOR)
-    /// (~30 seconds or 1e-6 years).
+    /// The default value is `1e-6` years (~30 seconds).
     ///
     /// # Use Cases
     ///

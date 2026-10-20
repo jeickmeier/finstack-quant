@@ -49,7 +49,7 @@ use crate::{error::InputError, types::CurveId};
 ///     None,
 /// ).expect("surface should build");
 ///
-/// assert_eq!(surface.num_expiries(), 3);
+/// assert_eq!(surface.expiries().len(), 3);
 /// assert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);
 /// ```
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -189,12 +189,6 @@ impl FxDeltaVolSurface {
     #[inline]
     pub fn expiries(&self) -> &[f64] {
         &self.expiries
-    }
-
-    /// Number of expiry pillars.
-    #[inline]
-    pub fn num_expiries(&self) -> usize {
-        self.expiries.len()
     }
 
     /// Return the ATM delta-neutral-straddle volatility nodes.

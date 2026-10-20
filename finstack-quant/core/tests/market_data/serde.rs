@@ -210,7 +210,9 @@ fn market_context_roundtrip() {
     assert!(deserialized.get_discount("USD-OIS").is_ok());
     assert!(deserialized.get_forward("USD-SOFR").is_ok());
     assert!(deserialized.get_surface("VOL").is_ok());
-    assert!(deserialized.get_dividend_schedule("AAPL-DIVS").is_ok());
+    assert!(deserialized
+        .dividends_iter()
+        .any(|(id, _)| id.as_str() == "AAPL-DIVS"));
     assert!(deserialized.fx().is_some());
 }
 
@@ -239,9 +241,11 @@ fn market_context_roundtrip_preserves_hierarchy() {
     let hierarchy = deserialized
         .hierarchy()
         .expect("hierarchy should survive MarketContext serde round-trip");
-    assert!(hierarchy
-        .all_curve_ids()
-        .contains(&CurveId::from("EUR-ESTR")));
+    let path: Vec<String> = vec!["Rates".into(), "EUR".into(), "ESTR".into()];
+    assert_eq!(
+        hierarchy.get_node(&path).expect("EUR node").curve_ids(),
+        &[CurveId::from("EUR-ESTR")]
+    );
 }
 
 #[test]
@@ -339,10 +343,7 @@ fn market_context_missing_schema_version_is_rejected_by_all_loaders() {
 
 #[test]
 fn market_context_strict_loader_reports_zero_future_and_malformed_json() {
-    for version in [
-        0,
-        finstack_quant_core::market_data::context::MARKET_CONTEXT_STATE_VERSION + 1,
-    ] {
+    for version in [0, finstack_quant_core::wire::SchemaVersion::VALUE + 1] {
         let mut json = serde_json::to_value(
             MarketContextState::try_from(&MarketContext::new()).expect("coherent market snapshot"),
         )
@@ -370,10 +371,7 @@ fn market_context_strict_loader_reports_zero_future_and_malformed_json() {
 
 #[test]
 fn market_context_state_rejects_unsupported_versions() {
-    for version in [
-        0,
-        finstack_quant_core::market_data::context::MARKET_CONTEXT_STATE_VERSION + 1,
-    ] {
+    for version in [0, finstack_quant_core::wire::SchemaVersion::VALUE + 1] {
         let mut json = serde_json::to_value(
             MarketContextState::try_from(&MarketContext::new()).expect("coherent market snapshot"),
         )

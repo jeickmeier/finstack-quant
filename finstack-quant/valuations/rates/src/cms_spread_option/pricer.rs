@@ -740,14 +740,7 @@ mod tests {
     fn sabr_cube_smiles_are_rejected_instead_of_using_a_flat_vol_cdf() {
         use finstack_quant_core::market_data::surfaces::{SabrParameterData, VolCube};
         let params = SabrParameterData::new(0.05, 0.5, -0.2, 0.4).expect("SABR");
-        let cube = VolCube::builder("SABR")
-            .expiries(&[0.5, 2.0])
-            .tenors(&[2.0, 10.0])
-            .node(params, 0.04)
-            .node(params, 0.04)
-            .node(params, 0.04)
-            .node(params, 0.04)
-            .build()
+        let cube = VolCube::from_grid("SABR", &[0.5, 2.0], &[2.0, 10.0], &[params; 4], &[0.04; 4])
             .expect("cube");
         let error =
             validate_flat_marginal(&VolSource::Cube(std::sync::Arc::new(cube)), 1.0, 10.0, 0.25)

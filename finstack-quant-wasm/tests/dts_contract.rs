@@ -1338,7 +1338,6 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
         surface,
         "readonly expiries: Float64Array;"
     ));
-    assert!(contains_signature(surface, "readonly numExpiries: number;"));
     for removed_method in ["pillarVols(", "impliedVol("] {
         assert!(
             !surface.contains(removed_method),

@@ -156,7 +156,7 @@ impl std::fmt::Debug for CurveCalendar {
 /// due to catastrophic cancellation when z1*t1 ≈ z2*t2.
 ///
 /// This constant can be overridden via [`DiscountCurveBuilder::min_forward_tenor`].
-pub const DEFAULT_MIN_FORWARD_TENOR: f64 = 1e-6;
+pub(crate) const DEFAULT_MIN_FORWARD_TENOR: f64 = 1e-6;
 
 /// Piece-wise discount factor curve supporting several interpolation styles.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

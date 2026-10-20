@@ -556,9 +556,18 @@ mod tests {
                 .clone()
                 .with_quote_type(VolQuoteType::Normal)
                 .unwrap(),
-            base.as_ref()
-                .clone()
-                .with_secondary_axis(VolSurfaceAxis::Tenor),
+            finstack_quant_core::market_data::surfaces::VolSurface::from_grid_opts(
+                base.id(),
+                base.expiries(),
+                base.strikes(),
+                base.vols(),
+                finstack_quant_core::market_data::surfaces::VolGridOpts {
+                    secondary_axis: VolSurfaceAxis::Tenor,
+                    ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                },
+                None,
+            )
+            .expect("tenor surface"),
         ] {
             let context = market.clone().insert_surface(surface);
             let error = replicated_variance_to(&swap, &context, swap.start_date, swap.maturity)

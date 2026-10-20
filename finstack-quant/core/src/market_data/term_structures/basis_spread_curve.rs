@@ -262,21 +262,6 @@ impl BasisSpreadCurve {
             .build()
     }
 
-    /// Create a builder from this curve with a new ID (for rebuildable-with-id pattern).
-    ///
-    /// The builder keeps the curve's spread pillars and any roll state, so
-    /// `build()` reproduces the curve under `id`; replacing the pillars through
-    /// [`BasisSpreadCurveBuilder::knots`] drops the roll state.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Identifier of the rebuilt curve, the `MarketContext` lookup key.
-    pub fn to_builder_with_id(&self, id: CurveId) -> BasisSpreadCurveBuilder {
-        self.metadata_builder(id)
-            .knots(self.knots.iter().copied().zip(self.spreads.iter().copied()))
-            .roll_transform(self.roll.clone())
-    }
-
     /// Builder seeded with this curve's base date, day count, interpolation
     /// style and extrapolation policy; the caller supplies pillars and any
     /// roll state.
@@ -316,7 +301,7 @@ impl BasisSpreadCurveBuilder {
     /// Set the knot points as `(time, spread)` pairs.
     ///
     /// Supplied pillars define the curve's interpolation; any roll state
-    /// carried over from [`BasisSpreadCurve::to_builder_with_id`] is dropped.
+    /// already set on the builder is dropped.
     ///
     /// # Arguments
     ///
@@ -457,12 +442,6 @@ mod tests {
         for time in [0.25, 0.5, 1.5] {
             assert!((rolled.spread(time) - source.spread(time + 1.0)).abs() < 1e-12);
         }
-        let rebuilt = rolled
-            .to_builder_with_id("BASIS-ROLL-REBUILT".into())
-            .build()
-            .unwrap();
-        assert!((rebuilt.spread(0.5) - source.spread(1.5)).abs() < 1e-12);
-
         let restored: BasisSpreadCurve =
             serde_json::from_str(&serde_json::to_string(&rolled).unwrap()).unwrap();
         assert!((restored.spread(0.5) - source.spread(1.5)).abs() < 1e-12);

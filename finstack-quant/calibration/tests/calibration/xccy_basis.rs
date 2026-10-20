@@ -73,7 +73,9 @@ fn xccy_basis_builds_signed_spread_output_with_default_discount_interpolation() 
         .expect("zero and negative basis spreads must build");
         assert!(report.success);
         let spread = context
-            .get_basis_spread("EUR-USD-BASIS")
+            .curve("EUR-USD-BASIS")
+            .and_then(|c| c.basis_spread())
+            .cloned()
             .expect("basis curve");
         assert_eq!(spread.interp_style(), InterpStyle::Linear);
         assert_eq!(spread.spread(0.0), 0.0);
@@ -94,7 +96,9 @@ fn xccy_basis_preserves_foreign_and_spread_curve_day_counts() {
     assert!(report.success);
     let foreign = context.get_discount("EUR-OIS").expect("foreign curve");
     let spread = context
-        .get_basis_spread("EUR-USD-BASIS")
+        .curve("EUR-USD-BASIS")
+        .and_then(|c| c.basis_spread())
+        .cloned()
         .expect("basis curve");
     assert_eq!(foreign.day_count(), DayCount::Act360);
     assert_eq!(spread.day_count(), DayCount::Act360);
@@ -134,7 +138,9 @@ fn xccy_basis_is_invariant_to_domestic_curve_clock_and_base() {
             assert!(report.success);
             spreads.push(
                 context
-                    .get_basis_spread("EUR-USD-BASIS")
+                    .curve("EUR-USD-BASIS")
+                    .and_then(|c| c.basis_spread())
+                    .cloned()
                     .expect("basis")
                     .spread(1.0),
             );

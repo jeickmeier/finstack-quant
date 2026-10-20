@@ -4104,10 +4104,6 @@ export interface FxDeltaVolSurface extends WasmOwned {
    */
   readonly expiries: Float64Array;
   /**
-   * Number of expiry pillars.
-   */
-  readonly numExpiries: number;
-  /**
    * ATM delta-neutral straddle vols per expiry (decimals).
    */
   readonly atmVols: Float64Array;
@@ -4153,7 +4149,7 @@ export interface FxDeltaVolSurface extends WasmOwned {
  *   [0.01],
  *   [0.002]
  * );
- * console.log(surface.id, surface.numExpiries);
+ * console.log(surface.id, surface.expiries.length);
  * surface.free();
  * ```
  */
