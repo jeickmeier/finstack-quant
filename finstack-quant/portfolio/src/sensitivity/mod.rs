@@ -4,13 +4,11 @@
 //! against a `MarketContext`:
 //!
 //! - `DeltaBasedEngine`: linear sensitivity via finite-difference bumps.
-//! - `FullRepricingEngine` + `ScenarioGrid`: P&L profile across a
-//!   scenario grid.
+//! - `FullRepricingEngine`: P&L profile across a symmetric scenario grid.
 //! - `FactorSensitivityEngine`: shared trait.
 //!
-//! `SensitivityMatrix` is re-exported from
-//! [`finstack_quant_factor`] for binding stability; its one wire form
-//! is [`SensitivityMatrixJson`](crate::sensitivity::SensitivityMatrixJson),
+//! The engines return [`finstack_quant_factor::SensitivityMatrix`]; its one
+//! wire form is [`SensitivityMatrixJson`](crate::sensitivity::SensitivityMatrixJson),
 //! shared by both hosts in both directions.
 //!
 //! The `json` submodule holds the JSON-facing helpers used by Python and WASM
@@ -25,7 +23,6 @@ mod traits;
 
 pub(crate) use delta_engine::mapping_to_market_bumps;
 pub use delta_engine::DeltaBasedEngine;
-pub use finstack_quant_factor::SensitivityMatrix;
 pub use json::{
     compute_factor_sensitivities_from_json, compute_pnl_profiles_from_json, SensitivityMatrixJson,
     DEFAULT_PNL_SCENARIO_POINTS,

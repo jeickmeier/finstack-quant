@@ -30,12 +30,12 @@ const DEFAULT_PNL_SCENARIO_POINTS: usize =
 #[derive(Clone)]
 pub(crate) struct PySensitivityMatrix {
     base_currency: finstack_quant_core::currency::Currency,
-    pub(crate) inner: finstack_quant_portfolio::sensitivity::SensitivityMatrix,
+    pub(crate) inner: finstack_quant_factor::SensitivityMatrix,
 }
 
 impl PySensitivityMatrix {
     pub(crate) fn from_inner(
-        inner: finstack_quant_portfolio::sensitivity::SensitivityMatrix,
+        inner: finstack_quant_factor::SensitivityMatrix,
         base_currency: finstack_quant_core::currency::Currency,
     ) -> Self {
         Self {
@@ -67,8 +67,7 @@ impl PySensitivityMatrix {
         let wire: finstack_quant_portfolio::sensitivity::SensitivityMatrixJson =
             serde_json::from_str(json).map_err(display_to_py)?;
         let base_currency = wire.base_currency;
-        let inner = finstack_quant_portfolio::sensitivity::SensitivityMatrix::try_from(wire)
-            .map_err(core_to_py)?;
+        let inner = finstack_quant_factor::SensitivityMatrix::try_from(wire).map_err(core_to_py)?;
         Ok(Self::from_inner(inner, base_currency))
     }
 

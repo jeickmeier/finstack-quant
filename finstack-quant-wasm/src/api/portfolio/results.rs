@@ -6,12 +6,13 @@
 
 use crate::utils::input::{from_js_json, js_f64, js_json_value, js_opt_string, js_string, js_uint};
 use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
+use finstack_quant_factor::SensitivityMatrix;
 use finstack_quant_portfolio::attribution::PortfolioAttribution;
 use finstack_quant_portfolio::metrics::PortfolioMetrics;
 use finstack_quant_portfolio::optimization::{
     Constraint, PortfolioOptimizationResultWire, PositionFilter,
 };
-use finstack_quant_portfolio::sensitivity::{SensitivityMatrix, SensitivityMatrixJson};
+use finstack_quant_portfolio::sensitivity::SensitivityMatrixJson;
 use finstack_quant_portfolio::valuation::PortfolioValuation;
 use wasm_bindgen::prelude::*;
 

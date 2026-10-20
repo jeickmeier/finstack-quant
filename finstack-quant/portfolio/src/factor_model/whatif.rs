@@ -339,7 +339,7 @@ mod tests {
     use super::*;
     use crate::factor_model::FactorModel;
     use crate::position::{Position, PositionUnit};
-    use crate::sensitivity::{FactorSensitivityEngine, SensitivityMatrix};
+    use crate::sensitivity::FactorSensitivityEngine;
     use crate::test_utils::build_test_market_at;
     use crate::types::{PositionId, DUMMY_ENTITY_ID};
     use crate::Portfolio;
@@ -350,6 +350,7 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{Attributes, CurveId};
     use finstack_quant_factor::matching::{DependencyFilter, MappingRule, MatchingConfig};
+    use finstack_quant_factor::SensitivityMatrix;
     use finstack_quant_factor::{
         CurveType, DependencyType, FactorCovarianceMatrix, FactorDefinition, FactorId,
         FactorModelConfig, FactorType, MarketMapping, RiskMeasure, UnmatchedPolicy,

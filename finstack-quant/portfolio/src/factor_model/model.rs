@@ -24,9 +24,7 @@ use super::assignment::{assign_position_factors, FactorAssignmentReport};
 use super::dependencies::flatten as flatten_dependencies;
 use super::whatif::{StressPnl, StressResult};
 use crate::error::{Error, Result};
-use crate::sensitivity::{
-    exact_factor_market_keys, DeltaBasedEngine, FactorSensitivityEngine, SensitivityMatrix,
-};
+use crate::sensitivity::{exact_factor_market_keys, DeltaBasedEngine, FactorSensitivityEngine};
 use crate::{MarketFactorKey, Portfolio};
 use finstack_quant_calibration::api::schema::HazardCurveParams;
 use finstack_quant_calibration::recalibration::bump_hazard_spreads;
@@ -39,6 +37,7 @@ use finstack_quant_factor::risk::{
     apply_residual_contributions, decompose_factors, PositionResidualContribution,
     ResidualContributionSource, RiskDecomposition,
 };
+use finstack_quant_factor::SensitivityMatrix;
 use finstack_quant_factor::{
     BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorModelConfig, FactorType,
     MarketDependency, MatchingConfig, RiskMeasure, UnmatchedPolicy,
@@ -997,7 +996,7 @@ fn shift_credit_curves(
 pub(super) mod tests {
     use super::*;
     use crate::position::{Position, PositionUnit};
-    use crate::sensitivity::{FactorSensitivityEngine, SensitivityMatrix};
+    use crate::sensitivity::FactorSensitivityEngine;
     use crate::types::{PositionId, DUMMY_ENTITY_ID};
     use crate::Portfolio;
     use finstack_quant_core::currency::Currency;
@@ -1006,6 +1005,7 @@ pub(super) mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{Attributes, CurveId};
     use finstack_quant_factor::matching::{DependencyFilter, MappingRule};
+    use finstack_quant_factor::SensitivityMatrix;
     use finstack_quant_factor::{
         BumpSizeConfig, CurveType, DependencyType, FactorCovarianceMatrix, FactorDefinition,
         FactorId, FactorModelConfig, FactorType, MarketMapping, RiskMeasure, UnmatchedPolicy,

@@ -29,15 +29,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-/// Re-export attribution types appearing in this module's public API so direct
-/// portfolio consumers do not need a separate, version-sensitive dependency.
-pub use finstack_quant_attribution::{
-    AttributionFactor, AttributionMeta, AttributionMethod, CarryDetail, CorrelationsAttribution,
-    CreditCarryByLevel, CreditCarryDecomposition, CreditCurvesAttribution, CreditFactorAttribution,
-    CrossFactorDetail, ExecutionPolicy, FxAttribution, InflationCurvesAttribution, LevelCarry,
-    LevelPnl, ModelParamsAttribution, PnlAttribution, RatesCurvesAttribution, ScalarsAttribution,
-    SourceLine, TaylorAttributionConfig, VolAttribution,
-};
+use finstack_quant_attribution::{AttributionMethod, PnlAttribution};
 
 /// Portfolio-level P&L attribution result.
 ///
@@ -1100,6 +1092,7 @@ mod tests {
     use super::*;
     use crate::position::{Position, PositionUnit};
     use crate::types::Entity;
+    use finstack_quant_attribution::{ExecutionPolicy, TaylorAttributionConfig};
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_valuations::instruments::composite::{
         CompositeLegSpec, CompositeSpec, RebalanceRule, WeightingMethod,

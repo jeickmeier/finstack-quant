@@ -1,14 +1,12 @@
 //! JSON-facing helpers for factor-model bindings.
 
 use super::positions::{parse_positions_json, pricing_positions};
-use super::{
-    DeltaBasedEngine, FactorPnlProfile, FactorSensitivityEngine, FullRepricingEngine,
-    SensitivityMatrix,
-};
+use super::{DeltaBasedEngine, FactorPnlProfile, FactorSensitivityEngine, FullRepricingEngine};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{Error, Result};
+use finstack_quant_factor::SensitivityMatrix;
 use finstack_quant_factor::{BumpSizeConfig, FactorDefinition, FactorId};
 use serde::{Deserialize, Serialize};
 
@@ -30,7 +28,8 @@ pub const DEFAULT_PNL_SCENARIO_POINTS: usize = 5;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_portfolio::sensitivity::{SensitivityMatrix, SensitivityMatrixJson};
+/// use finstack_quant_factor::SensitivityMatrix;
+/// use finstack_quant_portfolio::sensitivity::SensitivityMatrixJson;
 ///
 /// let wire: SensitivityMatrixJson = serde_json::from_str(
 ///     r#"{"base_currency":"USD","position_ids":["A"],"factor_ids":["F1","F2"],"data":[[1.0,2.0]]}"#,
