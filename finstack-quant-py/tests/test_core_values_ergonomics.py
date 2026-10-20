@@ -154,7 +154,7 @@ class TestConfig:
             RoundingMode.from_name("BANKERS")
         assert str(RoundingMode.from_json('"ceil"')) == "ceil"
         assert pickle.loads(pickle.dumps(RoundingMode.CEIL)) == RoundingMode.CEIL  # noqa: S301
-        t = ToleranceConfig(rate_epsilon=1e-9)
+        t = ToleranceConfig(generic_epsilon=1e-9)
         assert ToleranceConfig.from_json(t.to_json()) == t
 
 

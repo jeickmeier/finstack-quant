@@ -540,7 +540,6 @@ Reserve `FinstackConfig` extensions for truly user-facing configuration that:
 ```rust
 // In config.rs - part of FinstackConfig
 pub struct ToleranceConfig {
-    pub rate_epsilon: f64,
     pub generic_epsilon: f64,
 }
 

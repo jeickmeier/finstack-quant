@@ -145,11 +145,13 @@ impl JsDayCountContext {
     /// # Arguments
     ///
     /// * `json` - Canonical DayCountContext JSON text or plain object; unknown
-    ///   fields are rejected. As in Rust and Python, the coupon period is
-    ///   validated when the context is used (`DayCountContextState::to_ctx`).
+    ///   fields are rejected. As in Rust and Python, it is validated on load
+    ///   by `DayCountContextState::try_new`.
     ///
     /// @returns The parsed `DayCountContext`.
-    /// @throws If `json` is malformed or has unknown or mistyped fields.
+    /// @throws `FinstackError` (kind `validation`) if `json` is malformed, has
+    /// unknown or mistyped fields, an inverted coupon period or a zero
+    /// business-day basis.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsDayCountContext, JsValue> {
         from_js_json::<DayCountContextState>(&json, "json").map(|inner| JsDayCountContext { inner })

@@ -157,13 +157,15 @@ test('DayCountContext is built by DayCountContextState::try_new', () => {
   const message =
     'Validation error: coupon period start must be before end, got start=1970-01-11 end=1970-01-06';
   assert.throws(() => new core.DayCountContext(null, null, null, [10, 5]), validation(message));
-  // JSON is a snapshot: like Python, an inverted coupon period is rejected
-  // when the context is used (DayCountContextState::to_ctx).
-  const inverted = core.DayCountContext.fromJson(
-    '{"calendar_id":null,"frequency":null,"bus_basis":null,' +
-      '"coupon_period":["1970-01-11","1970-01-06"],"end_is_termination_date":false}'
+  // Like Python, JSON is validated on load through DayCountContextState::try_new.
+  assert.throws(
+    () =>
+      core.DayCountContext.fromJson(
+        '{"calendar_id":null,"frequency":null,"bus_basis":null,' +
+          '"coupon_period":["1970-01-11","1970-01-06"],"end_is_termination_date":false}'
+      ),
+    (e) => e.kind === 'validation' && e.message.includes(message)
   );
-  assert.throws(() => core.DayCount.act360().yearFraction(0, 30, inverted), validation(message));
   const ctx = new core.DayCountContext('nyse', '3M', 252, [10, 20], true);
   assert.equal(ctx.calendarId, 'nyse');
   assert.equal(ctx.frequency.toString(), '3M');

@@ -1202,8 +1202,16 @@ mod tests {
         }
 
         let mut restore_failure = base;
-        restore_failure["result"]["final_market"]["collateral"] =
-            serde_json::json!({"USD-CSA": "MISSING"});
+        restore_failure["result"]["final_market"]["credit_indices"] = serde_json::json!([{
+            "id": "CDX-IG",
+            "num_constituents": 125,
+            "recovery_rate": 0.4,
+            "index_credit_curve_id": "MISSING",
+            "base_correlation_curve_id": "MISSING-BC",
+            "issuer_credit_curve_ids": null,
+            "issuer_recovery_rates": null,
+            "issuer_weights": null
+        }]);
         let bytes = serde_json::to_vec(&restore_failure).expect("restore case serializes");
         let error = CalibrationResultEnvelope::from_slice_strict(&bytes, &LoadLimits::default())
             .expect_err("invalid nested market references must fail");
@@ -1213,11 +1221,11 @@ mod tests {
         let diagnostic = report
             .diagnostics
             .iter()
-            .find(|diagnostic| diagnostic.code == "market-context/missing-collateral-curve")
+            .find(|diagnostic| diagnostic.code == "market-context/missing-credit-index-reference")
             .expect("restore diagnostic");
         assert_eq!(
             diagnostic.pointer.as_deref(),
-            Some("/result/final_market/collateral/USD-CSA")
+            Some("/result/final_market/credit_indices/0/index_credit_curve_id")
         );
     }
 

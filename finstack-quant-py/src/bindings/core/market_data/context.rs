@@ -6,7 +6,6 @@ use std::sync::Arc;
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::{ConvertedMoney, MarketContext};
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::types::CurveId;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyString};
@@ -279,30 +278,6 @@ impl PyMarketContext {
         slf
     }
 
-    /// Map a CSA code to a discount curve id for collateral discounting (fluent).
-    ///
-    /// Parameters
-    /// ----------
-    /// csa_code : str
-    ///     Collateral agreement identifier (e.g. ``"USD-CSA"``).
-    /// discount_id : str
-    ///     Id of a discount curve already inserted (or to be inserted) in this context.
-    ///
-    /// Returns
-    /// -------
-    /// MarketContext
-    ///     ``self``.
-    #[pyo3(text_signature = "(self, csa_code, discount_id)")]
-    fn map_collateral<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        csa_code: &str,
-        discount_id: &str,
-    ) -> PyRefMut<'py, Self> {
-        slf.inner
-            .map_collateral_mut(csa_code, CurveId::from(discount_id));
-        slf
-    }
-
     /// Retrieve a discount curve by identifier.
     ///
     /// Raises ``KeyError`` if the curve does not exist, ``ValueError`` if it is not a discount curve.
@@ -565,8 +540,7 @@ impl PyMarketContext {
     ///     Keys: ``curve_counts`` (dict of curve type to count), ``total_curves``,
     ///     ``has_fx``, ``surface_count``, ``vol_cube_count``, ``price_count``,
     ///     ``series_count``, ``inflation_index_count``, ``credit_index_count``,
-    ///     ``dividend_schedule_count``, ``fx_delta_vol_surface_count``,
-    ///     ``collateral_mapping_count``.
+    ///     ``dividend_schedule_count``, ``fx_delta_vol_surface_count``.
     #[pyo3(text_signature = "(self)")]
     fn stats<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.stats())

@@ -67,7 +67,7 @@ try {
     );
   }
   await page.getByLabel("Search market data", { exact: true }).fill("USD~1CSA");
-  await page.getByRole("button", { name: "/collateral/USD~1CSA" }).click();
+  await page.getByRole("button", { name: "/prices/USD~1CSA" }).click();
   await originalSelected();
   assert.equal(
     await page

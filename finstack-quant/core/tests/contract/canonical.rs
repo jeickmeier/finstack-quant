@@ -197,7 +197,6 @@ fn market_state_with_tags(tags: &str) -> (Vec<u8>, MarketContextState) {
             "credit_indices": [],
             "fx_delta_vol_surfaces": [],
             "vol_cubes": [],
-            "collateral": {{}},
             "hierarchy": {{
                 "roots": {{
                     "Rates": {{

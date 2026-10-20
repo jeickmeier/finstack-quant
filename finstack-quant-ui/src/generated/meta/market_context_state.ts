@@ -6,7 +6,6 @@ export default [
     "description": "Canonical v1 persisted snapshot of a complete market-data context.",
     "examples": [
       {
-        "collateral": {},
         "credit_indices": [],
         "curves": [],
         "dividends": [],
@@ -1262,12 +1261,6 @@ export default [
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/calendar_id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/calendar_id",
     "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar."
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/calibration_ois_cutoff_days",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/calibration_ois_cutoff_days",
-    "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
-    "format": "int32"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/day_count",
@@ -3577,15 +3570,6 @@ export default [
     "path": "#/$defs/d_fe18010fa6c9de5d3f03/oneOf/1/properties/variant",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel/oneOf/1/properties/variant",
     "const": "nss"
-  },
-  {
-    "path": "#/properties/collateral",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/properties/collateral",
-    "description": "Collateral CSA mappings"
-  },
-  {
-    "path": "#/properties/collateral/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/properties/collateral/additionalProperties"
   },
   {
     "path": "#/properties/credit_indices",

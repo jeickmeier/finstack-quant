@@ -140,10 +140,10 @@ it("searches literal paths and preserves identified selection across reorder, th
   fireEvent.click(
     within(
       screen.getByRole("navigation", { name: "Market references" }),
-    ).getByRole("button", { name: "Inspect USD/CSA, /collateral/USD~1CSA" }),
+    ).getByRole("button", { name: "Inspect USD/CSA, /prices/USD~1CSA" }),
   );
   expect(link.select).toHaveBeenLastCalledWith(
-    JSON.stringify(["collateral", "USD/CSA"]),
+    JSON.stringify(["prices", "USD/CSA"]),
   );
   expect(marketPointer(["a.b", "x~/y", 0])).toBe("/a.b/x~0~1y/0");
   rerender(

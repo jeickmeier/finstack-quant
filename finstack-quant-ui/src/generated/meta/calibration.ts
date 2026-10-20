@@ -3253,30 +3253,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/14",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/14",
-    "description": "Collateral / CSA mapping entry."
-  },
-  {
-    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/14/properties/csa_currency",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/14/properties/csa_currency",
-    "description": "Collateral / CSA currency.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/14/properties/id",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/14/properties/id",
-    "description": "Trade-leg currency this CSA mapping applies to.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/14/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/14/properties/kind",
-    "const": "collateral"
-  },
-  {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/2",
     "description": "CDS index tranche quote."
@@ -6758,12 +6734,6 @@ export default [
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/0/properties/calendar_id",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/0/properties/calendar_id",
     "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar."
-  },
-  {
-    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/0/properties/calibration_ois_cutoff_days",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/0/properties/calibration_ois_cutoff_days",
-    "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
-    "format": "int32"
   },
   {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/0/properties/day_count",

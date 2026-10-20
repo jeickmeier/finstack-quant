@@ -58,11 +58,6 @@ pub(crate) struct DiscountCurveTargetParams {
     pub(crate) residual_notional: f64,
     /// Context needed for pricing against OTHER curves (if any).
     pub(crate) base_context: MarketContext,
-    /// OIS rate cut-off (business days) the bootstrap-internal swaps are priced
-    /// under, derived from the step-level `ois_compounding` override. Stamped
-    /// onto every solver and final curve so calibration and pricing agree on
-    /// the compounded fast-path decision. `None` for non-cut-off conventions.
-    pub(crate) calibration_ois_cutoff_days: Option<i32>,
 }
 
 /// Target for discount curve calibration (Bootstrap and Global).
@@ -276,7 +271,6 @@ impl DiscountCurveTarget {
             .knots(knots.iter().copied())
             .interp(self.params.solve_interp)
             .extrapolation(self.params.extrapolation)
-            .calibration_ois_cutoff_days_opt(self.params.calibration_ois_cutoff_days)
             .validation(validation)
     }
 
@@ -382,9 +376,6 @@ impl DiscountCurveTarget {
             curve_day_count,
             residual_notional,
             base_context: context.clone(),
-            calibration_ois_cutoff_days: Self::calibration_ois_cutoff_days(
-                params.conventions.ois_compounding.as_ref(),
-            ),
         });
 
         // Target-specific validation tolerance for discount curves.
@@ -538,28 +529,6 @@ impl DiscountCurveTarget {
             },
             quotes: quotes.iter().map(Into::into).collect(),
         })
-    }
-
-    /// Extract the OIS rate cut-off (business days) from the step-level
-    /// `ois_compounding` override, when it is a `CompoundedWithRateCutoff`
-    /// convention with a positive cut-off.
-    ///
-    /// This value is stamped onto every solver and final discount curve the
-    /// bootstrap produces so that the bootstrap-internal swap repricing and all
-    /// downstream single-curve OIS pricing apply the *same* compounded fast-path
-    /// decision (see `projected_compounded_float_leg_schedule`).
-    fn calibration_ois_cutoff_days(
-        ois_compounding: Option<&finstack_quant_cashflows::builder::FloatingLegCompounding>,
-    ) -> Option<i32> {
-        use finstack_quant_cashflows::builder::FloatingLegCompounding;
-        match ois_compounding {
-            Some(FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days })
-                if *cutoff_days > 0 =>
-            {
-                i32::try_from(*cutoff_days).ok()
-            }
-            _ => None,
-        }
     }
 }
 
@@ -989,7 +958,6 @@ mod tests {
             curve_day_count: DayCount::Act365F,
             residual_notional: 1.0,
             base_context: MarketContext::new(),
-            calibration_ois_cutoff_days: None,
         });
 
         // Mock instrument using Deposit with all required fields
@@ -1038,7 +1006,6 @@ mod tests {
             curve_day_count: DayCount::Act365F,
             residual_notional: 1.0,
             base_context: MarketContext::new(),
-            calibration_ois_cutoff_days: None,
         });
 
         // Manual Simple Quote (Deposit)
@@ -1107,7 +1074,6 @@ mod tests {
                 curve_day_count: DayCount::Act365F,
                 residual_notional: notional, // Different notionals
                 base_context: MarketContext::new(),
-                calibration_ois_cutoff_days: None,
             });
 
             // Create a few deposit quotes with different maturities
@@ -1218,7 +1184,6 @@ mod tests {
             curve_day_count: DayCount::Act365F,
             residual_notional: 1.0,
             base_context: MarketContext::new(),
-            calibration_ois_cutoff_days: None,
         });
 
         let maturity = base_date + time::Duration::days(90);

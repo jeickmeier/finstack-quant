@@ -41,7 +41,6 @@ pub struct DiscountCurveBuilder {
     pub(super) allow_non_monotonic: bool,
     pub(super) min_forward_tenor: f64,
     pub(super) rate_calibration: Option<super::super::RateCalibrationRecipe>,
-    pub(super) calibration_ois_cutoff_days: Option<i32>,
     pub(super) fx_policy: Option<String>,
     pub(super) transform: Option<super::evaluation::CurveTransform>,
 }
@@ -189,14 +188,6 @@ impl DiscountCurveBuilder {
         self
     }
 
-    /// Record the OIS rate cut-off (business days) this curve was calibrated
-    /// under. Pass `Some(days)` only when the bootstrap used a
-    /// `CompoundedWithRateCutoff` convention; leave unset otherwise.
-    pub fn calibration_ois_cutoff_days_opt(mut self, cutoff_days: Option<i32>) -> Self {
-        self.calibration_ois_cutoff_days = cutoff_days;
-        self
-    }
-
     /// Stamp an opaque FX policy on the curve.
     ///
     /// Use when the bootstrap involved an FX-sensitive assumption (XCCY basis
@@ -298,7 +289,6 @@ impl DiscountCurveBuilder {
             allow_non_monotonic: self.allow_non_monotonic,
             min_forward_tenor: self.min_forward_tenor,
             rate_calibration: self.rate_calibration,
-            calibration_ois_cutoff_days: self.calibration_ois_cutoff_days,
             fx_policy: self.fx_policy,
         };
         if let Some(transform) = self.transform {

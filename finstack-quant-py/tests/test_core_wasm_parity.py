@@ -129,7 +129,6 @@ def _market() -> MarketContext:
     hazard = HazardCurve.flat("CDX-IG-HZD", "2025-01-02", 0.01, 0.4)
     market.insert(hazard)
     market.insert_credit_index("CDX-IG-43", CreditIndexData(125, 0.4, hazard, _base_correlation()))
-    market.map_collateral("USD-CSA", "USD-OIS")
     return market
 
 

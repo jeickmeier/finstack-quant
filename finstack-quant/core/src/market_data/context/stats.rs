@@ -91,11 +91,10 @@ impl MarketContext {
             credit_index_count: self.credit_indices.len(),
             dividend_schedule_count: self.dividends.len(),
             fx_delta_vol_surface_count: self.fx_delta_vol_surfaces.len(),
-            collateral_mapping_count: self.collateral.len(),
         }
     }
 
-    /// Check whether any data (curve, surface, price, series, index, dividend, or collateral mapping) is registered under the given id.
+    /// Check whether any data (curve, surface, price, series, index, or dividend) is registered under the given id.
     pub fn contains(&self, id: impl AsRef<str>) -> bool {
         let id = id.as_ref();
         self.keyed_maps().iter().any(|map| map.has(id))
@@ -104,15 +103,15 @@ impl MarketContext {
     /// Number of stored market-data objects.
     ///
     /// Counts every curve, volatility surface, volatility cube, price/scalar,
-    /// time series, inflation index, credit index, dividend schedule, FX
-    /// delta-vol surface and collateral mapping, plus one for an attached FX
-    /// matrix. The optional data hierarchy is metadata and is not counted.
+    /// time series, inflation index, credit index, dividend schedule and FX
+    /// delta-vol surface, plus one for an attached FX matrix. The optional data hierarchy is metadata and is not counted.
     ///
     /// # Examples
     /// ```rust
     /// use finstack_quant_core::market_data::context::MarketContext;
+    /// use finstack_quant_core::market_data::scalars::MarketScalar;
     ///
-    /// let ctx = MarketContext::new().map_collateral("USD-CSA", "USD-OIS".into());
+    /// let ctx = MarketContext::new().insert_price("USD-RATE", MarketScalar::Unitless(0.05));
     /// assert_eq!(ctx.len(), 1);
     /// assert!(!ctx.is_empty());
     /// assert_eq!(MarketContext::new().len(), 0);
@@ -128,7 +127,7 @@ impl MarketContext {
 
     /// Every id-keyed store, in one list shared by [`Self::len`] and
     /// [`Self::contains`].
-    fn keyed_maps(&self) -> [&dyn KeyedMap; 10] {
+    fn keyed_maps(&self) -> [&dyn KeyedMap; 9] {
         [
             &*self.curves,
             &*self.surfaces,
@@ -139,7 +138,6 @@ impl MarketContext {
             &*self.credit_indices,
             &*self.dividends,
             &*self.fx_delta_vol_surfaces,
-            &*self.collateral,
         ]
     }
 
@@ -212,8 +210,7 @@ impl MarketContext {
     /// Retain only the curves for which `pred` returns `true` (mutable).
     ///
     /// Credit indices whose dependencies are removed are dropped immediately
-    /// and reported in the returned mutation information. Collateral mappings
-    /// without a surviving discount curve are also removed. For snapshot
+    /// and reported in the returned mutation information. For snapshot
     /// replacement, insert replacement curves before removing obsolete IDs so
     /// dependent indices remain present throughout the operation.
     ///
@@ -229,9 +226,6 @@ impl MarketContext {
         mut pred: impl FnMut(&CurveId, &CurveStorage) -> bool,
     ) -> Vec<CurveId> {
         Arc::make_mut(&mut self.curves).retain(|id, curve| pred(id, curve));
-        let curves = &self.curves;
-        Arc::make_mut(&mut self.collateral)
-            .retain(|_, id| matches!(curves.get(id), Some(CurveStorage::Discount(_))));
         let mut invalidated = self.rebind_all_credit_indices();
         invalidated.sort();
         invalidated
@@ -338,8 +332,6 @@ pub struct ContextStats {
     pub dividend_schedule_count: usize,
     /// Number of FX delta-quoted volatility surfaces
     pub fx_delta_vol_surface_count: usize,
-    /// Number of collateral mappings
-    pub collateral_mapping_count: usize,
 }
 
 impl core::fmt::Display for ContextStats {
@@ -361,11 +353,6 @@ impl core::fmt::Display for ContextStats {
             "  FX delta vol surfaces: {}",
             self.fx_delta_vol_surface_count
         )?;
-        writeln!(
-            f,
-            "  Collateral mappings: {}",
-            self.collateral_mapping_count
-        )?;
         writeln!(f, "  Has FX: {}", self.has_fx)?;
         Ok(())
     }
@@ -384,7 +371,6 @@ mod stats_serde_tests {
         assert_eq!(
             keys,
             [
-                "collateral_mapping_count",
                 "credit_index_count",
                 "curve_counts",
                 "dividend_schedule_count",

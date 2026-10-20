@@ -38,7 +38,6 @@ __all__ = [
     "CalibrationValidationReport",
     "CdsQuote",
     "CdsTrancheQuote",
-    "CollateralEntry",
     "DividendScheduleDatum",
     "FxSpotDatum",
     "InflationQuote",
@@ -2342,107 +2341,8 @@ class DividendScheduleDatum:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
-class CollateralEntry:
-    """A collateral (CSA) currency mapping market datum (``kind == "collateral"``).
-
-    Examples:
-    --------
-    >>> from finstack_quant.calibration import CollateralEntry
-    >>> CollateralEntry("EUR", "USD").csa_currency
-    'USD'
-
-    """
-
-    def __init__(self, id: str, csa_currency: str) -> None:
-        """Build a collateral mapping entry.
-
-        Parameters
-        ----------
-        id : str | Currency
-            Trade-leg currency the CSA mapping applies to (the datum id).
-        csa_currency : str | Currency
-            Collateral (CSA) currency.
-
-        Raises
-        ------
-        ValueError
-            If a currency code is unknown.
-
-        """
-
-    @property
-    def id(self) -> str:
-        """
-        Trade-leg currency code (the datum id).
-
-        This property does not raise.
-
-        Returns
-        -------
-        str
-            Trade-leg currency code (the datum id).
-        """
-
-    @property
-    def csa_currency(self) -> str:
-        """
-        Collateral (CSA) currency code.
-
-        This property does not raise.
-
-        Returns
-        -------
-        str
-            Collateral (CSA) currency code.
-        """
-
-    def to_json(self) -> str:
-        """
-        Serialize to compact JSON.
-
-        Returns
-        -------
-        str
-            Compact JSON encoding of this value.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized to JSON.
-        """
-
-    @staticmethod
-    def from_json(json: str) -> CollateralEntry:
-        """
-        Rebuild from JSON produced by :meth:`to_json`.
-
-        Parameters
-        ----------
-        json : str
-            JSON produced by :meth:`to_json`.
-
-        Returns
-        -------
-        CollateralEntry
-            The decoded value.
-
-        Raises
-        ------
-        ValueError
-            If ``json`` is malformed or carries unknown fields.
-
-        Examples
-        --------
-        >>> from finstack_quant.calibration import CollateralEntry
-        >>> CollateralEntry.from_json(CollateralEntry("EUR", "USD").to_json()).id
-        'EUR'
-        """
-
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
-    def __repr__(self) -> str: ...
-
 type Quote = RateQuote | CdsQuote | VolQuote | InflationQuote | XccyQuote | CdsTrancheQuote
-type MarketDatum = Quote | FxSpotDatum | PriceDatum | DividendScheduleDatum | CollateralEntry
+type MarketDatum = Quote | FxSpotDatum | PriceDatum | DividendScheduleDatum
 
 class CalibrationStep:
     """One calibration step: a target kind, parameters, and a named quote set.

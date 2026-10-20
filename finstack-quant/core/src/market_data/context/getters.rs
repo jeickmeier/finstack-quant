@@ -394,45 +394,4 @@ impl MarketContext {
     pub fn get_vol_cube(&self, id: impl AsRef<str>) -> Result<Arc<VolCube>> {
         self.get_cloned(&self.vol_cubes, id.as_ref())
     }
-
-    /// Resolve a collateral discount curve for a CSA code.
-    ///
-    /// This performs the indirection from a CSA or collateral agreement code to
-    /// the discount curve configured for that collateral set. The returned trait
-    /// object exposes the generic [`Discounting`](crate::market_data::traits::Discounting) interface rather than the
-    /// concrete [`DiscountCurve`] type.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the CSA code is not mapped or if the mapped curve is missing.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::market_data::context::MarketContext;
-    /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    /// use finstack_quant_core::math::interp::InterpStyle;
-    /// use finstack_quant_core::dates::Date;
-    /// use finstack_quant_core::types::CurveId;
-    /// use time::Month;
-    ///
-    /// let curve = DiscountCurve::builder("USD-OIS")
-    ///     .base_date(Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"))
-    ///     .knots([(0.0, 1.0), (1.0, 0.99)])
-    ///     .build()
-    ///     .expect("... builder should succeed");
-    /// let ctx = MarketContext::new()
-    ///     .insert(curve)
-    ///     .map_collateral("USD-CSA", CurveId::from("USD-OIS"));
-    /// let discount = ctx.get_collateral("USD-CSA").expect("Collateral curve should exist");
-    /// assert!(discount.df(0.5) <= 1.0);
-    /// ```
-    pub fn get_collateral(&self, csa_code: &str) -> Result<Arc<DiscountCurve>> {
-        let curve_id = self
-            .collateral
-            .get(csa_code)
-            .ok_or(crate::InputError::NotFound {
-                id: format!("collateral:{}", csa_code),
-            })?;
-        self.get_discount(curve_id.as_str())
-    }
 }

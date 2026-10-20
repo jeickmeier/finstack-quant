@@ -204,9 +204,7 @@ pub(super) fn count_business_days_by_scan<C: HolidayCalendar + ?Sized>(
 }
 
 /// Basic metadata describing a holiday calendar.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct CalendarMetadata {
     /// Lowercase identifier (stable code).
     pub id: &'static str,

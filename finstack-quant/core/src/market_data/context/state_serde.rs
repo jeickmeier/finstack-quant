@@ -172,7 +172,6 @@ where
     "credit_indices",
     "fx_delta_vol_surfaces",
     "vol_cubes",
-    "collateral",
     "hierarchy",
 ])))]
 pub struct MarketContextState {
@@ -198,8 +197,6 @@ pub struct MarketContextState {
     pub fx_delta_vol_surfaces: Vec<FxDeltaVolSurface>,
     /// SABR volatility cubes
     pub vol_cubes: Vec<VolCube>,
-    /// Collateral CSA mappings
-    pub collateral: std::collections::BTreeMap<String, String>,
     /// Market data hierarchy snapshot, or `null` when no hierarchy is configured.
     ///
     /// The key is mandatory but its value is nullable: `deserialize_with` makes
@@ -308,14 +305,6 @@ fn validate_restore_references(
         state.vol_cubes.iter().map(|entry| entry.id().to_string()),
     );
 
-    let discount_ids: FxHashSet<&str> = state
-        .curves
-        .iter()
-        .filter_map(|entry| match entry {
-            CurveState::Discount(curve) => Some(curve.id().as_str()),
-            _ => None,
-        })
-        .collect();
     let hazard_ids: FxHashSet<&str> = state
         .curves
         .iter()
@@ -332,24 +321,6 @@ fn validate_restore_references(
             _ => None,
         })
         .collect();
-
-    for (csa, curve_id) in &state.collateral {
-        if !discount_ids.contains(curve_id.as_str()) {
-            report.push_bounded(
-                limits,
-                Diagnostic::new(
-                    "market-context/missing-collateral-curve",
-                    LoadPhase::Semantic,
-                    Severity::Error,
-                    format!(
-                        "collateral mapping '{csa}' references missing discount curve '{curve_id}'"
-                    ),
-                )
-                .with_pointer(format!("/collateral/{}", escape_json_pointer(csa)))
-                .with_contract(MARKET_CONTEXT_STATE_CONTRACT.id),
-            );
-        }
-    }
 
     for (index, credit_index) in state.credit_indices.iter().enumerate() {
         let mut check_reference = |curve_id: &str, expected: &str, suffix: &str, present: bool| {
@@ -514,12 +485,6 @@ impl TryFrom<&MarketContext> for MarketContextState {
 
         let vol_cubes = sorted_by_id(&ctx.vol_cubes, |_, cube| (**cube).clone());
 
-        let collateral: std::collections::BTreeMap<String, String> = ctx
-            .collateral
-            .iter()
-            .map(|(csa, curve_id)| (csa.clone(), curve_id.to_string()))
-            .collect();
-
         Ok(MarketContextState {
             schema_version: SchemaVersion::CURRENT,
             curves,
@@ -532,7 +497,6 @@ impl TryFrom<&MarketContext> for MarketContextState {
             credit_indices,
             fx_delta_vol_surfaces,
             vol_cubes,
-            collateral,
             hierarchy: ctx.hierarchy.clone(),
         })
     }
@@ -628,10 +592,6 @@ fn restore_market_context(
         ctx.insert_vol_cube_mut(cube);
     }
 
-    for (csa, curve_id_str) in state.collateral {
-        ctx.map_collateral_mut(csa, CurveId::from(curve_id_str));
-    }
-
     ctx.hierarchy = state.hierarchy;
 
     Ok((ctx, report))
@@ -672,7 +632,7 @@ impl MarketContext {
     ///
     /// Returns [`ContractError`] for malformed JSON, resource-limit failures,
     /// missing or unsupported versions, invalid state shape, duplicate IDs,
-    /// unresolved credit-index or collateral references, or failed market
+    /// unresolved credit-index references, or failed market
     /// context reconstruction. Semantic findings are retained up to
     /// [`LoadLimits::max_diagnostics`].
     pub fn from_state_slice(

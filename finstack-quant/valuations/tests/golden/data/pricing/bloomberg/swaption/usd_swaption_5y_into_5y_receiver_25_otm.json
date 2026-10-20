@@ -206,7 +206,6 @@
           "allow_non_monotonic": false,
           "min_forward_tenor": 1e-06,
           "rate_calibration": null,
-          "calibration_ois_cutoff_days": 1,
           "fx_policy": null
         },
         {

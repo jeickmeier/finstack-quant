@@ -184,20 +184,6 @@ pub struct DiscountCurve {
     pub(crate) min_forward_tenor: f64,
     /// Exact typed recipe used to replay calibration after quote shocks.
     pub(crate) rate_calibration: Option<super::RateCalibrationRecipe>,
-    /// Rate cut-off (business days) of the OIS compounding convention this
-    /// curve was *calibrated* under, when bootstrapped with a
-    /// `CompoundedWithRateCutoff` override.
-    ///
-    /// `None` = calibrated under a non-cut-off convention (registry default),
-    /// or not calibrated from instruments at all (hand-built curve).
-    ///
-    /// Stored as a plain scalar (no dependency on the valuations-crate
-    /// `FloatingLegCompounding` enum). Calibration **provenance only**: it is
-    /// stamped on both the intermediate solver curves and the final curve as
-    /// an audit trail of the bootstrap convention, and round-trips through
-    /// serialization, but no pricing or re-bump path consults it — pricing
-    /// takes the cut-off from the instrument's own `FloatingLegCompounding`.
-    pub(crate) calibration_ois_cutoff_days: Option<i32>,
     /// Opaque FX policy stamp when bootstrap used cross-currency assumptions
     /// (XCCY basis, FX triangulation). Propagated to `ResultsMeta.fx_policy_applied`
     /// for instruments that depend on this curve.
@@ -235,8 +221,6 @@ struct RawDiscountCurve {
     pub min_forward_tenor: f64,
     /// Exact typed calibration replay recipe.
     pub rate_calibration: Option<super::RateCalibrationRecipe>,
-    /// OIS cut-off (business days) the curve was calibrated under, if any.
-    pub calibration_ois_cutoff_days: Option<i32>,
     /// Opaque FX policy stamp; see [`DiscountCurve::fx_policy`].
     pub fx_policy: Option<String>,
     /// Canonical source interpolation and accumulated continuous transformations.
@@ -265,7 +249,6 @@ impl From<DiscountCurve> for RawDiscountCurve {
             allow_non_monotonic: curve.allow_non_monotonic,
             min_forward_tenor: curve.min_forward_tenor,
             rate_calibration: curve.rate_calibration,
-            calibration_ois_cutoff_days: curve.calibration_ois_cutoff_days,
             fx_policy: curve.fx_policy,
             transform: curve.transform,
         }
@@ -285,7 +268,6 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
             .extrapolation(state.extrapolation)
             .min_forward_tenor(state.min_forward_tenor)
             .rate_calibration_opt(state.rate_calibration)
-            .calibration_ois_cutoff_days_opt(state.calibration_ois_cutoff_days)
             .fx_policy_opt(state.fx_policy)
             .validation(ValidationMode::Raw {
                 allow_non_monotonic: state.allow_non_monotonic,
@@ -371,7 +353,6 @@ mod tests {
             "allow_non_monotonic": false,
             "min_forward_tenor": 1e-8,
             "rate_calibration": null,
-            "calibration_ois_cutoff_days": null,
             "fx_policy": null
         });
 

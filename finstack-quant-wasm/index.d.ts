@@ -2752,9 +2752,9 @@ export interface DayCountContextConstructor {
   /**
    * Deserialize from the canonical JSON wire form produced by `toJson`.
    *
-   * @param json - Canonical DayCountContext JSON text or plain object; unknown fields are rejected. As in Rust and Python, the coupon period is validated when the context is used (`DayCountContextState::to_ctx`).
+   * @param json - Canonical DayCountContext JSON text or plain object; unknown fields are rejected. As in Rust and Python, it is validated on load by `DayCountContextState::try_new`.
    * @returns The parsed `DayCountContext`.
-   * @throws If `json` is malformed or has unknown or mistyped fields.
+   * @throws `FinstackError` (kind `validation`) if `json` is malformed, has unknown or mistyped fields, an inverted coupon period or a zero business-day basis.
    */
   fromJson(json: JsonInput): DayCountContext;
 }
@@ -4359,16 +4359,6 @@ export interface MarketContext extends WasmOwned {
    */
   insertInflationIndex(index: InflationIndex): MarketContext;
   /**
-   * Map a CSA code to the discount curve used for collateralised trades
-   * (Rust `MarketContext::map_collateral_mut`).
-   *
-   * @param csaCode - Credit-support-annex code, such as `"USD-CSA"`.
-   * @param discountId - Identifier of the discount curve to use for that CSA; it is resolved when a collateral curve is requested.
-   * @returns This context, updated in place, so calls can be chained.
-   * @throws `TypeError` if an argument is not a string.
-   */
-  mapCollateral(csaCode: string, discountId: string): MarketContext;
-  /**
    * Look up a discount curve by id (Rust `MarketContext::get_discount`).
    *
    * @param id - Identifier the item was inserted under.
@@ -4527,7 +4517,7 @@ export interface MarketContext extends WasmOwned {
   /**
    * Counts of the stored market data (Rust `MarketContext::stats`).
    *
-   * @returns A plain object with `curve_counts` (count per curve type), `total_curves`, `has_fx`, `surface_count`, `vol_cube_count`, `price_count`, `series_count`, `inflation_index_count`, `credit_index_count`, `dividend_schedule_count`, `fx_delta_vol_surface_count` and `collateral_mapping_count`.
+   * @returns A plain object with `curve_counts` (count per curve type), `total_curves`, `has_fx`, `surface_count`, `vol_cube_count`, `price_count`, `series_count`, `inflation_index_count`, `credit_index_count`, `dividend_schedule_count` and `fx_delta_vol_surface_count`.
    * @throws If the counts cannot be converted (not expected).
    */
   stats(): ContextStats;
@@ -5519,7 +5509,7 @@ export interface FinstackConfig extends WasmOwned {
    */
   readonly roundingMode: RoundingMode;
   /**
-   * Numeric tolerances as a plain `ToleranceConfig` object (`rate_epsilon`, `generic_epsilon`).
+   * Numeric tolerances as a plain `ToleranceConfig` object (`generic_epsilon`).
    */
   readonly tolerances: ToleranceConfig;
   /**
@@ -5630,7 +5620,7 @@ export interface FinstackConfigConstructor {
    * Create a configuration from the Rust defaults.
    *
    * @param roundingMode - Lowercase rounding-mode name (for example `"bankers"`, or `mode.toString()` of a `RoundingMode`); omitted uses the Rust default, `"bankers"`.
-   * @param tolerances - `ToleranceConfig` object or JSON text with the optional absolute tolerances `rate_epsilon` (default `1e-12`) and `generic_epsilon` (default `1e-10`), both finite and positive; omitted uses the defaults.
+   * @param tolerances - `ToleranceConfig` object or JSON text with the optional absolute tolerance `generic_epsilon` (default `1e-10`), finite and positive; omitted uses the default.
    * @returns A new `FinstackConfig`.
    * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an unknown rounding mode, an unknown tolerance field, or a non-positive tolerance.
    */
@@ -7310,10 +7300,6 @@ export interface ContextStats {
    * Number of FX delta-quoted volatility surfaces.
    */
   fx_delta_vol_surface_count: number;
-  /**
-   * Number of CSA-code to discount-curve collateral mappings.
-   */
-  collateral_mapping_count: number;
 }
 
 /**

@@ -151,7 +151,6 @@ fn make_market_state(disc: DiscountCurve, haz: HazardCurve) -> MarketContextStat
         inflation_indices: vec![],
         dividends: vec![],
         credit_indices: vec![],
-        collateral: BTreeMap::new(),
         fx_delta_vol_surfaces: vec![],
         hierarchy: None,
         vol_cubes: vec![],

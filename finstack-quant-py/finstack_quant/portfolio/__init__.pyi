@@ -3370,7 +3370,7 @@ class PortfolioResult:
     ...     "mode": "bankers",
     ...     "ingest_scale_by_currency": {},
     ...     "output_scale_by_currency": {},
-    ...     "tolerances": {"rate_epsilon": 1e-12, "generic_epsilon": 1e-10},
+    ...     "tolerances": {"generic_epsilon": 1e-10},
     ...     "version": 1,
     ... }
     >>> doc = {
@@ -3523,7 +3523,7 @@ class PortfolioResult:
         ...     "mode": "bankers",
         ...     "ingest_scale_by_currency": {},
         ...     "output_scale_by_currency": {},
-        ...     "tolerances": {"rate_epsilon": 1e-12, "generic_epsilon": 1e-10},
+        ...     "tolerances": {"generic_epsilon": 1e-10},
         ...     "version": 1,
         ... }
         >>> doc = {

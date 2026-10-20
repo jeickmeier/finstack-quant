@@ -44,8 +44,6 @@ def test_config_maximum_scale_preserves_small_nonzero_money() -> None:
 @pytest.mark.parametrize("bad", [0.0, -1.0, math.nan, math.inf])
 def test_tolerance_config_rejects_nonpositive_and_nonfinite_values(bad: float) -> None:
     with pytest.raises(ValueError, match="finite and positive"):
-        ToleranceConfig(rate_epsilon=bad)
-    with pytest.raises(ValueError, match="finite and positive"):
         ToleranceConfig(generic_epsilon=bad)
 
 

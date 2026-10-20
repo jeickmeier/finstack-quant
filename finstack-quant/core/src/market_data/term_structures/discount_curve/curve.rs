@@ -554,7 +554,6 @@ impl DiscountCurve {
             allow_non_monotonic: false,
             min_forward_tenor: DEFAULT_MIN_FORWARD_TENOR,
             rate_calibration: None,
-            calibration_ois_cutoff_days: None,
             fx_policy: None,
             transform: None,
         }
@@ -600,7 +599,6 @@ impl DiscountCurve {
             .extrapolation(self.interp.extrapolation())
             .min_forward_tenor(self.min_forward_tenor)
             .rate_calibration_opt(self.rate_calibration.clone())
-            .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)
             .fx_policy_opt(self.fx_policy.clone())
             .validation(ValidationMode::Raw {
                 allow_non_monotonic: self.allow_non_monotonic,

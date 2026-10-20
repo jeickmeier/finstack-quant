@@ -21,7 +21,6 @@ use crate::utils::{contract_to_js_err, to_js_err, to_js_value};
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::{ConvertedMoney, MarketContext};
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::types::CurveId;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 
@@ -294,29 +293,6 @@ impl JsMarketContext {
     pub fn insert_inflation_index(&mut self, index: &JsInflationIndex) {
         self.context_mut()
             .insert_inflation_index_mut(Arc::clone(&index.inner));
-    }
-
-    /// Map a CSA code to the discount curve used for collateralised trades
-    /// (Rust `MarketContext::map_collateral_mut`).
-    ///
-    /// # Arguments
-    ///
-    /// * `csa_code` - Credit-support-annex code, such as `"USD-CSA"`.
-    /// * `discount_id` - Identifier of the discount curve to use for that
-    ///   CSA; it is resolved when a collateral curve is requested.
-    ///
-    /// @returns This context, updated in place, so calls can be chained.
-    /// @throws `TypeError` if an argument is not a string.
-    #[wasm_bindgen(js_name = mapCollateral)]
-    pub fn map_collateral(
-        &mut self,
-        csa_code: JsValue,
-        discount_id: JsValue,
-    ) -> Result<(), JsValue> {
-        let csa_code = js_string(&csa_code, "csaCode")?;
-        let discount_id = CurveId::from(js_string(&discount_id, "discountId")?);
-        self.context_mut().map_collateral_mut(csa_code, discount_id);
-        Ok(())
     }
 
     /// Look up a discount curve by id (Rust `MarketContext::get_discount`).
@@ -665,8 +641,8 @@ impl JsMarketContext {
     /// @returns A plain object with `curve_counts` (count per curve type),
     /// `total_curves`, `has_fx`, `surface_count`, `vol_cube_count`,
     /// `price_count`, `series_count`, `inflation_index_count`,
-    /// `credit_index_count`, `dividend_schedule_count`,
-    /// `fx_delta_vol_surface_count` and `collateral_mapping_count`.
+    /// `credit_index_count`, `dividend_schedule_count` and
+    /// `fx_delta_vol_surface_count`.
     /// @throws If the counts cannot be converted (not expected).
     #[wasm_bindgen(js_name = stats)]
     pub fn stats(&self) -> Result<JsValue, JsValue> {

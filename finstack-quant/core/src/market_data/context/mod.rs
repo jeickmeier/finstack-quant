@@ -178,9 +178,6 @@ pub struct MarketContext {
     /// SABR volatility cubes (expiry x tenor x strike)
     vol_cubes: Arc<FxHashMap<CurveId, Arc<VolCube>>>,
 
-    /// Collateral CSA code mappings
-    collateral: Arc<FxHashMap<String, CurveId>>,
-
     /// Optional market data hierarchy for organizational grouping.
     hierarchy: Option<MarketDataHierarchy>,
 }

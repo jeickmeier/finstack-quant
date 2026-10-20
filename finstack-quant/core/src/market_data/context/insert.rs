@@ -273,36 +273,6 @@ impl MarketContext {
         self
     }
 
-    /// Map collateral CSA code to a discount curve identifier.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::market_data::context::MarketContext;
-    /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    /// use finstack_quant_core::dates::Date;
-    /// use finstack_quant_core::types::CurveId;
-    /// use time::Month;
-    ///
-    /// let curve = DiscountCurve::builder("USD-OIS")
-    ///     .base_date(Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"))
-    ///     .knots([(0.0, 1.0), (1.0, 0.99)])
-    ///     .build()
-    ///     .expect("... builder should succeed");
-    /// let ctx = MarketContext::new()
-    ///     .insert(curve)
-    ///     .map_collateral("USD-CSA", CurveId::from("USD-OIS"));
-    /// assert!(ctx.get_collateral("USD-CSA").is_ok());
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `csa_code` - Collateral CSA identifier such as `"USD-CSA"`.
-    /// * `discount_id` - Discount curve already present in the context.
-    pub fn map_collateral(mut self, csa_code: impl Into<String>, discount_id: CurveId) -> Self {
-        self.map_collateral_mut(csa_code, discount_id);
-        self
-    }
-
     // Insert methods (mutable variants for binding layers)
     //
     // These `&mut self` variants mirror the consuming `insert_*` methods above but
@@ -470,18 +440,6 @@ impl MarketContext {
     /// Clear the FX matrix, mutating in place.
     pub fn clear_fx_mut(&mut self) -> &mut Self {
         self.fx = None;
-        self
-    }
-
-    /// Map collateral CSA code to a discount curve identifier, mutating in place.
-    ///
-    /// Mirrors [`Self::map_collateral`] but takes `&mut self`.
-    pub fn map_collateral_mut(
-        &mut self,
-        csa_code: impl Into<String>,
-        discount_id: CurveId,
-    ) -> &mut Self {
-        Arc::make_mut(&mut self.collateral).insert(csa_code.into(), discount_id);
         self
     }
 }

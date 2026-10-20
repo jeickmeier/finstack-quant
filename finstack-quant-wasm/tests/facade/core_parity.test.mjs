@@ -119,7 +119,6 @@ const market = () => {
     'CDX-IG-43',
     new core.CreditIndexData(125, 0.4, hazard, baseCorrelation())
   );
-  context.mapCollateral('USD-CSA', 'USD-OIS');
   return context;
 };
 const schedule = () =>
@@ -627,14 +626,11 @@ test('cdsImm / imm set quarterly short_back like Rust ScheduleBuilder; a later f
   assert.deepEqual([imm.frequency, imm.stub], [{ count: 3, unit: 'months' }, 'short_back']);
 });
 
-test('MarketContext.len counts the FX matrix and collateral mappings', () => {
+test('MarketContext.len counts the FX matrix', () => {
   assert.equal(new core.MarketContext().len(), 0);
   const fxOnly = new core.MarketContext();
   fxOnly.insertFx(fx());
   assert.deepEqual([fxOnly.len(), fxOnly.isEmpty()], [1, false]);
-  const collateralOnly = new core.MarketContext();
-  collateralOnly.mapCollateral('USD-CSA', 'USD-OIS');
-  assert.deepEqual([collateralOnly.len(), collateralOnly.isEmpty()], [1, false]);
 });
 
 test('CreditIndexData issuer accessors fall back to the index data', () => {
@@ -686,15 +682,15 @@ test('MarketContext inserts change the context in place and share curve data', (
 });
 
 test('FinstackConfig extensions hold JSON values, not JSON text', () => {
-  const cfg = new core.FinstackConfig(null, { rate_epsilon: 1e-9 });
-  assert.deepEqual(cfg.tolerances, { rate_epsilon: 1e-9, generic_epsilon: 1e-10 });
+  const cfg = new core.FinstackConfig(null, { generic_epsilon: 1e-9 });
+  assert.deepEqual(cfg.tolerances, { generic_epsilon: 1e-9 });
   cfg.setExtension('core.example.v1', '{"not":"parsed"}');
   assert.equal(cfg.getExtension('core.example.v1'), '{"not":"parsed"}');
   assert.equal(cfg.getExtension('core.other.v1'), undefined);
   assert.equal(cfg.removeExtension('core.example.v1'), true);
   assert.equal(cfg.removeExtension('core.example.v1'), false);
   assert.throws(() => cfg.setExtension('bad key', 1), kind('validation'));
-  assert.throws(() => new core.FinstackConfig(null, { rate_epsilon: -1 }), kind('validation'));
+  assert.throws(() => new core.FinstackConfig(null, { generic_epsilon: -1 }), kind('validation'));
   cfg.setIngestScale('USD', 8);
   assert.deepEqual(cfg.ingestScaleOverrides(), { USD: 8 });
   assert.deepEqual(cfg.outputScaleOverrides(), {});

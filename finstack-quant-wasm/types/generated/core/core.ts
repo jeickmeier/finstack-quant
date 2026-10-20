@@ -206,10 +206,6 @@ export type CurveState =
        */
       calendar_id?: string | null;
       /**
-       * OIS cut-off (business days) the curve was calibrated under, if any.
-       */
-      calibration_ois_cutoff_days?: number | null;
-      /**
        * Day count convention for discount time basis
        */
       day_count: DayCount;
@@ -1692,12 +1688,6 @@ export interface InflationPublicationWire {
  * Canonical v1 persisted snapshot of a complete market-data context.
  */
 export interface MarketContextState {
-  /**
-   * Collateral CSA mappings
-   */
-  collateral: {
-    [k: string]: string;
-  };
   /**
    * Credit index aggregates (references curves by ID)
    */

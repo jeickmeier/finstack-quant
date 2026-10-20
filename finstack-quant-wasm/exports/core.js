@@ -87,7 +87,6 @@ chain(wasm.MarketContext, [
   'insertCreditIndex',
   'insertSeries',
   'insertInflationIndex',
-  'mapCollateral',
 ]);
 chain(wasm.ScheduleBuilder, [
   'frequency',

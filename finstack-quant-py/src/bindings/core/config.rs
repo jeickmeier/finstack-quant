@@ -65,13 +65,10 @@ label_enum!(PyRoundingMode, RoundingMode, "RoundingMode", from_name, {
 });
 wire_methods!(PyRoundingMode, RoundingMode, "RoundingMode", json_only);
 
-/// Numerical tolerance settings for rate and generic comparisons.
+/// Numerical tolerance settings for generic floating-point comparisons.
 ///
 /// Parameters
 /// ----------
-/// rate_epsilon : float | None
-///     Epsilon for rate-style comparisons (decimal rate units); library
-///     default when ``None``.
 /// generic_epsilon : float | None
 ///     Epsilon for generic floating-point comparisons; library default when
 ///     ``None``.
@@ -84,7 +81,7 @@ wire_methods!(PyRoundingMode, RoundingMode, "RoundingMode", json_only);
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.config import ToleranceConfig
-/// >>> ToleranceConfig(rate_epsilon=1e-9).rate_epsilon
+/// >>> ToleranceConfig(generic_epsilon=1e-9).generic_epsilon
 /// 1e-09
 #[pyclass(
     module = "finstack_quant.core.config",
@@ -107,27 +104,18 @@ impl PyToleranceConfig {
 
 #[pymethods]
 impl PyToleranceConfig {
-    /// Create tolerance settings, optionally overriding the default epsilons.
+    /// Create tolerance settings, optionally overriding the default epsilon.
     ///
     /// Raises ``ValueError`` if a supplied epsilon is non-finite or not
     /// strictly positive.
     #[new]
-    #[pyo3(signature = (rate_epsilon=None, generic_epsilon=None))]
-    #[pyo3(text_signature = "(rate_epsilon=None, generic_epsilon=None)")]
-    fn new(rate_epsilon: Option<f64>, generic_epsilon: Option<f64>) -> PyResult<Self> {
+    #[pyo3(signature = (generic_epsilon=None))]
+    #[pyo3(text_signature = "(generic_epsilon=None)")]
+    fn new(generic_epsilon: Option<f64>) -> PyResult<Self> {
         let defaults = ToleranceConfig::default();
-        ToleranceConfig::new(
-            rate_epsilon.unwrap_or(defaults.rate_epsilon),
-            generic_epsilon.unwrap_or(defaults.generic_epsilon),
-        )
-        .map(Self::from_inner)
-        .map_err(core_to_py)
-    }
-
-    /// Epsilon used for rate-style comparisons.
-    #[getter]
-    fn rate_epsilon(&self) -> f64 {
-        self.inner.rate_epsilon
+        ToleranceConfig::new(generic_epsilon.unwrap_or(defaults.generic_epsilon))
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Epsilon used for generic floating-point comparisons.
@@ -139,8 +127,8 @@ impl PyToleranceConfig {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "ToleranceConfig(rate_epsilon={:?}, generic_epsilon={:?})",
-            self.inner.rate_epsilon, self.inner.generic_epsilon
+            "ToleranceConfig(generic_epsilon={:?})",
+            self.inner.generic_epsilon
         )
     }
 }

@@ -167,9 +167,8 @@ impl JsFinstackConfig {
     ///   `"bankers"`, or `mode.toString()` of a `RoundingMode`); omitted uses the
     ///   Rust default, `"bankers"`.
     /// * `tolerances` - `ToleranceConfig` object or JSON text with the
-    ///   optional absolute tolerances `rate_epsilon` (default `1e-12`) and
-    ///   `generic_epsilon` (default `1e-10`), both finite and positive;
-    ///   omitted uses the defaults.
+    ///   optional absolute tolerance `generic_epsilon` (default `1e-10`),
+    ///   finite and positive; omitted uses the default.
     ///
     /// @returns A new `FinstackConfig`.
     /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
@@ -196,7 +195,7 @@ impl JsFinstackConfig {
         JsRoundingMode::from_inner(self.inner.rounding.mode)
     }
 
-    /// Numeric tolerances as a plain `ToleranceConfig` object (`rate_epsilon`, `generic_epsilon`).
+    /// Numeric tolerances as a plain `ToleranceConfig` object (`generic_epsilon`).
     #[wasm_bindgen(getter, js_name = tolerances)]
     pub fn tolerances(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.tolerances)

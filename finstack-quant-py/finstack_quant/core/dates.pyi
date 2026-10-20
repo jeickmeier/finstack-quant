@@ -566,7 +566,7 @@ class DayCountContext:
         ------
         ValueError
             If *json* is malformed, has unknown fields, or carries an
-            inverted ``coupon_period``.
+            inverted ``coupon_period`` or a zero ``bus_basis``.
         Examples
         --------
         >>> from finstack_quant.core.dates import DayCountContext

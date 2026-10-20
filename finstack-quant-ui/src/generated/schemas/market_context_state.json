@@ -4,7 +4,6 @@
   "description": "Canonical v1 persisted snapshot of a complete market-data context.",
   "examples": [
     {
-      "collateral": {},
       "credit_indices": [],
       "curves": [],
       "dividends": [],
@@ -20,13 +19,6 @@
     }
   ],
   "properties": {
-    "collateral": {
-      "additionalProperties": {
-        "type": "string"
-      },
-      "description": "Collateral CSA mappings",
-      "type": "object"
-    },
     "credit_indices": {
       "description": "Credit index aggregates (references curves by ID)",
       "items": {
@@ -128,7 +120,6 @@
     "credit_indices",
     "fx_delta_vol_surfaces",
     "vol_cubes",
-    "collateral",
     "hierarchy"
   ],
   "title": "Market Context State",
@@ -1405,14 +1396,6 @@
               "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar.",
               "type": [
                 "string",
-                "null"
-              ]
-            },
-            "calibration_ois_cutoff_days": {
-              "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
-              "format": "int32",
-              "type": [
-                "integer",
                 "null"
               ]
             },

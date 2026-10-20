@@ -698,7 +698,6 @@ public = [
     "CalibrationValidationReport",
     "CdsQuote",
     "CdsTrancheQuote",
-    "CollateralEntry",
     "DividendScheduleDatum",
     "FxSpotDatum",
     "InflationQuote",
@@ -1861,7 +1860,7 @@ js = "attribution.schema"
 
 [parity.modules."finstack_quant.calibration"]
 js = "calibration"
-types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationEnvelopeError = "CalibrationEnvelopeError", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResult = "CalibrationResult", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", CdsTrancheQuote = "CdsTrancheQuote", CollateralEntry = "CollateralEntry", DividendScheduleDatum = "DividendScheduleDatum", FxSpotDatum = "FxSpotDatum", InflationQuote = "InflationQuote", PriceDatum = "PriceDatum", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", ValidationConfig = "ValidationConfig", VolQuote = "VolQuote", XccyQuote = "XccyQuote" }
+types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationEnvelopeError = "CalibrationEnvelopeError", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResult = "CalibrationResult", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", CdsTrancheQuote = "CdsTrancheQuote", DividendScheduleDatum = "DividendScheduleDatum", FxSpotDatum = "FxSpotDatum", InflationQuote = "InflationQuote", PriceDatum = "PriceDatum", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", ValidationConfig = "ValidationConfig", VolQuote = "VolQuote", XccyQuote = "XccyQuote" }
 
 [parity.modules."finstack_quant.calibration.hull_white"]
 js = "calibration"

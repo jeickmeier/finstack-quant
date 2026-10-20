@@ -565,7 +565,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "d4a98f6f0acb278c497e057784f3d671c1a9d1fd34eed6766c158c7e3a3d159c",
+          "sha256": "e0820ba0495d55e4331bf5e576e7310b715eceb86ab91114162a4ed70f7ad877",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -579,7 +579,7 @@
           "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "pointer": "#",
           "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
-          "sha256": "a39ca0a713346f6ab632324f1568907e64eedd4f178d3520ac7be4d2e3741618",
+          "sha256": "7e22c02924d7b0829f7330a14ca1b190581446c0de6da5e7a63dbde2a93d1f38",
           "description": "Canonical typed calibration request and result envelope."
         }
       ]
@@ -994,7 +994,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#/$defs/CurveState",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "8c31c58ae70ca4a9306c703af1999e4135c7f2df7cfe17ef708125c0bf806bdf",
+          "sha256": "bd6df250d6505213354b52c167c7dc385508911b4d7538771e2b0151a1200463",
           "description": "Serializable state representation for any curve type.\n\nProduced when persisting market data snapshots through serde."
         }
       ]
@@ -1189,7 +1189,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "d4a98f6f0acb278c497e057784f3d671c1a9d1fd34eed6766c158c7e3a3d159c",
+          "sha256": "e0820ba0495d55e4331bf5e576e7310b715eceb86ab91114162a4ed70f7ad877",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -1319,7 +1319,7 @@
   ],
   "hostContract": {
     "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
-    "sha256": "91da98d63e0bd5ee3ff631e29958e056f92b060f87a8f20369504289ffe93d23"
+    "sha256": "b5edf19072b5cbe4a06711403dae1ce5df441b682583303c7bd24eef4627291a"
   },
   "details": [
     {

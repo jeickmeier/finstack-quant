@@ -5867,29 +5867,6 @@ class MarketContext:
         """
         ...
 
-    def map_collateral(self, csa_code: str, discount_id: str) -> MarketContext:
-        """
-        Map a CSA code to a discount curve id for collateral discounting (fluent).
-
-        Parameters
-        ----------
-        csa_code : str
-            Collateral agreement identifier (e.g. ``"USD-CSA"``).
-        discount_id : str
-            Id of a discount curve in this context.
-
-        Returns
-        -------
-        MarketContext
-            ``self``, so mappings can be chained fluently.
-
-        Notes
-        -----
-        This method does not raise; the curve id is resolved lazily when the
-        mapping is used, and an existing mapping for ``csa_code`` is replaced.
-        """
-        ...
-
     def get_discount(self, id: str) -> DiscountCurve:
         """
         Retrieve a discount curve by identifier.
@@ -6340,8 +6317,7 @@ class MarketContext:
             ``total_curves``, ``has_fx``, ``surface_count``,
             ``vol_cube_count``, ``price_count``, ``series_count``,
             ``inflation_index_count``, ``credit_index_count``,
-            ``dividend_schedule_count``, ``fx_delta_vol_surface_count`` and
-            ``collateral_mapping_count``.
+            ``dividend_schedule_count`` and ``fx_delta_vol_surface_count``.
 
         Raises
         ------
