@@ -25,6 +25,16 @@ fn valid_horizon(ann_factor: Option<f64>) -> bool {
     ann_factor.is_none_or(|af| af.is_finite() && af > 0.0)
 }
 
+/// Scale the per-period quantile `mean + z·vol` to a horizon of `ann_factor`
+/// periods (`mean·h + z·vol·√h`); `None` keeps the per-period quantile.
+#[inline]
+fn horizon_quantile(mean: f64, vol: f64, z: f64, ann_factor: Option<f64>) -> f64 {
+    match ann_factor {
+        Some(af) => mean * af + z * vol * af.sqrt(),
+        None => mean + z * vol,
+    }
+}
+
 fn historical_sample(returns: &[f64], confidence: f64) -> Option<Vec<f64>> {
     if returns.is_empty() || !has_strict_confidence(confidence) {
         return None;
@@ -293,10 +303,7 @@ pub(crate) fn parametric_var(returns: &[f64], confidence: f64, ann_factor: Optio
     let (m, var) = mean_var(returns);
     let vol = var.sqrt();
     let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
-    match ann_factor {
-        Some(af) => m * af + z * vol * af.sqrt(),
-        None => m + z * vol,
-    }
+    horizon_quantile(m, vol, z, ann_factor)
 }
 /// Cornish-Fisher Value-at-Risk: adjusts Gaussian VaR for skewness and kurtosis.
 ///
@@ -385,17 +392,11 @@ pub(crate) fn cornish_fisher_var(returns: &[f64], confidence: f64, ann_factor: O
             "Cornish-Fisher expansion non-monotonic at requested confidence; \
              falling back to parametric (Gaussian) VaR"
         );
-        return match ann_factor {
-            Some(af) => m * af + z * vol * af.sqrt(),
-            None => m + z * vol,
-        };
+        return horizon_quantile(m, vol, z, ann_factor);
     }
     let z_cf =
         z + (z2 - 1.0) * s / 6.0 + (z3 - 3.0 * z) * k / 24.0 - (2.0 * z3 - 5.0 * z) * s * s / 36.0;
-    match ann_factor {
-        Some(af) => m * af + z_cf * vol * af.sqrt(),
-        None => m + z_cf * vol,
-    }
+    horizon_quantile(m, vol, z_cf, ann_factor)
 }
 /// Compute mean, standard deviation, skewness (G₁), and excess kurtosis (G₂) in a single pass.
 ///
