@@ -55,6 +55,15 @@ pub struct EvaluationContext {
     /// Warnings collected while evaluating this period
     pub warnings: Vec<EvalWarning>,
 
+    /// Set when a comparison, logical operator or `if` condition consumed a
+    /// non-finite operand during this period's evaluation.
+    ///
+    /// DSL comparisons read `NaN` as false, so a formula check fed a missing
+    /// lag (`lag(x, 1)` in the first period) or a non-finite input would
+    /// otherwise look like a failed test. Formula checks read this flag to
+    /// report insufficient data instead.
+    pub(crate) non_finite_operand: bool,
+
     /// Per-context memoization of sorted historical lookups.
     ///
     /// Within a single period's evaluation many formulas (rolling, expanding,
@@ -134,6 +143,7 @@ impl EvaluationContext {
             current_sources: vec![None; num_nodes],
             capital_structure_cashflows: None,
             warnings: Vec::new(),
+            non_finite_operand: false,
             sorted_history_cache: RefCell::new(IndexMap::new()),
         }
     }

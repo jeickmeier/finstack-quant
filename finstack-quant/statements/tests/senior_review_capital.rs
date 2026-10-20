@@ -472,6 +472,96 @@ fn loan_issuance_is_funded_once_before_on_and_after_first_period_start() {
 }
 
 #[test]
+fn plain_evaluate_generates_fixed_rate_capital_structure_cashflows() {
+    let q1 = PeriodId::quarter(2025, 1).expect("valid quarter");
+    let q2 = PeriodId::quarter(2025, 2).expect("valid quarter");
+    let mut fixed = loan(date!(2024 - 01 - 01));
+    fixed.rate = RateSpec::Fixed { rate: 0.08 };
+    let mut model = ModelBuilder::new("plain capital structure")
+        .add_debt("TL", FinancialStatementInstrument::TermLoan(fixed))
+        .periods("2025Q1..2025Q2", None)
+        .expect("valid periods")
+        .value(
+            "cash",
+            &[
+                (q1, AmountOrScalar::scalar(10.0)),
+                (q2, AmountOrScalar::scalar(12.0)),
+            ],
+        )
+        .compute("interest", "cs.interest_expense.TL")
+        .expect("valid capital-structure formula")
+        .build()
+        .expect("valid model");
+
+    let plain = Evaluator::new().evaluate(&model).expect("plain evaluation");
+    let empty_market = Evaluator::new()
+        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
+        .expect("empty-market evaluation");
+
+    let cashflows = plain
+        .cs_cashflows
+        .as_ref()
+        .expect("capital-structure cashflows");
+    assert_eq!(
+        serde_json::to_value(cashflows).expect("serialize"),
+        serde_json::to_value(empty_market.cs_cashflows.as_ref().expect("cashflows"))
+            .expect("serialize"),
+    );
+    for period in [q1, q2] {
+        let interest = plain.get("interest", &period).expect("interest");
+        assert!(interest > 1.9 && interest < 2.1, "{period}: {interest}");
+        assert_eq!(
+            plain.get("interest", &period),
+            empty_market.get("interest", &period)
+        );
+    }
+
+    // No as-of cutoff: an actual is used as given, where evaluating with a
+    // market as of the first period's start would hide it until period end.
+    model.periods[0].is_actual = true;
+    let plain = Evaluator::new().evaluate(&model).expect("plain evaluation");
+    assert_eq!(
+        plain.node_sources["cash"][&q1],
+        finstack_quant_statements::evaluator::CellSource::Value
+    );
+    assert_eq!(plain.get("cash", &q1), Some(10.0));
+    assert!(plain.cs_cashflows.is_some());
+}
+
+#[test]
+fn plain_evaluate_names_instruments_that_need_market_data() {
+    let swap = crate::dsl_all::rates_support::usd_irs_swap(
+        "IRS".into(),
+        Money::from((100_000_i64, Currency::USD)),
+        0.01,
+        date!(2025 - 01 - 01),
+        date!(2027 - 01 - 01),
+        PayReceive::Pay,
+    )
+    .expect("canonical IRS");
+    let q1 = PeriodId::quarter(2025, 1).expect("valid quarter");
+    let model = ModelBuilder::new("floating capital structure")
+        .add_debt("IRS", FinancialStatementInstrument::InterestRateSwap(swap))
+        .periods("2025Q1..2025Q1", None)
+        .expect("valid periods")
+        .value("cash", &[(q1, AmountOrScalar::scalar(10.0))])
+        .build()
+        .expect("valid model");
+
+    let err = Evaluator::new()
+        .evaluate(&model)
+        .expect_err("a swap needs a forward curve");
+    assert_eq!(err.kind(), finstack_quant_core::error::ErrorKind::NotFound);
+    let message = err.to_string();
+    assert!(message.contains("'IRS'"), "{message}");
+    assert!(message.contains("evaluate_with_market"), "{message}");
+
+    Evaluator::new()
+        .evaluate_with_market(&model, &swap_market(0.03), date!(2025 - 01 - 01))
+        .expect("the swap evaluates against a market");
+}
+
+#[test]
 fn bond_issuance_is_funded_once_before_on_and_after_first_period_start() {
     let q1 = PeriodId::quarter(2025, 1).expect("valid quarter");
     let q2 = PeriodId::quarter(2025, 2).expect("valid quarter");
