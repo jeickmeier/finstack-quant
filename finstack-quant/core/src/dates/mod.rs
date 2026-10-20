@@ -101,7 +101,7 @@
 //! - **Settlement calendars**: `target2` (Eurozone), `usny` (Federal Reserve
 //!   Bank of New York), `sifma` (US bond market), `sofr`
 //! - **Country calendars**: banking holidays such as `gblo` (London), `jpto`
-//!   (Tokyo) and `defr` (Frankfurt); see [`available_calendars`] for the full list
+//!   (Tokyo) and `defr` (Frankfurt); see [`available_calendars`](crate::dates::available_calendars) for the full list
 
 // Time constants – canonical "days per year" values
 

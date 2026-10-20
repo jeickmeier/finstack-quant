@@ -200,12 +200,6 @@ impl PyPeriodId {
             .map_err(core_to_py)
     }
 
-    /// Period code string (e.g. ``"2025Q1"``).
-    #[getter]
-    fn code(&self) -> String {
-        self.inner.to_string()
-    }
-
     /// Gregorian or fiscal year label.
     #[getter]
     fn year(&self) -> i32 {

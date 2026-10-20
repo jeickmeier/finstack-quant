@@ -266,13 +266,6 @@ impl PyHolidayCalendar {
         self.cal.metadata().map(PyCalendarMetadata::from_inner)
     }
 
-    /// Canonical registry id (``"usny"``, ``"target2"``, ``"weekends_only"``),
-    /// or the normalized ``a+b`` form for union calendars.
-    #[getter]
-    fn code(&self) -> &str {
-        &self.code
-    }
-
     /// Support ``pickle`` by reconstructing through ``HolidayCalendar(code)``.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         Ok((py.get_type::<Self>().into_any(), (self.code.clone(),)))

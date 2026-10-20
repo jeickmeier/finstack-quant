@@ -243,7 +243,7 @@ pub struct JsSifmaSettlementClass {
 }
 
 impl JsSifmaSettlementClass {
-    const fn wrap(inner: SifmaSettlementClass) -> Self {
+    const fn from_inner(inner: SifmaSettlementClass) -> Self {
         Self { inner }
     }
 }
@@ -255,7 +255,7 @@ impl JsSifmaSettlementClass {
     /// @returns Settlement class A (the Rust default).
     #[wasm_bindgen(js_name = a)]
     pub fn a() -> Self {
-        Self::wrap(SifmaSettlementClass::A)
+        Self::from_inner(SifmaSettlementClass::A)
     }
 
     /// Class B: fixed-rate 15-year agency pools.
@@ -263,7 +263,7 @@ impl JsSifmaSettlementClass {
     /// @returns Settlement class B.
     #[wasm_bindgen(js_name = b)]
     pub fn b() -> Self {
-        Self::wrap(SifmaSettlementClass::B)
+        Self::from_inner(SifmaSettlementClass::B)
     }
 
     /// Class C: GNMA single-family 30-year pools.
@@ -271,7 +271,7 @@ impl JsSifmaSettlementClass {
     /// @returns Settlement class C.
     #[wasm_bindgen(js_name = c)]
     pub fn c() -> Self {
-        Self::wrap(SifmaSettlementClass::C)
+        Self::from_inner(SifmaSettlementClass::C)
     }
 
     /// Class D: balloons, ARMs, multifamily and other non-standard products.
@@ -279,7 +279,7 @@ impl JsSifmaSettlementClass {
     /// @returns Settlement class D.
     #[wasm_bindgen(js_name = d)]
     pub fn d() -> Self {
-        Self::wrap(SifmaSettlementClass::D)
+        Self::from_inner(SifmaSettlementClass::D)
     }
 
     /// Infer the settlement class from the agency program and original term
@@ -301,7 +301,7 @@ impl JsSifmaSettlementClass {
         agency: JsValue,
         term_years: JsValue,
     ) -> Result<JsSifmaSettlementClass, JsValue> {
-        Ok(Self::wrap(SifmaSettlementClass::from_agency_term(
+        Ok(Self::from_inner(SifmaSettlementClass::from_agency_term(
             &js_string(&agency, "agency")?,
             js_uint(&term_years, "termYears")?,
         )))
@@ -420,89 +420,6 @@ pub fn next_sifma_settlement(date: JsValue) -> Result<Option<i32>, JsValue> {
     Ok(rust_dates::next_sifma_settlement(js_epoch_days(&date, "date")?).map(days_since_epoch))
 }
 
-/// 30/360 day-count variant used by `days30360`.
-///
-/// @example
-/// ```typescript
-/// import init, { core } from "finstack-quant-wasm";
-/// await init();
-/// const isda = core.Thirty360Convention.isda();
-/// core.days30360(core.createDate(2025, 1, 31), core.createDate(2025, 3, 31), isda.toString()); // 60
-/// ```
-#[wasm_bindgen(js_name = Thirty360Convention)]
-#[derive(Clone, Copy, Debug)]
-pub struct JsThirty360Convention {
-    pub(crate) inner: Thirty360Convention,
-}
-
-impl JsThirty360Convention {
-    const fn wrap(inner: Thirty360Convention) -> Self {
-        Self { inner }
-    }
-}
-
-#[wasm_bindgen(js_class = Thirty360Convention)]
-impl JsThirty360Convention {
-    /// 30U/360 (US SIA bond basis).
-    ///
-    /// @returns The `us_sia` variant.
-    #[wasm_bindgen(js_name = usSia)]
-    pub fn us_sia() -> Self {
-        Self::wrap(Thirty360Convention::UsSia)
-    }
-
-    /// 30/360 ISDA bond basis (ISDA 2006 Section 4.16(f); no February month-end rule).
-    ///
-    /// @returns The `isda` variant.
-    #[wasm_bindgen(js_name = isda)]
-    pub fn isda() -> Self {
-        Self::wrap(Thirty360Convention::Isda)
-    }
-
-    /// 30E/360 (European): day 31 becomes 30 on both dates.
-    ///
-    /// @returns The `european` variant.
-    #[wasm_bindgen(js_name = european)]
-    pub fn european() -> Self {
-        Self::wrap(Thirty360Convention::European)
-    }
-
-    /// 30/360 Italian: day 31 and any February day after the 27th become 30.
-    ///
-    /// @returns The `italian` variant.
-    #[wasm_bindgen(js_name = italian)]
-    pub fn italian() -> Self {
-        Self::wrap(Thirty360Convention::Italian)
-    }
-
-    /// Parse a variant name (the Rust serde label).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Variant name: `"us_sia"`, `"isda"`, `"european"` or
-    ///   `"italian"`, in any ASCII case.
-    ///
-    /// @returns The matching `Thirty360Convention`.
-    /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
-    /// `FinstackError` (kind `validation`) if no variant matches.
-    #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(name: JsValue) -> Result<JsThirty360Convention, JsValue> {
-        js_string(&name, "name")?
-            .parse()
-            .map(Self::wrap)
-            .map_err(to_js_err)
-    }
-
-    /// Canonical snake_case name of the variant.
-    ///
-    /// @returns The name accepted by `fromName` and `days30360`.
-    #[wasm_bindgen(js_name = toString)]
-    #[allow(clippy::inherent_to_string)]
-    pub fn to_string(&self) -> String {
-        self.inner.to_string()
-    }
-}
-
 /// Day count between two dates under a 30/360 variant (Rust `days_30_360`).
 ///
 /// # Arguments
@@ -570,7 +487,7 @@ pub struct JsTenorUnit {
 }
 
 impl JsTenorUnit {
-    const fn wrap(inner: TenorUnit) -> Self {
+    const fn from_inner(inner: TenorUnit) -> Self {
         Self { inner }
     }
 }
@@ -582,7 +499,7 @@ impl JsTenorUnit {
     /// @returns The days unit.
     #[wasm_bindgen(js_name = days)]
     pub fn days() -> Self {
-        Self::wrap(TenorUnit::Days)
+        Self::from_inner(TenorUnit::Days)
     }
 
     /// Calendar weeks (`W`).
@@ -590,7 +507,7 @@ impl JsTenorUnit {
     /// @returns The weeks unit.
     #[wasm_bindgen(js_name = weeks)]
     pub fn weeks() -> Self {
-        Self::wrap(TenorUnit::Weeks)
+        Self::from_inner(TenorUnit::Weeks)
     }
 
     /// Calendar months (`M`).
@@ -598,7 +515,7 @@ impl JsTenorUnit {
     /// @returns The months unit.
     #[wasm_bindgen(js_name = months)]
     pub fn months() -> Self {
-        Self::wrap(TenorUnit::Months)
+        Self::from_inner(TenorUnit::Months)
     }
 
     /// Calendar years (`Y`).
@@ -606,7 +523,7 @@ impl JsTenorUnit {
     /// @returns The years unit.
     #[wasm_bindgen(js_name = years)]
     pub fn years() -> Self {
-        Self::wrap(TenorUnit::Years)
+        Self::from_inner(TenorUnit::Years)
     }
 
     /// Parse a one-letter unit code (Rust `TenorUnit::from_str`).
@@ -622,7 +539,9 @@ impl JsTenorUnit {
     #[wasm_bindgen(js_name = fromName)]
     pub fn from_name(name: JsValue) -> Result<JsTenorUnit, JsValue> {
         let text = js_string(&name, "name")?;
-        text.parse::<TenorUnit>().map(Self::wrap).map_err(to_js_err)
+        text.parse::<TenorUnit>()
+            .map(Self::from_inner)
+            .map_err(to_js_err)
     }
 
     /// One-letter unit code: `"D"`, `"W"`, `"M"` or `"Y"`.

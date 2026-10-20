@@ -6,7 +6,6 @@ use finstack_quant_core::money::fx::{
     fx_market_pair as rust_fx_market_pair, fx_pair_convention as rust_fx_pair_convention,
     fx_pip_size as rust_fx_pip_size, invert_fx_rate as rust_invert_fx_rate, CurrencyPair,
     FxConversionPolicy, FxMatrix, FxPairConvention, FxQuery, FxQuoteConvention, FxRateResult,
-    SimpleFxProvider,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
@@ -139,10 +138,8 @@ impl PyFxMatrix {
     /// Create an empty FX matrix.
     #[new]
     fn new() -> Self {
-        let provider = Arc::new(SimpleFxProvider::new());
-        let matrix = FxMatrix::new(provider);
         Self {
-            inner: Arc::new(matrix),
+            inner: Arc::new(FxMatrix::default()),
         }
     }
 
@@ -276,15 +273,17 @@ impl PyFxMatrix {
     #[staticmethod]
     #[pyo3(text_signature = "(quotes)")]
     fn from_dict(quotes: &Bound<'_, pyo3::types::PyDict>) -> PyResult<Self> {
-        let matrix = Self::new();
         let mut parsed = Vec::with_capacity(quotes.len());
         for (key, value) in quotes.iter() {
             let pair: String = key.extract()?;
             let pair: CurrencyPair = pair.parse().map_err(core_to_py)?;
             parsed.push((pair.base, pair.quote, value.extract::<f64>()?));
         }
-        matrix.inner.set_quotes(&parsed).map_err(core_to_py)?;
-        Ok(matrix)
+        FxMatrix::from_quotes(&parsed)
+            .map(|matrix| Self {
+                inner: Arc::new(matrix),
+            })
+            .map_err(core_to_py)
     }
 
     /// Explicit pair-global quotes as a pandas ``DataFrame``.

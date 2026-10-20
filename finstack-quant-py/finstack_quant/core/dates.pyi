@@ -1524,7 +1524,7 @@ class PeriodId:
     Examples
     --------
     >>> from finstack_quant.core.dates import PeriodId
-    >>> (PeriodId.parse("2025Q2").code, PeriodId.parse("2025Q2").shift(1).code)
+    >>> (str(PeriodId.parse("2025Q2")), str(PeriodId.parse("2025Q2").shift(1)))
     ('2025Q2', '2025Q3')
 
     """
@@ -1554,7 +1554,7 @@ class PeriodId:
         Examples
         --------
         >>> from finstack_quant.core.dates import PeriodId
-        >>> PeriodId.parse("2025Q2").code
+        >>> str(PeriodId.parse("2025Q2"))
         '2025Q2'
 
         """
@@ -1585,7 +1585,7 @@ class PeriodId:
         Examples
         --------
         >>> from finstack_quant.core.dates import PeriodId
-        >>> PeriodId.month(2025, 2).code
+        >>> str(PeriodId.month(2025, 2))
         '2025M02'
 
         """
@@ -1616,7 +1616,7 @@ class PeriodId:
         Examples
         --------
         >>> from finstack_quant.core.dates import PeriodId
-        >>> PeriodId.quarter(2025, 2).code
+        >>> str(PeriodId.quarter(2025, 2))
         '2025Q2'
 
         """
@@ -1644,7 +1644,7 @@ class PeriodId:
         Examples
         --------
         >>> from finstack_quant.core.dates import PeriodId
-        >>> PeriodId.annual(2025).code
+        >>> str(PeriodId.annual(2025))
         '2025'
         """
         ...
@@ -1674,7 +1674,7 @@ class PeriodId:
         Examples
         --------
         >>> from finstack_quant.core.dates import PeriodId
-        >>> PeriodId.half(2025, 2).code
+        >>> str(PeriodId.half(2025, 2))
         '2025H2'
 
         """
@@ -1705,7 +1705,7 @@ class PeriodId:
         Examples
         --------
         >>> from finstack_quant.core.dates import PeriodId
-        >>> PeriodId.week(2025, 2).code
+        >>> str(PeriodId.week(2025, 2))
         '2025W02'
 
         """
@@ -1736,25 +1736,9 @@ class PeriodId:
         Examples
         --------
         >>> from finstack_quant.core.dates import PeriodId
-        >>> PeriodId.day(2025, 2).code
+        >>> str(PeriodId.day(2025, 2))
         '2025D002'
 
-        """
-        ...
-
-    @property
-    def code(self) -> str:
-        """
-        Period code string (e.g. ``"2025Q1"``).
-
-        Returns
-        -------
-        str
-            Period code string (e.g. ``"2025Q1"``).
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
         """
         ...
 
@@ -1851,9 +1835,9 @@ class PeriodId:
         Examples
         --------
         >>> from finstack_quant.core.dates import PeriodId
-        >>> PeriodId.quarter(2025, 4).shift(1).code
+        >>> str(PeriodId.quarter(2025, 4).shift(1))
         '2026Q1'
-        >>> PeriodId.quarter(2025, 1).shift(-1).code
+        >>> str(PeriodId.quarter(2025, 1).shift(-1))
         '2024Q4'
         """
         ...
@@ -1931,7 +1915,7 @@ class Period:
     --------
     >>> from finstack_quant.core.dates import build_periods
     >>> period = build_periods("2024Q1..Q1").periods[0]
-    >>> (period.id.code, period.start, period.end)
+    >>> (str(period.id), period.start, period.end)
     ('2024Q1', datetime.date(2024, 1, 1), datetime.date(2024, 4, 1))
 
     """
@@ -2067,7 +2051,7 @@ class PeriodPlan:
     Examples
     --------
     >>> from finstack_quant.core.dates import build_periods
-    >>> [period.id.code for period in build_periods("2024Q1..Q2").periods]
+    >>> [str(period.id) for period in build_periods("2024Q1..Q2").periods]
     ['2024Q1', '2024Q2']
 
     """
@@ -2396,7 +2380,7 @@ def build_periods(
     Examples
     --------
     >>> from finstack_quant.core.dates import build_periods
-    >>> [(period.id.code, period.is_actual) for period in build_periods("2024Q1..Q4", "2024Q2").periods]
+    >>> [(str(period.id), period.is_actual) for period in build_periods("2024Q1..Q4", "2024Q2").periods]
     [('2024Q1', True), ('2024Q2', True), ('2024Q3', False), ('2024Q4', False)]
 
     """
@@ -2716,23 +2700,6 @@ class HolidayCalendar:
         Notes
         -----
         This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
-    def code(self) -> str:
-        """
-        Canonical registry id (``"usny"``, ``"target2"``, ``"weekends_only"``),
-        or the normalized ``a+b`` form for union calendars.
-
-        Returns
-        -------
-        str
-            Canonical calendar code (``HolidayCalendar("USNY").code`` is ``"usny"``).
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
         """
         ...
 

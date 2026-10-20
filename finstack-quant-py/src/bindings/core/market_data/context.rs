@@ -9,11 +9,11 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::types::CurveId;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::PyModule;
+use pyo3::types::{PyModule, PyString};
 use pyo3::IntoPyObjectExt;
 
 use crate::bindings::core::currency::extract_currency;
-use crate::bindings::core::money::{decimal_to_py, money_from_amount, PyMoney};
+use crate::bindings::core::money::{decimal_to_py, is_python_decimal, money_from_amount, PyMoney};
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::errors::core_to_py;
@@ -180,7 +180,7 @@ impl PyMarketContext {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``value`` is non-finite (Rust ``MarketScalar::unitless`` / ``Money::new``).
+    ///     If ``value`` is non-finite (Rust ``MarketScalar::from_parts``).
     #[pyo3(signature = (id, value, currency=None), text_signature = "(self, id, value, currency=None)")]
     fn insert_price<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -188,11 +188,14 @@ impl PyMarketContext {
         value: &Bound<'_, PyAny>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let scalar = if let Some(raw_currency) = currency {
-            let currency = extract_currency(raw_currency)?;
-            MarketScalar::Price(money_from_amount(value, currency)?)
-        } else {
-            MarketScalar::unitless(extract_f64(value, "price value")?).map_err(core_to_py)?
+        let currency = currency.map(extract_currency).transpose()?;
+        let scalar = match currency {
+            // A Decimal or decimal-text price keeps its exact Decimal amount.
+            Some(currency) if is_python_decimal(value)? || value.is_instance_of::<PyString>() => {
+                MarketScalar::Price(money_from_amount(value, currency)?)
+            }
+            _ => MarketScalar::from_parts(extract_f64(value, "price value")?, currency)
+                .map_err(core_to_py)?,
         };
         slf.inner.insert_price_mut(id, scalar);
         Ok(slf)

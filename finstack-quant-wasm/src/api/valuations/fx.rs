@@ -12,7 +12,7 @@
 //! deterministic stream set that label inside the instrument JSON.
 
 use super::pricing::{parse_market_json, standard_option_greeks_with_context};
-use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
+use crate::utils::input::{from_js_json, js_currency, js_f64, js_opt_string, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
 use indexmap::IndexMap;
 use wasm_bindgen::prelude::*;
@@ -355,13 +355,6 @@ fx_option_class!(
     ]
 );
 
-fn parse_currency(
-    value: &JsValue,
-    label: &str,
-) -> Result<finstack_quant_core::currency::Currency, JsValue> {
-    js_string(value, label)?.parse().map_err(to_js_err)
-}
-
 #[wasm_bindgen(js_class = FxForward)]
 impl JsFxForward {
     /// Canonical example forward (mirrors Rust `FxForward::example`).
@@ -387,8 +380,8 @@ impl JsFxForward {
     #[wasm_bindgen(js_name = standardSettlementDays)]
     pub fn standard_settlement_days(base: JsValue, quote: JsValue) -> Result<u32, JsValue> {
         Ok(fxi::FxForward::standard_settlement_days(
-            parse_currency(&base, "base")?,
-            parse_currency(&quote, "quote")?,
+            js_currency(&base, "base")?,
+            js_currency(&quote, "quote")?,
         ))
     }
 
@@ -431,8 +424,8 @@ impl JsFxForward {
         };
         let inner = fxi::FxForward::from_trade_date(
             js_string(&id, "id")?,
-            parse_currency(&base_currency, "baseCurrency")?,
-            parse_currency(&quote_currency, "quoteCurrency")?,
+            js_currency(&base_currency, "baseCurrency")?,
+            js_currency(&quote_currency, "quoteCurrency")?,
             crate::utils::parse_iso_date(&js_string(&trade_date, "tradeDate")?)?,
             tenor.inner,
             notional.inner,
@@ -582,14 +575,14 @@ impl JsFxOption {
             js_string(&delta_convention_kind, "deltaConventionKind")?
                 .parse()
                 .map_err(to_js_err)?,
-            parse_currency(&premium_currency, "premiumCurrency")?,
+            js_currency(&premium_currency, "premiumCurrency")?,
             js_string(&venue, "venue")?,
         )
         .map_err(to_js_err)?;
         let inner = fxi::FxOption::european(
             js_string(&id, "id")?,
-            parse_currency(&base_currency, "baseCurrency")?,
-            parse_currency(&quote_currency, "quoteCurrency")?,
+            js_currency(&base_currency, "baseCurrency")?,
+            js_currency(&quote_currency, "quoteCurrency")?,
             js_f64(&strike, "strike")?,
             crate::utils::parse_iso_date(&js_string(&expiry, "expiry")?)?,
             notional.inner,

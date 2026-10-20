@@ -1,7 +1,9 @@
 //! WASM bindings for [`finstack_quant_core::money::Money`].
 
 use crate::api::core::currency::JsCurrency;
-use crate::utils::input::{js_f64, js_opt_bool, js_opt_string, js_opt_uint, js_string, json_text};
+use crate::utils::input::{
+    from_js_json, js_f64, js_opt_bool, js_opt_string, js_opt_uint, js_string,
+};
 use crate::utils::to_js_err;
 use finstack_quant_core::config::RoundingMode;
 use finstack_quant_core::money::{FormatOpts, Money as RustMoney};
@@ -236,13 +238,8 @@ impl JsMoney {
             .map(|mode| mode.parse::<RoundingMode>())
             .transpose()
             .map_err(to_js_err)?;
-        let opts = FormatOpts::new(
-            decimals,
-            show_currency.unwrap_or(true),
-            group.as_deref(),
-            rounding,
-        )
-        .map_err(to_js_err)?;
+        let opts = FormatOpts::new(decimals, show_currency, group.as_deref(), rounding)
+            .map_err(to_js_err)?;
         Ok(self.inner.format_with(opts))
     }
 
@@ -272,9 +269,7 @@ impl JsMoney {
     /// @throws If `json` is malformed or fails strict schema validation.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsMoney, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        let inner: RustMoney = serde_json::from_str(json).map_err(to_js_err)?;
-        Ok(JsMoney { inner })
+        from_js_json(&json, "json").map(|inner| JsMoney { inner })
     }
 
     /// Construct from exact decimal text, rejecting inexact amounts.
@@ -314,19 +309,18 @@ impl JsMoney {
             .map_err(to_js_err)
     }
 
-    /// A zero amount in a currency.
+    /// An exact zero amount in a currency (Rust `Money::zero`).
     ///
     /// # Arguments
     ///
     /// * `currency` - ISO-4217 `Currency` object that tags the amount.
     ///
     /// @returns `Money` with amount `0` in `currency`.
-    /// @throws If the amount cannot be constructed (not expected for zero).
     #[wasm_bindgen(js_name = zero)]
-    pub fn zero(currency: &JsCurrency) -> Result<JsMoney, JsValue> {
-        RustMoney::new(0.0, currency.inner)
-            .map(|inner| JsMoney { inner })
-            .map_err(to_js_err)
+    pub fn zero(currency: &JsCurrency) -> JsMoney {
+        JsMoney {
+            inner: RustMoney::zero(currency.inner),
+        }
     }
 }
 

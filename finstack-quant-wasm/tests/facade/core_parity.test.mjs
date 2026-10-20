@@ -195,7 +195,7 @@ const CASES = {
   days_30e_360_isda: () =>
     [false, true].map((flag) => core.days30e360Isda(ep('2025-01-31'), ep('2025-02-28'), flag)),
   holiday_calendar: () => ({
-    code: new core.HolidayCalendar('NYSE + gblo').code,
+    code: new core.HolidayCalendar('NYSE + gblo').toString(),
     is_holiday: nyse.isHoliday(ep('2025-01-01')),
     is_business_day: nyse.isBusinessDay(ep('2025-01-06')),
     count_business_days: nyse.countBusinessDays(ep('2025-01-01'), ep('2025-02-01')),
@@ -203,9 +203,9 @@ const CASES = {
   }),
   // --- dates: periods and schedules ---------------------------------------------
   period_id: () => [
-    core.PeriodId.parse('2025M12').shift(1).code,
-    core.PeriodId.quarter(2025, 1).shift(-1).code,
-    core.PeriodId.parse('FY2025Q4').nextFiscal(usFederal).code,
+    core.PeriodId.parse('2025M12').shift(1).toString(),
+    core.PeriodId.quarter(2025, 1).shift(-1).toString(),
+    core.PeriodId.parse('FY2025Q4').nextFiscal(usFederal).toString(),
     core.PeriodId.week(2025, 5).kind.periodsPerYear,
   ],
   period_kind_prior_observation_date: () =>
@@ -262,21 +262,21 @@ const CASES = {
     config().outputScale('JPY'),
     config().outputScale('USD'),
     config().ingestScale('USD'),
-    config().roundingMode.name,
+    config().roundingMode.toString(),
     config().extensionKeys(),
   ],
   rating_registry: () => ({
     default_scale_id: registry.defaultScaleId(),
     default_score: registry.defaultScorecardScore(),
     scale_ids: registry.scaleIds(),
-    policy: registry.unknownScalePolicy().name,
+    policy: registry.unknownScalePolicy().toString(),
     known: registry.isKnownRatingScale(registry.defaultScaleId()),
     scale: registry.ratingScale(registry.defaultScaleId()),
     extension_key: core.ratingScalesExtensionKey(),
     from_config: core.registryFromConfig(new core.FinstackConfig()).defaultScaleId(),
   }),
   credit_rating: () => [
-    new core.CreditRating('Baa3').name,
+    new core.CreditRating('Baa3').toString(),
     core.CreditRating.bbb().notchesTo('BB'),
     core.CreditRating.aaPlus().toMoodysString(),
     core.CreditRating.bbPlus().isInvestmentGrade(),
@@ -541,13 +541,6 @@ test('arguments of the wrong type are TypeErrors', () => {
 
 test('enum classes expose every Rust variant and round-trip their names', () => {
   const families = [
-    [
-      core.BusinessDayConvention,
-      ['unadjusted', 'following', 'modifiedFollowing', 'preceding', 'modifiedPreceding', 'nearest'],
-    ],
-    [core.StubKind, ['none', 'shortFront', 'shortBack', 'longFront', 'longBack']],
-    [core.ScheduleErrorPolicy, ['strict', 'missingCalendarWarning', 'gracefulEmpty']],
-    [core.Thirty360Convention, ['usSia', 'isda', 'european', 'italian']],
     [core.PeriodKind, ['daily', 'weekly', 'monthly', 'quarterly', 'semiAnnual', 'annual']],
     [core.RoundingMode, ['bankers', 'awayFromZero', 'towardZero', 'floor', 'ceil']],
     [core.UnknownScalePolicy, ['error', 'fallbackToDefault', 'warnAndFallback']],
@@ -567,9 +560,9 @@ test('enum classes expose every Rust variant and round-trip their names', () => 
     ['a', 'b', 'c', 'd'].map((cls) => core.SifmaSettlementClass[cls]().toString()),
     ['a', 'b', 'c', 'd']
   );
-  assert.equal(core.RoundingMode.fromJson(core.RoundingMode.floor().toJson()).name, 'floor');
+  assert.equal(core.RoundingMode.fromJson(core.RoundingMode.floor().toJson()).toString(), 'floor');
   assert.equal(
-    core.UnknownScalePolicy.fromJson(core.UnknownScalePolicy.error().toJson()).name,
+    core.UnknownScalePolicy.fromJson(core.UnknownScalePolicy.error().toJson()).toString(),
     'error'
   );
 });
@@ -602,7 +595,10 @@ test('handles round-trip through their JSON wire form', () => {
     assert.equal(handle.fromJson(json).toJson(), json);
     assert.equal(handle.fromJson(JSON.parse(json)).toJson(), json);
   }
-  assert.equal(core.CreditRating.fromJson(core.CreditRating.bbbMinus().toJson()).name, 'BBB-');
+  assert.equal(
+    core.CreditRating.fromJson(core.CreditRating.bbbMinus().toJson()).toString(),
+    'BBB-'
+  );
 });
 
 test('ScheduleBuilder setters update the builder in place and round-trip its spec', () => {

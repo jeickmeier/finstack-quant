@@ -63,15 +63,6 @@ wire_methods!(
     json_only
 );
 
-#[pymethods]
-impl PyUnknownScalePolicy {
-    /// Canonical snake_case name (the serde representation).
-    #[getter]
-    fn name(&self) -> String {
-        self.label()
-    }
-}
-
 /// A single rating threshold row on a scorecard scale.
 ///
 /// Parameters

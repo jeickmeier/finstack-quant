@@ -36,7 +36,7 @@ use crate::utils::input::{
 };
 
 use crate::api::core::market_context::JsMarketContext;
-use crate::api::core::market_data::JsDiscountCurve;
+use crate::api::core::market_discount::JsDiscountCurve;
 use crate::utils::input::{from_js_json, opt_json_text};
 use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
 use wasm_bindgen::prelude::*;

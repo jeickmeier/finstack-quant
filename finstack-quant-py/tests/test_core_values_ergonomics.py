@@ -152,7 +152,7 @@ class TestConfig:
         assert "floor" in repr(cfg)
         with pytest.raises(ValueError, match=r'invalid value "BANKERS": unknown variant'):
             RoundingMode.from_name("BANKERS")
-        assert RoundingMode.from_json('"ceil"').name == "ceil"
+        assert str(RoundingMode.from_json('"ceil"')) == "ceil"
         assert pickle.loads(pickle.dumps(RoundingMode.CEIL)) == RoundingMode.CEIL  # noqa: S301
         t = ToleranceConfig(rate_epsilon=1e-9)
         assert ToleranceConfig.from_json(t.to_json()) == t

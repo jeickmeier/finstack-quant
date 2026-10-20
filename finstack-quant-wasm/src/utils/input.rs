@@ -75,6 +75,48 @@ pub fn js_string(value: &JsValue, label: &str) -> Result<String, JsValue> {
     })
 }
 
+/// A required ISO-4217 currency code, in any ASCII case (Rust `Currency`'s
+/// `FromStr`).
+///
+/// Unlike [`super::wire::js_wire`], which follows the strict upper-case serde
+/// form, this accepts `"usd"` as `new Currency("usd")` does.
+///
+/// # Arguments
+///
+/// * `value` - The JavaScript argument.
+/// * `label` - The camelCase argument name, used in the error message.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (`kind: "invalid_type"`) when `value` is not a string
+/// and a validation error when it is not a known ISO-4217 code.
+pub fn js_currency(
+    value: &JsValue,
+    label: &str,
+) -> Result<finstack_quant_core::currency::Currency, JsValue> {
+    js_string(value, label)?.parse().map_err(super::to_js_err)
+}
+
+/// An optional ISO-4217 currency code; `null` and `undefined` mean absent.
+///
+/// # Arguments
+///
+/// * `value` - The JavaScript argument, if supplied.
+/// * `label` - The camelCase argument name, used in the error message.
+///
+/// # Errors
+///
+/// Throws as [`js_currency`] does for a supplied value.
+pub fn js_opt_currency(
+    value: Option<&JsValue>,
+    label: &str,
+) -> Result<Option<finstack_quant_core::currency::Currency>, JsValue> {
+    match value {
+        Some(v) if !(v.is_null() || v.is_undefined()) => js_currency(v, label).map(Some),
+        _ => Ok(None),
+    }
+}
+
 /// An optional string argument; `null` and `undefined` mean absent.
 ///
 /// # Arguments

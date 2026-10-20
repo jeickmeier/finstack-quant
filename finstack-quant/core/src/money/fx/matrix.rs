@@ -262,6 +262,14 @@ impl FxProvider for ResolvedPairProvider {
     }
 }
 
+impl Default for FxMatrix {
+    /// An empty matrix over an empty [`SimpleFxProvider`](super::SimpleFxProvider) with the default
+    /// configuration: rates come only from quotes set on the matrix.
+    fn default() -> Self {
+        Self::new(Arc::new(super::SimpleFxProvider::new()))
+    }
+}
+
 impl FxMatrix {
     /// Create a new [`FxMatrix`] wrapping the given provider with the default configuration.
     ///
@@ -299,6 +307,36 @@ impl FxMatrix {
     /// ```
     pub fn new(provider: Arc<dyn FxProvider>) -> Self {
         Self::with_capacity(provider, FxConfig::default(), DEFAULT_CACHE_CAPACITY)
+    }
+
+    /// Build a matrix over an empty [`SimpleFxProvider`](super::SimpleFxProvider) holding `quotes` as
+    /// pair-global quotes.
+    ///
+    /// This is [`FxMatrix::default`] followed by [`set_quotes`](Self::set_quotes),
+    /// the construction both host bindings expose.
+    ///
+    /// # Arguments
+    ///
+    /// * `quotes` - `(base, quote, rate)` triples, where `rate` is the finite,
+    ///   strictly positive number of `quote` units per one `base` unit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any rate is non-finite or not strictly positive.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::fx::FxMatrix;
+    ///
+    /// let matrix = FxMatrix::from_quotes(&[(Currency::EUR, Currency::USD, 1.1)])?;
+    /// assert_eq!(matrix.get_serializable_state()?.quotes.len(), 1);
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn from_quotes(quotes: &[(Currency, Currency, f64)]) -> crate::Result<Self> {
+        let matrix = Self::default();
+        matrix.set_quotes(quotes)?;
+        Ok(matrix)
     }
 
     /// Create a new [`FxMatrix`] with custom configuration, failing closed on invalid inputs.

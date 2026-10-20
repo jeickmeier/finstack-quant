@@ -514,9 +514,9 @@ class Bps:
         """
         ...
 
-    def abs(self) -> Bps:
+    def checked_abs(self) -> Bps:
         """
-        Magnitude of the spread, discarding its sign (basis points preserved).
+        Magnitude of the spread, discarding its sign (Rust ``Bps::checked_abs``).
 
         Returns
         -------
@@ -532,7 +532,7 @@ class Bps:
         Examples
         --------
         >>> from finstack_quant.core.types import Bps
-        >>> Bps(-25).abs().as_bp
+        >>> Bps(-25).checked_abs().as_bp
         25
         """
         ...
@@ -698,7 +698,7 @@ class CreditRating:
         Examples
         --------
         >>> from finstack_quant.core.types import CreditRating
-        >>> CreditRating("bbb+").name
+        >>> str(CreditRating("bbb+"))
         'BBB+'
         """
         ...
@@ -744,28 +744,6 @@ class CreditRating:
         ------
         ValueError
             If serialization fails (cannot happen for a valid rating).
-        """
-        ...
-
-    @property
-    def name(self) -> str:
-        """
-        Canonical S&P/Fitch-style rating name (e.g. ``"BBB-"``).
-
-        Returns
-        -------
-        str
-            Canonical S&P/Fitch-style rating name.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.types import CreditRating
-        >>> CreditRating.AAA.name
-        'AAA'
         """
         ...
 

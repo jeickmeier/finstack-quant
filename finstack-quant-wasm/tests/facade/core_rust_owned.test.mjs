@@ -182,13 +182,14 @@ test('DayCountContext is built by DayCountContextState::try_new', () => {
   }
 });
 
-test('FxMatrix.rate takes an optional policy; rateDefault is gone', () => {
+test('FxMatrix.rate takes an optional policy defaulting to the Rust default', () => {
   const fx = new core.FxMatrix();
   fx.setQuote('EUR', 'USD', 1.1);
   const cashflowDate = core.FxConversionPolicy.cashflowDate();
   assert.equal(fx.rate('EUR', 'USD', '2025-01-02').rate, 1.1);
   assert.equal(fx.rate('EUR', 'USD', '2025-01-02', null).rate, 1.1);
   assert.equal(fx.rate('EUR', 'USD', '2025-01-02', cashflowDate).rate, 1.1);
+  assert.equal(new core.FxConversionPolicy().toString(), 'cashflow_date');
   assert.equal('rateDefault' in fx, false);
   assert.equal('rateWithDefaultPolicy' in fx, false);
 });
@@ -206,7 +207,7 @@ test('FxDeltaVolSurface wing pairing is the Rust constructor check', () => {
 });
 
 test('VolCube keeps the Rust from_grid interpolation default when omitted', () => {
-  const params = [0.01, 0.5, -0.2, 0.4, Number.NaN];
+  const params = [{ alpha: 0.01, beta: 0.5, rho: -0.2, nu: 0.4 }];
   assert.equal(new core.VolCube('C', [1], [2], params, [0.02]).interpolationMode, 'vol');
   assert.equal(
     new core.VolCube('C', [1], [2], params, [0.02], 'total_variance').interpolationMode,

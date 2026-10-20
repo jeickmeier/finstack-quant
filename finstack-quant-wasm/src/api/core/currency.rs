@@ -1,6 +1,6 @@
 //! WASM bindings for [`finstack_quant_core::currency::Currency`].
 
-use crate::utils::input::json_text;
+use crate::utils::input::from_js_json;
 use crate::utils::to_js_err;
 use finstack_quant_core::currency::Currency as RustCurrency;
 use std::str::FromStr;
@@ -117,9 +117,7 @@ impl JsCurrency {
     /// @throws If `json` is malformed or contains an unknown code.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsCurrency, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        let inner: RustCurrency = serde_json::from_str(json).map_err(to_js_err)?;
-        Ok(JsCurrency { inner })
+        from_js_json(&json, "json").map(|inner| JsCurrency { inner })
     }
 }
 

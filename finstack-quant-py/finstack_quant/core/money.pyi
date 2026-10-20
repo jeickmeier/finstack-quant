@@ -238,7 +238,7 @@ class Money:
     def format_with(
         self,
         decimals: int | None = None,
-        show_currency: bool = True,
+        show_currency: bool | None = None,
         group: str | None = None,
         rounding: Union[RoundingMode, str, None] = None,
     ) -> str:
@@ -253,8 +253,9 @@ class Money:
         decimals : int | None
             Number of decimal places, inclusive range ``0`` to ``1_000_000``.
             Defaults to the currency's minor units.
-        show_currency : bool
-            Whether to prepend the currency code (default ``True``).
+        show_currency : bool | None
+            Whether to prepend the currency code; ``None`` (the default)
+            selects the Rust default, ``True``.
         group : str | None
             Single-character thousands separator (e.g. ``","``); ``None``
             disables grouping.

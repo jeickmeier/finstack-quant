@@ -65,15 +65,6 @@ label_enum!(PyRoundingMode, RoundingMode, "RoundingMode", from_name, {
 });
 wire_methods!(PyRoundingMode, RoundingMode, "RoundingMode", json_only);
 
-#[pymethods]
-impl PyRoundingMode {
-    /// Canonical lowercase name (the serde representation), e.g. ``"bankers"``.
-    #[getter]
-    fn name(&self) -> String {
-        self.label()
-    }
-}
-
 /// Numerical tolerance settings for rate and generic comparisons.
 ///
 /// Parameters

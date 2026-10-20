@@ -167,14 +167,11 @@ impl PyMoney {
         .map_err(core_to_py)
     }
 
-    /// Zero amount in the given currency.
+    /// Exact zero amount in the given currency (Rust ``Money::zero``).
     #[classmethod]
     #[pyo3(text_signature = "(cls, currency)")]
     fn zero(_cls: &Bound<'_, PyType>, currency: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let ccy = extract_currency(currency)?;
-        Money::new(0.0, ccy)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
+        Ok(Self::from_inner(Money::zero(extract_currency(currency)?)))
     }
 
     /// Construct from a ``decimal.Decimal`` amount without going through ``float``.
@@ -226,15 +223,16 @@ impl PyMoney {
     /// Format the amount.
     ///
     /// ``decimals`` defaults to the currency's ISO minor units and is bounded
-    /// by the native maximum of 1,000,000; ``group`` is an optional thousands
+    /// by the native maximum of 1,000,000; ``show_currency`` defaults to
+    /// ``True`` (Rust ``FormatOpts::new``); ``group`` is an optional thousands
     /// separator (``","``); ``rounding`` is a ``RoundingMode`` or its exact
     /// lowercase name (default: the Rust ``RoundingMode::default()``, bankers).
-    #[pyo3(signature = (decimals=None, show_currency=true, group=None, rounding=None))]
-    #[pyo3(text_signature = "(self, decimals=None, show_currency=True, group=None, rounding=None)")]
+    #[pyo3(signature = (decimals=None, show_currency=None, group=None, rounding=None))]
+    #[pyo3(text_signature = "(self, decimals=None, show_currency=None, group=None, rounding=None)")]
     fn format_with(
         &self,
         decimals: Option<usize>,
-        show_currency: bool,
+        show_currency: Option<bool>,
         group: Option<&str>,
         rounding: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<String> {

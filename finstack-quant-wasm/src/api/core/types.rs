@@ -304,8 +304,8 @@ impl JsBps {
     /// @returns A new `Bps` with the sign removed.
     /// @throws `FinstackError` (kind `validation`) when the quote is
     /// `-2147483648` bp, whose absolute value has no 32-bit representation.
-    #[wasm_bindgen(js_name = abs)]
-    pub fn abs(&self) -> Result<JsBps, JsValue> {
+    #[wasm_bindgen(js_name = checkedAbs)]
+    pub fn checked_abs(&self) -> Result<JsBps, JsValue> {
         self.inner
             .checked_abs()
             .map(|inner| JsBps { inner })
@@ -394,7 +394,7 @@ mod tests {
         };
         assert!((bps.as_percent() + 19.95).abs() < 1e-12);
         assert!((bps.as_rate().as_decimal() + 0.1995).abs() < 1e-12);
-        assert!(bps.is_negative() && bps.abs().expect("representable").is_positive());
+        assert!(bps.is_negative() && bps.checked_abs().expect("representable").is_positive());
         let rate = JsRate {
             inner: "12.5bp".parse::<RustRate>().expect("fractional bp quote"),
         };

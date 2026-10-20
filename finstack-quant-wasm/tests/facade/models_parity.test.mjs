@@ -277,7 +277,10 @@ const cube = () =>
     'CUBE',
     [1, 2],
     [5],
-    [0.02, 0.5, -0.2, 0.4, Number.NaN, 0.03, 0.5, -0.1, 0.3, Number.NaN],
+    [
+      { alpha: 0.02, beta: 0.5, rho: -0.2, nu: 0.4 },
+      { alpha: 0.03, beta: 0.5, rho: -0.1, nu: 0.3 },
+    ],
     [0.03, 0.035]
   );
 const surfaceVols = (surface) => surface.vols_row_major;

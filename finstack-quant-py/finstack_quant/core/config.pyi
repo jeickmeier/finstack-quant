@@ -124,22 +124,6 @@ class RoundingMode:
         """
         ...
 
-    @property
-    def name(self) -> str:
-        """
-        Canonical lowercase name, e.g. ``"bankers"``.
-
-        Returns
-        -------
-        str
-            The serde label.
-
-        Notes
-        -----
-        This accessor does not raise.
-        """
-        ...
-
     def __reduce__(self) -> tuple[object, tuple[type[RoundingMode], str]]: ...
     def __repr__(self) -> str:
         """Return a debug representation of this rounding mode.
@@ -352,7 +336,7 @@ class FinstackConfig:
     2
     >>> cfg = FinstackConfig(rounding_mode="floor")
     >>> cfg.set_output_scale("JPY", 2)
-    >>> (cfg.rounding_mode.name, cfg.output_scale("JPY"), cfg.output_scale_overrides())
+    >>> (str(cfg.rounding_mode), cfg.output_scale("JPY"), cfg.output_scale_overrides())
     ('floor', 2, {'JPY': 2})
 
     """

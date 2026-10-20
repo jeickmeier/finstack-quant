@@ -141,16 +141,16 @@ def test_fiscal_week_stepping_includes_week_53() -> None:
     week_52 = PeriodId.parse("FY2025W52")
 
     week_53 = week_52.next_fiscal(fiscal)
-    assert week_53.code == "FY2025W53"
+    assert str(week_53) == "FY2025W53"
     assert week_53.is_fiscal
-    assert PeriodId.parse(week_53.code) == week_53
-    assert week_53.next_fiscal(fiscal).code == "FY2026W01"
+    assert PeriodId.parse(str(week_53)) == week_53
+    assert str(week_53.next_fiscal(fiscal)) == "FY2026W01"
     assert week_53.prev_fiscal(fiscal) == week_52
 
-    assert PeriodId.parse("2025W52").shift(1).code == "2026W01"
+    assert str(PeriodId.parse("2025W52").shift(1)) == "2026W01"
 
     assert week_52.shift(1) == week_53
-    assert week_53.shift(1).code == "FY2026W01"
+    assert str(week_53.shift(1)) == "FY2026W01"
     assert PeriodId.parse("FY2026W01").shift(-1) == week_53
 
     with pytest.raises(ValueError, match="next_fiscal"):
@@ -248,19 +248,19 @@ def test_period_plan_iteration_dataframe_and_ordering() -> None:
     from finstack_quant.core.dates import PeriodKind, build_periods
 
     plan = build_periods("2024Q1..Q4", "2024Q2")
-    assert [p.id.code for p in plan] == ["2024Q1", "2024Q2", "2024Q3", "2024Q4"]
+    assert [str(p.id) for p in plan] == ["2024Q1", "2024Q2", "2024Q3", "2024Q4"]
     frame = plan.to_dataframe()
     assert list(frame.columns) == ["id", "start", "end", "is_actual"]
     assert frame["is_actual"].tolist() == [True, True, False, False]
     assert PeriodId.parse("2024Q1") < PeriodId.parse("2024Q2") <= PeriodId.parse("2024Q2")
-    assert sorted([PeriodId.parse("2025M02"), PeriodId.parse("2024M12")])[0].code == "2024M12"
+    assert str(sorted([PeriodId.parse("2025M02"), PeriodId.parse("2024M12")])[0]) == "2024M12"
     assert PeriodKind.QUARTERLY.prior_observation_date("2025-03-31") == date(2024, 12, 31)
     with pytest.raises(ValueError, match=r"'2024Q1\.\.2024M06'.*2024Q1\.\.Q4"):
         build_periods("2024Q1..2024M06")
     with pytest.raises(ValueError, match="13"):
         PeriodId.month(2025, month=13)
-    assert PeriodId.half(2025, half=2).code == "2025H2"
-    assert PeriodId.week(2025, week=2).code == "2025W02"
+    assert str(PeriodId.half(2025, half=2)) == "2025H2"
+    assert str(PeriodId.week(2025, week=2)) == "2025W02"
 
 
 def test_tenor_constructor_forms_and_context_helpers() -> None:
@@ -285,10 +285,10 @@ def test_tenor_constructor_forms_and_context_helpers() -> None:
     ) == pytest.approx(0.5)
 
     joint = HolidayCalendar("GBLO + nyse")
-    assert joint.code == "gblo+nyse"
+    assert str(joint) == "gblo+nyse"
     assert joint.metadata is None
     assert not joint.is_business_day(date(2025, 7, 4))
-    assert HolidayCalendar("USNY").code == "usny"
+    assert str(HolidayCalendar("USNY")) == "usny"
     assert HolidayCalendar("usny").count_business_days("2025-01-01", "2025-01-08") == 4
     assert str(BusinessDayConvention.from_name("MF")) == "modified_following"
     assert "weekends_only" in available_calendars()

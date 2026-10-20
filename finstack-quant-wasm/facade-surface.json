@@ -715,7 +715,6 @@
       "Attributes",
       "BaseCorrelationCurve",
       "Bps",
-      "BusinessDayConvention",
       "ConvertedMoney",
       "CreditIndexData",
       "CreditRating",
@@ -747,12 +746,9 @@
       "ScalarTimeSeries",
       "Schedule",
       "ScheduleBuilder",
-      "ScheduleErrorPolicy",
       "SifmaSettlementClass",
-      "StubKind",
       "Tenor",
       "TenorUnit",
-      "Thirty360Convention",
       "UnknownScalePolicy",
       "VolCube",
       "VolCubeExpirySlice",
@@ -1031,7 +1027,7 @@
   "core.Bps": {
     "kind": "class",
     "statics": ["fromJson", "zero"],
-    "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
+    "methods": ["checkedAbs", "free", "isNegative", "isPositive", "isZero", "toJson"],
     "getters": ["asBp", "asDecimal", "asPercent", "asRate"]
   },
   "core.CreditRating": {
@@ -1072,7 +1068,7 @@
       "toMoodysString",
       "toString"
     ],
-    "getters": ["name"]
+    "getters": []
   },
   "core.Attributes": {
     "kind": "class",
@@ -1095,7 +1091,7 @@
     "kind": "class",
     "statics": ["awayFromZero", "bankers", "ceil", "floor", "fromJson", "fromName", "towardZero"],
     "methods": ["free", "toJson", "toString"],
-    "getters": ["name"]
+    "getters": []
   },
   "core.FinstackConfig": {
     "kind": "class",
@@ -1120,7 +1116,7 @@
     "kind": "class",
     "statics": ["error", "fallbackToDefault", "fromJson", "fromName", "warnAndFallback"],
     "methods": ["free", "toJson", "toString"],
-    "getters": ["name"]
+    "getters": []
   },
   "core.RatingScaleRegistry": {
     "kind": "class",
@@ -1173,12 +1169,6 @@
     "methods": ["free", "toJson"],
     "getters": ["busBasis", "calendarId", "couponPeriod", "endIsTerminationDate", "frequency"]
   },
-  "core.Thirty360Convention": {
-    "kind": "class",
-    "statics": ["european", "fromName", "isda", "italian", "usSia"],
-    "methods": ["free", "toString"],
-    "getters": []
-  },
   "core.days30360": {
     "kind": "function"
   },
@@ -1226,25 +1216,11 @@
   "core.daysSinceEpoch": {
     "kind": "function"
   },
-  "core.BusinessDayConvention": {
-    "kind": "class",
-    "statics": [
-      "following",
-      "fromName",
-      "modifiedFollowing",
-      "modifiedPreceding",
-      "nearest",
-      "preceding",
-      "unadjusted"
-    ],
-    "methods": ["free", "toString"],
-    "getters": []
-  },
   "core.HolidayCalendar": {
     "kind": "class",
     "statics": [],
     "methods": ["countBusinessDays", "free", "isBusinessDay", "isHoliday", "toString"],
-    "getters": ["code", "metadata"]
+    "getters": ["metadata"]
   },
   "core.adjust": {
     "kind": "function"
@@ -1286,7 +1262,7 @@
     "kind": "class",
     "statics": ["annual", "day", "half", "month", "parse", "quarter", "week"],
     "methods": ["free", "nextFiscal", "prevFiscal", "shift", "toString"],
-    "getters": ["code", "index", "isFiscal", "kind", "year"]
+    "getters": ["index", "isFiscal", "kind", "year"]
   },
   "core.FiscalConfig": {
     "kind": "class",
@@ -1299,18 +1275,6 @@
   },
   "core.buildFiscalPeriods": {
     "kind": "function"
-  },
-  "core.StubKind": {
-    "kind": "class",
-    "statics": ["fromName", "longBack", "longFront", "none", "shortBack", "shortFront"],
-    "methods": ["free", "toString"],
-    "getters": []
-  },
-  "core.ScheduleErrorPolicy": {
-    "kind": "class",
-    "statics": ["fromName", "gracefulEmpty", "missingCalendarWarning", "strict"],
-    "methods": ["free", "toString"],
-    "getters": []
   },
   "core.Schedule": {
     "kind": "class",

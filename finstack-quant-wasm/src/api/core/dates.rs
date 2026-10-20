@@ -1,5 +1,6 @@
 //! WASM bindings for date utilities from [`finstack_quant_core::dates`].
 
+use crate::api::core::calendar::calendar_arg;
 use crate::api::core::imm::JsTenorUnit;
 use crate::utils::input::{
     from_js_json, invalid_type, js_epoch_days, js_f64, js_int, js_opt_bool, js_opt_string,
@@ -8,8 +9,8 @@ use crate::utils::input::{
 use crate::utils::to_js_err;
 use finstack_quant_core::dates::{
     adjust as core_adjust, available_calendars as core_available_calendars, calendar_by_id_strict,
-    BusinessDayConvention, Date, DayCount as RustDayCount, DayCountContext as RustDayCountContext,
-    DayCountContextState, HolidayCalendar, Tenor as RustTenor,
+    BusinessDayConvention, Date, DayCount as RustDayCount, DayCountContextState, HolidayCalendar,
+    Tenor as RustTenor,
 };
 use wasm_bindgen::prelude::*;
 
@@ -20,18 +21,6 @@ pub struct JsDayCountContext {
     /// Serializable state (`DayCountContextState::default()` when empty); the
     /// live calendar is resolved on each use.
     pub(crate) inner: DayCountContextState,
-}
-
-impl JsDayCountContext {
-    /// Resolve to a runtime context.
-    ///
-    /// Errors when the calendar id is set but unknown to the global calendar
-    /// lookup, instead of silently dropping the calendar. Routes through the
-    /// core registry error so unknown codes surface "Did you mean …?"
-    /// suggestions and a structured `not_found` kind.
-    fn to_rust_ctx(&self) -> Result<RustDayCountContext<'static>, JsValue> {
-        self.inner.to_ctx().map_err(to_js_err)
-    }
 }
 
 #[wasm_bindgen(js_class = DayCountContext)]
@@ -407,7 +396,7 @@ impl JsDayCount {
         let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
         let end = js_epoch_days(&end_epoch_days, "endEpochDays")?;
         self.inner
-            .year_fraction(start, end, ctx.to_rust_ctx()?)
+            .year_fraction(start, end, ctx.inner.to_ctx().map_err(to_js_err)?)
             .map_err(to_js_err)
     }
 
@@ -438,7 +427,7 @@ impl JsDayCount {
         let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
         let end = js_epoch_days(&end_epoch_days, "endEpochDays")?;
         self.inner
-            .signed_year_fraction(start, end, ctx.to_rust_ctx()?)
+            .signed_year_fraction(start, end, ctx.inner.to_ctx().map_err(to_js_err)?)
             .map_err(to_js_err)
     }
 
@@ -803,11 +792,11 @@ pub fn adjust(
     convention: JsValue,
     calendar_code: JsValue,
 ) -> Result<i32, JsValue> {
-    let convention: &str = &js_string(&convention, "convention")?;
-    let calendar_code: &str = &js_string(&calendar_code, "calendarCode")?;
+    let business_day_convention: BusinessDayConvention = js_string(&convention, "convention")?
+        .parse()
+        .map_err(to_js_err)?;
+    let cal = calendar_arg(&calendar_code, "calendarCode")?;
     let date = js_epoch_days(&epoch_days, "epochDays")?;
-    let business_day_convention: BusinessDayConvention = convention.parse().map_err(to_js_err)?;
-    let cal = calendar_by_id_strict(calendar_code).map_err(to_js_err)?;
     let adjusted = core_adjust(date, business_day_convention, cal).map_err(to_js_err)?;
     Ok(finstack_quant_core::dates::days_since_epoch(adjusted))
 }

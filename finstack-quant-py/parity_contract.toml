@@ -71,12 +71,12 @@ public = ["get", "index", "validate"]
 [crates.core.module_symbols.config]
 python_package = "finstack_quant.core.config"
 public = ["RoundingMode", "ToleranceConfig", "FinstackConfig"]
-note = "Subset scope: the Rust config module also exposes ConfigExtensions, CurrencyScalePolicy, RoundingPolicy, RoundingContext, ZeroKind, NumericMode, ResultsMeta and the rounding_context_from/results_meta* helpers. These policy-stamp types stay Rust-only; hosts see them serialized inside result envelopes rather than as constructible objects. Python FinstackConfig exposes the CurrencyScalePolicy maps through output_scale/ingest_scale (accepting Currency or str), set_output_scale/set_ingest_scale and the *_scale_overrides() dicts, plus rounding_mode/tolerances getters; RoundingMode and ToleranceConfig carry name/to_json/from_json/pickle."
+note = "Subset scope: the Rust config module also exposes ConfigExtensions, CurrencyScalePolicy, RoundingPolicy, RoundingContext, ZeroKind, NumericMode, ResultsMeta and the rounding_context_from/results_meta* helpers. These policy-stamp types stay Rust-only; hosts see them serialized inside result envelopes rather than as constructible objects. Python FinstackConfig exposes the CurrencyScalePolicy maps through output_scale/ingest_scale (accepting Currency or str), set_output_scale/set_ingest_scale and the *_scale_overrides() dicts, plus rounding_mode/tolerances getters; RoundingMode and ToleranceConfig carry to_json/from_json/pickle (the RoundingMode label is its __str__). The FinstackConfig extension accessors (get_extension, set_extension, remove_extension, extension_keys) are host conveniences over the pub Rust FinstackConfig.extensions map (ConfigExtensions get/insert/remove/keys), bound under the same names in both hosts; there is no Rust FinstackConfig-level method of those names."
 
 [crates.core.module_symbols.types]
 python_package = "finstack_quant.core.types"
 public = ["Rate", "Bps", "CreditRating", "Attributes"]
-note = "Subset scope: Rust-only extras are BarrierType, BarrierDirection, PayoutTiming, and every id newtype (CalendarId, CurveId, DealId, Id, IndexId, InstrumentId, IssuerId, PoolId, PriceId, UnderlyingId) — hosts pass ids as plain strings on JSON/typed surfaces. Rating-factor behavior is owned by models.credit. Python binds the full Rate/Bps value API (abs, is_zero/is_positive/is_negative, checked arithmetic dunders, as_rate/as_bp cross conversions, Rate FromStr via Rate('5%'|'25bp'|'0.05')), CreditRating predicates/to_moodys_string/notches_to with typed equality and ordering, and Attributes tags/add_tag/has_tag/matches_selector + mapping dunders; all four carry to_json/from_json/pickle. WASM binds the same Rate/Bps value API (getters, cross conversions, abs/isZero/isPositive/isNegative, toJson/fromJson, and Rate.parse for Rust FromStr) except the ZERO constants and the arithmetic dunders (JS has no operator overloading); CreditRating remains outside its core types subset. CreditRating::bucket stays Rust-only."
+note = "Subset scope: Rust-only extras are BarrierType, BarrierDirection, PayoutTiming, and every id newtype (CalendarId, CurveId, DealId, Id, IndexId, InstrumentId, IssuerId, PoolId, PriceId, UnderlyingId) — hosts pass ids as plain strings on JSON/typed surfaces. Rating-factor behavior is owned by models.credit. Python binds the full Rate/Bps value API (abs, is_zero/is_positive/is_negative, checked arithmetic dunders, as_rate/as_bp cross conversions, Rate FromStr via Rate('5%'|'25bp'|'0.05')), CreditRating predicates/to_moodys_string/notches_to with typed equality and ordering, and Attributes tags/add_tag/has_tag/matches_selector + mapping dunders; all four carry to_json/from_json/pickle. WASM binds the same Rate/Bps value API (getters, cross conversions, Rate.abs and Bps.checkedAbs (Rust Bps::checked_abs), isZero/isPositive/isNegative, toJson/fromJson, and Rate.parse for Rust FromStr), the ZERO constants as Rate.zero()/Bps.zero() static factories, and CreditRating with the same predicates, toMoodysString and notchesTo; only the arithmetic dunders stay Python-only (JS has no operator overloading). CreditRating::bucket stays Rust-only."
 
 [crates.core.module_symbols.currency]
 python_package = "finstack_quant.core.currency"
@@ -1907,6 +1907,10 @@ types = { ToleranceConfig = "ToleranceConfig" }
 
 [parity.modules."finstack_quant.core.currency"]
 js = "core"
+# `Currency.code` (both hosts) duplicates `__str__`/`toString()`; it is kept as
+# the documented host convenience for reading the ISO code. The other
+# host-invented `code`/`name` getters that duplicated `toString()` (HolidayCalendar,
+# PeriodId, RoundingMode, CreditRating, UnknownScalePolicy) were removed.
 # The ISO-4217 module constants (`currency.USD`) are the static factories of
 # the WASM class (`core.Currency.usd()`): a facade value cannot hold a wasm
 # handle before `init()` runs, so each constant is a factory.
@@ -1914,7 +1918,12 @@ constants_on = "core.Currency"
 
 [parity.modules."finstack_quant.core.dates"]
 js = "core"
-types = { CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan" }
+# BusinessDayConvention, StubKind, ScheduleErrorPolicy and Thirty360Convention
+# cross WASM as their snake_case labels: every WASM consumer (`adjust`,
+# `Tenor.addToDate`, `ScheduleBuilder.adjustWith/stubRule/errorPolicy`,
+# `days30360`) takes the label and parses it with the Rust `FromStr`, so the
+# TypeScript literal type is the twin of the Python enum class.
+types = { BusinessDayConvention = "BusinessDayConvention", CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan", ScheduleErrorPolicy = "ScheduleErrorPolicy", StubKind = "StubKind", Thirty360Convention = "Thirty360Convention" }
 
 [parity.modules."finstack_quant.core.market_data"]
 js = "core"
@@ -2610,6 +2619,18 @@ renames = { synthesized_deal = { js = "synthesizedDealJson", reason = "the Rust 
 [parity.members."finstack_quant.analytics.Performance"]
 renames = { from_arrays = { js = "constructor", reason = "Python distinguishes its pandas constructor from the Rust-shaped array adapter; WASM's constructor already accepts arrays (Rust Performance::new)" }, from_returns_arrays = { js = "fromReturns", reason = "Python distinguishes pandas and array input adapters; WASM fromReturns already accepts arrays (Rust Performance::from_returns)" } }
 wasm_only = { summary = "WASM twin of the pandas exit Performance.to_dataframe, returned as a TableEnvelope" }
+
+[parity.members."finstack_quant.core.dates.BusinessDayConvention"]
+excluded = { from_name = "literal" }
+
+[parity.members."finstack_quant.core.dates.ScheduleErrorPolicy"]
+excluded = { from_name = "literal" }
+
+[parity.members."finstack_quant.core.dates.StubKind"]
+excluded = { from_name = "literal" }
+
+[parity.members."finstack_quant.core.dates.Thirty360Convention"]
+excluded = { from_name = "literal" }
 
 [parity.members."finstack_quant.core.market_data.MarketContext"]
 wasm_only = { len = "JavaScript twin of Python __len__ (Rust MarketContext::len); JS has no length protocol for class handles" }

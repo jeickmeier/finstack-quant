@@ -54,13 +54,7 @@ try {
       cube.id,
       cube.expiries,
       cube.tenors,
-      cube.params.flatMap((p) => [
-        p.alpha,
-        p.beta,
-        p.rho,
-        p.nu,
-        p.shift ?? NaN,
-      ]),
+      cube.params,
       cube.forwards,
       cube.interpolation_mode,
     );
@@ -187,13 +181,7 @@ try {
       cube.id,
       cube.expiries,
       cube.tenors,
-      cube.params.flatMap((p) => [
-        p.alpha,
-        p.beta,
-        p.rho,
-        p.nu,
-        p.shift ?? NaN,
-      ]),
+      cube.params,
       cube.forwards,
       cube.interpolation_mode,
     );

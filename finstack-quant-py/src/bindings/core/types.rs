@@ -317,7 +317,7 @@ impl PyBps {
         PyRate::from_inner(self.inner.as_rate())
     }
 
-    /// Absolute value.
+    /// Absolute value (Rust ``Bps::checked_abs``).
     ///
     /// Raises
     /// ------
@@ -325,7 +325,7 @@ impl PyBps {
     ///     If the quote is ``-2147483648`` bp, whose absolute value has no
     ///     32-bit representation.
     #[pyo3(text_signature = "(self)")]
-    fn abs(&self) -> PyResult<Self> {
+    fn checked_abs(&self) -> PyResult<Self> {
         self.inner
             .checked_abs()
             .map(Self::from_inner)
@@ -513,12 +513,6 @@ impl PyCreditRating {
         name.parse::<CreditRating>()
             .map(Self::from_inner)
             .map_err(core_to_py)
-    }
-
-    /// Canonical rating name in S&P/Fitch notation (e.g. ``"BBB-"``).
-    #[getter]
-    fn name(&self) -> String {
-        self.label()
     }
 
     /// ``True`` for BBB- and above.

@@ -44,7 +44,7 @@ test('models.volatility evaluates core data artifacts', () => {
     'USD-SWAPTION',
     [1],
     [5],
-    [0.03, 0.5, -0.2, 0.4, Number.NaN],
+    [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4 }],
     [0.03]
   );
   const vol = facade.models.volatility.getCubeVol(cube, 1, 5, 0.03);
@@ -99,7 +99,13 @@ test('SABR calibration rejects a poor final quote fit', () => {
 });
 
 test('clamped cube preserves small quotes and invalid model domains', () => {
-  const low = new facade.core.VolCube('LOW', [1], [5], [0.0001, 1, 0, 0.3, Number.NaN], [0.02]);
+  const low = new facade.core.VolCube(
+    'LOW',
+    [1],
+    [5],
+    [{ alpha: 0.0001, beta: 1, rho: 0, nu: 0.3 }],
+    [0.02]
+  );
   const checked = facade.models.volatility.getCubeVol(low, 1, 5, 0.02);
   const clamped = facade.models.volatility.getCubeVolClamped(low, 1, 5, 0.02);
   assert.ok(Math.abs(clamped - checked) < 1e-14);
@@ -107,7 +113,7 @@ test('clamped cube preserves small quotes and invalid model domains', () => {
     'INVALID',
     [1],
     [5],
-    [0.008, 0.5, 0, 0.3, Number.NaN],
+    [{ alpha: 0.008, beta: 0.5, rho: 0, nu: 0.3 }],
     [-0.01]
   );
   assert.ok(Number.isNaN(facade.models.volatility.getCubeVolClamped(invalid, 1, 5, -0.01)));
@@ -131,7 +137,7 @@ test('canonical volatility state constructors preserve named parameters and opti
       'STATE',
       [1],
       [5],
-      [0.03, 0.5, -0.2, 0.4, shift ?? Number.NaN],
+      [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4, shift }],
       [0.03],
       'vol'
     );

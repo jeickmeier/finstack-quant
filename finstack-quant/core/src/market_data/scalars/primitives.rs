@@ -150,6 +150,47 @@ impl MarketScalar {
             ))
         }
     }
+
+    /// Build a scalar from a value and an optional currency: a monetary
+    /// [`MarketScalar::Price`] when `currency` is given, otherwise a
+    /// [`MarketScalar::Unitless`] value.
+    ///
+    /// This is the construction behind host `insert_price(id, value, currency?)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Finite observation: a price in major units of `currency`,
+    ///   or a dimensionless value when `currency` is `None`.
+    /// * `currency` - ISO-4217 currency of a monetary price; `None` for a
+    ///   unitless scalar.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is NaN or infinite (or, for a price, not
+    /// representable as a `Money` amount).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::market_data::scalars::MarketScalar;
+    ///
+    /// assert!(matches!(MarketScalar::from_parts(1.2, None)?, MarketScalar::Unitless(_)));
+    /// assert!(matches!(
+    ///     MarketScalar::from_parts(101.5, Some(Currency::USD))?,
+    ///     MarketScalar::Price(_)
+    /// ));
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn from_parts(
+        value: f64,
+        currency: Option<crate::currency::Currency>,
+    ) -> crate::Result<Self> {
+        match currency {
+            Some(currency) => crate::money::Money::new(value, currency).map(Self::Price),
+            None => Self::unitless(value),
+        }
+    }
 }
 
 impl TryFrom<MarketScalarWire> for MarketScalar {
