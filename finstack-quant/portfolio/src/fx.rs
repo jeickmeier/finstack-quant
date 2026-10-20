@@ -54,6 +54,9 @@ pub fn convert_to_base(
     market: &MarketContext,
     base_currency: Currency,
 ) -> Result<Money> {
+    if amount.currency() == base_currency {
+        return Ok(amount);
+    }
     let rate = spot_rate_to_base(amount.currency(), as_of, market, base_currency)?;
     Ok(Money::new(amount.amount() * rate, base_currency)?)
 }
@@ -263,6 +266,23 @@ mod tests {
             .interp(InterpStyle::Linear)
             .build()
             .expect("test discount curve should build")
+    }
+
+    #[test]
+    fn convert_to_base_returns_same_currency_amount_unchanged() {
+        // 17 significant digits do not survive a Decimal -> f64 -> Decimal trip.
+        let amount = Money::from_decimal_str("123456789012.34567", Currency::USD)
+            .expect("exact decimal amount");
+
+        let converted = convert_to_base(
+            amount,
+            date!(2025 - 01 - 01),
+            &MarketContext::new(),
+            Currency::USD,
+        )
+        .expect("same-currency conversion needs no market data");
+
+        assert_eq!(converted.amount_decimal(), amount.amount_decimal());
     }
 
     #[test]
