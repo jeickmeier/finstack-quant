@@ -77,7 +77,7 @@
 //! - Expected shortfall: `docs/REFERENCES.md#artzner1999CoherentRisk`
 //! - Active-portfolio context: `docs/REFERENCES.md#grinoldKahn1999ActivePortfolio`
 
-pub(crate) use finstack_quant_core::{dates, error, math};
+pub(crate) use finstack_quant_core::{dates, math};
 
 pub(crate) type Result<T> = finstack_quant_core::Result<T>;
 

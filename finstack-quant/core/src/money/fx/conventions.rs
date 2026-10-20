@@ -54,7 +54,7 @@ impl std::fmt::Display for FxQuoteConvention {
 }
 
 impl std::str::FromStr for FxQuoteConvention {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     /// Parses the serde label; the error names the accepted labels.
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -198,8 +198,8 @@ pub fn fx_pip_size(base: Currency, quote: Currency) -> f64 {
 /// `1 / rate` when that reciprocal is a valid FX rate.
 pub fn invert_fx_rate(rate: f64) -> Result<f64> {
     if !rate.is_finite() {
-        return Err(crate::error::InputError::NonFiniteValue {
-            kind: crate::error::NonFiniteKind::classify(rate),
+        return Err(crate::InputError::NonFiniteValue {
+            kind: crate::NonFiniteKind::classify(rate),
         }
         .into());
     }
@@ -304,7 +304,7 @@ mod tests {
     #[test]
     fn invert_fx_rate_rejects_non_positive() {
         let zero = invert_fx_rate(0.0).expect_err("a zero rate has no reciprocal");
-        assert_eq!(zero.kind(), crate::error::ErrorKind::Validation, "{zero}");
+        assert_eq!(zero.kind(), crate::ErrorKind::Validation, "{zero}");
         assert!(invert_fx_rate(-1.10).is_err());
         assert!(invert_fx_rate(f64::NAN).is_err());
         assert!(invert_fx_rate(f64::INFINITY).is_err());

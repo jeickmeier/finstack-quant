@@ -4,7 +4,7 @@ use time::{Date, Month};
 
 use super::DayCountContext;
 use crate::dates::tenor::TenorUnit;
-use crate::error::InputError;
+use crate::InputError;
 
 // ACT/365L helper
 /// Calculate year fraction for Act/365L convention per ICMA Rule 251.1(i)(c).

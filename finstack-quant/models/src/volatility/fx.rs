@@ -74,7 +74,7 @@
 //! - Garman, M. B., & Kohlhagen, S. W. (1983). "Foreign Currency Option Values."
 //!   `docs/REFERENCES.md#garman-kohlhagen-1983`
 
-use finstack_quant_core::{error::InputError, types::CurveId};
+use finstack_quant_core::{types::CurveId, InputError};
 
 use finstack_quant_core::market_data::surfaces::{FxDeltaVolSurface, VolSurface};
 use finstack_quant_core::math::interp::{
@@ -517,7 +517,7 @@ fn fx_put_call_25d_strikes(
 ///
 /// # Errors
 ///
-/// Returns [`InputError::NegativeValue`](finstack_quant_core::error::InputError) if any
+/// Returns [`InputError::NegativeValue`](finstack_quant_core::InputError) if any
 /// recovered wing vol is non-positive.
 fn fx_smile_pillars(
     forward: f64,
@@ -529,7 +529,7 @@ fn fx_smile_pillars(
 ) -> Result<(Vec<f64>, Vec<f64>)> {
     let (sigma_put, sigma_call) = recover_fx_wing_vols(atm, rr_25d, bf_25d);
     if sigma_call <= 0.0 || sigma_put <= 0.0 {
-        return Err(finstack_quant_core::error::InputError::NegativeValue.into());
+        return Err(finstack_quant_core::InputError::NegativeValue.into());
     }
 
     let k_atm = fx_atm_dns_strike(forward, atm, expiry);
@@ -538,7 +538,7 @@ fn fx_smile_pillars(
     if let Some((rr_10d, bf_10d)) = wings_10d {
         let (sigma_put_10d, sigma_call_10d) = recover_fx_wing_vols(atm, rr_10d, bf_10d);
         if sigma_call_10d <= 0.0 || sigma_put_10d <= 0.0 {
-            return Err(finstack_quant_core::error::InputError::NegativeValue.into());
+            return Err(finstack_quant_core::InputError::NegativeValue.into());
         }
         let (k_put_10d, k_call_10d) =
             fx_put_call_delta_strikes(forward, sigma_put_10d, sigma_call_10d, expiry, 0.10);

@@ -587,8 +587,7 @@ export type DateWire = string;
  * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
  *   frequency, take (actual days) / (actual days in coupon period) for each,
  *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
- *   first/last coupons use
- *   [`act_act_isma_year_fraction_with_reference_period`].
+ *   first/last coupons also supply the enclosing regular `coupon_period`.
  * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
  *   **backwards from `end`** until the candidate is before `start`; each
  *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -1112,7 +1111,7 @@ export type ScheduleErrorPolicy = "strict" | "missing_calendar_warning" | "grace
  *   ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide
  *   evenly by the frequency. Use a stub variant for misaligned schedules.
  *
- * [`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor
+ * [`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor
  * - **`ShortFront`**: Short stub period at the start. Schedule is built
  *   backward from the end date, creating a short first period.
  * - **`ShortBack`**: Short stub period at the end. Schedule is built forward

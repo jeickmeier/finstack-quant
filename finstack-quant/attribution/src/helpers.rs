@@ -112,7 +112,7 @@ impl InstrumentFactorUse {
 pub(crate) fn measured_unless_missing(
     measurement: finstack_quant_core::Result<f64>,
 ) -> finstack_quant_core::Result<Option<f64>> {
-    use finstack_quant_core::error::InputError;
+    use finstack_quant_core::InputError;
     match measurement {
         Ok(shift) => Ok(Some(shift)),
         Err(finstack_quant_core::Error::Input(

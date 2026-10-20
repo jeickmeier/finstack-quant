@@ -188,7 +188,7 @@ impl BrentSolver {
     where
         Func: FnMut(f64) -> f64,
     {
-        use crate::error::InputError;
+        use crate::InputError;
 
         if !initial_guess.is_finite()
             || !self.bracket_min.is_finite()
@@ -333,7 +333,7 @@ impl BrentSolver {
     ///
     /// # Errors
     ///
-    /// Returns [`InputError::SolverConvergenceFailed`](crate::error::InputError::SolverConvergenceFailed) when:
+    /// Returns [`InputError::SolverConvergenceFailed`](crate::InputError::SolverConvergenceFailed) when:
     /// - Maximum iterations are exceeded without convergence
     /// - The function returns non-finite values (NaN, infinity)
     /// - No bracketing interval is found within the bracket bounds
@@ -390,7 +390,7 @@ impl BrentSolver {
     where
         Func: FnMut(f64) -> f64,
     {
-        use crate::error::InputError;
+        use crate::InputError;
 
         let [(lo, flo), (hi, fhi)] = bracket;
         tracing::debug!(
@@ -680,7 +680,7 @@ mod tests {
 
         // Verify error contains useful information
         match result {
-            Err(crate::Error::Input(crate::error::InputError::SolverConvergenceFailed {
+            Err(crate::Error::Input(crate::InputError::SolverConvergenceFailed {
                 iterations,
                 reason,
                 ..

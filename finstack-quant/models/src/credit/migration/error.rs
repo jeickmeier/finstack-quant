@@ -170,8 +170,8 @@ impl MigrationError {
     /// and singular-matrix failures and internal invariants are computation
     /// errors; every other variant rejects the input (validation).
     #[must_use]
-    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
-        use finstack_quant_core::error::ErrorKind;
+    pub fn kind(&self) -> finstack_quant_core::ErrorKind {
+        use finstack_quant_core::ErrorKind;
         match self {
             Self::UnknownState { .. } | Self::NoWarfFactor { .. } => ErrorKind::NotFound,
             Self::NoValidGenerator { .. }

@@ -53,9 +53,7 @@ Full item documentation is in the rustdoc (`cargo doc -p finstack-quant-core
 | `dates::{create_date, parse_iso_date}` | Fallible constructors (no `unwrap` on `from_calendar_date`). |
 | `dates::DayCount` | Day-count conventions, plus `DayCountContext` for conventions (Act/Act ICMA, Bus/252) that need a coupon period or calendar. |
 | `dates::{adjust, BusinessDayConvention, HolidayCalendar, CalendarMetadata}` | Business-day rolling. |
-| `dates::{calendar_by_id, calendars_by_ids, available_calendars, WEEKENDS_ONLY}` | Calendar registry; the 27 built-in calendars are generated from `data/calendars/*.json` at build time. |
-| `dates::{Rule, Direction, Observed}` | Declarative holiday-rule primitives (fixed dates, nth weekday, Easter, lunar festivals, spans). |
-| `dates::{CompositeCalendar, CompositeMode}` | Union and intersection of calendars. |
+| `dates::{calendar_by_id_strict, available_calendars, resolve_calendar, resolve_joint_calendar, WEEKENDS_ONLY}` | Calendar registry by id; the 27 built-in calendars are generated from `data/calendars/*.json` at build time, and a `+`-joined id (`"nyse+gblo"`) resolves to their union. |
 | `dates::{Schedule, ScheduleBuilder, ScheduleSpec, StubKind, ScheduleWarning, ScheduleErrorPolicy}` | Schedule generation with stub handling and EOM rules. |
 | `dates::{Tenor, TenorUnit}` | Tenor arithmetic. |
 | IMM / roll helpers on `dates` | `next_imm`, `third_wednesday`, `third_friday`, `is_cds_date`, `next_cds_date`, `sifma_settlement_date`, `SifmaSettlementClass`, equity and IMM option expiries. |

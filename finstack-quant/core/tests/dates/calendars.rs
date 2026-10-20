@@ -1,15 +1,9 @@
 //! Calendar tests (sample-based to reduce duplication)
 
-use super::common::make_date;
-use finstack_quant_core::dates::calendar::{
-    ASX as Asx, AUCE as Auce, BRBD as Brbd, BSE as Bse, CATO as Cato, CHZH as Chzh, CME as Cme,
-    CNBE as Cnbe, DEFR as Defr, EUREX as Eurex, GBLO as Gblo, HKEX as Hkex, HKHK as Hkhk,
-    NSE as Nse, NYSE as Nyse, SGSI as Sgsi, SIFMA as Sifma, SIX as Six, SSE as Sse,
-    TARGET2 as Target2, TSX as Tsx, USNY as Usny,
-};
+use super::common::{by_id, make_date};
 use finstack_quant_core::dates::{
     adjust, available_calendars, calendar_by_id_strict, BusinessDayConvention, Date, DateExt,
-    HolidayCalendar, Month, Rule,
+    HolidayCalendar, Month,
 };
 use std::collections::HashSet;
 use time::Weekday;
@@ -91,27 +85,27 @@ fn calendar_conventions_preserve_neighboring_open_dates() {
         assert!(!calendar.is_business_day(make_date(2022, 12, 27)));
         assert!(calendar.is_business_day(make_date(2022, 12, 28)));
     }
-    assert!(Nyse.is_business_day(make_date(2027, 12, 31)));
-    assert!(!Nyse.is_business_day(make_date(2025, 1, 9)));
-    assert!(Usny.is_business_day(make_date(2025, 1, 9)));
-    assert!(Sifma.is_business_day(make_date(2026, 4, 3)));
-    assert!(!Nyse.is_business_day(make_date(2026, 4, 3)));
-    assert!(Sgsi.is_business_day(make_date(2025, 8, 11)));
-    assert!(!Sgsi.is_business_day(make_date(2027, 2, 8)));
+    assert!(by_id("nyse").is_business_day(make_date(2027, 12, 31)));
+    assert!(!by_id("nyse").is_business_day(make_date(2025, 1, 9)));
+    assert!(by_id("usny").is_business_day(make_date(2025, 1, 9)));
+    assert!(by_id("sifma").is_business_day(make_date(2026, 4, 3)));
+    assert!(!by_id("nyse").is_business_day(make_date(2026, 4, 3)));
+    assert!(by_id("sgsi").is_business_day(make_date(2025, 8, 11)));
+    assert!(!by_id("sgsi").is_business_day(make_date(2027, 2, 8)));
     // ANBIMA national accrual holidays deliberately differ from B3 trading.
-    assert!(Brbd.is_business_day(make_date(2025, 12, 24)));
-    assert!(Brbd.is_business_day(make_date(2025, 12, 31)));
-    assert!(Brbd.name.contains("ANBIMA"));
+    assert!(by_id("brbd").is_business_day(make_date(2025, 12, 24)));
+    assert!(by_id("brbd").is_business_day(make_date(2025, 12, 31)));
+    assert!(by_id("brbd").metadata().unwrap().name.contains("ANBIMA"));
 }
 
 #[test]
 fn holiday_adoption_bounds_are_respected() {
-    for calendar in [&Cato, &Tsx] {
+    for calendar in [by_id("cato"), by_id("tsx")] {
         assert!(calendar.is_business_day(make_date(2007, 2, 19)));
         assert!(!calendar.is_business_day(make_date(2008, 2, 18)));
     }
-    assert!(Cato.is_business_day(make_date(2020, 9, 30)));
-    assert!(!Cato.is_business_day(make_date(2021, 9, 30)));
+    assert!(by_id("cato").is_business_day(make_date(2020, 9, 30)));
+    assert!(!by_id("cato").is_business_day(make_date(2021, 9, 30)));
     let auckland = calendar_by_id_strict("nzau").unwrap();
     assert!(!auckland.is_business_day(make_date(2022, 6, 24)));
     assert!(!auckland.is_business_day(make_date(2052, 6, 21)));
@@ -298,11 +292,6 @@ fn japan_matches_cabinet_office_holidays_1970_through_2027() {
             let Ok(date) = Date::from_ordinal_date(year, ordinal) else {
                 continue;
             };
-            assert_eq!(
-                Rule::JapanPublicHolidays.applies(date),
-                expected.contains(&date),
-                "national/citizens/substitute holiday {date}"
-            );
             let bank_closure = (date.month() == Month::January && matches!(date.day(), 2 | 3))
                 || (date.month() == Month::December && date.day() == 31);
             let business = !expected.contains(&date)
@@ -354,14 +343,14 @@ struct YearCheck {
 #[derive(Clone, Copy)]
 struct CalendarCase {
     name: &'static str,
-    cal: &'static dyn HolidayCalendar,
+    cal: &'static str,
     checks: &'static [YearCheck],
 }
 
 const CASES: &[CalendarCase] = &[
     CalendarCase {
         name: "USNY",
-        cal: &Usny,
+        cal: "usny",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -377,7 +366,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "NYSE",
-        cal: &Nyse,
+        cal: "nyse",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -393,7 +382,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "CME",
-        cal: &Cme,
+        cal: "cme",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -409,7 +398,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "SIFMA",
-        cal: &Sifma,
+        cal: "sifma",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -425,7 +414,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "TARGET2",
-        cal: &Target2,
+        cal: "target2",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -441,7 +430,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "DEFR",
-        cal: &Defr,
+        cal: "defr",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -457,7 +446,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "GBLO",
-        cal: &Gblo,
+        cal: "gblo",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -473,7 +462,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "CHZH",
-        cal: &Chzh,
+        cal: "chzh",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -489,7 +478,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "HKHK",
-        cal: &Hkhk,
+        cal: "hkhk",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -505,7 +494,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "HKEX",
-        cal: &Hkex,
+        cal: "hkex",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -521,7 +510,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "CNBE",
-        cal: &Cnbe,
+        cal: "cnbe",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -537,7 +526,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "SSE",
-        cal: &Sse,
+        cal: "sse",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -581,7 +570,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "SGSI",
-        cal: &Sgsi,
+        cal: "sgsi",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -597,7 +586,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "ASX",
-        cal: &Asx,
+        cal: "asx",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -613,7 +602,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "AUCE",
-        cal: &Auce,
+        cal: "auce",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -629,7 +618,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "BRBD",
-        cal: &Brbd,
+        cal: "brbd",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -645,7 +634,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "CATO",
-        cal: &Cato,
+        cal: "cato",
         checks: &[
             YearCheck {
                 year: 2024,
@@ -661,7 +650,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "EUREX",
-        cal: &Eurex,
+        cal: "eurex",
         checks: &[YearCheck {
             year: 2025,
             expected_count: Some(8),
@@ -670,7 +659,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "SIX",
-        cal: &Six,
+        cal: "six",
         checks: &[YearCheck {
             year: 2025,
             expected_count: Some(12),
@@ -679,7 +668,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "TSX",
-        cal: &Tsx,
+        cal: "tsx",
         checks: &[
             YearCheck {
                 year: 2025,
@@ -695,7 +684,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "NSE",
-        cal: &Nse,
+        cal: "nse",
         checks: &[YearCheck {
             year: 2026,
             expected_count: None,
@@ -704,7 +693,7 @@ const CASES: &[CalendarCase] = &[
     },
     CalendarCase {
         name: "BSE",
-        cal: &Bse,
+        cal: "bse",
         checks: &[YearCheck {
             year: 2026,
             expected_count: None,
@@ -718,32 +707,32 @@ const CASES: &[CalendarCase] = &[
 fn exchange_calendars_are_not_aliases() {
     let eve = make_date(2025, 12, 24);
     let nye = make_date(2025, 12, 31);
-    assert!(Eurex.is_holiday(eve));
-    assert!(Eurex.is_holiday(nye));
+    assert!(by_id("eurex").is_holiday(eve));
+    assert!(by_id("eurex").is_holiday(nye));
     assert!(
-        Defr.is_business_day(eve),
+        by_id("defr").is_business_day(eve),
         "defr must remain open on Christmas Eve (eurex is not an alias)"
     );
     assert!(
-        Defr.is_business_day(nye),
+        by_id("defr").is_business_day(nye),
         "defr must remain open on New Year's Eve (eurex is not an alias)"
     );
 
     let truth = make_date(2025, 9, 30);
     let remembrance = make_date(2025, 11, 11);
     assert!(
-        Tsx.is_business_day(truth),
+        by_id("tsx").is_business_day(truth),
         "TSX trades on National Day for Truth and Reconciliation"
     );
     assert!(
-        Tsx.is_business_day(remembrance),
+        by_id("tsx").is_business_day(remembrance),
         "TSX trades on Remembrance Day"
     );
-    assert!(Cato.is_holiday(truth));
-    assert!(Cato.is_holiday(remembrance));
+    assert!(by_id("cato").is_holiday(truth));
+    assert!(by_id("cato").is_holiday(remembrance));
 
-    assert!(Nse.is_holiday(make_date(2026, 1, 26)));
-    assert!(Nse.is_holiday(make_date(2026, 3, 3)));
+    assert!(by_id("nse").is_holiday(make_date(2026, 1, 26)));
+    assert!(by_id("nse").is_holiday(make_date(2026, 3, 3)));
     let independence_saturday = make_date(2026, 8, 15);
     assert_eq!(
         independence_saturday.weekday(),
@@ -751,15 +740,15 @@ fn exchange_calendars_are_not_aliases() {
         "2026-08-15 must be Saturday for this regression"
     );
     assert!(
-        Nse.is_business_day(make_date(2026, 8, 14)),
+        by_id("nse").is_business_day(make_date(2026, 8, 14)),
         "Independence Day 2026 is Saturday; Friday is not an observed weekday holiday"
     );
     assert!(
-        Nse.is_business_day(make_date(2026, 8, 17)),
+        by_id("nse").is_business_day(make_date(2026, 8, 17)),
         "Independence Day 2026 is Saturday; Monday is not an observed weekday holiday"
     );
-    assert!(Bse.is_holiday(make_date(2026, 1, 26)));
-    assert!(Bse.is_holiday(make_date(2026, 3, 3)));
+    assert!(by_id("bse").is_holiday(make_date(2026, 1, 26)));
+    assert!(by_id("bse").is_holiday(make_date(2026, 3, 3)));
 
     let ids = available_calendars();
     for id in ["eurex", "six", "tsx", "nse", "bse"] {
@@ -771,7 +760,7 @@ fn exchange_calendars_are_not_aliases() {
 fn calendars_match_sample_expectations() {
     for case in CASES {
         for check in case.checks {
-            let holidays = holiday_set(case.cal, check.year);
+            let holidays = holiday_set(by_id(case.cal), check.year);
             if let Some(expected) = check.expected_count {
                 assert_eq!(
                     holidays.len(),
@@ -818,7 +807,7 @@ fn test_unknown_calendar_id() {
 
 #[test]
 fn test_calendar_weekend_behavior() {
-    let cal = Gblo;
+    let cal = by_id("gblo");
     assert!(!cal.is_business_day(make_date(2025, 6, 21)));
     assert!(!cal.is_business_day(make_date(2025, 6, 22)));
     assert!(cal.is_business_day(make_date(2025, 6, 18)));
@@ -828,7 +817,7 @@ fn test_calendar_weekend_behavior() {
 
 fn check_cny_dates(dates: &[(i32, u8, u8)]) {
     // Check multiple calendars that observe CNY
-    let calendars = [Cnbe, Hkhk, Sgsi];
+    let calendars = [by_id("cnbe"), by_id("hkhk"), by_id("sgsi")];
 
     for &(y, m, d) in dates {
         let date = make_date(y, m, d);
@@ -898,7 +887,7 @@ fn sse_cnbe_match_official_closure_notices_2024_2026() {
         (2026, 10, 8),
     ];
 
-    for cal in [&Sse as &dyn HolidayCalendar, &Cnbe] {
+    for cal in [by_id("sse") as &dyn HolidayCalendar, by_id("cnbe")] {
         let id = cal.metadata().unwrap().id;
         for &((sy, sm, sd), (ey, em, ed)) in closed {
             let mut d = make_date(sy, sm, sd);
@@ -943,7 +932,7 @@ fn sse_lunar_festivals_and_bridges_present() {
     ];
     for &(y, m, d) in must_be_holiday {
         assert!(
-            Sse.is_holiday(make_date(y, m, d)),
+            by_id("sse").is_holiday(make_date(y, m, d)),
             "SSE should mark {y}-{m:02}-{d:02} as a holiday"
         );
     }
@@ -951,17 +940,17 @@ fn sse_lunar_festivals_and_bridges_present() {
     // Dragon Boat and Mid-Autumn only became statutory in 2008; SSE traded on
     // them before then. 2007 Dragon Boat = Jun 19, 2007 Mid-Autumn = Sep 25.
     assert!(
-        Sse.is_business_day(make_date(2007, 6, 19)),
+        by_id("sse").is_business_day(make_date(2007, 6, 19)),
         "Dragon Boat pre-dates its 2008 adoption"
     );
     assert!(
-        Sse.is_business_day(make_date(2007, 9, 25)),
+        by_id("sse").is_business_day(make_date(2007, 9, 25)),
         "Mid-Autumn pre-dates its 2008 adoption"
     );
     // 2008 was the first year Dragon Boat was observed; it fell on Sunday
     // Jun 8, so the market closure is the substitute Monday Jun 9.
     assert!(
-        Sse.is_holiday(make_date(2008, 6, 9)),
+        by_id("sse").is_holiday(make_date(2008, 6, 9)),
         "Dragon Boat 2008 substitute Monday"
     );
 }
@@ -969,8 +958,8 @@ fn sse_lunar_festivals_and_bridges_present() {
 #[test]
 fn mainland_calendars_use_published_2022_closure_boundaries() {
     for (name, calendar) in [
-        ("sse", &Sse as &dyn HolidayCalendar),
-        ("cnbe", &Cnbe as &dyn HolidayCalendar),
+        ("sse", by_id("sse") as &dyn HolidayCalendar),
+        ("cnbe", by_id("cnbe") as &dyn HolidayCalendar),
     ] {
         assert!(
             calendar.is_holiday(make_date(2022, 1, 31)),
@@ -1005,8 +994,8 @@ fn mainland_calendars_include_historical_official_one_off_closures() {
     ];
 
     for (name, calendar) in [
-        ("sse", &Sse as &dyn HolidayCalendar),
-        ("cnbe", &Cnbe as &dyn HolidayCalendar),
+        ("sse", by_id("sse") as &dyn HolidayCalendar),
+        ("cnbe", by_id("cnbe") as &dyn HolidayCalendar),
     ] {
         for date in closures {
             assert!(calendar.is_holiday(date), "{name} must close on {date}");
@@ -1042,25 +1031,25 @@ fn usny_fed_observance_saturday_no_substitute_sunday_to_monday() {
     // NYSE holiday.
     let fri_jul3_2026 = make_date(2026, 7, 3);
     assert!(
-        Usny.is_business_day(fri_jul3_2026),
+        by_id("usny").is_business_day(fri_jul3_2026),
         "Fed convention: no Friday substitute when July 4 falls on Saturday"
     );
     assert!(
-        Nyse.is_holiday(fri_jul3_2026),
+        by_id("nyse").is_holiday(fri_jul3_2026),
         "NYSE observes Saturday July 4 on the preceding Friday"
     );
 
     // Christmas 2027 falls on Saturday: Fri 2027-12-24 is a USNY business day.
     let fri_dec24_2027 = make_date(2027, 12, 24);
     assert!(
-        Usny.is_business_day(fri_dec24_2027),
+        by_id("usny").is_business_day(fri_dec24_2027),
         "Fed convention: banks open Fri 2027-12-24 (Christmas on Saturday)"
     );
 
     // New Year's Day 2023 fell on Sunday: Mon 2023-01-02 is a USNY holiday.
     let mon_jan2_2023 = make_date(2023, 1, 2);
     assert!(
-        Usny.is_holiday(mon_jan2_2023),
+        by_id("usny").is_holiday(mon_jan2_2023),
         "Fed convention: Sunday holiday observed the following Monday"
     );
 }
@@ -1076,7 +1065,10 @@ fn sofr_calendar_follows_repo_closures_independently_of_banking_and_trading() {
         (make_date(2026, 7, 3), make_date(2026, 7, 6)),
     ] {
         assert!(!sofr.is_business_day(holiday), "SOFR closure: {holiday}");
-        assert!(Usny.is_business_day(holiday), "banking day: {holiday}");
+        assert!(
+            by_id("usny").is_business_day(holiday),
+            "banking day: {holiday}"
+        );
         assert_eq!(
             adjust(holiday, BusinessDayConvention::Following, sofr).unwrap(),
             following
@@ -1084,7 +1076,7 @@ fn sofr_calendar_follows_repo_closures_independently_of_banking_and_trading() {
     }
     // Good Friday 2026 is a SIFMA early-close trading session, but the
     // cleared repo market is closed and SOFR does not fix.
-    assert!(Sifma.is_business_day(make_date(2026, 4, 3)));
+    assert!(by_id("sifma").is_business_day(make_date(2026, 4, 3)));
 
     // Repo observance is holiday-specific; do not import the federal-workforce
     // Friday-substitution rule for New Year's Day or Veterans Day.
@@ -1104,36 +1096,36 @@ fn sofr_calendar_follows_repo_closures_independently_of_banking_and_trading() {
 fn gblo_christmas_boxing_day_chained_substitution() {
     // 2021: Dec 25 = Saturday, Dec 26 = Sunday.
     // Actual UK bank holidays: Mon 27 Dec + Tue 28 Dec.
-    assert!(Gblo.is_holiday(make_date(2021, 12, 27)));
-    assert!(Gblo.is_holiday(make_date(2021, 12, 28)));
+    assert!(by_id("gblo").is_holiday(make_date(2021, 12, 27)));
+    assert!(by_id("gblo").is_holiday(make_date(2021, 12, 28)));
     assert!(
-        Gblo.is_business_day(make_date(2021, 12, 24)),
+        by_id("gblo").is_business_day(make_date(2021, 12, 24)),
         "Fri 2021-12-24 was a UK working day"
     );
     assert!(
-        Gblo.is_business_day(make_date(2021, 12, 29)),
+        by_id("gblo").is_business_day(make_date(2021, 12, 29)),
         "Wed 2021-12-29 was a UK working day"
     );
 
     // 2022: Dec 25 = Sunday, Dec 26 = Monday.
     // Actual UK bank holidays: Mon 26 Dec (Boxing Day) + Tue 27 Dec (substitute).
-    assert!(Gblo.is_holiday(make_date(2022, 12, 26)));
+    assert!(by_id("gblo").is_holiday(make_date(2022, 12, 26)));
     assert!(
-        Gblo.is_holiday(make_date(2022, 12, 27)),
+        by_id("gblo").is_holiday(make_date(2022, 12, 27)),
         "Tue 2022-12-27 was the Christmas Day substitute (previously collapsed)"
     );
     assert!(
-        Gblo.is_business_day(make_date(2022, 12, 28)),
+        by_id("gblo").is_business_day(make_date(2022, 12, 28)),
         "Wed 2022-12-28 was a UK working day"
     );
 
     // 2027: Dec 25 = Saturday, Dec 26 = Sunday (same shape as 2021).
-    assert!(Gblo.is_holiday(make_date(2027, 12, 27)));
+    assert!(by_id("gblo").is_holiday(make_date(2027, 12, 27)));
     assert!(
-        Gblo.is_holiday(make_date(2027, 12, 28)),
+        by_id("gblo").is_holiday(make_date(2027, 12, 28)),
         "Tue 2027-12-28 substitute was previously missing"
     );
-    assert!(Gblo.is_business_day(make_date(2027, 12, 29)));
+    assert!(by_id("gblo").is_business_day(make_date(2027, 12, 29)));
 }
 
 /// UK one-off bank holidays and moved May bank holidays (gov.uk history).
@@ -1141,35 +1133,35 @@ fn gblo_christmas_boxing_day_chained_substitution() {
 fn gblo_one_off_and_moved_bank_holidays() {
     // 2012 Diamond Jubilee: Spring BH moved to Mon Jun 4, extra day Tue Jun 5;
     // the regular last-Monday-of-May (May 28) was a working day.
-    assert!(Gblo.is_holiday(make_date(2012, 6, 4)));
-    assert!(Gblo.is_holiday(make_date(2012, 6, 5)));
+    assert!(by_id("gblo").is_holiday(make_date(2012, 6, 4)));
+    assert!(by_id("gblo").is_holiday(make_date(2012, 6, 5)));
     assert!(
-        Gblo.is_business_day(make_date(2012, 5, 28)),
+        by_id("gblo").is_business_day(make_date(2012, 5, 28)),
         "Spring Bank Holiday was moved out of May in 2012"
     );
 
     // 2020 VE Day 75th anniversary: Early May BH moved from Mon May 4 to Fri May 8.
-    assert!(Gblo.is_holiday(make_date(2020, 5, 8)));
+    assert!(by_id("gblo").is_holiday(make_date(2020, 5, 8)));
     assert!(
-        Gblo.is_business_day(make_date(2020, 5, 4)),
+        by_id("gblo").is_business_day(make_date(2020, 5, 4)),
         "Early May Bank Holiday was moved to May 8 in 2020"
     );
 
     // 2022 Platinum Jubilee: Spring BH moved to Thu Jun 2, extra day Fri Jun 3;
     // last Monday of May (May 30) was a working day.
-    assert!(Gblo.is_holiday(make_date(2022, 6, 2)));
-    assert!(Gblo.is_holiday(make_date(2022, 6, 3)));
+    assert!(by_id("gblo").is_holiday(make_date(2022, 6, 2)));
+    assert!(by_id("gblo").is_holiday(make_date(2022, 6, 3)));
     assert!(
-        Gblo.is_business_day(make_date(2022, 5, 30)),
+        by_id("gblo").is_business_day(make_date(2022, 5, 30)),
         "Spring Bank Holiday was moved out of May in 2022"
     );
 
     // 2022-09-19: State Funeral of Queen Elizabeth II.
-    assert!(Gblo.is_holiday(make_date(2022, 9, 19)));
+    assert!(by_id("gblo").is_holiday(make_date(2022, 9, 19)));
 
     // 2023-05-08: Coronation of King Charles III (extra; Early May BH May 1 kept).
-    assert!(Gblo.is_holiday(make_date(2023, 5, 8)));
-    assert!(Gblo.is_holiday(make_date(2023, 5, 1)));
+    assert!(by_id("gblo").is_holiday(make_date(2023, 5, 8)));
+    assert!(by_id("gblo").is_holiday(make_date(2023, 5, 1)));
 }
 
 /// Dia da Consciência Negra became a Brazilian national holiday only from 2024
@@ -1177,15 +1169,15 @@ fn gblo_one_off_and_moved_bank_holidays() {
 #[test]
 fn brbd_consciencia_negra_year_gated_from_2024() {
     assert!(
-        Brbd.is_business_day(make_date(2023, 11, 20)),
+        by_id("brbd").is_business_day(make_date(2023, 11, 20)),
         "National accrual holiday applies from 2024"
     );
-    assert!(Brbd.is_holiday(make_date(2024, 11, 20)));
+    assert!(by_id("brbd").is_holiday(make_date(2024, 11, 20)));
 }
 
 #[test]
 fn swiss_and_frankfurt_calendars_do_not_substitute_weekend_holidays() {
-    for calendar in [&Six as &dyn HolidayCalendar, &Chzh] {
+    for calendar in [by_id("six") as &dyn HolidayCalendar, by_id("chzh")] {
         assert!(calendar.is_holiday(make_date(2026, 8, 1)));
         assert!(calendar.is_business_day(make_date(2026, 8, 3)));
         assert!(calendar.is_holiday(make_date(2026, 12, 25)));
@@ -1193,7 +1185,7 @@ fn swiss_and_frankfurt_calendars_do_not_substitute_weekend_holidays() {
         assert!(calendar.is_business_day(make_date(2026, 12, 28)));
     }
 
-    assert!(Defr.is_holiday(make_date(2026, 12, 25)));
-    assert!(Defr.is_holiday(make_date(2026, 12, 26)));
-    assert!(Defr.is_business_day(make_date(2026, 12, 28)));
+    assert!(by_id("defr").is_holiday(make_date(2026, 12, 25)));
+    assert!(by_id("defr").is_holiday(make_date(2026, 12, 26)));
+    assert!(by_id("defr").is_business_day(make_date(2026, 12, 28)));
 }

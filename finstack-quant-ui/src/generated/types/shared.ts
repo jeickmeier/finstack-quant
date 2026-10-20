@@ -15249,7 +15249,7 @@ export type SnowballVariant = "snowball" | "inverse_floater";
  *   ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide
  *   evenly by the frequency. Use a stub variant for misaligned schedules.
  *
- * [`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor
+ * [`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor
  * - **`ShortFront`**: Short stub period at the start. Schedule is built
  *   backward from the end date, creating a short first period.
  * - **`ShortBack`**: Short stub period at the end. Schedule is built forward
@@ -15564,7 +15564,7 @@ export type D_10Afa2C48803544Dc415 =
  *   ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide
  *   evenly by the frequency. Use a stub variant for misaligned schedules.
  *
- * [`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor
+ * [`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor
  * - **`ShortFront`**: Short stub period at the start. Schedule is built
  *   backward from the end date, creating a short first period.
  * - **`ShortBack`**: Short stub period at the end. Schedule is built forward
@@ -15883,7 +15883,7 @@ export type D_7E19Cc4Df9954B864180 = number;
  *   ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide
  *   evenly by the frequency. Use a stub variant for misaligned schedules.
  *
- * [`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor
+ * [`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor
  * - **`ShortFront`**: Short stub period at the start. Schedule is built
  *   backward from the end date, creating a short first period.
  * - **`ShortBack`**: Short stub period at the end. Schedule is built forward

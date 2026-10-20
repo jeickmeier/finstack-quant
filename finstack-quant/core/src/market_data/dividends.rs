@@ -208,7 +208,7 @@ impl DividendSchedule {
             match &ev.kind {
                 DividendKind::Cash(m) => {
                     if m.amount() < 0.0 {
-                        return Err(Error::Input(crate::error::InputError::NegativeValue));
+                        return Err(Error::Input(crate::InputError::NegativeValue));
                     }
                 }
                 DividendKind::Yield(y) => {
@@ -218,7 +218,7 @@ impl DividendSchedule {
                         ));
                     }
                     if *y < 0.0 {
-                        return Err(Error::Input(crate::error::InputError::NegativeValue));
+                        return Err(Error::Input(crate::InputError::NegativeValue));
                     }
                 }
                 DividendKind::Stock { ratio } => {
@@ -228,7 +228,7 @@ impl DividendSchedule {
                         ));
                     }
                     if *ratio < 0.0 {
-                        return Err(Error::Input(crate::error::InputError::NegativeValue));
+                        return Err(Error::Input(crate::InputError::NegativeValue));
                     }
                 }
             }

@@ -875,17 +875,17 @@ impl ReturnKind {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] for an unknown label, or
+    /// Returns [`finstack_quant_core::Error::Validation`] for an unknown label, or
     /// for a non-zero `risk_free_rate` with [`ReturnKind::Excess`].
     pub fn from_label(label: Option<&str>, risk_free_rate: f64) -> crate::Result<Self> {
         match label {
             None | Some("excess") if risk_free_rate == 0.0 => Ok(Self::Excess),
-            None | Some("excess") => Err(crate::error::Error::Validation(format!(
+            None | Some("excess") => Err(finstack_quant_core::Error::Validation(format!(
                 "risk_free_rate {risk_free_rate} has no effect on excess returns; \
                  pass return_kind \"total\" or leave risk_free_rate at 0.0"
             ))),
             Some("total") => Ok(Self::Total { risk_free_rate }),
-            Some(other) => Err(crate::error::Error::Validation(format!(
+            Some(other) => Err(finstack_quant_core::Error::Validation(format!(
                 "unknown return_kind {other:?}; expected \"excess\" or \"total\""
             ))),
         }
@@ -1120,7 +1120,7 @@ pub(crate) fn multi_factor_greeks(
             reason = "factor_length_mismatch",
             "multi-factor greeks rejected input"
         );
-        return Err(crate::error::InputError::DimensionMismatch.into());
+        return Err(finstack_quant_core::InputError::DimensionMismatch.into());
     }
     let design = DMatrix::from_fn(
         n,

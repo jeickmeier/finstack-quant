@@ -48,8 +48,8 @@
 //!   - Lewis, A. L. (2000). *Option Valuation under Stochastic Volatility*.
 //!     Finance Press. (Fourier methods and quadrature)
 
-use crate::error::InputError;
 use crate::Error;
+use crate::InputError;
 
 /// Gauss-Hermite quadrature points and weights for numerical integration
 /// over the standard normal distribution.

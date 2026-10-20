@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::dates::{HolidayCalendar, WeekendRule};
+use finstack_quant_core::dates::{calendar_by_id_strict, HolidayCalendar, WeekendRule};
 use time::Month;
 
 /// Standard tolerance for day count year fraction comparisons.
@@ -13,6 +13,11 @@ pub(crate) const DAYCOUNT_TOLERANCE: f64 = 1e-12;
 /// Helper to construct `Date` instances.
 pub(crate) fn make_date(year: i32, month: u8, day: u8) -> Date {
     Date::from_calendar_date(year, Month::try_from(month).unwrap(), day).unwrap()
+}
+
+/// Resolves a built-in calendar by id; panics on an unknown id.
+pub(crate) fn by_id(id: &str) -> &'static dyn HolidayCalendar {
+    calendar_by_id_strict(id).unwrap()
 }
 
 /// Simple in-memory calendar used for testing adjustments.

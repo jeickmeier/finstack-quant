@@ -67,10 +67,10 @@
 //! - O'Kane, D. (2008). *Modelling Single-name and Multi-name Credit Derivatives*.
 //!   Wiley Finance. Chapters 6-8 (Tranche pricing and base correlation). `docs/REFERENCES.md#o-kane-2008`
 
-use crate::error::InputError;
 use crate::market_data::bumps::{BumpSpec, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, Interp, InterpStyle, ValidationPolicy};
 use crate::types::CurveId;
+use crate::InputError;
 use crate::Result;
 
 /// Absolute detachment tolerance for bucket shocks.

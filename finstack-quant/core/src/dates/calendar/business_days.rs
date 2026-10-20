@@ -36,17 +36,17 @@
 //! # Examples
 //!
 //! ```rust
-//! use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date};
-//! use finstack_quant_core::dates::calendar::TARGET2;
+//! use finstack_quant_core::dates::{adjust, calendar_by_id_strict, BusinessDayConvention, Date};
 //! use time::Month;
 //!
+//! let target2 = calendar_by_id_strict("target2")?;
 //! let date = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"); // New Year (holiday)
-//! let adjusted = adjust(date, BusinessDayConvention::Following, &TARGET2)?;
+//! let adjusted = adjust(date, BusinessDayConvention::Following, target2)?;
 //! assert!(adjusted > date); // Moved to next business day
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 
-use crate::error::{Error, InputError};
+use crate::{Error, InputError};
 use time::{Date, Duration};
 
 /// Shared upper bound used across business-day search helpers to avoid runaway loops.
@@ -222,19 +222,19 @@ pub struct CalendarMetadata {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date};
-/// use finstack_quant_core::dates::calendar::TARGET2;
+/// use finstack_quant_core::dates::{adjust, calendar_by_id_strict, BusinessDayConvention, Date};
 /// use time::Month;
 ///
+/// let target2 = calendar_by_id_strict("target2")?;
 /// // Saturday, January 4, 2025
 /// let weekend = Date::from_calendar_date(2025, Month::January, 4).expect("Valid date");
 ///
 /// // Following: moves to next Monday (Jan 6)
-/// let adj = adjust(weekend, BusinessDayConvention::Following, &TARGET2)?;
+/// let adj = adjust(weekend, BusinessDayConvention::Following, target2)?;
 /// assert_eq!(adj.day(), 6);
 ///
 /// // Preceding: moves to previous Friday (Jan 3)
-/// let adj = adjust(weekend, BusinessDayConvention::Preceding, &TARGET2)?;
+/// let adj = adjust(weekend, BusinessDayConvention::Preceding, target2)?;
 /// assert_eq!(adj.day(), 3);
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
@@ -354,12 +354,11 @@ impl core::str::FromStr for BusinessDayConvention {
 ///
 /// Example:
 /// ```
-/// use finstack_quant_core::dates::{Date, BusinessDayConvention, adjust};
-/// use finstack_quant_core::dates::calendar::TARGET2;
+/// use finstack_quant_core::dates::{adjust, calendar_by_id_strict, BusinessDayConvention, Date};
 /// use time::Month;
-/// let cal = TARGET2;
+/// let cal = calendar_by_id_strict("target2").expect("built-in calendar");
 /// let sat = Date::from_calendar_date(2025, Month::January, 4).expect("Valid date");
-/// let adj = adjust(sat, BusinessDayConvention::Following, &cal).expect("Adjustment should succeed");
+/// let adj = adjust(sat, BusinessDayConvention::Following, cal).expect("Adjustment should succeed");
 /// assert_eq!(adj, Date::from_calendar_date(2025, Month::January, 6).expect("Valid date"));
 /// ```
 ///
@@ -449,7 +448,7 @@ pub const fn available_calendars() -> &'static [&'static str] {
 /// * `id` - Canonical lowercase calendar identifier (for example `"nyse"` or
 ///   `"target2"`); see [`available_calendars`] for the registry. Joining
 ///   identifiers with `+` (for example `"nyse+gblo"`) resolves to a union
-///   [`super::composite::CompositeCalendar`] that is a business day only when every member is.
+///   calendar that is a business day only when every member is.
 ///
 /// # Errors
 ///
@@ -481,18 +480,7 @@ pub fn calendar_by_id_strict(id: &str) -> crate::Result<&'static dyn HolidayCale
 ///
 /// Returns `InputError::CalendarNotFound` (with suggestions) when `id` or any
 /// `+`-joined member is not a built-in calendar.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::dates::canonical_calendar_id;
-///
-/// assert_eq!(canonical_calendar_id("NYSE")?, "nyse");
-/// assert_eq!(canonical_calendar_id("nyse + GBLO")?, "gblo+nyse");
-/// assert!(canonical_calendar_id("nope").is_err());
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-pub fn canonical_calendar_id(id: &str) -> crate::Result<String> {
+pub(crate) fn canonical_calendar_id(id: &str) -> crate::Result<String> {
     let calendar = calendar_by_id_strict(id)?;
     Ok(match calendar.metadata() {
         Some(metadata) => metadata.id.to_string(),
@@ -757,7 +745,7 @@ mod serde_tests {
         assert!(
             matches!(err, Error::Input(ref e) if matches!(
                 e,
-                crate::error::InputError::CalendarNotFound { .. }
+                crate::InputError::CalendarNotFound { .. }
             )),
             "Should be CalendarNotFound error, got: {:?}",
             err

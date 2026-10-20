@@ -454,7 +454,7 @@ mod tests {
         assert!(
             matches!(err, Error::Input(ref e) if matches!(
                 e,
-                crate::error::InputError::CalendarNotFound { .. }
+                crate::InputError::CalendarNotFound { .. }
             )),
             "Should be CalendarNotFound error, got: {:?}",
             err

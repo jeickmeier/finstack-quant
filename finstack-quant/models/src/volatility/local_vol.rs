@@ -41,10 +41,10 @@
 
 use crate::volatility::arbitrage::DEFAULT_ARBITRAGE_TOLERANCE;
 use crate::volatility::dupire::{dupire_node, MoneynessLookup};
-use finstack_quant_core::error::InputError;
 use finstack_quant_core::market_data::surfaces::{
     VolGridOpts, VolQuoteType, VolSurface, VolSurfaceAxis,
 };
+use finstack_quant_core::InputError;
 use finstack_quant_core::{Error, Result};
 
 fn validate_implied_surface(surface: &VolSurface, forwards: &[f64]) -> Result<()> {

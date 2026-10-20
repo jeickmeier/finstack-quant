@@ -36,7 +36,7 @@ impl DiscountCurve {
             "only supports Additive/{RateBp,Percent,Fraction} bumps",
         )?;
         if is_multiplicative {
-            return Err(crate::error::InputError::UnsupportedBump {
+            return Err(crate::InputError::UnsupportedBump {
                 reason: "DiscountCurve does not support Multiplicative bumps".to_string(),
             }
             .into());
@@ -261,7 +261,7 @@ impl DiscountCurve {
         // time basis (the same `dt_years` the knots are shifted by).
         let df_dt = self.df(dt_years);
         if !df_dt.is_finite() || df_dt <= 0.0 {
-            return Err(crate::error::InputError::NonPositiveValue.into());
+            return Err(crate::InputError::NonPositiveValue.into());
         }
 
         let rolled_points: Vec<(f64, f64)> = roll_knots(&self.knots, &self.dfs, dt_years)
@@ -274,7 +274,7 @@ impl DiscountCurve {
         // correct: DF_new(0) = DF_old(dt) / DF_old(dt) = 1. One live knot is
         // therefore enough.
         if rolled_points.is_empty() {
-            return Err(crate::error::InputError::TooFewPoints.into());
+            return Err(crate::InputError::TooFewPoints.into());
         }
         if rolled_points
             .iter()

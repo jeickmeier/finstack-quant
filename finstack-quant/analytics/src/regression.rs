@@ -30,8 +30,8 @@
 //! # References
 //! - Jeet & Partani (2023): see `docs/REFERENCES.md#jeet-partani-2023`
 
-use finstack_quant_core::error::{InputError, NonFiniteKind};
 use finstack_quant_core::math::summation::neumaier_sum;
+use finstack_quant_core::{InputError, NonFiniteKind};
 use nalgebra::{DMatrix, DVector};
 
 /// Relative tolerance, on the Cauchy-Schwarz ratio `|w'Xg| / (‖w‖‖Xg‖)`,

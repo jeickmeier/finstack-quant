@@ -178,9 +178,9 @@ pub fn flat_discount_factor(rate: f64, years: f64) -> crate::Result<f64> {
 /// # Errors
 ///
 /// Returns `Err` when:
-/// - [`InputError::TooFewPoints`](crate::error::InputError::TooFewPoints): The `flows`
+/// - [`InputError::TooFewPoints`](crate::InputError::TooFewPoints): The `flows`
 ///   slice is empty
-/// - Day count year fraction calculation fails (e.g., [`InputError::MissingCalendarForBus252`](crate::error::InputError::MissingCalendarForBus252)
+/// - Day count year fraction calculation fails (e.g., [`InputError::MissingCalendarForBus252`](crate::InputError::MissingCalendarForBus252)
 ///   when using Bus/252 without a calendar context)
 /// - [`Error::CurrencyMismatch`](crate::Error::CurrencyMismatch): Cashflows have
 ///   mixed currencies (all flows must share the same currency)
@@ -222,7 +222,7 @@ pub fn npv<D: Discounting + ?Sized>(
     flows: &[(Date, Money)],
 ) -> crate::Result<Money> {
     if flows.is_empty() {
-        return Err(crate::error::InputError::TooFewPoints.into());
+        return Err(crate::InputError::TooFewPoints.into());
     }
     let ccy = flows[0].1.currency();
     for (_, amt) in flows.iter().skip(1) {
@@ -268,7 +268,7 @@ pub fn npv_amounts_with_curve<D: Discounting + ?Sized>(
     flows: &[(Date, f64)],
 ) -> crate::Result<f64> {
     if flows.is_empty() {
-        return Err(crate::error::InputError::TooFewPoints.into());
+        return Err(crate::InputError::TooFewPoints.into());
     }
 
     if flows.iter().any(|(_, amount)| !amount.is_finite()) {

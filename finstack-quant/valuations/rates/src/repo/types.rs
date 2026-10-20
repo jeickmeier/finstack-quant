@@ -803,8 +803,8 @@ mod tests {
     #[test]
     fn term_repo_weekend_business_day_convention_adjustment_target2() {
         use finstack_quant_cashflows::CashflowProvider;
-        use finstack_quant_core::dates::calendar::TARGET2;
-        use finstack_quant_core::dates::HolidayCalendar;
+        let target2 =
+            finstack_quant_core::dates::calendar_by_id_strict("target2").expect("target2 calendar");
 
         // Saturday Jan 4, 2025 -> should adjust to Monday Jan 6
         let start_saturday = date(2025, 1, 4);
@@ -838,7 +838,7 @@ mod tests {
 
         // Saturday Jan 4 -> Monday Jan 6 (Following)
         assert!(
-            TARGET2.is_business_day(adj_start),
+            target2.is_business_day(adj_start),
             "Adjusted start should be a business day"
         );
         assert_eq!(
@@ -849,7 +849,7 @@ mod tests {
 
         // Saturday Jan 11 -> Monday Jan 13 (Following)
         assert!(
-            TARGET2.is_business_day(adj_maturity),
+            target2.is_business_day(adj_maturity),
             "Adjusted maturity should be a business day"
         );
         assert_eq!(
@@ -1096,8 +1096,8 @@ mod tests {
     /// Test overnight repo with calendar properly adjusts start date.
     #[test]
     fn overnight_repo_adjusts_start_date() {
-        use finstack_quant_core::dates::calendar::TARGET2;
-        use finstack_quant_core::dates::HolidayCalendar;
+        let target2 =
+            finstack_quant_core::dates::calendar_by_id_strict("target2").expect("target2 calendar");
 
         // Saturday Jan 4, 2025 -> should adjust to Monday Jan 6
         let start_saturday = date(2025, 1, 4);
@@ -1121,7 +1121,7 @@ mod tests {
             "Start date should be pre-adjusted to Monday"
         );
         assert!(
-            TARGET2.is_business_day(repo.start_date),
+            target2.is_business_day(repo.start_date),
             "Start date should be a business day"
         );
 
@@ -1132,7 +1132,7 @@ mod tests {
             "Maturity should be next business day (Tuesday)"
         );
         assert!(
-            TARGET2.is_business_day(repo.maturity),
+            target2.is_business_day(repo.maturity),
             "Maturity should be a business day"
         );
 

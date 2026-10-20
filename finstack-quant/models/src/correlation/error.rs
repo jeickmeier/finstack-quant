@@ -109,7 +109,7 @@ impl From<Error> for finstack_quant_core::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::error::ErrorKind;
+    use finstack_quant_core::ErrorKind;
 
     #[test]
     fn convergence_failures_fold_to_computation_kind() {

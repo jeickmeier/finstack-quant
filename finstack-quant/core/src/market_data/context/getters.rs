@@ -18,14 +18,14 @@ use super::{CurveStorage, MarketContext};
 impl MarketContext {
     #[inline]
     fn not_found_error(id: &str) -> crate::Error {
-        crate::error::InputError::NotFound { id: id.to_string() }.into()
+        crate::InputError::NotFound { id: id.to_string() }.into()
     }
 
     fn missing_curve_error(&self, id: &str) -> crate::Error {
         // Sort for deterministic error messages (HashMap iteration order varies).
         let mut available: Vec<&str> = self.curves.keys().map(|k| k.as_str()).collect();
         available.sort_unstable();
-        crate::error::Error::missing_curve_with_suggestions(id, &available)
+        crate::Error::missing_curve_with_suggestions(id, &available)
     }
 
     #[inline]
@@ -52,7 +52,7 @@ impl MarketContext {
     {
         match self.curves.get(id) {
             Some(storage) => extractor(storage).ok_or_else(|| {
-                crate::error::InputError::WrongCurveType {
+                crate::InputError::WrongCurveType {
                     id: id.to_string(),
                     expected: expected_type.to_string(),
                     actual: storage.curve_type().to_string(),
@@ -467,7 +467,7 @@ impl MarketContext {
         let curve_id = self
             .collateral
             .get(csa_code)
-            .ok_or(crate::error::InputError::NotFound {
+            .ok_or(crate::InputError::NotFound {
                 id: format!("collateral:{}", csa_code),
             })?;
         self.get_discount(curve_id.as_str())

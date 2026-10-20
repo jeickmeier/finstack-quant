@@ -3,14 +3,13 @@
 use std::sync::Arc;
 
 use finstack_quant_core::{
-    error::InputError,
     market_data::context::MarketContext,
     market_data::surfaces::{
         FxDeltaVolSurface, VolCube, VolCubeExpirySlice, VolInterpolationMode, VolQuoteType,
         VolSurface, VolSurfaceAxis,
     },
     types::CurveId,
-    Error, Result,
+    Error, InputError, Result,
 };
 
 use super::conventions::VolatilityConvention;

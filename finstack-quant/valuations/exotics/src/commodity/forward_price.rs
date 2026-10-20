@@ -71,7 +71,7 @@ pub(crate) fn resolve_forward_price(request: ForwardPriceRequest<'_>) -> Result<
         return Ok(spot / df);
     }
     Err(finstack_quant_core::Error::Input(
-        finstack_quant_core::error::InputError::NotFound {
+        finstack_quant_core::InputError::NotFound {
             id: format!(
                 "PriceCurve '{forward_curve_id}' not found. \
                  Use MarketContext::insert_price_curve() to add a commodity forward price curve."

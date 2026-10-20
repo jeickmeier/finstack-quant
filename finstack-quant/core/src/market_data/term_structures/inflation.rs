@@ -566,7 +566,7 @@ impl InflationCurve {
         let mut rolled_points = roll_knots(&self.knots, &self.cpi_levels, dt_years);
 
         if rolled_points.is_empty() {
-            return Err(crate::error::InputError::TooFewPoints.into());
+            return Err(crate::InputError::TooFewPoints.into());
         }
         rolled_points.insert(0, (0.0, new_base_cpi));
 

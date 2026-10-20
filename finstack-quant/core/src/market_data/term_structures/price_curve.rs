@@ -541,7 +541,7 @@ impl PriceCurve {
         let mut rolled_points = roll_knots(&self.knots, &self.prices, dt_years);
 
         if rolled_points.is_empty() {
-            return Err(crate::error::InputError::TooFewPoints.into());
+            return Err(crate::InputError::TooFewPoints.into());
         }
 
         // New spot is interpolated from old curve at dt_years

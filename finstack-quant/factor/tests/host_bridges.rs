@@ -3,7 +3,7 @@
 //! WebAssembly both call these, so each case pins the one behaviour the two
 //! hosts share.
 
-use finstack_quant_core::error::ErrorKind;
+use finstack_quant_core::ErrorKind;
 use finstack_quant_factor::credit::hierarchy::{dimension_key, HierarchyDimension};
 use finstack_quant_factor::credit::VolHorizon;
 use finstack_quant_factor::risk::parametric_var_decomposition;

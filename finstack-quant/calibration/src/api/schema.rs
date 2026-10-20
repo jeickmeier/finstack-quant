@@ -1553,10 +1553,7 @@ mod step_report_tests {
             .result
             .step_report("USD-OIS")
             .expect_err("no such step");
-        assert_eq!(
-            error.kind(),
-            finstack_quant_core::error::ErrorKind::NotFound
-        );
+        assert_eq!(error.kind(), finstack_quant_core::ErrorKind::NotFound);
         assert!(error
             .to_string()
             .contains("calibration step 'USD-OIS'; available steps: []"));

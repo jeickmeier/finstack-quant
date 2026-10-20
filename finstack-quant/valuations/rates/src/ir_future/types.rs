@@ -344,7 +344,7 @@ impl InterestRateFuture {
             period_start.add_months(self.contract_specs.delivery_months as i32)?
         };
         if period_end <= period_start {
-            return Err(finstack_quant_core::error::InputError::InvalidDateRange.into());
+            return Err(finstack_quant_core::InputError::InvalidDateRange.into());
         }
         Ok((fixing, period_start, period_end))
     }

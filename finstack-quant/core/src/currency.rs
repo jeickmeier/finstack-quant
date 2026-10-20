@@ -119,10 +119,10 @@ include!("generated/currency_generated.rs");
 ///
 /// This is the only currency-text parser: `FromStr`, `TryFrom<&str>` and
 /// every host binding go through it, so a bad code always reports
-/// [`InputError::UnknownCurrency`](crate::error::InputError::UnknownCurrency)
+/// [`InputError::UnknownCurrency`](crate::InputError::UnknownCurrency)
 /// naming the rejected text.
 fn unknown_currency_code(code: &str) -> crate::Error {
-    crate::error::InputError::UnknownCurrency {
+    crate::InputError::UnknownCurrency {
         code: code.to_string(),
     }
     .into()
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn test_currency_parse_error_names_code_and_does_not_trim() {
-        use crate::error::{ErrorKind, InputError};
+        use crate::{ErrorKind, InputError};
         for code in [" USD ", "USD\n", "XXX", "é€x"] {
             let err = code.parse::<Currency>().expect_err("rejected code");
             assert_eq!(err.kind(), ErrorKind::Validation);
@@ -320,7 +320,7 @@ mod tests {
 
     #[test]
     fn test_currency_error_display() {
-        use crate::error::{Error, InputError};
+        use crate::{Error, InputError};
         let error: Error = InputError::NegativeValue.into();
         assert_eq!(format!("{}", error), "Values must be non-negative");
     }

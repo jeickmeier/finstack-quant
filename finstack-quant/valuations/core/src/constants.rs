@@ -87,11 +87,6 @@ pub mod credit {
     ///
     /// If the risky annuity (denominator) is below this, par spread is undefined.
     pub const PAR_SPREAD_DENOM_TOLERANCE: f64 = 1e-12;
-
-    /// Calendar days per year for settlement delay calculations.
-    ///
-    /// Re-exported from `finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR` (ACT/365 Fixed).
-    pub use finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR;
 }
 
 /// Standard number of trading/business days per year (US equity markets).

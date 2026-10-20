@@ -391,7 +391,7 @@ mod tests {
 
     #[test]
     fn simulate_paths_rejects_sizes_that_overflow_or_cannot_be_allocated() {
-        use finstack_quant_core::error::ErrorKind;
+        use finstack_quant_core::ErrorKind;
         let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
         // The last pair fits in usize but not in memory (more than isize::MAX bytes).
         for (paths, steps) in [(1, usize::MAX), (usize::MAX, 4), (usize::MAX / 16, 1)] {

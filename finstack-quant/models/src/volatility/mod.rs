@@ -39,7 +39,8 @@
 //! # Quick Example
 //!
 //! ```
-//! use finstack_quant_models::volatility::{d1_d2, norm_cdf};
+//! use finstack_quant_core::math::special_functions::norm_cdf;
+//! use finstack_quant_models::volatility::d1_d2;
 //!
 //! let spot = 100.0;
 //! let strike = 105.0;

@@ -37,11 +37,13 @@ impl MarketContext {
             )));
         }
         let key = CurveId::from(price_id);
-        let current = self.prices.get(price_id).cloned().ok_or_else(|| {
-            crate::error::InputError::NotFound {
-                id: price_id.to_string(),
-            }
-        })?;
+        let current =
+            self.prices
+                .get(price_id)
+                .cloned()
+                .ok_or_else(|| crate::InputError::NotFound {
+                    id: price_id.to_string(),
+                })?;
         let bumped = match current {
             crate::market_data::scalars::MarketScalar::Unitless(v) => {
                 let bumped = v * (1.0 + bump_pct);
@@ -73,7 +75,7 @@ impl MarketContext {
         spec.validate()?;
         let key = CurveId::from(vol_surface_id);
         let previous = self.surfaces.get(vol_surface_id).cloned().ok_or_else(|| {
-            crate::error::InputError::NotFound {
+            crate::InputError::NotFound {
                 id: vol_surface_id.to_string(),
             }
         })?;
@@ -105,7 +107,7 @@ impl MarketContext {
         let key = CurveId::from(vol_surface_id);
         let surface = Arc::make_mut(&mut self.surfaces)
             .get_mut(vol_surface_id)
-            .ok_or_else(|| crate::error::InputError::NotFound {
+            .ok_or_else(|| crate::InputError::NotFound {
                 id: vol_surface_id.to_string(),
             })?;
         let original_vol =
@@ -127,7 +129,7 @@ impl MarketContext {
     ) -> Result<ContextScratchBump> {
         spec.validate()?;
         let previous = self.curves.get(curve_id.as_str()).cloned().ok_or_else(|| {
-            crate::error::InputError::NotFound {
+            crate::InputError::NotFound {
                 id: curve_id.to_string(),
             }
         })?;
@@ -142,7 +144,7 @@ impl MarketContext {
         };
         let storage = Arc::make_mut(&mut self.curves)
             .get_mut(curve_id.as_str())
-            .ok_or_else(|| crate::error::InputError::NotFound {
+            .ok_or_else(|| crate::InputError::NotFound {
                 id: curve_id.to_string(),
             })?;
         storage.apply_bump_preserving_id(curve_id, spec)?;
@@ -173,7 +175,7 @@ impl MarketContext {
             } => {
                 let surface = Arc::make_mut(&mut self.surfaces)
                     .get_mut(id.as_str())
-                    .ok_or_else(|| crate::error::InputError::NotFound { id: id.to_string() })?;
+                    .ok_or_else(|| crate::InputError::NotFound { id: id.to_string() })?;
                 Arc::make_mut(surface).unbump_point_in_place(expiry, strike, original_vol)?;
             }
             ContextScratchBump::Curve {
@@ -311,7 +313,7 @@ impl MarketContext {
             return Ok(false);
         }
 
-        Err(crate::error::InputError::NotFound {
+        Err(crate::InputError::NotFound {
             id: cid.to_string(),
         }
         .into())

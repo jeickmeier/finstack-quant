@@ -324,7 +324,7 @@ impl InflationIndex {
         currency: Currency,
     ) -> Result<Self> {
         if observations.is_empty() {
-            return Err(Error::Input(crate::error::InputError::TooFewPoints));
+            return Err(Error::Input(crate::InputError::TooFewPoints));
         }
 
         // Use a placeholder internal id; external id is stored separately.
@@ -519,7 +519,7 @@ impl InflationIndex {
     /// exceeds the signed month-offset range, or an anchor falls outside the calendar.
     pub fn ref_cpi_months_lag(&self, date: Date, lag_months: u32) -> Result<f64> {
         let first_of_month = Date::from_calendar_date(date.year(), date.month(), 1)
-            .map_err(|_| Error::Input(crate::error::InputError::InvalidDateRange))?;
+            .map_err(|_| Error::Input(crate::InputError::InvalidDateRange))?;
         let lag_months = i32::try_from(lag_months)
             .map_err(|_| Error::Validation("CPI lag months exceed supported range".into()))?;
         let anchor0 = first_of_month.add_months(-lag_months)?;
@@ -553,7 +553,7 @@ impl InflationIndex {
         let settle_value = self.value_on(settle_date)?;
 
         if base_value == 0.0 {
-            return Err(Error::Input(crate::error::InputError::NonPositiveValue));
+            return Err(Error::Input(crate::InputError::NonPositiveValue));
         }
 
         Ok(settle_value / base_value)
@@ -630,7 +630,7 @@ impl InflationIndex {
             InflationLag::None => Ok(date),
             InflationLag::Days(days) => date
                 .checked_sub(time::Duration::days(days as i64))
-                .ok_or(Error::Input(crate::error::InputError::InvalidDateRange)),
+                .ok_or(Error::Input(crate::InputError::InvalidDateRange)),
             InflationLag::Months(months) => {
                 // Proper month arithmetic using shared helper
                 date.add_months(-(months as i32))
@@ -939,7 +939,7 @@ mod tests {
                     .with_interpolation(interpolation);
                 assert!(matches!(
                     index.ref_cpi_months_lag(make_date(2025, 5, 15), 3),
-                    Err(Error::Input(crate::error::InputError::NotFound { .. }))
+                    Err(Error::Input(crate::InputError::NotFound { .. }))
                 ));
             }
             let index = InflationIndex::new(

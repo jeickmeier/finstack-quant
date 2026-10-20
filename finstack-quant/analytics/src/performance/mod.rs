@@ -113,8 +113,8 @@ fn invalid_return_series(
     ticker: impl Into<String>,
     index: usize,
     reason: impl Into<String>,
-) -> crate::error::InputError {
-    crate::error::InputError::InvalidReturnSeries {
+) -> finstack_quant_core::InputError {
+    finstack_quant_core::InputError::InvalidReturnSeries {
         ticker: ticker.into(),
         index,
         reason: reason.into(),
@@ -447,7 +447,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when:
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when:
     ///
     /// * `prices` or `dates` is empty.
     /// * `ticker_names.len() != prices.len()` or ticker names are duplicated.
@@ -788,14 +788,14 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::NotFound`] when `ticker` is not
+    /// Returns [`finstack_quant_core::InputError::NotFound`] when `ticker` is not
     /// among the loaded ticker names.
     pub fn ticker_index(&self, ticker: &str) -> crate::Result<usize> {
         self.ticker_names
             .iter()
             .position(|name| name == ticker)
             .ok_or_else(|| {
-                crate::error::InputError::NotFound {
+                finstack_quant_core::InputError::NotFound {
                     id: format!("ticker '{ticker}' (loaded: {:?})", self.ticker_names),
                 }
                 .into()
@@ -812,7 +812,7 @@ impl Performance {
         if confidence.is_finite() && confidence > 0.0 && confidence < 1.0 {
             Ok(())
         } else {
-            Err(crate::error::Error::Validation(format!(
+            Err(finstack_quant_core::Error::Validation(format!(
                 "confidence must lie in the open interval (0, 1); got {confidence}"
             )))
         }
@@ -825,7 +825,7 @@ impl Performance {
     /// window is a caller error and is rejected here.
     fn ensure_window(window: usize) -> crate::Result<()> {
         if window == 0 {
-            Err(crate::error::Error::Validation(
+            Err(finstack_quant_core::Error::Validation(
                 "rolling window must be at least 1 observation".to_string(),
             ))
         } else {
@@ -878,7 +878,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
     ///
     /// # Arguments
@@ -907,7 +907,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
     ///
     /// # Arguments

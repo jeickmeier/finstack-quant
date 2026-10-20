@@ -25,7 +25,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierDirection;
-pub use finstack_quant_core::types::BarrierType;
+use finstack_quant_core::types::BarrierType;
 
 /// Simulation-step representation of a barrier's monitoring contract.
 #[derive(Debug, Clone, PartialEq, Eq)]

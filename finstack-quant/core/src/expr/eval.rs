@@ -213,7 +213,7 @@ impl CompiledExpr {
         match &node.expr.node {
             ExprNode::Column(name) => {
                 let Some(idx) = env.ctx.index_of(name) else {
-                    return Err(crate::error::InputError::NotFound {
+                    return Err(crate::InputError::NotFound {
                         id: format!("expr column:{name}"),
                     }
                     .into());

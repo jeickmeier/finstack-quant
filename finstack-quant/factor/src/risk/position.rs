@@ -210,7 +210,7 @@ impl PositionRiskDecomposition {
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::error::InputError::NotFound`] when the
+    /// Returns [`finstack_quant_core::InputError::NotFound`] when the
     /// decomposition holds no contribution for `position_id`.
     pub fn component_var(&self, position_id: &str) -> finstack_quant_core::Result<f64> {
         self.var_contributions
@@ -218,11 +218,9 @@ impl PositionRiskDecomposition {
             .find(|c| c.position_id == position_id)
             .map(|c| c.component_var)
             .ok_or_else(|| {
-                finstack_quant_core::Error::Input(
-                    finstack_quant_core::error::InputError::NotFound {
-                        id: format!("position '{position_id}' in decomposition"),
-                    },
-                )
+                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
+                    id: format!("position '{position_id}' in decomposition"),
+                })
             })
     }
 }

@@ -910,16 +910,13 @@ mod tests {
                 err.to_string().contains("num_terms must be in 1..=65536"),
                 "{err}"
             );
-            assert_eq!(
-                err.kind(),
-                finstack_quant_core::error::ErrorKind::Validation
-            );
+            assert_eq!(err.kind(), finstack_quant_core::ErrorKind::Validation);
         }
         let degenerate =
             bs_cos_price(market(128), -0.2).expect_err("negative volatility is rejected");
         assert_eq!(
             degenerate.kind(),
-            finstack_quant_core::error::ErrorKind::Validation
+            finstack_quant_core::ErrorKind::Validation
         );
     }
 
@@ -1207,7 +1204,7 @@ mod tests {
             .expect_err("rejected");
             (
                 error.kind().as_str(),
-                finstack_quant_core::error::format_chain(&error),
+                finstack_quant_core::format_chain(&error),
             )
         };
         for ((vol, expiry, n_terms), (kind, message)) in [

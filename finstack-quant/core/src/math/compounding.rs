@@ -365,7 +365,7 @@ impl Compounding {
 }
 
 impl std::str::FromStr for Compounding {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {

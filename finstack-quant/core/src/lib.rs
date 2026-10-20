@@ -26,7 +26,7 @@
 //! * [`currency::Currency`] – ISO-4217 codes with numeric identifiers and metadata
 //! * [`money::Money`] – type-safe monetary amounts that refuse to mix currencies
 //! * [`dates`] – date/time scaffolding (business calendars, day-count, schedules)
-//! * [`market_data`] – curves, surfaces, scalars, and [`market_data::MarketContext`]
+//! * [`market_data`] – curves, surfaces, scalars, and [`market_data::context::MarketContext`]
 //! * [`math`] – interpolation, solvers, integration, statistics, and random numbers
 //!
 //! # Quick start
@@ -63,7 +63,7 @@
 //! - [`math`]: Numerical utilities and interpolation
 //! - [`expr`]: Expression engine for formula evaluation
 //! - [`explain`]: Computation tracing and debugging
-//! - [`error`]: Error types and result handling
+//! - [`Error`], [`Result`], [`InputError`], [`ErrorKind`]: Error types and result handling
 //! - [`decimal`]: `f64 ↔ Decimal` conversion helpers with explicit error propagation
 //! - [`rating_scales`]: Shared credit rating-scale registry
 //! - [`serde_guard`]: `deny_unknown_fields` enforcement for `#[serde(flatten)]` structs
@@ -107,7 +107,7 @@ pub mod decimal;
 /// Shared loader for embedded JSON registries with config override support.
 pub mod embedded_registry;
 /// Error types for finstack-quant-core.
-pub mod error;
+mod error;
 /// Explainability infrastructure for computation tracing.
 pub mod explain;
 /// Expression engine (AST, planning, and evaluation).
@@ -141,7 +141,7 @@ pub use rustc_hash::FxHashMap as HashMap;
 /// Hash set type alias used across Finstack (`rustc_hash::FxHashSet`).
 pub use rustc_hash::FxHashSet as HashSet;
 
-pub use error::{Error, InputError, NonFiniteKind, Result};
+pub use error::{format_chain, Error, ErrorKind, InputError, NonFiniteKind, Result};
 
 /// Recover the inner guard from a mutex or rwlock acquisition result if a previous holder panicked.
 #[inline]

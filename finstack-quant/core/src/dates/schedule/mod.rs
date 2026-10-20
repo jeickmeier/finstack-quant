@@ -119,7 +119,7 @@ use smallvec::SmallVec;
 use time::Date;
 
 use super::{adjust, next_imm, prev_cds_date, BusinessDayConvention, DateExt, HolidayCalendar};
-use crate::error::InputError;
+use crate::InputError;
 
 use crate::dates::Tenor;
 
@@ -136,7 +136,7 @@ use crate::dates::Tenor;
 ///   ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide
 ///   evenly by the frequency. Use a stub variant for misaligned schedules.
 ///
-/// [`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor
+/// [`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor
 /// - **`ShortFront`**: Short stub period at the start. Schedule is built
 ///   backward from the end date, creating a short first period.
 /// - **`ShortBack`**: Short stub period at the end. Schedule is built forward

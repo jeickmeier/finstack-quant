@@ -338,8 +338,8 @@ impl PricingError {
     /// `ModelFailure` a computation error, and every other variant a
     /// validation error.
     #[must_use]
-    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
-        use finstack_quant_core::error::ErrorKind;
+    pub fn kind(&self) -> finstack_quant_core::ErrorKind {
+        use finstack_quant_core::ErrorKind;
         match self {
             PricingError::UnknownPricer { .. } | PricingError::MissingMarketData { .. } => {
                 ErrorKind::NotFound
@@ -369,7 +369,7 @@ impl PricingError {
     /// | `Input(other)`                   | `InvalidInput`      |
     /// | `Validation(msg)`                | `InvalidInput`      |
     /// | `Calibration { message, .. }`    | `ModelFailure`      |
-    /// | all other variants               | by [`finstack_quant_core::error::ErrorKind`]: `NotFound` → `MissingMarketData`, `Validation` → `InvalidInput`, `Computation` → `ModelFailure` |
+    /// | all other variants               | by [`finstack_quant_core::ErrorKind`]: `NotFound` → `MissingMarketData`, `Validation` → `InvalidInput`, `Computation` → `ModelFailure` |
     ///
     /// # Example
     ///
@@ -424,24 +424,20 @@ impl PricingError {
                 other => {
                     let error = finstack_quant_core::Error::Input(other);
                     match error.kind() {
-                        finstack_quant_core::error::ErrorKind::NotFound => {
+                        finstack_quant_core::ErrorKind::NotFound => {
                             PricingError::MissingMarketData {
                                 missing_id: error.to_string(),
                                 context,
                             }
                         }
-                        finstack_quant_core::error::ErrorKind::Validation => {
-                            PricingError::InvalidInput {
-                                message: error.to_string(),
-                                context,
-                            }
-                        }
-                        finstack_quant_core::error::ErrorKind::Computation => {
-                            PricingError::ModelFailure {
-                                message: error.to_string(),
-                                context,
-                            }
-                        }
+                        finstack_quant_core::ErrorKind::Validation => PricingError::InvalidInput {
+                            message: error.to_string(),
+                            context,
+                        },
+                        finstack_quant_core::ErrorKind::Computation => PricingError::ModelFailure {
+                            message: error.to_string(),
+                            context,
+                        },
                     }
                 }
             },
@@ -458,17 +454,15 @@ impl PricingError {
             // surfaces as `MissingMarketData` and therefore as a host
             // `KeyError`, not an opaque model failure.
             other => match other.kind() {
-                finstack_quant_core::error::ErrorKind::NotFound => {
-                    PricingError::MissingMarketData {
-                        missing_id: other.to_string(),
-                        context,
-                    }
-                }
-                finstack_quant_core::error::ErrorKind::Validation => PricingError::InvalidInput {
+                finstack_quant_core::ErrorKind::NotFound => PricingError::MissingMarketData {
+                    missing_id: other.to_string(),
+                    context,
+                },
+                finstack_quant_core::ErrorKind::Validation => PricingError::InvalidInput {
                     message: other.to_string(),
                     context,
                 },
-                finstack_quant_core::error::ErrorKind::Computation => PricingError::ModelFailure {
+                finstack_quant_core::ErrorKind::Computation => PricingError::ModelFailure {
                     message: other.to_string(),
                     context,
                 },
@@ -578,7 +572,7 @@ mod tests {
 
     #[test]
     fn kind_agrees_with_the_core_fold() {
-        use finstack_quant_core::error::ErrorKind;
+        use finstack_quant_core::ErrorKind;
         let key = PricerKey::new(InstrumentType::Bond, ModelKey::Tree);
         let cases = [
             (
@@ -833,7 +827,7 @@ mod tests {
     /// the kind must survive core → `PricingError` → core.
     #[test]
     fn from_core_round_trip_preserves_error_kind() {
-        use finstack_quant_core::error::ErrorKind;
+        use finstack_quant_core::ErrorKind;
         let ctx = PricingErrorContext::new().instrument_id("RT-1");
         let cases: Vec<(finstack_quant_core::Error, ErrorKind)> = vec![
             (

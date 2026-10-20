@@ -186,7 +186,7 @@ impl core::fmt::Display for Seniority {
 }
 
 impl core::str::FromStr for Seniority {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
         match s {

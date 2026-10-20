@@ -2,12 +2,12 @@
 
 use super::Repo;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_margin::constants;
-use finstack_quant_margin::constants::CALENDAR_DAYS_PER_YEAR;
 use finstack_quant_margin::Marginable;
 use finstack_quant_margin::NettingSetId;
 use finstack_quant_margin::OtcMarginSpec;

@@ -529,7 +529,7 @@ impl VolSurface {
 
 impl Bumpable for VolSurface {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        use crate::error::InputError;
+        use crate::InputError;
 
         spec.validate()?;
         if !matches!(spec.bump_type, BumpType::Parallel) {

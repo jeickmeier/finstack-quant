@@ -10,8 +10,8 @@
 //! - [`CFKind`]: Cashflow type enumeration (fixed, floating, principal, etc.)
 
 use crate::dates::{Date, DayCount};
-use crate::error::{InputError, NonFiniteKind};
 use crate::money::Money;
+use crate::{InputError, NonFiniteKind};
 
 /// Keep invalid rate observations from becoming absent rates in JSON.
 fn serialize_optional_rate<S>(rate: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>

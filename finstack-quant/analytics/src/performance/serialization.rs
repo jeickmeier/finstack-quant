@@ -22,7 +22,7 @@ pub(super) struct PerformanceState {
 }
 
 impl TryFrom<PerformanceState> for Performance {
-    type Error = crate::error::Error;
+    type Error = finstack_quant_core::Error;
 
     fn try_from(state: PerformanceState) -> Result<Self, Self::Error> {
         let benchmark = state

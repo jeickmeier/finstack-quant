@@ -30,7 +30,7 @@ impl std::fmt::Display for FxConversionPolicy {
 }
 
 impl std::str::FromStr for FxConversionPolicy {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     /// Parses the serde label; the error names the accepted labels.
     fn from_str(s: &str) -> Result<Self, Self::Err> {

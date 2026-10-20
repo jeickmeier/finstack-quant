@@ -21,7 +21,7 @@ use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use crate::error::InputError;
+use crate::InputError;
 
 use value_serializer::CanonicalValueError;
 

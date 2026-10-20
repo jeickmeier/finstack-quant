@@ -75,7 +75,7 @@ impl fmt::Display for PeriodKind {
 }
 
 impl FromStr for PeriodKind {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -917,7 +917,7 @@ impl fmt::Display for PeriodId {
 }
 
 impl FromStr for PeriodId {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         parse_id(s, PeriodCalendar::Gregorian)
     }
@@ -930,7 +930,7 @@ impl From<PeriodId> for String {
 }
 
 impl TryFrom<String> for PeriodId {
-    type Error = crate::error::Error;
+    type Error = crate::Error;
     fn try_from(s: String) -> Result<Self, Self::Error> {
         s.parse()
     }

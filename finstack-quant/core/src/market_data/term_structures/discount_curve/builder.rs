@@ -242,10 +242,10 @@ impl DiscountCurveBuilder {
         }
 
         if self.points.len() < 2 {
-            return Err(crate::error::InputError::TooFewPoints.into());
+            return Err(crate::InputError::TooFewPoints.into());
         }
         if self.points.iter().any(|&(_, df)| df <= 0.0) {
-            return Err(crate::error::InputError::NonPositiveValue.into());
+            return Err(crate::InputError::NonPositiveValue.into());
         }
         validate_origin(&self.points)?;
 

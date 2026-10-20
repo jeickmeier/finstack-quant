@@ -7,7 +7,7 @@ use super::provider::directional_rate;
 use super::{FxConversionPolicy, FxProvider};
 use crate::currency::Currency;
 use crate::dates::Date;
-use crate::error::InputError;
+use crate::InputError;
 use crate::{recover_lock as recover, HashMap};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
@@ -196,11 +196,11 @@ impl FxProvider for SimpleFxProvider {
     /// # Errors
     ///
     /// Returns `Err` when:
-    /// - [`InputError::NotFound`](crate::error::InputError::NotFound): No direct quote
+    /// - [`InputError::NotFound`](crate::InputError::NotFound): No direct quote
     ///   exists for `from→to` and no reciprocal `to→from` is available
-    /// - [`InputError::NonFiniteValue`](crate::error::InputError::NonFiniteValue): The
+    /// - [`InputError::NonFiniteValue`](crate::InputError::NonFiniteValue): The
     ///   stored rate is non-finite
-    /// - [`InputError::InvalidFxRate`](crate::error::InputError::InvalidFxRate): The
+    /// - [`InputError::InvalidFxRate`](crate::InputError::InvalidFxRate): The
     ///   computed reciprocal is non-finite or non-positive (e.g. the stored
     ///   rate is subnormal, so `1/rate` overflows to infinity)
     ///

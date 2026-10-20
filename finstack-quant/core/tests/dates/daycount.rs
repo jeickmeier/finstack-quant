@@ -16,12 +16,8 @@
 //! ## Business Day Count
 //! - Bus/252 - calendar-dependent
 
-use super::common::DAYCOUNT_TOLERANCE;
-use finstack_quant_core::dates::calendar::TARGET2;
-use finstack_quant_core::dates::{
-    act_act_isma_year_fraction_with_reference_period, Date, DayCount, DayCountContext, Duration,
-    Tenor, TenorUnit,
-};
+use super::common::{by_id, DAYCOUNT_TOLERANCE};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Duration, Tenor, TenorUnit};
 use proptest::prelude::*;
 use time::Month;
 
@@ -35,6 +31,25 @@ fn d(year: i32, month: u8, day: u8) -> Date {
 }
 
 const TOL: f64 = DAYCOUNT_TOLERANCE;
+
+/// ACT/ACT ICMA year fraction measured against an explicit regular coupon
+/// period. With `coupon_period` set the coupon frequency is not used.
+fn act_act_isma_year_fraction_with_reference_period(
+    start: Date,
+    end: Date,
+    reference_start: Date,
+    reference_end: Date,
+) -> finstack_quant_core::Result<f64> {
+    DayCount::ActActIsma.year_fraction(
+        start,
+        end,
+        DayCountContext {
+            frequency: Some(Tenor::semi_annual()),
+            coupon_period: Some((reference_start, reference_end)),
+            ..Default::default()
+        },
+    )
+}
 
 fn annual_coupon(start: Date, end: Date) -> DayCountContext<'static> {
     DayCountContext {
@@ -1170,7 +1185,7 @@ fn bus252_requires_calendar() {
     assert!(result.is_err());
 
     // With calendar, should work
-    let calendar = TARGET2;
+    let calendar = by_id("target2");
     let ctx = DayCountContext {
         calendar: Some(&calendar),
         frequency: None,
@@ -1184,7 +1199,7 @@ fn bus252_requires_calendar() {
 
 #[test]
 fn bus252_rejects_zero_basis() {
-    let calendar = TARGET2;
+    let calendar = by_id("target2");
     let ctx = DayCountContext {
         calendar: Some(&calendar),
         frequency: None,
@@ -1200,7 +1215,7 @@ fn bus252_rejects_zero_basis() {
 
 #[test]
 fn bus252_counts_only_business_days() {
-    let calendar = TARGET2;
+    let calendar = by_id("target2");
     let start = make_date(2025, 1, 2); // Thursday
     let end = make_date(2025, 1, 6); // Monday (includes weekend)
 
@@ -1227,9 +1242,7 @@ fn bus252_counts_only_business_days() {
 
 #[test]
 fn bus252_full_year_is_deterministic() {
-    use finstack_quant_core::dates::HolidayCalendar;
-
-    let calendar = TARGET2;
+    let calendar = by_id("target2");
     let start = make_date(2025, 1, 2);
     let end = make_date(2026, 1, 2);
 
@@ -1274,7 +1287,7 @@ fn bus252_full_year_is_deterministic() {
 
 #[test]
 fn bus252_excludes_holidays() {
-    let calendar = TARGET2;
+    let calendar = by_id("target2");
 
     // Period including Christmas
     let start = make_date(2024, 12, 23); // Monday

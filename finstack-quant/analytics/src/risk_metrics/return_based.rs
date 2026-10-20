@@ -36,7 +36,7 @@ pub enum CagrDayCount {
 }
 
 impl std::str::FromStr for CagrDayCount {
-    type Err = crate::error::Error;
+    type Err = finstack_quant_core::Error;
 
     /// Parse a CAGR day-count label.
     ///
@@ -91,7 +91,7 @@ impl std::fmt::Display for CagrDayCount {
 ///
 /// Returns [`Error::Validation`](finstack_quant_core::Error::Validation) when `returns` is empty or the
 /// date range has a non-positive span. Propagates
-/// [`crate::error::InputError::MissingCalendarForBus252`] when Bus/252 is
+/// [`finstack_quant_core::InputError::MissingCalendarForBus252`] when Bus/252 is
 /// requested without a calendar.
 pub(crate) fn cagr(
     returns: &[f64],

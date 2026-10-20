@@ -25,7 +25,7 @@ use crate::config::{FinstackConfig, RoundingMode};
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::decimal::f64_to_decimal;
-use crate::error::{Error, InputError};
+use crate::{Error, InputError};
 use core::fmt;
 
 use super::rounding::{
@@ -978,9 +978,9 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result,
-            Err(crate::error::Error::Input(
-                crate::error::InputError::NonFiniteValue { kind }
-            )) if kind == crate::error::NonFiniteKind::NaN
+            Err(crate::Error::Input(
+                crate::InputError::NonFiniteValue { kind }
+            )) if kind == crate::NonFiniteKind::NaN
         ));
     }
 
@@ -990,9 +990,9 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result,
-            Err(crate::error::Error::Input(
-                crate::error::InputError::NonFiniteValue { kind }
-            )) if kind == crate::error::NonFiniteKind::PosInfinity
+            Err(crate::Error::Input(
+                crate::InputError::NonFiniteValue { kind }
+            )) if kind == crate::NonFiniteKind::PosInfinity
         ));
     }
 
@@ -1002,9 +1002,9 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result,
-            Err(crate::error::Error::Input(
-                crate::error::InputError::NonFiniteValue { kind }
-            )) if kind == crate::error::NonFiniteKind::NegInfinity
+            Err(crate::Error::Input(
+                crate::InputError::NonFiniteValue { kind }
+            )) if kind == crate::NonFiniteKind::NegInfinity
         ));
     }
 

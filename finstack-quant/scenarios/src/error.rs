@@ -123,8 +123,8 @@ impl Error {
     /// kind. `MarketDataNotFound`, `NodeNotFound`, `TenorNotFound` are not-found errors, `Internal` a computation
     /// error, and every other variant a validation error.
     #[must_use]
-    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
-        use finstack_quant_core::error::ErrorKind;
+    pub fn kind(&self) -> finstack_quant_core::ErrorKind {
+        use finstack_quant_core::ErrorKind;
         match self {
             Error::Core(error) => error.kind(),
             Error::Statements(error) => error.kind(),
@@ -146,7 +146,7 @@ impl From<Error> for finstack_quant_core::Error {
     /// `ErrorKind::NotFound` (and therefore `KeyError` in Python); `Internal`
     /// stays `Internal`; everything else becomes a validation error.
     fn from(err: Error) -> Self {
-        use finstack_quant_core::error::InputError;
+        use finstack_quant_core::InputError;
         match err {
             Error::Core(core) => core,
             Error::Statements(statements) => statements.into(),
@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn lookup_misses_keep_not_found_kind() {
-        use finstack_quant_core::error::ErrorKind;
+        use finstack_quant_core::ErrorKind;
         for err in [
             Error::MarketDataNotFound {
                 id: "USD-OIS".into(),

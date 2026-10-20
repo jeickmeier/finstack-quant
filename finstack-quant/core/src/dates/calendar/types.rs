@@ -50,22 +50,22 @@ impl WeekendRule {
 #[derive(Debug, Clone, Copy)]
 pub struct Calendar {
     /// Unique identifier (e.g., "target2", "gblo")
-    pub id: &'static str,
+    pub(crate) id: &'static str,
 
     /// Display name for the calendar
-    pub name: &'static str,
+    pub(crate) name: &'static str,
 
     /// Whether weekends should be ignored in is_holiday checks
-    pub ignore_weekends: bool,
+    pub(crate) ignore_weekends: bool,
 
     /// The rules defining this calendar's holidays
-    pub rules: &'static [Rule],
+    pub(crate) rules: &'static [Rule],
 
     /// Weekend convention for this calendar's jurisdiction.
     ///
     /// Defaults to [`WeekendRule::SaturdaySunday`]. Middle Eastern calendars
     /// should use [`WeekendRule::FridaySaturday`].
-    pub weekend_rule: WeekendRule,
+    pub(crate) weekend_rule: WeekendRule,
 }
 
 impl Calendar {
@@ -73,7 +73,7 @@ impl Calendar {
     ///
     /// Defaults to [`WeekendRule::SaturdaySunday`]. Use
     /// [`with_weekend_rule`](Self::with_weekend_rule) to override.
-    pub const fn new(
+    pub(crate) const fn new(
         id: &'static str,
         name: &'static str,
         ignore_weekends: bool,

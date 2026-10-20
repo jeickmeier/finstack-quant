@@ -453,9 +453,7 @@ impl FxMatrix {
                     triangulated: false,
                 })
             }
-            Err(error @ crate::Error::Input(crate::error::InputError::InvalidFxRate { .. })) => {
-                Err(error)
-            }
+            Err(error @ crate::Error::Input(crate::InputError::InvalidFxRate { .. })) => Err(error),
             Err(_) if self.config.enable_triangulation => {
                 // Try simple triangulation via pivot
                 let rate = self.triangulate_rate(from, to, on, policy)?;
@@ -893,7 +891,7 @@ impl FxMatrix {
         on: Date,
         policy: FxConversionPolicy,
     ) -> crate::Result<f64> {
-        use crate::error::InputError;
+        use crate::InputError;
 
         let revision = self.observation_revision();
         let pivot = self.config.pivot_currency;

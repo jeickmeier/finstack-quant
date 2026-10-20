@@ -26,8 +26,8 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Error, InputError, NonFiniteKind};
 use crate::Result;
+use crate::{Error, InputError, NonFiniteKind};
 
 /// Scale `value` by a power of ten in decimal arithmetic.
 ///

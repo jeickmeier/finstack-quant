@@ -132,7 +132,8 @@ pub(super) fn settlement_date(
 
     // Fallback: approximate business days into calendar days, then roll the
     // result forward off any weekend so settlement always lands on a weekday.
-    let delay_days = ((settlement_delay as f64) * credit::CALENDAR_DAYS_PER_YEAR
+    let delay_days = ((settlement_delay as f64)
+        * finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR
         / business_days_per_year)
         .round() as i64;
     let mut settle = default_date + Duration::days(delay_days);

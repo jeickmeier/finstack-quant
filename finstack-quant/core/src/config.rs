@@ -851,7 +851,7 @@ mod tests {
         let err = "BANKERS"
             .parse::<RoundingMode>()
             .expect_err("case-sensitive");
-        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+        assert_eq!(err.kind(), crate::ErrorKind::Validation);
         assert!(err.to_string().contains("\"BANKERS\""), "{err}");
     }
 

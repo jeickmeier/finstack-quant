@@ -99,16 +99,16 @@ impl HazardCurve {
             } => Some((prev_bucket, target_bucket, next_bucket)),
         };
 
-        let (spread, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
-            crate::error::InputError::UnsupportedBump {
-                reason: format!(
-                    "HazardCurve only supports Additive bumps, got {:?}/{:?}",
-                    spec.mode, spec.units
-                ),
-            }
-        })?;
+        let (spread, is_multiplicative) =
+            spec.resolve_standard_values()
+                .ok_or_else(|| crate::InputError::UnsupportedBump {
+                    reason: format!(
+                        "HazardCurve only supports Additive bumps, got {:?}/{:?}",
+                        spec.mode, spec.units
+                    ),
+                })?;
         if is_multiplicative {
-            return Err(crate::error::InputError::UnsupportedBump {
+            return Err(crate::InputError::UnsupportedBump {
                 reason: "HazardCurve does not support Multiplicative bumps".to_string(),
             }
             .into());
@@ -121,7 +121,7 @@ impl HazardCurve {
                 // infinite shift.
                 let recovery = self.recovery_rate;
                 if !recovery.is_finite() || !(0.0..1.0).contains(&recovery) {
-                    return Err(crate::error::InputError::UnsupportedBump {
+                    return Err(crate::InputError::UnsupportedBump {
                         reason: format!(
                             "HazardCurve bump requires recovery rate in [0, 1), got {}",
                             recovery
@@ -147,7 +147,7 @@ impl HazardCurve {
             });
             let shifted = *lambda + shift * weight;
             if !shifted.is_finite() || shifted < 0.0 {
-                return Err(crate::error::InputError::UnsupportedBump {
+                return Err(crate::InputError::UnsupportedBump {
                     reason: "non-finite or negative hazard rate after bump".to_string(),
                 }
                 .into());
@@ -235,7 +235,7 @@ impl HazardCurve {
         if knots.len() < 2 {
             let total_bp = targets_bp.iter().try_fold(0.0, |total, (tenor, bump_bp)| {
                 if !tenor.is_finite() || !bump_bp.is_finite() {
-                    return Err(crate::error::InputError::UnsupportedBump {
+                    return Err(crate::InputError::UnsupportedBump {
                         reason: "hazard-rate tenor and basis-point bump must be finite".to_string(),
                     });
                 }
@@ -247,7 +247,7 @@ impl HazardCurve {
         let last_knot = knots[knots.len() - 1];
         for (tenor, bump_bp) in targets_bp {
             if !tenor.is_finite() || !bump_bp.is_finite() {
-                return Err(crate::error::InputError::UnsupportedBump {
+                return Err(crate::InputError::UnsupportedBump {
                     reason: "hazard-rate tenor and basis-point bump must be finite".to_string(),
                 }
                 .into());
@@ -265,7 +265,7 @@ impl HazardCurve {
                 });
             let shifted = hazard_rates[target_index] + bump_bp * 1e-4;
             if !shifted.is_finite() || shifted < 0.0 {
-                return Err(crate::error::InputError::UnsupportedBump {
+                return Err(crate::InputError::UnsupportedBump {
                     reason: "non-finite or negative hazard rate after tenor bump".to_string(),
                 }
                 .into());
@@ -316,7 +316,7 @@ impl HazardCurve {
         ));
 
         if rolled_points.len() < 2 {
-            return Err(crate::error::InputError::TooFewPoints.into());
+            return Err(crate::InputError::TooFewPoints.into());
         }
 
         let rolled_par_points = crate::market_data::term_structures::common::roll_knots(

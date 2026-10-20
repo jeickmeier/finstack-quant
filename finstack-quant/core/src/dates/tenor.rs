@@ -27,24 +27,26 @@
 //! For accurate day counting that respects holidays and business day conventions:
 //!
 //! ```
-//! use finstack_quant_core::dates::{Tenor, DayCount, DayCountContext, BusinessDayConvention};
-//! use finstack_quant_core::dates::calendar::TARGET2;
+//! use finstack_quant_core::dates::{
+//!     calendar_by_id_strict, BusinessDayConvention, DayCount, DayCountContext, Tenor,
+//! };
 //! use time::macros::date;
 //! # fn main() -> finstack_quant_core::Result<()> {
 //!
+//! let target2 = calendar_by_id_strict("target2")?;
 //! let as_of = date!(2025 - 01 - 31);
 //! let tenor = Tenor::parse("1M")?;
 //!
 //! // Calendar-aware: 1M from Jan 31 -> Feb 28 (end of month)
 //! let end_date = tenor.add_to_date(
 //!     as_of,
-//!     Some(&TARGET2),
+//!     Some(target2),
 //!     BusinessDayConvention::ModifiedFollowing,
 //! )?;
 //!
 //! let years = tenor.to_years_with_context(
 //!     as_of,
-//!     Some(&TARGET2),
+//!     Some(target2),
 //!     BusinessDayConvention::ModifiedFollowing,
 //!     DayCount::ActAct,
 //! )?;
@@ -56,7 +58,7 @@
 use crate::dates::{
     adjust, BusinessDayConvention, Date, DayCount, DayCountContext, HolidayCalendar,
 };
-use crate::error::InputError;
+use crate::InputError;
 
 const MAX_TENOR_YEARS: u32 = 200;
 const MAX_TENOR_DAYS: u32 = MAX_TENOR_YEARS * 366;

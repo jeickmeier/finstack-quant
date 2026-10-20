@@ -270,7 +270,7 @@ mod tests {
         }
     }
 
-    fn make_market(base_date: Date) -> finstack_quant_core::market_data::MarketContext {
+    fn make_market(base_date: Date) -> finstack_quant_core::market_data::context::MarketContext {
         let discount_curve = DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
             .knots([(0.0, 1.0), (10.0, 0.90)])
@@ -278,7 +278,7 @@ mod tests {
             .build()
             .expect("should succeed");
 
-        finstack_quant_core::market_data::MarketContext::new()
+        finstack_quant_core::market_data::context::MarketContext::new()
             .insert(discount_curve)
             .insert_price("AAPL", MarketScalar::Unitless(150.0))
             .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))

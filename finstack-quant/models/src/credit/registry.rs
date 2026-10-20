@@ -302,7 +302,7 @@ fn first_id(ids: &[String]) -> &str {
 }
 
 /// Lookup miss for `id` in the `kind` section of the registry. Its kind is
-/// [`ErrorKind::NotFound`](finstack_quant_core::error::ErrorKind::NotFound), so
+/// [`ErrorKind::NotFound`](finstack_quant_core::ErrorKind::NotFound), so
 /// hosts raise their missing-key error (`KeyError` / `not_found`).
 fn not_found(kind: &str, id: &str) -> Error {
     InputError::NotFound {
@@ -449,7 +449,7 @@ mod tests {
         let err = registry
             .rating_factor_table("nope")
             .expect_err("unknown id should fail");
-        assert_eq!(err.kind(), finstack_quant_core::error::ErrorKind::NotFound);
+        assert_eq!(err.kind(), finstack_quant_core::ErrorKind::NotFound);
         assert!(
             err.to_string().contains("rating factor table 'nope'"),
             "unexpected error: {err}"

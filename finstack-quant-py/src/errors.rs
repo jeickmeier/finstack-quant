@@ -43,7 +43,7 @@
 //! # Exception class from the Rust error kind
 //!
 //! Every typed Rust error reports a Rust-owned
-//! [`ErrorKind`](finstack_quant_core::error::ErrorKind), and [`kind_to_py`]
+//! [`ErrorKind`](finstack_quant_core::ErrorKind), and [`kind_to_py`]
 //! turns it into the builtin class: `NotFound` → `KeyError`, `Validation` →
 //! `ValueError`, `Computation` → `RuntimeError`. A domain subclass is raised
 //! only where its base matches the kind: `AnalyticsError` and
@@ -112,15 +112,15 @@ pyo3::create_exception!(
 );
 
 /// Flatten an error and its `source()` chain into one message (see
-/// [`finstack_quant_core::error::format_chain`]).
+/// [`finstack_quant_core::format_chain`]).
 fn format_chain(err: &(dyn std::error::Error + 'static)) -> String {
-    finstack_quant_core::error::format_chain(err)
+    finstack_quant_core::format_chain(err)
 }
 
 /// Build the builtin exception for a Rust-owned error kind: `NotFound` →
 /// `KeyError`, `Validation` → `ValueError`, `Computation` → `RuntimeError`.
-pub fn kind_to_py(kind: finstack_quant_core::error::ErrorKind, message: String) -> PyErr {
-    use finstack_quant_core::error::ErrorKind;
+pub fn kind_to_py(kind: finstack_quant_core::ErrorKind, message: String) -> PyErr {
+    use finstack_quant_core::ErrorKind;
     match kind {
         ErrorKind::NotFound => PyKeyError::new_err(message),
         ErrorKind::Validation => PyValueError::new_err(message),
@@ -166,9 +166,7 @@ pub fn migration_to_py(e: finstack_quant_models::credit::migration::MigrationErr
 /// while analytics users can opt into a narrower exception type.
 pub fn analytics_to_py(e: finstack_quant_core::Error) -> PyErr {
     match e.kind() {
-        finstack_quant_core::error::ErrorKind::Validation => {
-            AnalyticsError::new_err(format_chain(&e))
-        }
+        finstack_quant_core::ErrorKind::Validation => AnalyticsError::new_err(format_chain(&e)),
         kind => kind_to_py(kind, format_chain(&e)),
     }
 }
@@ -204,7 +202,7 @@ pub fn portfolio_to_py(e: finstack_quant_portfolio::Error) -> PyErr {
     match e {
         finstack_quant_portfolio::Error::Core(core) => core_to_py(core),
         err => match err.kind() {
-            finstack_quant_core::error::ErrorKind::Validation => {
+            finstack_quant_core::ErrorKind::Validation => {
                 PortfolioError::new_err(format_chain(&err))
             }
             kind => kind_to_py(kind, format_chain(&err)),
@@ -300,7 +298,7 @@ pub fn statements_to_py(e: finstack_quant_statements::Error) -> PyErr {
     }
 }
 
-/// Errors that carry no Rust-owned [`ErrorKind`](finstack_quant_core::error::ErrorKind)
+/// Errors that carry no Rust-owned [`ErrorKind`](finstack_quant_core::ErrorKind)
 /// and may therefore be raised as a plain `ValueError` by [`display_to_py`].
 ///
 /// Only parse/serde errors from outside the workspace belong here. A typed

@@ -122,7 +122,7 @@ Centralized error conversion in `errors.rs`:
 ```rust
 use pyo3::prelude::*;
 use pyo3::exceptions::*;
-use finstack_quant_core::error::Error as CoreError;
+use finstack_quant_core::Error as CoreError;
 
 // Custom exception hierarchy
 pyo3::create_exception!(finstack, FinstackError, PyException);

@@ -218,22 +218,22 @@ pub enum CorrelationError {
 
 impl CorrelationError {
     /// Host-exception category: an exhausted iteration budget or a failed
-    /// eigendecomposition is a [`ErrorKind::Computation`](crate::error::ErrorKind::Computation)
+    /// eigendecomposition is a [`ErrorKind::Computation`](crate::ErrorKind::Computation)
     /// failure; every other variant rejects the input matrix
-    /// ([`ErrorKind::Validation`](crate::error::ErrorKind::Validation)).
+    /// ([`ErrorKind::Validation`](crate::ErrorKind::Validation)).
     ///
     /// Agrees with `crate::Error::from(self).kind()`.
     #[must_use]
-    pub fn kind(&self) -> crate::error::ErrorKind {
+    pub fn kind(&self) -> crate::ErrorKind {
         match self {
             Self::DidNotConverge { .. } | Self::EigenDecompositionFailed => {
-                crate::error::ErrorKind::Computation
+                crate::ErrorKind::Computation
             }
             Self::InvalidSize { .. }
             | Self::DiagonalNotOne { .. }
             | Self::NotSymmetric { .. }
             | Self::NotPositiveSemiDefinite { .. }
-            | Self::OutOfBounds { .. } => crate::error::ErrorKind::Validation,
+            | Self::OutOfBounds { .. } => crate::ErrorKind::Validation,
         }
     }
 }
@@ -1409,7 +1409,7 @@ mod tests {
         let mut x = [0.0; 3];
         let error = cholesky_solve(&[2.0, 0.0, 1.0, 1.0], &[2.0, 1.0, 0.0], &mut x)
             .expect_err("a 2x2 factor cannot solve a length-3 system");
-        assert_eq!(error.kind(), crate::error::ErrorKind::Validation);
+        assert_eq!(error.kind(), crate::ErrorKind::Validation);
         assert!(
             error
                 .to_string()
@@ -1423,7 +1423,7 @@ mod tests {
 
     #[test]
     fn correlation_error_kind_survives_the_core_fold() {
-        use crate::error::ErrorKind;
+        use crate::ErrorKind;
         let cases = [
             (
                 CorrelationError::DidNotConverge {

@@ -177,17 +177,17 @@ impl ForwardCurve {
     /// Apply a continuous rate shock while preserving the source interpolator.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
         spec.validate()?;
-        let (val, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
-            crate::error::InputError::UnsupportedBump {
-                reason: format!(
+        let (val, is_multiplicative) =
+            spec.resolve_standard_values()
+                .ok_or_else(|| crate::InputError::UnsupportedBump {
+                    reason: format!(
                     "ForwardCurve bump requires Additive or Multiplicative values, got {:?}/{:?}",
                     spec.mode, spec.units
                 ),
-            }
-        })?;
+                })?;
 
         if is_multiplicative && matches!(spec.bump_type, BumpType::TriangularKeyRate { .. }) {
-            return Err(crate::error::InputError::UnsupportedBump {
+            return Err(crate::InputError::UnsupportedBump {
                 reason: "ForwardCurve key-rate shocks require additive rate units".into(),
             }
             .into());
@@ -307,7 +307,7 @@ impl ForwardCurve {
         rolled_points.extend(roll_knots(&self.knots, &self.forwards, dt_years));
 
         if rolled_points.len() < 2 {
-            return Err(crate::error::InputError::TooFewPoints.into());
+            return Err(crate::InputError::TooFewPoints.into());
         }
 
         let projection_grid = self.projection_grid.as_ref().map(|grid| {

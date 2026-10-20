@@ -20,8 +20,8 @@ pub(crate) fn reciprocal_rate_or_err(
     to: Currency,
 ) -> crate::Result<f64> {
     if !rate.is_finite() {
-        return Err(crate::error::InputError::NonFiniteValue {
-            kind: crate::error::NonFiniteKind::classify(rate),
+        return Err(crate::InputError::NonFiniteValue {
+            kind: crate::NonFiniteKind::classify(rate),
         }
         .into());
     }
@@ -53,7 +53,7 @@ pub(super) fn directional_rate(
 #[inline]
 pub(crate) fn validate_fx_rate(from: Currency, to: Currency, rate: f64) -> crate::Result<f64> {
     if !rate.is_finite() || rate <= 0.0 {
-        return Err(crate::error::InputError::InvalidFxRate { from, to, rate }.into());
+        return Err(crate::InputError::InvalidFxRate { from, to, rate }.into());
     }
     Ok(rate)
 }
@@ -80,9 +80,9 @@ pub(crate) fn validate_fx_rate(from: Currency, to: Currency, rate: f64) -> crate
 /// # Errors
 ///
 /// Implementations should return errors when:
-/// - [`InputError::NotFound`](crate::error::InputError::NotFound): No rate available for the requested pair
-/// - [`InputError::InvalidFxRate`](crate::error::InputError::InvalidFxRate): Rate is non-finite or non-positive
-/// - [`InputError::NonFiniteValue`](crate::error::InputError::NonFiniteValue): Computed rate is NaN or infinity
+/// - [`InputError::NotFound`](crate::InputError::NotFound): No rate available for the requested pair
+/// - [`InputError::InvalidFxRate`](crate::InputError::InvalidFxRate): Rate is non-finite or non-positive
+/// - [`InputError::NonFiniteValue`](crate::InputError::NonFiniteValue): Computed rate is NaN or infinity
 ///
 /// # Examples
 ///

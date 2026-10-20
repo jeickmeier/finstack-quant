@@ -510,7 +510,7 @@ impl ParametricCurve {
         }
         let normalization = source_discount_factor(&self.model, time_offset);
         if !normalization.is_finite() || normalization <= 0.0 {
-            return Err(crate::error::InputError::NonPositiveValue.into());
+            return Err(crate::InputError::NonPositiveValue.into());
         }
         let mut rolled = self.clone();
         rolled.base_date = base_date;
@@ -597,7 +597,7 @@ impl ParametricCurveBuilder {
         }
         let normalization = source_discount_factor(&model, self.time_offset);
         if !normalization.is_finite() || normalization <= 0.0 {
-            return Err(crate::error::InputError::NonPositiveValue.into());
+            return Err(crate::InputError::NonPositiveValue.into());
         }
 
         Ok(ParametricCurve {

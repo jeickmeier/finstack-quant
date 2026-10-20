@@ -38,9 +38,9 @@
 //! - Hull, J. C., *Options, Futures, and Other Derivatives*. `docs/REFERENCES.md#hull-options-futures`
 
 use crate::dates::{Date, DayCount, DayCountContext};
-use crate::error::InputError;
 use crate::math::solver::BrentSolver;
 use crate::math::summation::NeumaierAccumulator;
+use crate::InputError;
 
 /// Absolute root tolerance in log-growth coordinates, `log(1 + r)`.
 const LOG_RATE_TOLERANCE: f64 = 1e-12;

@@ -43,7 +43,7 @@ pub enum Error {
         message: String,
         /// Classification of the failure: the wrapped pricing error's kind, or
         /// the kind of the consistency check that failed.
-        kind: finstack_quant_core::error::ErrorKind,
+        kind: finstack_quant_core::ErrorKind,
     },
 
     /// Scenario application error
@@ -98,7 +98,7 @@ impl Error {
     /// * `msg` - Human-readable error detail.
     pub fn valuation(
         position_id: impl Into<PositionId>,
-        kind: finstack_quant_core::error::ErrorKind,
+        kind: finstack_quant_core::ErrorKind,
         msg: impl Into<String>,
     ) -> Self {
         Self::ValuationError {
@@ -118,11 +118,11 @@ impl Error {
     /// `Core` keeps its own kind and `ValuationError` carries the kind of the
     /// failure it wraps.
     ///
-    /// [`ErrorKind::NotFound`]: finstack_quant_core::error::ErrorKind::NotFound
-    /// [`ErrorKind::Validation`]: finstack_quant_core::error::ErrorKind::Validation
+    /// [`ErrorKind::NotFound`]: finstack_quant_core::ErrorKind::NotFound
+    /// [`ErrorKind::Validation`]: finstack_quant_core::ErrorKind::Validation
     #[must_use]
-    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
-        use finstack_quant_core::error::ErrorKind;
+    pub fn kind(&self) -> finstack_quant_core::ErrorKind {
+        use finstack_quant_core::ErrorKind;
         match self {
             Error::Core(core) => core.kind(),
             Error::ValuationError { kind, .. } => *kind,
@@ -181,7 +181,7 @@ impl From<Error> for finstack_quant_core::Error {
     /// lookup misses become `InputError::NotFound`, computation failures
     /// `Internal`, and the rest validation errors with the full message.
     fn from(err: Error) -> Self {
-        use finstack_quant_core::error::{ErrorKind, InputError};
+        use finstack_quant_core::{ErrorKind, InputError};
         if let Error::Core(core) = err {
             return core;
         }
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn kind_is_preserved_by_the_core_fold() {
-        use finstack_quant_core::error::ErrorKind;
+        use finstack_quant_core::ErrorKind;
         let cases = [
             (
                 Error::FxConversionFailed {

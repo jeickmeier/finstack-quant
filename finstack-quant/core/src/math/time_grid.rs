@@ -290,7 +290,7 @@ impl TimeGrid {
                 return Err(invalid(format!("times[{i}] must be finite")));
             }
             if times[i] <= times[i - 1] {
-                return Err(crate::error::InputError::NonMonotonicKnots.into());
+                return Err(crate::InputError::NonMonotonicKnots.into());
             }
             if (times[i] - times[i - 1]).abs() < MIN_DT_THRESHOLD {
                 return Err(invalid(format!(
@@ -668,7 +668,7 @@ mod tests {
 
     #[test]
     fn map_date_to_step_uses_provided_day_count_context() {
-        use crate::dates::{Calendar, Tenor};
+        use crate::dates::{Tenor, WEEKENDS_ONLY};
 
         let base = date!(2024 - 01 - 01);
         let event = date!(2024 - 07 - 01);
@@ -683,9 +683,8 @@ mod tests {
             6
         );
 
-        let calendar = Calendar::new("test", "Test", false, &[]);
         let bus252 = DayCountContext {
-            calendar: Some(&calendar),
+            calendar: Some(&WEEKENDS_ONLY),
             ..Default::default()
         };
         let step = map_date_to_step(base, event, maturity, 12, DayCount::Bus252, bus252)

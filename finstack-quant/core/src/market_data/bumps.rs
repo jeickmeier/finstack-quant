@@ -327,7 +327,7 @@ impl BumpSpec {
     pub(crate) fn validate_parallel(&self, context: &str) -> crate::Result<()> {
         self.validate()?;
         if !matches!(self.bump_type, BumpType::Parallel) {
-            return Err(crate::error::InputError::UnsupportedBump {
+            return Err(crate::InputError::UnsupportedBump {
                 reason: format!("{} only supports Parallel bumps", context),
             }
             .into());
@@ -361,7 +361,7 @@ impl BumpSpec {
     ) -> crate::Result<(f64, bool)> {
         self.validate()?;
         self.resolve_standard_values().ok_or_else(|| {
-            crate::error::InputError::UnsupportedBump {
+            crate::InputError::UnsupportedBump {
                 reason: format!(
                     "{context} {supported}, got {:?}/{:?}",
                     self.mode, self.units
@@ -491,7 +491,7 @@ pub trait Bumpable: Sized + Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns [`InputError::UnsupportedBump`](crate::error::InputError::UnsupportedBump)
+    /// Returns [`InputError::UnsupportedBump`](crate::InputError::UnsupportedBump)
     /// if the bump operation is not supported for this type.
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self>;
 }
@@ -638,7 +638,7 @@ mod tests {
         use time::Month;
 
         let base = Date::from_calendar_date(2025, Month::January, 1).map_err(|_| {
-            crate::error::InputError::InvalidDate {
+            crate::InputError::InvalidDate {
                 year: 2025,
                 month: 1,
                 day: 1,
@@ -678,7 +678,7 @@ mod tests {
         use time::Month;
 
         let base = Date::from_calendar_date(2025, Month::January, 1).map_err(|_| {
-            crate::error::InputError::InvalidDate {
+            crate::InputError::InvalidDate {
                 year: 2025,
                 month: 1,
                 day: 1,
@@ -715,7 +715,7 @@ mod tests {
         use time::Month;
 
         let base = Date::from_calendar_date(2025, Month::January, 1).map_err(|_| {
-            crate::error::InputError::InvalidDate {
+            crate::InputError::InvalidDate {
                 year: 2025,
                 month: 1,
                 day: 1,
@@ -743,7 +743,7 @@ mod tests {
         use time::Month;
 
         let base = Date::from_calendar_date(2025, Month::January, 1).map_err(|_| {
-            crate::error::InputError::InvalidDate {
+            crate::InputError::InvalidDate {
                 year: 2025,
                 month: 1,
                 day: 1,

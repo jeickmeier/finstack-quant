@@ -9,7 +9,7 @@
 
 use crate::config::RoundingMode;
 use crate::decimal::f64_to_decimal;
-use crate::error::{Error, InputError};
+use crate::{Error, InputError};
 use rust_decimal::Decimal;
 
 /// Internal numeric representation for `Money` amounts.

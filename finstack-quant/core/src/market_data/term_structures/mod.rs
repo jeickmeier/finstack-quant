@@ -124,7 +124,7 @@ mod discount_curve;
 /// Forward‐rate curves.
 mod forward_curve;
 /// Forward variance curves for rough volatility models.
-pub mod forward_variance;
+mod forward_variance;
 /// Serializable hazard-curve calibration replay inputs.
 mod hazard_calibration;
 /// Credit hazard curves.

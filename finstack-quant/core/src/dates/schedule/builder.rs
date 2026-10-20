@@ -377,7 +377,7 @@ impl<'a> ScheduleBuilder<'a> {
             ));
         }
         if self.spec.start > self.spec.end {
-            return Err(crate::error::InputError::InvalidDateRange.into());
+            return Err(crate::InputError::InvalidDateRange.into());
         }
         let error_policy = self.spec.error_policy;
         let result = self.build_impl();
@@ -438,7 +438,7 @@ impl<'a> ScheduleBuilder<'a> {
                 // schedule means zero cashflows / PV = 0 downstream. Error
                 // in strict mode (graceful policies convert this to an
                 // empty schedule WITH a warning).
-                return Err(crate::error::Error::Validation(format!(
+                return Err(crate::Error::Validation(format!(
                     "IMM schedule from {} to {} contains no IMM dates \
                      (first IMM date after start exceeds end)",
                     self.spec.start, self.spec.end

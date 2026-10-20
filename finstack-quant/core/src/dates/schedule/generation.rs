@@ -109,7 +109,7 @@ pub(super) struct BuilderInternal {
 impl BuilderInternal {
     pub(super) fn generate(self) -> crate::Result<Vec<Date>> {
         if self.start >= self.end {
-            return Err(crate::error::InputError::InvalidDateRange.into());
+            return Err(crate::InputError::InvalidDateRange.into());
         }
         match self.stub {
             StubKind::ShortFront => self.gen_short_front(),
@@ -137,13 +137,13 @@ impl BuilderInternal {
             return Ok(Some(anchor));
         }
         let count_i32 =
-            i32::try_from(tenor.count()).map_err(|_| crate::error::InputError::InvalidTenor {
+            i32::try_from(tenor.count()).map_err(|_| crate::InputError::InvalidTenor {
                 tenor: tenor.to_string(),
                 reason: format!("count {} exceeds i32::MAX", tenor.count()),
             })?;
         let checked_mul_i32 = |lhs: i32, rhs: i32| -> crate::Result<i32> {
             lhs.checked_mul(rhs).ok_or_else(|| {
-                crate::Error::from(crate::error::InputError::InvalidTenor {
+                crate::Error::from(crate::InputError::InvalidTenor {
                     tenor: tenor.to_string(),
                     reason: "tenor multiplication overflowed while generating schedule".to_string(),
                 })
@@ -151,7 +151,7 @@ impl BuilderInternal {
         };
         let checked_mul_i64 = |lhs: i64, rhs: i64| -> crate::Result<i64> {
             lhs.checked_mul(rhs).ok_or_else(|| {
-                crate::Error::from(crate::error::InputError::InvalidTenor {
+                crate::Error::from(crate::InputError::InvalidTenor {
                     tenor: tenor.to_string(),
                     reason: "tenor multiplication overflowed while generating schedule".to_string(),
                 })
@@ -221,7 +221,7 @@ impl BuilderInternal {
                 Some(dt) if dt < self.end => dt,
                 last => {
                     if aligned && last != Some(self.end) {
-                        return Err(crate::error::InputError::NonIntegerScheduleTenor.into());
+                        return Err(crate::InputError::NonIntegerScheduleTenor.into());
                     }
                     push_if_new(&mut buf, self.end);
                     check_anchor_count(buf.len())?;

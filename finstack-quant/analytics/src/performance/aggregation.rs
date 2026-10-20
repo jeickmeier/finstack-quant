@@ -51,7 +51,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
     ///
     /// # Arguments
@@ -81,7 +81,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when a pair
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when a pair
     /// is degenerate, an off-diagonal is non-finite, or Higham repair fails.
     ///
     /// # Returns
@@ -178,7 +178,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `rf.len()` does not equal the active panel date count.
     ///
     /// # Returns
@@ -192,7 +192,7 @@ impl Performance {
     ) -> crate::Result<Vec<Vec<f64>>> {
         let panel_len = self.active_dates().len();
         if rf.len() != panel_len {
-            return Err(crate::error::InputError::InvalidReturnSeries {
+            return Err(finstack_quant_core::InputError::InvalidReturnSeries {
                 ticker: "<rf>".into(),
                 index: rf.len(),
                 reason: format!(
@@ -272,7 +272,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
     pub fn period_stats(
         &self,
@@ -324,7 +324,7 @@ impl Performance {
 
 fn pair_correlation(lhs: &[f64], rhs: &[f64], i: usize, j: usize) -> crate::Result<f64> {
     if lhs.len() < 2 || rhs.len() < 2 {
-        return Err(crate::error::InputError::InvalidReturnSeries {
+        return Err(finstack_quant_core::InputError::InvalidReturnSeries {
             ticker: format!("<{i},{j}>"),
             index: lhs.len().min(rhs.len()),
             reason: format!(
@@ -336,7 +336,7 @@ fn pair_correlation(lhs: &[f64], rhs: &[f64], i: usize, j: usize) -> crate::Resu
     let (_, var_l) = mean_var(lhs);
     let (_, var_r) = mean_var(rhs);
     if var_l == 0.0 || var_r == 0.0 {
-        return Err(crate::error::InputError::InvalidReturnSeries {
+        return Err(finstack_quant_core::InputError::InvalidReturnSeries {
             ticker: format!("<{i},{j}>"),
             index: 0,
             reason: format!("correlation pair ({i}, {j}) has a zero-variance series"),
@@ -345,7 +345,7 @@ fn pair_correlation(lhs: &[f64], rhs: &[f64], i: usize, j: usize) -> crate::Resu
     }
     let corr = correlation(lhs, rhs);
     if !corr.is_finite() {
-        return Err(crate::error::InputError::InvalidReturnSeries {
+        return Err(finstack_quant_core::InputError::InvalidReturnSeries {
             ticker: format!("<{i},{j}>"),
             index: 0,
             reason: format!("correlation pair ({i}, {j}) produced a non-finite coefficient"),
@@ -367,14 +367,14 @@ fn finalize_correlation_matrix(matrix: Vec<Vec<f64>>) -> crate::Result<(Vec<Vec<
     }
     let repaired =
         nearest_correlation(&flat, n, NearestCorrelationOpts::default()).map_err(|err| {
-            crate::error::InputError::InvalidReturnSeries {
+            finstack_quant_core::InputError::InvalidReturnSeries {
                 ticker: "<correlation>".into(),
                 index: 0,
                 reason: err.to_string(),
             }
         })?;
     if validate_correlation_matrix(&repaired, n).is_err() {
-        return Err(crate::error::InputError::InvalidReturnSeries {
+        return Err(finstack_quant_core::InputError::InvalidReturnSeries {
             ticker: "<correlation>".into(),
             index: 0,
             reason: "Higham repair did not produce a valid correlation matrix".into(),
@@ -382,7 +382,7 @@ fn finalize_correlation_matrix(matrix: Vec<Vec<f64>>) -> crate::Result<(Vec<Vec<
         .into());
     }
     let repaired = unflatten_square(&repaired, n).map_err(|err| {
-        crate::error::InputError::InvalidReturnSeries {
+        finstack_quant_core::InputError::InvalidReturnSeries {
             ticker: "<correlation>".into(),
             index: 0,
             reason: err.to_string(),

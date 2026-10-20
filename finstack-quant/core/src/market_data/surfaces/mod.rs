@@ -47,7 +47,7 @@
 //! - FX volatility quoting: `docs/REFERENCES.md#clark-fx-options`,
 //!   `docs/REFERENCES.md#wystup-fx-options`
 
-pub mod fx_delta_vol_surface;
+mod fx_delta_vol_surface;
 mod sabr_parameter_data;
 mod vol_cube;
 mod vol_cube_expiry_slice;
@@ -64,7 +64,7 @@ pub use vol_surface::{
 /// Validate a surface axis: non-empty, finite, and strictly increasing if `len > 1`.
 pub(super) fn validate_axis(axis: &[f64]) -> crate::Result<()> {
     if axis.is_empty() {
-        return Err(crate::error::InputError::TooFewPoints.into());
+        return Err(crate::InputError::TooFewPoints.into());
     }
     if axis.iter().any(|x| !x.is_finite()) {
         return Err(crate::Error::Validation(

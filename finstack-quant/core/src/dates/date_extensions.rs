@@ -121,12 +121,11 @@ pub trait DateExt: Sized {
     ///
     /// Example:
     /// ```
-    /// use finstack_quant_core::dates::{Date, DateExt};
-    /// use finstack_quant_core::dates::calendar::TARGET2;
+    /// use finstack_quant_core::dates::{calendar_by_id_strict, Date, DateExt};
     /// use time::Month;
-    /// let cal = TARGET2;
+    /// let cal = calendar_by_id_strict("target2").expect("built-in calendar");
     /// let start = Date::from_calendar_date(2025, Month::June, 27).expect("Valid date"); // Friday
-    /// let next = start.add_business_days(3, &cal).expect("Business days calculation should succeed");
+    /// let next = start.add_business_days(3, cal).expect("Business days calculation should succeed");
     /// assert_eq!(next, Date::from_calendar_date(2025, Month::July, 2).expect("Valid date"));
     /// ```
     fn add_business_days<C: crate::dates::HolidayCalendar + ?Sized>(
@@ -464,9 +463,7 @@ mod tests {
             .add_business_days(1, &cal)
             .expect_err("Should fail with AllHolidaysCal");
         match err {
-            crate::Error::Input(crate::error::InputError::AdjustmentFailed {
-                max_days, ..
-            }) => {
+            crate::Error::Input(crate::InputError::AdjustmentFailed { max_days, .. }) => {
                 assert_eq!(max_days, MAX_BUSINESS_DAY_SEARCH_DAYS);
             }
             other => panic!("Expected AdjustmentFailed error, got {:?}", other),

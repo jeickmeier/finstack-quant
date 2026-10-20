@@ -1449,7 +1449,7 @@ mod tests {
     #[test]
     fn test_instrument_schema_rejects_unknown_discriminator() {
         let err = instrument_schema("not_a_supported_instrument_type").expect_err("unknown type");
-        assert_eq!(err.kind(), finstack_quant_core::error::ErrorKind::NotFound);
+        assert_eq!(err.kind(), finstack_quant_core::ErrorKind::NotFound);
         let msg = err.to_string();
         assert!(
             msg.contains("unknown instrument type"),

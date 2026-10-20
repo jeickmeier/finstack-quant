@@ -209,7 +209,7 @@ fn position_primitive_report(
     let definition = instrument_json_of(position.instrument.as_ref()).ok_or_else(|| {
         Error::valuation(
             position.position_id.clone(),
-            finstack_quant_core::error::ErrorKind::Validation,
+            finstack_quant_core::ErrorKind::Validation,
             "instrument is not registered for canonical serialization",
         )
     })?;

@@ -70,7 +70,7 @@ impl Performance {
         (0..self.ticker_names.len())
             .map(|i| {
                 let Some((start, end)) = self.active_holding_period_for_ticker(i) else {
-                    return Err(crate::error::InputError::InvalidReturnSeries {
+                    return Err(finstack_quant_core::InputError::InvalidReturnSeries {
                         ticker: self.ticker_names[i].clone(),
                         index: self.start_idx,
                         reason: format!(
@@ -235,7 +235,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
     pub fn value_at_risk(&self, confidence: f64) -> crate::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;
@@ -257,7 +257,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
     pub fn expected_shortfall(&self, confidence: f64) -> crate::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;
@@ -277,7 +277,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
     pub fn tail_ratio(&self, confidence: f64) -> crate::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;
@@ -418,7 +418,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
     pub fn parametric_var(
         &self,
@@ -448,7 +448,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
     pub fn cornish_fisher_var(
         &self,
@@ -570,7 +570,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
     pub fn cdar(&self, confidence: f64) -> crate::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;
@@ -606,7 +606,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
     pub fn modified_sharpe(&self, risk_free_rate: f64, confidence: f64) -> crate::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;

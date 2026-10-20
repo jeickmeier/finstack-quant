@@ -95,7 +95,7 @@ impl DiscountCurve {
         compounding: Compounding,
     ) -> crate::Result<Self> {
         if points.is_empty() {
-            return Err(crate::error::InputError::TooFewPoints.into());
+            return Err(crate::InputError::TooFewPoints.into());
         }
         let mut knots = Vec::with_capacity(points.len() + 1);
         for &(t, r) in points {
@@ -151,7 +151,7 @@ impl DiscountCurve {
         day_count: Option<DayCount>,
     ) -> crate::Result<Self> {
         if points.is_empty() {
-            return Err(crate::error::InputError::TooFewPoints.into());
+            return Err(crate::InputError::TooFewPoints.into());
         }
         let day_count = day_count.unwrap_or(DayCount::Act365F);
         let mut knots = Vec::with_capacity(points.len() + 1);
@@ -688,7 +688,7 @@ impl DiscountCurve {
         let mut forward_rates = Vec::with_capacity(self.knots.len());
 
         if self.knots.len() < 2 {
-            return Err(crate::error::InputError::TooFewPoints.into());
+            return Err(crate::InputError::TooFewPoints.into());
         }
 
         for &t in self.knots.iter() {

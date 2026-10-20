@@ -109,7 +109,7 @@ impl ScheduleSpec {
     /// Returns InvalidDateRange if start is after end.
     pub fn new(start: Date, end: Date) -> crate::Result<Self> {
         if start > end {
-            return Err(crate::error::InputError::InvalidDateRange.into());
+            return Err(crate::InputError::InvalidDateRange.into());
         }
         Ok(Self {
             start,

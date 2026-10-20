@@ -62,11 +62,11 @@ use std::sync::Arc;
 
 use crate::currency::Currency;
 use crate::dates::Date;
-use crate::error::InputError;
 use crate::money::fx::{FxMatrix, FxQuery};
 use crate::money::Money;
 use crate::types::CurveId;
 use crate::HashMap;
+use crate::InputError;
 
 use super::{
     dividends::DividendSchedule,
@@ -360,9 +360,9 @@ impl MarketContext {
 mod tests {
     use super::MarketContext;
     use crate::currency::Currency;
-    use crate::error::InputError;
     use crate::money::fx::{FxMatrix, SimpleFxProvider};
     use crate::money::Money;
+    use crate::InputError;
     use std::sync::Arc;
     use time::macros::date;
 

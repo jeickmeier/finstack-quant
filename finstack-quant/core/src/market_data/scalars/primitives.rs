@@ -12,9 +12,9 @@
 use super::storage::TimeSeriesStorage;
 use crate::currency::Currency;
 use crate::dates::Date;
-use crate::error::InputError;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpUnits, Bumpable};
 use crate::types::CurveId;
+use crate::InputError;
 use crate::Result;
 #[cfg(test)]
 use time::Duration as TimeDuration;
@@ -61,7 +61,7 @@ impl std::fmt::Display for SeriesInterpolation {
 }
 
 impl std::str::FromStr for SeriesInterpolation {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
@@ -444,7 +444,7 @@ impl ScalarTimeSeries {
     ///
     /// * `date` - Calendar date in the instrument or market convention for the operation
     pub fn value_on_exact(&self, date: Date) -> Result<f64> {
-        use crate::error::InputError;
+        use crate::InputError;
 
         let q = to_days(date);
         let date_vec = self.data.dates();
@@ -614,7 +614,7 @@ impl Bumpable for MarketScalar {
                 (BumpMode::Multiplicative, BumpUnits::Factor) => {
                     m.checked_mul_f64(spec.value).map(MarketScalar::Price)
                 }
-                _ => Err(crate::error::InputError::UnsupportedBump {
+                _ => Err(crate::InputError::UnsupportedBump {
                     reason: format!(
                         "MarketScalar::Price only supports Additive/{{Fraction,Percent}} or Multiplicative/Factor, got {:?}/{:?}",
                         spec.mode, spec.units
@@ -769,7 +769,7 @@ mod tests {
         assert!(result.is_err());
 
         match result.expect_err("Should fail with too few points") {
-            crate::Error::Input(crate::error::InputError::TooFewPoints) => {
+            crate::Error::Input(crate::InputError::TooFewPoints) => {
                 // Expected error type
             }
             _ => panic!("Expected TooFewPoints error for empty series"),

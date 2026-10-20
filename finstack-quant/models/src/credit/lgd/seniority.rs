@@ -9,8 +9,8 @@
 //! - Schuermann, T. (2004). "What Do We Know About Loss Given Default?"
 //!   Wharton Financial Institutions Center Working Paper 04-01. `docs/REFERENCES.md#schuermann-2004-lgd`
 
-use finstack_quant_core::error::InputError;
 use finstack_quant_core::math::random::Pcg64Rng;
+use finstack_quant_core::InputError;
 use finstack_quant_core::Result;
 
 /// Debt seniority classification for recovery rate modeling.

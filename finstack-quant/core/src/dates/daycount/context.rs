@@ -126,7 +126,7 @@ impl DayCountContextState {
             validate_coupon_period(start, end)?;
         }
         if bus_basis == Some(0) {
-            return Err(crate::error::InputError::InvalidBusBasis { basis: 0 }.into());
+            return Err(crate::InputError::InvalidBusBasis { basis: 0 }.into());
         }
         Ok(Self {
             calendar_id,

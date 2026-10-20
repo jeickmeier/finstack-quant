@@ -76,7 +76,7 @@
 //! # }
 //! ```
 
-pub use finstack_quant_core::rating_scales::{RatingLevel, ScorecardScale};
+use finstack_quant_core::rating_scales::ScorecardScale;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::Result;

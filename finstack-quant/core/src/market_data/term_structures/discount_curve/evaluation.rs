@@ -68,7 +68,7 @@ impl CurveTransform {
         }
         self.normalization = interp.interp(self.offset);
         if !self.normalization.is_finite() || self.normalization <= 0.0 {
-            return Err(crate::error::InputError::NonPositiveValue.into());
+            return Err(crate::InputError::NonPositiveValue.into());
         }
         Ok(())
     }
