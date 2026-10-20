@@ -13116,8 +13116,9 @@ class SensitivityMatrix:
     Examples
     --------
     >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import compute_factor_sensitivities
-    >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15", "USD")
+    >>> from finstack_quant.portfolio import Portfolio, compute_factor_sensitivities
+    >>> book = Portfolio.builder("book", "USD", "2025-01-15").build()
+    >>> matrix = compute_factor_sensitivities(book, "[]", MarketContext(), "2025-01-15")
     >>> (matrix.n_positions, matrix.n_factors)
     (0, 0)
     """
@@ -13523,88 +13524,100 @@ class FactorPnlProfile:
         ...
 
 def compute_factor_sensitivities(
-    positions_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    factors_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    portfolio: Portfolio | str,
+    factors: str | list[Any] | pd.DataFrame,
     market: MarketContext | str,
     as_of: datetime.date | str,
-    base_currency: str,
-    bump_config_json: str | None = None,
+    bump_config: str | dict[str, Any] | None = None,
 ) -> SensitivityMatrix:
     """
-        Compute first-order factor sensitivities using central finite differences.
+    Compute the position-by-factor sensitivity matrix of a portfolio.
 
-        Parameters
-        ----------
-        positions_json : str
-            JSON array of position objects, each with ``id`` (str),
-    ``instrument`` (canonical v1 instrument envelope), and ``weight`` (float).
-        factors_json : str
-            JSON array of ``FactorDefinition`` objects.
-        market : MarketContext or str
-            ``MarketContext`` instance or JSON string.
-        as_of : datetime.date | str
-            Valuation date, either a date-like object or an ISO 8601 string.
-        base_currency : str
-            ISO reporting currency for every sensitivity or P&L amount. Missing FX raises KeyError.
-        bump_config_json : str, optional
-            Optional JSON-serialized ``BumpSizeConfig``.
-            Defaults to 1 bp / 1 % per factor type.
+    Each cell is the central difference of the position's base-currency PV
+    under an up and a down bump of the factor, weighted by the position's
+    scale factor (``quantity``, or ``quantity / 100`` for percentage
+    positions). Rows follow portfolio position order, columns follow
+    ``factors``, and every value is in ``portfolio.base_currency``, converted
+    with spot FX on each bumped market.
 
-        Returns
-        -------
-        SensitivityMatrix
-            Positions-by-factors delta matrix.
+    Parameters
+    ----------
+    portfolio : Portfolio | str
+        Built ``Portfolio`` or ``PortfolioSpec`` JSON. Its positions are the
+        rows and its ``base_currency`` is the reporting currency.
+    factors : str | list | pandas.DataFrame
+        ``FactorDefinition`` array as JSON text, a list of dicts or a records
+        ``DataFrame``. Every factor must map to market data; credit hierarchy
+        factors (``Credit`` with an empty ``curve_ids`` list) are rejected, use
+        :meth:`FactorModel.compute_sensitivities` for them.
+    market : MarketContext | str
+        Market to bump, including the FX needed for cross-currency positions.
+    as_of : datetime.date | str
+        Valuation date for pricing and spot FX.
+    bump_config : str | dict, optional
+        ``BumpSizeConfig`` as JSON text or a dict. Defaults to 1 bp / 1 % per
+        factor type.
 
-        Raises
-        ------
-        TypeError
-            If ``market`` is neither a ``MarketContext`` nor a JSON string.
-        ValueError
-            If position, factor, market, bump-configuration, or date input is
-            malformed or invalid, or a factor cannot be bumped or priced.
-        KeyError
-            If repricing requires market data that is absent from ``market``.
+    Returns
+    -------
+    SensitivityMatrix
+        Positions-by-factors delta matrix in ``portfolio.base_currency``.
 
-        Examples
-        --------
-        >>> from finstack_quant.core.market_data import MarketContext
-        >>> from finstack_quant.portfolio import compute_factor_sensitivities
-        >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15", "USD")
-        >>> matrix.to_dataframe().shape
-        (0, 0)
+    Raises
+    ------
+    TypeError
+        If ``portfolio`` or ``market`` is neither a handle nor a JSON string.
+    ValueError
+        If the portfolio spec, factors, bump configuration or date is malformed,
+        a factor is a credit hierarchy factor, or a factor cannot be bumped or
+        priced.
+    KeyError
+        If repricing requires market data or FX that is absent from ``market``.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, compute_factor_sensitivities
+    >>> book = Portfolio.builder("book", "USD", "2025-01-15").build()
+    >>> matrix = compute_factor_sensitivities(book, "[]", MarketContext(), "2025-01-15")
+    >>> matrix.to_dataframe().shape
+    (0, 0)
     """
     ...
 
 def compute_pnl_profiles(
-    positions_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    factors_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    portfolio: Portfolio | str,
+    factors: str | list[Any] | pd.DataFrame,
     market: MarketContext | str,
     as_of: datetime.date | str,
-    base_currency: str,
-    bump_config_json: str | None = None,
-    n_scenario_points: int = 5,
+    bump_config: str | dict[str, Any] | None = None,
+    n_points: int | None = None,
 ) -> list[FactorPnlProfile]:
     """
-    Compute scenario P&L profiles via full repricing across a factor grid.
+    Compute full-repricing scenario P&L profiles of a portfolio, one per factor.
+
+    Each factor is shifted across a symmetric grid of multiples of its bump
+    size. A profile row holds every position's scale-factor-weighted P&L in
+    ``portfolio.base_currency``.
 
     Parameters
     ----------
-    positions_json : str | dict | list | pandas.DataFrame
-        JSON array of position objects (same schema as
+    portfolio : Portfolio | str
+        Built ``Portfolio`` or ``PortfolioSpec`` JSON. Its positions are the
+        profile columns and its ``base_currency`` is the reporting currency.
+    factors : str | list | pandas.DataFrame
+        ``FactorDefinition`` array, in returned profile order (same accepted
+        forms and credit-hierarchy restriction as
         :func:`compute_factor_sensitivities`).
-    factors_json : str | dict | list | pandas.DataFrame
-        JSON array of ``FactorDefinition`` objects.
-    market : MarketContext or str
-        ``MarketContext`` instance or JSON string.
+    market : MarketContext | str
+        Market reused by every scenario.
     as_of : datetime.date | str
-        Valuation date, either a date-like object or an ISO 8601 string.
-    base_currency : str
-        ISO reporting currency for every P&L amount; missing FX raises KeyError.
-    bump_config_json : str, optional
-        Optional JSON-serialized ``BumpSizeConfig``.
-    n_scenario_points : int, default 5
-        Odd number of scenario grid points in ``3..=1001``
-        (default 5 produces shifts ``[-2, -1, 0, 1, 2]``).
+        Valuation date for pricing and spot FX.
+    bump_config : str | dict, optional
+        ``BumpSizeConfig`` as JSON text or a dict.
+    n_points : int, optional
+        Odd number of scenario grid points in ``3..=1001``; ``None`` selects 5
+        (shifts ``[-2, -1, 0, 1, 2]``).
 
     Returns
     -------
@@ -13614,19 +13627,20 @@ def compute_pnl_profiles(
     Raises
     ------
     TypeError
-        If ``market`` is neither a ``MarketContext`` nor a JSON string.
+        If ``portfolio`` or ``market`` is neither a handle nor a JSON string.
     ValueError
-        If position, factor, market, bump-configuration, or date input is
-        malformed or invalid; if ``n_scenario_points`` is less than ``3``,
-        greater than ``1001`` or even; or if a factor cannot be bumped or priced.
+        If the portfolio spec, factors, bump configuration or date is malformed;
+        a factor is a credit hierarchy factor; ``n_points`` is less than ``3``,
+        greater than ``1001`` or even; or a factor cannot be bumped or priced.
     KeyError
-        If repricing requires market data that is absent from ``market``.
+        If repricing requires market data or FX that is absent from ``market``.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import compute_pnl_profiles
-    >>> compute_pnl_profiles("[]", "[]", MarketContext(), "2025-01-15", "USD")
+    >>> from finstack_quant.portfolio import Portfolio, compute_pnl_profiles
+    >>> book = Portfolio.builder("book", "USD", "2025-01-15").build()
+    >>> compute_pnl_profiles(book, "[]", MarketContext(), "2025-01-15")
     []
     """
     ...

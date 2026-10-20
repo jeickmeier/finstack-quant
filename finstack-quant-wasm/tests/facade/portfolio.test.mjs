@@ -1236,35 +1236,32 @@ test('models.factor.risk.decomposeFactors rejects malformed sensitivity wire wit
   }
 });
 
-test('standalone sensitivity outputs require and retain the reporting currency', () => {
-  const result = portfolio.computeFactorSensitivities(
-    '[]',
-    '[]',
-    portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
-    '2025-01-15',
-    'EUR'
+test('portfolio sensitivity outputs report in the portfolio base currency', () => {
+  const book = portfolio.Portfolio.fromSpec(
+    JSON.stringify({ ...JSON.parse(EMPTY_SPEC), base_currency: 'EUR' })
   );
+  const market = portfolioCore.MarketContext.fromJson(EMPTY_MARKET);
+  const result = portfolio.computeFactorSensitivities(book, [], market, '2024-01-15');
   assert.equal(result.base_currency, 'EUR');
   assert.deepEqual(result.position_ids, []);
   assert.deepEqual(result.data, []);
-  assert.deepEqual(
-    portfolio.computePnlProfiles(
-      '[]',
-      '[]',
-      portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
-      '2025-01-15',
-      'EUR'
-    ),
-    []
-  );
-  assert.throws(() =>
-    portfolio.computeFactorSensitivities(
-      '[]',
-      '[]',
-      portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
-      '2025-01-15',
-      'INVALID'
-    )
+  assert.deepEqual(portfolio.computePnlProfiles(book, '[]', market, '2024-01-15'), []);
+  const creditHierarchy = [
+    {
+      id: 'credit::generic',
+      factor_type: 'credit',
+      market_mapping: { curve_parallel: { curve_ids: [], units: 'rate_bp' } },
+    },
+  ];
+  for (const call of [portfolio.computeFactorSensitivities, portfolio.computePnlProfiles]) {
+    assert.throws(
+      () => call(book, creditHierarchy, market, '2024-01-15'),
+      (error) => error.kind === 'validation' && /credit::generic/.test(error.message)
+    );
+  }
+  assert.throws(
+    () => portfolio.computePnlProfiles(book, [], market, '2024-01-15', undefined, 1.5),
+    (error) => error.kind === 'invalid_type' && /nPoints/.test(error.message)
   );
 });
 

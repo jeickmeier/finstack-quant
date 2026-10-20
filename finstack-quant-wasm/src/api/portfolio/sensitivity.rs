@@ -1,104 +1,115 @@
-//! WASM bindings for factor-model sensitivities and P&L profiles.
+//! WASM bindings for portfolio factor sensitivities and P&L profiles.
 
+use super::JsPortfolio;
 use crate::api::core::market_context::JsMarketContext;
 use crate::utils::date::parse_iso_date;
-use crate::utils::input::{js_opt_uint, js_string, json_text, opt_json_text};
+use crate::utils::input::{from_js_json, js_opt_uint, js_string, opt_json_text};
 use crate::utils::{to_js_err, to_js_value};
+use finstack_quant_factor::{BumpSizeConfig, FactorDefinition};
 use wasm_bindgen::prelude::*;
-/// Compute first-order factor sensitivities using a pre-parsed `MarketContext` handle.
+
+/// Deserialize an optional `BumpSizeConfig` (JSON text or plain object).
+fn parse_bump_config(value: Option<&JsValue>) -> Result<Option<BumpSizeConfig>, JsValue> {
+    opt_json_text(value, "bumpConfigJson")?
+        .map(|text| {
+            serde_json::from_str(&text).map_err(|error| {
+                to_js_err(finstack_quant_core::Error::Validation(format!(
+                    "bumpConfigJson: {error}"
+                )))
+            })
+        })
+        .transpose()
+}
+
+/// Compute the position-by-factor sensitivity matrix of a portfolio.
 ///
-/// Avoids reparsing market JSON for repeated factor analytics calls.
-/// @param positions_json - Canonical portfolio-positions JSON to bump and revalue.
-/// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
-/// @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
-/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-/// @param base_currency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
-/// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
+/// Each cell is the central difference of the position's base-currency PV
+/// under an up and a down bump of the factor, weighted by the position's scale
+/// factor. Rows follow portfolio position order, columns follow the factors,
+/// and every value is in the portfolio's base currency. Returns the
+/// sensitivity-matrix wire object (`base_currency`, `position_ids`,
+/// `factor_ids`, `data` rows).
+/// @param portfolio - Built portfolio whose positions are the matrix rows; its base currency is the reporting currency.
+/// @param factors_json - `FactorDefinition` array (object or JSON text); every factor must map to market data, so credit hierarchy factors need `FactorModel.computeSensitivities`.
+/// @param market - `core.MarketContext` handle bumped per factor, including FX for cross-currency positions.
+/// @param as_of - ISO-8601 valuation date for pricing and spot FX.
+/// @param bump_config_json - Optional `BumpSizeConfig` (object or JSON text); omit for 1 bp / 1 % per factor type.
+/// @returns The `SensitivityMatrixJson` object.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `asOf` is not a valid ISO date; a position,
-/// factor, or bump-config JSON input is malformed; a factor definition is
-/// invalid or unsupported; bumping or repricing fails; or the sensitivity
-/// matrix cannot be converted to a JavaScript value.
+/// Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string or a
+/// JSON argument is neither text nor a plain object/array, and a
+/// `FinstackError` if `asOf` is not an ISO date, the factors or bump config do
+/// not match their schema, a factor is a credit hierarchy factor (kind
+/// `validation`), or bumping, repricing or FX conversion fails.
 #[wasm_bindgen(js_name = computeFactorSensitivities)]
 pub fn compute_factor_sensitivities(
-    positions_json: JsValue,
+    portfolio: &JsPortfolio,
     factors_json: JsValue,
     market: &JsMarketContext,
     as_of: JsValue,
-    base_currency: JsValue,
     bump_config_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let positions_json: &str = &json_text(&positions_json, "positionsJson")?;
-    let factors_json: &str = &json_text(&factors_json, "factorsJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
-    let base_currency: &str = &js_string(&base_currency, "baseCurrency")?;
-    let bump_config_json = opt_json_text(bump_config_json.as_ref(), "bumpConfigJson")?;
-    let as_of = parse_iso_date(as_of)?;
-    let base_currency = base_currency
-        .parse::<finstack_quant_core::currency::Currency>()
-        .map_err(to_js_err)?;
-    let matrix = finstack_quant_portfolio::sensitivity::compute_factor_sensitivities_from_json(
-        positions_json,
-        factors_json,
+    let factors: Vec<FactorDefinition> = from_js_json(&factors_json, "factorsJson")?;
+    let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
+    let bump_config = parse_bump_config(bump_config_json.as_ref())?;
+    let matrix = finstack_quant_portfolio::sensitivity::compute_factor_sensitivities(
+        &portfolio.inner,
+        &factors,
         market.inner(),
         as_of,
-        base_currency,
-        bump_config_json.as_deref(),
+        bump_config,
     )
     .map_err(to_js_err)?;
-    let output = finstack_quant_portfolio::sensitivity::SensitivityMatrixJson::from_matrix(
-        &matrix,
-        base_currency,
-    );
-    to_js_value(&output)
+    to_js_value(
+        &finstack_quant_portfolio::sensitivity::SensitivityMatrixJson::from_matrix(
+            &matrix,
+            portfolio.inner.base_currency,
+        ),
+    )
 }
-/// Compute scenario P&L profiles using a pre-parsed `MarketContext` handle.
-/// @param positions_json - Canonical portfolio-positions JSON to bump and revalue.
-/// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
-/// @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
-/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-/// @param base_currency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
-/// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-/// @param n_scenario_points - Odd number of evenly spaced bump levels in each P-and-L profile, in `3..=1001`; omit for 5.
+
+/// Compute full-repricing scenario P&L profiles of a portfolio, one per factor.
+///
+/// Each profile holds the scale-factor-weighted P&L of every position at each
+/// grid shift, in the portfolio's base currency.
+/// @param portfolio - Built portfolio whose positions are the profile columns; its base currency is the reporting currency.
+/// @param factors_json - `FactorDefinition` array (object or JSON text) to shock, in returned profile order.
+/// @param market - `core.MarketContext` handle reused by every scenario.
+/// @param as_of - ISO-8601 valuation date for pricing and spot FX.
+/// @param bump_config_json - Optional `BumpSizeConfig` (object or JSON text); omit for 1 bp / 1 % per factor type.
+/// @param n_points - Odd number of grid points in `3..=1001`; omit for 5 (shifts `[-2, -1, 0, 1, 2]`).
+/// @returns The `FactorPnlProfile` array.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `asOf` is not a valid ISO date; a position,
-/// factor, or bump-config JSON input is malformed; a factor or scenario-point
-/// count is invalid or unsupported; bumping or repricing fails; or the profiles
-/// cannot be converted to a JavaScript value.
+/// Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string,
+/// `nPoints` is not a whole number, or a JSON argument is neither text nor a
+/// plain object/array, and a `FinstackError` if `asOf` is not an ISO date, the
+/// factors or bump config do not match their schema, the grid size is invalid
+/// or a factor is a credit hierarchy factor (kind `validation`), or bumping,
+/// repricing or FX conversion fails.
 #[wasm_bindgen(js_name = computePnlProfiles)]
 pub fn compute_pnl_profiles(
-    positions_json: JsValue,
+    portfolio: &JsPortfolio,
     factors_json: JsValue,
     market: &JsMarketContext,
     as_of: JsValue,
-    base_currency: JsValue,
     bump_config_json: Option<JsValue>,
-    n_scenario_points: Option<JsValue>,
+    n_points: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let positions_json: &str = &json_text(&positions_json, "positionsJson")?;
-    let factors_json: &str = &json_text(&factors_json, "factorsJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
-    let base_currency: &str = &js_string(&base_currency, "baseCurrency")?;
-    let bump_config_json = opt_json_text(bump_config_json.as_ref(), "bumpConfigJson")?;
-    let n_scenario_points: Option<usize> =
-        js_opt_uint(n_scenario_points.as_ref(), "nScenarioPoints")?;
-    let as_of = parse_iso_date(as_of)?;
-    let base_currency = base_currency
-        .parse::<finstack_quant_core::currency::Currency>()
-        .map_err(to_js_err)?;
-    let profiles = finstack_quant_portfolio::sensitivity::compute_pnl_profiles_from_json(
-        positions_json,
-        factors_json,
+    let factors: Vec<FactorDefinition> = from_js_json(&factors_json, "factorsJson")?;
+    let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
+    let bump_config = parse_bump_config(bump_config_json.as_ref())?;
+    let n_points: Option<usize> = js_opt_uint(n_points.as_ref(), "nPoints")?;
+    let profiles = finstack_quant_portfolio::sensitivity::compute_pnl_profiles(
+        &portfolio.inner,
+        &factors,
         market.inner(),
         as_of,
-        base_currency,
-        bump_config_json.as_deref(),
-        n_scenario_points
-            .unwrap_or(finstack_quant_portfolio::sensitivity::DEFAULT_PNL_SCENARIO_POINTS),
+        bump_config,
+        n_points,
     )
     .map_err(to_js_err)?;
     to_js_value(&profiles)

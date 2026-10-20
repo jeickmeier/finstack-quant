@@ -23,7 +23,10 @@
 use super::assignment::{assign_position_factors, FactorAssignmentReport};
 use super::dependencies::factor_dependencies;
 use crate::error::{Error, Result};
-use crate::sensitivity::{exact_factor_market_keys, DeltaBasedEngine, FactorSensitivityEngine};
+use crate::sensitivity::{
+    exact_factor_market_keys, portfolio_rows, uses_assignment_driven_credit_shock,
+    DeltaBasedEngine, FactorSensitivityEngine,
+};
 use crate::{dependencies::MarketFactorKey, Portfolio};
 use finstack_quant_calibration::api::schema::HazardCurveParams;
 use finstack_quant_calibration::recalibration::bump_hazard_spreads;
@@ -38,8 +41,8 @@ use finstack_quant_factor::risk::{
 };
 use finstack_quant_factor::SensitivityMatrix;
 use finstack_quant_factor::{
-    BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorModelConfig, FactorType,
-    MarketDependency, MatchingConfig, RiskMeasure, UnmatchedPolicy,
+    BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorModelConfig, MarketDependency,
+    MatchingConfig, RiskMeasure, UnmatchedPolicy,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::recalibration::QuoteBump;
@@ -233,20 +236,11 @@ impl FactorModel {
         credit_exposures: &mut CreditExposureMatrix<'_>,
     ) -> Result<SensitivityMatrix> {
         let assignment_report = self.assign_factors(portfolio, market)?;
-        let positions: Vec<(String, &dyn Instrument, f64)> = portfolio
-            .positions
-            .iter()
-            .map(|position| {
-                (
-                    position.position_id.to_string(),
-                    position.instrument.as_ref() as &dyn Instrument,
-                    position.scale_factor(),
-                )
-            })
-            .collect();
-
+        // Same rows as `sensitivity::compute_factor_sensitivities`; this path
+        // additionally overlays the assignment-driven credit-hierarchy exposure
+        // that the free function rejects.
         let mut sensitivities = self.sensitivity_engine.compute_sensitivities(
-            &positions,
+            &portfolio_rows(portfolio),
             &self.factors,
             market,
             as_of,
@@ -679,15 +673,6 @@ fn collect_credit_idiosyncratic_variance(
         }
         _ => {}
     }
-}
-
-fn uses_assignment_driven_credit_shock(factor: &FactorDefinition) -> bool {
-    matches!(factor.factor_type, FactorType::Credit)
-        && matches!(
-            factor.market_mapping,
-            finstack_quant_factor::MarketMapping::CurveParallel { ref curve_ids, .. }
-                if curve_ids.is_empty()
-        )
 }
 
 fn credit_curve_id(dependency: &MarketDependency) -> Option<finstack_quant_core::types::CurveId> {

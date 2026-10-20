@@ -120,21 +120,6 @@ def _factor_model_config_json() -> str:
     })
 
 
-def _sensitivity_positions_json(position_count: int) -> str:
-    spec = json.loads(_portfolio_spec_json(position_count))
-    return json.dumps([
-        {
-            "id": position["position_id"],
-            "instrument": {
-                "schema": "finstack_quant.instrument/1",
-                "instrument": position["instrument_spec"],
-            },
-            "weight": position["quantity"],
-        }
-        for position in spec["positions"]
-    ])
-
-
 _GIL_PROBE_ATTEMPTS = 8
 
 
@@ -358,17 +343,16 @@ def test_large_carino_parse_compute_and_serialize_release_gil() -> None:
 
 def test_sensitivity_result_conversion_and_decomposition_release_gil() -> None:
     factor_config = json.loads(_factor_model_config_json())
-    positions_json = _sensitivity_positions_json(2_000)
+    portfolio = Portfolio.from_spec(_portfolio_spec_json(2_000))
     factors_json = json.dumps(factor_config["factors"])
     covariance_json = json.dumps(factor_config["covariance"])
     market = _market()
     matrix = _assert_releases_gil(
         lambda: compute_factor_sensitivities(
-            positions_json,
+            portfolio,
             factors_json,
             market,
             AS_OF.isoformat(),
-            "USD",
         )
     )
     decomposition = _assert_releases_gil(lambda: decompose_factors(matrix, covariance_json))

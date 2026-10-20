@@ -35123,46 +35123,50 @@ export interface PortfolioNamespace {
     configJson: JsonInput
   ): ReplayResult;
   /**
-   * Compute first-order factor sensitivities using a pre-parsed `core.MarketContext` handle.
+   * Compute the position-by-factor sensitivity matrix of a portfolio.
    *
-   * Avoids reparsing market JSON for repeated factor analytics calls.
-   * @returns Returns a structured `SensitivityMatrixJson` object.
-   * @param positionsJson - Canonical portfolio-positions JSON to bump and revalue.
-   * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
-   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
-   * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-   * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor definition is invalid or unsupported; bumping or repricing fails; or the sensitivity matrix cannot be converted to a JavaScript value.
+   * Each cell is the central difference of the position's base-currency PV
+   * under an up and a down bump of the factor, weighted by the position's scale
+   * factor. Rows follow portfolio position order, columns follow the factors,
+   * and every value is in the portfolio's base currency. Returns the
+   * sensitivity-matrix wire object (`base_currency`, `position_ids`,
+   * `factor_ids`, `data` rows).
+   * @param portfolio - Built portfolio whose positions are the matrix rows; its base currency is the reporting currency.
+   * @param factorsJson - `FactorDefinition` array (object or JSON text); every factor must map to market data, so credit hierarchy factors need `FactorModel.computeSensitivities`.
+   * @param market - `core.MarketContext` handle bumped per factor, including FX for cross-currency positions.
+   * @param asOf - ISO-8601 valuation date for pricing and spot FX.
+   * @param bumpConfigJson - Optional `BumpSizeConfig` (object or JSON text); omit for 1 bp / 1 % per factor type.
+   * @returns The `SensitivityMatrixJson` object.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string or a JSON argument is neither text nor a plain object/array, and a `FinstackError` if `asOf` is not an ISO date, the factors or bump config do not match their schema, a factor is a credit hierarchy factor (kind `validation`), or bumping, repricing or FX conversion fails.
    */
   computeFactorSensitivities(
-    positionsJson: JsonInput,
-    factorsJson: JsonInput,
+    portfolio: Portfolio,
+    factorsJson: FactorDefinition[] | string,
     market: MarketContext,
     asOf: string,
-    baseCurrency: string,
-    bumpConfigJson?: JsonInput
+    bumpConfigJson?: BumpSizeConfig | string
   ): SensitivityMatrixJson;
   /**
-   * Compute scenario P&L profiles using a pre-parsed `core.MarketContext` handle.
-   * @returns Returns a structured `FactorPnlProfile` array.
-   * @param positionsJson - Canonical portfolio-positions JSON to bump and revalue.
-   * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
-   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
-   * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-   * @param nScenarioPoints - Odd number of evenly spaced bump levels in each P-and-L profile, in `3..=1001`; omit for 5.
-   * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor or scenario-point count is invalid or unsupported; bumping or repricing fails; or the profiles cannot be converted to a JavaScript value.
+   * Compute full-repricing scenario P&L profiles of a portfolio, one per factor.
+   *
+   * Each profile holds the scale-factor-weighted P&L of every position at each
+   * grid shift, in the portfolio's base currency.
+   * @param portfolio - Built portfolio whose positions are the profile columns; its base currency is the reporting currency.
+   * @param factorsJson - `FactorDefinition` array (object or JSON text) to shock, in returned profile order.
+   * @param market - `core.MarketContext` handle reused by every scenario.
+   * @param asOf - ISO-8601 valuation date for pricing and spot FX.
+   * @param bumpConfigJson - Optional `BumpSizeConfig` (object or JSON text); omit for 1 bp / 1 % per factor type.
+   * @param nPoints - Odd number of grid points in `3..=1001`; omit for 5 (shifts `[-2, -1, 0, 1, 2]`).
+   * @returns The `FactorPnlProfile` array.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string, `nPoints` is not a whole number, or a JSON argument is neither text nor a plain object/array, and a `FinstackError` if `asOf` is not an ISO date, the factors or bump config do not match their schema, the grid size is invalid or a factor is a credit hierarchy factor (kind `validation`), or bumping, repricing or FX conversion fails.
    */
   computePnlProfiles(
-    positionsJson: JsonInput,
-    factorsJson: JsonInput,
+    portfolio: Portfolio,
+    factorsJson: FactorDefinition[] | string,
     market: MarketContext,
     asOf: string,
-    baseCurrency: string,
-    bumpConfigJson?: JsonInput,
-    nScenarioPoints?: number
+    bumpConfigJson?: BumpSizeConfig | string,
+    nPoints?: number
   ): FactorPnlProfile[];
   /**
    * Fluent portfolio builder class; instances come from `Portfolio.builder`.

@@ -15,7 +15,7 @@ import pytest
 
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.models.factor.risk import decompose_factors
-from finstack_quant.portfolio import SensitivityMatrix, compute_factor_sensitivities
+from finstack_quant.portfolio import Portfolio, SensitivityMatrix, compute_factor_sensitivities
 
 SENSITIVITY_WIRE = {
     "base_currency": "USD",
@@ -66,7 +66,8 @@ def test_malformed_wire_raises_value_error(wire: dict[str, object], message: str
 
 
 def test_engine_output_uses_the_wire_form() -> None:
-    matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15", "EUR")
+    book = Portfolio.builder("book", "EUR", "2025-01-15").build()
+    matrix = compute_factor_sensitivities(book, "[]", MarketContext(), "2025-01-15")
     assert json.loads(matrix.to_json()) == {
         "base_currency": "EUR",
         "position_ids": [],
