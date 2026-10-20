@@ -340,7 +340,7 @@ impl LmmProcess {
 impl StochasticProcess for LmmProcess {
     fn validate_time_grid(
         &self,
-        time_grid: &crate::monte_carlo::TimeGrid,
+        time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
     ) -> finstack_quant_core::Result<()> {
         self.params.clone().validate()?;
         // Require exact nodes: accepting a near-knot start while selecting
@@ -569,11 +569,14 @@ mod tests {
         params.vol_times = vec![0.4];
         params.vol_values.push(params.vol_values[0].clone());
         let process = LmmProcess::new(params);
-        let aligned = crate::monte_carlo::TimeGrid::from_times(vec![0.0, 0.4, 1.0, 2.0, 3.0])
-            .expect("valid grid");
+        let aligned = finstack_quant_core::math::time_grid::TimeGrid::from_times(vec![
+            0.0, 0.4, 1.0, 2.0, 3.0,
+        ])
+        .expect("valid grid");
         assert!(process.validate_time_grid(&aligned).is_ok());
         for times in [vec![0.0, 1.0, 2.0, 3.0], vec![0.0, 0.4, 2.0, 3.0]] {
-            let grid = crate::monte_carlo::TimeGrid::from_times(times).expect("valid grid");
+            let grid = finstack_quant_core::math::time_grid::TimeGrid::from_times(times)
+                .expect("valid grid");
             assert!(process.validate_time_grid(&grid).is_err());
         }
     }
@@ -587,12 +590,13 @@ mod tests {
         for offset in [-1e-15, 1e-15] {
             let near = 0.3 + offset;
             let grid =
-                crate::monte_carlo::TimeGrid::from_times(vec![0.0, near, 1.0]).expect("valid grid");
+                finstack_quant_core::math::time_grid::TimeGrid::from_times(vec![0.0, near, 1.0])
+                    .expect("valid grid");
             assert!(process.validate_time_grid(&grid).is_err());
         }
         assert!(!process.step_is_aligned(0.3 - 1e-15, 0.7));
-        let exact =
-            crate::monte_carlo::TimeGrid::from_times(vec![0.0, 0.3, 1.0]).expect("valid grid");
+        let exact = finstack_quant_core::math::time_grid::TimeGrid::from_times(vec![0.0, 0.3, 1.0])
+            .expect("valid grid");
         assert!(process.validate_time_grid(&exact).is_ok());
         assert_eq!(process.params.factor_loadings(1, 0.3)[0], 0.2);
     }

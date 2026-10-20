@@ -1,7 +1,7 @@
 //! Merged piecewise-linear functions for exact continuous curve adjustments.
 
 use crate::market_data::bumps::BumpType;
-use crate::math::NeumaierAccumulator;
+use crate::math::summation::NeumaierAccumulator;
 
 /// A flat function representation: repeated shocks merge on a breakpoint union
 /// rather than forming a recursively nested transformation history.

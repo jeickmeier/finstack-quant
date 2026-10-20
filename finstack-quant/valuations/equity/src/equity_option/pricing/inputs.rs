@@ -89,7 +89,8 @@ pub(crate) fn resolve_lifecycle_value(
                 };
                 spot * (-q * t).exp()
             } else {
-                let mut dividend_pv = finstack_quant_core::math::NeumaierAccumulator::new();
+                let mut dividend_pv =
+                    finstack_quant_core::math::summation::NeumaierAccumulator::new();
                 for (date, amount) in future_dividends {
                     dividend_pv.add(*amount * discount_curve.df_between_dates(as_of, *date)?);
                 }

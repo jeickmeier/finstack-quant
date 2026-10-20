@@ -560,7 +560,7 @@ fn fx_smile_pillars(
 /// * `vol` - Annualized Black volatility as a decimal.
 /// * `expiry` - Time to expiry in years.
 pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
-    let z = finstack_quant_core::math::standard_normal_inv_cdf(delta);
+    let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(delta);
     forward * (-z * vol * expiry.sqrt() + 0.5 * vol * vol * expiry).exp()
 }
 
@@ -573,7 +573,9 @@ pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
 /// * `vol` - Annualized Black volatility as a decimal.
 /// * `expiry` - Time to expiry in years.
 pub fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
-    finstack_quant_core::math::norm_cdf(super::black::d1_d2_black76(forward, strike, vol, expiry).0)
+    finstack_quant_core::math::special_functions::norm_cdf(
+        super::black::d1_d2_black76(forward, strike, vol, expiry).0,
+    )
 }
 
 /// Evaluate an FX delta-quoted volatility artifact.

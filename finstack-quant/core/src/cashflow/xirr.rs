@@ -40,7 +40,7 @@
 use crate::dates::{Date, DayCount, DayCountContext};
 use crate::error::InputError;
 use crate::math::solver::BrentSolver;
-use crate::math::NeumaierAccumulator;
+use crate::math::summation::NeumaierAccumulator;
 
 /// Absolute root tolerance in log-growth coordinates, `log(1 + r)`.
 const LOG_RATE_TOLERANCE: f64 = 1e-12;

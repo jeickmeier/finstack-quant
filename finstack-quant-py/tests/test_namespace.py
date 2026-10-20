@@ -213,7 +213,7 @@ class TestCorrelationNamespace:
             LatentTwoFactor,
             RecoveryModel,
             RecoverySpec,
-            cholesky_decompose,
+            cholesky_correlation,
             correlation_bounds,
             joint_probabilities,
             validate_correlation_matrix,

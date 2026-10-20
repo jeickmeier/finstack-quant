@@ -2469,7 +2469,7 @@
       "PortfolioLossResult",
       "RecoveryModel",
       "RecoverySpec",
-      "choleskyDecompose",
+      "choleskyCorrelation",
       "correlationBounds",
       "jointProbabilities",
       "maxPortfolioLossPaths",
@@ -2571,7 +2571,7 @@
   "models.correlation.nearestCorrelation": {
     "kind": "function"
   },
-  "models.correlation.choleskyDecompose": {
+  "models.correlation.choleskyCorrelation": {
     "kind": "function"
   },
   "models.correlation.maxPortfolioLossPaths": {

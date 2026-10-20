@@ -917,8 +917,8 @@ mod tests {
             let df = (-rate * t).exp();
             let d1 = ((spot / strike).ln() + (rate + 0.5 * vol * vol) * t) / (vol * t.sqrt());
             let d2 = d1 - vol * t.sqrt();
-            let vanilla = spot * finstack_quant_core::math::norm_cdf(d1)
-                - strike * df * finstack_quant_core::math::norm_cdf(d2);
+            let vanilla = spot * finstack_quant_core::math::special_functions::norm_cdf(d1)
+                - strike * df * finstack_quant_core::math::special_functions::norm_cdf(d2);
             assert!(
                 pv >= -1e-6 && pv <= vanilla + 1e-6,
                 "up-and-out call price {pv:.6} at spot {spot} must lie in \
@@ -1001,8 +1001,8 @@ mod tests {
         let df = (-rate * t).exp();
         let d1 = ((spot / strike).ln() + (rate + 0.5 * vol * vol) * t) / (vol * t.sqrt());
         let d2 = d1 - vol * t.sqrt();
-        let vanilla = spot * finstack_quant_core::math::norm_cdf(d1)
-            - strike * df * finstack_quant_core::math::norm_cdf(d2);
+        let vanilla = spot * finstack_quant_core::math::special_functions::norm_cdf(d1)
+            - strike * df * finstack_quant_core::math::special_functions::norm_cdf(d2);
         let analytical_ko = barrier_price(
             &BarrierParams::new(spot, strike, barrier, t, rate, 0.0, vol),
             BarrierType::DownAndOut,

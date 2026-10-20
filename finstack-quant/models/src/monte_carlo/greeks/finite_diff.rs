@@ -35,8 +35,8 @@ use super::super::engine::McEngine;
 use crate::monte_carlo::engine::build_correlation_factor;
 use crate::monte_carlo::traits::Payoff;
 use crate::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
-use crate::monte_carlo::OnlineStats;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::Result;
 
 const MIN_SPOT_FOR_BUMP: f64 = 1.0e-12;
@@ -401,8 +401,8 @@ mod tests {
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
     use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
     use crate::monte_carlo::rng::philox::PhiloxRng;
-    use crate::monte_carlo::TimeGrid;
-    use finstack_quant_core::math::{norm_cdf, norm_pdf};
+    use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
+    use finstack_quant_core::math::time_grid::TimeGrid;
 
     const SPOT: f64 = 100.0;
     const STRIKE: f64 = 100.0;

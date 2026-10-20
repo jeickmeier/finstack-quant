@@ -241,7 +241,7 @@ impl EquityFuture {
             let carry = (-self.dividend_yield(market)? * t).exp() / df;
             (spot * carry, carry)
         } else {
-            let mut pv_dividends = finstack_quant_core::math::NeumaierAccumulator::new();
+            let mut pv_dividends = finstack_quant_core::math::summation::NeumaierAccumulator::new();
             for (date, amount) in &self.discrete_dividends {
                 if *date > as_of {
                     pv_dividends.add(amount * discount.df_between_dates(as_of, *date)?);

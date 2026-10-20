@@ -11,7 +11,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, HazardCurve};
-use finstack_quant_core::math::standard_normal_inv_cdf;
+use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::correlation::copula::CopulaSpec;
 use finstack_quant_valuations_core::instruments::PayReceive;
@@ -2545,7 +2545,7 @@ fn seasoned_aod_reduces_only_the_remaining_day_of_accrual() {
 
 #[test]
 fn heterogeneous_tail_loss_matches_independent_state_enumeration_and_factor_grids() {
-    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_core::math::special_functions::norm_cdf;
     use time::macros::date;
     let base = date!(2025 - 01 - 01);
     let maturity = date!(2026 - 01 - 01);

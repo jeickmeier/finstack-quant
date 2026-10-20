@@ -10,7 +10,7 @@ use crate::metrics::core::finite_difference::{
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::MetricCalculator;
 use crate::metrics::{MetricContext, MetricId};
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use std::marker::PhantomData;
 
 /// Key-rate vega calculator: bumps individual (expiry, strike) points.

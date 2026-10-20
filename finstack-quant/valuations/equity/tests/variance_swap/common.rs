@@ -8,12 +8,11 @@ use finstack_quant_core::market_data::scalars::{
 };
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::math::stats::RealizedVarMethod;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations_core::instruments::Attributes;
-use finstack_quant_valuations_equity::variance_swap::{
-    PayReceive, RealizedVarMethod, VarianceSwap,
-};
+use finstack_quant_valuations_equity::variance_swap::{PayReceive, VarianceSwap};
 
 pub const DISC_ID: &str = "USD_OIS";
 pub const UNDERLYING_ID: &str = "SPX";

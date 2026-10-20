@@ -85,7 +85,6 @@ pub use crate::closed_form::volatility::bachelier_price_with_annuity;
 pub use black::{d1_d2, d1_d2_black76};
 pub use conventions::VolatilityConvention;
 pub use convert::convert_atm_volatility;
-pub use finstack_quant_core::math::{norm_cdf, norm_pdf};
 pub use implied::{implied_vol_bachelier, implied_vol_black};
 pub use sabr::{SabrCalibrationOutcome, SabrCalibrator, SabrParameters, SabrShift, SabrSmile};
 pub use source::{

@@ -8,7 +8,7 @@
 //! numerical recovery can trigger additional rebuilds.
 
 use crate::dates::Date;
-use finstack_quant_core::math::neumaier_sum;
+use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 use super::return_based::invalid_annualization_factor;

@@ -514,8 +514,8 @@ const CASES = {
       list(correlation.LatentMultiFactor.uncorrelated(2, [0.2, 0.3]).correlationMatrix),
     ];
   },
-  'correlation.cholesky_decompose': () =>
-    list(correlation.choleskyDecompose([1.0, 0.5, 0.5, 1.0], 2)),
+  'correlation.cholesky_correlation': () =>
+    list(correlation.choleskyCorrelation([1.0, 0.5, 0.5, 1.0], 2)),
   'correlation.simulate_portfolio_loss': () => {
     const config = {
       num_paths: 2000,

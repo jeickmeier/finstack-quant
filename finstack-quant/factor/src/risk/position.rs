@@ -463,7 +463,7 @@ pub fn build_stress_attribution(
 
 const VARIANCE_TOLERANCE: f64 = 1e-12;
 
-use finstack_quant_core::math::{norm_pdf, standard_normal_inv_cdf};
+use finstack_quant_core::math::special_functions::{norm_pdf, standard_normal_inv_cdf};
 
 // Validation helpers
 

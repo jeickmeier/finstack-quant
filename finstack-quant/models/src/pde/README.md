@@ -361,7 +361,7 @@ no exercise field. `PdeSolution2D` likewise exposes only `interpolate`,
 
 with `Dirichlet(0)` on the deep-OTM edge and `LinearInExp` on the deep-ITM edge, and
 reports `is_time_homogeneous() == true`. `bridge::tests` grades it against
-`finstack_quant_core::math::norm_cdf`-based Black-Scholes at 301 sinh points and
+`finstack_quant_core::math::special_functions::norm_cdf`-based Black-Scholes at 301 sinh points and
 300 CN steps: relative error below 1e-3 for both a call and a put.
 
 `LocalVolPde` solves the same equation with `σ` replaced by the Dupire local

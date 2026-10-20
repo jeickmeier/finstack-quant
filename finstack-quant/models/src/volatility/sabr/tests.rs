@@ -523,21 +523,28 @@ fn test_normal_inverse_cdf_precision() {
 
     // Standard values
     assert!(
-        (finstack_quant_core::math::standard_normal_inv_cdf(0.5) - 0.0).abs() < 1e-12,
+        (finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.5) - 0.0).abs()
+            < 1e-12,
         "CDF^-1(0.5) should be 0"
     );
     assert!(
-        (finstack_quant_core::math::standard_normal_inv_cdf(0.84134474606854) - 1.0).abs() < 1e-8,
+        (finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.84134474606854)
+            - 1.0)
+            .abs()
+            < 1e-8,
         "CDF^-1(0.84134...) should be ~1.0"
     );
     assert!(
-        (finstack_quant_core::math::standard_normal_inv_cdf(0.97724986805182) - 2.0).abs() < 1e-8,
+        (finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.97724986805182)
+            - 2.0)
+            .abs()
+            < 1e-8,
         "CDF^-1(0.97724...) should be ~2.0"
     );
 
     // Tail precision test: p = 1e-8 should give approximately -5.6120
     // (from scipy.stats.norm.ppf(1e-8) = -5.612001244174965)
-    let tail_result = finstack_quant_core::math::standard_normal_inv_cdf(1e-8);
+    let tail_result = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1e-8);
     assert!(
         (tail_result - (-5.612001244174965)).abs() < 1e-6,
         "Tail precision: CDF^-1(1e-8) = {} should be ~-5.612",
@@ -545,7 +552,8 @@ fn test_normal_inverse_cdf_precision() {
     );
 
     // Upper tail: p = 1 - 1e-8 should give approximately +5.6120
-    let upper_tail_result = finstack_quant_core::math::standard_normal_inv_cdf(1.0 - 1e-8);
+    let upper_tail_result =
+        finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - 1e-8);
     assert!(
         (upper_tail_result - 5.612001244174965).abs() < 1e-6,
         "Upper tail precision: CDF^-1(1-1e-8) = {} should be ~5.612",
@@ -553,7 +561,7 @@ fn test_normal_inverse_cdf_precision() {
     );
 
     // Extreme tail: p = 1e-15 should give approximately -7.941
-    let extreme_tail = finstack_quant_core::math::standard_normal_inv_cdf(1e-15);
+    let extreme_tail = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1e-15);
     assert!(
         (extreme_tail - (-7.941397804)).abs() < 1e-4,
         "Extreme tail: CDF^-1(1e-15) = {} should be ~-7.941",
@@ -565,21 +573,22 @@ fn test_normal_inverse_cdf_precision() {
 fn test_normal_inverse_cdf_boundary_behavior() {
     // Edge cases: boundaries should return appropriate infinity values
     assert!(
-        finstack_quant_core::math::standard_normal_inv_cdf(0.0).is_infinite()
-            && finstack_quant_core::math::standard_normal_inv_cdf(0.0) < 0.0,
+        finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.0).is_infinite()
+            && finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.0) < 0.0,
         "CDF^-1(0) should be -infinity"
     );
     assert!(
-        finstack_quant_core::math::standard_normal_inv_cdf(1.0).is_infinite()
-            && finstack_quant_core::math::standard_normal_inv_cdf(1.0) > 0.0,
+        finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0).is_infinite()
+            && finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0) > 0.0,
         "CDF^-1(1) should be +infinity"
     );
 
     // Values very close to boundaries
-    let near_zero = finstack_quant_core::math::standard_normal_inv_cdf(1e-300);
+    let near_zero = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1e-300);
     assert!(near_zero < -30.0, "CDF^-1(1e-300) should be very negative");
 
-    let near_one = finstack_quant_core::math::standard_normal_inv_cdf(1.0 - 1e-300);
+    let near_one =
+        finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - 1e-300);
     assert!(near_one > 30.0, "CDF^-1(1-1e-300) should be very positive");
 }
 
@@ -1083,7 +1092,7 @@ fn test_sabr_strike_from_delta_half_delta_is_delta_neutral_strike() {
 /// of ~0.78.
 #[test]
 fn test_sabr_strike_from_delta_round_trip_at_25_delta() {
-    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_core::math::special_functions::norm_cdf;
 
     let model = SabrParameters::new(0.2, 0.5, 0.3, -0.2).expect("valid params");
     let forward = 100.0;

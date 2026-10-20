@@ -77,7 +77,7 @@ use crate::dates::DateExt;
 use crate::dates::{Date, DayCount};
 use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
-use crate::{error::InputError, math::interp::types::Interp, types::CurveId};
+use crate::{error::InputError, math::interp::Interp, types::CurveId};
 
 /// Default indexation lag in months for inflation-linked securities.
 ///
@@ -715,9 +715,7 @@ impl InflationCurveBuilder {
         if self.points.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
-        crate::math::interp::utils::validate_knots(
-            &self.points.iter().map(|p| p.0).collect::<Vec<_>>(),
-        )?;
+        crate::math::interp::validate_knots(&self.points.iter().map(|p| p.0).collect::<Vec<_>>())?;
         if self.points.iter().any(|&(_, c)| !c.is_finite() || c <= 0.0) {
             return Err(InputError::NonPositiveValue.into());
         }
@@ -736,7 +734,7 @@ impl InflationCurveBuilder {
             kvec.insert(origin, 0.0);
             cvec.insert(origin, self.base_cpi);
         }
-        crate::math::interp::utils::validate_knots(&kvec)?;
+        crate::math::interp::validate_knots(&kvec)?;
         let knots = kvec.into_boxed_slice();
         let cpi_levels = cvec.into_boxed_slice();
         let mut interp = self.style.build_enum(

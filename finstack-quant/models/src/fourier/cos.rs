@@ -16,7 +16,7 @@ use super::{invalid_input, numerical};
 use crate::fourier::characteristic_function::{
     BlackScholesCf, CharacteristicFunction, MertonJumpCf, VarianceGammaCf,
 };
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::Result;
 use num_complex::Complex64;
 use std::f64::consts::PI;

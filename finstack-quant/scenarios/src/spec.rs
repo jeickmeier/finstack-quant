@@ -27,6 +27,7 @@
 
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::hierarchy::ResolutionMode;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::types::CurveId;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -654,7 +655,7 @@ pub enum OperationSpec {
     /// # Example
     /// ```rust
     /// use finstack_quant_scenarios::{OperationSpec, RateBindingSpec};
-    /// use finstack_quant_scenarios::spec::Compounding;
+    /// use finstack_quant_core::math::Compounding;
     ///
     /// let op = OperationSpec::RateBinding {
     ///     binding: RateBindingSpec {
@@ -1149,7 +1150,7 @@ pub enum TimeRollMode {
 /// # Examples
 /// ```rust
 /// use finstack_quant_scenarios::spec::RateBindingSpec;
-/// use finstack_quant_scenarios::spec::Compounding;
+/// use finstack_quant_core::math::Compounding;
 ///
 /// let binding = RateBindingSpec {
 ///     node_id: "InterestRate".into(),
@@ -1209,11 +1210,6 @@ impl RateBindingSpec {
         Ok(())
     }
 }
-
-/// Compounding convention for rate conversions: the canonical core
-/// [`finstack_quant_core::math::Compounding`] (wire `continuous`, `simple`,
-/// `annual`, or `{"periodic": n}`), re-exported for scenario authoring.
-pub use finstack_quant_core::math::Compounding;
 
 impl ScenarioSpec {
     /// Parse a scenario specification from JSON and validate it.

@@ -350,7 +350,7 @@ fn remaining_squared_returns(
             "FX variance forecast requires finite positive spot".into(),
         ));
     }
-    let mut total = finstack_quant_core::math::NeumaierAccumulator::new();
+    let mut total = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut count = 0;
     let mut prior_boundary = None;
     for window in obs_dates.windows(2).filter(|window| window[1] > as_of) {

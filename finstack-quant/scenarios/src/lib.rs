@@ -125,7 +125,7 @@ pub use envelope::ScenarioEnvelope;
 pub use error::{Error, Result};
 pub use horizon::{HorizonAnalysis, HorizonReport, HorizonResult, HorizonSummary};
 pub use spec::{
-    Compounding, CurveKind, HazardBumpMode, HierarchyTarget, InstrumentType, NodeId, OperationSpec,
+    CurveKind, HazardBumpMode, HierarchyTarget, InstrumentType, NodeId, OperationSpec,
     RateBindingSpec, ScenarioSpec, TenorMatchMode, TimeRollMode,
 };
 pub use templates::{AssetClass, TemplateMetadata, TemplateRegistry, TemplateSeverity};

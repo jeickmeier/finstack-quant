@@ -176,15 +176,27 @@ fn price_digital(
 
     match payout_type {
         DigitalPayoutType::CashOrNothing => match option_type {
-            OptionType::Call => exp_rd_t * finstack_quant_core::math::norm_cdf(d2) * payout_amount,
-            OptionType::Put => exp_rd_t * finstack_quant_core::math::norm_cdf(-d2) * payout_amount,
+            OptionType::Call => {
+                exp_rd_t
+                    * finstack_quant_core::math::special_functions::norm_cdf(d2)
+                    * payout_amount
+            }
+            OptionType::Put => {
+                exp_rd_t
+                    * finstack_quant_core::math::special_functions::norm_cdf(-d2)
+                    * payout_amount
+            }
         },
         DigitalPayoutType::AssetOrNothing => match option_type {
             OptionType::Call => {
-                spot * exp_rf_t * finstack_quant_core::math::norm_cdf(d1) * notional
+                spot * exp_rf_t
+                    * finstack_quant_core::math::special_functions::norm_cdf(d1)
+                    * notional
             }
             OptionType::Put => {
-                spot * exp_rf_t * finstack_quant_core::math::norm_cdf(-d1) * notional
+                spot * exp_rf_t
+                    * finstack_quant_core::math::special_functions::norm_cdf(-d1)
+                    * notional
             }
         },
     }
@@ -250,10 +262,10 @@ fn greeks_digital(
     let exp_rd_t = (-r_d * t).exp();
     let exp_rf_t = (-r_f * t).exp();
     let sqrt_t = t.sqrt();
-    let pdf_d1 = finstack_quant_core::math::norm_pdf(d1);
-    let pdf_d2 = finstack_quant_core::math::norm_pdf(d2);
-    let cdf_d1 = finstack_quant_core::math::norm_cdf(d1);
-    let cdf_d2 = finstack_quant_core::math::norm_cdf(d2);
+    let pdf_d1 = finstack_quant_core::math::special_functions::norm_pdf(d1);
+    let pdf_d2 = finstack_quant_core::math::special_functions::norm_pdf(d2);
+    let cdf_d1 = finstack_quant_core::math::special_functions::norm_cdf(d1);
+    let cdf_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2);
     let sigma_sqrt_t = sigma * sqrt_t;
     // One-day finite difference, including a possible change in exercise state.
     let asset_theta = |base_pv: f64| {
@@ -733,8 +745,8 @@ mod tests {
         let (d1, d2) = d1_d2(spot, strike, r_d, sigma, t, r_f);
         let exp_rd_t = (-r_d * t).exp();
         let sqrt_t = t.sqrt();
-        let pdf_d2 = finstack_quant_core::math::norm_pdf(d2);
-        let cdf_d2 = finstack_quant_core::math::norm_cdf(d2);
+        let pdf_d2 = finstack_quant_core::math::special_functions::norm_pdf(d2);
+        let cdf_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2);
         let base_pv_call = exp_rd_t * cdf_d2 * payout_amount;
 
         let analytic_theta_call = analytic_theta_cash_or_nothing(
@@ -760,7 +772,7 @@ mod tests {
         let t_minus_fine = t - dt_fine;
         let (_, d2_minus) = d1_d2(spot, strike, r_d, sigma, t_minus_fine, r_f);
         let exp_rd_t_minus = (-r_d * t_minus_fine).exp();
-        let cdf_d2_minus = finstack_quant_core::math::norm_cdf(d2_minus);
+        let cdf_d2_minus = finstack_quant_core::math::special_functions::norm_cdf(d2_minus);
         let pv_call_t_minus_fine = exp_rd_t_minus * cdf_d2_minus * payout_amount;
         // (V(τ-ε) - V(τ)) / ε / 365  ≈  -(∂V/∂τ)/365 = analytic_theta
         let fd_theta_fine = (pv_call_t_minus_fine - base_pv_call) / dt_fine / theta_days_per_year;
@@ -798,7 +810,7 @@ mod tests {
         );
 
         // Verify the Put theta is also analytic (d1 is used in the put formula).
-        let cdf_neg_d2 = finstack_quant_core::math::norm_cdf(-d2);
+        let cdf_neg_d2 = finstack_quant_core::math::special_functions::norm_cdf(-d2);
         let base_pv_put = exp_rd_t * cdf_neg_d2 * payout_amount;
         let analytic_theta_put = analytic_theta_cash_or_nothing(
             d2,

@@ -993,7 +993,7 @@ fn single_curve_float_leg_pv(
     periods: &[finstack_quant_cashflows::builder::SchedulePeriod],
     spread: f64,
 ) -> Result<(f64, f64)> {
-    use finstack_quant_core::math::NeumaierAccumulator;
+    use finstack_quant_core::math::summation::NeumaierAccumulator;
 
     let mut float_leg = NeumaierAccumulator::new();
     let mut annuity = NeumaierAccumulator::new();

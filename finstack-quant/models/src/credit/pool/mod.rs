@@ -28,7 +28,9 @@ use finstack_quant_cashflows::builder::{clamped_cdr_to_mdr, clamped_cpr_to_smm};
 /// * `shock_volatility` - Standard deviation of the log-CPR shock (`|loading * vol|`),
 ///   in `[0, 1]` under the pool models' parameter bounds; the sign is immaterial.
 fn expected_shocked_smm(base_cpr: f64, shock_volatility: f64) -> f64 {
-    use finstack_quant_core::math::{gauss_legendre_integrate_composite, norm_cdf};
+    use finstack_quant_core::math::{
+        integration::gauss_legendre_integrate_composite, special_functions::norm_cdf,
+    };
 
     if base_cpr <= 0.0 {
         return 0.0;

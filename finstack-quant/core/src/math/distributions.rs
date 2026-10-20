@@ -45,7 +45,7 @@
 //! ```
 //! use finstack_quant_core::math::distributions::sample_beta;
 //! use finstack_quant_core::math::random::Pcg64Rng;
-//! use finstack_quant_core::math::RandomNumberGenerator;
+//! use finstack_quant_core::math::random::RandomNumberGenerator;
 //!
 //! let mut rng = Pcg64Rng::new(42);
 //!
@@ -108,7 +108,7 @@ use super::random::RandomNumberGenerator;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::math::binomial_pmf_all;
+/// use finstack_quant_core::math::distributions::binomial_pmf_all;
 ///
 /// let pmf = binomial_pmf_all(10, 0.5)?;
 /// assert_eq!(pmf.len(), 11);
@@ -241,7 +241,7 @@ pub fn binomial_pmf_all_into(out: &mut Vec<f64>, n: usize, p: f64) -> crate::Res
 /// ```rust
 /// use finstack_quant_core::math::distributions::sample_beta;
 /// use finstack_quant_core::math::random::Pcg64Rng;
-/// use finstack_quant_core::math::RandomNumberGenerator;
+/// use finstack_quant_core::math::random::RandomNumberGenerator;
 ///
 /// let mut rng = Pcg64Rng::new(42);
 ///

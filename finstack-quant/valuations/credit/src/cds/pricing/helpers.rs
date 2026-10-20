@@ -2,8 +2,9 @@
 //!
 use finstack_quant_core::dates::{Date, DateExt, DayCount, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::constants::{credit, numerical};
+use finstack_quant_valuations_core::constants::credit;
 use time::Duration;
 
 /// Tolerance for recovery-rate consistency between the CDS instrument and the
@@ -229,7 +230,7 @@ pub(super) fn isda_standard_model_boundaries(
         ));
     }
     boundaries.sort_by(f64::total_cmp);
-    boundaries.dedup_by(|a, b| (*a - *b).abs() <= numerical::ZERO_TOLERANCE);
+    boundaries.dedup_by(|a, b| (*a - *b).abs() <= ZERO_TOLERANCE);
     Ok(boundaries)
 }
 

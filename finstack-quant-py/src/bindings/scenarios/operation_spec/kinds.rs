@@ -4,7 +4,8 @@
 //! the canonical snake-case wire label, ``name`` / ``value`` accessors, and
 //! value semantics (``==`` / ``hash``).
 
-use finstack_quant_scenarios::spec::{Compounding, CurveKind, TenorMatchMode, TimeRollMode};
+use finstack_quant_core::math::Compounding;
+use finstack_quant_scenarios::spec::{CurveKind, TenorMatchMode, TimeRollMode};
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 

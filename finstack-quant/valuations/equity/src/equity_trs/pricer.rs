@@ -7,7 +7,7 @@ use super::types::{EquityTotalReturnSwap, TrsDividendSettlement};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::math::neumaier_sum;
+use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;

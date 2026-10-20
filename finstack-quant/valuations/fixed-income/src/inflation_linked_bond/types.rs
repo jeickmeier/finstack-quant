@@ -1004,7 +1004,8 @@ mod tests {
                 .payment_index_ratio(payment, &market, as_of, true)
                 .expect("floor");
             // ATM lognormal ratio: E[max(X,1)] = 2 Phi(sigma/2).
-            let expected = 2.0 * finstack_quant_core::math::norm_cdf(sigma / 2.0);
+            let expected =
+                2.0 * finstack_quant_core::math::special_functions::norm_cdf(sigma / 2.0);
             assert!((ratio - expected).abs() < 1e-12, "{ratio} vs {expected}");
         }
     }

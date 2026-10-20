@@ -201,7 +201,7 @@ impl BetaRecovery {
     /// * `rng` - Random-number generator supplying uniform or Gaussian draws for simulation
     pub fn sample(
         &self,
-        rng: &mut dyn finstack_quant_core::math::RandomNumberGenerator,
+        rng: &mut dyn finstack_quant_core::math::random::RandomNumberGenerator,
     ) -> Result<f64> {
         finstack_quant_core::math::distributions::sample_beta(rng, self.alpha, self.beta_param)
     }
@@ -338,7 +338,7 @@ impl SeniorityCalibration {
 mod tests {
     use super::*;
     use finstack_quant_core::math::random::Pcg64Rng;
-    use finstack_quant_core::math::RandomNumberGenerator;
+    use finstack_quant_core::math::random::RandomNumberGenerator;
     use std::str::FromStr;
 
     #[test]

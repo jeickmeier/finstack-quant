@@ -174,7 +174,7 @@ pub(super) fn black_delta_ratio(
     let d1 = ((forward / strike).ln() + 0.5 * sigma_sqrt_t * sigma_sqrt_t) / sigma_sqrt_t;
 
     match option_type {
-        OptionType::Call => finstack_quant_core::math::norm_cdf(d1),
-        OptionType::Put => -finstack_quant_core::math::norm_cdf(-d1),
+        OptionType::Call => finstack_quant_core::math::special_functions::norm_cdf(d1),
+        OptionType::Put => -finstack_quant_core::math::special_functions::norm_cdf(-d1),
     }
 }

@@ -174,8 +174,8 @@ impl ForwardCurveBuilder {
             return Err(InputError::TooFewPoints.into());
         }
         let (kvec, fvec): (Vec<f64>, Vec<f64>) = self.points.into_iter().unzip();
-        crate::math::interp::utils::validate_knots(&kvec)?;
-        crate::math::interp::utils::validate_finite_series(&fvec)?;
+        crate::math::interp::validate_knots(&kvec)?;
+        crate::math::interp::validate_finite_series(&fvec)?;
         if let Some(min_fwd) = self.min_forward_rate {
             for (i, &f) in fvec.iter().enumerate() {
                 if f < min_fwd {

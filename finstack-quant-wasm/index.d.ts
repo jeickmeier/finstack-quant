@@ -11282,7 +11282,7 @@ export interface CorrelationNamespace {
    * @returns The lower-triangular factor `L` with `L * L^T = matrix`, flat row-major.
    * @throws Error - Throws a `validation` error if the length is not `n * n` or the matrix is not a valid positive-semidefinite correlation matrix.
    */
-  choleskyDecompose(matrix: NumericArray, n: number): Float64Array;
+  choleskyCorrelation(matrix: NumericArray, n: number): Float64Array;
   /**
    * Largest path count accepted by `simulatePortfolioLoss`. Twin of the Rust
    * and Python constant `MAX_PORTFOLIO_LOSS_PATHS`.

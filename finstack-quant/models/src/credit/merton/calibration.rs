@@ -1,5 +1,5 @@
 use finstack_quant_core::math::solver::BrentSolver;
-use finstack_quant_core::math::{norm_cdf, standard_normal_inv_cdf};
+use finstack_quant_core::math::special_functions::{norm_cdf, standard_normal_inv_cdf};
 use finstack_quant_core::{Error, InputError, Result};
 
 use super::{AssetDynamics, MertonBarrierType, MertonModel};

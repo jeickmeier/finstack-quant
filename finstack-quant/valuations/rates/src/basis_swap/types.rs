@@ -419,7 +419,7 @@ impl BasisSwap {
             finstack_quant_cashflows::builder::FloatingLegCompounding::Simple
         ) {
             let schedule = self.floating_leg_schedule(leg, market, as_of)?;
-            let mut acc = finstack_quant_core::math::NeumaierAccumulator::new();
+            let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
             for flow in schedule.get_flows() {
                 if flow.date <= as_of {
                     continue;
@@ -460,7 +460,7 @@ impl BasisSwap {
         )
         .ok();
 
-        let mut acc = finstack_quant_core::math::NeumaierAccumulator::new();
+        let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
         for period in periods {
             if period.payment_date <= as_of {
                 continue;

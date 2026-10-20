@@ -69,7 +69,7 @@
 
 use crate::error::InputError;
 use crate::market_data::bumps::{BumpSpec, Bumpable};
-use crate::math::interp::{types::Interp, ExtrapolationPolicy, InterpStyle, ValidationPolicy};
+use crate::math::interp::{ExtrapolationPolicy, Interp, InterpStyle, ValidationPolicy};
 use crate::types::CurveId;
 use crate::Result;
 

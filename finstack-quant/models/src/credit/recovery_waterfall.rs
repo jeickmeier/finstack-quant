@@ -11,7 +11,7 @@
 
 use std::collections::HashSet;
 
-use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
+use finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator};
 use finstack_quant_core::validation::validate_f64_non_negative;
 use finstack_quant_core::{Error, Result};
 

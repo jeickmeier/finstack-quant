@@ -1080,8 +1080,8 @@ mod tests {
             let std = sigma * t.sqrt();
             let z_lower = ((100.0_f64 / forward).ln() + 0.5 * sigma * sigma * t) / std;
             let z_upper = ((120.0_f64 / forward).ln() + 0.5 * sigma * sigma * t) / std;
-            let probability = finstack_quant_core::math::norm_cdf(z_upper)
-                - finstack_quant_core::math::norm_cdf(z_lower);
+            let probability = finstack_quant_core::math::special_functions::norm_cdf(z_upper)
+                - finstack_quant_core::math::special_functions::norm_cdf(z_lower);
             let expected = full_coupon * probability;
             let analytical = npv_analytic(&inst, &curves, as_of)
                 .expect("quanto analytical")

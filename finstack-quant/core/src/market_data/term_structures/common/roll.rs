@@ -8,7 +8,7 @@
 //! unrolled source interpolation. Discount and forward curves carry richer
 //! transforms (`CurveTransform`) and share only [`validate_pillars`].
 
-use crate::math::interp::types::Interp;
+use crate::math::interp::Interp;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 
 /// Serialized source grid and time origin of a rolled curve.

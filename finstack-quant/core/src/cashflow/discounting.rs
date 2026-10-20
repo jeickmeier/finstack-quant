@@ -72,7 +72,7 @@ use crate::dates::Date;
 #[cfg(test)]
 use crate::dates::DayCount;
 use crate::market_data::traits::Discounting;
-use crate::math::NeumaierAccumulator;
+use crate::math::summation::NeumaierAccumulator;
 use crate::money::Money;
 
 /// Discount factor for a flat, continuously compounded rate over `years`.

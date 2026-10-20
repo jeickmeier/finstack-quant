@@ -40,7 +40,7 @@ use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, DayCount
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use rust_decimal::prelude::ToPrimitive;
 

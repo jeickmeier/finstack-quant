@@ -2,9 +2,10 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::hierarchy::ResolutionMode;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_scenarios::{
-    Compounding, CurveKind, HierarchyTarget, InstrumentType, OperationSpec, RateBindingSpec,
-    ScenarioSpec, TenorMatchMode, TimeRollMode,
+    CurveKind, HierarchyTarget, InstrumentType, OperationSpec, RateBindingSpec, ScenarioSpec,
+    TenorMatchMode, TimeRollMode,
 };
 #[test]
 fn scenario_validate_rejects_empty_id() {

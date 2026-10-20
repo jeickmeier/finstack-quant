@@ -259,7 +259,7 @@ pub fn schedule_trade_pv_raw<S>(
 where
     S: finstack_quant_cashflows::CashflowProvider,
 {
-    use finstack_quant_core::math::NeumaierAccumulator;
+    use finstack_quant_core::math::summation::NeumaierAccumulator;
 
     let flows = S::dated_cashflows(instrument, market, as_of)?;
     let disc = market.get_discount(discount_curve_id.as_str())?;

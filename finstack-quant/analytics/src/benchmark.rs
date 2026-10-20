@@ -12,7 +12,7 @@ use crate::dates::Date;
 use crate::math::stats::{OnlineCovariance, OnlineStats};
 use crate::regression::normalized_svd_least_squares;
 use finstack_quant_core::math::special_functions::student_t_inv_cdf;
-use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
+use finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator};
 use finstack_quant_core::wire::NonFiniteFields;
 use nalgebra::DMatrix;
 

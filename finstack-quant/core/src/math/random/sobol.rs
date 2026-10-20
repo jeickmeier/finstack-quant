@@ -40,7 +40,7 @@
 //! - Owen, A. B. (1997). "Scrambled Net Variance for Integrals of Smooth Functions."
 //!   Annals of Statistics, 25(4), 1541-1562. `docs/REFERENCES.md#owen-1995-scrambling`
 
-use crate::math::special_functions::standard_normal_inv_cdf as inverse_normal_cdf;
+use crate::math::special_functions::standard_normal_inv_cdf;
 
 /// Maximum supported dimension for this Sobol implementation.
 ///
@@ -408,7 +408,7 @@ impl SobolRng {
         );
         for chunk in out.chunks_mut(self.dimension) {
             for (d, slot) in chunk.iter_mut().enumerate().take(self.dimension) {
-                *slot = inverse_normal_cdf(self.owen_scramble(self.state[d], d));
+                *slot = standard_normal_inv_cdf(self.owen_scramble(self.state[d], d));
             }
             self.advance();
         }

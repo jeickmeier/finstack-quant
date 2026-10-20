@@ -1,6 +1,6 @@
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
-use finstack_quant_core::math::norm_cdf;
+use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::{Error, Result};
 
 use super::{MertonBarrierType, MertonModel};
@@ -288,7 +288,7 @@ impl MertonModel {
 
 #[cfg(test)]
 mod tests {
-    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_core::math::special_functions::norm_cdf;
 
     use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 

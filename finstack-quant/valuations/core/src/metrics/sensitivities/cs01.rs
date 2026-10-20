@@ -64,7 +64,7 @@ use crate::metrics::{MetricContext, MetricId};
 use crate::recalibration::{DealCdsQuoteOverride, QuoteBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::types::CurveId;
 use std::sync::Arc;
 
@@ -541,7 +541,7 @@ pub fn cs01_reval(
 #[cfg(test)]
 mod tests {
     use super::validate_buckets_strictly_increasing;
-    use finstack_quant_core::math::NeumaierAccumulator;
+    use finstack_quant_core::math::summation::NeumaierAccumulator;
 
     #[test]
     fn test_central_vs_forward_difference() {

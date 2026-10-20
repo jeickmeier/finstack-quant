@@ -601,7 +601,7 @@ fn b2_cap_auto_uses_normal_quote_metadata_and_rejects_black_mismatch() {
     let std_dev = 0.008 * t.sqrt();
     let d = (forward - 0.02) / std_dev;
     let phi = (-0.5 * d * d).exp() / std::f64::consts::TAU.sqrt();
-    let cdf = finstack_quant_core::math::norm_cdf(d);
+    let cdf = finstack_quant_core::math::special_functions::norm_cdf(d);
     let scale = 1_000_000.0 * 0.25;
     let expected = scale * ((forward - 0.02) * cdf + std_dev * phi);
     assert!((normal.value.amount() - expected).abs() < 1e-7);
@@ -727,7 +727,7 @@ fn b3_shifted_swaption_prices_shifted_positive_rates() {
     let d1 = (forward / strike).ln() / std_dev + 0.5 * std_dev;
     let d2 = d1 - std_dev;
     let phi = (-0.5 * d1 * d1).exp() / std::f64::consts::TAU.sqrt();
-    let cdf = finstack_quant_core::math::norm_cdf;
+    let cdf = finstack_quant_core::math::special_functions::norm_cdf;
     let scale = 1_000_000.0 * inputs.annuity;
     let expected = scale * (forward * cdf(d1) - strike * cdf(d2));
     assert!((shifted - expected).abs() < 1e-7);

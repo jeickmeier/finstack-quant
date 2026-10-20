@@ -20,7 +20,7 @@
 //! # Examples
 //!
 //! ```
-//! use finstack_quant_core::math::{mean, variance, covariance, correlation};
+//! use finstack_quant_core::math::stats::{mean, variance, covariance, correlation};
 //! let xs = [1.0, 2.0, 3.0, 4.0];
 //! let ys = [2.0, 4.0, 6.0, 8.0];
 //! assert!((mean(&xs) - 2.5).abs() < 1e-12);
@@ -237,7 +237,7 @@ pub fn finite_count(xs: &[f64]) -> usize {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::math::longest_positive_run;
+/// use finstack_quant_core::math::stats::longest_positive_run;
 ///
 /// // One losing period followed by three wins → longest streak is 3.
 /// let returns = [-0.01, 0.02, 0.03, 0.04];
@@ -1087,7 +1087,7 @@ pub fn compensated_covariance(xs: &[f64], ys: &[f64], mean_x: f64, mean_y: f64) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::standard_normal_inv_cdf;
+    use crate::math::special_functions::standard_normal_inv_cdf;
 
     #[test]
     fn range_estimators_use_each_observed_bar_from_the_first() {

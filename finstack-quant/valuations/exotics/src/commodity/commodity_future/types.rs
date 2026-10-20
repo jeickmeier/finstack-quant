@@ -245,7 +245,7 @@ impl CommodityFuture {
                 } else {
                     None
                 };
-                let mut sum = finstack_quant_core::math::NeumaierAccumulator::new();
+                let mut sum = finstack_quant_core::math::summation::NeumaierAccumulator::new();
                 for fixing_date in fixing_dates {
                     let price = if *fixing_date < as_of {
                         past_fixings

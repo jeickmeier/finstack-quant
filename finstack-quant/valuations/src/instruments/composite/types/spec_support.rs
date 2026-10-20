@@ -12,8 +12,8 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::expr::Expr;
 use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
+use finstack_quant_core::math::stats::variance;
 use finstack_quant_core::math::summation::neumaier_sum;
-use finstack_quant_core::math::variance;
 use finstack_quant_core::money::{fx::FxQuery, Money};
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::{Error, Result};

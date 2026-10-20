@@ -27,7 +27,7 @@ use finstack_quant_models::monte_carlo::variance_reduction::control_variate::app
 /// Exact simulation grid and one event index for every future fixing.
 /// Repeated indices retain contractual observations sharing a model time.
 pub(super) struct FixingGrid {
-    pub(super) time_grid: finstack_quant_models::monte_carlo::TimeGrid,
+    pub(super) time_grid: finstack_quant_core::math::time_grid::TimeGrid,
     pub(super) fixing_steps: Vec<usize>,
 }
 
@@ -54,7 +54,7 @@ pub(super) fn map_fixings_to_steps(
         .filter(|&&date| date > as_of)
         .map(|&date| day_count.year_fraction(as_of, date, DayCountContext::default()))
         .collect::<finstack_quant_core::Result<Vec<_>>>()?;
-    let time_grid = finstack_quant_models::monte_carlo::TimeGrid::uniform_with_required_times(
+    let time_grid = finstack_quant_core::math::time_grid::TimeGrid::uniform_with_required_times(
         t,
         base_num_steps.max(1) as f64 / t,
         base_num_steps.max(1),
@@ -182,7 +182,7 @@ fn seasoned_geometric_asian_control(
     // With a drift schedule, E[ln S_{tᵢ}] = ln S + M(tᵢ) − σ²tᵢ/2 where
     // M(t) is the schedule's cumulative log-drift — identical to what the MC
     // engine applies step by step.
-    let mut mean_acc = finstack_quant_core::math::NeumaierAccumulator::new();
+    let mut mean_acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     mean_acc.add(hist_prod_log);
     for (index, &t_i) in future_times.iter().enumerate() {
         let drift_to_t = match drift_schedule {
@@ -195,7 +195,7 @@ fn seasoned_geometric_asian_control(
     let mu = mean_acc.total() / n;
 
     // Variance of ln(G): σ² ΣᵢΣⱼ min(t_i,t_j) / N².
-    let mut cov_acc = finstack_quant_core::math::NeumaierAccumulator::new();
+    let mut cov_acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     for &t_i in future_times {
         for &t_j in future_times {
             cov_acc.add(t_i.min(t_j));
@@ -218,7 +218,7 @@ fn seasoned_geometric_asian_control(
     let expected_g = (mu + 0.5 * var_ln_g).exp();
     let d1 = (mu + var_ln_g - strike.ln()) / std;
     let d2 = d1 - std;
-    let norm_cdf = finstack_quant_core::math::norm_cdf;
+    let norm_cdf = finstack_quant_core::math::special_functions::norm_cdf;
     let price = if is_call {
         expected_g * norm_cdf(d1) - strike * norm_cdf(d2)
     } else {
@@ -2044,8 +2044,9 @@ mod tests {
         let expected_g = (mean_log + 0.5 * variance).exp();
         let d2 = (mean_log - option.strike.ln()) / variance.sqrt();
         let expected = df
-            * (expected_g * finstack_quant_core::math::norm_cdf(d2 + variance.sqrt())
-                - option.strike * finstack_quant_core::math::norm_cdf(d2));
+            * (expected_g
+                * finstack_quant_core::math::special_functions::norm_cdf(d2 + variance.sqrt())
+                - option.strike * finstack_quant_core::math::special_functions::norm_cdf(d2));
         let grid = map_fixings_to_steps(&option.fixing_dates, option.day_count, as_of, t, 2)
             .expect("grid");
         let times = grid.future_times();
@@ -2137,12 +2138,13 @@ mod tests {
             let expected = 0.85
                 * match option_type {
                     OptionType::Call => {
-                        expected_g * finstack_quant_core::math::norm_cdf(d1)
-                            - 100.0 * finstack_quant_core::math::norm_cdf(d2)
+                        expected_g * finstack_quant_core::math::special_functions::norm_cdf(d1)
+                            - 100.0 * finstack_quant_core::math::special_functions::norm_cdf(d2)
                     }
                     OptionType::Put => {
-                        100.0 * finstack_quant_core::math::norm_cdf(-d2)
-                            - expected_g * finstack_quant_core::math::norm_cdf(-d1)
+                        100.0 * finstack_quant_core::math::special_functions::norm_cdf(-d2)
+                            - expected_g
+                                * finstack_quant_core::math::special_functions::norm_cdf(-d1)
                     }
                 };
             let actual = AsianOptionAnalyticalGeometricPricer::new()

@@ -51,7 +51,9 @@
 
 use super::{select_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
 use finstack_quant_core::math::{
-    norm_cdf, norm_pdf, standard_normal_inv_cdf, BrentSolver, GaussHermiteQuadrature,
+    integration::GaussHermiteQuadrature,
+    solver::BrentSolver,
+    special_functions::{norm_cdf, norm_pdf, standard_normal_inv_cdf},
 };
 use std::sync::Mutex;
 
@@ -133,7 +135,7 @@ impl RandomFactorLoadingCopula {
     ///
     /// ```rust
     /// use finstack_quant_models::correlation::{Copula, RandomFactorLoadingCopula};
-    /// use finstack_quant_core::math::standard_normal_inv_cdf;
+    /// use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
     ///
     /// let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
     /// let threshold = standard_normal_inv_cdf(0.05);
@@ -423,7 +425,7 @@ impl Copula for RandomFactorLoadingCopula {
 mod tests {
     use super::super::GaussianCopula;
     use super::*;
-    use finstack_quant_core::math::standard_normal_inv_cdf;
+    use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 
     #[test]
     fn test_rfl_creation() {

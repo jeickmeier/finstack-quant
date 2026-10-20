@@ -277,12 +277,12 @@ fn price_geometric_commodity(
     let d2 = d1 - total_vol;
     let price = match option_type {
         OptionType::Call => {
-            fwd_x * finstack_quant_core::math::norm_cdf(d1)
-                - strike * finstack_quant_core::math::norm_cdf(d2)
+            fwd_x * finstack_quant_core::math::special_functions::norm_cdf(d1)
+                - strike * finstack_quant_core::math::special_functions::norm_cdf(d2)
         }
         OptionType::Put => {
-            strike * finstack_quant_core::math::norm_cdf(-d2)
-                - fwd_x * finstack_quant_core::math::norm_cdf(-d1)
+            strike * finstack_quant_core::math::special_functions::norm_cdf(-d2)
+                - fwd_x * finstack_quant_core::math::special_functions::norm_cdf(-d1)
         }
     };
 
@@ -374,12 +374,12 @@ fn price_arithmetic_tw_commodity(
 
     let price = match option_type {
         OptionType::Call => {
-            m1 * finstack_quant_core::math::norm_cdf(d1)
-                - k_eff * finstack_quant_core::math::norm_cdf(d2)
+            m1 * finstack_quant_core::math::special_functions::norm_cdf(d1)
+                - k_eff * finstack_quant_core::math::special_functions::norm_cdf(d2)
         }
         OptionType::Put => {
-            k_eff * finstack_quant_core::math::norm_cdf(-d2)
-                - m1 * finstack_quant_core::math::norm_cdf(-d1)
+            k_eff * finstack_quant_core::math::special_functions::norm_cdf(-d2)
+                - m1 * finstack_quant_core::math::special_functions::norm_cdf(-d1)
         }
     };
 

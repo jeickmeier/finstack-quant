@@ -202,7 +202,7 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonM
             );
 
         // Build time grid and discretization
-        let time_grid = finstack_quant_models::monte_carlo::TimeGrid::uniform(t, self.num_steps)
+        let time_grid = finstack_quant_core::math::time_grid::TimeGrid::uniform(t, self.num_steps)
             .map_err(|e| {
                 finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
             })?;

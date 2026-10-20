@@ -91,7 +91,7 @@ use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::{
     dates::{Date, DayCount},
     error::InputError,
-    math::interp::types::Interp,
+    math::interp::Interp,
     types::CurveId,
 };
 
@@ -695,7 +695,7 @@ impl PriceCurveBuilder {
         }
 
         let (mut kvec, mut pvec): (Vec<f64>, Vec<f64>) = self.points.into_iter().unzip();
-        crate::math::interp::utils::validate_knots(&kvec)?;
+        crate::math::interp::validate_knots(&kvec)?;
 
         if pvec.iter().any(|price| !price.is_finite()) {
             return Err(crate::Error::Validation(

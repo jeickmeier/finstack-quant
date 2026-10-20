@@ -41,7 +41,7 @@ use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::{
     dates::{Date, DayCount},
     error::InputError,
-    math::interp::types::Interp,
+    math::interp::Interp,
     types::CurveId,
 };
 

@@ -9,9 +9,10 @@ use crate::cds::CreditDefaultSwap;
 use finstack_quant_core::dates::{Date, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
+use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::constants::{credit, numerical};
+use finstack_quant_valuations_core::constants::credit;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
 use rust_decimal::prelude::ToPrimitive;
 
@@ -370,7 +371,7 @@ impl CdsPricer {
             let t1 = window[0];
             let t2 = window[1];
             let dt = t2 - t1;
-            if dt <= numerical::ZERO_TOLERANCE {
+            if dt <= ZERO_TOLERANCE {
                 continue;
             }
 
@@ -433,7 +434,7 @@ impl CdsPricer {
             //   I0 = (1 - e^{-kΔ})/k
             //   I1 = (1 - e^{-kΔ}(1 + kΔ))/k²
             let k = hazard_rate + interest_rate;
-            let contribution = if k.abs() > numerical::ZERO_TOLERANCE {
+            let contribution = if k.abs() > ZERO_TOLERANCE {
                 let exp_term = (-k * dt).exp();
                 let i0 = (1.0 - exp_term) / k;
                 let i1 = (1.0 - exp_term * (1.0 + k * dt)) / (k * k);

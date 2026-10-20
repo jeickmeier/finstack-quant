@@ -24,11 +24,6 @@
 /// These constants replace magic numbers scattered throughout the codebase,
 /// providing consistent tolerances and step sizes with documented rationale.
 pub mod numerical {
-    /// Tolerance for checking if a value is effectively zero (1e-10).
-    ///
-    /// Re-exported from [`finstack_quant_core::math::ZERO_TOLERANCE`].
-    pub use finstack_quant_core::math::ZERO_TOLERANCE;
-
     /// Tolerance for comparing floating-point rates and spreads.
     ///
     /// Used when checking if two rates are "equal" for purposes like

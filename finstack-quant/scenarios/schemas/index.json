@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json",
-      "bytes": 103053,
+      "bytes": 103043,
       "kind": "input",
       "path": "schemas/scenarios/1/scenario.schema.json",
       "summary": "Ordered shock and roll operations over market, statement and valuation targets.",

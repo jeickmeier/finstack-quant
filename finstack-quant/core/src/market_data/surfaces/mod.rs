@@ -72,7 +72,7 @@ pub(super) fn validate_axis(axis: &[f64]) -> crate::Result<()> {
         ));
     }
     if axis.len() > 1 {
-        crate::math::interp::utils::validate_knots(axis)?;
+        crate::math::interp::validate_knots(axis)?;
     }
     Ok(())
 }

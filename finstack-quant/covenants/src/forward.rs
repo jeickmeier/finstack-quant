@@ -9,8 +9,8 @@ use crate::engine::{
     SpringingCondition,
 };
 use finstack_quant_core::dates::{Date, PeriodId};
-use finstack_quant_core::math::norm_cdf;
 use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
+use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::Error;
 use finstack_quant_core::InputError;
 use finstack_quant_core::Result;

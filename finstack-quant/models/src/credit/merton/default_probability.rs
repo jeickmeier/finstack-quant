@@ -1,4 +1,4 @@
-use finstack_quant_core::math::{log_norm_cdf, norm_cdf};
+use finstack_quant_core::math::special_functions::{log_norm_cdf, norm_cdf};
 use finstack_quant_core::{Error, Result};
 
 use super::{AssetDynamics, MertonBarrierType, MertonModel};
@@ -444,7 +444,7 @@ impl MertonModel {
 
 #[cfg(test)]
 mod tests {
-    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_core::math::special_functions::norm_cdf;
 
     use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 

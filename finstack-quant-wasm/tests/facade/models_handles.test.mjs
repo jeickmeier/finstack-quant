@@ -280,7 +280,7 @@ test('correlation handles expose their accessors and reject bad input', () => {
     () => new correlation.LatentMultiFactor(2, [0.2], [1, 0.5, 0.5, 1]),
     kind('validation')
   );
-  assert.throws(() => correlation.choleskyDecompose([1, 2, 2, 1], 2), kind('validation'));
+  assert.throws(() => correlation.choleskyCorrelation([1, 2, 2, 1], 2), kind('validation'));
 
   const exposures = [
     { id: 'A', notional: 100, default_probability: 0.02, lgd: 0.6, factor_loadings: [0.4] },

@@ -157,7 +157,7 @@ const SCREEN: [(&str, f64, f64); 6] = [
 fn cdx_ig_46_convention_matrix() {
     use finstack_quant_valuations::instruments::credit_derivatives::cds_option::bloomberg_quadrature::quadrature_payoff;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_core::math::special_functions::norm_cdf;
 
     let fixture = load_fixture_json();
     let as_of = date!(2026 - 05 - 07);

@@ -8,7 +8,7 @@ use crate::cds_tranche::CdsTranche;
 use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
-use finstack_quant_core::math::binomial_pmf_all_into;
+use finstack_quant_core::math::distributions::binomial_pmf_all_into;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::{Error, Result};
 
@@ -646,7 +646,7 @@ impl CdsTranchePricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::math::binomial_pmf_all;
+    use finstack_quant_core::math::distributions::binomial_pmf_all;
 
     /// W-20: `conditional_equity_tranche_loss` evaluates the conditional binomial
     /// PMF for every `k` in `0..=N` via [`binomial_pmf_all`]. With `N = 125` a

@@ -7,7 +7,7 @@ use finstack_quant_core::{Error, Result};
 
 use crate::convertible::{ConversionEvent, ConversionPolicy, ConvertibleBond, PriceTrigger};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_core::math::map_date_to_step;
+use finstack_quant_core::math::time_grid::map_date_to_step;
 
 /// Contractual debt events and exercise decisions for the defaultable-equity tree.
 pub(super) struct ConvertibleBondValuator {

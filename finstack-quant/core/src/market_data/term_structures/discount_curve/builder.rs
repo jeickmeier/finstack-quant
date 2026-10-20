@@ -251,7 +251,7 @@ impl DiscountCurveBuilder {
 
         let (knots_vec, dfs_vec): (Vec<f64>, Vec<f64>) =
             std::mem::take(&mut self.points).into_iter().unzip();
-        crate::math::interp::utils::validate_knots(&knots_vec)?;
+        crate::math::interp::validate_knots(&knots_vec)?;
 
         if !self.allow_non_monotonic {
             validate_monotonic_df(&knots_vec, &dfs_vec)?;

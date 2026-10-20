@@ -200,8 +200,8 @@ fn price_touch(
     let s_over_h = spot / barrier;
     let power1 = s_over_h.powf(-(mu + lambda));
     let power2 = s_over_h.powf(-(mu - lambda));
-    let n_eta_z = finstack_quant_core::math::norm_cdf(eta * z);
-    let n_eta_z_prime = finstack_quant_core::math::norm_cdf(eta * z_prime);
+    let n_eta_z = finstack_quant_core::math::special_functions::norm_cdf(eta * z);
+    let n_eta_z_prime = finstack_quant_core::math::special_functions::norm_cdf(eta * z_prime);
     let one_touch_prob = power1 * n_eta_z + power2 * n_eta_z_prime;
 
     let df = (-r_d * t).exp();

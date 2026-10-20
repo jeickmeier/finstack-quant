@@ -3,7 +3,7 @@ use super::super::types::*;
 use super::context::MetricsContext;
 use super::shifts::{note_twist, rate_curve_abs_shift_bp};
 use finstack_quant_core::config::{RoundingContext, ZeroKind};
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_valuations::metrics::MetricId;
 
 // Large Move Warning Thresholds

@@ -4,8 +4,9 @@ use super::engine::CdsPricer;
 use super::helpers::{date_from_hazard_time, isda_standard_model_boundaries, settlement_date};
 use finstack_quant_core::dates::{Date, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::constants::{credit, numerical};
+use finstack_quant_valuations_core::constants::credit;
 
 /// Shared inputs for the conditional protection-leg integrators.
 ///
@@ -75,7 +76,7 @@ impl CdsPricer {
             let t1 = window[0];
             let t2 = window[1];
             let dt = t2 - t1;
-            if dt <= numerical::ZERO_TOLERANCE {
+            if dt <= ZERO_TOLERANCE {
                 continue;
             }
 
@@ -113,7 +114,7 @@ impl CdsPricer {
                 // ISDA Standard Model analytical integration
                 let lambda_plus_r = hazard_rate + interest_rate;
 
-                if lambda_plus_r.abs() > numerical::ZERO_TOLERANCE {
+                if lambda_plus_r.abs() > ZERO_TOLERANCE {
                     let exp_term = (-lambda_plus_r * dt).exp();
                     integral += df1 * sp1 * (hazard_rate / lambda_plus_r) * (1.0 - exp_term);
                 } else {

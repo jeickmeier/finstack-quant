@@ -17,7 +17,7 @@ use crate::traits::Marginable;
 use crate::types::ImMethodology;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::neumaier_sum;
+use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;

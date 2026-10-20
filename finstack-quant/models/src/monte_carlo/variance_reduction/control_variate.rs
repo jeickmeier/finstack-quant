@@ -13,11 +13,11 @@
 //! # Online Covariance
 //!
 //! For large-scale simulations where storing all samples is impractical,
-//! use [`OnlineCovariance`](crate::monte_carlo::OnlineCovariance)
+//! use [`OnlineCovariance`](finstack_quant_core::math::stats::OnlineCovariance)
 //! to compute covariance incrementally:
 //!
 //! ```
-//! use finstack_quant_models::monte_carlo::OnlineCovariance;
+//! use finstack_quant_core::math::stats::OnlineCovariance;
 //!
 //! let mut cov = OnlineCovariance::new();
 //! // Update incrementally during simulation

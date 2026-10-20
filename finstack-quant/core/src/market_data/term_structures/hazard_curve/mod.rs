@@ -72,9 +72,8 @@ use crate::{
     dates::{Date, DayCount},
     error::InputError,
     math::interp::{
-        strategies::{LinearStrategy, LogLinearStrategy},
-        types::Interp,
-        ExtrapolationPolicy, InterpStyle, InterpolationStrategy, ValidationPolicy,
+        ExtrapolationPolicy, Interp, InterpStyle, InterpolationStrategy, LinearStrategy,
+        LogLinearStrategy, ValidationPolicy,
     },
     types::CurveId,
 };

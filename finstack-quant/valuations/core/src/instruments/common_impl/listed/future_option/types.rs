@@ -13,7 +13,7 @@ use crate::instruments::Position;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::norm_cdf;
+use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_models::volatility::bachelier_price_with_annuity;
