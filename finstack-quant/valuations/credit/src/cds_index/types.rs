@@ -24,7 +24,6 @@ use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, Pr
 use finstack_quant_valuations_core::market::conventions::CdsConvention;
 
 use super::parameters::CdsIndexParams;
-use super::pricer::CdsIndexPricer;
 use finstack_quant_valuations_core::impl_instrument_base;
 
 /// Pricing mode for CDS indices.
@@ -420,60 +419,6 @@ impl CdsIndex {
         }
         self
     }
-
-    /// Calculate protection leg PV
-    pub fn pv_protection_leg(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let pricer = CdsIndexPricer::new();
-        pricer.pv_protection_leg(self, market, as_of)
-    }
-
-    /// Calculate premium leg PV
-    pub fn pv_premium_leg(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let pricer = CdsIndexPricer::new();
-        pricer.pv_premium_leg(self, market, as_of)
-    }
-
-    /// Calculate par spread
-    pub fn par_spread(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let pricer = CdsIndexPricer::new();
-        pricer.par_spread(self, market, as_of)
-    }
-
-    /// Calculate risky PV01
-    pub fn risky_pv01(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let pricer = CdsIndexPricer::new();
-        pricer.risky_pv01(self, market, as_of)
-    }
-
-    /// Calculate CS01 under the default parallel credit-spread bump; the
-    /// `Cs01` metric uses the configured `credit_spread_bump_bp` instead.
-    pub fn cs01(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        provider: &dyn finstack_quant_valuations_core::recalibration::RecalibrationProvider,
-    ) -> finstack_quant_core::Result<f64> {
-        let pricer = CdsIndexPricer::new();
-        let bump_bp = finstack_quant_valuations_core::metrics::sensitivities::config::SensitivitiesConfig::default()
-            .credit_spread_bump_bp;
-        pricer.cs01(self, market, as_of, provider, bump_bp)
-    }
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for CdsIndex {
@@ -512,8 +457,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CdsIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let pricer = CdsIndexPricer::new();
-        pricer.npv(self, curves, as_of)
+        self.npv(curves, as_of)
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
@@ -533,8 +477,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CdsIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        let pricer = CdsIndexPricer::new();
-        let schedule = pricer.build_projected_schedule(self, curves, as_of)?;
+        let schedule = self.build_projected_schedule(curves, as_of)?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))

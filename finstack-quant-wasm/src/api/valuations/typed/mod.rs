@@ -232,13 +232,15 @@ pub(super) fn metric_value(
     let market = market(market_json)?;
     let as_of = js_string(as_of, "asOf")?;
     let model = crate::utils::input::js_opt_string(model, "model")?;
-    super::pricing::metric_value_with_context(
+    finstack_quant_valuations::pricer::metric_value(
         &instrument,
         &market,
         &as_of,
         model.as_deref().unwrap_or("default"),
         metric_id,
+        finstack_quant_calibration::recalibration::pricing_options(),
     )
+    .map_err(to_js_err)
 }
 
 /// Shared, consumable state of a fluent builder.

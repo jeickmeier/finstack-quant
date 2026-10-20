@@ -382,11 +382,11 @@ impl Instrument for ScenarioFailureInstrument {
                 "scenario test expected the executor request config".to_string(),
             )
         })?;
-        Ok(ValuationResult::stamped_with_config(
+        Ok(ValuationResult::stamped_with_meta(
             self.id(),
             as_of,
             self.checked_value(market)?,
-            config,
+            finstack_quant_core::config::results_meta(config),
         ))
     }
 

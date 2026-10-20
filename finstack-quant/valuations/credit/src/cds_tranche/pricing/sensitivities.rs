@@ -58,7 +58,7 @@ impl CdsTranchePricer {
     /// equity-tranche LOSS `E[min(L, K) | Z]`; with `exposure = R` it is the
     /// conditional capped RECOVERED notional `E[min(G, cap) | Z]` used for
     /// senior-side recovery amortization (see
-    /// `calculate_equity_tranche_recovery`).
+    /// `calculate_equity_tranche_capped` with `PoolExposure::Recovery`).
     ///
     /// Uses the binomial distribution to sum over all possible numbers of defaults.
     pub(super) fn conditional_equity_tranche_capped(
@@ -230,28 +230,6 @@ impl CdsTranchePricer {
             .build()
     }
 
-    /// Create a bumped credit index with shifted hazard rates for CS01 calculation.
-    ///
-    /// Creates a new CreditIndexData with the index hazard curve shifted by delta_lambda.
-    pub(super) fn rebuild_credit_index(
-        &self,
-        original_index: &CreditIndexData,
-        recovery_rate: f64,
-        index_credit_curve: std::sync::Arc<
-            finstack_quant_core::market_data::term_structures::HazardCurve,
-        >,
-        base_correlation_curve: std::sync::Arc<
-            finstack_quant_core::market_data::term_structures::BaseCorrelationCurve,
-        >,
-    ) -> Result<CreditIndexData> {
-        original_index
-            .to_builder()
-            .recovery_rate(recovery_rate)
-            .index_credit_curve(index_credit_curve)
-            .base_correlation_curve(base_correlation_curve)
-            .build()
-    }
-
     /// Calculate prior realized loss on the tranche as a fraction of original tranche notional.
     pub(super) fn calculate_prior_tranche_loss(&self, tranche: &CdsTranche) -> f64 {
         let l = tranche.realized_loss;
@@ -376,21 +354,6 @@ impl CdsTranchePricer {
                 roll_rule: tranche.roll_rule,
             },
         )
-    }
-
-    /// Calculate the model upfront for the tranche.
-    ///
-    /// This is the net present value at the contractual running coupon,
-    /// representing the payment required to enter the position at that
-    /// coupon.
-    pub fn calculate_model_upfront(
-        &self,
-        tranche: &CdsTranche,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<f64> {
-        let pv = self.price_tranche(tranche, market, as_of)?;
-        Ok(pv.amount())
     }
 
     fn coupon_projection(
@@ -539,19 +502,15 @@ impl CdsTranchePricer {
         let bumped_corr_curve_down =
             self.bump_base_correlation(original_index_arc.base_correlation_curve(), -bump_abs)?;
 
-        let bumped_index_up = self.rebuild_credit_index(
-            original_index_arc.as_ref(),
-            original_index_arc.recovery_rate(),
-            std::sync::Arc::clone(original_index_arc.index_credit_curve()),
-            std::sync::Arc::new(bumped_corr_curve_up),
-        )?;
+        let bumped_index_up = original_index_arc
+            .to_builder()
+            .base_correlation_curve(std::sync::Arc::new(bumped_corr_curve_up))
+            .build()?;
 
-        let bumped_index_down = self.rebuild_credit_index(
-            original_index_arc.as_ref(),
-            original_index_arc.recovery_rate(),
-            std::sync::Arc::clone(original_index_arc.index_credit_curve()),
-            std::sync::Arc::new(bumped_corr_curve_down),
-        )?;
+        let bumped_index_down = original_index_arc
+            .to_builder()
+            .base_correlation_curve(std::sync::Arc::new(bumped_corr_curve_down))
+            .build()?;
 
         let ctx_up = market
             .clone()

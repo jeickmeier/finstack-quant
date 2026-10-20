@@ -196,15 +196,6 @@ impl LookbackOption {
             .attributes(Attributes::new())
             .build()
     }
-    /// Calculate the net present value using Monte Carlo.
-    pub fn npv_mc(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        use crate::exotics::lookback_option::pricer;
-        pricer::compute_pv(self, market, as_of)
-    }
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for LookbackOption {
@@ -288,7 +279,8 @@ impl finstack_quant_valuations_core::instruments::Instrument for LookbackOption 
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         if matches!(self.monitoring, Monitoring::Discrete { .. }) {
-            return self.npv_mc(market, as_of);
+            use crate::exotics::lookback_option::pricer::LookbackOptionMcPricer;
+            return LookbackOptionMcPricer::new().price_internal(self, market, as_of);
         }
 
         use crate::exotics::lookback_option::pricer::LookbackOptionAnalyticalPricer;

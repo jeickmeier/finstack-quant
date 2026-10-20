@@ -30,29 +30,12 @@ pub(crate) struct EffectiveDurationResult {
     pub convexity: f64,
 }
 
-/// Calculate effective duration for a bond using parallel curve bumps.
+/// Calculate both effective duration and convexity in one pass (three
+/// pricings) using parallel curve bumps.
 ///
-/// For bonds without embedded options, this produces results very close to
+/// For bonds without embedded options, the duration is very close to
 /// modified duration. For bonds with call, put, or return-floor rights, the
 /// option model captures the change in exercise behavior as rates shift.
-pub(crate) fn effective_duration(
-    bond: &Bond,
-    context: &MetricContext,
-    shock_bp: Option<f64>,
-) -> Result<f64> {
-    Ok(effective_duration_convexity(bond, context, shock_bp)?.duration)
-}
-
-/// Calculate effective convexity for a bond using parallel curve bumps.
-pub(crate) fn effective_convexity(
-    bond: &Bond,
-    context: &MetricContext,
-    shock_bp: Option<f64>,
-) -> Result<f64> {
-    Ok(effective_duration_convexity(bond, context, shock_bp)?.convexity)
-}
-
-/// Calculate both effective duration and convexity in one pass (three pricings).
 pub(crate) fn effective_duration_convexity(
     bond: &Bond,
     context: &MetricContext,
@@ -613,10 +596,12 @@ mod tests {
         let bullet_context = test_context(&bullet, &market, as_of);
         let callable_context = test_context(&callable, &market, as_of);
 
-        let eff_bullet =
-            effective_duration(&bullet, &bullet_context, Some(25.0)).expect("bullet eff dur");
-        let eff_callable =
-            effective_duration(&callable, &callable_context, Some(25.0)).expect("callable eff dur");
+        let eff_bullet = effective_duration_convexity(&bullet, &bullet_context, Some(25.0))
+            .expect("bullet eff dur")
+            .duration;
+        let eff_callable = effective_duration_convexity(&callable, &callable_context, Some(25.0))
+            .expect("callable eff dur")
+            .duration;
 
         // Callable bond effective duration <= bullet (call caps upside)
         assert!(

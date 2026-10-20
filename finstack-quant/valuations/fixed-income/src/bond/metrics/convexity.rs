@@ -59,7 +59,10 @@ impl MetricCalculator for ConvexityCalculator {
         let has_options = bond.return_floor.is_some()
             || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
-            return Ok(super::effective::effective_convexity(bond, context, None)? / 100.0);
+            return Ok(
+                super::effective::effective_duration_convexity(bond, context, None)?.convexity
+                    / 100.0,
+            );
         }
         let workout = super::context_workout_path(context)?;
         let bond: &Bond = context.instrument_as()?;

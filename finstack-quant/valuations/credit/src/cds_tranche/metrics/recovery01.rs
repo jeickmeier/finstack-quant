@@ -47,14 +47,6 @@ const RECOVERY_BUMP: f64 = 0.01;
 /// Recovery01 calculator for CDS Tranche.
 pub(crate) struct Recovery01Calculator;
 
-/// Build a copy of `original` with `recovery_rate` replaced, preserving all
-/// per-issuer overrides (curves, recovery rates, weights). Mirrors the
-/// pricer's own rebuild logic so that heterogeneous bespoke tranches are
-/// not silently downgraded to the homogeneous binomial path during bumping.
-fn rebuild_with_recovery(original: &CreditIndexData, new_recovery: f64) -> Result<CreditIndexData> {
-    original.to_builder().recovery_rate(new_recovery).build()
-}
-
 /// Build a market with the index recovery bumped and the index hazard curve
 /// **frozen** (reused unchanged).
 fn frozen_market_at_bumped_recovery(
@@ -63,7 +55,13 @@ fn frozen_market_at_bumped_recovery(
     original_index: &CreditIndexData,
     new_recovery: f64,
 ) -> Result<MarketContext> {
-    let bumped_index = rebuild_with_recovery(original_index, new_recovery)?;
+    // `to_builder` preserves all per-issuer overrides (curves, recovery rates,
+    // weights), so heterogeneous bespoke tranches are not silently downgraded
+    // to the homogeneous binomial path during bumping.
+    let bumped_index = original_index
+        .to_builder()
+        .recovery_rate(new_recovery)
+        .build()?;
     base_market
         .clone()
         .insert_credit_index(&tranche.credit_index_id, bumped_index)
@@ -238,9 +236,13 @@ mod tests {
     }
 
     #[test]
-    fn rebuild_with_recovery_preserves_per_issuer_recovery_rates() {
+    fn recovery_rebuild_preserves_per_issuer_recovery_rates() {
         let original = sample_index(true, false);
-        let bumped = rebuild_with_recovery(&original, 0.41).expect("rebuild");
+        let bumped = original
+            .to_builder()
+            .recovery_rate(0.41)
+            .build()
+            .expect("rebuild");
 
         assert!((bumped.recovery_rate() - 0.41).abs() < 1e-12);
 
@@ -256,9 +258,13 @@ mod tests {
     }
 
     #[test]
-    fn rebuild_with_recovery_preserves_per_issuer_weights() {
+    fn recovery_rebuild_preserves_per_issuer_weights() {
         let original = sample_index(false, true);
-        let bumped = rebuild_with_recovery(&original, 0.39).expect("rebuild");
+        let bumped = original
+            .to_builder()
+            .recovery_rate(0.39)
+            .build()
+            .expect("rebuild");
 
         assert!((bumped.recovery_rate() - 0.39).abs() < 1e-12);
 
@@ -271,9 +277,13 @@ mod tests {
     }
 
     #[test]
-    fn rebuild_with_recovery_preserves_all_three_overrides_together() {
+    fn recovery_rebuild_preserves_all_three_overrides_together() {
         let original = sample_index(true, true);
-        let bumped = rebuild_with_recovery(&original, 0.42).expect("rebuild");
+        let bumped = original
+            .to_builder()
+            .recovery_rate(0.42)
+            .build()
+            .expect("rebuild");
 
         assert!((bumped.recovery_rate() - 0.42).abs() < 1e-12);
         assert!(
@@ -289,11 +299,15 @@ mod tests {
     }
 
     #[test]
-    fn rebuild_with_recovery_handles_homogeneous_index() {
+    fn recovery_rebuild_handles_homogeneous_index() {
         // Homogeneous (no per-issuer recovery/weight overrides) — must not
         // panic and must propagate the bumped recovery without inventing fields.
         let original = sample_index(false, false);
-        let bumped = rebuild_with_recovery(&original, 0.45).expect("rebuild");
+        let bumped = original
+            .to_builder()
+            .recovery_rate(0.45)
+            .build()
+            .expect("rebuild");
 
         assert!((bumped.recovery_rate() - 0.45).abs() < 1e-12);
         assert!(bumped.issuer_credit_curves().is_some());

@@ -203,13 +203,16 @@ impl InflationSwap {
                     .map(|index| index.interpolation())
             })
             .unwrap_or_default();
-        finstack_quant_valuations_core::instruments::common_impl::helpers::reference_inflation_value(
-            curves,
-            self.inflation_index_id.as_str(),
-            date,
-            as_of,
-            self.effective_lag(curves),
-            interpolation,
+        Ok(
+            finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_reference_inflation(
+                curves,
+                self.inflation_index_id.as_str(),
+                date,
+                as_of,
+                self.effective_lag(curves),
+                interpolation,
+            )?
+            .value,
         )
     }
 
@@ -768,13 +771,16 @@ impl YoYInflationSwap {
                     .map(|index| index.interpolation())
             })
             .unwrap_or_default();
-        finstack_quant_valuations_core::instruments::common_impl::helpers::reference_inflation_value(
-            curves,
-            self.inflation_index_id.as_str(),
-            date,
-            as_of,
-            self.effective_lag(curves),
-            interpolation,
+        Ok(
+            finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_reference_inflation(
+                curves,
+                self.inflation_index_id.as_str(),
+                date,
+                as_of,
+                self.effective_lag(curves),
+                interpolation,
+            )?
+            .value,
         )
     }
 

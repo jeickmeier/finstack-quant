@@ -37,11 +37,6 @@ pub(crate) fn compounding_from_py(
     crate::bindings::module_utils::py_to_serde(py, obj, "compounding")
 }
 
-/// Render a Decimal field as a Python float literal.
-fn decimal_repr(value: rust_decimal::Decimal) -> String {
-    value.to_string()
-}
-
 /// Typed wrapper for the Rust `FixedLegSpec` (fixed leg of an IRS/swaption).
 ///
 /// Immutable; every constructor argument is readable back through a property
@@ -288,7 +283,7 @@ payment_lag_days=0, end_of_month=False)"
 business_day_convention={:?}, calendar_id={}, stub={:?}, \
 payment_lag_days={}, end_of_month={})",
             self.inner.discount_curve_id.as_str(),
-            decimal_repr(self.inner.rate),
+            self.inner.rate,
             self.inner.frequency,
             self.inner.day_count,
             self.inner.start,
@@ -617,7 +612,7 @@ day_count={}, start={}, end={}, business_day_convention={:?}, calendar_id={}, st
 reset_lag_days={}, fixing_calendar_id={}, compounding={}, payment_lag_days={}, end_of_month={})",
             self.inner.discount_curve_id.as_str(),
             self.inner.forward_curve_id.as_str(),
-            decimal_repr(self.inner.spread_bp),
+            self.inner.spread_bp,
             self.inner.frequency,
             self.inner.day_count,
             self.inner.start,
@@ -869,7 +864,7 @@ discount_curve_id={:?}, stub={:?}, business_day_convention={:?}, calendar_id={})
             self.inner.end,
             self.inner.frequency,
             self.inner.day_count,
-            decimal_repr(self.inner.coupon_bp),
+            self.inner.coupon_bp,
             self.inner.discount_curve_id.as_str(),
             enum_to_py_string(&self.inner.stub).unwrap_or_default(),
             enum_to_py_string(&self.inner.business_day_convention).unwrap_or_default(),

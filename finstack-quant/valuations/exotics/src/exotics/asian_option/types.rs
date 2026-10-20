@@ -228,14 +228,26 @@ impl AsianOption {
     }
 
     /// Calculate the net present value of this Asian option using Monte Carlo.
+    ///
+    /// # Arguments
+    ///
+    /// - `market`: Market context holding the option's spot, volatility surface,
+    ///   discount curve and optional dividend-yield inputs (decimal annualized).
+    /// - `as_of`: Valuation date; fixings on or before it are read from the
+    ///   instrument's `past_fixings`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the instrument fails validation or a market input
+    /// is missing.
     pub fn npv_mc(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
-        use crate::exotics::asian_option::pricer;
-        pricer::compute_pv(self, market, as_of)
+        crate::exotics::asian_option::pricer::AsianOptionMcPricer::new()
+            .price_internal(self, market, as_of)
     }
 
     /// Get the accumulated state (sum, log_sum_product, count) for seasoned options.

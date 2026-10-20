@@ -222,15 +222,6 @@ impl CmsOptionPricer {
 
         Money::new(total_pv * inst.notional.amount(), inst.notional.currency())
     }
-
-    fn price_internal(
-        &self,
-        inst: &CmsOption,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        self.price_internal_with_convexity(inst, curves, as_of, 1.0)
-    }
 }
 
 impl crate::cms_common::CmsConvexityPricing for CmsOption {
@@ -266,16 +257,10 @@ impl Pricer for CmsOptionPricer {
             InstrumentType::CmsOption,
         )?;
 
-        let pv = self.price_internal(cms, market, as_of)?;
+        let pv = self.price_internal_with_convexity(cms, market, as_of, 1.0)?;
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
     }
-}
-
-/// Present value using Convexity Adjusted Black.
-pub(crate) fn compute_pv(inst: &CmsOption, curves: &MarketContext, as_of: Date) -> Result<Money> {
-    let pricer = CmsOptionPricer::new();
-    pricer.price_internal(inst, curves, as_of)
 }
 
 /// First-order CMS convexity adjustment (Hagan 2003) using the actual

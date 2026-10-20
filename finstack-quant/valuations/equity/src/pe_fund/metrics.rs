@@ -186,8 +186,8 @@ impl MetricCalculator for CarryAccruedCalculator {
 /// flow. Both the discount form `(1 + r)^{-t}` and multi-root handling
 /// (deterministic selection of the root closest to `r = 0`) come from the core
 /// solver, so PE-fund metrics inherit its compensated summation, scale
-/// invariance, and unbounded high-rate handling. The waterfall IRR routine
-/// (`PeFundWaterfallSpec::calculate_irr`) delegates here so both stay consistent.
+/// invariance, and unbounded high-rate handling. The waterfall's LP
+/// IRR-to-date uses this routine too, so both stay consistent.
 ///
 /// # Arguments
 ///
@@ -281,8 +281,7 @@ mod tests {
 
     /// `calculate_irr` must discount cashflows with the exact closed form
     /// `(1 + r)^{-t}` — no linearized `1 − r·t` near zero. This reconciles the
-    /// standalone routine with the waterfall's IRR routine
-    /// (`PeFundWaterfallSpec::calculate_irr`), which also uses `(1 + r)^{-t}`.
+    /// standalone routine with the waterfall's LP IRR-to-date, which calls it.
     ///
     /// With a near-zero IRR (a marginal gain over a multi-year horizon) the old
     /// `1 − r·t` linearization is a different discount function from

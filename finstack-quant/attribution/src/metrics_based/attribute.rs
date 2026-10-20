@@ -6,7 +6,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{collect_cashflows_in_period, MetricId};
+use finstack_quant_valuations::metrics::{collect_period_cash, MetricId};
 use finstack_quant_valuations::results::ValuationResult;
 use std::sync::Arc;
 
@@ -153,13 +153,15 @@ pub fn attribute_pnl_metrics_based(
     // carry itself is NOT adjusted here because the metrics already carry the
     // cashflow component.
     let realized_period_cash = Money::new(
-        collect_cashflows_in_period(
+        collect_period_cash(
             instrument.as_ref(),
             market_t0,
             as_of_t0,
             as_of_t1,
             val_t1.value.currency(),
-        )?,
+        )?
+        .total
+        .amount(),
         val_t1.value.currency(),
     )?;
     attribution.total_pnl = attribution.total_pnl.checked_add(realized_period_cash)?;

@@ -170,33 +170,6 @@ impl BarrierOption {
         }
         Ok(())
     }
-
-    /// Price the total trade payoff and rebate with the GBM Monte Carlo engine.
-    ///
-    /// # Arguments
-    ///
-    /// - `market`: Market context containing the instrument's spot, volatility,
-    ///   discount curve and optional dividend-yield inputs. Volatilities and
-    ///   yields are decimal annualized values; spot is in the payoff currency.
-    /// - `as_of`: Valuation date defining the start of the remaining simulation.
-    ///   Discrete monitoring uses the contract's exact observation dates;
-    ///   continuous monitoring uses a Brownian bridge between simulation steps.
-    ///
-    /// # Returns
-    /// Present value in the notional currency. Rebate Money is the total trade
-    /// payment and is discounted according to its contractual payment timing.
-    ///
-    /// # Errors
-    /// Returns an error for missing market inputs, invalid parameters or missing
-    /// observed barrier state for monitoring dates before `as_of`.
-    pub fn npv_mc(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        use crate::exotics::barrier_option::pricer;
-        pricer::compute_pv(self, market, as_of)
-    }
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for BarrierOption {
@@ -274,14 +247,18 @@ impl finstack_quant_valuations_core::instruments::Instrument for BarrierOption {
 
     /// Compute the present value with explicit monitoring semantics.
     ///
-    /// Continuous monitoring selects analytical pricing; discrete dates select MC.
+    /// Continuous monitoring selects analytical pricing; discrete dates select
+    /// the GBM Monte Carlo engine on the contract's exact observation dates.
+    /// Rebate Money is the total trade payment, discounted according to its
+    /// contractual payment timing.
     fn base_value(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         if matches!(self.monitoring, Monitoring::Discrete { .. }) {
-            return self.npv_mc(market, as_of);
+            use crate::exotics::barrier_option::pricer::BarrierOptionMcPricer;
+            return BarrierOptionMcPricer::new().price_internal(self, market, as_of);
         }
 
         use crate::exotics::barrier_option::pricer::BarrierOptionAnalyticalPricer;

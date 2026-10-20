@@ -29,7 +29,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::sensitivities::config::{
-    format_bucket_label_cow, STANDARD_BUCKETS_YEARS,
+    format_bucket_label, STANDARD_BUCKETS_YEARS,
 };
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::borrow::Cow;
@@ -185,7 +185,7 @@ impl MetricCalculator for BucketedCs01Calculator {
             let cs01 = setup.cs01(as_of, |bump_bp| {
                 key_rate_spec(i, bump_bp, &STANDARD_BUCKETS_YEARS)
             })?;
-            series.push((format_bucket_label_cow(t), cs01));
+            series.push((format_bucket_label(t), cs01));
             total += cs01;
         }
 

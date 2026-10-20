@@ -93,71 +93,6 @@ pub(super) fn price_result_with_context(
     .map_err(to_js_err)
 }
 
-#[cfg(test)]
-fn price_instrument_with_context(
-    instrument_json: &str,
-    market: &MarketContext,
-    as_of: &str,
-    model: &str,
-    metrics: Vec<String>,
-    metric_pricing_overrides: Option<&str>,
-    market_history_json: Option<&str>,
-) -> Result<String, JsValue> {
-    let instrument = parse_pricing_instrument_json(instrument_json, metric_pricing_overrides)?;
-    valuation_result_json(price_result_with_context(
-        &instrument,
-        market,
-        as_of,
-        model,
-        metrics,
-        market_history_json,
-        false,
-    )?)
-}
-
-/// Native-testable core of [`price_instrument`].
-///
-/// Kept separate from the `#[wasm_bindgen]` wrapper because `JsValue`
-/// construction aborts on non-wasm32 targets, so the unit tests below drive
-/// this function and assert on the `ValuationResult` directly.
-#[cfg(test)]
-fn price_instrument_result(
-    instrument_json: &str,
-    market_json: &str,
-    as_of: &str,
-    model: Option<&str>,
-) -> Result<ValuationResult, JsValue> {
-    let instrument = parse_pricing_instrument_json(instrument_json, None)?;
-    let market = parse_market_json(market_json)?;
-    price_result_with_context(
-        &instrument,
-        &market,
-        as_of,
-        model.unwrap_or("default"),
-        Vec::new(),
-        None,
-        false,
-    )
-}
-
-pub(super) fn metric_value_with_context(
-    instrument: &finstack_quant_valuations::pricer::ParsedInstrument,
-    market: &MarketContext,
-    as_of: &str,
-    model: &str,
-    metric: &str,
-) -> Result<f64, JsValue> {
-    finstack_quant_valuations::pricer::metric_value(
-        instrument,
-        market,
-        as_of,
-        model,
-        metric,
-        finstack_quant_calibration::recalibration::pricing_options(),
-    )
-    .map_err(to_js_err)
-}
-
 pub(super) fn standard_option_greeks_with_context(
     instrument: &finstack_quant_valuations::pricer::ParsedInstrument,
     market: &MarketContext,
@@ -480,44 +415,18 @@ pub fn instrument_cashflows(
     let market_json: &str = &json_text(&market_json, "marketJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let model: &str = &js_string(&model, "model")?;
-    to_js_value(&cashflows_envelope_from_json(
-        instrument_json,
-        market_json,
-        as_of,
-        model,
-    )?)
-}
-
-/// Parse the instrument (before the market) and run the Rust
-/// `instrument_cashflows` export for the JSON-market entry points.
-fn cashflows_envelope_from_json(
-    instrument_json: &str,
-    market_json: &str,
-    as_of: &str,
-    model: &str,
-) -> Result<
-    finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope,
-    JsValue,
-> {
+    // Parse the instrument before the market so instrument errors surface first.
     let instrument = parse_pricing_instrument_json(instrument_json, None)?;
     let market = parse_market_json(market_json)?;
-    cashflows_envelope(&instrument, &market, as_of, model)
-}
-
-/// The cash-flow envelope shared by the `instrumentCashflows*` entry points.
-fn cashflows_envelope(
-    instrument: &finstack_quant_valuations::pricer::ParsedInstrument,
-    market: &MarketContext,
-    as_of: &str,
-    model: &str,
-) -> Result<
-    finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope,
-    JsValue,
-> {
-    finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
-        instrument, market, as_of, model,
+    to_js_value(
+        &finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
+            &instrument,
+            &market,
+            as_of,
+            model,
+        )
+        .map_err(to_js_err)?,
     )
-    .map_err(to_js_err)
 }
 
 /// List all metric IDs in the standard metric registry.
@@ -726,17 +635,65 @@ pub fn instrument_cashflows_with_market(
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let model: &str = &js_string(&model, "model")?;
     let instrument = parse_pricing_instrument_json(instrument_json, None)?;
-    to_js_value(&cashflows_envelope(
-        &instrument,
-        market.inner(),
-        as_of,
-        model,
-    )?)
+    to_js_value(
+        &finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
+            &instrument,
+            market.inner(),
+            as_of,
+            model,
+        )
+        .map_err(to_js_err)?,
+    )
 }
 
 #[cfg(test)]
 pub(super) mod tests {
     use super::*;
+
+    fn price_instrument_with_context(
+        instrument_json: &str,
+        market: &MarketContext,
+        as_of: &str,
+        model: &str,
+        metrics: Vec<String>,
+        metric_pricing_overrides: Option<&str>,
+        market_history_json: Option<&str>,
+    ) -> Result<String, JsValue> {
+        let instrument = parse_pricing_instrument_json(instrument_json, metric_pricing_overrides)?;
+        valuation_result_json(price_result_with_context(
+            &instrument,
+            market,
+            as_of,
+            model,
+            metrics,
+            market_history_json,
+            false,
+        )?)
+    }
+
+    /// Native-testable core of [`price_instrument`].
+    ///
+    /// Kept separate from the `#[wasm_bindgen]` wrapper because `JsValue`
+    /// construction aborts on non-wasm32 targets, so the unit tests below drive
+    /// this function and assert on the `ValuationResult` directly.
+    fn price_instrument_result(
+        instrument_json: &str,
+        market_json: &str,
+        as_of: &str,
+        model: Option<&str>,
+    ) -> Result<ValuationResult, JsValue> {
+        let instrument = parse_pricing_instrument_json(instrument_json, None)?;
+        let market = parse_market_json(market_json)?;
+        price_result_with_context(
+            &instrument,
+            &market,
+            as_of,
+            model.unwrap_or("default"),
+            Vec::new(),
+            None,
+            false,
+        )
+    }
 
     /// A request whose market, date and model are all invalid.
     pub(crate) fn not_a_market_request() -> PriceRequest {
@@ -1270,13 +1227,15 @@ pub(super) mod tests {
         let credit_instrument =
             parse_pricing_instrument_json(&revolving_credit_json(false, true), None)
                 .expect("credit instrument");
-        assert!(cashflows_envelope(
-            &credit_instrument,
-            &revolving_credit_market(true),
-            "2024-01-01",
-            "discounting",
-        )
-        .is_err());
+        assert!(
+            finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
+                &credit_instrument,
+                &revolving_credit_market(true),
+                "2024-01-01",
+                "discounting",
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1310,7 +1269,13 @@ pub(super) mod tests {
         let parsed = serde_json::to_value(&priced).expect("price json");
         assert!(parsed.is_object());
 
-        let cashflows = cashflows_envelope(&instrument, &market, "2024-01-01", "discounting")
+        let cashflows =
+            finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
+                &instrument,
+                &market,
+                "2024-01-01",
+                "discounting",
+            )
             .expect("cashflows");
         let parsed_cashflows = serde_json::to_value(&cashflows).expect("cashflow json");
         assert!(parsed_cashflows.is_object());

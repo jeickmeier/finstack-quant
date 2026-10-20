@@ -45,23 +45,11 @@ const WEIGHT_SUM_TOL: f64 = 1e-6;
 /// Tolerance for validating index_factor consistency with defaulted weights.
 const INDEX_FACTOR_CONSISTENCY_TOL: f64 = 1e-6;
 
-/// CDS Index pricing engine. Aggregates single-name CDS pricing according to
-/// the index's configured pricing mode.
-///
-/// All priced quantities (NPV, leg PVs, par spread, RPV01, CS01) are
-/// derived by delegating to the single-name `CdsPricer` per-name (Constituents
-/// mode) or via a single synthetic CDS (SingleCurve mode), then aggregating.
-/// This guarantees that `npv ≈ par_spread × notional × risky_pv01 − pv_protection_leg`
-/// holds to numerical tolerance.
-///
-/// `project_cds_flows` is retained as an informational projection used only
-/// by `build_projected_schedule` to expose expected cashflow timing to
-/// `CashflowProvider` consumers; it is intentionally a coarser approximation
-/// than the priced values and is not used to compute any reported PV.
-pub(crate) struct CdsIndexPricer {
-    /// Configuration carried so inner `CdsPricer` instances and the
-    /// informational flow projection stay in sync.
-    cds_config: CdsPricerConfig,
+/// Single-name CDS pricer used for every resolved index position, with the
+/// default ISDA-compliant configuration. The informational flow projection
+/// reads the same configuration so the two stay in sync.
+fn cds_pricer() -> CdsPricer {
+    CdsPricer::with_config(CdsPricerConfig::default())
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -102,20 +90,20 @@ struct ProjectedIndexFlows {
     constituents: Vec<ProjectedConstituentFlows>,
 }
 
-impl Default for CdsIndexPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl CdsIndexPricer {
-    /// Create a new CDS Index pricer with default ISDA-compliant CDS config.
-    pub(crate) fn new() -> Self {
-        Self {
-            cds_config: CdsPricerConfig::default(),
-        }
-    }
-
+/// CDS index pricing. Aggregates single-name CDS pricing according to the
+/// index's configured pricing mode.
+///
+/// All priced quantities (NPV, leg PVs, par spread, RPV01, CS01) are
+/// derived by delegating to the single-name `CdsPricer` per-name (Constituents
+/// mode) or via a single synthetic CDS (SingleCurve mode), then aggregating.
+/// This guarantees that `npv ≈ par_spread × notional × risky_pv01 − pv_protection_leg`
+/// holds to numerical tolerance.
+///
+/// `project_cds_flows` is retained as an informational projection used only
+/// by `build_projected_schedule` to expose expected cashflow timing to
+/// `CashflowProvider` consumers; it is intentionally a coarser approximation
+/// than the priced values and is not used to compute any reported PV.
+impl CdsIndex {
     /// Compute instrument NPV from the perspective of `PayReceive`.
     ///
     /// NPV is computed by delegating to `CdsPricer::npv_full` per resolved
@@ -125,14 +113,10 @@ impl CdsIndexPricer {
     /// premium discount curve and applied once at the aggregate, with the same
     /// sign convention used by `CdsPricer::npv_full` for single-name CDS
     /// upfronts. Upfronts paid before `as_of` are dropped.
-    pub(crate) fn npv(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
+    pub(crate) fn npv(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+        let index = self;
         let currency = index.notional.currency();
-        let mut total = self.sum_money(index, curves, as_of, |pricer, cds, disc, surv| {
+        let mut total = sum_money(index, curves, as_of, |pricer, cds, disc, surv| {
             Money::new(
                 pricer.npv_full(cds, disc, surv, as_of)?,
                 cds.notional.currency(),
@@ -151,30 +135,48 @@ impl CdsIndexPricer {
         Money::new(total.amount(), currency)
     }
 
-    /// Present value of the protection leg (aggregated by pricing mode).
+    /// Present value of the protection leg, aggregated by pricing mode.
     ///
-    /// Returns the unsigned protection-leg PV (always non-negative).
-    pub(crate) fn pv_protection_leg(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        self.sum_money(index, curves, as_of, |pricer, cds, disc, surv| {
+    /// # Arguments
+    ///
+    /// - `curves`: Market context holding the premium-leg discount curve and the
+    ///   index hazard curve (`SingleCurve`) or every live constituent's hazard
+    ///   curve (`Constituents`).
+    /// - `as_of`: Valuation date; the PV is zero on or after the premium-leg end.
+    ///
+    /// # Returns
+    ///
+    /// The unsigned protection-leg PV (always non-negative) in the index notional
+    /// currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the index fails validation or a curve is missing.
+    pub fn pv_protection_leg(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+        sum_money(self, curves, as_of, |pricer, cds, disc, surv| {
             pricer.pv_protection_leg(cds, disc, surv, as_of)
         })
     }
 
-    /// Present value of the premium leg (aggregated by pricing mode).
+    /// Present value of the premium leg, aggregated by pricing mode.
     ///
-    /// Returns the unsigned premium-leg PV (always non-negative).
-    pub(crate) fn pv_premium_leg(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        self.sum_money(index, curves, as_of, |pricer, cds, disc, surv| {
+    /// # Arguments
+    ///
+    /// - `curves`: Market context holding the premium-leg discount curve and the
+    ///   index hazard curve (`SingleCurve`) or every live constituent's hazard
+    ///   curve (`Constituents`).
+    /// - `as_of`: Valuation date; the PV is zero on or after the premium-leg end.
+    ///
+    /// # Returns
+    ///
+    /// The unsigned premium-leg PV (always non-negative) in the index notional
+    /// currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the index fails validation or a curve is missing.
+    pub fn pv_premium_leg(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+        sum_money(self, curves, as_of, |pricer, cds, disc, surv| {
             pricer.pv_premium_leg(cds, disc, surv, as_of)
         })
     }
@@ -183,20 +185,31 @@ impl CdsIndexPricer {
     ///
     /// Both branches (`SingleCurve` and `Constituents`) divide the protection
     /// PV by the ISDA-standard risky-annuity denominator.
-    pub(crate) fn par_spread(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<f64> {
+    ///
+    /// # Arguments
+    ///
+    /// - `curves`: Market context holding the premium-leg discount curve and the
+    ///   index or constituent hazard curves.
+    /// - `as_of`: Valuation date.
+    ///
+    /// # Returns
+    ///
+    /// The par spread in basis points.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the index fails validation, a curve is missing, or
+    /// the risky-annuity denominator is near zero.
+    pub fn par_spread(&self, curves: &MarketContext, as_of: Date) -> Result<f64> {
+        let index = self;
         // Enforce the same top-level trade invariants as the npv/leg-PV/CS01
         // aggregation paths; without this the SingleCurve branch builds the
         // synthetic CDS directly and silently prices e.g. index_factor > 1.
         index.validate()?;
-        let pricer = CdsPricer::with_config(self.cds_config.clone());
+        let pricer = cds_pricer();
         match index.pricing {
             IndexPricing::SingleCurve => {
-                let cds = self.synthetic_cds(index)?;
+                let cds = index.to_synthetic_cds()?;
                 let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
                 let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
                 let numerator_protection_pv =
@@ -214,11 +227,11 @@ impl CdsIndexPricer {
                 Ok(numerator_protection_pv.amount() / denominator * BASIS_POINTS_PER_UNIT)
             }
             IndexPricing::Constituents => {
-                let mut cds = self.synthetic_cds(index)?;
+                let mut cds = index.to_synthetic_cds()?;
                 let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
                 let mut numerator_protection_pv = Money::from((0_i64, index.notional.currency()));
                 let mut denominator = 0.0;
-                self.for_each_constituent(index, |position| {
+                for_each_constituent(index, |position| {
                     position.apply_to_cds(index, &mut cds)?;
                     let surv = curves.get_hazard(position.credit_curve_id)?;
                     let prot_pv =
@@ -241,14 +254,23 @@ impl CdsIndexPricer {
         }
     }
 
-    /// Risky PV01 (absolute currency units) aggregated by pricing mode.
-    pub(crate) fn risky_pv01(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<f64> {
-        self.sum_f64(index, curves, as_of, |pricer, cds, disc, surv| {
+    /// Risky PV01 aggregated by pricing mode.
+    ///
+    /// # Arguments
+    ///
+    /// - `curves`: Market context holding the premium-leg discount curve and the
+    ///   index or constituent hazard curves.
+    /// - `as_of`: Valuation date.
+    ///
+    /// # Returns
+    ///
+    /// The risky PV01 in absolute currency units (index notional currency).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the index fails validation or a curve is missing.
+    pub fn risky_pv01(&self, curves: &MarketContext, as_of: Date) -> Result<f64> {
+        sum_f64(self, curves, as_of, |pricer, cds, disc, surv| {
             pricer.risky_pv01(cds, disc, surv, as_of)
         })
     }
@@ -262,11 +284,11 @@ impl CdsIndexPricer {
     /// will agree with `npv()` only to within a few percent for benign curves.
     pub(crate) fn build_projected_schedule(
         &self,
-        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<CashFlowSchedule> {
-        let projected = self.project_resolved_flows(index, curves, as_of)?;
+        let index = self;
+        let projected = project_resolved_flows(index, curves, as_of)?;
         match projected.single_curve {
             Some(flows) => Ok(schedule_from_classified_flows(
                 flows,
@@ -300,428 +322,436 @@ impl CdsIndexPricer {
         }
     }
 
+    /// Calculate CS01 under the default parallel credit-spread bump; the
+    /// `Cs01` metric uses the configured `credit_spread_bump_bp` instead.
+    ///
+    /// # Arguments
+    ///
+    /// - `curves`: Market context holding the premium-leg discount curve and the
+    ///   index or constituent hazard curves; each hazard curve must carry
+    ///   bootstrap replay data.
+    /// - `as_of`: Valuation date.
+    /// - `provider`: Recalibration provider that re-bootstraps each hazard curve
+    ///   under the par-spread bump.
+    ///
+    /// # Returns
+    ///
+    /// The central-difference CS01 in index notional currency per basis point
+    /// of par spread.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the index fails validation, a curve is missing or
+    /// lacks replay data, or a re-bootstrap fails.
+    pub fn cs01(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+        provider: &dyn RecalibrationProvider,
+    ) -> Result<f64> {
+        let bump_bp = finstack_quant_valuations_core::metrics::sensitivities::config::SensitivitiesConfig::default()
+            .credit_spread_bump_bp;
+        self.cs01_with_bump(curves, as_of, provider, bump_bp)
+    }
+
     /// CS01 (approximate) aggregated by pricing mode, central difference
     /// over a parallel `bump_bp` par-spread shock (basis points).
-    pub(crate) fn cs01(
+    pub(crate) fn cs01_with_bump(
         &self,
-        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
         provider: &dyn RecalibrationProvider,
         bump_bp: f64,
     ) -> Result<f64> {
-        self.sum_f64(index, curves, as_of, |_, cds, _, _| {
-            self.compute_cds_cs01(cds, curves, as_of, provider, bump_bp)
+        sum_f64(self, curves, as_of, |_, cds, _, _| {
+            compute_cds_cs01(cds, curves, as_of, provider, bump_bp)
         })
     }
+}
 
-    fn compute_cds_cs01(
-        &self,
-        cds: &CreditDefaultSwap,
-        curves: &MarketContext,
-        as_of: Date,
-        provider: &dyn RecalibrationProvider,
-        bump_bp: f64,
-    ) -> Result<f64> {
-        let credit_id = &cds.protection_leg.credit_curve_id;
-        let discount_id = &cds.premium_leg.discount_curve_id;
+fn compute_cds_cs01(
+    cds: &CreditDefaultSwap,
+    curves: &MarketContext,
+    as_of: Date,
+    provider: &dyn RecalibrationProvider,
+    bump_bp: f64,
+) -> Result<f64> {
+    let credit_id = &cds.protection_leg.credit_curve_id;
+    let discount_id = &cds.premium_leg.discount_curve_id;
 
-        let pricer = CdsPricer::with_config(self.cds_config.clone());
-        let hazard = curves.get_hazard(credit_id)?;
-        finstack_quant_valuations_core::metrics::sensitivities::cs01::require_hazard_replay(
-            hazard.as_ref(),
-            "CDS index CS01",
-        )?;
-        let market = Arc::new(curves.clone());
+    let pricer = cds_pricer();
+    let hazard = curves.get_hazard(credit_id)?;
+    finstack_quant_valuations_core::metrics::sensitivities::cs01::require_hazard_replay(
+        hazard.as_ref(),
+        "CDS index CS01",
+    )?;
+    let market = Arc::new(curves.clone());
 
-        let bump_hazard_for = |bp: f64| -> Result<_> {
-            provider
-                .rebuild_hazard_curve(&HazardRecalibrationRequest {
-                    hazard: Arc::clone(&hazard),
-                    source_market: Arc::clone(&market),
-                    target_market: Arc::clone(&market),
-                    discount_curve_id: discount_id.clone(),
-                    doc_clause: None,
-                    cds_valuation_convention: None,
-                    deal_quote_override: None,
-                    action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(bp)),
-                })
-                .map_err(|e| finstack_quant_core::Error::Calibration {
-                    message: format!(
-                        "CDS index CS01: par-spread re-bootstrap failed for curve '{}' ({e})",
-                        credit_id
-                    ),
-                    category: "cs01_rebootstrap".to_string(),
-                })
-        };
+    let bump_hazard_for = |bp: f64| -> Result<_> {
+        provider
+            .rebuild_hazard_curve(&HazardRecalibrationRequest {
+                hazard: Arc::clone(&hazard),
+                source_market: Arc::clone(&market),
+                target_market: Arc::clone(&market),
+                discount_curve_id: discount_id.clone(),
+                doc_clause: None,
+                cds_valuation_convention: None,
+                deal_quote_override: None,
+                action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(bp)),
+            })
+            .map_err(|e| finstack_quant_core::Error::Calibration {
+                message: format!(
+                    "CDS index CS01: par-spread re-bootstrap failed for curve '{}' ({e})",
+                    credit_id
+                ),
+                category: "cs01_rebootstrap".to_string(),
+            })
+    };
 
-        let bumped_up = bump_hazard_for(bump_bp)?;
-        let ctx_up = curves.clone().insert(bumped_up);
-        let disc_up = ctx_up.get_discount(discount_id)?;
-        let surv_up = ctx_up.get_hazard(credit_id)?;
-        let pv_up = pricer.npv_full(cds, disc_up.as_ref(), surv_up.as_ref(), as_of)?;
+    let bumped_up = bump_hazard_for(bump_bp)?;
+    let ctx_up = curves.clone().insert(bumped_up);
+    let disc_up = ctx_up.get_discount(discount_id)?;
+    let surv_up = ctx_up.get_hazard(credit_id)?;
+    let pv_up = pricer.npv_full(cds, disc_up.as_ref(), surv_up.as_ref(), as_of)?;
 
-        let bumped_down = bump_hazard_for(-bump_bp)?;
-        let ctx_down = curves.clone().insert(bumped_down);
-        let disc_down = ctx_down.get_discount(discount_id)?;
-        let surv_down = ctx_down.get_hazard(credit_id)?;
-        let pv_down = pricer.npv_full(cds, disc_down.as_ref(), surv_down.as_ref(), as_of)?;
+    let bumped_down = bump_hazard_for(-bump_bp)?;
+    let ctx_down = curves.clone().insert(bumped_down);
+    let disc_down = ctx_down.get_discount(discount_id)?;
+    let surv_down = ctx_down.get_hazard(credit_id)?;
+    let pv_down = pricer.npv_full(cds, disc_down.as_ref(), surv_down.as_ref(), as_of)?;
 
-        Ok((pv_up - pv_down) / (2.0 * bump_bp))
+    Ok((pv_up - pv_down) / (2.0 * bump_bp))
+}
+
+fn visit_positions(
+    index: &CdsIndex,
+    curves: &MarketContext,
+    as_of: Date,
+    mut visit: impl FnMut(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve) -> Result<()>,
+) -> Result<()> {
+    index.validate()?;
+    if as_of >= index.premium_leg.end {
+        return Ok(());
     }
-
-    // ----- internals -----
-
-    fn visit_positions(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-        mut visit: impl FnMut(
-            &CdsPricer,
-            &CreditDefaultSwap,
-            &DiscountCurve,
-            &HazardCurve,
-        ) -> Result<()>,
-    ) -> Result<()> {
-        index.validate()?;
-        if as_of >= index.premium_leg.end {
-            return Ok(());
+    let pricer = cds_pricer();
+    // `to_synthetic_cds()` already applies `index_factor` to notional and
+    // leaves the synthetic CDS without an upfront: the index applies its
+    // own upfront once at the aggregate level in `npv`.
+    let mut cds = index.to_synthetic_cds()?;
+    let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
+    match index.pricing {
+        IndexPricing::SingleCurve => {
+            let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
+            visit(&pricer, &cds, disc.as_ref(), surv.as_ref())
         }
-        let pricer = CdsPricer::with_config(self.cds_config.clone());
-        let mut cds = self.synthetic_cds(index)?;
-        let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
-        match index.pricing {
-            IndexPricing::SingleCurve => {
-                let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
+        IndexPricing::Constituents => {
+            for_each_constituent(index, |position| {
+                position.apply_to_cds(index, &mut cds)?;
+                let surv = curves.get_hazard(position.credit_curve_id)?;
                 visit(&pricer, &cds, disc.as_ref(), surv.as_ref())
-            }
-            IndexPricing::Constituents => {
-                self.for_each_constituent(index, |position| {
-                    position.apply_to_cds(index, &mut cds)?;
-                    let surv = curves.get_hazard(position.credit_curve_id)?;
-                    visit(&pricer, &cds, disc.as_ref(), surv.as_ref())
-                })?;
-                Ok(())
-            }
-        }
-    }
-
-    /// Sum a per-CDS scalar metric over the resolved positions (one synthetic
-    /// CDS in `SingleCurve` mode, one per live constituent otherwise).
-    fn sum_f64(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-        f: impl Fn(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve) -> Result<f64>,
-    ) -> Result<f64> {
-        let mut total = 0.0;
-        self.visit_positions(index, curves, as_of, |pricer, cds, disc, surv| {
-            total += f(pricer, cds, disc, surv)?;
+            })?;
             Ok(())
-        })?;
-        Ok(total)
-    }
-
-    /// [`Self::sum_f64`] for currency-typed metrics; the sum is in the index
-    /// notional currency.
-    fn sum_money(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-        f: impl Fn(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve) -> Result<Money>,
-    ) -> Result<Money> {
-        let mut total = Money::from((0_i64, index.notional.currency()));
-        self.visit_positions(index, curves, as_of, |pricer, cds, disc, surv| {
-            total = total.checked_add(f(pricer, cds, disc, surv)?)?;
-            Ok(())
-        })?;
-        Ok(total)
-    }
-
-    fn for_each_constituent<'a>(
-        &self,
-        index: &'a CdsIndex,
-        mut visit: impl FnMut(ResolvedConstituent<'a>) -> Result<()>,
-    ) -> Result<usize> {
-        if index.constituents.is_empty() {
-            return Err(Error::Validation(format!(
-                "CDS Index '{}' has pricing=Constituents but no constituents supplied",
-                index.id
-            )));
         }
-        if !index.index_factor.is_finite() || index.index_factor < 0.0 {
+    }
+}
+
+/// Sum a per-CDS scalar metric over the resolved positions (one synthetic
+/// CDS in `SingleCurve` mode, one per live constituent otherwise).
+fn sum_f64(
+    index: &CdsIndex,
+    curves: &MarketContext,
+    as_of: Date,
+    f: impl Fn(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve) -> Result<f64>,
+) -> Result<f64> {
+    let mut total = 0.0;
+    visit_positions(index, curves, as_of, |pricer, cds, disc, surv| {
+        total += f(pricer, cds, disc, surv)?;
+        Ok(())
+    })?;
+    Ok(total)
+}
+
+/// [`sum_f64`] for currency-typed metrics; the sum is in the index
+/// notional currency.
+fn sum_money(
+    index: &CdsIndex,
+    curves: &MarketContext,
+    as_of: Date,
+    f: impl Fn(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve) -> Result<Money>,
+) -> Result<Money> {
+    let mut total = Money::from((0_i64, index.notional.currency()));
+    visit_positions(index, curves, as_of, |pricer, cds, disc, surv| {
+        total = total.checked_add(f(pricer, cds, disc, surv)?)?;
+        Ok(())
+    })?;
+    Ok(total)
+}
+
+fn for_each_constituent<'a>(
+    index: &'a CdsIndex,
+    mut visit: impl FnMut(ResolvedConstituent<'a>) -> Result<()>,
+) -> Result<usize> {
+    if index.constituents.is_empty() {
+        return Err(Error::Validation(format!(
+            "CDS Index '{}' has pricing=Constituents but no constituents supplied",
+            index.id
+        )));
+    }
+    if !index.index_factor.is_finite() || index.index_factor < 0.0 {
+        return Err(Error::Validation(format!(
+            "CDS Index '{}' has invalid index_factor {} (must be finite and >= 0)",
+            index.id, index.index_factor
+        )));
+    }
+    for (i, constituent) in index.constituents.iter().enumerate() {
+        if !constituent.weight.is_finite() || constituent.weight < 0.0 {
             return Err(Error::Validation(format!(
-                "CDS Index '{}' has invalid index_factor {} (must be finite and >= 0)",
-                index.id, index.index_factor
-            )));
-        }
-        for (i, constituent) in index.constituents.iter().enumerate() {
-            if !constituent.weight.is_finite() || constituent.weight < 0.0 {
-                return Err(Error::Validation(format!(
-                    "CDS Index '{}' constituent #{} ('{}') has invalid weight {} \
+                "CDS Index '{}' constituent #{} ('{}') has invalid weight {} \
                      (must be finite and >= 0)",
-                    index.id,
-                    i + 1,
-                    constituent.credit.credit_curve_id,
-                    constituent.weight
-                )));
-            }
-            if !(0.0..=1.0).contains(&constituent.credit.recovery_rate) {
-                return Err(Error::Validation(format!(
-                    "CDS Index '{}' constituent #{} ('{}') has recovery_rate {} \
+                index.id,
+                i + 1,
+                constituent.credit.credit_curve_id,
+                constituent.weight
+            )));
+        }
+        if !(0.0..=1.0).contains(&constituent.credit.recovery_rate) {
+            return Err(Error::Validation(format!(
+                "CDS Index '{}' constituent #{} ('{}') has recovery_rate {} \
                      outside [0, 1]",
-                    index.id,
-                    i + 1,
-                    constituent.credit.credit_curve_id,
-                    constituent.credit.recovery_rate
-                )));
-            }
+                index.id,
+                i + 1,
+                constituent.credit.credit_curve_id,
+                constituent.credit.recovery_rate
+            )));
         }
-        let sum_w: f64 = index
-            .constituents
-            .iter()
-            .map(|constituent| constituent.weight)
-            .sum();
-        if (sum_w - 1.0).abs() > WEIGHT_SUM_TOL {
-            return Err(Error::Validation(format!(
-                "CDS Index '{}' constituent weights sum to {} (expected 1.0 \
+    }
+    let sum_w: f64 = index
+        .constituents
+        .iter()
+        .map(|constituent| constituent.weight)
+        .sum();
+    if (sum_w - 1.0).abs() > WEIGHT_SUM_TOL {
+        return Err(Error::Validation(format!(
+            "CDS Index '{}' constituent weights sum to {} (expected 1.0 \
                  within tolerance {})",
-                index.id, sum_w, WEIGHT_SUM_TOL
-            )));
-        }
-        let defaulted_sum_w: f64 = index
-            .constituents
-            .iter()
-            .filter(|constituent| constituent.defaulted)
-            .map(|constituent| constituent.weight)
-            .sum();
-        let expected_factor_max = 1.0 - defaulted_sum_w;
-        if index.index_factor > expected_factor_max + INDEX_FACTOR_CONSISTENCY_TOL {
-            return Err(Error::Validation(format!(
-                "CDS Index '{}' index_factor {} exceeds 1 - sum_defaulted_weights = {} \
+            index.id, sum_w, WEIGHT_SUM_TOL
+        )));
+    }
+    let defaulted_sum_w: f64 = index
+        .constituents
+        .iter()
+        .filter(|constituent| constituent.defaulted)
+        .map(|constituent| constituent.weight)
+        .sum();
+    let expected_factor_max = 1.0 - defaulted_sum_w;
+    if index.index_factor > expected_factor_max + INDEX_FACTOR_CONSISTENCY_TOL {
+        return Err(Error::Validation(format!(
+            "CDS Index '{}' index_factor {} exceeds 1 - sum_defaulted_weights = {} \
                  (defaulted weights total {})",
-                index.id, index.index_factor, expected_factor_max, defaulted_sum_w
-            )));
-        }
-        if defaulted_sum_w > INDEX_FACTOR_CONSISTENCY_TOL
-            && index.index_factor < expected_factor_max - INDEX_FACTOR_CONSISTENCY_TOL
-        {
-            return Err(Error::Validation(format!(
-                "CDS Index '{}' index_factor {} is below 1 - sum_defaulted_weights = {} \
+            index.id, index.index_factor, expected_factor_max, defaulted_sum_w
+        )));
+    }
+    if defaulted_sum_w > INDEX_FACTOR_CONSISTENCY_TOL
+        && index.index_factor < expected_factor_max - INDEX_FACTOR_CONSISTENCY_TOL
+    {
+        return Err(Error::Validation(format!(
+            "CDS Index '{}' index_factor {} is below 1 - sum_defaulted_weights = {} \
                  with defaults declared (defaulted weights total {}, tolerance {}). \
                  If you intend to model additional externally-tracked defaults, mark \
                  the corresponding constituents as defaulted instead of shrinking the \
                  factor below the declared total.",
-                index.id,
-                index.index_factor,
-                expected_factor_max,
-                defaulted_sum_w,
-                INDEX_FACTOR_CONSISTENCY_TOL
-            )));
-        }
+            index.id,
+            index.index_factor,
+            expected_factor_max,
+            defaulted_sum_w,
+            INDEX_FACTOR_CONSISTENCY_TOL
+        )));
+    }
 
-        let active_count = index
-            .constituents
-            .iter()
-            .filter(|constituent| !constituent.defaulted)
-            .count();
-        if active_count == 0 {
-            return Ok(0);
+    let active_count = index
+        .constituents
+        .iter()
+        .filter(|constituent| !constituent.defaulted)
+        .count();
+    if active_count == 0 {
+        return Ok(0);
+    }
+    let active_sum_w: f64 = index
+        .constituents
+        .iter()
+        .filter(|constituent| !constituent.defaulted)
+        .map(|constituent| constituent.weight)
+        .sum();
+    let norm = if active_count != index.constituents.len() && active_sum_w > 0.0 {
+        active_sum_w
+    } else {
+        1.0
+    };
+    for (ordinal, constituent) in index
+        .constituents
+        .iter()
+        .filter(|constituent| !constituent.defaulted)
+        .enumerate()
+    {
+        visit(ResolvedConstituent {
+            ordinal: ordinal + 1,
+            credit_curve_id: &constituent.credit.credit_curve_id,
+            recovery_rate: constituent.credit.recovery_rate,
+            weight_effective: constituent.weight / norm,
+        })?;
+    }
+    Ok(active_count)
+}
+
+fn project_resolved_flows(
+    index: &CdsIndex,
+    curves: &MarketContext,
+    as_of: Date,
+) -> Result<ProjectedIndexFlows> {
+    match index.pricing {
+        IndexPricing::SingleCurve => {
+            let cds = index.to_synthetic_cds()?;
+            let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
+            Ok(ProjectedIndexFlows {
+                single_curve: Some(project_cds_flows(&cds, surv.as_ref(), as_of)?),
+                constituents: Vec::new(),
+            })
         }
-        let active_sum_w: f64 = index
-            .constituents
-            .iter()
-            .filter(|constituent| !constituent.defaulted)
-            .map(|constituent| constituent.weight)
-            .sum();
-        let norm = if active_count != index.constituents.len() && active_sum_w > 0.0 {
-            active_sum_w
-        } else {
-            1.0
-        };
-        for (ordinal, constituent) in index
-            .constituents
-            .iter()
-            .filter(|constituent| !constituent.defaulted)
-            .enumerate()
-        {
-            visit(ResolvedConstituent {
-                ordinal: ordinal + 1,
-                credit_curve_id: &constituent.credit.credit_curve_id,
-                recovery_rate: constituent.credit.recovery_rate,
-                weight_effective: constituent.weight / norm,
+        IndexPricing::Constituents => {
+            let mut cds = index.to_synthetic_cds()?;
+            let mut constituents = Vec::with_capacity(index.constituents.len());
+            for_each_constituent(index, |position| {
+                position.apply_to_cds(index, &mut cds)?;
+                let surv = curves.get_hazard(position.credit_curve_id)?;
+                constituents.push(ProjectedConstituentFlows {
+                    flows: project_cds_flows(&cds, surv.as_ref(), as_of)?,
+                });
+                Ok(())
             })?;
-        }
-        Ok(active_count)
-    }
-
-    fn project_resolved_flows(
-        &self,
-        index: &CdsIndex,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<ProjectedIndexFlows> {
-        match index.pricing {
-            IndexPricing::SingleCurve => {
-                let cds = self.synthetic_cds(index)?;
-                let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
-                Ok(ProjectedIndexFlows {
-                    single_curve: Some(self.project_cds_flows(&cds, surv.as_ref(), as_of)?),
-                    constituents: Vec::new(),
-                })
-            }
-            IndexPricing::Constituents => {
-                let mut cds = self.synthetic_cds(index)?;
-                let mut constituents = Vec::with_capacity(index.constituents.len());
-                self.for_each_constituent(index, |position| {
-                    position.apply_to_cds(index, &mut cds)?;
-                    let surv = curves.get_hazard(position.credit_curve_id)?;
-                    constituents.push(ProjectedConstituentFlows {
-                        flows: self.project_cds_flows(&cds, surv.as_ref(), as_of)?,
-                    });
-                    Ok(())
-                })?;
-                Ok(ProjectedIndexFlows {
-                    single_curve: None,
-                    constituents,
-                })
-            }
+            Ok(ProjectedIndexFlows {
+                single_curve: None,
+                constituents,
+            })
         }
     }
+}
 
-    fn synthetic_cds(&self, index: &CdsIndex) -> Result<CreditDefaultSwap> {
-        // `to_synthetic_cds()` already applies `index_factor` to notional and
-        // leaves the synthetic CDS without an upfront: the index applies its
-        // own upfront once at the aggregate level in `npv_detailed`.
-        index.to_synthetic_cds()
-    }
+fn project_cds_flows(
+    cds: &CreditDefaultSwap,
+    survival: &HazardCurve,
+    as_of: Date,
+) -> Result<Vec<CashFlow>> {
+    let mut schedule = CashflowProvider::cashflow_schedule(cds, &MarketContext::new(), as_of)?;
+    let premium_sign = match cds.side {
+        PayReceive::Pay => -1.0,
+        PayReceive::Receive => 1.0,
+    };
+    let protection_sign = -premium_sign;
+    let loss_given_default = 1.0 - cds.protection_leg.recovery_rate;
 
-    fn project_cds_flows(
-        &self,
-        cds: &CreditDefaultSwap,
-        survival: &HazardCurve,
-        as_of: Date,
-    ) -> Result<Vec<CashFlow>> {
-        let mut schedule = CashflowProvider::cashflow_schedule(cds, &MarketContext::new(), as_of)?;
-        let premium_sign = match cds.side {
-            PayReceive::Pay => -1.0,
-            PayReceive::Receive => 1.0,
-        };
-        let protection_sign = -premium_sign;
-        let loss_given_default = 1.0 - cds.protection_leg.recovery_rate;
+    schedule.retain_flows(|flow| flow.date >= as_of);
+    let mut prev_survival = if as_of <= survival.base_date() {
+        1.0
+    } else {
+        let t = survival.day_count().year_fraction(
+            survival.base_date(),
+            as_of,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
+        survival.sp(t)
+    };
+    let conditioning_survival = prev_survival.max(f64::EPSILON);
+    let mut projected_flows = Vec::with_capacity(schedule.get_flows().len() * 2);
+    let mut previous_premium_date = as_of;
+    let include_accrual_on_default = CdsPricerConfig::default().include_accrual_on_default;
 
-        schedule.retain_flows(|flow| flow.date >= as_of);
-        let mut prev_survival = if as_of <= survival.base_date() {
-            1.0
-        } else {
+    for flow in schedule.into_flows() {
+        if matches!(flow.kind, CFKind::Fixed | CFKind::Stub) {
             let t = survival.day_count().year_fraction(
                 survival.base_date(),
-                as_of,
+                flow.date,
                 finstack_quant_core::dates::DayCountContext::default(),
             )?;
-            survival.sp(t)
-        };
-        let conditioning_survival = prev_survival.max(f64::EPSILON);
-        let mut projected_flows = Vec::with_capacity(schedule.get_flows().len() * 2);
-        let mut previous_premium_date = as_of;
-
-        for flow in schedule.into_flows() {
-            if matches!(flow.kind, CFKind::Fixed | CFKind::Stub) {
-                let t = survival.day_count().year_fraction(
-                    survival.base_date(),
-                    flow.date,
-                    finstack_quant_core::dates::DayCountContext::default(),
-                )?;
-                let current_survival = survival.sp(t);
-                let delta_default = (prev_survival - current_survival).max(0.0);
-                let conditional_default = delta_default / conditioning_survival;
-                let conditional_survival = current_survival / conditioning_survival;
-                let projected_survival = if self.cds_config.include_accrual_on_default {
-                    conditional_survival + 0.5 * conditional_default
-                } else {
-                    conditional_survival
-                };
-                let projected_premium = flow.amount.amount().abs() * projected_survival;
-                if projected_premium.abs() > f64::EPSILON {
-                    let mut projected_flow = flow.clone();
-                    projected_flow.amount =
-                        Money::new(projected_premium * premium_sign, flow.amount.currency())?;
-                    projected_flows.push(projected_flow);
-                }
-                if delta_default > 0.0 {
-                    let default_date =
-                        Self::midpoint_default_date(survival, previous_premium_date, flow.date)?;
-                    let settlement_date = Self::settlement_date_with_delay(
-                        default_date,
-                        cds.protection_leg.settlement_delay,
-                    )?;
-                    projected_flows.push(CashFlow::new(
-                        settlement_date,
-                        None,
-                        Money::new(
-                            cds.notional.amount()
-                                * loss_given_default
-                                * conditional_default
-                                * protection_sign,
-                            cds.notional.currency(),
-                        )?,
-                        CFKind::DefaultedNotional,
-                        0.0,
-                        None,
-                    ));
-                }
-                previous_premium_date = flow.date;
-                prev_survival = current_survival;
-            } else if flow.kind == CFKind::Fee {
+            let current_survival = survival.sp(t);
+            let delta_default = (prev_survival - current_survival).max(0.0);
+            let conditional_default = delta_default / conditioning_survival;
+            let conditional_survival = current_survival / conditioning_survival;
+            let projected_survival = if include_accrual_on_default {
+                conditional_survival + 0.5 * conditional_default
+            } else {
+                conditional_survival
+            };
+            let projected_premium = flow.amount.amount().abs() * projected_survival;
+            if projected_premium.abs() > f64::EPSILON {
                 let mut projected_flow = flow.clone();
                 projected_flow.amount =
-                    Money::new(flow.amount.amount() * premium_sign, flow.amount.currency())?;
+                    Money::new(projected_premium * premium_sign, flow.amount.currency())?;
                 projected_flows.push(projected_flow);
             }
+            if delta_default > 0.0 {
+                let default_date =
+                    midpoint_default_date(survival, previous_premium_date, flow.date)?;
+                let settlement_date =
+                    settlement_date_with_delay(default_date, cds.protection_leg.settlement_delay)?;
+                projected_flows.push(CashFlow::new(
+                    settlement_date,
+                    None,
+                    Money::new(
+                        cds.notional.amount()
+                            * loss_given_default
+                            * conditional_default
+                            * protection_sign,
+                        cds.notional.currency(),
+                    )?,
+                    CFKind::DefaultedNotional,
+                    0.0,
+                    None,
+                ));
+            }
+            previous_premium_date = flow.date;
+            prev_survival = current_survival;
+        } else if flow.kind == CFKind::Fee {
+            let mut projected_flow = flow.clone();
+            projected_flow.amount =
+                Money::new(flow.amount.amount() * premium_sign, flow.amount.currency())?;
+            projected_flows.push(projected_flow);
         }
-
-        Ok(projected_flows)
     }
 
-    fn midpoint_default_date(
-        survival: &HazardCurve,
-        start_date: Date,
-        end_date: Date,
-    ) -> Result<Date> {
-        let t_start = survival.day_count().year_fraction(
-            survival.base_date(),
-            start_date,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        let t_end = survival.day_count().year_fraction(
-            survival.base_date(),
-            end_date,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        Ok(date_from_hazard_time(survival, 0.5 * (t_start + t_end)))
-    }
+    Ok(projected_flows)
+}
 
-    /// Resolve the cash-settlement date for a default occurring on
-    /// `default_date`, given a business-day settlement delay.
-    ///
-    /// `settlement_delay` is a count of *business days* (T+N per ISDA). With
-    /// no holiday calendar available on this projection path, the delay is
-    /// applied via [`DateExt::add_weekdays`], which advances by whole
-    /// weekdays — so the result is **always a weekday**. The previous
-    /// implementation converted the business-day count to calendar days via
-    /// a `365 / business_days_per_year` ratio and added that as a raw
-    /// `Duration`, which could land the settlement on a Saturday or Sunday.
-    /// `add_weekdays` is both weekend-safe and an exact (rather than
-    /// ratio-approximated) weekday count.
-    fn settlement_date_with_delay(default_date: Date, settlement_delay: u16) -> Result<Date> {
-        if settlement_delay == 0 {
-            return Ok(default_date);
-        }
-        default_date.add_weekdays(i32::from(settlement_delay))
+fn midpoint_default_date(survival: &HazardCurve, start_date: Date, end_date: Date) -> Result<Date> {
+    let t_start = survival.day_count().year_fraction(
+        survival.base_date(),
+        start_date,
+        finstack_quant_core::dates::DayCountContext::default(),
+    )?;
+    let t_end = survival.day_count().year_fraction(
+        survival.base_date(),
+        end_date,
+        finstack_quant_core::dates::DayCountContext::default(),
+    )?;
+    Ok(date_from_hazard_time(survival, 0.5 * (t_start + t_end)))
+}
+
+/// Resolve the cash-settlement date for a default occurring on
+/// `default_date`, given a business-day settlement delay.
+///
+/// `settlement_delay` is a count of *business days* (T+N per ISDA). With
+/// no holiday calendar available on this projection path, the delay is
+/// applied via [`DateExt::add_weekdays`], which advances by whole
+/// weekdays — so the result is **always a weekday**. The previous
+/// implementation converted the business-day count to calendar days via
+/// a `365 / business_days_per_year` ratio and added that as a raw
+/// `Duration`, which could land the settlement on a Saturday or Sunday.
+/// `add_weekdays` is both weekend-safe and an exact (rather than
+/// ratio-approximated) weekday count.
+fn settlement_date_with_delay(default_date: Date, settlement_delay: u16) -> Result<Date> {
+    if settlement_delay == 0 {
+        return Ok(default_date);
     }
+    default_date.add_weekdays(i32::from(settlement_delay))
 }
 
 /// Registry pricer for CDS Index using the engine
@@ -754,17 +784,15 @@ impl finstack_quant_valuations_core::pricer::Pricer for SimpleCdsIndexHazardPric
 
         // Use the provided as_of date for valuation
         // Compute present value using the engine
-        let pv = CdsIndexPricer::new()
-            .npv(cds_index, market, as_of)
-            .map_err(|e| {
-                finstack_quant_valuations_core::pricer::PricingError::from_core(
-                    e,
-                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                        cds_index,
-                    )
-                    .model(finstack_quant_valuations_core::pricer::ModelKey::HazardRate),
+        let pv = cds_index.npv(market, as_of).map_err(|e| {
+            finstack_quant_valuations_core::pricer::PricingError::from_core(
+                e,
+                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
+                    cds_index,
                 )
-            })?;
+                .model(finstack_quant_valuations_core::pricer::ModelKey::HazardRate),
+            )
+        })?;
 
         Ok(
             finstack_quant_valuations_core::results::ValuationResult::stamped(
@@ -831,16 +859,15 @@ mod tests {
         ];
 
         let mut resolved = Vec::new();
-        let count = CdsIndexPricer::new()
-            .for_each_constituent(&index, |position| {
-                resolved.push((
-                    position.credit_curve_id.clone(),
-                    position.weight_effective,
-                    index.notional.amount() * index.index_factor * position.weight_effective,
-                ));
-                Ok(())
-            })
-            .expect("constituents should resolve");
+        let count = for_each_constituent(&index, |position| {
+            resolved.push((
+                position.credit_curve_id.clone(),
+                position.weight_effective,
+                index.notional.amount() * index.index_factor * position.weight_effective,
+            ));
+            Ok(())
+        })
+        .expect("constituents should resolve");
 
         assert_eq!(count, 1);
         assert_eq!(resolved[0].0.as_str(), "LIVE-HAZARD");
@@ -852,28 +879,24 @@ mod tests {
     fn upfront_respects_pay_receive_sign() {
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
-        let pricer = CdsIndexPricer::new();
         let upfront = Money::from((125_000_i64, Currency::USD));
 
         // Paid on the valuation date, so the discount factor is exactly 1.
         let mut pay = CdsIndex::example().expect("example");
         pay.upfront = Some((as_of, upfront));
-        let pay_base = pricer
-            .npv(&CdsIndex::example().expect("example"), &market, as_of)
+        let pay_base = CdsIndex::example()
+            .expect("example")
+            .npv(&market, as_of)
             .expect("base pay npv");
-        let pay_with_upfront = pricer
-            .npv(&pay, &market, as_of)
-            .expect("pay npv with upfront");
+        let pay_with_upfront = pay.npv(&market, as_of).expect("pay npv with upfront");
 
         let mut receive = CdsIndex::example().expect("example");
         receive.side = finstack_quant_valuations_core::instruments::PayReceive::Receive;
         let mut receive_with_upfront = receive.clone();
         receive_with_upfront.upfront = Some((as_of, upfront));
-        let receive_base = pricer
-            .npv(&receive, &market, as_of)
-            .expect("base receive npv");
-        let receive_total = pricer
-            .npv(&receive_with_upfront, &market, as_of)
+        let receive_base = receive.npv(&market, as_of).expect("base receive npv");
+        let receive_total = receive_with_upfront
+            .npv(&market, as_of)
             .expect("receive npv with upfront");
 
         assert!((pay_with_upfront.amount() - (pay_base.amount() - upfront.amount())).abs() < 1e-8);
@@ -884,8 +907,9 @@ mod tests {
     fn projected_schedule_contains_premium_and_default_rows() {
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
-        let schedule = CdsIndexPricer::new()
-            .build_projected_schedule(&CdsIndex::example().expect("example"), &market, as_of)
+        let schedule = CdsIndex::example()
+            .expect("example")
+            .build_projected_schedule(&market, as_of)
             .expect("projected schedule should build");
 
         assert!(schedule
@@ -907,9 +931,8 @@ mod tests {
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
         let index = CdsIndex::example().expect("example");
-        let pricer = CdsIndexPricer::new();
-        let schedule = pricer
-            .build_projected_schedule(&index, &market, as_of)
+        let schedule = index
+            .build_projected_schedule(&market, as_of)
             .expect("projected schedule should build");
         let discount = market.get_discount("USD-OIS").expect("discount curve");
         let discounted_total = schedule
@@ -920,7 +943,7 @@ mod tests {
                 acc.checked_add(flow.amount.checked_mul_f64(df)?)
             })
             .expect("discounted projected rows should sum");
-        let npv = pricer.npv(&index, &market, as_of).expect("index npv");
+        let npv = index.npv(&market, as_of).expect("index npv");
 
         let denom = npv.amount().abs().max(discounted_total.amount().abs());
         let rel_err = (npv.amount() - discounted_total.amount()).abs() / denom.max(1.0);
@@ -945,16 +968,13 @@ mod tests {
         // that the dual-pathway design previously violated.
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
-        let pricer = CdsIndexPricer::new();
         let index = CdsIndex::example().expect("example"); // Pay by default
 
-        let npv = pricer.npv(&index, &market, as_of).expect("npv");
-        let pv_prot = pricer
-            .pv_protection_leg(&index, &market, as_of)
+        let npv = index.npv(&market, as_of).expect("npv");
+        let pv_prot = index
+            .pv_protection_leg(&market, as_of)
             .expect("pv protection");
-        let pv_prem = pricer
-            .pv_premium_leg(&index, &market, as_of)
-            .expect("pv premium");
+        let pv_prem = index.pv_premium_leg(&market, as_of).expect("pv premium");
 
         // Pay: NPV = protection - premium
         let recomposed = pv_prot.amount() - pv_prem.amount();
@@ -1008,14 +1028,11 @@ mod tests {
             },
         ];
 
-        let pricer = CdsIndexPricer::new();
-        let npv = pricer.npv(&index, &market, as_of).expect("npv");
-        let pv_prot = pricer
-            .pv_protection_leg(&index, &market, as_of)
+        let npv = index.npv(&market, as_of).expect("npv");
+        let pv_prot = index
+            .pv_protection_leg(&market, as_of)
             .expect("pv protection");
-        let pv_prem = pricer
-            .pv_premium_leg(&index, &market, as_of)
-            .expect("pv premium");
+        let pv_prem = index.pv_premium_leg(&market, as_of).expect("pv premium");
 
         let recomposed = pv_prot.amount() - pv_prem.amount();
         assert!(
@@ -1039,8 +1056,7 @@ mod tests {
             weight: 1.0,
             defaulted: false,
         }];
-        let err = CdsIndexPricer::new()
-            .for_each_constituent(&index, |_| Ok(()))
+        let err = for_each_constituent(&index, |_| Ok(()))
             .expect_err("inconsistent index_factor should fail");
         let msg = format!("{err}");
         assert!(msg.contains("index_factor"), "got: {msg}");
@@ -1069,8 +1085,7 @@ mod tests {
                 defaulted: true,
             },
         ];
-        let err = CdsIndexPricer::new()
-            .for_each_constituent(&index, |_| Ok(()))
+        let err = for_each_constituent(&index, |_| Ok(()))
             .expect_err("understated index_factor should fail when defaults are declared");
         let msg = format!("{err}");
         assert!(msg.contains("index_factor"), "got: {msg}");
@@ -1090,8 +1105,7 @@ mod tests {
             weight: 1.0,
             defaulted: false,
         }];
-        CdsIndexPricer::new()
-            .for_each_constituent(&index, |_| Ok(()))
+        for_each_constituent(&index, |_| Ok(()))
             .expect("factor < 1 with no declared defaults must be accepted");
     }
 
@@ -1111,9 +1125,8 @@ mod tests {
                 defaulted: false,
             },
         ];
-        let err = CdsIndexPricer::new()
-            .for_each_constituent(&index, |_| Ok(()))
-            .expect_err("negative weight should fail");
+        let err =
+            for_each_constituent(&index, |_| Ok(())).expect_err("negative weight should fail");
         let msg = format!("{err}");
         assert!(
             msg.contains("invalid weight"),
@@ -1134,8 +1147,8 @@ mod tests {
         for offset in 0..14 {
             let default_date = start + time::Duration::days(offset);
             for delay in [1_u16, 2, 3, 5] {
-                let settle = CdsIndexPricer::settlement_date_with_delay(default_date, delay)
-                    .expect("valid settlement date");
+                let settle =
+                    settlement_date_with_delay(default_date, delay).expect("valid settlement date");
                 assert!(
                     !settle.is_weekend(),
                     "settlement (default {default_date:?}, T+{delay}) must be a \
@@ -1151,7 +1164,7 @@ mod tests {
         // T+0 is a pass-through (same date, no business-day roll).
         let d = date(2025, 1, 4); // Saturday
         assert_eq!(
-            CdsIndexPricer::settlement_date_with_delay(d, 0).expect("valid settlement date"),
+            settlement_date_with_delay(d, 0).expect("valid settlement date"),
             d,
             "T+0 settlement is a pass-through of the default date"
         );

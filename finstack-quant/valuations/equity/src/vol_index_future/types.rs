@@ -42,7 +42,6 @@
 //! - CBOE (2019). "VIX Futures Contract Specifications." `docs/REFERENCES.md#cboe-vix-white-paper`
 //! - Whaley, R. E. (2009). "Understanding the VIX." *Journal of Portfolio Management*. `docs/REFERENCES.md#whaley-2009-vix`
 
-use super::pricer;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -186,14 +185,20 @@ impl VolatilityIndexFuture {
         Ok(())
     }
 
-    /// Calculate the raw present value as f64.
+    /// Calculate the raw present value as f64: the undiscounted
+    /// variation-margin P&L `sign × contracts × multiplier × (mark − entry_price)`,
+    /// zero after settlement.
     ///
     /// # Arguments
     ///
     /// * `market` - Market context containing the volatility index curve.
     /// * `as_of` - Valuation date controlling live versus final-settlement state.
     pub fn npv_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
-        pricer::compute_pv_raw(self, market, as_of)
+        self.validate()?;
+        if as_of > self.terms.settlement_date {
+            return Ok(0.0);
+        }
+        self.terms.mark_to_market(self.mark_price(market, as_of)?)
     }
 
     /// Model futures level in index points: the volatility index curve read at
@@ -210,7 +215,18 @@ impl VolatilityIndexFuture {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        pricer::fair_price(self, market, as_of)
+        // The curve's own base date anchors the time axis (see `as_of` above).
+        let _ = as_of;
+        let vol_curve = market.get_vol_index_curve(&self.vol_index_curve_id)?;
+        let t = vol_curve
+            .day_count()
+            .year_fraction(
+                vol_curve.base_date(),
+                self.terms.settlement_date,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )?
+            .max(0.0);
+        Ok(vol_curve.price(t))
     }
 
     /// Resolve the live quote, model level, or official final settlement price.
@@ -227,7 +243,17 @@ impl VolatilityIndexFuture {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        pricer::mark_price(self, market, as_of)
+        self.validate()?;
+        if as_of >= self.terms.settlement_date {
+            return self.terms.settlement_price.ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "VolatilityIndexFuture '{}' requires terms.settlement_price on settlement date {}",
+                    self.id, self.terms.settlement_date
+                ))
+            });
+        }
+        self.terms
+            .resolve_mark(self.id.as_str(), as_of, || self.fair_price(market, as_of))
     }
 
     /// P&L change for a 1-point increase in the vol index level
@@ -257,7 +283,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for VolatilityIndex
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        pricer::compute_pv(self, curves, as_of)
+        Money::new(self.npv_raw(curves, as_of)?, self.terms.currency)
     }
 
     fn base_value_raw(
@@ -265,7 +291,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for VolatilityIndex
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        pricer::compute_pv_raw(self, curves, as_of)
+        self.npv_raw(curves, as_of)
     }
 
     fn base_value_raw_with_currency(
@@ -273,10 +299,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for VolatilityIndex
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<(f64, Currency)> {
-        Ok((
-            pricer::compute_pv_raw(self, curves, as_of)?,
-            self.terms.currency,
-        ))
+        Ok((self.npv_raw(curves, as_of)?, self.terms.currency))
     }
 
     fn expiry(&self) -> Option<Date> {
@@ -462,5 +485,63 @@ mod tests {
             serde_json::from_str(&json).expect("json deserialization");
         assert_eq!(future.id, recovered.id);
         assert_eq!(future, recovered);
+    }
+
+    /// Convention golden: on a FLAT vol-index curve the fair future equals the
+    /// quoted forward level EXACTLY (the curve IS the futures strip — no
+    /// convexity term is added or removed; see the module docs on
+    /// `PriceCurve` for why variance-derived inputs are forbidden),
+    /// and the MTM is undiscounted variation margin
+    /// `(F − entry) × multiplier × contracts × sign` in exact dollars.
+    #[test]
+    fn flat_curve_future_equals_forward_level_with_exact_variation_margin() {
+        let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .knots([(0.0, 1.0), (1.0, 0.97)])
+            .build()
+            .expect("disc");
+        let vix = PriceCurve::builder("VIX")
+            .kind(PriceCurveKind::VolIndex)
+            .base_date(base_date)
+            .spot_price(21.5)
+            .knots([(0.0, 21.5), (1.0, 21.5)]) // flat futures strip at 21.5
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(disc).insert(vix);
+
+        let settlement = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
+        // Long 1 contract, entry 20.0, $1000/point.
+        let future = VolatilityIndexFuture::builder()
+            .id(InstrumentId::new("VIX-PRICER"))
+            .terms(
+                ListedFutureTerms::new(
+                    1.0,
+                    1_000.0,
+                    Currency::USD,
+                    20.0,
+                    settlement,
+                    settlement,
+                    Position::Long,
+                )
+                .expect("terms"),
+            )
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .vol_index_curve_id(CurveId::new("VIX"))
+            .attributes(Attributes::new())
+            .build()
+            .expect("valid future");
+
+        // Fair forward = curve level exactly (no convexity adjustment).
+        let fair = future.fair_price(&market, base_date).expect("forward");
+        assert_eq!(fair, 21.5);
+
+        // Long MTM: (21.5 − 20.0) × $1000 × contracts, undiscounted.
+        let pv = future.npv_raw(&market, base_date).expect("pv");
+        let expected = 1.5 * 1000.0 * future.terms.contracts;
+        assert!(
+            (pv - expected).abs() < 1e-9,
+            "variation-margin MTM must be exact: got {pv}, expected {expected}"
+        );
     }
 }

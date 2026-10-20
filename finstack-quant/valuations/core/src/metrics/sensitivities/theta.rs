@@ -126,7 +126,18 @@ pub fn calculate_theta_date(
     Ok(rolled_date)
 }
 
-/// Collect period economic cash that occurs during a time period.
+/// Signed cash receipts used by total-return and income attribution.
+#[derive(Debug, Clone, Copy)]
+pub struct PeriodCash {
+    /// All eligible economic cash in the requested reporting currency,
+    /// including principal repayments and signed notional exchanges.
+    pub total: finstack_quant_core::money::Money,
+    /// Coupon, interest and fee cash in the same reporting currency as
+    /// `total`; principal, recovery and notional exchanges are excluded.
+    pub income: finstack_quant_core::money::Money,
+}
+
+/// Collect period economic cash while separating income from principal receipts.
 ///
 /// Uses the full `cashflow_schedule()` so that each flow's [`CFKind`] is
 /// available for filtering. A flow enters the sum when its **payment date**
@@ -163,47 +174,8 @@ pub fn calculate_theta_date(
 /// fall in `(start_date, end_date]`. The instrument declares this convention
 /// through `Instrument::includes_valuation_date_cashflows`.
 ///
-/// # Arguments
-///
-/// * `instrument` - Instrument whose full cashflow schedule is queried.
-/// * `curves` - Market context used to construct the schedule and convert
-///   eligible receipts into `base_currency` at each payment date using this
-///   snapshot's FX provider. Missing FX rates propagate as errors.
-/// * `start_date` - Opening valuation date; receipt inclusion follows the instrument PV boundary.
-/// * `end_date` - Closing valuation date; receipt inclusion follows the instrument PV boundary.
-/// * `base_currency` - Reporting currency of the returned economic cash sum, including principal.
-///
-/// # Returns
-/// Signed sum of eligible economic cash in the period, including principal,
-/// converted to `base_currency`; capitalized and collateral transfers are excluded.
-pub fn collect_cashflows_in_period(
-    instrument: &dyn crate::instruments::Instrument,
-    curves: &finstack_quant_core::market_data::context::MarketContext,
-    start_date: Date,
-    end_date: Date,
-    base_currency: Currency,
-) -> Result<f64> {
-    collect_period_cash(instrument, curves, start_date, end_date, base_currency)
-        .map(|cash| cash.total.amount())
-}
-
-/// Signed cash receipts used by total-return and income attribution.
-#[derive(Debug, Clone, Copy)]
-pub struct PeriodCash {
-    /// All eligible economic cash in the requested reporting currency,
-    /// including principal repayments and signed notional exchanges.
-    pub total: finstack_quant_core::money::Money,
-    /// Coupon, interest and fee cash in the same reporting currency as
-    /// `total`; principal, recovery and notional exchanges are excluded.
-    pub income: finstack_quant_core::money::Money,
-}
-
-/// Collect period cash while separating income from principal receipts.
-///
-/// Uses the payment-date interval and economic-cash exclusions documented by
-/// [`collect_cashflows_in_period`]. Each eligible payment is converted once
-/// at its payment-date FX rate. Principal enters `total` without being labeled
-/// coupon or interest income.
+/// Each eligible payment is converted once at its payment-date FX rate.
+/// Principal enters `total` without being labeled coupon or interest income.
 ///
 /// # Arguments
 ///
@@ -216,6 +188,12 @@ pub struct PeriodCash {
 /// * `end_date` - Closing valuation date; the complementary PV boundary
 ///   determines whether same-day payments are included.
 /// * `base_currency` - Reporting currency shared by the returned total and income.
+///
+/// # Returns
+///
+/// [`PeriodCash`] whose `total` is the signed sum of eligible economic cash in
+/// the period, including principal, converted to `base_currency`; capitalized
+/// and collateral transfers are excluded.
 ///
 /// # Errors
 ///
@@ -237,16 +215,6 @@ pub fn collect_period_cash(
         instrument.notional_draw_date(),
         instrument.includes_valuation_date_cashflows(),
     )
-}
-
-pub fn collect_cashflows_in_period_cached(
-    context: &mut crate::metrics::MetricContext,
-    start_date: Date,
-    end_date: Date,
-    base_currency: Currency,
-) -> Result<f64> {
-    collect_period_cash_cached(context, start_date, end_date, base_currency)
-        .map(|cash| cash.total.amount())
 }
 
 pub fn collect_period_cash_cached(
@@ -437,8 +405,9 @@ fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Resul
         .amount();
 
     let start_date = context.as_of;
-    let carry =
-        collect_cashflows_in_period_cached(context, start_date, rolled_date, base_currency)?;
+    let carry = collect_period_cash_cached(context, start_date, rolled_date, base_currency)?
+        .total
+        .amount();
 
     let roll_down = rolled_pv - base_pv;
 

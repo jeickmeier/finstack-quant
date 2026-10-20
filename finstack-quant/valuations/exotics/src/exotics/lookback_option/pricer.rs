@@ -33,7 +33,7 @@ impl LookbackOptionMcPricer {
     }
 
     /// Price a lookback option using Monte Carlo.
-    fn price_internal(
+    pub(crate) fn price_internal(
         &self,
         inst: &LookbackOption,
         curves: &MarketContext,
@@ -250,16 +250,6 @@ impl Pricer for LookbackOptionMcPricer {
 
         Ok(ValuationResult::stamped(lookback.id(), as_of, pv))
     }
-}
-
-/// Present value using Monte Carlo.
-pub(crate) fn compute_pv(
-    inst: &LookbackOption,
-    curves: &MarketContext,
-    as_of: Date,
-) -> finstack_quant_core::Result<Money> {
-    let pricer = LookbackOptionMcPricer::new();
-    pricer.price_internal(inst, curves, as_of)
 }
 
 use finstack_quant_models::closed_form::lookback::{

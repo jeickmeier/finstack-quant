@@ -1,4 +1,4 @@
-//! Pricing and metric helpers for equity instruments.
+//! Variance swap pricing, observation schedule and variance estimators.
 //!
 use crate::variance_swap::VarianceSwap;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
@@ -45,21 +45,21 @@ pub(crate) fn compute_pv(
                 &low,
                 &close,
                 Some(inst.realized_var_method),
-                Some(annualization_factor(inst)),
+                Some(inst.annualization_factor()),
             )?
         } else {
-            let prices = get_historical_prices(inst, curves, as_of)?;
+            let prices = inst.get_historical_prices(curves, as_of)?;
             if prices.is_empty() {
                 return Ok(Money::from((0_i64, inst.notional.currency())));
             }
-            realized_variance(&prices, Some(annualization_factor(inst)))?
+            realized_variance(&prices, Some(inst.annualization_factor()))?
         };
         let df = disc.as_ref().df_between_dates(as_of, settlement_date)?;
         return inst.payoff(realized_var)?.checked_mul_f64(df);
     }
 
     if as_of < inst.start_date {
-        let forward_var = remaining_forward_variance(inst, curves, as_of)?;
+        let forward_var = inst.remaining_forward_variance(curves, as_of)?;
         let undiscounted = inst.payoff(forward_var)?;
         let df = disc.as_ref().df_between_dates(as_of, settlement_date)?;
         return undiscounted.checked_mul_f64(df);
@@ -69,123 +69,234 @@ pub(crate) fn compute_pv(
     // and remaining forward variance. Shared with the `ExpectedVariance` metric via
     // `seasoned_expected_variance` so the reported metric can never drift from the
     // variance implied by this PV (W-32/W-33).
-    let expected_var = seasoned_expected_variance(inst, curves, as_of)?;
+    let expected_var = inst.seasoned_expected_variance(curves, as_of)?;
     let undiscounted = inst.payoff(expected_var)?;
     let df = disc.as_ref().df_between_dates(as_of, settlement_date)?;
     undiscounted.checked_mul_f64(df)
 }
 
-/// Expected annualized variance using the same sample-count basis as settlement.
-/// The observed part uses the contractual estimator and annualization; remaining
-/// samples use forward variance. A fully observed swap needs no volatility input.
-pub(crate) fn seasoned_expected_variance(
-    inst: &VarianceSwap,
-    curves: &MarketContext,
-    as_of: Date,
-) -> Result<f64> {
-    let w = realized_fraction_by_observations(inst, as_of)?;
-    let realized = partial_realized_variance(inst, curves, as_of)?;
-    if w >= 1.0 {
-        return Ok(realized);
-    }
-    let forward = remaining_forward_variance(inst, curves, as_of)?;
-    Ok(realized * w + forward * (1.0 - w))
-}
-
-pub(crate) fn observation_dates(inst: &VarianceSwap) -> Result<Vec<Date>> {
-    finstack_quant_valuations_core::instruments::pricing::variance_observations::variance_observation_dates(
-        inst.start_date,
-        inst.maturity,
-        inst.observation_frequency,
-        inst.observation_business_day_convention,
-        inst.observation_end_of_month,
-        finstack_quant_valuations_core::instruments::pricing::variance_observations::VarianceCalendar::Single(
-            &inst.observation_calendar_id,
-        ),
-    )
-}
-
-pub(crate) fn annualization_factor(inst: &VarianceSwap) -> f64 {
-    finstack_quant_valuations_core::instruments::pricing::variance_observations::annualization_factor(
-        inst.observation_frequency,
-        inst.trading_days_per_year,
-    )
-}
-
-pub(crate) fn realized_fraction_by_observations(inst: &VarianceSwap, as_of: Date) -> Result<f64> {
-    let all = observation_dates(inst)?;
-    if all.is_empty() {
-        return Ok(0.0);
-    }
-    if as_of < inst.start_date {
-        return Ok(0.0);
-    }
-    if as_of >= all.last().copied().unwrap_or(inst.maturity) {
-        return Ok(1.0);
-    }
-    // Close-to-close and Yang-Zhang need the first level as an anchor;
-    // the other OHLC estimators count each bar as one sample.
-    let anchor = usize::from(
-        !inst.realized_var_method.requires_ohlc()
-            || inst.realized_var_method
-                == finstack_quant_core::math::stats::RealizedVarMethod::YangZhang,
-    );
-    let total = all.len().saturating_sub(anchor);
-    let realized = all
-        .iter()
-        .filter(|&&d| d <= as_of)
-        .count()
-        .saturating_sub(anchor);
-    if total == 0 {
-        return Err(finstack_quant_core::Error::Validation(
-            "variance swap has no return samples".into(),
-        ));
-    }
-    Ok(realized as f64 / total as f64)
-}
-
-pub(crate) fn get_historical_prices(
-    inst: &VarianceSwap,
-    context: &MarketContext,
-    as_of: Date,
-) -> Result<Vec<f64>> {
-    let close_id = inst.close_series_id();
-    let past_dates: Vec<Date> = observation_dates(inst)?
-        .into_iter()
-        .filter(|&d| d <= as_of)
-        .collect();
-
-    if let Ok(series) = context.get_series(close_id) {
-        if past_dates.len() >= 2 {
-            return past_dates
-                .iter()
-                .map(|&date| series.value_on_exact(date))
-                .collect();
+impl VarianceSwap {
+    /// Seasoned mark-to-market expected variance: the observation-count
+    /// blend of realized-to-date and remaining forward variance.
+    ///
+    /// Uses the same sample-count basis as settlement. The observed part uses
+    /// the contractual estimator and annualization; remaining samples use
+    /// forward variance. A fully observed swap needs no volatility input.
+    ///
+    /// This is exactly the expected variance the pricer feeds into the payoff for
+    /// a partially-observed swap (`start_date <= as_of < maturity`), so the
+    /// `ExpectedVariance` metric and the swap's PV stay consistent (W-33).
+    ///
+    /// # Arguments
+    ///
+    /// * `curves` - Market context holding the close (or OHLC) series, spot, discount curve and volatility surface named by the swap.
+    /// * `as_of` - Valuation date; observations on this date count as realized.
+    pub fn seasoned_expected_variance(&self, curves: &MarketContext, as_of: Date) -> Result<f64> {
+        let w = self.realized_fraction_by_observations(as_of)?;
+        let realized = self.partial_realized_variance(curves, as_of)?;
+        if w >= 1.0 {
+            return Ok(realized);
         }
-    }
-    if past_dates.len() >= 2 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "VarianceSwap '{}' has {} past observation dates but no historical price data is available in series '{}'. Provide the time series before pricing a seasoned swap.",
-            inst.id.as_str(),
-            past_dates.len(),
-            close_id
-        )));
-    }
-    if let Ok(scalar) = context.get_price(&inst.spot_id) {
-        let spot =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
-                scalar,
-                inst.notional.currency(),
-            )?;
-        return Ok(vec![spot]);
+        let forward = self.remaining_forward_variance(curves, as_of)?;
+        Ok(realized * w + forward * (1.0 - w))
     }
 
-    // Only acceptable in two cases: (a) the swap hasn't accrued any past
-    // observations yet, or (b) it has accrued ≤ 1, in which case realised
-    // variance is 0 by definition. Otherwise this is a data-availability
-    // failure and must error rather than silently mark the swap to zero
-    // realised variance.
-    Ok(vec![])
+    /// Get observation dates based on frequency.
+    ///
+    /// Day tenors use the calendar in
+    /// `attributes.meta["observation_calendar_id"]` (or `calendar_id`),
+    /// defaulting to weekends-only. Non-business start and maturity dates are
+    /// adjusted following and preceding, respectively.
+    pub fn observation_dates(&self) -> Result<Vec<Date>> {
+        finstack_quant_valuations_core::instruments::pricing::variance_observations::variance_observation_dates(
+            self.start_date,
+            self.maturity,
+            self.observation_frequency,
+            self.observation_business_day_convention,
+            self.observation_end_of_month,
+            finstack_quant_valuations_core::instruments::pricing::variance_observations::VarianceCalendar::Single(
+                &self.observation_calendar_id,
+            ),
+        )
+    }
+
+    /// Calculate annualization factor based on observation frequency.
+    ///
+    /// Daily observations annualise with the contract's
+    /// `trading_days_per_year` (252 by default, Demeterfi et al., 1999):
+    /// σ²_annual = (trading_days_per_year/N) × Σ [ln(S_i/S_{i-1})]² for N
+    /// observations. Weekly and month-based frequencies use 52 and 12.
+    pub fn annualization_factor(&self) -> f64 {
+        finstack_quant_valuations_core::instruments::pricing::variance_observations::annualization_factor(
+            self.observation_frequency,
+            self.trading_days_per_year,
+        )
+    }
+
+    /// Fraction of contractual variance samples observed by valuation date.
+    ///
+    /// Close-to-close and Yang-Zhang exclude the initial anchoring level;
+    /// other OHLC estimators count each observed bar. Uses the observation
+    /// schedule, including its calendar adjustments, rather than elapsed days.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date; scheduled observations on this date are included. Dates before inception return zero and dates at or after the final observation return one.
+    pub fn realized_fraction_by_observations(&self, as_of: Date) -> Result<f64> {
+        let all = self.observation_dates()?;
+        if all.is_empty() {
+            return Ok(0.0);
+        }
+        if as_of < self.start_date {
+            return Ok(0.0);
+        }
+        if as_of >= all.last().copied().unwrap_or(self.maturity) {
+            return Ok(1.0);
+        }
+        // Close-to-close and Yang-Zhang need the first level as an anchor;
+        // the other OHLC estimators count each bar as one sample.
+        let anchor = usize::from(
+            !self.realized_var_method.requires_ohlc()
+                || self.realized_var_method
+                    == finstack_quant_core::math::stats::RealizedVarMethod::YangZhang,
+        );
+        let total = all.len().saturating_sub(anchor);
+        let realized = all
+            .iter()
+            .filter(|&&d| d <= as_of)
+            .count()
+            .saturating_sub(anchor);
+        if total == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "variance swap has no return samples".into(),
+            ));
+        }
+        Ok(realized as f64 / total as f64)
+    }
+
+    /// Get historical prices aligned to observation dates when available.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Market context holding the close-price series named by the swap and, as a fallback, its spot price.
+    /// * `as_of` - Valuation date; scheduled observations on or before it are returned.
+    pub fn get_historical_prices(&self, context: &MarketContext, as_of: Date) -> Result<Vec<f64>> {
+        let close_id = self.close_series_id();
+        let past_dates: Vec<Date> = self
+            .observation_dates()?
+            .into_iter()
+            .filter(|&d| d <= as_of)
+            .collect();
+
+        if let Ok(series) = context.get_series(close_id) {
+            if past_dates.len() >= 2 {
+                return past_dates
+                    .iter()
+                    .map(|&date| series.value_on_exact(date))
+                    .collect();
+            }
+        }
+        if past_dates.len() >= 2 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "VarianceSwap '{}' has {} past observation dates but no historical price data is available in series '{}'. Provide the time series before pricing a seasoned swap.",
+                self.id.as_str(),
+                past_dates.len(),
+                close_id
+            )));
+        }
+        if let Ok(scalar) = context.get_price(&self.spot_id) {
+            let spot =
+                finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+                    scalar,
+                    self.notional.currency(),
+                )?;
+            return Ok(vec![spot]);
+        }
+
+        // Only acceptable in two cases: (a) the swap hasn't accrued any past
+        // observations yet, or (b) it has accrued ≤ 1, in which case realised
+        // variance is 0 by definition. Otherwise this is a data-availability
+        // failure and must error rather than silently mark the swap to zero
+        // realised variance.
+        Ok(vec![])
+    }
+
+    /// Calculate partial realized variance for the elapsed period.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Market context holding the close (or OHLC) series named by the swap.
+    /// * `as_of` - Valuation date; observations on or before it enter the estimator.
+    pub fn partial_realized_variance(&self, context: &MarketContext, as_of: Date) -> Result<f64> {
+        realized_variance_with_factor(self, context, as_of, self.annualization_factor())
+    }
+
+    /// Calculate implied forward variance for the remaining period.
+    ///
+    /// Uses the Carr-Madan (1998) replication formula when a volatility surface is available:
+    /// ```text
+    /// E[σ²] = (2·e^{rT}/T) × ∫ [V(K)/K²] dK − (2/T)·[(F/K₀ − 1) − ln(F/K₀)]
+    /// ```
+    /// where V(K) are OTM put/call prices, F is the forward price, and K₀ is the highest
+    /// strike at or below the forward. The anchor term is the EXACT Demeterfi et al.
+    /// log-contract correction (not its second-order Taylor expansion). For a
+    /// forward-starting swap (`as_of < start_date`) the pre-start leg is removed
+    /// via the total-variance identity. Sparse or missing surfaces error unless
+    /// the instrument carries an explicit flat implied-volatility override.
+    ///
+    /// References: Carr, P. & Madan, D. (1998). "Towards a Theory of Volatility Trading";
+    /// Demeterfi, Derman, Kamal & Zou (1999). "More Than You Ever Wanted to Know About
+    /// Volatility Swaps."
+    ///
+    /// Forward (remaining) variance for the swap's accrual window.
+    ///
+    /// For a live or seasoned swap (`as_of >= start_date`) this is the expected
+    /// variance over `[as_of, final_observation_date]`. For a FORWARD-STARTING
+    /// swap (`as_of < start_date`) variance accrues only from `start_date`, so the
+    /// spot-started replication over `[as_of, T]` must have the pre-start leg
+    /// removed via the total-variance identity (Demeterfi et al. 1999, forward
+    /// variance):
+    ///
+    /// ```text
+    /// K²[start,T] = (t1·K²[as_of,T] − t0·K²[as_of,start]) / (t1 − t0)
+    /// ```
+    ///
+    /// A negative result means the supplied term structure violates calendar
+    /// monotonicity and is rejected as an arbitrageable input.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Market context holding the spot, discount curve, optional dividend yield and volatility surface named by the swap.
+    /// * `as_of` - Valuation date; the forward window starts here, or at `start_date` for a forward-starting swap.
+    pub fn remaining_forward_variance(&self, context: &MarketContext, as_of: Date) -> Result<f64> {
+        let final_observation_date = self.final_observation_date()?;
+        let var_to_end = spot_variance_to_date(self, context, as_of, final_observation_date)?;
+
+        if as_of >= self.start_date {
+            return Ok(var_to_end);
+        }
+
+        let t0 = self
+            .day_count
+            .year_fraction(as_of, self.start_date, Default::default())?;
+        let t1 = self
+            .day_count
+            .year_fraction(as_of, final_observation_date, Default::default())?;
+        if t0 <= FORWARD_START_MIN_T || (t1 - t0) <= FORWARD_START_MIN_T {
+            return Ok(var_to_end);
+        }
+
+        let var_to_start = spot_variance_to_date(self, context, as_of, self.start_date)?;
+        let fwd = (var_to_end * t1 - var_to_start * t0) / (t1 - t0);
+        if fwd < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "VarianceSwap '{}': forward variance is negative over [{}, {}]: \
+                 start_variance={var_to_start}, end_variance={var_to_end}, result={fwd}",
+                self.id, self.start_date, final_observation_date
+            )));
+        }
+        Ok(fwd)
+    }
 }
 
 /// Load aligned OHLC histories from the market context for OHLC-based estimators.
@@ -220,7 +331,8 @@ pub(crate) fn get_historical_ohlc(
         ))
     })?;
 
-    let dates: Vec<Date> = observation_dates(inst)?
+    let dates: Vec<Date> = inst
+        .observation_dates()?
         .into_iter()
         .filter(|&d| d <= as_of)
         .collect();
@@ -265,73 +377,16 @@ fn realized_variance_with_factor(
             Some(annualization_factor),
         );
     }
-    let prices = get_historical_prices(inst, context, as_of)?;
+    let prices = inst.get_historical_prices(context, as_of)?;
     if prices.len() < 2 {
         return Ok(0.0);
     }
     realized_variance(&prices, Some(annualization_factor))
 }
 
-pub(crate) fn partial_realized_variance(
-    inst: &VarianceSwap,
-    context: &MarketContext,
-    as_of: Date,
-) -> Result<f64> {
-    realized_variance_with_factor(inst, context, as_of, annualization_factor(inst))
-}
-
 /// Minimum year-fraction below which the forward-start subtraction is skipped
 /// (the pre-start gap or the accrual window is economically degenerate).
 const FORWARD_START_MIN_T: f64 = 1e-6;
-
-/// Forward (remaining) variance for the swap's accrual window.
-///
-/// For a live or seasoned swap (`as_of >= start_date`) this is the expected
-/// variance over `[as_of, final_observation_date]`. For a FORWARD-STARTING
-/// swap (`as_of < start_date`) variance accrues only from `start_date`, so the
-/// spot-started replication over `[as_of, T]` must have the pre-start leg
-/// removed via the total-variance identity (Demeterfi et al. 1999, forward
-/// variance):
-///
-/// ```text
-/// K²[start,T] = (t1·K²[as_of,T] − t0·K²[as_of,start]) / (t1 − t0)
-/// ```
-///
-/// A negative result means the supplied term structure violates calendar
-/// monotonicity and is rejected as an arbitrageable input.
-pub(crate) fn remaining_forward_variance(
-    inst: &VarianceSwap,
-    context: &MarketContext,
-    as_of: Date,
-) -> Result<f64> {
-    let final_observation_date = inst.final_observation_date()?;
-    let var_to_end = spot_variance_to_date(inst, context, as_of, final_observation_date)?;
-
-    if as_of >= inst.start_date {
-        return Ok(var_to_end);
-    }
-
-    let t0 = inst
-        .day_count
-        .year_fraction(as_of, inst.start_date, Default::default())?;
-    let t1 = inst
-        .day_count
-        .year_fraction(as_of, final_observation_date, Default::default())?;
-    if t0 <= FORWARD_START_MIN_T || (t1 - t0) <= FORWARD_START_MIN_T {
-        return Ok(var_to_end);
-    }
-
-    let var_to_start = spot_variance_to_date(inst, context, as_of, inst.start_date)?;
-    let fwd = (var_to_end * t1 - var_to_start * t0) / (t1 - t0);
-    if fwd < 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "VarianceSwap '{}': forward variance is negative over [{}, {}]: \
-             start_variance={var_to_start}, end_variance={var_to_end}, result={fwd}",
-            inst.id, inst.start_date, final_observation_date
-        )));
-    }
-    Ok(fwd)
-}
 
 /// Spot-started expected variance over `[as_of, target_date]`.
 ///
@@ -493,7 +548,7 @@ mod tests {
         swap.instrument_pricing_overrides = swap
             .instrument_pricing_overrides
             .with_implied_volatility(0.2);
-        let dates = observation_dates(&swap).expect("dates");
+        let dates = swap.observation_dates().expect("dates");
         let final_date = *dates.last().expect("final observation");
         let prices: Vec<_> = dates
             .iter()
@@ -502,9 +557,12 @@ mod tests {
             .collect();
         let market = build_market(final_date)
             .insert_series(ScalarTimeSeries::new("SPX", prices, None).expect("series"));
-        let expected = partial_realized_variance(&swap, &market, final_date).expect("realized");
-        let actual =
-            seasoned_expected_variance(&swap, &market, final_date).expect("expected variance");
+        let expected = swap
+            .partial_realized_variance(&market, final_date)
+            .expect("realized");
+        let actual = swap
+            .seasoned_expected_variance(&market, final_date)
+            .expect("expected variance");
         assert!((actual - expected).abs() < 1e-12, "{actual} vs {expected}");
     }
 
@@ -575,7 +633,9 @@ mod tests {
             .insert_price("SPX", MarketScalar::Unitless(100.0))
             .insert_price("SPX-DIVYIELD", MarketScalar::Unitless(0.015));
 
-        let fair_var = remaining_forward_variance(&swap, &market, as_of).expect("fair variance");
+        let fair_var = swap
+            .remaining_forward_variance(&market, as_of)
+            .expect("fair variance");
         assert!(
             (fair_var - vol * vol).abs() < 5e-4,
             "flat-surface equity replication must give K_var ≈ σ² = {}: got {fair_var}",
@@ -653,7 +713,9 @@ mod tests {
             .insert_price("SPX", MarketScalar::Unitless(100.0))
             .insert_price("SPX-DIVYIELD", MarketScalar::Unitless(0.0));
 
-        let fwd = remaining_forward_variance(&swap, &market, as_of).expect("forward variance");
+        let fwd = swap
+            .remaining_forward_variance(&market, as_of)
+            .expect("forward variance");
 
         // Independent expectation from the total-variance identity: both
         // sub-expiries sit in flat-in-t regions of the surface, so
@@ -705,7 +767,8 @@ mod tests {
             .expect("curve");
         let market = MarketContext::new().insert(curve);
 
-        let err = remaining_forward_variance(&swap, &market, as_of)
+        let err = swap
+            .remaining_forward_variance(&market, as_of)
             .expect_err("missing volatility must not manufacture a zero mark");
         assert!(err.to_string().contains("SPX-VOL"), "{err}");
     }
@@ -777,8 +840,9 @@ mod tests {
 
         // The count fraction must genuinely diverge from the time fraction;
         // otherwise the test would not distinguish the two weightings.
-        let count_w =
-            realized_fraction_by_observations(&swap, as_of).expect("observation fraction");
+        let count_w = swap
+            .realized_fraction_by_observations(as_of)
+            .expect("observation fraction");
         let time_w = swap.time_elapsed_fraction(as_of);
         assert!(
             (count_w - time_w).abs() > 1e-4,
@@ -788,7 +852,8 @@ mod tests {
         // Close series on every past observation date with a non-trivial
         // return path so realized variance differs from the scalar-vol forward
         // variance supplied by `build_market`.
-        let past: Vec<Date> = observation_dates(&swap)
+        let past: Vec<Date> = swap
+            .observation_dates()
             .expect("observation schedule")
             .into_iter()
             .filter(|&d| d <= as_of)
@@ -803,8 +868,12 @@ mod tests {
 
         let pv = compute_pv(&swap, &market, as_of).expect("seasoned pv");
 
-        let realized = partial_realized_variance(&swap, &market, as_of).expect("realized");
-        let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
+        let realized = swap
+            .partial_realized_variance(&market, as_of)
+            .expect("realized");
+        let forward = swap
+            .remaining_forward_variance(&market, as_of)
+            .expect("forward");
         let expected_var = realized * count_w + forward * (1.0 - count_w);
         let disc = market.get_discount("USD-OIS").expect("curve");
         let df = disc
@@ -842,31 +911,31 @@ mod tests {
         let mut swap = VarianceSwap::example().expect("example swap");
 
         swap.observation_frequency = Tenor::new(1, TenorUnit::Weeks).expect("valid tenor fixture");
-        assert_eq!(annualization_factor(&swap), 52.0);
+        assert_eq!(swap.annualization_factor(), 52.0);
 
         swap.observation_frequency = Tenor::new(2, TenorUnit::Weeks).expect("valid tenor fixture");
-        assert_eq!(annualization_factor(&swap), 26.0);
+        assert_eq!(swap.annualization_factor(), 26.0);
 
         swap.observation_frequency = Tenor::new(1, TenorUnit::Days).expect("valid tenor fixture");
-        assert_eq!(annualization_factor(&swap), 252.0);
+        assert_eq!(swap.annualization_factor(), 252.0);
 
         swap.observation_frequency = Tenor::new(7, TenorUnit::Days).expect("valid tenor fixture");
-        assert_eq!(annualization_factor(&swap), 36.0);
+        assert_eq!(swap.annualization_factor(), 36.0);
         swap.observation_frequency = Tenor::new(14, TenorUnit::Days).expect("valid tenor fixture");
-        assert_eq!(annualization_factor(&swap), 18.0);
+        assert_eq!(swap.annualization_factor(), 18.0);
 
         // The contract's trading_days_per_year replaces the 252 default.
         swap.trading_days_per_year = 260.0;
         swap.observation_frequency = Tenor::new(1, TenorUnit::Days).expect("valid tenor fixture");
-        assert_eq!(annualization_factor(&swap), 260.0);
+        assert_eq!(swap.annualization_factor(), 260.0);
         swap.observation_frequency = Tenor::new(2, TenorUnit::Days).expect("valid tenor fixture");
-        assert_eq!(annualization_factor(&swap), 130.0);
+        assert_eq!(swap.annualization_factor(), 130.0);
         swap.trading_days_per_year = 252.0;
 
         swap.start_date = date!(2025 - 01 - 03); // Friday
         swap.maturity = date!(2025 - 01 - 15);
         swap.observation_frequency = Tenor::new(2, TenorUnit::Days).expect("valid tenor fixture");
-        let dates = observation_dates(&swap).expect("observation schedule");
+        let dates = swap.observation_dates().expect("observation schedule");
         assert_eq!(dates[0], date!(2025 - 01 - 03));
         assert_eq!(dates[1], date!(2025 - 01 - 07));
         assert!(dates

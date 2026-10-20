@@ -149,9 +149,11 @@ impl Bond {
                 lsmc: None,
             }),
             ModelKey::Tree => TreePricer::with_config(bond_tree_config(self, curves)?)
-                .price_at_oas_outcome(self, curves, as_of, oas_quote_decimal * 10_000.0),
+                .prepare(self, curves, as_of)?
+                .price(oas_quote_decimal * 10_000.0),
             ModelKey::RatesCredit => TreePricer::rates_credit(bond_tree_settings(self))
-                .price_at_oas_outcome(self, curves, as_of, oas_quote_decimal * 10_000.0),
+                .prepare(self, curves, as_of)?
+                .price(oas_quote_decimal * 10_000.0),
             _ => Err(finstack_quant_core::Error::Validation(format!(
                 "Bond '{}' does not support pricing model '{}'",
                 self.id,
@@ -238,20 +240,6 @@ impl Bond {
         as_of: finstack_quant_core::dates::Date,
     ) -> Result<f64> {
         Ok(self.price_for_model_outcome(model, curves, as_of)?.amount)
-    }
-
-    /// Compute the bond's unshocked pricing-policy value without entering the
-    /// public instrument lifecycle.
-    ///
-    /// This is the instrument-native default path used by `base_value` and
-    /// `base_value_raw`. Explicit registry pricing bypasses inference and calls
-    /// [`Self::price_for_model_raw`] with the caller-selected model.
-    pub(crate) fn base_value_raw_impl(
-        &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> Result<f64> {
-        self.price_for_model_raw(self.default_pricing_model(), curves, as_of)
     }
 
     /// Pricing-oriented dated cashflows: coupons, amortization, and positive

@@ -33,7 +33,7 @@ Everything supported is re-exported from `crate::metrics`. `risk` is public.
 | `bump_surface_vol_absolute` | Absolute vol-point surface bump helper |
 | `STANDARD_BUCKETS_YEARS`, `STANDARD_BUCKET_LABELS`, `format_bucket_label` | Canonical key-rate bucket grid and labels |
 | `CrossFactorCalculator`, `CrossFactorPair` | Cross-gamma style two-factor sensitivities |
-| `collect_cashflows_in_period` | Theta helper for period cashflow collection |
+| `collect_period_cash`, `PeriodCash` | Period economic cash (total and income) for theta carry and attribution |
 | `risk::{calculate_var, VarConfig, VarMethod, VarResult}` | Historical VaR entry point and configuration |
 | `risk::{GenericHVar, GenericExpectedShortfall, MarketHistory, MarketScenario, RiskFactorShift}` | Scenario inputs and estimators |
 | `risk::{extract_risk_factors, RiskFactorType}` | Risk-factor extraction from a market context |

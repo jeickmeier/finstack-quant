@@ -1,6 +1,8 @@
 //! Unit tests for the CDS tranche pricing engine.
 
-use super::config::{DiscountAt, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION};
+use super::config::{
+    DiscountAt, PoolExposure, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION,
+};
 use super::*;
 use crate::cds_tranche::parameters::CdsTrancheParams;
 use crate::cds_tranche::CdsTranche;
@@ -964,11 +966,12 @@ fn test_extreme_correlation_numerical_stability() {
 
         // Test equity tranche loss calculation
         let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
-        let result = model.calculate_equity_tranche_loss(
+        let result = model.calculate_equity_tranche_capped(
             7.0, // 7% detachment
             test_correlation,
             &extreme_index_data,
             maturity,
+            PoolExposure::Loss,
         );
 
         assert!(
@@ -1889,7 +1892,13 @@ fn homogeneous_path_boundary_default_prob_does_not_panic() {
 
     // Drive the homogeneous Gaussian branch directly (no issuer curves).
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        CdsTranchePricer::new().calculate_equity_tranche_loss(7.0, 0.30, &index_data, maturity)
+        CdsTranchePricer::new().calculate_equity_tranche_capped(
+            7.0,
+            0.30,
+            &index_data,
+            maturity,
+            PoolExposure::Loss,
+        )
     }));
 
     // `Err` here is a `catch_unwind` panic payload, not a domain error.
@@ -2429,7 +2438,13 @@ mod production_credit_audit {
                 .build()
                 .expect("index");
             let actual = pricer
-                .calculate_equity_tranche_loss(cap * 100.0, rho, &index, maturity)
+                .calculate_equity_tranche_capped(
+                    cap * 100.0,
+                    rho,
+                    &index,
+                    maturity,
+                    PoolExposure::Loss,
+                )
                 .expect("loss");
             assert!(
                 (actual - expected).abs() < 2e-10,

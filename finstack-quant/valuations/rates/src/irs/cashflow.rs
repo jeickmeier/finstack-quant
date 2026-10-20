@@ -344,18 +344,13 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
 ///
 /// * `irs` - The interest rate swap for which to build the schedule
 /// * `curves` - Optional market context containing forward curves
+/// * `as_of` - Optional valuation date for compounded-in-arrears legs; `None`
+///   falls back to the projection (else discount) curve base date
 ///
 /// # Returns
 ///
 /// A `CashFlowSchedule` containing all floating leg cashflows with `CFKind::FloatReset`
 /// classifications.
-pub(crate) fn float_leg_schedule_with_curves(
-    irs: &InterestRateSwap,
-    curves: Option<&MarketContext>,
-) -> Result<CashFlowSchedule> {
-    float_leg_schedule_with_curves_as_of(irs, curves, None)
-}
-
 pub(crate) fn float_leg_schedule_with_curves_as_of(
     irs: &InterestRateSwap,
     curves: Option<&MarketContext>,
@@ -468,10 +463,7 @@ pub(crate) fn full_signed_schedule_with_curves_as_of(
     as_of: Option<Date>,
 ) -> Result<CashFlowSchedule> {
     let fixed_sched = fixed_leg_schedule(irs)?;
-    let float_sched = match as_of {
-        Some(as_of_date) => float_leg_schedule_with_curves_as_of(irs, curves, Some(as_of_date))?,
-        None => float_leg_schedule_with_curves(irs, curves)?,
-    };
+    let float_sched = float_leg_schedule_with_curves_as_of(irs, curves, as_of)?;
 
     let (fixed_sign, floating_sign) = match irs.side {
         PayReceive::Receive => (1.0, -1.0),
@@ -586,7 +578,7 @@ mod tests {
             "fixed_leg_schedule should be coupon-only"
         );
 
-        let float = float_leg_schedule_with_curves(&irs, None).expect("float schedule");
+        let float = float_leg_schedule_with_curves_as_of(&irs, None, None).expect("float schedule");
         assert!(
             float
                 .get_flows()

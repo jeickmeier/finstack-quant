@@ -48,7 +48,9 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         finstack_quant_core::money::Money::new(
-            self.base_value_raw_impl(curves, as_of)?,
+            finstack_quant_valuations_core::instruments::Instrument::base_value_raw(
+                self, curves, as_of,
+            )?,
             self.notional.currency(),
         )
     }
@@ -58,7 +60,11 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        self.base_value_raw_impl(curves, as_of)
+        // Instrument-native default path: the unshocked pricing-policy value
+        // without entering the public instrument lifecycle. Explicit registry
+        // pricing bypasses inference and calls `price_for_model_raw` with the
+        // caller-selected model.
+        self.price_for_model_raw(self.default_pricing_model(), curves, as_of)
     }
 
     fn base_value_raw_with_currency(
@@ -67,7 +73,9 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
         Ok((
-            self.base_value_raw_impl(curves, as_of)?,
+            finstack_quant_valuations_core::instruments::Instrument::base_value_raw(
+                self, curves, as_of,
+            )?,
             self.notional.currency(),
         ))
     }

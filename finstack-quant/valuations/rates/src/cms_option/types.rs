@@ -262,7 +262,9 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsOption {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         self.validate()?;
-        crate::cms_option::pricer::compute_pv(self, market, as_of)
+        // Present value using convexity-adjusted Black (full convexity).
+        crate::cms_option::pricer::CmsOptionPricer::new()
+            .price_internal_with_convexity(self, market, as_of, 1.0)
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();

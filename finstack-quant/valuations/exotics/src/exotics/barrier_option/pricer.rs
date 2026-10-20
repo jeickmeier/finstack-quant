@@ -139,7 +139,7 @@ impl BarrierOptionMcPricer {
     /// - **Discounting**: Uses the discount curve's own day count for DF and zero rate calculations
     /// - **Volatility lookup**: Uses the instrument's day count (assumed to match vol surface calibration)
     /// - **Monte Carlo time grid**: Uses the vol surface time basis for proper barrier monitoring
-    fn price_internal(
+    pub(crate) fn price_internal(
         &self,
         inst: &BarrierOption,
         curves: &MarketContext,
@@ -252,16 +252,6 @@ impl Pricer for BarrierOptionMcPricer {
 
         Ok(ValuationResult::stamped(barrier.id(), as_of, pv))
     }
-}
-
-/// Present value using Monte Carlo.
-pub(crate) fn compute_pv(
-    inst: &BarrierOption,
-    curves: &MarketContext,
-    as_of: Date,
-) -> finstack_quant_core::Result<Money> {
-    let pricer = BarrierOptionMcPricer::new();
-    pricer.price_internal(inst, curves, as_of)
 }
 
 /// Price an expired barrier option using explicit observed barrier state.

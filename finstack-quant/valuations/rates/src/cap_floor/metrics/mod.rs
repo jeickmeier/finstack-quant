@@ -168,15 +168,18 @@ impl MetricCalculator for GammaCalculator {
 
 fn caplet_gamma(is_cap: bool, c: CapletInputs) -> f64 {
     use crate::cap_floor::pricing::{black, normal};
+    use finstack_quant_models::closed_form::{bachelier_gamma, black_gamma};
     use finstack_quant_models::volatility::VolatilityConvention;
+    // Forward gamma (per unit forward) is non-negative for long options; for
+    // Bachelier it is n(d) / (σ√T).
     let (delta, gamma) = match c.convention {
         VolatilityConvention::Normal => (
             normal::delta(is_cap, c.strike, c.forward, c.sigma, c.time_to_fixing),
-            normal::gamma(c.strike, c.forward, c.sigma, c.time_to_fixing),
+            bachelier_gamma(c.forward, c.strike, c.sigma, c.time_to_fixing),
         ),
         _ => (
             black::delta(is_cap, c.strike, c.forward, c.sigma, c.time_to_fixing),
-            black::gamma(c.strike, c.forward, c.sigma, c.time_to_fixing),
+            black_gamma(c.forward, c.strike, c.sigma, c.time_to_fixing),
         ),
     };
     gamma * c.forward_sensitivity * c.forward_sensitivity + delta * c.forward_second_sensitivity

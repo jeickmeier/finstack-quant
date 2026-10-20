@@ -373,8 +373,8 @@ impl CdsTranche {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_model_upfront(self, market, as_of)
+        let pv = pricing::CdsTranchePricer::new().price_tranche(self, market, as_of)?;
+        Ok(pv.amount())
     }
 
     /// Calculate spread DV01 (sensitivity to 1bp change in running coupon)

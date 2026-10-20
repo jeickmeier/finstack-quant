@@ -48,15 +48,7 @@ impl MetricCalculator for DeltaCalculator {
 ///
 /// Returned as a unit-less ratio (multiply by 100 for the displayed
 /// percentage). Payers Δ ≥ 0, receivers Δ ≤ 0 under both conventions.
-pub(crate) fn delta(
-    option: &CdsOption,
-    curves: &MarketContext,
-    as_of: finstack_quant_core::dates::Date,
-) -> Result<f64> {
-    delta_with_provider(option, curves, as_of, None)
-}
-
-fn delta_with_provider(
+pub(crate) fn delta_with_provider(
     option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
