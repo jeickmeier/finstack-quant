@@ -475,25 +475,20 @@ impl ScenarioSet {
         let mut lineage = Vec::new();
         let mut seen = IndexSet::new();
         let mut current = Some(scenario);
-        let mut steps = 0usize;
-        let max_steps = self.scenarios.len().saturating_add(1);
 
+        // Every step inserts a new name into `seen` and must find it in
+        // `scenarios`, so the walk ends within `scenarios.len()` steps.
         while let Some(name) = current {
-            steps += 1;
-            if steps > max_steps {
-                return Err(Error::invalid_input(
-                    "Scenario parent chain exceeded maximum depth; check for cycles or corrupted data",
-                ));
-            }
             if !seen.insert(name.to_string()) {
                 return Err(Error::invalid_input(format!(
                     "Cycle detected in scenario parents at '{name}'"
                 )));
             }
 
-            let def = self.scenarios.get(name).ok_or_else(|| {
-                Error::invalid_input(format!("Unknown scenario '{name}' in trace()"))
-            })?;
+            let def = self
+                .scenarios
+                .get(name)
+                .ok_or_else(|| Error::invalid_input(format!("Unknown scenario '{name}'")))?;
 
             lineage.push(name.to_string());
             current = def.parent.as_deref();
@@ -513,36 +508,11 @@ impl ScenarioSet {
         let mut merged_periods: IndexMap<String, IndexMap<PeriodId, AmountOrScalar>> =
             IndexMap::new();
         let mut merged_forecasts = IndexMap::new();
-        let mut stack = Vec::new();
-        let mut seen = IndexSet::new();
-        let mut current = Some(name);
-        let mut steps = 0usize;
-        let max_steps = self.scenarios.len().saturating_add(1);
-
-        while let Some(scenario_name) = current {
-            steps += 1;
-            if steps > max_steps {
-                return Err(Error::invalid_input(
-                    "Scenario parent chain exceeded maximum depth; check for cycles or corrupted data",
-                ));
-            }
-            if !seen.insert(scenario_name.to_string()) {
-                return Err(Error::invalid_input(format!(
-                    "Cycle detected in scenario parents at '{scenario_name}'"
-                )));
-            }
-
-            let def = self.scenarios.get(scenario_name).ok_or_else(|| {
-                Error::invalid_input(format!("Unknown scenario '{scenario_name}'"))
-            })?;
-            stack.push(scenario_name);
-            current = def.parent.as_deref();
-        }
 
         // Merge from oldest ancestor → target scenario so that later overrides win.
-        while let Some(scenario_name) = stack.pop() {
-            // Scenario was verified to exist when pushed onto the stack
-            if let Some(def) = self.scenarios.get(scenario_name) {
+        for scenario_name in self.trace(name)? {
+            // `trace` verified every scenario in the lineage exists.
+            if let Some(def) = self.scenarios.get(scenario_name.as_str()) {
                 for (node_id, value) in &def.overrides {
                     merged.insert(node_id.clone(), *value);
                 }

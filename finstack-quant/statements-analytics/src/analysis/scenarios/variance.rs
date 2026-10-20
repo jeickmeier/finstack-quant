@@ -45,12 +45,10 @@
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::ZERO_TOLERANCE;
-use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::StatementResult;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 /// Configuration for variance analysis between two `StatementResult`.
 ///
@@ -430,89 +428,6 @@ impl<'a> VarianceAnalyzer<'a> {
             steps,
             unexplained,
         })
-    }
-}
-
-impl VarianceReport {
-    /// Check if the report is empty.
-    pub fn is_empty(&self) -> bool {
-        self.rows.is_empty()
-    }
-}
-
-impl VarianceReport {
-    /// Export variance rows to a table envelope.
-    ///
-    /// Schema:
-    /// - `period` (String)
-    /// - `metric` (String)
-    /// - `baseline` (Float64)
-    /// - `comparison` (Float64)
-    /// - `abs_var` (Float64)
-    /// - `pct_var` (Float64, nullable)
-    /// - `driver_contribution` (String, nullable)
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the table envelope rejects the generated columns or
-    /// metadata.
-    pub fn to_table(&self) -> Result<TableEnvelope> {
-        let mut periods = Vec::with_capacity(self.rows.len());
-        let mut metrics = Vec::with_capacity(self.rows.len());
-        let mut baselines = Vec::with_capacity(self.rows.len());
-        let mut comparisons = Vec::with_capacity(self.rows.len());
-        let mut abs_vars = Vec::with_capacity(self.rows.len());
-        let mut pct_vars = Vec::with_capacity(self.rows.len());
-        let mut driver_contributions = Vec::with_capacity(self.rows.len());
-
-        for row in &self.rows {
-            periods.push(row.period.to_string());
-            metrics.push(row.metric.clone());
-            baselines.push(row.baseline);
-            comparisons.push(row.comparison);
-            abs_vars.push(row.abs_var);
-            pct_vars.push(row.pct_var);
-
-            if row.driver_contribution.is_empty() {
-                driver_contributions.push(None::<String>);
-            } else {
-                let joined = row
-                    .driver_contribution
-                    .iter()
-                    .map(|(driver, value)| format!("{driver}: {value}"))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                driver_contributions.push(Some(joined));
-            }
-        }
-
-        let mut metadata = IndexMap::new();
-        metadata.insert("layout".to_string(), json!("long"));
-        metadata.insert("source".to_string(), json!("variance_report"));
-
-        TableEnvelope::new_with_metadata(
-            vec![
-                TableColumn::new("period", TableColumnData::String(periods))
-                    .with_role(TableColumnRole::Index),
-                TableColumn::new("metric", TableColumnData::String(metrics))
-                    .with_role(TableColumnRole::Dimension),
-                TableColumn::new("baseline", TableColumnData::Float64(baselines))
-                    .with_role(TableColumnRole::Measure),
-                TableColumn::new("comparison", TableColumnData::Float64(comparisons))
-                    .with_role(TableColumnRole::Measure),
-                TableColumn::new("abs_var", TableColumnData::Float64(abs_vars))
-                    .with_role(TableColumnRole::Measure),
-                TableColumn::new("pct_var", TableColumnData::NullableFloat64(pct_vars))
-                    .with_role(TableColumnRole::Measure),
-                TableColumn::new(
-                    "driver_contribution",
-                    TableColumnData::NullableString(driver_contributions),
-                )
-                .with_role(TableColumnRole::Attribute),
-            ],
-            metadata,
-        )
-        .map_err(Into::into)
     }
 }
 

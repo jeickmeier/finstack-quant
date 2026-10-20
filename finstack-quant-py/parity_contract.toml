@@ -1356,7 +1356,7 @@ templates                   = { python = "finstack_quant.statements_analytics", 
 
 # Rust-only surfaces (categories, not every name), deliberately unbound in
 # both hosts for now:
-# - ECL: EclConfig/EclConfigBuilder, CeclConfig, EclEngine/CeclEngine,
+# - ECL: EclConfig/EclConfigBuilder, CeclConfig, CeclEngine,
 #   policy default_* constructors, RatingPdMap, RawPdCurve and portfolio
 #   aggregation remain Rust-only. Python binds StagingConfig, Exposure,
 #   qualitative flags, stage triggers and full bucket/result envelopes;
@@ -1368,7 +1368,7 @@ templates                   = { python = "finstack_quant.statements_analytics", 
 #   the two PDs are arguments there because the Python Exposure carries them.
 #   `stage` is required in every host (classify first).
 # - analysis::credit covenant forecasting (forecast_breaches,
-#   forecast_covenant, compute_credit_context with per-period
+#   compute_credit_context with per-period
 #   reference_values, CreditContextMetrics including dscr_incl_fees,
 #   CorporateAnalysisBuilder.ltv_value_node — the last is bound on
 #   run_corporate_analysis), StatementsAdapter, compute_peer_multiples, and

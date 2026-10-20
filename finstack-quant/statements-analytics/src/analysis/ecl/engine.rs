@@ -4,7 +4,6 @@
 //!
 //! - [`compute_ecl_from_curve`] -- single exposure, single scenario
 //! - [`compute_ecl_weighted_from_curves`] -- single exposure, probability-weighted across scenarios
-//! - [`EclEngine`] -- stateful facade wrapping staging + calculation
 //!
 //! # ECL Formula
 //!
@@ -41,7 +40,7 @@ use finstack_quant_core::{Error, Result};
 use finstack_quant_models::credit::lgd::DownturnLgd;
 use serde::{Deserialize, Serialize};
 
-use super::staging::{classify_stage_from_curves, StageResult, StagingConfig};
+use super::staging::{StageResult, StagingConfig};
 use super::types::{Exposure, PdTermStructure, Stage};
 
 // Macro scenario
@@ -124,7 +123,7 @@ pub enum LgdType {
 ///
 /// Controls time bucket granularity, staging parameters, and LGD methodology.
 /// Probability-weighted scenarios are supplied once, alongside their PD sources
-/// to [`compute_ecl_weighted_from_curves`] or [`EclEngine::new`].
+/// to [`compute_ecl_weighted_from_curves`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -835,138 +834,6 @@ pub(crate) fn validate_scenario_weights<'a>(
     Ok(())
 }
 
-// Stateful facade
-
-/// Stateful ECL engine wrapping staging + calculation + aggregation.
-///
-/// Holds configuration and PD sources, provides a single entry point for
-/// portfolio-level ECL computation.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_statements_analytics::analysis::{
-///     EclConfig, EclEngine, MacroScenario, PdTermStructure, RawPdCurve,
-/// };
-///
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let config = EclConfig::default();
-/// let scenario = MacroScenario { id: "base".to_string(), weight: 1.0, lgd_override: None };
-/// let pd_curve = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.02)])?;
-/// let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
-///     vec![(&scenario, &pd_curve)];
-///
-/// let engine = EclEngine::new(config, pd_sources);
-/// assert_eq!(engine.config().bucket_width_years, 0.25);
-/// # Ok(())
-/// # }
-/// ```
-pub struct EclEngine<'a> {
-    config: EclConfig,
-    pd_sources: Vec<(&'a MacroScenario, &'a dyn PdTermStructure)>,
-}
-
-impl<'a> EclEngine<'a> {
-    /// Create a new engine with the given configuration and PD sources.
-    ///
-    /// The first element in `pd_sources` is used as the base scenario for
-    /// stage classification.
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - ECL integration bucket width, IFRS 9 staging thresholds,
-    ///   LGD methodology, and Stage 3 recovery-time settings.
-    /// * `pd_sources` - Authoritative scenario IDs, probability weights, and
-    ///   optional LGD overrides paired with current reporting-date PD curves.
-    ///   Weights must be finite, non-negative, and sum to 1 within `1e-6`.
-    ///   The first curve supplies current risk for SICR staging.
-    ///
-    /// # Returns
-    ///
-    /// An engine that can classify exposures and compute weighted ECL.
-    ///
-    /// # Errors
-    ///
-    /// Construction does not validate `pd_sources`; [`Self::process_exposure`]
-    /// returns an error if the source list is empty, scenario weights or LGD
-    /// overrides are invalid, or configuration or PD lookups are invalid.
-    pub fn new(
-        config: EclConfig,
-        pd_sources: Vec<(&'a MacroScenario, &'a dyn PdTermStructure)>,
-    ) -> Self {
-        Self { config, pd_sources }
-    }
-
-    /// Classify and compute ECL for a single exposure.
-    ///
-    /// # Arguments
-    ///
-    /// * `exposure` - Exposure to stage and measure, including its rating at
-    ///   initial recognition and current drawn/undrawn amounts in base currency.
-    /// * `origination_pd_source` - Initial-recognition PD snapshot for this
-    ///   exposure, keyed by its origination rating and returning cumulative
-    ///   decimal probabilities from initial recognition. Its conditional PD
-    ///   from `elapsed_years` to `elapsed_years + min(remaining maturity, 30)`
-    ///   is compared with the first current scenario source. Supply this
-    ///   exposure's original snapshot even if its rating is unchanged.
-    /// * `elapsed_years` - Finite, non-negative exposure age in years since
-    ///   initial recognition, using the original PD curve's time basis.
-    ///
-    /// # Returns
-    ///
-    /// A combined staging and probability-weighted ECL result.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the engine has no PD sources, if staging fails, or
-    /// if ECL calculation fails for any scenario.
-    pub fn process_exposure(
-        &self,
-        exposure: &Exposure,
-        origination_pd_source: &dyn PdTermStructure,
-        elapsed_years: f64,
-    ) -> Result<ExposureEclResult> {
-        // Use base scenario PD for staging
-        let base_pd = self
-            .pd_sources
-            .first()
-            .map(|(_, pd_source)| *pd_source)
-            .ok_or_else(|| {
-                Error::Validation("At least one PD source is required for EclEngine".to_string())
-            })?;
-        let stage_result = classify_stage_from_curves(
-            exposure,
-            base_pd,
-            origination_pd_source,
-            elapsed_years,
-            &self.config.staging,
-        )?;
-        let ecl_result = compute_ecl_weighted_from_curves(
-            exposure,
-            stage_result.stage,
-            &self.pd_sources,
-            &self.config,
-        )?;
-        Ok(ExposureEclResult {
-            stage_result,
-            ecl_result,
-            ead: exposure.ead,
-            meta: finstack_quant_core::config::results_meta(
-                &finstack_quant_core::config::FinstackConfig::default(),
-            ),
-        })
-    }
-
-    /// Access the engine's configuration.
-    ///
-    /// # Returns
-    ///
-    /// The validated configuration stored by the engine.
-    pub fn config(&self) -> &EclConfig {
-        &self.config
-    }
-}
-
 /// Reject arithmetic overflow before publishing an allowance.
 pub(super) fn validate_finite_ecl(ecl: f64) -> Result<()> {
     if !ecl.is_finite() {
@@ -980,7 +847,45 @@ pub(super) fn validate_finite_ecl(ecl: f64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::analysis::ecl::staging::classify_stage_from_curves;
     use crate::analysis::ecl::types::{QualitativeFlags, RawPdCurve};
+
+    struct Staged {
+        stage_result: StageResult,
+        ecl_result: WeightedEclResult,
+    }
+
+    /// Stage `exposure` against `current` vs its own `origination` snapshot,
+    /// then measure ECL under a single base scenario on `current`.
+    fn stage_and_measure(
+        exposure: &Exposure,
+        current: &dyn PdTermStructure,
+        origination: &dyn PdTermStructure,
+        elapsed_years: f64,
+    ) -> Staged {
+        let config = EclConfig::default();
+        let scenario = MacroScenario {
+            id: "base".into(),
+            weight: 1.0,
+            lgd_override: None,
+        };
+        let stage_result = classify_stage_from_curves(
+            exposure,
+            current,
+            origination,
+            elapsed_years,
+            &config.staging,
+        )
+        .unwrap();
+        let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> = vec![(&scenario, current)];
+        let ecl_result =
+            compute_ecl_weighted_from_curves(exposure, stage_result.stage, &pd_sources, &config)
+                .unwrap();
+        Staged {
+            stage_result,
+            ecl_result,
+        }
+    }
 
     fn make_exposure() -> Exposure {
         Exposure {
@@ -1557,27 +1462,6 @@ mod tests {
     }
 
     #[test]
-    fn test_ecl_engine_process_exposure() {
-        let curve = make_pd_curve();
-        let config = EclConfig::default();
-        let scenario = MacroScenario {
-            id: "base".into(),
-            weight: 1.0,
-            lgd_override: None,
-        };
-
-        let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
-            vec![(&scenario, &curve as &dyn PdTermStructure)];
-        let engine = EclEngine::new(config, pd_sources);
-
-        let exposure = make_exposure();
-        let result = engine.process_exposure(&exposure, &curve, 0.0).unwrap();
-
-        assert_eq!(result.stage_result.stage, Stage::Stage1);
-        assert!(result.ecl_result.ecl > 0.0);
-    }
-
-    #[test]
     fn test_compute_ecl_weighted_rejects_empty_pd_sources() {
         let exposure = make_exposure();
         let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> = Vec::new();
@@ -1587,16 +1471,6 @@ mod tests {
             &pd_sources,
             &EclConfig::default(),
         );
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_ecl_engine_rejects_empty_pd_sources() {
-        let curve = make_pd_curve();
-        let engine = EclEngine::new(EclConfig::default(), Vec::new());
-        let exposure = make_exposure();
-        let result = engine.process_exposure(&exposure, &curve, 0.0);
 
         assert!(result.is_err());
     }
@@ -1652,12 +1526,6 @@ mod tests {
         let current = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.04), (5.0, 0.20)]).unwrap();
         let origination =
             RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.002), (5.0, 0.01)]).unwrap();
-        let scenario = MacroScenario {
-            id: "base".into(),
-            weight: 1.0,
-            lgd_override: None,
-        };
-        let engine = EclEngine::new(EclConfig::default(), vec![(&scenario, &current)]);
         let exposure = Exposure {
             ead: 100.0,
             eir: 0.0,
@@ -1665,18 +1533,14 @@ mod tests {
             remaining_maturity_years: 5.0,
             ..make_exposure()
         };
-        let result = engine
-            .process_exposure(&exposure, &origination, 0.0)
-            .unwrap();
+        let result = stage_and_measure(&exposure, &current, &origination, 0.0);
         assert_eq!(result.stage_result.stage, Stage::Stage2);
         assert!((result.ecl_result.ecl - 8.0).abs() < 1e-12);
 
         // A second origination cohort with the same rating but unchanged risk
         // must retain its own initial-recognition snapshot on the same engine.
         let higher_origination_risk = &current;
-        let unchanged = engine
-            .process_exposure(&exposure, higher_origination_risk, 0.0)
-            .unwrap();
+        let unchanged = stage_and_measure(&exposure, &current, higher_origination_risk, 0.0);
         assert_eq!(unchanged.stage_result.stage, Stage::Stage1);
         assert!((unchanged.ecl_result.ecl - 1.6).abs() < 1e-12);
     }
@@ -1689,12 +1553,6 @@ mod tests {
             vec![(0.0, 0.0), (2.0, 0.10), (3.0, 0.14), (5.0, 0.16)],
         )
         .unwrap();
-        let scenario = MacroScenario {
-            id: "base".into(),
-            weight: 1.0,
-            lgd_override: None,
-        };
-        let engine = EclEngine::new(EclConfig::default(), vec![(&scenario, &current)]);
         let exposure = Exposure {
             ead: 100.0,
             eir: 0.0,
@@ -1704,9 +1562,7 @@ mod tests {
         };
         // Original remaining-window risk is (16% - 14%) / (1 - 14%),
         // not the original first-two-year PD of 10%.
-        let result = engine
-            .process_exposure(&exposure, &origination, 3.0)
-            .unwrap();
+        let result = stage_and_measure(&exposure, &current, &origination, 3.0);
         assert_eq!(result.stage_result.stage, Stage::Stage2);
         assert!((result.ecl_result.ecl - 2.0).abs() < 1e-12);
         let expected_delta = 0.05 - (0.16 - 0.14) / (1.0 - 0.14);

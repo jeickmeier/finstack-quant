@@ -15,7 +15,8 @@
 //!
 //! ```
 //! use finstack_quant_statements_analytics::analysis::{
-//!     EclConfigBuilder, EclEngine, Exposure, MacroScenario, QualitativeFlags, RawPdCurve, Stage,
+//!     classify_stage_from_curves, compute_ecl_weighted_from_curves, EclConfigBuilder, Exposure,
+//!     MacroScenario, PdTermStructure, QualitativeFlags, RawPdCurve, Stage,
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -46,10 +47,12 @@
 //! let config = EclConfigBuilder::new().bucket_width(0.25).build()?;
 //! let scenario = MacroScenario { id: "base".into(), weight: 1.0, lgd_override: None };
 //! let origination_pd = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.02), (5.0, 0.10)])?;
-//! let engine = EclEngine::new(config, vec![(&scenario, &pd_curve)]);
-//! let result = engine.process_exposure(&exposure, &origination_pd, 0.0)?;
+//! let staging = classify_stage_from_curves(&exposure, &pd_curve, &origination_pd, 0.0, &config.staging)?;
+//! let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> = vec![(&scenario, &pd_curve)];
+//! let ecl = compute_ecl_weighted_from_curves(&exposure, staging.stage, &pd_sources, &config)?;
 //!
-//! assert_eq!(result.stage_result.stage, Stage::Stage1);
+//! assert_eq!(staging.stage, Stage::Stage1);
+//! assert!(ecl.ecl > 0.0);
 //! # Ok(())
 //! # }
 //! ```
@@ -78,8 +81,7 @@ pub use staging::{classify_stage_from_curves, StageResult, StagingConfig, Stagin
 
 pub use engine::{
     compute_ecl_from_curve, compute_ecl_weighted_from_curves, EclBucket, EclConfig,
-    EclConfigBuilder, EclEngine, EclResult, ExposureEclResult, LgdType, MacroScenario,
-    WeightedEclResult,
+    EclConfigBuilder, EclResult, ExposureEclResult, LgdType, MacroScenario, WeightedEclResult,
 };
 
 pub use request::{classify_stage, compute_ecl, compute_ecl_weighted, EclRequest, EclStageRequest};

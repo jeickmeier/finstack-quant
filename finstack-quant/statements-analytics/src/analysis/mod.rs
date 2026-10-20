@@ -53,8 +53,8 @@ mod reports;
 
 pub use backtesting::{backtest_forecast, ForecastMetrics};
 pub use credit::{
-    compute_credit_context, forecast_breaches, forecast_covenant, to_table, CreditContextMetrics,
-    CreditNumeratorNodes, StatementsAdapter,
+    compute_credit_context, forecast_breaches, CreditContextMetrics, CreditNumeratorNodes,
+    StatementsAdapter,
 };
 pub use goal_seek::{goal_seek, GoalSeekResult};
 pub use introspection::{
@@ -89,8 +89,8 @@ pub use checks::{
 pub use ecl::{
     classify_stage, classify_stage_from_curves, compute_ecl, compute_ecl_from_curve,
     compute_ecl_weighted, compute_ecl_weighted_from_curves, compute_waterfall, CeclConfig,
-    CeclEngine, CeclMethodology, CeclResult, EclBucket, EclConfig, EclConfigBuilder, EclEngine,
-    EclRequest, EclResult, EclStageRequest, Exposure, ExposureEclResult, LgdType, MacroScenario,
+    CeclEngine, CeclMethodology, CeclResult, EclBucket, EclConfig, EclConfigBuilder, EclRequest,
+    EclResult, EclStageRequest, Exposure, ExposureEclResult, LgdType, MacroScenario,
     PdTermStructure, PortfolioEclResult, ProvisionWaterfall, QualitativeFlags, RatingPdMap,
     RawPdCurve, ReversionMethod, Stage, StageResult, StagingConfig, StagingTrigger,
     WeightedEclResult, DEFAULT_REVOLVER_CCF,

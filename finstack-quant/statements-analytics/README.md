@@ -103,9 +103,9 @@ a submodule.
 | Scenarios | `ScenarioSet`, `ScenarioDefinition`, `ScenarioResults`, `ScenarioDiff` |
 | Sensitivity | `run_sensitivity`, `SensitivityConfig`, `SensitivityMode`, `SensitivityResult`, `ParameterSpec`, `TornadoEntry`, `generate_tornado_entries` |
 | Variance | `run_variance`, `variance_bridge`, `VarianceConfig`, `VarianceReport`, `VarianceRow`, `BridgeChart`, `BridgeStep` |
-| Credit | `compute_credit_context`, `CreditContextMetrics`, `forecast_covenant`, `forecast_breaches`, `StatementsAdapter`, `to_table` |
+| Credit | `compute_credit_context`, `CreditContextMetrics`, `forecast_breaches`, `StatementsAdapter` |
 | Checks | `three_statement_checks`, `credit_underwriting_checks`, `lbo_model_checks`, `ThreeStatementMapping`, `CreditMapping`, `FormulaCheckSpec`, `render_check_report_text`, `render_check_report_html`, plus reconciliation / consistency / credit check types |
-| ECL | `EclEngine`, `EclConfig`, `EclConfigBuilder`, `CeclEngine`, `CeclConfig`, `classify_stage`, `compute_ecl`, `compute_ecl_weighted`, `classify_stage_from_curves`, `compute_ecl_from_curve`, `compute_ecl_weighted_from_curves`, `StagingConfig`, `PdTermStructure`, `PortfolioEclResult`, `ProvisionWaterfall`, `compute_waterfall` |
+| ECL | `EclConfig`, `EclConfigBuilder`, `CeclEngine`, `CeclConfig`, `classify_stage`, `compute_ecl`, `compute_ecl_weighted`, `classify_stage_from_curves`, `compute_ecl_from_curve`, `compute_ecl_weighted_from_curves`, `StagingConfig`, `PdTermStructure`, `PortfolioEclResult`, `ProvisionWaterfall`, `compute_waterfall` |
 | Comps | `PeerSet`, `PeerFilter`, `PeerStats`, `compute_peer_multiples`, `compute_multiple`, `regression_fair_value`, `score_relative_value`, `percentile_rank`, `z_score` |
 | Goal seek | `goal_seek` |
 | Backtesting | `backtest_forecast`, `ForecastMetrics` |
@@ -144,7 +144,8 @@ mixed-currency ratios fail. LTV is `debt_t / value_t`; scalar EV references may
 be broadcast across periods. Metrics include cash DSCR, total (PIK) DSCR, and
 fee-inclusive DSCR. `StatementsAdapter` implements the covenants crate's
 `ModelTimeSeries` bridge, so covenant forecasts do not make that crate depend
-on statements. `to_table` renders a `CovenantForecast` as a `TableEnvelope`.
+on statements: pass `StatementsAdapter::new(&results, &model)` to
+`finstack_quant_covenants::forecast_covenant_generic` for a single covenant.
 
 **Checks.** `analysis::checks` extends the structural checks in
 `finstack_quant_statements::checks::builtins` with cross-statement
@@ -174,9 +175,8 @@ rating is `None`, the PD-delta test is explicitly skipped. `EclConfig`, `Staging
 `classify_stage_from_curves(exposure, current_pd_source, origination_pd_source, elapsed_years, config)`
 compares reporting-date risk with the initial-recognition conditional PD over
 the same remaining window, given survival to finite non-negative
-`elapsed_years`, even when the rating label is unchanged. `EclEngine::new(config, pd_sources)` uses
-the first current source for staging, and `process_exposure(exposure,
-origination_pd_source, elapsed_years)` takes each exposure's own initial-recognition snapshot. Weighted
+`elapsed_years`, even when the rating label is unchanged; supply each exposure's own
+initial-recognition snapshot as `origination_pd_source`. Weighted
 IFRS 9 and CECL calculations define scenario IDs, weights, and LGD overrides
 only in the `MacroScenario` values paired with `pd_sources`; configuration
 objects contain calculation policy and no duplicate scenario list.
