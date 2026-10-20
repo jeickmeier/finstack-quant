@@ -108,7 +108,6 @@ pub fn aggregate_period_flows(
                 instrument.as_ref(),
                 period,
                 opening,
-                Money::new(0.0, currency).expect("valid money fixture"),
                 market_ctx,
                 as_of,
                 None,
