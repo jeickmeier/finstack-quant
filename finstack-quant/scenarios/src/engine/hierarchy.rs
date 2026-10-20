@@ -123,7 +123,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
             } => expand_target(
                 hierarchy,
                 target,
-                "HierarchyCurveParallelBp",
+                op.kind(),
                 &mut warnings,
                 |id| curve_kind_target_exists(market, *curve_kind, id),
                 |curve_id| {
@@ -144,7 +144,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
             OperationSpec::HierarchyVolSurfaceParallelPct { target, pct } => expand_target(
                 hierarchy,
                 target,
-                "HierarchyVolSurfaceParallelPct",
+                op.kind(),
                 &mut warnings,
                 |id| market.get_surface(id.as_str()).is_ok(),
                 |curve_id| {
@@ -162,7 +162,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
             OperationSpec::HierarchyEquityPricePct { target, pct } => expand_target(
                 hierarchy,
                 target,
-                "HierarchyEquityPricePct",
+                op.kind(),
                 &mut warnings,
                 |id| market.get_price(id.as_str()).is_ok(),
                 |curve_id| {
@@ -180,7 +180,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
             OperationSpec::HierarchyBaseCorrParallelPts { target, points } => expand_target(
                 hierarchy,
                 target,
-                "HierarchyBaseCorrParallelPts",
+                op.kind(),
                 &mut warnings,
                 |id| market.get_base_correlation(id.as_str()).is_ok(),
                 |curve_id| {

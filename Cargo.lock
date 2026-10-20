@@ -971,6 +971,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "strum",
  "thiserror",
  "time",
  "tracing",

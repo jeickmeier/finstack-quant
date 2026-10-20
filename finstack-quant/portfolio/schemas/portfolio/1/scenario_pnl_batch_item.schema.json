@@ -2504,7 +2504,7 @@
               "type": "string"
             },
             "op_kind": {
-              "description": "Operation kind name (e.g., `\"HierarchyCurveParallelBp\"`).",
+              "description": "Operation `kind` tag (e.g., `\"hierarchy_curve_parallel_bp\"`).",
               "type": "string"
             },
             "target_path": {
@@ -2531,7 +2531,7 @@
               "type": "string"
             },
             "op_kind": {
-              "description": "Operation kind name (e.g., `\"HierarchyCurveParallelBp\"`).",
+              "description": "Operation `kind` tag (e.g., `\"hierarchy_curve_parallel_bp\"`).",
               "type": "string"
             }
           },

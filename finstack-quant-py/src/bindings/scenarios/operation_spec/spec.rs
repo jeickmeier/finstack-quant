@@ -496,13 +496,8 @@ impl PyOperationSpec {
     /// The variant discriminator (the serde ``kind`` tag value), e.g.
     /// ``"curve_parallel_bp"``.
     #[getter]
-    fn kind(&self) -> PyResult<String> {
-        let value = serde_json::to_value(&self.inner).map_err(display_to_py)?;
-        value
-            .get("kind")
-            .and_then(|v| v.as_str())
-            .map(str::to_string)
-            .ok_or_else(|| crate::errors::value_error("OperationSpec JSON missing 'kind' tag"))
+    fn kind(&self) -> &'static str {
+        self.inner.kind()
     }
 
     /// Python-style repr rendered from the wire fields, e.g.
