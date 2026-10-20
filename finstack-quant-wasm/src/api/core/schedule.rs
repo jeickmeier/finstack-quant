@@ -7,8 +7,8 @@
 use crate::utils::input::{from_js_json, js_bool, js_epoch_days, js_int, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{
-    days_since_epoch, BusinessDayConvention, Date, Schedule, ScheduleErrorPolicy, ScheduleSpec,
-    StubKind, Tenor,
+    days_since_epoch, BusinessDayConvention, Date, Schedule, ScheduleBuilder, ScheduleErrorPolicy,
+    ScheduleSpec, StubKind, Tenor,
 };
 use wasm_bindgen::prelude::*;
 
@@ -228,7 +228,7 @@ impl JsSchedule {
             .map_err(to_js_err)
     }
 
-    /// Build a schedule from a persisted specification (Rust `ScheduleSpec::build`).
+    /// Build a schedule from a persisted specification (Rust `ScheduleBuilder::build`).
     ///
     /// # Arguments
     ///
@@ -246,7 +246,7 @@ impl JsSchedule {
     /// calendar under the strict policy.
     #[wasm_bindgen(js_name = fromSpec)]
     pub fn from_spec(spec: JsValue) -> Result<JsSchedule, JsValue> {
-        from_js_json::<ScheduleSpec>(&spec, "spec")?
+        ScheduleBuilder::from(from_js_json::<ScheduleSpec>(&spec, "spec")?)
             .build()
             .map(|inner| JsSchedule { inner })
             .map_err(to_js_err)
@@ -498,7 +498,7 @@ impl JsScheduleBuilder {
         to_js_value(&self.spec)
     }
 
-    /// Generate the schedule (Rust `ScheduleSpec::build`).
+    /// Generate the schedule (Rust `ScheduleBuilder::build`).
     ///
     /// @returns The generated `Schedule`.
     /// @throws `FinstackError` (kind `validation`) for an invalid frequency or
@@ -506,7 +506,7 @@ impl JsScheduleBuilder {
     /// the strict policy.
     #[wasm_bindgen(js_name = build)]
     pub fn build(&self) -> Result<JsSchedule, JsValue> {
-        self.spec
+        ScheduleBuilder::from(self.spec.clone())
             .build()
             .map(|inner| JsSchedule { inner })
             .map_err(to_js_err)

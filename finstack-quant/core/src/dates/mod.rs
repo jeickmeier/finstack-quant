@@ -15,7 +15,7 @@
 //! ```rust
 //! use finstack_quant_core::dates::{
 //!     adjust, build_periods, calendar_by_id_strict, BusinessDayConvention, Date, Tenor,
-//!     ScheduleBuilder, create_date,
+//!     Schedule, create_date,
 //! };
 //! use time::{Duration, Month};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,7 +26,7 @@
 //! assert!(adjusted >= trade_date);
 //!
 //! let end = trade_date + Duration::days(365);
-//! let schedule = ScheduleBuilder::new(trade_date, end)?
+//! let schedule = Schedule::builder(trade_date, end)?
 //!     .frequency(Tenor::quarterly())
 //!     .build()?;
 //! assert!(schedule.dates.len() >= 4);

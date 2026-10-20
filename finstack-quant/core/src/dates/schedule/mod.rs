@@ -24,13 +24,13 @@
 //!
 //! Basic monthly schedule:
 //! ```rust
-//! use finstack_quant_core::dates::{ScheduleBuilder, Tenor};
+//! use finstack_quant_core::dates::{Schedule, Tenor};
 //! use time::{Date, Month};
 //!
 //! let start = Date::from_calendar_date(2025, Month::January, 15)?;
 //! let end = Date::from_calendar_date(2025, Month::April, 15)?;
 //!
-//! let sched = ScheduleBuilder::new(start, end)?
+//! let sched = Schedule::builder(start, end)?
 //!     .frequency(Tenor::monthly())
 //!     .build()?;
 //!
@@ -41,13 +41,13 @@
 //!
 //! CDS IMM schedule (quarterly on 20-Mar/Jun/Sep/Dec):
 //! ```rust
-//! use finstack_quant_core::dates::ScheduleBuilder;
+//! use finstack_quant_core::dates::Schedule;
 //! use time::{Date, Month};
 //!
 //! let start = Date::from_calendar_date(2025, Month::January, 15)?;
 //! let end = Date::from_calendar_date(2025, Month::December, 20)?;
 //!
-//! let sched = ScheduleBuilder::new(start, end)?
+//! let sched = Schedule::builder(start, end)?
 //!     .cds_imm()  // Anchors at the CDS roll preceding start (front accrual)
 //!     .build()?;
 //!
@@ -59,13 +59,13 @@
 //!
 //! Standard IMM schedule (quarterly on third Wednesday):
 //! ```rust
-//! use finstack_quant_core::dates::ScheduleBuilder;
+//! use finstack_quant_core::dates::Schedule;
 //! use time::{Date, Month};
 //!
 //! let start = Date::from_calendar_date(2025, Month::January, 15)?;
 //! let end = Date::from_calendar_date(2025, Month::December, 31)?;
 //!
-//! let sched = ScheduleBuilder::new(start, end)?
+//! let sched = Schedule::builder(start, end)?
 //!     .imm()  // Auto-adjusts start to next IMM date (third Wednesday)
 //!     .build()?;
 //!
@@ -77,22 +77,19 @@
 //!
 //! With business day adjustment:
 //! ```rust
-//! use finstack_quant_core::dates::{calendar_by_id_strict, ScheduleBuilder, Tenor, BusinessDayConvention};
+//! use finstack_quant_core::dates::{BusinessDayConvention, Schedule, Tenor};
 //! use time::{Date, Month};
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
 //! let start = Date::from_calendar_date(2025, Month::June, 15)?;
 //! let end = Date::from_calendar_date(2025, Month::December, 15)?;
-//! let nyse = calendar_by_id_strict("nyse")?;
 //!
-//! let sched = ScheduleBuilder::new(start, end)?
+//! let sched = Schedule::builder(start, end)?
 //!     .frequency(Tenor::monthly())
-//!     .adjust_with(BusinessDayConvention::ModifiedFollowing, nyse)
+//!     .adjust_with(BusinessDayConvention::ModifiedFollowing, "nyse")
 //!     .build()?;
 //!
-//! // Dates are adjusted to business days according to NYSE calendar
-//! # Ok(())
-//! # }
+//! // Payment dates are adjusted to NYSE business days
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! # Stub Conventions
@@ -156,14 +153,14 @@ use crate::dates::Tenor;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};
+/// use finstack_quant_core::dates::{Schedule, StubKind, Tenor};
 /// use time::{Date, Month};
 ///
 /// let start = Date::from_calendar_date(2025, Month::January, 10)?;
 /// let end = Date::from_calendar_date(2025, Month::December, 15)?;
 ///
 /// // Short stub at front
-/// let sched = ScheduleBuilder::new(start, end)?
+/// let sched = Schedule::builder(start, end)?
 ///     .frequency(Tenor::quarterly())
 ///     .stub_rule(StubKind::ShortFront)
 ///     .build()?;
@@ -234,15 +231,23 @@ impl std::str::FromStr for StubKind {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::ScheduleBuilder;
+/// use finstack_quant_core::dates::{Schedule, ScheduleErrorPolicy, ScheduleWarning, Tenor};
 /// use time::{Date, Month};
 ///
-/// let start = Date::from_calendar_date(2025, Month::December, 31)?;
-/// let end = Date::from_calendar_date(2025, Month::January, 1)?; // Invalid: end before start
+/// let start = Date::from_calendar_date(2025, Month::January, 1)?;
+/// let end = Date::from_calendar_date(2025, Month::January, 20)?; // not a whole month
 ///
-/// // Invalid date ranges are rejected by new() before any error policy applies.
-/// let result = ScheduleBuilder::new(start, end);
-/// assert!(result.is_err()); // new() validates start <= end
+/// // Without a stub rule the misaligned range fails; GracefulEmpty turns the
+/// // failure into an empty schedule carrying the error as a warning.
+/// let schedule = Schedule::builder(start, end)?
+///     .frequency(Tenor::monthly())
+///     .error_policy(ScheduleErrorPolicy::GracefulEmpty)
+///     .build()?;
+/// assert!(schedule.dates.is_empty());
+/// assert!(matches!(
+///     schedule.warnings.as_slice(),
+///     [ScheduleWarning::GracefulFallback { .. }]
+/// ));
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -338,13 +343,13 @@ impl std::fmt::Display for ScheduleWarning {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{ScheduleBuilder, Tenor};
+/// use finstack_quant_core::dates::{Schedule, Tenor};
 /// use time::{Date, Month};
 ///
 /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
 /// let end = Date::from_calendar_date(2025, Month::March, 15)?;
 ///
-/// let schedule = ScheduleBuilder::new(start, end)?
+/// let schedule = Schedule::builder(start, end)?
 ///     .frequency(Tenor::monthly())
 ///     .build()?;
 ///
@@ -402,13 +407,13 @@ impl Schedule {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_core::dates::{ScheduleBuilder, Tenor};
+    /// use finstack_quant_core::dates::{Schedule, Tenor};
     /// use time::{Date, Month};
     ///
     /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
     /// let end = Date::from_calendar_date(2025, Month::March, 15)?;
     ///
-    /// let schedule = ScheduleBuilder::new(start, end)?
+    /// let schedule = Schedule::builder(start, end)?
     ///     .frequency(Tenor::monthly())
     ///     .build()?;
     ///

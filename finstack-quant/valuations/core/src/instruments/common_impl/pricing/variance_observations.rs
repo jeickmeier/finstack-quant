@@ -2,7 +2,7 @@
 
 use finstack_quant_core::dates::{
     adjust, resolve_joint_calendar, BusinessDayConvention, Date, DateExt, HolidayCalendar,
-    ScheduleBuilder, StubKind, Tenor, TenorUnit,
+    Schedule, StubKind, Tenor, TenorUnit,
 };
 
 /// Calendar convention for a realized-variance observation schedule.
@@ -66,7 +66,7 @@ pub fn variance_observation_dates(
         }
         dates
     } else {
-        ScheduleBuilder::new(start, maturity)?
+        Schedule::builder(start, maturity)?
             .frequency(frequency)
             .stub_rule(StubKind::ShortBack)
             .end_of_month(end_of_month)

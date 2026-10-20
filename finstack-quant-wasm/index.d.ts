@@ -5276,7 +5276,7 @@ export interface ScheduleConstructor {
    */
   builder(start: number, end: number): ScheduleBuilder;
   /**
-   * Build a schedule from a persisted specification (Rust `ScheduleSpec::build`).
+   * Build a schedule from a persisted specification (Rust `ScheduleBuilder::build`).
    *
    * @param spec - `ScheduleSpec` JSON text or plain object, such as `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency` (a `{ count, unit }` tenor), `stub`, `business_day_convention`, `calendar_id`, `end_of_month`, `imm_mode`, `cds_imm_mode`, `error_policy`, `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are rejected.
    * @returns The generated `Schedule`.
@@ -5397,7 +5397,7 @@ export interface ScheduleBuilder extends WasmOwned {
    */
   toSpec(): ScheduleSpec;
   /**
-   * Generate the schedule (Rust `ScheduleSpec::build`).
+   * Generate the schedule (Rust `ScheduleBuilder::build`).
    *
    * @returns The generated `Schedule`.
    * @throws `FinstackError` (kind `validation`) for an invalid frequency or a generation failure; kind `not_found` for an unknown calendar under the strict policy.

@@ -4,7 +4,9 @@ use crate::bindings::core::dates::calendar::extract_business_day_convention;
 use crate::bindings::core::dates::tenor::extract_tenor;
 use crate::bindings::date_utils::py_to_date;
 use crate::errors::core_to_py;
-use finstack_quant_core::dates::{Schedule, ScheduleErrorPolicy, ScheduleSpec, StubKind};
+use finstack_quant_core::dates::{
+    Schedule, ScheduleBuilder, ScheduleErrorPolicy, ScheduleSpec, StubKind,
+};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyIterator, PyList, PyModule, PyType};
 
@@ -272,7 +274,7 @@ impl PySchedule {
     #[staticmethod]
     #[pyo3(text_signature = "(spec)")]
     fn from_spec(spec: &Bound<'_, PyAny>) -> PyResult<Self> {
-        extract_schedule_spec(spec)?
+        ScheduleBuilder::from(extract_schedule_spec(spec)?)
             .build()
             .map(Self::from_inner)
             .map_err(core_to_py)
@@ -571,14 +573,14 @@ impl PyScheduleBuilder {
 
     /// Build the schedule.
     ///
-    /// Delegates entirely to the canonical Rust ``ScheduleSpec::build``:
-    /// under the default ``STRICT`` policy an invalid range or any build
-    /// warning raises ``ValueError`` (strict fails closed in Rust). Under
+    /// Delegates entirely to the canonical Rust ``ScheduleBuilder::build``:
+    /// under the default ``STRICT`` policy a generation failure raises
+    /// ``ValueError`` and an unknown calendar id ``KeyError``. Under
     /// ``MISSING_CALENDAR_WARNING`` or ``GRACEFUL_EMPTY`` the schedule is
     /// returned carrying its warnings (inspect via ``Schedule.warnings`` /
     /// ``Schedule.has_warnings()``).
     fn build(&self) -> PyResult<PySchedule> {
-        self.spec
+        ScheduleBuilder::from(self.spec.clone())
             .build()
             .map(PySchedule::from_inner)
             .map_err(core_to_py)

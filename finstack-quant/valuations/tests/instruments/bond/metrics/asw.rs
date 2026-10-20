@@ -171,7 +171,7 @@ fn test_asw_market_tightens_when_price_rises() {
 /// fixed-annuity amortization.
 #[test]
 fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
-    use finstack_quant_core::dates::ScheduleBuilder;
+    use finstack_quant_core::dates::Schedule;
     use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
         fixed_leg_annuity, par_rate_and_annuity_from_discount,
     };
@@ -215,12 +215,15 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
     let CashflowSpec::Fixed(spec) = &bond.cashflow_spec else {
         panic!("expected fixed bond")
     };
-    let mut builder = ScheduleBuilder::new(as_of, bond.maturity)
+    let mut builder = Schedule::builder(as_of, bond.maturity)
         .expect("schedule builder")
         .frequency(spec.schedule.frequency)
         .stub_rule(spec.schedule.stub);
-    if let Ok(cal) = finstack_quant_core::dates::calendar_by_id_strict(&spec.schedule.calendar_id) {
-        builder = builder.adjust_with(spec.schedule.business_day_convention, cal);
+    if finstack_quant_core::dates::calendar_by_id_strict(&spec.schedule.calendar_id).is_ok() {
+        builder = builder.adjust_with(
+            spec.schedule.business_day_convention,
+            &spec.schedule.calendar_id,
+        );
     }
     let sched: Vec<finstack_quant_core::dates::Date> =
         builder.build().expect("schedule").into_iter().collect();
@@ -232,7 +235,7 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
         &sched,
     )
     .expect("par rate and fixed annuity");
-    let float_dates = ScheduleBuilder::new(as_of, bond.maturity)
+    let float_dates = Schedule::builder(as_of, bond.maturity)
         .unwrap()
         .frequency(spec.schedule.frequency)
         .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)

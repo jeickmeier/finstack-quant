@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
-      "bytes": 78266,
+      "bytes": 78256,
       "kind": "input",
       "path": "schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
       "summary": "Notional, dates, coupon program, fees and principal events that build a schedule.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json",
-      "bytes": 11024,
+      "bytes": 11014,
       "kind": "component",
       "path": "schemas/cashflow/1/coupon_specs.schema.json",
       "summary": "Coupon rate, frequency, day count and stub handling for one leg.",
@@ -56,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json",
-      "bytes": 8083,
+      "bytes": 8073,
       "kind": "component",
       "path": "schemas/cashflow/1/fee_specs.schema.json",
       "summary": "Recurring or one-off fees attached to a schedule.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json",
-      "bytes": 30086,
+      "bytes": 30076,
       "kind": "component",
       "path": "schemas/cashflow/1/floating_coupon_spec.schema.json",
       "summary": "Index, spread, caps and floors, reset rules and schedule for one floating leg.",
@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json",
-      "bytes": 8924,
+      "bytes": 8914,
       "kind": "component",
       "path": "schemas/cashflow/1/schedule_params.schema.json",
       "summary": "Start, end, frequency, calendar and roll rules for a payment schedule.",
@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/step_up_coupon_spec.schema.json",
-      "bytes": 12037,
+      "bytes": 12027,
       "kind": "component",
       "path": "schemas/cashflow/1/step_up_coupon_spec.schema.json",
       "summary": "Initial coupon rate, dated rate steps and schedule for one step-up leg.",

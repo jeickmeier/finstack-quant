@@ -3491,10 +3491,9 @@ class ScheduleBuilder:
         """
         Materialize the date schedule from the builder settings.
 
-        Delegates entirely to the canonical Rust ``ScheduleSpec::build``:
-        under the default ``STRICT`` policy an invalid range (``start`` after
-        ``end``) or any build warning raises ``ValueError`` (strict fails
-        closed in Rust). Under ``MISSING_CALENDAR_WARNING`` or
+        Delegates entirely to the canonical Rust ``ScheduleBuilder::build``:
+        under the default ``STRICT`` policy a generation failure raises
+        ``ValueError`` and an unknown calendar id ``KeyError``. Under ``MISSING_CALENDAR_WARNING`` or
         ``GRACEFUL_EMPTY`` the schedule is returned carrying its warnings
         (inspect via ``Schedule.warnings`` / ``Schedule.has_warnings()``).
 

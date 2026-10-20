@@ -4,9 +4,7 @@ use super::engine::{AodInputs, CdsPricer, CouponPeriod};
 use super::helpers::sp_cond_to;
 use crate::cds::CreditDefaultSwap;
 use finstack_quant_cashflows::builder::RollRule;
-use finstack_quant_core::dates::{
-    Date, DayCountContext, Schedule, ScheduleBuilder, StubKind, Tenor,
-};
+use finstack_quant_core::dates::{Date, DayCountContext, Schedule, StubKind, Tenor};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::{BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
@@ -38,7 +36,7 @@ pub(crate) enum AccrualDayCountPolicy {
 impl CdsPricer {
     /// Generate contractual accrual and payment dates from the premium terms.
     fn premium_schedule(&self, cds: &CreditDefaultSwap) -> Result<Schedule> {
-        let mut builder = ScheduleBuilder::new(cds.premium_leg.start, cds.premium_leg.end)?;
+        let mut builder = Schedule::builder(cds.premium_leg.start, cds.premium_leg.end)?;
         builder = match cds.premium_leg.roll_rule {
             RollRule::CdsImm => {
                 if cds.premium_leg.frequency != Tenor::quarterly()
@@ -63,7 +61,7 @@ impl CdsPricer {
             }
         };
         if let Some(calendar_id) = cds.premium_leg.calendar_id.as_deref() {
-            builder = builder.adjust_with_id(cds.premium_leg.business_day_convention, calendar_id);
+            builder = builder.adjust_with(cds.premium_leg.business_day_convention, calendar_id);
         }
         let mut schedule = builder.build()?;
         // The standard grid includes the previous roll date. The explicit

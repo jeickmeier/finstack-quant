@@ -121,7 +121,7 @@ fn schedule_spec_examples() -> Result<Vec<Value>> {
 
 /// The schedule generated from [`schedule_spec_example`].
 fn schedule_examples() -> Result<Vec<Value>> {
-    example(&schedule_spec_example()?.build()?)
+    example(&crate::dates::ScheduleBuilder::from(schedule_spec_example()?).build()?)
 }
 
 /// The default scorecard scale of the rating-scale registry compiled into the library.

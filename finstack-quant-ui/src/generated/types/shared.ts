@@ -15269,14 +15269,14 @@ export type SnowballVariant = "snowball" | "inverse_floater";
  * # Examples
  *
  * ```rust
- * use finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};
+ * use finstack_quant_core::dates::{Schedule, StubKind, Tenor};
  * use time::{Date, Month};
  *
  * let start = Date::from_calendar_date(2025, Month::January, 10)?;
  * let end = Date::from_calendar_date(2025, Month::December, 15)?;
  *
  * // Short stub at front
- * let sched = ScheduleBuilder::new(start, end)?
+ * let sched = Schedule::builder(start, end)?
  *     .frequency(Tenor::quarterly())
  *     .stub_rule(StubKind::ShortFront)
  *     .build()?;
@@ -15584,14 +15584,14 @@ export type D_10Afa2C48803544Dc415 =
  * # Examples
  *
  * ```rust
- * use finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};
+ * use finstack_quant_core::dates::{Schedule, StubKind, Tenor};
  * use time::{Date, Month};
  *
  * let start = Date::from_calendar_date(2025, Month::January, 10)?;
  * let end = Date::from_calendar_date(2025, Month::December, 15)?;
  *
  * // Short stub at front
- * let sched = ScheduleBuilder::new(start, end)?
+ * let sched = Schedule::builder(start, end)?
  *     .frequency(Tenor::quarterly())
  *     .stub_rule(StubKind::ShortFront)
  *     .build()?;
@@ -15903,14 +15903,14 @@ export type D_7E19Cc4Df9954B864180 = number;
  * # Examples
  *
  * ```rust
- * use finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};
+ * use finstack_quant_core::dates::{Schedule, StubKind, Tenor};
  * use time::{Date, Month};
  *
  * let start = Date::from_calendar_date(2025, Month::January, 10)?;
  * let end = Date::from_calendar_date(2025, Month::December, 15)?;
  *
  * // Short stub at front
- * let sched = ScheduleBuilder::new(start, end)?
+ * let sched = Schedule::builder(start, end)?
  *     .frequency(Tenor::quarterly())
  *     .stub_rule(StubKind::ShortFront)
  *     .build()?;

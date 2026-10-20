@@ -1,7 +1,7 @@
 """Tests for ScheduleBuilder bindings.
 
 NOTE: requires a rebuilt wheel (the binding default frequency changed from
-quarterly to monthly to match Rust ``ScheduleBuilder::new``).
+quarterly to monthly to match Rust ``Schedule::builder``).
 """
 
 from datetime import date

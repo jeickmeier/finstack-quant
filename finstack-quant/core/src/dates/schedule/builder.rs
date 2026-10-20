@@ -19,7 +19,7 @@ use super::*;
 ///
 /// # Construction Flow
 ///
-/// 1. Create builder with `new(start, end)`
+/// 1. Create builder with [`Schedule::builder`]
 /// 2. Configure options via fluent methods
 /// 3. Call `build()` to generate the [`Schedule`]
 ///
@@ -27,13 +27,13 @@ use super::*;
 ///
 /// Basic quarterly schedule:
 /// ```rust
-/// use finstack_quant_core::dates::{ScheduleBuilder, Tenor};
+/// use finstack_quant_core::dates::{Schedule, Tenor};
 /// use time::{Date, Month};
 ///
 /// let start = Date::from_calendar_date(2025, Month::March, 20)?;
 /// let end = Date::from_calendar_date(2025, Month::December, 20)?;
 ///
-/// let schedule = ScheduleBuilder::new(start, end)?
+/// let schedule = Schedule::builder(start, end)?
 ///     .frequency(Tenor::quarterly())
 ///     .build()?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -41,31 +41,28 @@ use super::*;
 ///
 /// With business day adjustment:
 /// ```rust
-/// use finstack_quant_core::dates::{calendar_by_id_strict, ScheduleBuilder, Tenor, BusinessDayConvention};
+/// use finstack_quant_core::dates::{BusinessDayConvention, Schedule, Tenor};
 /// use time::{Date, Month};
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///
 /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
 /// let end = Date::from_calendar_date(2025, Month::December, 15)?;
-/// let nyse = calendar_by_id_strict("nyse")?;
 ///
-/// let schedule = ScheduleBuilder::new(start, end)?
+/// let schedule = Schedule::builder(start, end)?
 ///     .frequency(Tenor::monthly())
-///     .adjust_with(BusinessDayConvention::ModifiedFollowing, nyse)
+///     .adjust_with(BusinessDayConvention::ModifiedFollowing, "nyse")
 ///     .build()?;
-/// # Ok(())
-/// # }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
 /// CDS IMM schedule (credit default swaps):
 /// ```rust
-/// use finstack_quant_core::dates::ScheduleBuilder;
+/// use finstack_quant_core::dates::Schedule;
 /// use time::{Date, Month};
 ///
 /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
 /// let end = Date::from_calendar_date(2026, Month::December, 20)?;
 ///
-/// let schedule = ScheduleBuilder::new(start, end)?
+/// let schedule = Schedule::builder(start, end)?
 ///     .cds_imm()  // Quarterly on 20-Mar/Jun/Sep/Dec
 ///     .build()?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -73,13 +70,13 @@ use super::*;
 ///
 /// Standard IMM schedule (futures):
 /// ```rust
-/// use finstack_quant_core::dates::ScheduleBuilder;
+/// use finstack_quant_core::dates::Schedule;
 /// use time::{Date, Month};
 ///
 /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
 /// let end = Date::from_calendar_date(2025, Month::December, 31)?;
 ///
-/// let schedule = ScheduleBuilder::new(start, end)?
+/// let schedule = Schedule::builder(start, end)?
 ///     .imm()  // Quarterly on third Wednesday of Mar/Jun/Sep/Dec
 ///     .build()?;
 /// // Generates: Mar-19, Jun-18, Sep-17, Dec-17 (2025 third Wednesdays)
@@ -88,13 +85,13 @@ use super::*;
 ///
 /// End-of-month convention:
 /// ```rust
-/// use finstack_quant_core::dates::{ScheduleBuilder, Tenor};
+/// use finstack_quant_core::dates::{Schedule, Tenor};
 /// use time::{Date, Month};
 ///
 /// let start = Date::from_calendar_date(2025, Month::January, 31)?;
 /// let end = Date::from_calendar_date(2025, Month::June, 30)?;
 ///
-/// let schedule = ScheduleBuilder::new(start, end)?
+/// let schedule = Schedule::builder(start, end)?
 ///     .frequency(Tenor::monthly())
 ///     .end_of_month(true)  // Snap to month-end
 ///     .build()?;
@@ -110,17 +107,21 @@ use super::*;
 /// - [`BusinessDayConvention`] for adjustment rules
 ///
 /// [`BusinessDayConvention`]: super::BusinessDayConvention
-#[derive(Clone)]
-pub struct ScheduleBuilder<'a> {
+#[derive(Clone, Debug)]
+pub struct ScheduleBuilder {
     pub(super) spec: ScheduleSpec,
-    /// Borrowed calendar; otherwise the specification's calendar ID is resolved at build time.
-    pub(super) cal: Option<&'a dyn HolidayCalendar>,
 }
 
-impl<'a> ScheduleBuilder<'a> {
-    /// Create a new builder with mandatory `start` and `end` dates.
+impl Schedule {
+    /// Start a [`ScheduleBuilder`] with mandatory `start` and `end` dates.
     ///
-    /// Defaults: frequency = Monthly, stub = None, no adjustment, no EOM.
+    /// Defaults: frequency = Monthly, stub = None, no adjustment, no EOM,
+    /// strict error policy (see [`ScheduleSpec::new`]).
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - First unadjusted accrual date, included in the schedule.
+    /// * `end` - Last unadjusted accrual date; must be on or after `start`.
     ///
     /// # Errors
     ///
@@ -129,24 +130,33 @@ impl<'a> ScheduleBuilder<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_core::dates::{ScheduleBuilder, Tenor};
+    /// use finstack_quant_core::dates::{Schedule, Tenor};
     /// use time::{Date, Month};
     ///
     /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
     /// let end = Date::from_calendar_date(2025, Month::April, 15)?;
     ///
-    /// let schedule = ScheduleBuilder::new(start, end)?
+    /// let schedule = Schedule::builder(start, end)?
     ///     .frequency(Tenor::monthly())
     ///     .build()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn new(start: Date, end: Date) -> crate::Result<Self> {
-        Ok(Self {
+    pub fn builder(start: Date, end: Date) -> crate::Result<ScheduleBuilder> {
+        Ok(ScheduleBuilder {
             spec: ScheduleSpec::new(start, end)?,
-            cal: None,
         })
     }
+}
 
+/// A builder that applies a persisted [`ScheduleSpec`] as it is; this is how
+/// a deserialized specification is built.
+impl From<ScheduleSpec> for ScheduleBuilder {
+    fn from(spec: ScheduleSpec) -> Self {
+        Self { spec }
+    }
+}
+
+impl ScheduleBuilder {
     /// Set coupon/payment frequency.
     #[must_use]
     pub fn frequency(mut self, frequency: Tenor) -> Self {
@@ -162,24 +172,6 @@ impl<'a> ScheduleBuilder<'a> {
     #[must_use]
     pub fn stub_rule(mut self, stub: StubKind) -> Self {
         self.spec.stub = stub;
-        self
-    }
-
-    /// Configure business-day adjustment using `conv` and `cal`.
-    ///
-    /// # Arguments
-    ///
-    /// * `conv` - Business-day convention applied when an unadjusted date is not a business day.
-    /// * `cal` - Holiday calendar used for business-day adjustment.
-    #[must_use]
-    pub fn adjust_with(
-        mut self,
-        conv: BusinessDayConvention,
-        cal: &'a dyn HolidayCalendar,
-    ) -> Self {
-        self.spec.business_day_convention = Some(conv);
-        self.cal = Some(cal);
-        self.spec.calendar_id = None;
         self
     }
 
@@ -217,7 +209,7 @@ impl<'a> ScheduleBuilder<'a> {
     ///
     /// The generated 20ths are **unadjusted** roll dates; payment-date
     /// business-day adjustment is applied separately via
-    /// [`adjust_with`](Self::adjust_with) / [`adjust_with_id`](Self::adjust_with_id).
+    /// [`adjust_with`](Self::adjust_with).
     #[must_use]
     pub fn cds_imm(mut self) -> Self {
         self.spec = self.spec.with_cds_imm();
@@ -234,13 +226,13 @@ impl<'a> ScheduleBuilder<'a> {
     ///
     /// # Example
     /// ```rust
-    /// use finstack_quant_core::dates::ScheduleBuilder;
+    /// use finstack_quant_core::dates::Schedule;
     /// use time::{Date, Month};
     ///
     /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
     /// let end = Date::from_calendar_date(2025, Month::December, 31)?;
     ///
-    /// let schedule = ScheduleBuilder::new(start, end)?
+    /// let schedule = Schedule::builder(start, end)?
     ///     .imm()  // Quarterly on third Wednesday
     ///     .build()?;
     ///
@@ -269,7 +261,7 @@ impl<'a> ScheduleBuilder<'a> {
     ///
     /// A lag of zero leaves the payment date on the adjusted period end.
     /// A positive lag requires a holiday calendar from
-    /// [`adjust_with`](Self::adjust_with) or [`adjust_with_id`](Self::adjust_with_id).
+    /// [`adjust_with`](Self::adjust_with).
     ///
     /// # Arguments
     ///
@@ -286,8 +278,7 @@ impl<'a> ScheduleBuilder<'a> {
     ///
     /// The fixing date is `accrual_start` minus `lag` business days. A lag of
     /// zero stores the accrual start itself. A positive lag requires a holiday
-    /// calendar from [`adjust_with`](Self::adjust_with) or
-    /// [`adjust_with_id`](Self::adjust_with_id).
+    /// calendar from [`adjust_with`](Self::adjust_with).
     ///
     /// # Arguments
     ///
@@ -299,48 +290,53 @@ impl<'a> ScheduleBuilder<'a> {
         self
     }
 
-    /// Configure business-day adjustment using calendar ID string lookup.
+    /// Configure business-day adjustment of payment dates with a calendar id.
     ///
-    /// This is a convenience method that combines calendar lookup with adjustment
-    /// configuration. The calendar lookup is performed at build time.
+    /// The calendar is resolved at build time, so a later call replaces both
+    /// the convention and the calendar.
     ///
     /// # Errors
     ///
-    /// By default, returns an error at [`build()`](Self::build) time if the calendar ID
+    /// By default, [`build()`](Self::build) returns an error if the calendar ID
     /// is not found. Use [`error_policy`](Self::error_policy) with
     /// [`ScheduleErrorPolicy::MissingCalendarWarning`] to opt into lenient behavior.
     ///
     /// # Arguments
     ///
     /// * `conv` - Business day convention (Following, Modified Following, etc.)
-    /// * `calendar_id` - Calendar identifier string (e.g., "nyse", "target2", "gblo")
+    /// * `calendar_id` - Registered calendar identifier (e.g., "nyse", "target2",
+    ///   "gblo"); `+`-joined ids such as "nyse+gblo" resolve to the union calendar.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_core::dates::{ScheduleBuilder, Tenor, BusinessDayConvention};
+    /// use finstack_quant_core::dates::{BusinessDayConvention, Schedule, Tenor};
     /// use time::{Date, Month};
     ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 15).expect("Valid date");
-    /// let end = Date::from_calendar_date(2025, Month::December, 15).expect("Valid date");
+    /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
+    /// let end = Date::from_calendar_date(2025, Month::December, 15)?;
     ///
-    /// let schedule = ScheduleBuilder::new(start, end)
-    ///     .expect("Valid dates")
+    /// let schedule = Schedule::builder(start, end)?
     ///     .frequency(Tenor::monthly())
-    ///     .adjust_with_id(BusinessDayConvention::Following, "nyse")
-    ///     .build()
-    ///     .expect("Schedule builder should succeed");
-    /// # assert!(schedule.dates.len() > 0);
+    ///     .adjust_with(BusinessDayConvention::Following, "nyse")
+    ///     .build()?;
+    /// assert!(!schedule.dates.is_empty());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[must_use]
-    pub fn adjust_with_id(mut self, conv: BusinessDayConvention, calendar_id: &str) -> Self {
+    pub fn adjust_with(mut self, conv: BusinessDayConvention, calendar_id: &str) -> Self {
         self.spec.business_day_convention = Some(conv);
-        self.cal = None;
         self.spec.calendar_id = Some(calendar_id.to_string());
         self
     }
 
     /// Build a concrete schedule (adjusted if configured).
+    ///
+    /// The stored `frequency` and `stub` are used as they are in every mode
+    /// ([`imm`](Self::imm) and [`cds_imm`](Self::cds_imm) set the IMM
+    /// defaults). Business-day adjustment is applied only when both a
+    /// convention and a calendar id are set; either alone (possible in a
+    /// deserialized [`ScheduleSpec`]) leaves payment dates unadjusted.
     ///
     /// When [`ScheduleErrorPolicy::GracefulEmpty`] is selected,
     /// this method returns an empty schedule with a [`ScheduleWarning::GracefulFallback`]
@@ -401,11 +397,14 @@ impl<'a> ScheduleBuilder<'a> {
 
         let mut warnings: Vec<ScheduleWarning> = Vec::new();
 
-        // Resolve pending calendar ID if present, otherwise use directly provided calendar
-        let resolved_cal: Option<&dyn HolidayCalendar> = if let Some(ref calendar_id) =
-            self.spec.calendar_id
-        {
-            match calendar_by_id_strict(calendar_id) {
+        // A calendar id adjusts payment dates only together with a convention.
+        let calendar_id = self
+            .spec
+            .business_day_convention
+            .and(self.spec.calendar_id.as_ref());
+        let resolved_cal: Option<&dyn HolidayCalendar> = match calendar_id {
+            None => None,
+            Some(calendar_id) => match calendar_by_id_strict(calendar_id) {
                 Ok(cal) => Some(cal),
                 Err(_) if self.spec.error_policy == ScheduleErrorPolicy::MissingCalendarWarning => {
                     tracing::warn!(
@@ -419,9 +418,7 @@ impl<'a> ScheduleBuilder<'a> {
                 }
                 // Strict mode: error on missing calendar
                 Err(err) => return Err(err),
-            }
-        } else {
-            self.cal
+            },
         };
 
         // Generate dates based on mode

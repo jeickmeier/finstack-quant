@@ -13,9 +13,7 @@ mod bench_utils;
 
 use bench_utils::bench_iter;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_core::dates::{
-    calendar_by_id_strict, BusinessDayConvention, ScheduleBuilder, StubKind, Tenor,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, Schedule, StubKind, Tenor};
 use std::hint::black_box;
 use time::{Date, Month};
 
@@ -41,7 +39,7 @@ fn bench_frequency_variants(c: &mut Criterion) {
 
     for (name, frequency) in frequencies {
         bench_iter(&mut group, name, || {
-            let sched = ScheduleBuilder::new(start, end)
+            let sched = Schedule::builder(start, end)
                 .unwrap()
                 .frequency(frequency)
                 .build()
@@ -68,7 +66,7 @@ fn bench_stub_conventions(c: &mut Criterion) {
 
     for (name, stub) in stubs {
         bench_iter(&mut group, name, || {
-            let sched = ScheduleBuilder::new(start, end)
+            let sched = Schedule::builder(start, end)
                 .unwrap()
                 .frequency(Tenor::quarterly())
                 .stub_rule(stub)
@@ -92,7 +90,7 @@ fn bench_tenor_scaling(c: &mut Criterion) {
             &years,
             |b, _| {
                 b.iter(|| {
-                    let sched = ScheduleBuilder::new(start, end)
+                    let sched = Schedule::builder(start, end)
                         .unwrap()
                         .frequency(Tenor::quarterly())
                         .build()
@@ -110,7 +108,7 @@ fn bench_tenor_scaling(c: &mut Criterion) {
             &years,
             |b, _| {
                 b.iter(|| {
-                    let sched = ScheduleBuilder::new(start, end)
+                    let sched = Schedule::builder(start, end)
                         .unwrap()
                         .frequency(Tenor::monthly())
                         .build()
@@ -130,7 +128,7 @@ fn bench_end_of_month(c: &mut Criterion) {
     let end = Date::from_calendar_date(2035, Month::January, 31).expect("valid bench date");
 
     bench_iter(&mut group, "eom_false", || {
-        let sched = ScheduleBuilder::new(start, end)
+        let sched = Schedule::builder(start, end)
             .unwrap()
             .frequency(Tenor::monthly())
             .end_of_month(false)
@@ -140,7 +138,7 @@ fn bench_end_of_month(c: &mut Criterion) {
     });
 
     bench_iter(&mut group, "eom_true", || {
-        let sched = ScheduleBuilder::new(start, end)
+        let sched = Schedule::builder(start, end)
             .unwrap()
             .frequency(Tenor::monthly())
             .end_of_month(true)
@@ -164,7 +162,7 @@ fn bench_imm_schedules(c: &mut Criterion) {
             &years,
             |b, _| {
                 b.iter(|| {
-                    let sched = ScheduleBuilder::new(start, end)
+                    let sched = Schedule::builder(start, end)
                         .unwrap()
                         .cds_imm()
                         .build()
@@ -179,7 +177,7 @@ fn bench_imm_schedules(c: &mut Criterion) {
             &years,
             |b, _| {
                 b.iter(|| {
-                    let sched = ScheduleBuilder::new(start, end)
+                    let sched = Schedule::builder(start, end)
                         .unwrap()
                         .imm()
                         .build()
@@ -199,7 +197,7 @@ fn bench_business_day_adjustment(c: &mut Criterion) {
     let end = end_date_years(10);
 
     bench_iter(&mut group, "unadjusted", || {
-        let sched = ScheduleBuilder::new(start, end)
+        let sched = Schedule::builder(start, end)
             .unwrap()
             .frequency(Tenor::quarterly())
             .build()
@@ -207,22 +205,22 @@ fn bench_business_day_adjustment(c: &mut Criterion) {
         black_box(sched);
     });
 
-    if let Ok(nyse) = calendar_by_id_strict("nyse") {
+    {
         bench_iter(&mut group, "mod_following_nyse", || {
-            let sched = ScheduleBuilder::new(start, end)
+            let sched = Schedule::builder(start, end)
                 .unwrap()
                 .frequency(Tenor::quarterly())
-                .adjust_with(BusinessDayConvention::ModifiedFollowing, nyse)
+                .adjust_with(BusinessDayConvention::ModifiedFollowing, "nyse")
                 .build()
                 .unwrap();
             black_box(sched);
         });
 
         bench_iter(&mut group, "following_nyse", || {
-            let sched = ScheduleBuilder::new(start, end)
+            let sched = Schedule::builder(start, end)
                 .unwrap()
                 .frequency(Tenor::quarterly())
-                .adjust_with(BusinessDayConvention::Following, nyse)
+                .adjust_with(BusinessDayConvention::Following, "nyse")
                 .build()
                 .unwrap();
             black_box(sched);
@@ -237,7 +235,7 @@ fn bench_schedule_iteration(c: &mut Criterion) {
     let start = start_date();
     let end = end_date_years(30);
 
-    let sched = ScheduleBuilder::new(start, end)
+    let sched = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
         .build()
