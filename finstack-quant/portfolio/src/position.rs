@@ -67,6 +67,26 @@ pub enum PositionUnit {
     Percentage,
 }
 
+impl PositionUnit {
+    /// Instrument-value multiplier for `quantity` held in this unit: a
+    /// `Percentage` holding of `50.0` scales by `0.5`; every other unit scales
+    /// by the quantity itself.
+    pub(crate) fn scale_of(self, quantity: f64) -> f64 {
+        match self {
+            Self::Units | Self::Notional(_) | Self::FaceValue => quantity,
+            Self::Percentage => quantity / 100.0,
+        }
+    }
+
+    /// Inverse of [`Self::scale_of`]: the quantity in this unit that gives `scale`.
+    pub(crate) fn quantity_of(self, scale: f64) -> f64 {
+        match self {
+            Self::Units | Self::Notional(_) | Self::FaceValue => scale,
+            Self::Percentage => scale * 100.0,
+        }
+    }
+}
+
 impl std::str::FromStr for PositionUnit {
     type Err = crate::Error;
 
@@ -386,12 +406,7 @@ impl Position {
     /// return currency-less P&L deltas).
     #[inline]
     pub fn scale_factor(&self) -> f64 {
-        match self.unit {
-            PositionUnit::Units | PositionUnit::Notional(_) | PositionUnit::FaceValue => {
-                self.quantity
-            }
-            PositionUnit::Percentage => self.quantity / 100.0,
-        }
+        self.unit.scale_of(self.quantity)
     }
 
     /// Convert this position to a serializable specification.

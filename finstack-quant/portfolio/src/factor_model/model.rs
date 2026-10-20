@@ -22,7 +22,6 @@
 
 use super::assignment::{assign_position_factors, FactorAssignmentReport};
 use super::dependencies::factor_dependencies;
-use super::whatif::{StressPnl, StressResult};
 use crate::error::{Error, Result};
 use crate::sensitivity::{exact_factor_market_keys, DeltaBasedEngine, FactorSensitivityEngine};
 use crate::{dependencies::MarketFactorKey, Portfolio};
@@ -53,10 +52,10 @@ use std::collections::{BTreeMap, HashMap};
 pub struct FactorModel {
     credit_idiosyncratic_variance: BTreeMap<finstack_quant_core::types::IssuerId, f64>,
     factors: Vec<FactorDefinition>,
-    covariance: FactorCovarianceMatrix,
+    pub(super) covariance: FactorCovarianceMatrix,
     matcher: Box<dyn finstack_quant_factor::FactorMatcher>,
     sensitivity_engine: Box<dyn FactorSensitivityEngine>,
-    risk_measure: RiskMeasure,
+    pub(super) risk_measure: RiskMeasure,
     unmatched_policy: UnmatchedPolicy,
     bump_config: BumpSizeConfig,
 }
@@ -546,121 +545,6 @@ impl FactorModel {
             decomposition,
             residual_contributions,
         )?)
-    }
-
-    /// Shock configured factors and reprice the portfolio without decomposing
-    /// stressed risk.
-    ///
-    /// Use this when only shocked-minus-base P&L is required. Call
-    /// [`Self::factor_stress`] when the stressed risk decomposition is also
-    /// needed; that path reuses this P&L evaluation and then analyzes the
-    /// shocked market once.
-    ///
-    /// # Arguments
-    ///
-    /// * `portfolio` - Portfolio whose position P&L is evaluated.
-    /// * `market` - Baseline market snapshot to shock.
-    /// * `as_of` - Valuation date used for both endpoints.
-    /// * `stresses` - Factor IDs and shock magnitudes in each factor's
-    ///   configured market-mapping convention.
-    ///
-    /// # Returns
-    ///
-    /// Total and per-position stressed-minus-base P&L in the portfolio base
-    /// currency.
-    ///
-    /// # Errors
-    ///
-    /// Propagates unknown-factor, market-bump, valuation, and
-    /// currency-validation failures.
-    pub fn factor_stress_pnl(
-        &self,
-        portfolio: &Portfolio,
-        market: &MarketContext,
-        as_of: Date,
-        stresses: &[(finstack_quant_factor::FactorId, f64)],
-    ) -> Result<StressPnl> {
-        super::whatif::factor_stress_pnl(self, portfolio, market, as_of, stresses)
-            .map(|(pnl, _)| pnl)
-    }
-
-    /// Shock configured factors, reprice the portfolio, and decompose risk
-    /// under the stressed market.
-    ///
-    /// This direct workflow does not compute an unused baseline sensitivity
-    /// matrix; use [`Self::position_what_if`] for position remove/resize
-    /// scenarios against a baseline decomposition.
-    ///
-    /// # Arguments
-    ///
-    /// * `portfolio` - Portfolio whose position P&L and stressed risk are
-    ///   evaluated.
-    /// * `market` - Baseline market snapshot to shock.
-    /// * `as_of` - Valuation date used for both endpoints and stressed
-    ///   sensitivities.
-    /// * `stresses` - Factor IDs and shock magnitudes in each factor's
-    ///   configured market-mapping convention.
-    ///
-    /// # Returns
-    ///
-    /// Total and per-position stressed-minus-base P&L plus the risk
-    /// decomposition under the stressed market.
-    ///
-    /// # Errors
-    ///
-    /// Propagates unknown-factor, market-bump, valuation, currency-validation,
-    /// sensitivity, and decomposition failures.
-    pub fn factor_stress(
-        &self,
-        portfolio: &Portfolio,
-        market: &MarketContext,
-        as_of: Date,
-        stresses: &[(finstack_quant_factor::FactorId, f64)],
-    ) -> Result<StressResult> {
-        super::whatif::factor_stress(self, portfolio, market, as_of, stresses)
-    }
-
-    /// Run a position remove/resize what-if against this model's baseline.
-    ///
-    /// Decomposes the portfolio's baseline risk with
-    /// the same sensitivities [`Self::analyze`] uses, then applies `changes` to that
-    /// baseline: a removal zeroes the position's sensitivity row and a resize
-    /// scales it in proportion to the original nonzero quantity.
-    ///
-    /// # Arguments
-    ///
-    /// * `portfolio` - Portfolio the baseline is computed for and the changes
-    ///   are applied to.
-    /// * `market` - Market data used to value positions and compute
-    ///   sensitivities.
-    /// * `as_of` - Valuation date of the analysis.
-    /// * `changes` - Position removals and resizes to apply, in order; every
-    ///   `position_id` must exist in `portfolio`.
-    ///
-    /// # Returns
-    ///
-    /// The baseline and post-change risk decompositions with per-factor deltas.
-    ///
-    /// # Errors
-    ///
-    /// Propagates factor assignment, sensitivity, decomposition and
-    /// unknown-position failures.
-    pub fn position_what_if(
-        &self,
-        portfolio: &Portfolio,
-        market: &MarketContext,
-        as_of: Date,
-        changes: &[super::PositionChange],
-    ) -> Result<super::WhatIfResult> {
-        super::whatif::position_what_if(self, portfolio, market, as_of, changes)
-    }
-
-    pub(crate) fn covariance(&self) -> &FactorCovarianceMatrix {
-        &self.covariance
-    }
-
-    pub(crate) fn risk_measure(&self) -> &RiskMeasure {
-        &self.risk_measure
     }
 
     /// Build one stressed market and its exact selective-repricing manifest.

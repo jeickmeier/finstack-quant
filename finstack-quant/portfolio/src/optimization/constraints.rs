@@ -130,26 +130,7 @@ impl Constraint {
         value: impl Into<String>,
         max_share: f64,
     ) -> crate::Result<Self> {
-        if !(0.0..=1.0).contains(&max_share) {
-            return Err(crate::Error::invalid_input(format!(
-                "max_share must be in [0, 1], got {max_share}"
-            )));
-        }
-        Ok(Self::MetricBound {
-            label: None,
-            metric: super::types::MetricExpr::WeightedSum {
-                metric: super::types::PerPositionMetric::AttributeIndicator(
-                    crate::types::AttributeTest::new(
-                        key,
-                        crate::types::ComparisonOp::Eq,
-                        crate::types::AttributeValue::Text(value.into()),
-                    ),
-                ),
-                filter: None,
-            },
-            op: Inequality::Le,
-            rhs: max_share,
-        })
+        Self::exposure_bound(key, value, "max_share", Inequality::Le, max_share)
     }
 
     /// Shorthand for attribute exposure minimum: `sum w_i * I[attr == value] >= min_share`.
@@ -162,9 +143,20 @@ impl Constraint {
         value: impl Into<String>,
         min_share: f64,
     ) -> crate::Result<Self> {
-        if !(0.0..=1.0).contains(&min_share) {
+        Self::exposure_bound(key, value, "min_share", Inequality::Ge, min_share)
+    }
+
+    /// `sum w_i * I[attr == value] OP share`, with `share` checked to lie in `[0, 1]`.
+    fn exposure_bound(
+        key: impl Into<String>,
+        value: impl Into<String>,
+        share_name: &str,
+        op: Inequality,
+        share: f64,
+    ) -> crate::Result<Self> {
+        if !(0.0..=1.0).contains(&share) {
             return Err(crate::Error::invalid_input(format!(
-                "min_share must be in [0, 1], got {min_share}"
+                "{share_name} must be in [0, 1], got {share}"
             )));
         }
         Ok(Self::MetricBound {
@@ -179,8 +171,8 @@ impl Constraint {
                 ),
                 filter: None,
             },
-            op: Inequality::Ge,
-            rhs: min_share,
+            op,
+            rhs: share,
         })
     }
 

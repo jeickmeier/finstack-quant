@@ -132,6 +132,9 @@ fn selective_invalidation(
 /// * `portfolio` - Portfolio to borrow or clone according to scenario effects.
 /// * `scenario` - Scenario specification describing desired transformations.
 /// * `market` - Market data context subject to the scenario operations.
+/// * `config` - Library configuration handed to the scenario engine.
+/// * `provider` - Optional recalibration provider for market rebuilds; `None`
+///   uses the engine default.
 ///
 /// # Returns
 ///
@@ -141,33 +144,7 @@ fn selective_invalidation(
 /// # Errors
 ///
 /// Returns [`Error::ScenarioError`] when the scenario engine reports a failure.
-///
-/// # Examples
-///
-/// ```no_run
-/// use finstack_quant_core::market_data::context::MarketContext;
-/// use finstack_quant_portfolio::scenarios::apply_and_revalue;
-/// use finstack_quant_scenarios::spec::ScenarioSpec;
-///
-/// # fn main() -> finstack_quant_portfolio::Result<()> {
-/// # let portfolio: finstack_quant_portfolio::Portfolio = unimplemented!("Provide a portfolio");
-/// # let market: MarketContext = unimplemented!("Provide market data");
-/// # let scenario: ScenarioSpec = unimplemented!("Provide a scenario");
-/// let finstack_quant_portfolio::scenarios::ScenarioRevalueView { valuation: _valuation, report } = apply_and_revalue(&portfolio, &scenario, &market, &Default::default())?;
-/// println!("Applied {} effects", report.operations_applied);
-/// # Ok(())
-/// # }
-/// ```
 fn apply_scenario<'a>(
-    portfolio: &'a Portfolio,
-    scenario: &ScenarioSpec,
-    market: &MarketContext,
-    config: &finstack_quant_core::config::FinstackConfig,
-) -> Result<AppliedScenarioState<'a>> {
-    apply_scenario_with_provider(portfolio, scenario, market, config, None)
-}
-
-fn apply_scenario_with_provider<'a>(
     portfolio: &'a Portfolio,
     scenario: &ScenarioSpec,
     market: &MarketContext,
@@ -300,7 +277,7 @@ pub fn apply_and_revalue(
         market,
         as_of,
         report,
-    } = apply_scenario(portfolio, scenario, market, config)?;
+    } = apply_scenario(portfolio, scenario, market, config, None)?;
     let mut plan = crate::evaluation::PortfolioEvaluationPlan::new(config);
     let market_state = plan.register_owned_market(market, as_of);
     let portfolio_state = match portfolio {
@@ -556,7 +533,7 @@ pub fn scenario_pnl_batch(
         let mut applied = Vec::with_capacity(wave.len());
         let mut application_error = None;
         for scenario in wave {
-            match apply_scenario_with_provider(
+            match apply_scenario(
                 portfolio,
                 scenario,
                 market,
@@ -785,7 +762,7 @@ mod tests {
             .output_scale
             .set_scale(Currency::USD, 4)
             .expect("valid decimal scale");
-        let result = apply_scenario(&portfolio, &scenario, &market, &config);
+        let result = apply_scenario(&portfolio, &scenario, &market, &config, None);
         assert!(result.is_ok());
 
         let applied = result.expect("test should succeed");

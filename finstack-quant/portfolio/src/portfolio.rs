@@ -213,28 +213,7 @@ impl Portfolio {
     /// duplicate position IDs or references an unknown book. Book memberships
     /// are rebuilt from the replacement positions. The portfolio is left unchanged on error.
     pub fn set_positions(&mut self, positions: Vec<Position>) -> Result<()> {
-        use finstack_quant_core::HashSet;
-
-        let mut seen_ids = HashSet::default();
-        for position in &positions {
-            if !seen_ids.insert(&position.position_id) {
-                return Err(Error::validation(format!(
-                    "Duplicate position ID: {}",
-                    position.position_id
-                )));
-            }
-        }
-
-        for position in &positions {
-            if let Some(book_id) = &position.book_id {
-                if !self.books.contains_key(book_id) {
-                    return Err(Error::validation(format!(
-                        "Position '{}' references non-existent book '{}'",
-                        position.position_id, book_id
-                    )));
-                }
-            }
-        }
+        check_position_ids_and_books(&positions, &self.books)?;
         for book in self.books.values_mut() {
             book.position_ids.clear();
         }
@@ -297,17 +276,7 @@ impl Portfolio {
     /// that is not present in [`Portfolio::entities`], or when a cycle is detected
     /// in the book hierarchy.
     pub fn validate(&self) -> Result<()> {
-        use finstack_quant_core::HashSet;
-
-        let mut seen_ids: finstack_quant_core::HashSet<_> = HashSet::default();
         for position in &self.positions {
-            if !seen_ids.insert(&position.position_id) {
-                return Err(Error::validation(format!(
-                    "Duplicate position ID: {}",
-                    position.position_id
-                )));
-            }
-
             if !self.entities.contains_key(&position.entity_id) {
                 return Err(Error::UnknownEntity {
                     position_id: position.position_id.clone(),
@@ -315,19 +284,9 @@ impl Portfolio {
                 });
             }
         }
-
-        // Validate book references before hierarchy traversal so missing books
-        // or positions fail directly instead of being treated as empty groups.
-        for position in &self.positions {
-            if let Some(book_id) = &position.book_id {
-                if !self.books.contains_key(book_id) {
-                    return Err(Error::validation(format!(
-                        "Position '{}' references non-existent book '{}'",
-                        position.position_id, book_id
-                    )));
-                }
-            }
-        }
+        // Book references are checked before hierarchy traversal so missing
+        // books or positions fail directly instead of being treated as empty groups.
+        let seen_ids = check_position_ids_and_books(&self.positions, &self.books)?;
         let mut first_issue = None;
         let memberships = crate::book::validate_books(&self.books, &seen_ids, |issue| {
             if first_issue.is_none() {
@@ -417,6 +376,33 @@ impl Portfolio {
 
         Ok(portfolio)
     }
+}
+
+/// Reject duplicate position IDs and positions that name an unknown book.
+///
+/// Returns the set of position IDs for the book-membership checks that follow.
+fn check_position_ids_and_books<'a>(
+    positions: &'a [Position],
+    books: &IndexMap<BookId, Book>,
+) -> Result<finstack_quant_core::HashSet<&'a PositionId>> {
+    let mut seen_ids = finstack_quant_core::HashSet::default();
+    for position in positions {
+        if !seen_ids.insert(&position.position_id) {
+            return Err(Error::validation(format!(
+                "Duplicate position ID: {}",
+                position.position_id
+            )));
+        }
+        if let Some(book_id) = &position.book_id {
+            if !books.contains_key(book_id) {
+                return Err(Error::validation(format!(
+                    "Position '{}' references non-existent book '{}'",
+                    position.position_id, book_id
+                )));
+            }
+        }
+    }
+    Ok(seen_ids)
 }
 
 #[cfg(test)]

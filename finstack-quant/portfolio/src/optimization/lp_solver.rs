@@ -2,8 +2,7 @@
 //!
 use super::constraints::{Constraint, Inequality};
 use super::decision::{
-    build_decision_space, quantity_from_scale, DecisionFeatures, DecisionItem,
-    OptimizationDenominators,
+    build_decision_space, DecisionFeatures, DecisionItem, OptimizationDenominators,
 };
 use super::problem::PortfolioOptimizationProblem;
 use super::result::{OptimizationStatus, PortfolioOptimizationResult};
@@ -415,9 +414,7 @@ fn assemble_and_solve(
             )));
         }
 
-        let (var_min, var_max) = (min_w, max_w);
-
-        w_vars.push(vars.add(variable().min(var_min).max(var_max)));
+        w_vars.push(vars.add(variable().min(min_w).max(max_w)));
     }
 
     let has_turnover_constraint = problem
@@ -554,8 +551,7 @@ fn reconstruct_result(
             match problem.weighting {
                 WeightingScheme::NotionalWeight => {
                     if feat.deal_notional_abs > PV_PER_UNIT_TOL {
-                        quantity_from_scale(
-                            item.unit,
+                        item.unit.quantity_of(
                             (w_star * reconstruction_denominator) / feat.deal_notional_abs,
                         )
                     } else {
@@ -564,10 +560,8 @@ fn reconstruct_result(
                 }
                 WeightingScheme::ValueWeight => {
                     if feat.pv_per_unit.abs() > PV_PER_UNIT_TOL {
-                        quantity_from_scale(
-                            item.unit,
-                            (w_star * reconstruction_denominator) / feat.pv_per_unit,
-                        )
+                        item.unit
+                            .quantity_of((w_star * reconstruction_denominator) / feat.pv_per_unit)
                     } else {
                         0.0
                     }
