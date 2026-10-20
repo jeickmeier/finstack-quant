@@ -7,9 +7,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::optimization::{
-    optimize, CandidatePosition, Constraint, Inequality, MetricExpr, MissingMetricPolicy,
-    Objective, PerPositionMetric, PortfolioOptimizationProblem, PositionFilter, TradeDirection,
-    TradeUniverse, WeightingScheme,
+    optimize, rebalance, CandidatePosition, Constraint, Inequality, MetricExpr,
+    MissingMetricPolicy, Objective, PerPositionMetric, PortfolioOptimizationProblem,
+    PositionFilter, TradeDirection, TradeUniverse, WeightingScheme,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
@@ -266,12 +266,15 @@ fn held_zero_and_tiny_pv_positions_retain_exact_quantities() {
         assert_eq!(result.implied_quantities["HELD"], quantity);
         assert!(result.to_trade_list().is_empty());
         assert_eq!(
-            result
-                .to_rebalanced_portfolio()
-                .unwrap()
-                .get_position("HELD")
-                .unwrap()
-                .quantity,
+            rebalance(
+                problem.portfolio.clone(),
+                &problem.trade_universe.candidates,
+                &result
+            )
+            .unwrap()
+            .get_position("HELD")
+            .unwrap()
+            .quantity,
             quantity,
         );
     }
@@ -705,9 +708,12 @@ fn test_short_candidates_can_take_negative_weights() {
         }),
         "MO-10: selected short candidates must be classified as new positions"
     );
-    let rebalanced = result
-        .to_rebalanced_portfolio()
-        .expect("MO-7: selected candidates should materialize");
+    let rebalanced = rebalance(
+        problem.portfolio.clone(),
+        &problem.trade_universe.candidates,
+        &result,
+    )
+    .expect("MO-7: selected candidates should materialize");
     assert_eq!(
         rebalanced
             .get_position("SHORT_CANDIDATE")
@@ -931,9 +937,9 @@ fn m9_turnover_slack_uses_actual_turnover() -> Result<(), Box<dyn std::error::Er
         result.status
     );
     assert!(
-        (result.turnover() - 0.5).abs() < 1e-8,
+        (result.turnover - 0.5).abs() < 1e-8,
         "M-9: expected solver to consume the turnover budget, got {}",
-        result.turnover()
+        result.turnover
     );
     let slack = result
         .constraint_slacks
@@ -1089,7 +1095,7 @@ fn mo6_filtered_value_weighted_average_metric_bound_uses_filtered_denominator(
         "MO-6: filtered average cap should force the high-metric bucket out"
     );
     let json = serde_json::to_string(&result)?;
-    let restored: finstack_quant_portfolio::optimization::PortfolioOptimizationResultWire =
+    let restored: finstack_quant_portfolio::optimization::PortfolioOptimizationResult =
         serde_json::from_str(&json)?;
     assert_eq!(restored.optimal_weights, result.optimal_weights);
     assert_eq!(
@@ -1258,10 +1264,11 @@ fn test_notional_weighting_implied_quantities_use_notional_denominator() {
 
 /// MO-19: an unfiltered `ValueWeightedAverage` objective is lowered to the
 /// plain linear form `Σ wᵢ·mᵢ`, which equals the true average only when the
-/// weights sum to 1. With `Budget { rhs: -1.0 }` over two short positions the
-/// reported objective is sign-flipped by `Σw = -1`, so the solver maximizes
-/// the *lowest*-yield allocation. The optimizer must reject the combination
-/// instead of returning Optimal with the wrong weights.
+/// weights sum to 1. With `Budget { rhs: 2.0 }` the reported objective is
+/// scaled by `Σw = 2`, so the reported "average" is twice the true one. The
+/// optimizer must reject the combination instead of returning Optimal with a
+/// misleading objective. (Negative budgets, which would also sign-flip the
+/// optimization direction, are rejected earlier by `Constraint::validate`.)
 #[test]
 fn mo19_unfiltered_vwa_objective_with_non_unit_budget_is_rejected() {
     let as_of = create_date(2024, Month::January, 1).unwrap();
@@ -1314,10 +1321,10 @@ fn mo19_unfiltered_vwa_objective_with_non_unit_budget_is_rejected() {
         }),
     );
     problem.constraints =
-        vec![finstack_quant_portfolio::optimization::Constraint::Budget { rhs: -1.0 }];
+        vec![finstack_quant_portfolio::optimization::Constraint::Budget { rhs: 2.0 }];
 
     let err = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
-        .expect_err("MO-19: VWA objective with Σw = -1 budget must fail, not sign-flip");
+        .expect_err("MO-19: VWA objective with Σw = 2 budget must fail, not rescale");
     let msg = err.to_string();
     assert!(
         msg.contains("MO-19") && msg.contains("Budget"),
@@ -1451,9 +1458,9 @@ fn infeasible_result_turnover_is_nan() {
         result.status
     );
     assert!(
-        result.turnover().is_nan(),
+        result.turnover.is_nan(),
         "turnover of an infeasible result must be NaN (no solution), got {}",
-        result.turnover()
+        result.turnover
     );
     assert!(result.to_trade_list().is_empty());
     assert!(result.binding_constraints().is_empty());
@@ -1712,7 +1719,6 @@ fn mo9_unit_scaling_without_budget_does_not_synthesize_sum_multiplier_budget() {
         }),
     );
     problem.weighting = WeightingScheme::UnitScaling;
-    problem.constraints.clear();
 
     let err = optimize(&problem, &build_mock_market(), &FinstackConfig::default())
         .expect_err("MO-9: UnitScaling must not get a synthetic budget");
@@ -2097,7 +2103,7 @@ fn notional_weights_convert_native_currencies_before_normalizing() {
 #[test]
 fn rebalance_from_spec_matches_the_live_result_and_rejects_foreign_results() {
     use finstack_quant_portfolio::optimization::{
-        optimize_portfolio, rebalance_from_spec, Constraint, PortfolioOptimizationResultWire,
+        optimize_portfolio, rebalance_from_spec, Constraint, PortfolioOptimizationResult,
         PortfolioOptimizationSpec,
     };
     let as_of = create_date(2024, Month::January, 1).unwrap();
@@ -2126,10 +2132,10 @@ fn rebalance_from_spec_matches_the_live_result_and_rejects_foreign_results() {
     spec.constraints = vec![Constraint::Budget { rhs: 1.0 }];
     let market = build_multi_currency_market();
     let live = optimize_portfolio(&spec, &market, &FinstackConfig::default()).unwrap();
-    let wire: PortfolioOptimizationResultWire =
+    let wire: PortfolioOptimizationResult =
         serde_json::from_str(&serde_json::to_string(&live).unwrap()).unwrap();
 
-    let expected = live.to_rebalanced_portfolio().unwrap();
+    let expected = rebalance(portfolio, &[], &live).unwrap();
     let rebuilt = rebalance_from_spec(&spec, &wire).unwrap();
     for id in ["A", "B"] {
         assert_eq!(
@@ -2145,10 +2151,106 @@ fn rebalance_from_spec_matches_the_live_result_and_rejects_foreign_results() {
     assert!(err.to_string().contains("ZZZ"), "{err}");
 
     let mut infeasible = wire;
-    infeasible.status = finstack_quant_portfolio::optimization::OptimizationStatus::Infeasible {
-        conflicting_constraints: Vec::new(),
-    };
+    infeasible.status = finstack_quant_portfolio::optimization::OptimizationStatus::Infeasible;
     assert!(rebalance_from_spec(&spec, &infeasible).is_err());
+}
+
+/// OPT-01 / MO-9: the spec entry point passes the spec's constraints through
+/// unchanged, so a `unit_scaling` spec without an explicit budget reaches the
+/// MO-9 guard instead of silently getting a `Σw = 1` row.
+#[test]
+fn unit_scaling_spec_without_budget_is_rejected() {
+    use finstack_quant_portfolio::optimization::{optimize_portfolio, PortfolioOptimizationSpec};
+    let as_of = create_date(2024, Month::January, 1).unwrap();
+    let deposit = test_deposit("USD", 1_000_000.0, as_of).unwrap();
+    let portfolio = Portfolio::builder("UNIT_SCALING")
+        .base_currency(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("ENT_A"))
+        .position(
+            Position::new(
+                "A",
+                "ENT_A",
+                "A",
+                Arc::new(deposit),
+                1.0,
+                PositionUnit::Units,
+            )
+            .unwrap(),
+        )
+        .build()
+        .unwrap();
+    let mut spec = PortfolioOptimizationSpec::new(
+        portfolio.to_spec(),
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Constant(1.0),
+            filter: None,
+        }),
+    );
+    spec.weighting = WeightingScheme::UnitScaling;
+    let market = build_multi_currency_market();
+
+    let err = optimize_portfolio(&spec, &market, &FinstackConfig::default())
+        .expect_err("MO-9: a unit_scaling spec without a budget must fail");
+    assert!(err.to_string().contains("MO-9"), "unexpected error: {err}");
+
+    spec.constraints = vec![Constraint::Budget { rhs: 1.0 }];
+    let result = optimize_portfolio(&spec, &market, &FinstackConfig::default())
+        .expect("an explicit budget makes the unit_scaling spec solvable");
+    assert!(result.is_feasible(), "got {:?}", result.status);
+}
+
+/// OPT-05 / HZ-3: constraints deserialized from JSON skip the Rust
+/// shorthand constructors, so `optimize` validates every constraint before
+/// solving instead of reporting `Infeasible` or solving a malformed problem.
+#[test]
+fn invalid_json_constraints_are_rejected_before_solving() {
+    use finstack_quant_portfolio::optimization::{optimize_portfolio, PortfolioOptimizationSpec};
+    let as_of = create_date(2024, Month::January, 1).unwrap();
+    let deposit = test_deposit("USD", 1_000_000.0, as_of).unwrap();
+    let portfolio = Portfolio::builder("INVALID_CONSTRAINTS")
+        .base_currency(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("ENT_A"))
+        .position(
+            Position::new(
+                "A",
+                "ENT_A",
+                "A",
+                Arc::new(deposit),
+                1.0,
+                PositionUnit::Units,
+            )
+            .unwrap(),
+        )
+        .build()
+        .unwrap();
+    let market = build_multi_currency_market();
+
+    for (json, needle) in [
+        (
+            r#"{"max_turnover":{"label":null,"max_turnover":-0.1}}"#,
+            "max_turnover",
+        ),
+        (r#"{"budget":{"rhs":-1.0}}"#, "budget rhs"),
+        (
+            r#"{"weight_bounds":{"label":null,"filter":"all","min":0.2,"max":0.1}}"#,
+            "weight bounds",
+        ),
+    ] {
+        let constraint: Constraint = serde_json::from_str(json).expect("well-formed JSON");
+        let mut spec = PortfolioOptimizationSpec::new(
+            portfolio.to_spec(),
+            Objective::Maximize(MetricExpr::WeightedSum {
+                metric: PerPositionMetric::Constant(1.0),
+                filter: None,
+            }),
+        );
+        spec.constraints = vec![constraint];
+        let err = optimize_portfolio(&spec, &market, &FinstackConfig::default())
+            .expect_err("invalid constraint must be rejected");
+        assert!(err.to_string().contains(needle), "{json}: {err}");
+    }
 }
 
 #[test]

@@ -658,10 +658,9 @@ export type ReplayStep = WithFields<
 export type ReplayResult = WithFields<generated.portfolio.ReplayResult, { steps: ReplayStep[] }>;
 
 /**
- * Solution of a portfolio optimization problem (Rust `PortfolioOptimizationResult`, serialized
- * through its `PortfolioOptimizationResultWire` form).
+ * Solution of a portfolio optimization problem (Rust `PortfolioOptimizationResult`).
  */
-export type PortfolioOptimizationResult = generated.portfolio.PortfolioOptimizationResultWire;
+export type PortfolioOptimizationResult = generated.portfolio.PortfolioOptimizationResult;
 
 /**
  * A dated amount (Rust `DatedFlowJson`); in `CashFlowSchedule.outstandingByDate`
@@ -35401,7 +35400,7 @@ export interface PortfolioNamespace {
    * Trades of an optimization result that open a new position.
    *
    * Twin of Python `PortfolioOptimizationResult.new_position_trades` (Rust
-   * `PortfolioOptimizationResultWire::new_position_trades`): the entries of
+   * `PortfolioOptimizationResult::new_position_trades`): the entries of
    * `trades` whose `trade_type` is `new_position`, in trade-list order.
    * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
    * @returns The matching `TradeSpec` rows; empty for an infeasible solve.
@@ -35414,7 +35413,7 @@ export interface PortfolioNamespace {
    * Approximately binding constraints of an optimization result.
    *
    * Twin of Python `PortfolioOptimizationResult.binding_constraints` (Rust
-   * `PortfolioOptimizationResultWire::binding_constraints`): the constraints
+   * `PortfolioOptimizationResult::binding_constraints`): the constraints
    * whose slack is zero within the solver tolerance.
    * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
    * @returns `[label, slack]` pairs in slack order; empty for an infeasible solve.
@@ -35427,13 +35426,24 @@ export interface PortfolioNamespace {
    * Executable trade list of an optimization result.
    *
    * Twin of Python `PortfolioOptimizationResult.to_trade_list` (Rust
-   * `PortfolioOptimizationResultWire::to_trade_list`): the trades from current
+   * `PortfolioOptimizationResult::to_trade_list`): the trades from current
    * to target quantities, largest absolute quantity change first.
    * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
-   * @returns The `TradeSpec` rows; empty for an infeasible solve (check `is_feasible`).
+   * @returns The `TradeSpec` rows; empty for an infeasible solve (check `portfolioOptimizationResultIsFeasible`).
    * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the optimization-result schema.
    */
   portfolioOptimizationResultToTradeList(result: PortfolioOptimizationResult | string): TradeSpec[];
+  /**
+   * Whether an optimization result carries a usable solution.
+   *
+   * Twin of Python `PortfolioOptimizationResult.is_feasible` (Rust
+   * `PortfolioOptimizationResult::is_feasible`): derived from `status`, which
+   * is the only stored outcome; `true` only for `"optimal"`.
+   * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
+   * @returns `true` when the status is `"optimal"`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the optimization-result schema.
+   */
+  portfolioOptimizationResultIsFeasible(result: PortfolioOptimizationResult | string): boolean;
   /**
    * Look up one metric's portfolio-wide total, failing when it was not aggregated.
    *
@@ -35489,42 +35499,6 @@ export interface PortfolioNamespace {
     matrix: SensitivityMatrixJson | string,
     factorIdx: number
   ): Float64Array;
-  /**
-   * Build a budget (weight-sum) constraint.
-   *
-   * Twin of Python `Constraint.budget` (Rust `Constraint::budget`).
-   * @param rhs - Target sum of weights as a decimal (`1.0` is fully invested); finite and non-negative.
-   * @returns The `Constraint` object `{ budget: { rhs } }`.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `rhs` is not a number, and a `FinstackError` (kind `validation`) if it is negative or not finite.
-   */
-  constraintBudget(rhs: number): generated.portfolio.Constraint;
-  /**
-   * Build per-position weight bounds for the positions a filter selects.
-   *
-   * Twin of Python `Constraint.weight_bounds` (Rust `Constraint::weight_bounds`).
-   * @param filter - `PositionFilter` value selecting the bounded positions: `"all"` or a filter object such as `{ by_entity_id: "FUND" }`.
-   * @param min - Inclusive minimum weight as a decimal fraction of portfolio value.
-   * @param max - Inclusive maximum weight as a decimal fraction of portfolio value.
-   * @param label - Optional label reported in constraint slacks.
-   * @returns The `weight_bounds` `Constraint` object.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a `FinstackError` (kind `validation`) if `filter` does not match the schema or `min > max`.
-   */
-  constraintWeightBounds(
-    filter: generated.portfolio.PositionFilter,
-    min: number,
-    max: number,
-    label?: string | null
-  ): generated.portfolio.Constraint;
-  /**
-   * Build a maximum-turnover constraint: `sum |w_new - w_current| <= maxTurnover`.
-   *
-   * Twin of Python `Constraint.max_turnover` (Rust `Constraint::max_turnover`).
-   * @param maxTurnover - Largest allowed gross turnover as a decimal fraction of portfolio value; non-negative.
-   * @param label - Optional label reported in constraint slacks.
-   * @returns The `max_turnover` `Constraint` object.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a `FinstackError` (kind `validation`) if `maxTurnover` is negative.
-   */
-  constraintMaxTurnover(maxTurnover: number, label?: string | null): generated.portfolio.Constraint;
   /**
    * Build an attribute exposure cap: `sum w_i * I[attr == value] <= maxShare`.
    *

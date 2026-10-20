@@ -37,21 +37,13 @@ impl PyOptimizationStatus {
     }
 
     #[classmethod]
-    fn feasible_but_suboptimal(_cls: &Bound<'_, PyType>) -> Self {
-        Self::from_inner(OptimizationStatus::FeasibleButSuboptimal)
-    }
-
-    #[classmethod]
     fn unbounded(_cls: &Bound<'_, PyType>) -> Self {
         Self::from_inner(OptimizationStatus::Unbounded)
     }
 
     #[classmethod]
-    #[pyo3(text_signature = "(cls, conflicting_constraints)")]
-    fn infeasible(_cls: &Bound<'_, PyType>, conflicting_constraints: Vec<String>) -> Self {
-        Self::from_inner(OptimizationStatus::Infeasible {
-            conflicting_constraints,
-        })
+    fn infeasible(_cls: &Bound<'_, PyType>) -> Self {
+        Self::from_inner(OptimizationStatus::Infeasible)
     }
 
     #[classmethod]
@@ -84,7 +76,7 @@ impl PyOptimizationStatus {
         serialize_json(&self.inner)
     }
 
-    /// Variant tag (``"optimal"``, ``"feasible_but_suboptimal"``, ...).
+    /// Variant tag (``"optimal"``, ``"infeasible"``, ``"unbounded"`` or ``"error"``).
     #[getter]
     fn kind(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
@@ -94,18 +86,6 @@ impl PyOptimizationStatus {
     #[getter]
     fn is_feasible(&self) -> bool {
         self.inner.is_feasible()
-    }
-
-    /// Conflicting constraint names when ``kind == "infeasible"``, otherwise
-    /// an empty list.
-    #[getter]
-    fn conflicting_constraints(&self) -> Vec<String> {
-        match &self.inner {
-            OptimizationStatus::Infeasible {
-                conflicting_constraints,
-            } => conflicting_constraints.clone(),
-            _ => Vec::new(),
-        }
     }
 
     /// Error message when ``kind == "error"``, otherwise ``None``.

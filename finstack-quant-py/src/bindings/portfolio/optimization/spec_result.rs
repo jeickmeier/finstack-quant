@@ -5,8 +5,7 @@ use crate::errors::core_to_py;
 use pyo3::types::{PyDict, PyList, PyType};
 
 use finstack_quant_portfolio::optimization::{
-    CandidatePosition, PortfolioOptimizationResult, PortfolioOptimizationResultWire,
-    PortfolioOptimizationSpec, TradeUniverse,
+    CandidatePosition, PortfolioOptimizationResult, PortfolioOptimizationSpec, TradeUniverse,
 };
 use finstack_quant_portfolio::types::PositionId;
 
@@ -479,27 +478,19 @@ const TRADE_COLUMNS: [ColumnSchema<'static>; 9] = [
     ("target_weight", "float64"),
 ];
 
-/// Result of an optimization run.
-///
-/// The wrapper holds the canonical `PortfolioOptimizationResultWire` rather
-/// than `PortfolioOptimizationResult` itself: the latter echoes the original
-/// problem, whose `Arc<dyn Instrument>` values do not round-trip through
-/// serde. The wire type carries every field this class exposes, so storing it
-/// is what lets the wrapper satisfy the result-return contract — typed
-/// getters, `to_json`, `from_json`, and pickle — like its 154 siblings.
+/// Result of an optimization run (wraps Rust `PortfolioOptimizationResult`,
+/// which is also the canonical JSON wire contract).
 #[pyclass(
     name = "PortfolioOptimizationResult",
     module = "finstack_quant.portfolio"
 )]
 pub(super) struct PyPortfolioOptimizationResult {
-    pub(crate) inner: PortfolioOptimizationResultWire,
+    pub(crate) inner: PortfolioOptimizationResult,
 }
 
 impl PyPortfolioOptimizationResult {
     pub(crate) fn from_inner(inner: PortfolioOptimizationResult) -> Self {
-        Self {
-            inner: PortfolioOptimizationResultWire::from(&inner),
-        }
+        Self { inner }
     }
 }
 
@@ -545,16 +536,17 @@ impl PyPortfolioOptimizationResult {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Solver outcome (optimal, feasible-but-suboptimal, infeasible, ...).
+    /// Solver outcome (optimal, infeasible, unbounded or error).
     #[getter]
     fn status(&self) -> PyOptimizationStatus {
         PyOptimizationStatus::from_inner(self.inner.status.clone())
     }
 
-    /// Whether :attr:`status` represents a solution that may be consumed.
+    /// Whether :attr:`status` represents a solution that may be consumed;
+    /// derived from :attr:`status`, never stored.
     #[getter]
     fn is_feasible(&self) -> bool {
-        self.inner.is_feasible
+        self.inner.is_feasible()
     }
 
     /// Value of the objective function at the solution, in the objective's own
@@ -620,16 +612,6 @@ impl PyPortfolioOptimizationResult {
             .implied_quantities
             .iter()
             .map(|(k, v)| (k.as_str().to_owned(), *v))
-            .collect()
-    }
-
-    /// Evaluated portfolio-level metric values at the solution, keyed by metric id.
-    #[getter]
-    fn metric_values(&self) -> IndexMap<String, f64> {
-        self.inner
-            .metric_values
-            .iter()
-            .map(|(k, v)| (k.clone(), *v))
             .collect()
     }
 

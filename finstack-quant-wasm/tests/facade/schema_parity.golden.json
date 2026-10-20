@@ -1801,16 +1801,16 @@
           {
             "path": "schemas/portfolio/1/portfolio_optimization_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
-            "type_name": "PortfolioOptimizationResultWire",
+            "type_name": "PortfolioOptimizationResult",
             "kind": "output",
-            "bytes": 17613
+            "bytes": 17749
           },
           {
             "path": "schemas/portfolio/1/portfolio_optimization_spec.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
             "type_name": "PortfolioOptimizationSpec",
             "kind": "input",
-            "bytes": 56893
+            "bytes": 57048
           },
           {
             "path": "schemas/portfolio/1/portfolio_primitive_exposure_report.schema.json",
@@ -4298,9 +4298,9 @@
             "domain": "portfolio",
             "path": "schemas/portfolio/1/portfolio_optimization_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
-            "type_name": "PortfolioOptimizationResultWire",
+            "type_name": "PortfolioOptimizationResult",
             "kind": "output",
-            "bytes": 17613
+            "bytes": 17749
           },
           {
             "domain": "portfolio",
@@ -4308,7 +4308,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
             "type_name": "PortfolioOptimizationSpec",
             "kind": "input",
-            "bytes": 56893
+            "bytes": 57048
           },
           {
             "domain": "portfolio",

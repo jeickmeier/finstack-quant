@@ -1367,16 +1367,7 @@ export type Objective =
  */
 export type OptimizationStatus =
   | "optimal"
-  | "feasible_but_suboptimal"
-  | {
-      infeasible: {
-        /**
-         * Constraints that appear to conflict (if determinable).
-         */
-        conflicting_constraints: string[];
-        [k: string]: unknown;
-      };
-    }
+  | "infeasible"
   | "unbounded"
   | {
       error: {
@@ -4978,33 +4969,44 @@ export interface SkippedMetric {
 /**
  * Canonical typed v1 output from portfolio optimization.
  */
-export interface PortfolioOptimizationResultWire {
+export interface PortfolioOptimizationResult {
   /**
-   * Approximately binding constraint names.
+   * Names of the approximately binding constraints (slack ≈ 0), in slack
+   * order; empty for an infeasible solve.
    */
   binding_constraints: string[];
   /**
-   * Constraint slack values; undefined averages use the `"nan"` sentinel.
+   * Constraint slack values (positive = slack, zero ≈ binding); undefined
+   * averages use the `"nan"` sentinel.
    */
   constraint_slacks: {
     [k: string]: NonFiniteF64Wire;
   };
   /**
-   * Current weights keyed by position.
+   * Pre‑trade weights (current portfolio state).
    */
   current_weights: {
     [k: string]: number;
   };
   /**
-   * Implied target quantities keyed by position.
+   * Implied target quantities for each position (units / face / notional).
+   *
+   * Reconstruction depends on the weighting scheme and is always written
+   * in `Position::quantity` units (lots, shares, face multiplier, or
+   * percentage points):
+   * - `ValueWeight`: convert the target PV share through `pv_per_unit`
+   *   (base PV per 1.0 of `scale_factor()`) and map scale back to quantity
+   * - `NotionalWeight`: convert the target notional share through
+   *   `|instrument.notional().amount()|` and map scale back to quantity
+   * - `UnitScaling`: treat the optimized weight as a quantity multiplier for
+   *   existing positions, or as the direct target quantity for new candidates
+   *
+   * Held existing positions retain their exact current quantity under every
+   * scheme, including positions with zero or negligible present value.
    */
   implied_quantities: {
     [k: string]: number;
   };
-  /**
-   * Whether the solution can be consumed.
-   */
-  is_feasible: boolean;
   /**
    * Optional user-supplied problem label.
    */
@@ -5014,12 +5016,6 @@ export interface PortfolioOptimizationResultWire {
    */
   meta: ResultsMeta;
   /**
-   * Evaluated metrics.
-   */
-  metric_values: {
-    [k: string]: number;
-  };
-  /**
    * Objective value at the solution.
    *
    * `NaN` when the solve is not feasible; non-finite values travel as the
@@ -5027,7 +5023,8 @@ export interface PortfolioOptimizationResultWire {
    */
   objective_value: NonFiniteF64Wire;
   /**
-   * Optimal weights keyed by position.
+   * Optimal weights per position (for positions in the universe).
+   * Non‑universe positions implicitly keep weight = current_weight.
    */
   optimal_weights: {
     [k: string]: number;
@@ -5037,25 +5034,27 @@ export interface PortfolioOptimizationResultWire {
    */
   schema_version: SchemaVersion;
   /**
-   * Solver outcome.
+   * Solver outcome; see [`OptimizationStatus::is_feasible`].
    */
   status: OptimizationStatus;
   /**
-   * Stable snake-case status label.
-   */
-  status_label: string;
-  /**
-   * Executable trade list.
+   * Executable trade list, largest absolute quantity change first.
+   *
+   * Covers existing positions and candidate additions whose weight change
+   * is materially non-zero. Empty for an infeasible solve, which is not the
+   * same as "nothing to trade"; check [`Self::is_feasible`] first.
    */
   trades: TradeSpec[];
   /**
-   * Gross turnover.
+   * Gross turnover (sum of absolute weight changes).
    *
-   * `NaN` when the solve is not feasible; encoded like `objective_value`.
+   * `NaN` when the solve is not feasible — there is no solution, so "no
+   * turnover" would be indistinguishable from "already optimal"; encoded
+   * like `objective_value`.
    */
   turnover: NonFiniteF64Wire;
   /**
-   * Weight changes keyed by position.
+   * Weight changes (`optimal - current`).
    */
   weight_deltas: {
     [k: string]: number;
@@ -5107,8 +5106,10 @@ export interface TradeSpec {
  */
 export interface PortfolioOptimizationSpec {
   /**
-   * Constraints on the optimized portfolio. An explicit budget replaces the
-   * default sum-of-weights budget of one; duplicate explicit budgets are rejected.
+   * Constraints on the optimized portfolio. Without an explicit budget the
+   * optimizer applies a sum-of-weights budget of one, except under
+   * `unit_scaling` weighting, which requires an explicit budget; duplicate
+   * explicit budgets are rejected.
    */
   constraints?: Constraint[];
   /**

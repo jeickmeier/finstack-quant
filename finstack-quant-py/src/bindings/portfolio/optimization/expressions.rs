@@ -485,8 +485,8 @@ impl PyConstraint {
         }))
     }
 
-    /// Weight bounds for positions matching the filter. Raises
-    /// ``PortfolioError`` when ``min > max``.
+    /// Weight bounds for positions matching the filter. Inputs are checked
+    /// (finite, ``min <= max``) when the problem is optimized.
     #[classmethod]
     #[pyo3(text_signature = "(cls, filter, min, max, label=None)")]
     #[pyo3(signature = (filter, min, max, label=None))]
@@ -496,36 +496,33 @@ impl PyConstraint {
         min: f64,
         max: f64,
         label: Option<String>,
-    ) -> PyResult<Self> {
-        let mut c = Constraint::weight_bounds(filter.inner, min, max).map_err(portfolio_to_py)?;
-        if let Some(lbl) = label {
-            c = c.with_label(lbl);
-        }
-        Ok(Self::from_inner(c))
+    ) -> Self {
+        Self::from_inner(Constraint::WeightBounds {
+            label,
+            filter: filter.inner,
+            min,
+            max,
+        })
     }
 
-    /// Maximum turnover: `Σ |w_new - w_current| <= max_turnover`.
+    /// Maximum turnover: `Σ |w_new - w_current| <= max_turnover`. The cap is
+    /// checked (finite, non-negative) when the problem is optimized.
     #[classmethod]
     #[pyo3(text_signature = "(cls, max_turnover, label=None)")]
     #[pyo3(signature = (max_turnover, label=None))]
-    fn max_turnover(
-        _cls: &Bound<'_, PyType>,
-        max_turnover: f64,
-        label: Option<String>,
-    ) -> PyResult<Self> {
-        let mut c = Constraint::max_turnover(max_turnover).map_err(portfolio_to_py)?;
-        if let Some(lbl) = label {
-            c = c.with_label(lbl);
-        }
-        Ok(Self::from_inner(c))
+    fn max_turnover(_cls: &Bound<'_, PyType>, max_turnover: f64, label: Option<String>) -> Self {
+        Self::from_inner(Constraint::MaxTurnover {
+            label,
+            max_turnover,
+        })
     }
 
-    /// Budget / normalization constraint (typically ``rhs = 1.0``).
+    /// Budget / normalization constraint (typically ``rhs = 1.0``). ``rhs`` is
+    /// checked (finite, non-negative) when the problem is optimized.
     #[classmethod]
     #[pyo3(text_signature = "(cls, rhs)")]
-    fn budget(_cls: &Bound<'_, PyType>, rhs: f64) -> PyResult<Self> {
-        let c = Constraint::budget(rhs).map_err(portfolio_to_py)?;
-        Ok(Self::from_inner(c))
+    fn budget(_cls: &Bound<'_, PyType>, rhs: f64) -> Self {
+        Self::from_inner(Constraint::Budget { rhs })
     }
 
     /// Shorthand: `sum w_i * I[attr == value] <= max_share`.

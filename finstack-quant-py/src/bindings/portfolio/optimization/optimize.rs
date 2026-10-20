@@ -32,9 +32,8 @@ pub(super) fn optimize_portfolio(
 ///
 /// Mirrors Rust ``optimization::rebalance_from_spec``: held positions take the
 /// result's implied quantities and trade-universe candidates with a
-/// non-negligible target weight and quantity become new positions. Unlike
-/// ``PortfolioOptimizationResult.to_rebalanced_portfolio`` it also works on a
-/// result rebuilt from JSON or unpickled.
+/// non-negligible target weight and quantity become new positions. It works on
+/// any result, including one rebuilt from JSON or unpickled.
 #[pyfunction]
 #[pyo3(signature = (spec, result))]
 pub(super) fn rebalance_from_spec(

@@ -318,7 +318,6 @@ class TestOptimizationAndResultsAudit:
             "optimal_weights",
             "weight_deltas",
             "implied_quantities",
-            "metric_values",
             "constraint_slacks",
         ]
         wire = {
@@ -333,8 +332,6 @@ class TestOptimizationAndResultsAudit:
             },
             "schema_version": 1,
             "status": "optimal",
-            "status_label": "optimal",
-            "is_feasible": True,
             "objective_value": 0.0,
             "turnover": 0.0,
             "trades": [],

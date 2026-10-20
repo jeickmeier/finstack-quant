@@ -3504,11 +3504,8 @@
       "collapseToBaseByDateKind",
       "computeFactorSensitivities",
       "computePnlProfiles",
-      "constraintBudget",
       "constraintExposureLimit",
       "constraintExposureMinimum",
-      "constraintMaxTurnover",
-      "constraintWeightBounds",
       "excessReturns",
       "factorBrinsonAttribution",
       "fiAttributionResultReconciliationCheck",
@@ -3526,6 +3523,7 @@
       "portfolioMetricsRequireTotal",
       "portfolioMetricsSeries",
       "portfolioOptimizationResultBindingConstraints",
+      "portfolioOptimizationResultIsFeasible",
       "portfolioOptimizationResultNewPositionTrades",
       "portfolioOptimizationResultToTradeList",
       "portfolioValuationGetEntityValue",
@@ -3711,6 +3709,9 @@
   "portfolio.portfolioOptimizationResultToTradeList": {
     "kind": "function"
   },
+  "portfolio.portfolioOptimizationResultIsFeasible": {
+    "kind": "function"
+  },
   "portfolio.portfolioMetricsRequireTotal": {
     "kind": "function"
   },
@@ -3721,15 +3722,6 @@
     "kind": "function"
   },
   "portfolio.sensitivityMatrixFactorDeltas": {
-    "kind": "function"
-  },
-  "portfolio.constraintBudget": {
-    "kind": "function"
-  },
-  "portfolio.constraintWeightBounds": {
-    "kind": "function"
-  },
-  "portfolio.constraintMaxTurnover": {
     "kind": "function"
   },
   "portfolio.constraintExposureLimit": {

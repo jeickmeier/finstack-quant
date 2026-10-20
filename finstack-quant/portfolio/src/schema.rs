@@ -153,25 +153,20 @@ fn optimization_result_examples() -> Result<Vec<Value>> {
     deltas.insert(position.clone(), 0.05);
     let mut quantities = IndexMap::new();
     quantities.insert(position.clone(), 600_000.0);
-    let mut metrics = IndexMap::new();
-    metrics.insert("expected_return".to_string(), 0.0425);
     let mut slacks = IndexMap::new();
     slacks.insert("max_weight".to_string(), 0.40);
 
-    let result = crate::optimization::PortfolioOptimizationResultWire {
+    let result = crate::optimization::PortfolioOptimizationResult {
         meta: finstack_quant_core::config::ResultsMeta::default(),
         schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
         status: crate::optimization::OptimizationStatus::Optimal,
-        status_label: "optimal".to_string(),
         label: None,
-        is_feasible: true,
         objective_value: 0.0425,
         turnover: 0.05,
         optimal_weights: optimal,
         current_weights: current,
         weight_deltas: deltas,
         implied_quantities: quantities,
-        metric_values: metrics,
         trades: vec![crate::optimization::TradeSpec {
             position_id: position,
             instrument_id: "DEP_1M".to_string(),
@@ -215,7 +210,7 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     .with_kind(SchemaKind::Input)
     .with_summary("Positions, books and their instruments as one content-addressed bundle.")
     .with_examples(materialization_examples),
-    SchemaArtifact::new::<crate::optimization::PortfolioOptimizationResultWire>(
+    SchemaArtifact::new::<crate::optimization::PortfolioOptimizationResult>(
         "schemas/portfolio/1/portfolio_optimization_result.schema.json",
         "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
         "Portfolio Optimization Result",

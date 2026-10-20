@@ -193,9 +193,10 @@ def test_optimization_status_equality_and_hash() -> None:
     assert optimal == same_optimal
     assert hash(optimal) == hash(same_optimal)
     assert optimal != OptimizationStatus.unbounded()
-    infeasible, same_infeasible = OptimizationStatus.infeasible(["a"]), OptimizationStatus.infeasible(["a"])
+    infeasible, same_infeasible = OptimizationStatus.infeasible(), OptimizationStatus.infeasible()
     assert infeasible == same_infeasible
-    assert infeasible != OptimizationStatus.infeasible(["b"])
+    assert hash(infeasible) == hash(same_infeasible)
+    assert infeasible != OptimizationStatus.error("b")
 
 
 # MD11: Portfolio.validate_materialization Python twin

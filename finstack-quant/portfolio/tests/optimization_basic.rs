@@ -334,7 +334,7 @@ fn optimize_max_yield_with_ccc_limit() {
     }
 
     // Check CCC exposure constraint directly from weights and tags.
-    let portfolio_ref = &result.problem.portfolio;
+    let portfolio_ref = &problem.portfolio;
     let mut ccc_weight = 0.0_f64;
     for (pos_id, &w) in &result.optimal_weights {
         if let Some(position) = portfolio_ref.get_position(pos_id.as_str()) {

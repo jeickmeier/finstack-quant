@@ -37,7 +37,10 @@ impl PortfolioOptimizationProblem {
     /// This helper:
     /// - Uses `WeightingScheme::ValueWeight`
     /// - Uses a default `TradeUniverse` (all positions tradeable, no candidates)
-    /// - Adds a `Budget { rhs: 1.0 }` constraint
+    /// - Starts with no constraints. [`super::optimize`] adds the default
+    ///   `Σw = 1` budget when the problem declares none, except under
+    ///   `WeightingScheme::UnitScaling`, which requires an explicit
+    ///   [`Constraint::Budget`] (or other bounding constraints).
     ///
     /// # Arguments
     ///
@@ -46,7 +49,8 @@ impl PortfolioOptimizationProblem {
     ///
     /// # Returns
     ///
-    /// A problem initialized with standard long-only, fully-invested defaults.
+    /// A value-weighted problem over the full trade universe with no explicit
+    /// constraints.
     #[must_use]
     pub fn new(portfolio: Portfolio, objective: Objective) -> Self {
         Self {
@@ -54,7 +58,7 @@ impl PortfolioOptimizationProblem {
             weighting: WeightingScheme::ValueWeight,
             trade_universe: TradeUniverse::default(),
             objective,
-            constraints: vec![Constraint::Budget { rhs: 1.0 }],
+            constraints: Vec::new(),
             missing_metric_policy: MissingMetricPolicy::Zero,
             label: None,
         }

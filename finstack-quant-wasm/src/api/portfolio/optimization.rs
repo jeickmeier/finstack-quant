@@ -56,7 +56,7 @@ pub fn rebalance_from_spec(
 ) -> Result<JsPortfolio, JsValue> {
     let spec: finstack_quant_portfolio::optimization::PortfolioOptimizationSpec =
         serde_json::from_str(&json_text(&spec_json, "specJson")?).map_err(to_js_err)?;
-    let result: finstack_quant_portfolio::optimization::PortfolioOptimizationResultWire =
+    let result: finstack_quant_portfolio::optimization::PortfolioOptimizationResult =
         serde_json::from_str(&json_text(&result_json, "resultJson")?).map_err(to_js_err)?;
     let portfolio = finstack_quant_portfolio::optimization::rebalance_from_spec(&spec, &result)
         .map_err(to_js_err)?;

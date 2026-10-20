@@ -19,7 +19,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::metrics::aggregate_metrics;
 use finstack_quant_portfolio::optimization::{
-    optimize, Constraint, MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric,
+    optimize, rebalance, Constraint, MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric,
     PortfolioOptimizationProblem, WeightingScheme,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
@@ -173,7 +173,7 @@ fn main() -> finstack_quant_portfolio::Result<()> {
     let result = optimize(&problem, &market, &config)?;
 
     println!("=== Portfolio Optimization Example ===");
-    println!("Label: {:?}", result.problem.label);
+    println!("Label: {:?}", result.label);
     println!("Status: {:?}", result.status);
     println!("Objective: maximize value‑weighted YTM");
     println!("Objective value (YTM): {:.6}", result.objective_value);
@@ -186,7 +186,7 @@ fn main() -> finstack_quant_portfolio::Result<()> {
 
     // Compute CCC weight directly from result.
     let mut ccc_weight = 0.0_f64;
-    let portfolio_ref = &result.problem.portfolio;
+    let portfolio_ref = &problem.portfolio;
     for (pos_id, &w) in &result.optimal_weights {
         if let Some(position) = portfolio_ref.get_position(pos_id.as_str()) {
             if position.attributes.get("rating") == Some(&AttributeValue::from("CCC")) {
@@ -209,7 +209,11 @@ fn main() -> finstack_quant_portfolio::Result<()> {
 
     // Optionally, compute aggregated metrics at the optimal allocation by
     // revaluing the portfolio with implied quantities.
-    let rebalanced = result.to_rebalanced_portfolio()?;
+    let rebalanced = rebalance(
+        problem.portfolio.clone(),
+        &problem.trade_universe.candidates,
+        &result,
+    )?;
     let valuation = finstack_quant_portfolio::valuation::value_portfolio(
         &rebalanced,
         &market,

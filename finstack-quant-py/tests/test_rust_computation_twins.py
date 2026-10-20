@@ -152,19 +152,31 @@ def test_portfolio_input_errors_keep_their_rust_kind() -> None:
     """Constraint and replay-timeline validation raise ``PortfolioError``, as Rust's kind says."""
     from finstack_quant.portfolio import Portfolio, PositionFilter, replay_portfolio
 
-    with pytest.raises(PortfolioError, match="weight bounds"):
-        Constraint.weight_bounds(filter=PositionFilter.all(), min=1.0, max=0.0)
-    with pytest.raises(PortfolioError, match="max_turnover"):
-        Constraint.max_turnover(max_turnover=-1.0)
-    with pytest.raises(PortfolioError, match="budget"):
-        Constraint.budget(float("nan"))
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04))
+    objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.constant(1.0)))
+    # Plain constraint variants are validated by the optimizer, for typed and
+    # JSON-built constraints alike.
+    for constraint, needle in [
+        (Constraint.weight_bounds(filter=PositionFilter.all(), min=1.0, max=0.0), "weight bounds"),
+        (Constraint.max_turnover(max_turnover=-1.0), "max_turnover"),
+        (Constraint.budget(float("nan")), "budget"),
+        (Constraint.from_json('{"budget":{"rhs":-1.0}}'), "budget"),
+    ]:
+        spec = PortfolioOptimizationSpec.new(json.dumps(_book()), objective).with_constraint(constraint)
+        with pytest.raises(PortfolioError, match=needle):
+            optimize_portfolio(spec, market)
+    # UnitScaling never gets a synthesized budget (MO-9).
+    unit_spec = PortfolioOptimizationSpec.new(json.dumps(_book()), objective).with_weighting(
+        WeightingScheme.unit_scaling()
+    )
+    with pytest.raises(PortfolioError, match="MO-9"):
+        optimize_portfolio(unit_spec, market)
     with pytest.raises(PortfolioError, match="max_share"):
         Constraint.exposure_limit(key="rating", value="AAA", max_share=2.0)
     with pytest.raises(PortfolioError, match="min_share"):
         Constraint.exposure_minimum(key="rating", value="AAA", min_share=-1.0)
 
     portfolio = Portfolio.from_spec(json.dumps(_book()))
-    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04))
     with pytest.raises(PortfolioError, match="strictly ascending"):
         replay_portfolio(
             portfolio,

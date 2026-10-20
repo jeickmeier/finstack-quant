@@ -5,7 +5,9 @@ use super::decision::{
     build_decision_space, DecisionFeatures, DecisionItem, OptimizationDenominators,
 };
 use super::problem::PortfolioOptimizationProblem;
-use super::result::{OptimizationStatus, PortfolioOptimizationResult};
+use super::result::{
+    binding_constraint_names, trade_list, OptimizationStatus, PortfolioOptimizationResult,
+};
 use super::types::{
     MetricExpr, MissingMetricPolicy, PerPositionMetric, WeightingScheme, PV_PER_UNIT_TOL,
 };
@@ -14,6 +16,7 @@ use crate::types::PositionId;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
+use finstack_quant_core::wire::SchemaVersion;
 use finstack_quant_valuations::metrics::MetricId;
 use good_lp::{constraint, default_solver, variable, Expression, Solution, SolverModel};
 use indexmap::IndexMap;
@@ -275,8 +278,7 @@ fn build_lp_rows(
                     "MO-19: a ValueWeightedAverage objective is lowered to Σ wᵢ·mᵢ, which \
                          equals the true average only when the weights sum to 1; the explicit \
                          Budget rhs is {rhs}, so the reported objective would be scaled by \
-                         Σw = {rhs} (and the optimization direction flipped for a negative \
-                         budget). Use Budget {{ rhs: 1.0 }} or a WeightedSum objective."
+                         Σw = {rhs}. Use Budget {{ rhs: 1.0 }} or a WeightedSum objective."
                 )));
             }
         }
@@ -484,8 +486,8 @@ fn assemble_and_solve(
     }
 
     // Solver failures become structured `OptimizationStatus` (`Ok(Err)`):
-    // `objective_value = NaN`, empty weight maps, and empty
-    // `conflicting_constraints` because `good_lp` does not expose an IIS.
+    // `objective_value = NaN` and empty weight maps. `Infeasible` names no
+    // conflicting constraints because `good_lp` does not expose an IIS.
     match problem_model.solve() {
         Ok(sol) => Ok(Ok(AssembledModel {
             solution: Box::new(sol),
@@ -493,9 +495,7 @@ fn assemble_and_solve(
         })),
         Err(e) => {
             let status = match &e {
-                good_lp::ResolutionError::Infeasible => OptimizationStatus::Infeasible {
-                    conflicting_constraints: Vec::new(),
-                },
+                good_lp::ResolutionError::Infeasible => OptimizationStatus::Infeasible,
                 good_lp::ResolutionError::Unbounded => OptimizationStatus::Unbounded,
                 _ => OptimizationStatus::Error {
                     message: e.to_string(),
@@ -509,8 +509,8 @@ fn assemble_and_solve(
 /// Reconstruct the portfolio-level result from a solved LP model.
 ///
 /// This covers the post-solve steps of [`optimize`]: optimal weights,
-/// weight deltas, implied quantities, the objective value, metric values,
-/// and constraint slacks.
+/// weight deltas, implied quantities, the objective value, constraint
+/// slacks, and the derived turnover, trade list and binding constraints.
 #[allow(clippy::too_many_arguments)]
 fn reconstruct_result(
     problem: &PortfolioOptimizationProblem,
@@ -585,9 +585,6 @@ fn reconstruct_result(
         objective_acc.add(*coef * w_star);
     }
     let objective_value = objective_acc.total();
-
-    let mut metric_values: IndexMap<String, f64> = IndexMap::new();
-    metric_values.insert("objective".to_string(), objective_value);
 
     let mut constraint_slacks: IndexMap<String, f64> = IndexMap::new();
     for lc in &rows.lp_constraints {
@@ -664,21 +661,30 @@ fn reconstruct_result(
         );
     }
 
-    let status = OptimizationStatus::Optimal;
-
-    let meta = finstack_quant_core::config::results_meta(config);
+    let turnover = weight_deltas.values().map(|d| d.abs()).sum();
+    let trades = trade_list(
+        &problem.portfolio,
+        &problem.trade_universe.candidates,
+        &current_weights,
+        &optimal_weights,
+        &implied_quantities,
+    );
+    let binding_constraints = binding_constraint_names(&constraint_slacks);
 
     PortfolioOptimizationResult {
-        problem: problem.clone(),
-        current_weights,
+        meta: finstack_quant_core::config::results_meta(config),
+        schema_version: SchemaVersion::CURRENT,
+        status: OptimizationStatus::Optimal,
+        objective_value,
+        turnover,
         optimal_weights,
+        current_weights,
         weight_deltas,
         implied_quantities,
-        objective_value,
-        metric_values,
-        status,
+        trades,
         constraint_slacks,
-        meta,
+        binding_constraints,
+        label: problem.label.clone(),
     }
 }
 
@@ -698,6 +704,8 @@ fn reconstruct_result(
 ///
 /// Returns [`Error`] when:
 /// - Portfolio validation fails
+/// - A constraint fails [`Constraint::validate`]
+/// - `WeightingScheme::UnitScaling` is used without an explicit budget (MO-9)
 /// - Required metrics cannot be priced
 /// - The LP backend fails or returns an invalid solution
 pub fn optimize(
@@ -706,6 +714,9 @@ pub fn optimize(
     config: &FinstackConfig,
 ) -> Result<PortfolioOptimizationResult> {
     problem.portfolio.validate()?;
+    for constraint in &problem.constraints {
+        constraint.validate()?;
+    }
 
     let has_budget = problem
         .constraints
@@ -770,18 +781,20 @@ pub fn optimize(
     )? {
         Ok(model) => model,
         Err(status) => {
-            let meta = finstack_quant_core::config::results_meta(config);
             return Ok(PortfolioOptimizationResult {
-                problem: problem.clone(),
-                current_weights,
+                meta: finstack_quant_core::config::results_meta(config),
+                schema_version: SchemaVersion::CURRENT,
+                status,
+                objective_value: f64::NAN,
+                turnover: f64::NAN,
                 optimal_weights: IndexMap::new(),
+                current_weights,
                 weight_deltas: IndexMap::new(),
                 implied_quantities: IndexMap::new(),
-                objective_value: f64::NAN,
-                metric_values: IndexMap::new(),
-                status,
+                trades: Vec::new(),
                 constraint_slacks: IndexMap::new(),
-                meta,
+                binding_constraints: Vec::new(),
+                label: problem.label.clone(),
             });
         }
     };

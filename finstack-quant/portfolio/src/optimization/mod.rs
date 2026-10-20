@@ -39,8 +39,7 @@
 //!    [`crate::optimization::Constraint`] values.
 //! 3. Solve with [`crate::optimization::optimize`].
 //! 4. Inspect [`crate::optimization::PortfolioOptimizationResult::to_trade_list`]
-//!    or rebuild a portfolio with
-//!    [`crate::optimization::PortfolioOptimizationResult::to_rebalanced_portfolio`].
+//!    or rebuild a portfolio with [`crate::optimization::rebalance`].
 //!
 //! # References
 //!
@@ -62,8 +61,8 @@ pub use constraints::{Constraint, Inequality};
 pub use lp_solver::optimize;
 pub use problem::PortfolioOptimizationProblem;
 pub use result::{
-    OptimizationStatus, PortfolioOptimizationResult, PortfolioOptimizationResultWire,
-    TradeDirection, TradeSpec, TradeType,
+    rebalance, OptimizationStatus, PortfolioOptimizationResult, TradeDirection, TradeSpec,
+    TradeType,
 };
 pub use spec::{optimize_portfolio, rebalance_from_spec, PortfolioOptimizationSpec};
 pub use types::{MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric, WeightingScheme};

@@ -11175,10 +11175,11 @@ class Constraint:
         Constraint
             Inclusive ``[min, max]`` weight interval for positions matching ``filter``.
 
-        Raises
-        ------
-        PortfolioError
-            If ``min`` is greater than ``max``.
+        Notes
+        -----
+        This method does not raise; it builds the constraint as given.
+        The interval is checked when the problem is optimized:
+        :func:`optimize_portfolio` raises ``PortfolioError`` for a non-finite bound or ``min > max``.
 
         Examples
         --------
@@ -11209,10 +11210,11 @@ class Constraint:
         Constraint
             Bound enforcing ``sum(abs(w_new - w_current)) <= max_turnover``.
 
-        Raises
-        ------
-        PortfolioError
-            If ``max_turnover`` is negative.
+        Notes
+        -----
+        This method does not raise; it builds the constraint as given.
+        The cap is checked when the problem is optimized:
+        :func:`optimize_portfolio` raises ``PortfolioError`` for a negative or non-finite ``max_turnover``.
 
         Examples
         --------
@@ -11238,10 +11240,11 @@ class Constraint:
         Constraint
             Normalization constraint enforcing ``sum(w_i) == rhs``.
 
-        Raises
-        ------
-        PortfolioError
-            If ``rhs`` is non-finite or negative.
+        Notes
+        -----
+        This method does not raise; it builds the constraint as given.
+        ``rhs`` is checked when the problem is optimized:
+        :func:`optimize_portfolio` raises ``PortfolioError`` for a negative or non-finite ``rhs``.
 
         Examples
         --------
@@ -11913,28 +11916,6 @@ class OptimizationStatus:
         ...
 
     @classmethod
-    def feasible_but_suboptimal(cls) -> OptimizationStatus:
-        """
-        Feasible solution that did not prove optimality.
-
-        Returns
-        -------
-        OptimizationStatus
-            Usable status indicating feasibility without proven optimality.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.portfolio import OptimizationStatus
-        >>> OptimizationStatus.feasible_but_suboptimal().kind
-        'feasible_but_suboptimal'
-        """
-        ...
-
-    @classmethod
     def unbounded(cls) -> OptimizationStatus:
         """
         Optimization problem is unbounded.
@@ -11957,19 +11938,17 @@ class OptimizationStatus:
         ...
 
     @classmethod
-    def infeasible(cls, conflicting_constraints: list[str]) -> OptimizationStatus:
+    def infeasible(cls) -> OptimizationStatus:
         """
-        Create an infeasible status with the listed conflicting constraints.
+        No feasible solution exists.
 
-        Parameters
-        ----------
-        conflicting_constraints : list[str]
-            Constraint labels implicated in the infeasibility diagnosis.
+        The LP backend does not expose an irreducible infeasible subset, so the
+        status names no conflicting constraints.
 
         Returns
         -------
         OptimizationStatus
-            Non-feasible status retaining the conflicting constraint labels.
+            Non-feasible status for an infeasible problem.
 
         Notes
         -----
@@ -11978,9 +11957,9 @@ class OptimizationStatus:
         Examples
         --------
         >>> from finstack_quant.portfolio import OptimizationStatus
-        >>> status = OptimizationStatus.infeasible(["budget"])
-        >>> status.conflicting_constraints
-        ['budget']
+        >>> status = OptimizationStatus.infeasible()
+        >>> (status.kind, status.is_feasible)
+        ('infeasible', False)
         """
         ...
 
@@ -12035,9 +12014,9 @@ class OptimizationStatus:
         Examples
         --------
         >>> from finstack_quant.portfolio import OptimizationStatus
-        >>> original = OptimizationStatus.infeasible(["budget"])
-        >>> OptimizationStatus.from_json(original.to_json()).conflicting_constraints
-        ['budget']
+        >>> original = OptimizationStatus.error("solver failed")
+        >>> OptimizationStatus.from_json(original.to_json()).message
+        'solver failed'
         """
         ...
 
@@ -12079,27 +12058,11 @@ class OptimizationStatus:
         Returns
         -------
         bool
-            Whether feasible holds for this `OptimizationStatus`.
+            ``True`` only for ``optimal``.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def conflicting_constraints(self) -> list[str]:
-        """
-        Constraint labels implicated in infeasibility.
-
-        Returns
-        -------
-        list[str]
-            Constraint labels implicated in infeasibility.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        This accessor does not raise; it is derived from the variant.
         """
         ...
 
@@ -12487,7 +12450,8 @@ class PortfolioOptimizationSpec:
         ----------
         constraint : Constraint
             Constraint to append to the current optimization specification. An explicit
-            budget replaces the implicit sum-of-weights budget of one when solving.
+            budget replaces the implicit sum-of-weights budget of one when solving;
+            ``unit_scaling`` weighting has no implicit budget and requires one.
 
         Returns
         -------
@@ -12827,11 +12791,11 @@ class PortfolioOptimizationResult:
         Returns
         -------
         bool
-            Whether feasible holds for this `PortfolioOptimizationResult`.
+            ``status.is_feasible``; derived from :attr:`status`, never stored.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
+        This accessor does not raise.
         """
         ...
 
@@ -12911,22 +12875,6 @@ class PortfolioOptimizationResult:
             points for ``percentage``. Held existing positions retain their exact
             current quantity under every weighting scheme, including zero-PV
             holdings.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def metric_values(self) -> dict[str, float]:
-        """
-        Portfolio metric values at the solution.
-
-        Returns
-        -------
-        dict[str, float]
-            Portfolio metric values at the solution.
 
         Notes
         -----
@@ -13049,9 +12997,14 @@ class PortfolioOptimizationResult:
     def binding_constraints(self) -> list[tuple[str, float]]:
         """
         Return constraints with near-zero slack as ``(label, slack)`` pairs.
+
+        Reads the stored ``binding_constraints`` names of the JSON wire form and
+        looks each slack up in :attr:`constraint_slacks`.
+
         Returns
         -------
         list[tuple[str, float]]
+            Binding constraints in slack order; empty for an infeasible solve.
 
         Notes
         -----
@@ -13093,9 +13046,12 @@ def optimize_portfolio(
     ValueError
         If supplied market JSON is malformed or schema-incompatible.
     PortfolioError
-        If the embedded portfolio specification cannot be constructed, candidate
-        IDs collide with existing positions or one another, or an operational
-        optimization failure occurs before a result is available.
+        If the embedded portfolio specification cannot be constructed, a
+        constraint is invalid (non-finite inputs, a negative budget or turnover
+        cap, ``min > max`` weight bounds), ``unit_scaling`` weighting has no
+        explicit budget, candidate IDs collide with existing positions or one
+        another, or an operational optimization failure occurs before a result
+        is available.
     KeyError
         If a required position metric cannot be valued for lack of market
         data, or a required base-currency conversion is unavailable.
@@ -13171,9 +13127,9 @@ def rebalance_from_spec(
     >>> portfolio = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> spec = PortfolioOptimizationSpec.new(portfolio, objective)
     >>> foreign = PortfolioOptimizationResult.from_json(
-    ...     '{"meta":{"numeric_mode":"f64","rounding":{"mode":"bankers","ingest_scale_by_currency":{},"output_scale_by_currency":{},"version":1}},"schema_version":1,"status":"optimal","status_label":"optimal","is_feasible":true,'
+    ...     '{"meta":{"numeric_mode":"f64","rounding":{"mode":"bankers","ingest_scale_by_currency":{},"output_scale_by_currency":{},"version":1}},"schema_version":1,"status":"optimal",'
     ...     '"objective_value":0.0,"turnover":0.0,"optimal_weights":{"X":1.0},"current_weights":{},'
-    ...     '"weight_deltas":{},"implied_quantities":{"X":1.0},"metric_values":{},"trades":[],'
+    ...     '"weight_deltas":{},"implied_quantities":{"X":1.0},"trades":[],'
     ...     '"constraint_slacks":{},"binding_constraints":[]}'
     ... )
     >>> try:

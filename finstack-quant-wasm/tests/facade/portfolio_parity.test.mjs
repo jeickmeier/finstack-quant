@@ -323,4 +323,37 @@ test('optimization result methods read the wire result', () => {
     (error) => error.kind === 'validation'
   );
   assert.throws(() => portfolio.portfolioOptimizationResultNewPositionTrades(3), TypeError);
+  // Feasibility is derived from `status`; the wire carries no stored flag.
+  assert.equal(optimized.status, 'optimal');
+  assert.equal('is_feasible' in optimized, false);
+  assert.equal(portfolio.portfolioOptimizationResultIsFeasible(optimized), true);
+  assert.equal(
+    portfolio.portfolioOptimizationResultIsFeasible({ ...optimized, status: 'infeasible' }),
+    false
+  );
+});
+
+test('optimizePortfolio validates constraint objects and requires a UnitScaling budget', () => {
+  const spec = (constraints, weighting = 'notional_weight') => ({
+    portfolio: inputs.portfolio_spec,
+    objective: { maximize: { weighted_sum: { metric: { constant: 1.0 } } } },
+    constraints,
+    weighting,
+    missing_metric_policy: 'zero',
+    label: null,
+  });
+  for (const [constraint, pattern] of [
+    [{ budget: { rhs: -1.0 } }, /budget rhs/],
+    [{ max_turnover: { label: null, max_turnover: -0.1 } }, /max_turnover/],
+    [{ weight_bounds: { label: null, filter: 'all', min: 0.2, max: 0.1 } }, /weight bounds/],
+  ]) {
+    assert.throws(
+      () => portfolio.optimizePortfolio(spec([constraint]), inputs.market_t0),
+      (error) => error.kind === 'validation' && pattern.test(error.message)
+    );
+  }
+  assert.throws(
+    () => portfolio.optimizePortfolio(spec([], 'unit_scaling'), inputs.market_t0),
+    (error) => error.kind === 'validation' && /MO-9/.test(error.message)
+  );
 });
