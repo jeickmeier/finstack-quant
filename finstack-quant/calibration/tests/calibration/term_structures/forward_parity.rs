@@ -82,7 +82,7 @@ proptest! {
         let curve = create_discount_curve_for_parity(base_date, rate, "ZERO-CURVE");
 
         let df = curve.df(time);
-        let zero = curve.zero(time);
+        let zero = curve.zero_rate(time, finstack_quant_core::math::Compounding::Continuous);
 
         // Property: DF = exp(-z·t), so z = -ln(DF)/t
         let zero_from_df = -df.ln() / time;
@@ -111,8 +111,8 @@ proptest! {
         let base_date = Date::from_calendar_date(2025, Month::January, 15).unwrap();
         let curve = create_discount_curve_for_parity(base_date, rate, "FWD-PARITY");
 
-        let z1 = curve.zero(t1);
-        let z2 = curve.zero(t2);
+        let z1 = curve.zero_rate(t1, finstack_quant_core::math::Compounding::Continuous);
+        let z2 = curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous);
         let tau = t2 - t1;
 
         // Continuous compounding: f = (z2·t2 - z1·t1) / τ
@@ -142,7 +142,7 @@ proptest! {
         let curve = create_discount_curve_for_parity(base_date, rate, "FWD-PARITY-ZERO");
 
         let df = curve.df(t2);
-        let zero = curve.zero(t2);
+        let zero = curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous);
         let zero_from_df = -df.ln() / t2;
         let zero_diff = (zero - zero_from_df).abs();
         prop_assert!(
@@ -151,8 +151,8 @@ proptest! {
             t2, zero, zero_from_df
         );
 
-        let z1 = curve.zero(t1);
-        let z2 = curve.zero(t2);
+        let z1 = curve.zero_rate(t1, finstack_quant_core::math::Compounding::Continuous);
+        let z2 = curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous);
         let tau = t2 - t1;
         let fwd_from_zero = (z2 * t2 - z1 * t1) / tau;
         let fwd_from_curve = curve.forward(t1, t2).expect("forward should succeed");

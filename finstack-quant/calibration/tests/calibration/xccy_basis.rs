@@ -10,6 +10,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use time::macros::date;
 

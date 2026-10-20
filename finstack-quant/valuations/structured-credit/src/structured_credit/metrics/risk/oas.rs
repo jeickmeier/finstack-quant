@@ -30,6 +30,7 @@ use crate::structured_credit::StructuredCredit;
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
@@ -402,7 +403,9 @@ fn monthly_forwards(curve: &DiscountCurve, num_months: usize) -> Vec<f64> {
             let t1 = m as f64 * dt;
             let t2 = (m + 1) as f64 * dt;
             // `forward` only errors on a non-positive interval, impossible here.
-            curve.forward(t1, t2).unwrap_or_else(|_| curve.zero(t2))
+            curve.forward(t1, t2).unwrap_or_else(|_| {
+                curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous)
+            })
         })
         .collect()
 }

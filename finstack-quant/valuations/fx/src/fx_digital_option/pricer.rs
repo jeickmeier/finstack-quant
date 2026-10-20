@@ -469,6 +469,7 @@ mod tests {
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};

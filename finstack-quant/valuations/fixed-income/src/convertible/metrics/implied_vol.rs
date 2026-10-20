@@ -152,6 +152,7 @@ fn admissible_lower_volatility(evaluate: &impl Fn(f64) -> Result<f64>, upper: f6
 
 #[cfg(test)]
 mod tests {
+    use finstack_quant_core::market_data::traits::Discounting;
     use std::sync::Arc;
 
     use crate::convertible::{

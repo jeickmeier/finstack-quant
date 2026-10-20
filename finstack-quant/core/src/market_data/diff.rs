@@ -194,7 +194,12 @@ pub fn measure_discount_curve_shift(
     let curve_t1 = market_t1.get_discount(&curve_id)?;
 
     let tenors = method.tenors(Some(curve_t0.knots()));
-    measure_average_shift(tenors, 10_000.0, |t| curve_t0.zero(t), |t| curve_t1.zero(t))
+    measure_average_shift(
+        tenors,
+        10_000.0,
+        |t| curve_t0.zero_rate(t, crate::math::Compounding::Continuous),
+        |t| curve_t1.zero_rate(t, crate::math::Compounding::Continuous),
+    )
 }
 
 /// Measure the average **par CDS spread** shift on a hazard curve (basis points).
@@ -379,7 +384,9 @@ pub fn measure_per_tenor_credit_curve_shift(
     tenors
         .iter()
         .map(|&t| {
-            let shift = (curve_t1.zero(t) - curve_t0.zero(t)) * 10_000.0;
+            let shift = (curve_t1.zero_rate(t, crate::math::Compounding::Continuous)
+                - curve_t0.zero_rate(t, crate::math::Compounding::Continuous))
+                * 10_000.0;
             if shift.is_finite() {
                 Ok(shift)
             } else {

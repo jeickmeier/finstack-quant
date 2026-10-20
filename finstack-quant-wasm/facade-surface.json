@@ -1394,16 +1394,7 @@
   "core.DiscountCurve": {
     "kind": "class",
     "statics": ["flat", "fromDates", "fromJson", "fromZeroRates"],
-    "methods": [
-      "df",
-      "dfBetweenDates",
-      "forward",
-      "free",
-      "toForwardCurve",
-      "toJson",
-      "zero",
-      "zeroRate"
-    ],
+    "methods": ["df", "dfBetweenDates", "forward", "free", "toForwardCurve", "toJson", "zeroRate"],
     "getters": [
       "baseDate",
       "calendarId",

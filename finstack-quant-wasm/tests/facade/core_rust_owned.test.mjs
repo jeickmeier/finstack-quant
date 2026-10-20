@@ -224,7 +224,7 @@ const hazardOptions = (knots, recoveryRate) => ({
 test('HazardCurve recovery errors and precedence come from the Rust builder', () => {
   assert.throws(
     () => new core.HazardCurve(hazardOptions([1.0, 0.01, 5.0, 0.02], 1.5)),
-    validation('Validation error: recovery_rate must be a decimal fraction in [0, 1], got 1.5')
+    validation('Validation error: Invalid recovery_rate: must be finite and in [0, 1], got 1.5')
   );
   assert.throws(
     () => new core.HazardCurve(hazardOptions([1.0, -0.02], 1.5)),

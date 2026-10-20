@@ -1,5 +1,6 @@
 //! Stochastic structured-credit scenario waterfall pricing engine.
 
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::monte_carlo::estimate::independent_estimator_stats;
 
 use super::config::StochasticPricerConfig;

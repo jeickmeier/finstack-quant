@@ -11,6 +11,7 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 
 /// Curve source used to project future overnight fixings.

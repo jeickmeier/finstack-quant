@@ -4,6 +4,7 @@ use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
 };
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};

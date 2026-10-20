@@ -3,6 +3,7 @@
 use crate::utils::input::{
     from_js_json, js_f64, js_f64_seq, js_opt_string, js_string, js_string_seq,
 };
+use finstack_quant_core::market_data::traits::Discounting;
 use std::sync::Arc;
 
 use crate::api::core::currency::JsCurrency;
@@ -77,7 +78,7 @@ pub(crate) fn js_time_point(value: &JsValue, label: &str) -> Result<TimePoint, J
 ///   dayCount: "act_365f",
 /// });
 /// curve.df(2.5);          // discount factor at 2.5y
-/// curve.zero(2.5);        // continuously-compounded zero rate at 2.5y
+/// curve.zeroRate(2.5);    // continuously-compounded zero rate at 2.5y
 /// ```
 #[wasm_bindgen(js_name = DiscountCurve)]
 pub struct JsDiscountCurve {
@@ -222,27 +223,6 @@ impl JsDiscountCurve {
         match js_time_point(&t, "t")? {
             TimePoint::Years(t) => Ok(self.inner.df(t)),
             TimePoint::Date(d) => self.inner.df_on_date(d).map_err(to_js_err),
-        }
-    }
-
-    /// Continuously-compounded zero rate at year fraction `t` or on an ISO-8601 date.
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
-    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
-    ///
-    /// @returns The continuously-compounded zero rate as a decimal.
-    /// @throws `TypeError` if `t` is neither a number nor a string;
-    /// `FinstackError` (kind `validation`) for a malformed date or a year
-    /// fraction that cannot be computed.
-    pub fn zero(&self, t: JsValue) -> Result<f64, JsValue> {
-        match js_time_point(&t, "t")? {
-            TimePoint::Years(t) => Ok(self.inner.zero(t)),
-            TimePoint::Date(d) => self
-                .inner
-                .zero_rate_on_date(d, Compounding::Continuous)
-                .map_err(to_js_err),
         }
     }
 

@@ -1,6 +1,7 @@
 //! Discount curve bindings.
 
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ValidationMode};
+use finstack_quant_core::market_data::traits::Discounting;
 
 use std::sync::Arc;
 
@@ -298,33 +299,6 @@ impl PyDiscountCurve {
         match extract_time_point(t)? {
             TimePoint::Years(t) => Ok(self.inner.df(t)),
             TimePoint::Date(d) => self.inner.df_on_date(d).map_err(core_to_py),
-        }
-    }
-
-    /// Continuously-compounded zero rate (decimal) at a year fraction or date.
-    ///
-    /// Parameters
-    /// ----------
-    /// t : float | datetime.date | str
-    ///     Year fraction from ``base_date``, or a date converted with the curve day count.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Zero rate as a decimal (``0.05`` is 5%); ``0.0`` at ``t = 0``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a date precedes ``base_date``.
-    #[pyo3(text_signature = "(self, t)")]
-    fn zero(&self, t: &Bound<'_, PyAny>) -> PyResult<f64> {
-        match extract_time_point(t)? {
-            TimePoint::Years(t) => Ok(self.inner.zero(t)),
-            TimePoint::Date(d) => self
-                .inner
-                .zero_rate_on_date(d, finstack_quant_core::math::Compounding::Continuous)
-                .map_err(core_to_py),
         }
     }
 

@@ -5,6 +5,7 @@
 //! and the golden fixture is checked in here. The quadrature helpers it
 //! reaches are `#[doc(hidden)] pub` for this reason.
 
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::bloomberg_quadrature::{
     calibrate_lognormal_mean, normal_integral, z_limit, ForwardCdsContext,
 };

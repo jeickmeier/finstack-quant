@@ -462,7 +462,7 @@ class TestDiscountCurveParity:
         """exp(-z * t) recovers the discount factor."""
         t = 1.0
         df = curve.df(t)
-        z = curve.zero(t)
+        z = curve.zero_rate(t)
         assert df == pytest.approx(math.exp(-z * t), abs=1e-8)
 
     def test_df_at_time_zero(self, curve: DiscountCurve) -> None:

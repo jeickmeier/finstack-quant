@@ -1086,7 +1086,10 @@ mod tests {
                 return Ok(Money::new(amount, self.currency).expect("valid money fixture"));
             }
             let pv = self.raw_offset
-                + market.get_discount(self.discount_curve.as_str())?.zero(1.0) * self.scale;
+                + market
+                    .get_discount(self.discount_curve.as_str())?
+                    .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)
+                    * self.scale;
             Ok(Money::new(pv, self.currency).expect("valid money fixture"))
         }
 
@@ -1096,7 +1099,10 @@ mod tests {
             _as_of: finstack_quant_core::dates::Date,
         ) -> finstack_quant_core::Result<f64> {
             Ok(self.raw_offset
-                + market.get_discount(self.discount_curve.as_str())?.zero(1.0) * self.scale)
+                + market
+                    .get_discount(self.discount_curve.as_str())?
+                    .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)
+                    * self.scale)
         }
 
         fn base_value_raw_with_currency(

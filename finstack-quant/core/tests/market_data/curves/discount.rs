@@ -13,6 +13,7 @@ use super::super::test_helpers::{sample_base_date, sample_discount_curve};
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::bumps::{BumpSpec, Bumpable};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use proptest::prelude::*;
 use time::Month;
@@ -809,8 +810,8 @@ fn forward_and_df_on_date() {
     let t1 = 0.5;
     let t2 = 1.0;
     let fwd = curve.forward(t1, t2).expect("forward should succeed");
-    let zero_1 = curve.zero(t1);
-    let zero_2 = curve.zero(t2);
+    let zero_1 = curve.zero_rate(t1, finstack_quant_core::math::Compounding::Continuous);
+    let zero_2 = curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous);
 
     // Correct formula: f(t1,t2) = (z2*t2 - z1*t1) / (t2 - t1)
     assert!(
@@ -885,7 +886,10 @@ fn negative_rate_environment() {
         .unwrap();
 
     assert!(curve.df(1.0) > 1.0, "DF should be > 1 for negative rates");
-    assert!(curve.zero(1.0) < 0.0, "Zero rate should be negative");
+    assert!(
+        curve.zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous) < 0.0,
+        "Zero rate should be negative"
+    );
 }
 
 /// MonotoneConvex supports negative-rate (DF > 1) curves end-to-end.
@@ -920,7 +924,7 @@ fn negative_rate_environment_monotone_convex() {
             df > 1.0,
             "DF({t}) = {df} should exceed 1 for negative rates"
         );
-        let zero = curve.zero(t);
+        let zero = curve.zero_rate(t, finstack_quant_core::math::Compounding::Continuous);
         assert!(
             (zero - rate).abs() < 1e-9,
             "zero rate at t={t} should be ~ -1%, got {zero}"
@@ -1000,7 +1004,7 @@ fn minimal_two_point_curve() {
 //
 // rather than going via the zero-rate form
 //
-//     (self.zero(t2) * t2 - self.zero(t1) * t1) / (t2 - t1)
+//     (self.zero_rate(t2, Continuous) * t2 - self.zero_rate(t1, Continuous) * t1) / (t2 - t1)
 //
 // which is algebraically equivalent but round-trips each endpoint
 // through an extra division / multiplication and costs two `ln` calls

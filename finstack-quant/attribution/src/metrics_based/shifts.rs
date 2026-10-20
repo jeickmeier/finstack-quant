@@ -244,7 +244,11 @@ fn measure_per_tenor_discount_shift(
     Some(
         tenors
             .iter()
-            .map(|&t| (curve_t1.zero(t) - curve_t0.zero(t)) * 10_000.0)
+            .map(|&t| {
+                (curve_t1.zero_rate(t, finstack_quant_core::math::Compounding::Continuous)
+                    - curve_t0.zero_rate(t, finstack_quant_core::math::Compounding::Continuous))
+                    * 10_000.0
+            })
             .collect(),
     )
 }
@@ -390,7 +394,16 @@ fn discount_curve_abs_shift_bp(
     ) else {
         return 0.0;
     };
-    mean_tenor_shift_bp(|t| (c0.zero(t), c1.zero(t)), true).unwrap_or(0.0)
+    mean_tenor_shift_bp(
+        |t| {
+            (
+                c0.zero_rate(t, finstack_quant_core::math::Compounding::Continuous),
+                c1.zero_rate(t, finstack_quant_core::math::Compounding::Continuous),
+            )
+        },
+        true,
+    )
+    .unwrap_or(0.0)
 }
 
 /// L1-mean rate shift (bp) for a curve that may be a discount or a

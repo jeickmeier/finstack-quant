@@ -41,6 +41,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
     BasisSpreadCurve, DiscountCurve, DiscountCurveBuilder, ValidationMode as CurveValidationMode,
 };
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;

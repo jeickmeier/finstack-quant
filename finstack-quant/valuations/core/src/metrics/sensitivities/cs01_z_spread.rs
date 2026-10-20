@@ -43,6 +43,7 @@
 //! [canonical]: crate::metrics::sensitivities::cs01
 //! [`z_spread_discount_factor`]: finstack_quant_core::math::z_spread_discount_factor
 
+use finstack_quant_core::market_data::traits::Discounting;
 use std::marker::PhantomData;
 use std::sync::Arc;
 

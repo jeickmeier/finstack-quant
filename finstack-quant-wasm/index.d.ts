@@ -3021,7 +3021,7 @@ export interface DiscountCurveOptions {
  *   dayCount: "act_365f",
  * });
  * curve.df(2.5);          // discount factor at 2.5y
- * curve.zero(2.5);        // continuously-compounded zero rate at 2.5y
+ * curve.zeroRate(2.5);    // continuously-compounded zero rate at 2.5y
  * ```
  */
 export interface DiscountCurve extends WasmOwned {
@@ -3040,13 +3040,6 @@ export interface DiscountCurve extends WasmOwned {
    * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
   df(t: number | string): number;
-  /**
-   * Continuously-compounded zero rate at year fraction or ISO date `t`.
-   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
-   * @returns The continuously-compounded zero rate as a decimal.
-   * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
-   */
-  zero(t: number | string): number;
   /**
    * Continuously-compounded forward rate between `t1` and `t2`.
    * @returns Continuously compounded forward rate as a decimal over `(t1, t2)`.
@@ -3153,7 +3146,7 @@ export interface DiscountCurve extends WasmOwned {
  *   dayCount: "act_365f",
  * });
  * curve.df(2.5);          // discount factor at 2.5y
- * curve.zero(2.5);        // continuously-compounded zero rate at 2.5y
+ * curve.zeroRate(2.5);    // continuously-compounded zero rate at 2.5y
  * ```
  */
 export interface DiscountCurveConstructor {

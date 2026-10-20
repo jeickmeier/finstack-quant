@@ -889,7 +889,11 @@ fn compute_curve_factor(
             );
             KEY_RATE_BUCKETS_YEARS
                 .iter()
-                .map(|&t| (curve_t1.zero(t) - curve_t0.zero(t)) * 10_000.0)
+                .map(|&t| {
+                    (curve_t1.zero_rate(t, finstack_quant_core::math::Compounding::Continuous)
+                        - curve_t0.zero_rate(t, finstack_quant_core::math::Compounding::Continuous))
+                        * 10_000.0
+                })
                 .collect()
         }
         CurveKind::Forward => {

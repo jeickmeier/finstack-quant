@@ -894,6 +894,7 @@ finstack_quant_valuations_core::impl_empty_cashflow_provider!(
 
 #[cfg(test)]
 mod tests {
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_valuations_test_support::date as date_support;
     use finstack_quant_valuations_test_support::discount_forward_curves as discount_forward_curve_support;
     use finstack_quant_valuations_test_support::volatility as volatility_support;

@@ -8,6 +8,7 @@ use finstack_quant_core::dates::{
     Date, DayCountContext, Schedule, ScheduleBuilder, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::{BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::{credit, numerical};

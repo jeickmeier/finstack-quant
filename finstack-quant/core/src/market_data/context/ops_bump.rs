@@ -662,13 +662,16 @@ mod tests {
         let token = ctx
             .apply_curve_bump_in_place(&CurveId::from("USD-OIS"), BumpSpec::parallel_bp(1.0))
             .expect("curve bump");
-        let bumped_zero = ctx.get_discount("USD-OIS").expect("bumped curve").zero(5.0);
+        let bumped_zero = ctx
+            .get_discount("USD-OIS")
+            .expect("bumped curve")
+            .zero_rate(5.0, crate::math::Compounding::Continuous);
 
         ctx.revert_scratch_bump(token).expect("revert");
         let restored_zero = ctx
             .get_discount("USD-OIS")
             .expect("restored curve")
-            .zero(5.0);
+            .zero_rate(5.0, crate::math::Compounding::Continuous);
 
         assert!(
             (bumped_zero - restored_zero).abs() > 1e-9,
@@ -693,7 +696,10 @@ mod tests {
             .build()
             .expect("forward curve");
         let mut scratch = MarketContext::new().insert(discount).insert(forward);
-        let discount_before = scratch.get_discount("USD-OIS").expect("discount").zero(5.0);
+        let discount_before = scratch
+            .get_discount("USD-OIS")
+            .expect("discount")
+            .zero_rate(5.0, crate::math::Compounding::Continuous);
         let forward_before = scratch
             .get_forward("USD-SOFR-3M")
             .expect("forward")
@@ -730,7 +736,7 @@ mod tests {
             scratch
                 .get_discount("USD-OIS")
                 .expect("discount")
-                .zero(5.0)
+                .zero_rate(5.0, crate::math::Compounding::Continuous)
                 .to_bits(),
             discount_before.to_bits()
         );

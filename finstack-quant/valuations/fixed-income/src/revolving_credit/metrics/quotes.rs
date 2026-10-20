@@ -14,6 +14,7 @@
 //! of a par facility on a flat consistent curve is exactly its contractual
 //! margin.
 
+use finstack_quant_core::market_data::traits::Discounting;
 use std::sync::Arc;
 
 use finstack_quant_core::cashflow::CFKind;

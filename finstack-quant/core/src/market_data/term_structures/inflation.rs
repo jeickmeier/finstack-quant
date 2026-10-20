@@ -72,10 +72,10 @@
 //!   - Fleckenstein, M., Longstaff, F. A., & Lustig, H. (2017). "Deflation Risk."
 //!     *Review of Financial Studies*, 30(8), 2719-2760. `docs/REFERENCES.md#kerkhof-2005`
 
-use super::common::{roll_knots, validate_pillars, InterpRollState};
+use super::common::{roll_knots, InterpRollState};
 use crate::dates::DateExt;
 use crate::dates::{Date, DayCount};
-use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
+use crate::market_data::bumps::{BumpSpec, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::{error::InputError, math::interp::Interp, types::CurveId};
 
@@ -266,10 +266,7 @@ impl InflationCurve {
         if t <= 0.0 {
             return self.base_cpi;
         }
-        match &self.roll {
-            Some(state) => state.interp(&self.interp, t),
-            None => self.interp.interp(t),
-        }
+        InterpRollState::eval(self.roll.as_ref(), &self.interp, t)
     }
 
     /// CPI level at time `t` (years), adjusted for the indexation lag.
@@ -430,7 +427,11 @@ impl InflationCurve {
     /// Helper: compute year fraction from base date to target date using curve's day-count.
     #[inline]
     fn year_fraction_to(&self, date: Date) -> crate::Result<f64> {
-        super::common::year_fraction_to(self.base_date, date, self.day_count)
+        self.day_count.signed_year_fraction(
+            self.base_date,
+            date,
+            crate::dates::DayCountContext::default(),
+        )
     }
 
     /// Reference observation date represented by the zero-time CPI level.
@@ -558,7 +559,11 @@ impl InflationCurve {
             return Ok(self.clone());
         }
         let new_base = self.base_date.add_days(days)?;
-        let dt_years = super::common::year_fraction_to(self.base_date, new_base, self.day_count)?;
+        let dt_years = self.day_count.signed_year_fraction(
+            self.base_date,
+            new_base,
+            crate::dates::DayCountContext::default(),
+        )?;
 
         let new_base_cpi = self.cpi(dt_years);
 
@@ -711,9 +716,6 @@ impl InflationCurveBuilder {
         let base_date = self.base_date.ok_or_else(|| {
             crate::Error::Validation("InflationCurve requires base_date".to_string())
         })?;
-        if self.points.is_empty() {
-            return Err(InputError::TooFewPoints.into());
-        }
         crate::math::interp::validate_knots(&self.points.iter().map(|p| p.0).collect::<Vec<_>>())?;
         if self.points.iter().any(|&(_, c)| !c.is_finite() || c <= 0.0) {
             return Err(InputError::NonPositiveValue.into());
@@ -733,24 +735,16 @@ impl InflationCurveBuilder {
             kvec.insert(origin, 0.0);
             cvec.insert(origin, self.base_cpi);
         }
-        crate::math::interp::validate_knots(&kvec)?;
         let knots = kvec.into_boxed_slice();
         let cpi_levels = cvec.into_boxed_slice();
-        let mut interp = self.style.build_enum(
-            knots.clone(),
-            cpi_levels.clone(),
+        let interp = InterpRollState::build_source(
+            self.roll_transform.as_ref(),
+            self.style,
             self.extrapolation,
             ValidationPolicy::Strict,
+            &knots,
+            &cpi_levels,
         )?;
-        if let Some(state) = &self.roll_transform {
-            interp = state.restore(self.style, self.extrapolation, ValidationPolicy::Strict)?;
-            validate_pillars(
-                knots.iter().copied().zip(cpi_levels.iter().copied()),
-                false,
-                "rolled interpolation",
-                |t| state.interp(&interp, t),
-            )?;
-        }
         Ok(InflationCurve {
             id: self.id,
             base_cpi: self.base_cpi,
@@ -767,32 +761,17 @@ impl InflationCurveBuilder {
 
 impl Bumpable for InflationCurve {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        spec.validate()?;
-
         let (shift, is_multiplicative) = spec.resolve_standard_values_or_error(
             "InflationCurve",
             "only supports Additive/{RateBp,Percent,Fraction} or Multiplicative/Factor",
         )?;
 
         let bumped_id = spec.standard_bump_id(self.id());
-        let weight = |t: f64| match spec.bump_type {
-            BumpType::Parallel => 1.0,
-            BumpType::TriangularKeyRate {
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            } => crate::market_data::term_structures::common::triangular_weight(
-                t,
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            ),
-        };
         let base_cpi = self.base_cpi();
         // Shock the annualized zero inflation rate to time `t` and return the
         // implied CPI level; the base CPI is a published fixing and never moves.
         let shocked_cpi_from_rate = |t: f64, zero_rate: f64| -> f64 {
-            let weight = weight(t);
+            let weight = spec.bump_type.weight(t);
             let bumped_zero_rate = if is_multiplicative {
                 (1.0 + zero_rate) * (1.0 + (shift - 1.0) * weight) - 1.0
             } else {

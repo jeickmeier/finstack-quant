@@ -229,10 +229,7 @@ impl HazardCurveBuilder {
             }
         }
 
-        crate::market_data::term_structures::common::validate_unit_range(
-            recovery_rate,
-            "recovery_rate",
-        )?;
+        crate::validation::validate_f64_unit_interval(recovery_rate, "recovery_rate")?;
 
         let mut points = self.points;
         points.sort_by(|a, b| a.0.total_cmp(&b.0));

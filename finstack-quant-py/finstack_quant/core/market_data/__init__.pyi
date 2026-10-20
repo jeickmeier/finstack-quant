@@ -5,7 +5,7 @@ Provides term-structure curve types (discount, forward, hazard, price incl.
 volatility-index, inflation), volatility surfaces and cubes, the FX rate matrix,
 scalar series and the unified :class:`MarketContext` container.
 
-Every curve query (``df``, ``zero``, ``zero_rate``, ``rate``, ``sp``,
+Every curve query (``df``, ``zero_rate``, ``rate``, ``sp``,
 ``hazard_rate``, ``price``, ``cpi``) accepts either a year fraction (``float``)
 or a date (``datetime.date`` or ISO ``"YYYY-MM-DD"`` string); dates are
 converted with the curve's own day count by Rust. Constructor options after
@@ -363,28 +363,6 @@ class DiscountCurve:
             If a date precedes ``base_date`` or is not a valid ISO date.
         TypeError
             If ``t`` is neither a number nor date-like.
-        """
-        ...
-
-    def zero(self, t: TimeOrDate) -> float:
-        """
-        Continuously-compounded zero rate (decimal) at a year fraction or date.
-
-        Parameters
-        ----------
-        t : float, datetime.date or str
-            Year fraction from ``base_date``, or a date converted with the
-            curve day count.
-
-        Returns
-        -------
-        float
-            Zero rate as a decimal (``0.05`` is 5%); ``0.0`` at ``t = 0``.
-
-        Raises
-        ------
-        ValueError
-            If a date precedes ``base_date``.
         """
         ...
 

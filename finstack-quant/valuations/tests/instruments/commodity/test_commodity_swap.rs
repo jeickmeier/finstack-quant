@@ -5,6 +5,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
 use finstack_quant_valuations::instruments::rates::irs::PayReceive;

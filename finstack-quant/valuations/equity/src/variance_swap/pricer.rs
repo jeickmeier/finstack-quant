@@ -2,6 +2,7 @@
 //!
 use crate::variance_swap::VarianceSwap;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::market::OptionType;
@@ -373,7 +374,7 @@ fn spot_variance_to_date(
             inst.notional.currency(),
         )?;
     // Date-based zero rate over [as_of, target_date]: avoids the
-    // axis bias of `disc.zero(t)` when curve base != as_of.
+    // axis bias of `disc.zero_rate(t, Continuous)` when curve base != as_of.
     let df_mat = disc.as_ref().df_between_dates(as_of, target_date)?;
     let r = finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
         df_mat,

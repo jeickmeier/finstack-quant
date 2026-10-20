@@ -1,6 +1,6 @@
 //! Discount-curve bumping and roll-forward transformations.
 
-use super::super::common::{roll_knots, year_fraction_to_with_ctx};
+use super::super::common::roll_knots;
 use super::DiscountCurve;
 use crate::dates::DateExt;
 use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
@@ -17,16 +17,7 @@ impl DiscountCurve {
     /// Merges shocks into a flat piecewise-quadratic log-DF adjustment. Repeated
     /// shocks on the same grid do not create nested curves or extra breakpoints.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
-        let (val, is_multiplicative) = spec.resolve_standard_values_or_error(
-            "DiscountCurve",
-            "only supports Additive/{RateBp,Percent,Fraction} bumps",
-        )?;
-        if is_multiplicative {
-            return Err(crate::InputError::UnsupportedBump {
-                reason: "DiscountCurve does not support Multiplicative bumps".to_string(),
-            }
-            .into());
-        }
+        let val = spec.resolve_additive_or_error("DiscountCurve")?;
         if val == 0.0 {
             return Ok(());
         }
@@ -120,12 +111,9 @@ impl DiscountCurve {
             return Ok(self.clone());
         }
         let new_base = self.base.add_days(days)?;
-        let dt_years = year_fraction_to_with_ctx(
-            self.base,
-            new_base,
-            self.day_count,
-            self.day_count_context(),
-        )?;
+        let dt_years =
+            self.day_count
+                .signed_year_fraction(self.base, new_base, self.day_count_context())?;
 
         // Realized-forward renormalization: divide every rolled DF by the
         // old curve's DF at the roll horizon, interpolated in the curve's own

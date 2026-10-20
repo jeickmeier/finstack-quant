@@ -3,6 +3,7 @@
 use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;

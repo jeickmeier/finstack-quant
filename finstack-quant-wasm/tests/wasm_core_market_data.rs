@@ -383,7 +383,7 @@ fn discount_curve_new_and_accessors() {
     assert_eq!(curve.base_date(), "2024-01-15");
     assert!((curve.df(JsValue::from(0.5)).unwrap() - 0.99).abs() < 1e-6);
     assert!((curve.df(JsValue::from(1.0)).unwrap() - 0.98).abs() < 1e-6);
-    assert!(curve.zero(JsValue::from(1.0)).unwrap() > 0.0);
+    assert!(curve.zero_rate(JsValue::from(1.0), None).unwrap() > 0.0);
     let f = curve
         .forward(JsValue::from(0.5), JsValue::from(1.0))
         .expect("forward rate");

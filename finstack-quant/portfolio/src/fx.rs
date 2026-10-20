@@ -18,6 +18,7 @@
 //! covered-interest-parity forwards for cashflows with `payment_date > as_of`.
 //! Do not re-implement matrix lookup in those wrappers.
 
+use finstack_quant_core::market_data::traits::Discounting;
 use std::collections::HashMap;
 
 use finstack_quant_core::currency::Currency;

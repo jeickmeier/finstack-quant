@@ -25,6 +25,7 @@ use crate::irs::{InterestRateSwap, PayReceive};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;

@@ -4,6 +4,7 @@
 use crate::exotics::asian_option::types::AsianOption;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::stats::{
     compensated_covariance, compensated_mean, compensated_variance,
 };

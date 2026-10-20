@@ -6,6 +6,7 @@ use finstack_quant_calibration::api::schema::CalibrationEnvelope;
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};
 use std::collections::BTreeMap;

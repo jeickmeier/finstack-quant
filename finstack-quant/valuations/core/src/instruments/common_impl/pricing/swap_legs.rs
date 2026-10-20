@@ -7,7 +7,7 @@
 //! # Capabilities
 //!
 //! - Numerically stable relative discount factors via
-//!   [`DiscountCurve::df_between_dates`](finstack_quant_core::market_data::term_structures::DiscountCurve::df_between_dates)
+//!   [`Discounting::df_between_dates`](finstack_quant_core::market_data::traits::Discounting::df_between_dates)
 //! - Neumaier compensated summation for long-dated swaps
 //! - Holiday-aware payment delay handling
 
@@ -89,6 +89,7 @@ mod tests {
     use super::*;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::types::CurveId;
     use time::Month;
 

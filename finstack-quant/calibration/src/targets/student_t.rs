@@ -376,6 +376,7 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::{
         BaseCorrelationCurve, CreditIndexData, DiscountCurve, HazardCurve,
     };
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::FxHashMap;
     use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause,

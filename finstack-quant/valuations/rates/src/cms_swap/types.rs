@@ -820,6 +820,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
 
 #[cfg(test)]
 mod tests {
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_valuations_core::instruments::Instrument;
 
     fn funding_period(start: Date, end: Date, accrual: f64) -> super::super::types::FundingPeriod {

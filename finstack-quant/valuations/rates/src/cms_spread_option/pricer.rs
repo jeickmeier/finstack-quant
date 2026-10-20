@@ -13,6 +13,7 @@ use crate::cms_spread_option::CmsSpreadOption;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurfaceAxis;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::integration::GaussHermiteQuadrature;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;

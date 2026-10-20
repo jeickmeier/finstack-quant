@@ -103,7 +103,9 @@ impl Instrument for RatesCreditInteractionInstrument {
     }
 
     fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
-        let rate = market.get_discount("USD-OIS")?.zero(1.0);
+        let rate = market
+            .get_discount("USD-OIS")?
+            .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous);
         let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0);
         Ok(Money::new(1_000_000.0 * rate * hazard, Currency::USD).expect("valid money fixture"))
     }

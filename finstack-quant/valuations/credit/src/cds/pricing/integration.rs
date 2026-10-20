@@ -4,6 +4,7 @@ use super::engine::CdsPricer;
 use super::helpers::{date_from_hazard_time, isda_standard_model_boundaries, settlement_date};
 use finstack_quant_core::dates::{Date, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::credit;

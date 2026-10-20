@@ -10,6 +10,7 @@ use crate::cmo::pricer::{resolve_collateral, tranche_cashflows_on};
 use crate::cmo::AgencyCmo;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_fixed_income::mbs_passthrough::pricer::quote_basis_pool;

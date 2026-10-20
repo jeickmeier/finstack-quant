@@ -153,7 +153,7 @@ def test_vol_cube_node_dicts_use_the_rust_serde_shape() -> None:
 
 
 def test_hazard_curve_recovery_errors_come_from_the_rust_builder() -> None:
-    with _raises_exactly("Validation error: recovery_rate must be a decimal fraction in [0, 1], got 1.5"):
+    with _raises_exactly("Validation error: Invalid recovery_rate: must be finite and in [0, 1], got 1.5"):
         HazardCurve("HZ", "2025-01-01", [(1.0, 0.01), (5.0, 0.02)], recovery_rate=1.5)
     # Knots are validated before recovery, exactly as in WASM.
     with _raises_exactly("Values must be non-negative"):

@@ -8,6 +8,7 @@ use super::helpers::{
 use crate::cds::CreditDefaultSwap;
 use finstack_quant_core::dates::{Date, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::money::Money;

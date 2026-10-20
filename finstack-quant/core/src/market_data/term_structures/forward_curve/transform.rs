@@ -80,15 +80,10 @@ impl ForwardCurve {
 
     /// Apply a continuous rate shock while preserving the source interpolator.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
-        spec.validate()?;
-        let (val, is_multiplicative) =
-            spec.resolve_standard_values()
-                .ok_or_else(|| crate::InputError::UnsupportedBump {
-                    reason: format!(
-                    "ForwardCurve bump requires Additive or Multiplicative values, got {:?}/{:?}",
-                    spec.mode, spec.units
-                ),
-                })?;
+        let (val, is_multiplicative) = spec.resolve_standard_values_or_error(
+            "ForwardCurve",
+            "bump requires Additive or Multiplicative values",
+        )?;
 
         if is_multiplicative && matches!(spec.bump_type, BumpType::TriangularKeyRate { .. }) {
             return Err(crate::InputError::UnsupportedBump {
@@ -178,7 +173,11 @@ impl ForwardCurve {
             return Ok(self.clone());
         }
         let new_base = self.base.add_days(days)?;
-        let dt_years = super::super::common::year_fraction_to(self.base, new_base, self.day_count)?;
+        let dt_years = self.day_count.signed_year_fraction(
+            self.base,
+            new_base,
+            crate::dates::DayCountContext::default(),
+        )?;
 
         // Preserve the live forward at the new origin. Merely shifting and
         // dropping expired knots loses the interpolation segment containing

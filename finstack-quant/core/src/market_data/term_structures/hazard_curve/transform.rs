@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::dates::DateExt;
-use crate::market_data::bumps::{BumpSpec, BumpType, BumpUnits, Bumpable};
+use crate::market_data::bumps::{BumpSpec, BumpUnits, Bumpable};
 
 impl HazardCurve {
     /// Create a copy of this curve with its `recovery_rate` metadata overridden.
@@ -20,10 +20,7 @@ impl HazardCurve {
     ///
     /// Returns an error if `recovery_rate` is outside `[0, 1]`.
     pub fn with_recovery_rate(&self, recovery_rate: f64) -> crate::Result<HazardCurve> {
-        crate::market_data::term_structures::common::validate_unit_range(
-            recovery_rate,
-            "recovery_rate",
-        )?;
+        crate::validation::validate_f64_unit_interval(recovery_rate, "recovery_rate")?;
         let mut curve = self.clone();
         curve.recovery_rate = recovery_rate;
         // The calibration provenance described the original recovery assumption.
@@ -89,47 +86,15 @@ impl HazardCurve {
         spec: &BumpSpec,
         target: HazardBumpTarget,
     ) -> crate::Result<()> {
-        spec.validate()?;
-        let bucket = match spec.bump_type {
-            BumpType::Parallel => None,
-            BumpType::TriangularKeyRate {
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            } => Some((prev_bucket, target_bucket, next_bucket)),
-        };
-
-        let (spread, is_multiplicative) =
-            spec.resolve_standard_values()
-                .ok_or_else(|| crate::InputError::UnsupportedBump {
-                    reason: format!(
-                        "HazardCurve only supports Additive bumps, got {:?}/{:?}",
-                        spec.mode, spec.units
-                    ),
-                })?;
-        if is_multiplicative {
-            return Err(crate::InputError::UnsupportedBump {
-                reason: "HazardCurve does not support Multiplicative bumps".to_string(),
-            }
-            .into());
-        }
+        let spread = spec.resolve_additive_or_error("HazardCurve")?;
 
         let shift = match target {
             HazardBumpTarget::ParSpread => {
                 // Recovery must be within [0, 1) for the par spread ⇢ hazard
                 // conversion; recovery == 1.0 would divide by zero and yield an
                 // infinite shift.
-                let recovery = self.recovery_rate;
-                if !recovery.is_finite() || !(0.0..1.0).contains(&recovery) {
-                    return Err(crate::InputError::UnsupportedBump {
-                        reason: format!(
-                            "HazardCurve bump requires recovery rate in [0, 1), got {}",
-                            recovery
-                        ),
-                    }
-                    .into());
-                }
-                spread / (1.0 - recovery)
+                crate::validation::validate_recovery_rate(self.recovery_rate)?;
+                spread / (1.0 - self.recovery_rate)
             }
             // One basis point of intensity is 1e-4, kept as the exact product.
             HazardBumpTarget::HazardRate if spec.units == BumpUnits::RateBp => spec.value * 1e-4,
@@ -140,11 +105,7 @@ impl HazardCurve {
         // fallible interpolator build succeeds.
         let mut lambdas = self.lambdas.clone();
         for (lambda, &t) in lambdas.iter_mut().zip(self.knots.iter()) {
-            let weight = bucket.map_or(1.0, |(prev, target, next)| {
-                crate::market_data::term_structures::common::triangular_weight(
-                    t, prev, target, next,
-                )
-            });
+            let weight = spec.bump_type.weight(t);
             let shifted = *lambda + shift * weight;
             if !shifted.is_finite() || shifted < 0.0 {
                 return Err(crate::InputError::UnsupportedBump {
@@ -301,7 +262,11 @@ impl HazardCurve {
     /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
         let new_base = self.base.add_days(days)?;
-        let dt_years = super::super::common::year_fraction_to(self.base, new_base, self.day_count)?;
+        let dt_years = self.day_count.signed_year_fraction(
+            self.base,
+            new_base,
+            crate::dates::DayCountContext::default(),
+        )?;
 
         // Anchor the active post-roll hazard at the new origin, then retain
         // future hazard changes. This preserves conditional survival rather
@@ -340,11 +305,6 @@ impl HazardCurve {
 
 impl Bumpable for HazardCurve {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        spec.resolve_standard_values_or_error(
-            "HazardCurve",
-            "only supports Additive/{RateBp,Percent,Fraction} bumps",
-        )?;
-
         // `bump_in_place` interprets RateBp/Percent as **par spread** shocks
         // (converted to hazard via 1/(1 - recovery)), rejects bumps that would
         // drive a hazard rate negative, and drops the stored par-spread quotes

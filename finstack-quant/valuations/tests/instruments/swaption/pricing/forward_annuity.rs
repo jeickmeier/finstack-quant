@@ -4,6 +4,7 @@ use crate::instruments::swaption::common::*;
 use finstack_quant_core::dates::{
     BusinessDayConvention, DayCount, DayCountContext, StubKind, Tenor,
 };
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations::instruments::rates::swaption::CashSettlementMethod;
 use finstack_quant_valuations::instruments::rates::swaption::Swaption;
 use finstack_quant_valuations::instruments::FixedLegSpec;

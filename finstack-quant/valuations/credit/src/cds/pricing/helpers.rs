@@ -60,7 +60,7 @@ pub(super) fn haz_t(surv: &HazardCurve, date: Date) -> Result<f64> {
 /// `days_per_year` inverse drifted by tens of days at multi-year horizons.
 ///
 /// Why it matters: the returned date is then used with
-/// [`DiscountCurve::df_between_dates`] on the *discount* curve. When
+/// [`Discounting::df_between_dates`](finstack_quant_core::market_data::traits::Discounting::df_between_dates) on the *discount* curve. When
 /// `surv.day_count() != disc.day_count()`, an off-by-N-days inverse
 /// mis-attributes the discount lookup, shifting CDS protection-leg PV by tens
 /// of dollars per million on cross-currency or mixed-convention setups. See C2

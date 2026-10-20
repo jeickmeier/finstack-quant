@@ -398,21 +398,6 @@ impl ParametricCurve {
             / source_discount_factor(&self.model, self.time_offset)
     }
 
-    /// Relative discount factor from `from` to `to`: `df(t_to) / df(t_from)`.
-    ///
-    /// # Arguments
-    ///
-    /// * `from` - Start date for the relative discounting interval.
-    /// * `to` - End date for the relative discounting interval.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the day-count year-fraction calculation fails or
-    /// if the resulting discount factors are non-finite or non-positive.
-    pub fn df_between_dates(&self, from: Date, to: Date) -> crate::Result<f64> {
-        <Self as Discounting>::df_between_dates(self, from, to)
-    }
-
     /// Continuously compounded zero rate at time `t`.
     ///
     /// # Arguments
@@ -485,10 +470,10 @@ impl ParametricCurve {
             return Ok(self.clone());
         }
         let base_date = self.base_date.add_days(days)?;
-        let years = crate::market_data::term_structures::common::year_fraction_to(
+        let years = self.day_count.signed_year_fraction(
             self.base_date,
             base_date,
-            self.day_count,
+            crate::dates::DayCountContext::default(),
         )?;
         let time_offset = self.time_offset + years;
         if !time_offset.is_finite() {

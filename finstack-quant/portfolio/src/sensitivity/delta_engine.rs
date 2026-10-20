@@ -486,7 +486,10 @@ mod tests {
                 MockKind::CurveZero {
                     curve_id,
                     tenor_years,
-                } => Ok(market.get_discount(curve_id.as_str())?.zero(*tenor_years) * self.scale),
+                } => Ok(market.get_discount(curve_id.as_str())?.zero_rate(
+                    *tenor_years,
+                    finstack_quant_core::math::Compounding::Continuous,
+                ) * self.scale),
                 MockKind::Spot { spot_id } => {
                     let price = market.get_price(spot_id)?.clone();
                     let value = match price {

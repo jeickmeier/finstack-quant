@@ -24,12 +24,12 @@ impl ForwardCurve {
     #[must_use]
     pub fn builder(id: impl Into<CurveId>, tenor_years: f64) -> ForwardCurveBuilder {
         let id: CurveId = id.into();
-        let defaults = infer_forward_curve_defaults(id.as_str());
+        let (day_count, reset_lag) = infer_forward_curve_defaults(id.as_str());
         ForwardCurveBuilder {
             id,
             base: None,
-            reset_lag: defaults.reset_lag_business_days,
-            day_count: defaults.day_count,
+            reset_lag,
+            day_count,
             tenor: tenor_years,
             points: Vec::new(),
             projection_grid: None,
@@ -100,10 +100,10 @@ impl ForwardCurve {
     /// Propagates a failure while computing the curve day-count fraction from
     /// the base date to `date`.
     pub fn rate_on_date(&self, date: Date) -> crate::Result<f64> {
-        let t = crate::market_data::term_structures::common::year_fraction_to(
+        let t = self.day_count.signed_year_fraction(
             self.base,
             date,
-            self.day_count,
+            crate::dates::DayCountContext::default(),
         )?;
         Ok(self.rate(t))
     }
@@ -129,10 +129,10 @@ impl ForwardCurve {
         if date <= self.base {
             return Ok(0.0);
         }
-        let t = crate::market_data::term_structures::common::year_fraction_to(
+        let t = self.day_count.signed_year_fraction(
             self.base,
             date,
-            self.day_count,
+            crate::dates::DayCountContext::default(),
         )?;
         Ok(t.max(0.0))
     }
@@ -575,10 +575,10 @@ impl ForwardCurve {
     #[inline]
     #[must_use = "computed discount factor should not be discarded"]
     pub fn df_on_date(&self, date: Date) -> crate::Result<f64> {
-        let t = crate::market_data::term_structures::common::year_fraction_to(
+        let t = self.day_count.signed_year_fraction(
             self.base,
             date,
-            self.day_count,
+            crate::dates::DayCountContext::default(),
         )?;
         self.df(t)
     }

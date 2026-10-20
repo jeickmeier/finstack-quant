@@ -210,7 +210,7 @@ impl CurveValidator for DiscountCurve {
             if t > max_knot_bounds + 0.01 {
                 break;
             }
-            let rate = self.zero(t);
+            let rate = self.zero_rate(t, finstack_quant_core::math::Compounding::Continuous);
 
             // Allow slightly negative rates but not too extreme
             if rate < config.min_forward_rate * 5.0 {

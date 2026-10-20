@@ -140,7 +140,7 @@ mod rate_calibration;
 
 pub use base_correlation::{
     BaseCorrelationCurve, BaseCorrelationCurveBuilder, CorrelationShapeReport,
-    CorrelationShapeViolation, BASE_CORR_DETACHMENT_MATCH_TOLERANCE,
+    CorrelationShapeViolation,
 };
 pub use basis_spread_curve::{BasisSpreadCurve, BasisSpreadCurveBuilder};
 pub use credit_index::{CreditIndexData, CreditIndexDataBuilder};

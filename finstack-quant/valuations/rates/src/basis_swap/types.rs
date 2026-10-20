@@ -22,6 +22,7 @@
 
 use finstack_quant_core::dates::{BusinessDayConvention, DateExt, DayCount, Tenor};
 use finstack_quant_core::market_data::fixings::fixing_series_id;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::{
     dates::Date, market_data::context::MarketContext, money::Money, types::InstrumentId, Result,
 };

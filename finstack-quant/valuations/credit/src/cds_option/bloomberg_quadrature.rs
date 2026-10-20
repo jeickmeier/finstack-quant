@@ -58,6 +58,7 @@ use crate::cds_option::CdsOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;

@@ -35,7 +35,7 @@
 //! - Fujii, M., Shimada, Y., & Takahashi, A. (2011). "A Note on Construction of
 //!   Multiple Swap Curves with and without Collateral." *FSA Research Review*, 7. `docs/REFERENCES.md#fujii-shimada-takahashi-2010`
 
-use super::common::{roll_knots, validate_pillars, year_fraction_to, InterpRollState};
+use super::common::{roll_knots, InterpRollState};
 use crate::dates::DateExt;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::{
@@ -149,10 +149,7 @@ impl BasisSpreadCurve {
     #[must_use]
     #[inline]
     pub fn spread(&self, t: f64) -> f64 {
-        match &self.roll {
-            Some(state) => state.interp(&self.interp, t),
-            None => self.interp.interp(t),
-        }
+        InterpRollState::eval(self.roll.as_ref(), &self.interp, t)
     }
 
     /// Curve identifier.
@@ -244,7 +241,11 @@ impl BasisSpreadCurve {
             return Ok(self.clone());
         }
         let new_base = self.base.add_days(days)?;
-        let dt = year_fraction_to(self.base, new_base, self.day_count)?;
+        let dt = self.day_count.signed_year_fraction(
+            self.base,
+            new_base,
+            crate::dates::DayCountContext::default(),
+        )?;
         let rolled = roll_knots(&self.knots, &self.spreads, dt);
         if rolled.is_empty() {
             return Err(crate::Error::Validation(
@@ -355,26 +356,14 @@ impl BasisSpreadCurveBuilder {
         let knots: Box<[f64]> = knots_vec.into();
         let spreads: Box<[f64]> = spreads_vec.into();
 
-        let mut interp = self.style.build_enum(
-            knots.clone(),
-            spreads.clone(),
+        let interp = InterpRollState::build_source(
+            self.roll_transform.as_ref(),
+            self.style,
             self.extrapolation,
             ValidationPolicy::AllowNegative,
+            &knots,
+            &spreads,
         )?;
-
-        if let Some(state) = &self.roll_transform {
-            interp = state.restore(
-                self.style,
-                self.extrapolation,
-                ValidationPolicy::AllowNegative,
-            )?;
-            validate_pillars(
-                knots.iter().copied().zip(spreads.iter().copied()),
-                false,
-                "rolled interpolation",
-                |t| state.interp(&interp, t),
-            )?;
-        }
 
         Ok(BasisSpreadCurve {
             id: self.id,

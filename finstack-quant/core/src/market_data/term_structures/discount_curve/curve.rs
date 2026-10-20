@@ -161,7 +161,11 @@ impl DiscountCurve {
                     "DiscountCurve::from_dates pillar {date} precedes base date {base_date}"
                 )));
             }
-            let t = super::super::common::year_fraction_to(base_date, date, day_count)?;
+            let t = day_count.signed_year_fraction(
+                base_date,
+                date,
+                crate::dates::DayCountContext::default(),
+            )?;
             knots.push((t, df));
         }
         if !knots.iter().any(|&(t, _)| t == 0.0) {
@@ -230,22 +234,6 @@ impl DiscountCurve {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.knots.is_empty()
-    }
-
-    /// Continuously-compounded zero rate.
-    ///
-    /// Formula: `r_cc = -ln(DF) / t`
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Time from the curve base date in years on the curve's day-count basis; zero returns a zero rate.
-    #[must_use]
-    #[inline]
-    pub fn zero(&self, t: f64) -> f64 {
-        if t == 0.0 {
-            return 0.0;
-        }
-        -self.df(t).ln() / t
     }
 
     /// Continuously-compounded forward rate between `t1` and `t2`.
@@ -353,34 +341,6 @@ impl DiscountCurve {
         Ok(self.df(t))
     }
 
-    /// Fallible: discount factor from `from` to `to` using the curve's day-count.
-    ///
-    /// Inherent forwarder to [`Discounting::df_between_dates`] so concrete
-    /// callers need no trait import: `DF(from→to) = DF(0→to) / DF(0→from)`.
-    /// Works for both forward and backward date order. Returns `1.0` when
-    /// `from == to`.
-    ///
-    /// Both dates map to curve time with the curve's own day count and
-    /// time-axis calendar (see [`Self::day_count_context`]).
-    ///
-    /// # Arguments
-    ///
-    /// * `from` - Start date of the interval.
-    /// * `to` - End date of the interval; an earlier date inverts the ratio.
-    ///
-    /// [`Discounting::df_between_dates`]: crate::market_data::traits::Discounting::df_between_dates
-    ///
-    /// # Errors
-    ///
-    /// Propagates failures while computing either date's curve year fraction,
-    /// and returns `Error::Validation` when an evaluated discount factor is
-    /// non-finite or non-positive.
-    #[inline]
-    #[must_use = "computed discount factor should not be discarded"]
-    pub fn df_between_dates(&self, from: Date, to: Date) -> crate::Result<f64> {
-        crate::market_data::traits::Discounting::df_between_dates(self, from, to)
-    }
-
     /// Returns the zero rate for a given date with specified compounding convention.
     ///
     /// This is the unified method for obtaining zero rates under any compounding convention.
@@ -450,7 +410,7 @@ impl DiscountCurve {
     ///
     /// | Convention      | Formula                          | Typical use                              |
     /// |-----------------|----------------------------------|------------------------------------------|
-    /// | `Continuous`    | `r = -ln(DF) / t`                | Curve internals, [`zero`](Self::zero)    |
+    /// | `Continuous`    | `r = -ln(DF) / t`                | Curve internals                          |
     /// | `Annual`        | `r = DF^(-1/t) - 1`              | Bond-equivalent yields (Bloomberg zeros) |
     /// | `Periodic(n)`   | `r = n · (DF^(-1/(n·t)) - 1)`    | `n = 2` US Treasury, `n = 12` monthly    |
     /// | `Simple`        | `r = (1/DF - 1) / t`             | Money markets < 1Y (SOFR, €STR, SONIA,   |
@@ -502,12 +462,8 @@ impl DiscountCurve {
     /// Helper: compute year fraction from base date to target date using curve's day-count.
     #[inline]
     fn year_fraction_to(&self, date: Date) -> crate::Result<f64> {
-        super::super::common::year_fraction_to_with_ctx(
-            self.base,
-            date,
-            self.day_count,
-            self.day_count_context(),
-        )
+        self.day_count
+            .signed_year_fraction(self.base, date, self.day_count_context())
     }
 
     /// Day-count context of the curve's time axis: its holiday calendar, if
