@@ -194,11 +194,6 @@ mod expected_variance_tests {
         let count_w = swap
             .realized_fraction_by_observations(as_of)
             .expect("observation fraction");
-        let time_w = swap.time_elapsed_fraction(as_of).expect("time fraction");
-        assert!(
-            (count_w - time_w).abs() > 1e-4,
-            "schedule must make count weight ({count_w}) differ from time weight ({time_w})"
-        );
 
         let past: Vec<_> = swap
             .observation_dates()

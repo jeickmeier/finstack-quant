@@ -152,22 +152,6 @@ fn test_equity_forward_price() {
 }
 
 #[test]
-fn test_equity_forward_value() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_quoted_spot(100.0)
-        .with_quantity(10.0);
-
-    let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
-    let curve = build_flat_curve(0.04, base_date, "USD");
-    let market = MarketContext::new().insert(curve);
-
-    // Forward value should be forward_price_per_share * shares
-    let forward_value = equity.forward_value(&market, base_date, 1.0).unwrap();
-    let expected = 100.0 * (0.04_f64).exp() * 10.0; // ~104.08 * 10 = 1040.8
-    assert!((forward_value.amount() - expected).abs() < 0.1);
-}
-
-#[test]
 fn test_simple_equity_pricer_key() {
     let pricer = GenericInstrumentPricer::<Equity>::discounting(InstrumentType::Equity);
     let key = pricer.key();

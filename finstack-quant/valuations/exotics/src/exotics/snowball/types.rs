@@ -21,15 +21,6 @@ pub enum SnowballVariant {
     InverseFloater,
 }
 
-impl std::fmt::Display for SnowballVariant {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SnowballVariant::Snowball => write!(f, "snowball"),
-            SnowballVariant::InverseFloater => write!(f, "inverse_floater"),
-        }
-    }
-}
-
 /// Snowball structured note.
 ///
 /// The coupon in each period depends on the previous period's coupon,
@@ -154,8 +145,6 @@ impl Snowball {
             &self.period_boundaries(),
             "Snowball start_date followed by payment_dates",
         )?;
-
-        self.fixed_rate.as_f64();
 
         validation::require_with(self.gearing > 0.0 && self.gearing.is_finite(), || {
             format!(

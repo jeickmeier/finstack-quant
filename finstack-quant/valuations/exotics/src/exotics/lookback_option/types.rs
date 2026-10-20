@@ -61,30 +61,6 @@ pub enum LookbackType {
     FloatingStrike,
 }
 
-impl std::fmt::Display for LookbackType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::FixedStrike => write!(f, "fixed_strike"),
-            Self::FloatingStrike => write!(f, "floating_strike"),
-        }
-    }
-}
-
-impl std::str::FromStr for LookbackType {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "fixed_strike" => Ok(Self::FixedStrike),
-            "floating_strike" => Ok(Self::FloatingStrike),
-            _ => Err(format!(
-                "Unknown lookback type: '{}'. Valid: fixed_strike, floating_strike",
-                s
-            )),
-        }
-    }
-}
-
 /// Lookback option instrument.
 ///
 /// # Monitoring Convention
@@ -330,23 +306,3 @@ finstack_quant_valuations_core::impl_empty_cashflow_provider!(
     LookbackOption,
     finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::str::FromStr;
-
-    #[test]
-    fn lookback_type_fromstr_display_roundtrip() {
-        let variants = [LookbackType::FixedStrike, LookbackType::FloatingStrike];
-        for v in variants {
-            let s = v.to_string();
-            let parsed = LookbackType::from_str(&s).expect("roundtrip parse should succeed");
-            assert_eq!(v, parsed, "roundtrip failed for {s}");
-        }
-        for retired in ["fixedstrike", "floatingstrike", "fixed"] {
-            assert!(LookbackType::from_str(retired).is_err());
-        }
-        assert!(LookbackType::from_str("invalid").is_err());
-    }
-}

@@ -5496,24 +5496,9 @@
         }
       ]
     },
-    "ClawbackSettle": {
-      "description": "Clawback settlement trigger.",
-      "oneOf": [
-        {
-          "const": "fund_end",
-          "description": "Settle at fund termination",
-          "type": "string"
-        },
-        {
-          "const": "periodic",
-          "description": "Settle at configured period ends before subsequent distributions.\nEuropean settlements update fund allocation balances. American settlements\nstay at fund level and do not rewrite individual deal entitlements.",
-          "type": "string"
-        }
-      ]
-    },
     "ClawbackSpec": {
       "additionalProperties": false,
-      "description": "Clawback specification for GP carry reconciliation.",
+      "description": "Clawback specification for GP carry reconciliation, settled at fund end\n(the date of the last fund event).",
       "properties": {
         "holdback_decimal": {
           "description": "Optional share of GP carry held back until settlement, as a decimal\nfraction in `[0, 1]` (`0.2` = 20%)",
@@ -5522,15 +5507,8 @@
             "number",
             "null"
           ]
-        },
-        "settle_on": {
-          "$ref": "#/$defs/ClawbackSettle",
-          "description": "When to settle clawback"
         }
       },
-      "required": [
-        "settle_on"
-      ],
       "type": "object"
     },
     "ClearingStatus": {
@@ -30705,7 +30683,7 @@
         },
         {
           "const": "american",
-          "description": "American style: deal-by-deal allocation. Every event must carry a\nnon-empty `deal_id`; capital, preferred return, catch-up, and carry are\ntracked independently for each deal, while clawback remains a fund-level\nlifetime reconciliation. Periodic fund settlements do not reinstate an\nindividual deal's gross carry capacity or reassign returned capital to a\ndeal; later distributions continue to use that deal's original history.",
+          "description": "American style: deal-by-deal allocation. Every event must carry a\nnon-empty `deal_id`; capital, preferred return, catch-up, and carry are\ntracked independently for each deal, while clawback remains a fund-level\nlifetime reconciliation settled once at fund end.",
           "type": "string"
         }
       ]

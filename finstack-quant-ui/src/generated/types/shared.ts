@@ -13903,13 +13903,6 @@ export type CdsOptionStrike =
 export type CdsValuationConvention =
   "isda_dirty" | "bloomberg_cdsw_clean" | "bloomberg_cdsw_clean_full_premium" | "quant_lib_isda_parity";
 /**
- * Clawback settlement trigger.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "ClawbackSettle".
- */
-export type ClawbackSettle = "fund_end" | "periodic";
-/**
  * Clearing status for OTC derivatives.
  *
  * Determines whether a trade is cleared through a CCP or remains bilateral
@@ -16560,7 +16553,6 @@ export interface SharedDefs {
   CdsOptionStrike?: CdsOptionStrike;
   CdsTranche?: CdsTranche;
   CdsValuationConvention?: CdsValuationConvention;
-  ClawbackSettle?: ClawbackSettle;
   ClawbackSpec?: ClawbackSpec;
   ClearingStatus?: ClearingStatus;
   CliquetOption?: CliquetOption;
@@ -50561,7 +50553,8 @@ export interface PeFundWaterfallSpec {
   tranches: PeFundWaterfallTranche[];
 }
 /**
- * Clawback specification for GP carry reconciliation.
+ * Clawback specification for GP carry reconciliation, settled at fund end
+ * (the date of the last fund event).
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "ClawbackSpec".
@@ -50572,10 +50565,6 @@ export interface ClawbackSpec {
    * fraction in `[0, 1]` (`0.2` = 20%)
    */
   holdback_decimal?: number | null;
-  /**
-   * When to settle clawback
-   */
-  settle_on: "fund_end" | "periodic";
 }
 /**
  * Real estate asset valuation instrument.

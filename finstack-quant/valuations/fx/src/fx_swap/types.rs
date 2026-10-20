@@ -293,42 +293,6 @@ impl FxSwap {
             .build()
     }
 
-    /// Construct an FX swap from explicit broken near and far dates.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Instrument identifier.
-    /// * `base_currency` - Currency exchanged as the base leg.
-    /// * `quote_currency` - Currency exchanged as the quote leg.
-    /// * `near_date` - Explicit near-leg settlement date.
-    /// * `far_date` - Explicit far-leg settlement date.
-    /// * `notional` - Positive base-currency amount on both legs.
-    /// * `domestic_discount_curve_id` - Quote-currency discount curve.
-    /// * `foreign_discount_curve_id` - Base-currency discount curve.
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_broken_dates(
-        id: impl Into<InstrumentId>,
-        base_currency: Currency,
-        quote_currency: Currency,
-        near_date: Date,
-        far_date: Date,
-        notional: Money,
-        domestic_discount_curve_id: impl Into<CurveId>,
-        foreign_discount_curve_id: impl Into<CurveId>,
-    ) -> finstack_quant_core::Result<Self> {
-        Self::builder()
-            .id(id.into())
-            .base_currency(base_currency)
-            .quote_currency(quote_currency)
-            .near_date(near_date)
-            .far_date(far_date)
-            .notional(notional)
-            .domestic_discount_curve_id(domestic_discount_curve_id.into())
-            .foreign_discount_curve_id(foreign_discount_curve_id.into())
-            .attributes(Attributes::new())
-            .build()
-    }
-
     // Builder entrypoint is provided via derive
 
     fn single_cashflow_schedule(

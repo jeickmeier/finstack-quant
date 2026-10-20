@@ -1927,7 +1927,8 @@ export interface DB615D613Cb81Bc46Fa6E {
   tranches: D_40C29976C86Ef72069C6[];
 }
 /**
- * Clawback specification for GP carry reconciliation.
+ * Clawback specification for GP carry reconciliation, settled at fund end
+ * (the date of the last fund event).
  */
 export interface DEfbdfcaec74Cc53Cfacb {
   /**
@@ -1935,8 +1936,4 @@ export interface DEfbdfcaec74Cc53Cfacb {
    * fraction in `[0, 1]` (`0.2` = 20%)
    */
   holdback_decimal?: number | null;
-  /**
-   * When to settle clawback
-   */
-  settle_on: "fund_end" | "periodic";
 }

@@ -120,18 +120,6 @@ fn test_effective_notional_with_explicit_value() {
 }
 
 #[test]
-fn test_pair_name_generation() {
-    let eurusd = sample_eurusd();
-    assert_eq!(eurusd.pair_name(), "EURUSD");
-
-    let gbpusd = sample_gbpusd();
-    assert_eq!(gbpusd.pair_name(), "GBPUSD");
-
-    let usdjpy = sample_usdjpy();
-    assert_eq!(usdjpy.pair_name(), "USDJPY");
-}
-
-#[test]
 fn test_construction_with_various_currencies() {
     let pairs = vec![
         (Currency::EUR, Currency::USD, "EURUSD"),
@@ -145,7 +133,6 @@ fn test_construction_with_various_currencies() {
         let fx = FxSpot::new(InstrumentId::new(expected_name), base, quote);
         assert_eq!(fx.base_currency, base);
         assert_eq!(fx.quote_currency, quote);
-        assert_eq!(fx.pair_name(), expected_name);
     }
 }
 

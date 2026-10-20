@@ -116,15 +116,6 @@ impl NdfFixingSource {
             NdfFixingSource::Other => None,
         }
     }
-
-    /// Get the typical fixing offset (business days before settlement).
-    /// Most NDFs fix T-2, but some (KRW, PHP) fix T-1.
-    pub fn typical_fixing_offset(&self) -> i64 {
-        match self {
-            NdfFixingSource::Kftc | NdfFixingSource::PhpBval => 1, // KRW/PHP fix T-1
-            _ => 2,                                                // Most currencies fix T-2
-        }
-    }
 }
 
 impl std::fmt::Display for NdfFixingSource {
@@ -651,43 +642,6 @@ impl Ndf {
             .build()
     }
 
-    /// Construct an NDF from explicit broken fixing and maturity dates.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Instrument identifier.
-    /// * `base_currency` - Restricted currency underlying the fixing.
-    /// * `settlement_currency` - Convertible payout currency.
-    /// * `fixing_date` - Explicit contractual fixing date.
-    /// * `maturity` - Explicit cash-settlement date.
-    /// * `notional` - Positive base-currency notional.
-    /// * `contract_rate` - Positive contractual NDF rate.
-    /// * `domestic_discount_curve_id` - Settlement-currency discount curve.
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_broken_dates(
-        id: impl Into<InstrumentId>,
-        base_currency: Currency,
-        settlement_currency: Currency,
-        fixing_date: Date,
-        maturity: Date,
-        notional: Money,
-        contract_rate: f64,
-        domestic_discount_curve_id: impl Into<CurveId>,
-    ) -> finstack_quant_core::Result<Self> {
-        Self::builder()
-            .id(id.into())
-            .base_currency(base_currency)
-            .settlement_currency(settlement_currency)
-            .fixing_date(fixing_date)
-            .maturity(maturity)
-            .notional(notional)
-            .contract_rate(contract_rate)
-            .domestic_discount_curve_id(domestic_discount_curve_id.into())
-            .quote_convention(NdfQuoteConvention::BasePerSettlement)
-            .attributes(Attributes::new())
-            .build()
-    }
-
     /// Set the observed fixing rate (transitions NDF to post-fixing mode).
     ///
     /// # Errors
@@ -699,11 +653,6 @@ impl Ndf {
         Self::validate_rate("observed_fixing", observed_fixing)?;
         self.observed_fixing = Some(observed_fixing);
         Ok(self)
-    }
-
-    /// Check if NDF is in post-fixing mode.
-    pub fn is_fixed(&self) -> bool {
-        self.observed_fixing.is_some()
     }
 
     /// Estimate the forward rate when in pre-fixing mode.
@@ -1143,18 +1092,6 @@ mod tests {
             Some(Currency::BRL)
         );
         assert_eq!(NdfFixingSource::Other.typical_currency(), None);
-    }
-
-    #[test]
-    fn test_ndf_fixing_source_typical_fixing_offset() {
-        // Most currencies fix T-2
-        assert_eq!(NdfFixingSource::Pboc.typical_fixing_offset(), 2);
-        assert_eq!(NdfFixingSource::Rbi.typical_fixing_offset(), 2);
-        assert_eq!(NdfFixingSource::Ptax.typical_fixing_offset(), 2);
-
-        // KRW and PHP fix T-1
-        assert_eq!(NdfFixingSource::Kftc.typical_fixing_offset(), 1);
-        assert_eq!(NdfFixingSource::PhpBval.typical_fixing_offset(), 1);
     }
 
     #[test]
