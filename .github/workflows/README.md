@@ -36,10 +36,10 @@ parallel, and SonarQube runs after all three test jobs:
 | --- | --- | --- |
 | Supply-chain Security | `mise run all-audit` | `cargo deny check` (advisories, licenses, bans), then OSV-Scanner over `Cargo.lock`, `uv.lock` and `finstack-quant-wasm/package-lock.json`, filtered by `osv-scanner.toml`. |
 | Lint | `mise run pre-commit-run`, then `mise run gen-check` | `SKIP: cargo-deny,osv-scanner`, which the supply-chain job owns. Clippy covers lib/bins/tests/examples (`--all-features`), not Criterion benches. |
-| Test Rust | `mise run rust-test --coverage` | The fast nextest lib and integration targets under `cargo llvm-cov` (no doctests, no `#[ignore]`d tests); uploads `coverage/rust/lcov.info`. |
-| Test Python | `mise run python-test --coverage` | maturin dev build, then the fast pytest suite (`-m 'not slow and not doctest'`) with coverage; uploads `coverage/python/coverage.xml`. |
-| Test WASM | `mise run wasm-test` | wasm-bindgen tests plus the Node facade suite and JSDoc sync check (the documented code samples run under `--doctest`). |
-| SonarQube | `SonarSource/sonarqube-scan-action` | `master` only, so it is skipped inside a release run. Scan only: it imports the two coverage artifacts and runs no tests and no clippy (`sonar.rust.clippy.enabled=false`; Lint owns clippy). |
+| Test Rust | `mise run rust-test --coverage` | The fast nextest lib and integration targets under `cargo llvm-cov` (no doctests, no `#[ignore]`d tests); writes a Job Summary from nextest's `junit.xml` and `coverage/rust/lcov.info`, and uploads `coverage/rust/lcov.info`. |
+| Test Python | `mise run python-test --coverage` | maturin dev build, then the fast pytest suite (`-m 'not slow and not doctest'`) with coverage; writes a Job Summary from `coverage/python/{junit.xml,coverage.xml}` and uploads `coverage/python/coverage.xml`. |
+| Test WASM | `mise run wasm-test` | wasm-bindgen tests plus the Node facade suite and JSDoc sync check (the documented code samples run under `--doctest`); writes a Job Summary of the test results. |
+| SonarQube | `SonarSource/sonarqube-scan-action` | `master` only, so it is skipped inside a release run. Scan only: it imports the two coverage artifacts, runs no tests and no clippy (`sonar.rust.clippy.enabled=false`; Lint owns clippy), and writes the Quality Gate and project measures to the Job Summary. |
 
 Three details worth knowing before editing:
 
