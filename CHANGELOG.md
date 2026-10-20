@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Statements: one path per capability
+
+#### Changed
+
+- `Evaluator::evaluate_prepared` evaluates a model's capital structure exactly as `Evaluator::evaluate` does (an empty market as of the first period's start), so prepared evaluation now yields `cs_cashflows` and `cs.*` values. Before, it skipped the capital structure.
+- `ModelBuilder::with_builtin_metrics` no longer overwrites a node the model already defines with the same id.
+- `ModelBuilder` has no `NeedPeriods`/`Ready` type-state. `periods` returns `Result<Self>`, a second `periods` call fails with "Periods already set", and `build` fails when no timeline was set. `FinancialModelSpec::builder` is removed (Python `.builder`, WASM `financialModelBuilder`); `ModelBuilder::new` is the one entry point.
+- The statements-analytics entry points take the names the bindings already used: `run_sensitivity`, `run_variance`, `variance_bridge`, `explain_formula`, `render_check_report_text`/`_html`, `evaluate_dcf` (was `evaluate_dcf_with_market`). The engine structs behind them are private.
+- `dcf_sensitivity` takes no market argument (Rust, Python and WASM).
+- Each statements and statements-analytics item has one public path: internal modules (`checks::{suite,traits,types,helpers}`, `dsl::{ast,compiler,parser}`, `capital_structure::waterfall`, `registry::dynamic`, `evaluator::formula`, `adjustments::{engine,types}`, `forecast`, and the analysis submodules) are private, with their public items re-exported at the parent. `NormalizationEngine` is replaced by `adjustments::normalize` and `adjustments::merge_into_results`.
+
+#### Removed
+
+- Wire fields, variants and types that had no effect: `DcfOptions.discount_curve_id`, `VarianceRow.driver_contribution`, `EvalWarning::NaNPropagated`, `EclRequest`, `EclStageRequest`, `ExposureEclResult` and the `ecl::portfolio` module, and the toggled-PIK interest path in `calculate_period_flows`.
+- Forwarders and dead analysis API: `EclEngine`, the `config()` accessors, the comps `extract_metric`/`subject_metric` and `Multiple::is_*`/`label`, the analysis `forecast_covenant` forwarder, `VarianceReport::to_table`/`is_empty`, and `statements::formula`.
+- Python `normalize_json` and WASM `normalizeJson`; Python `explain_formula_text`, `pl_summary_report_text` and `validate_scorecard_config`.
+- The 20 WASM constructor functions that only built a plain object (`forecastSpec*`, `adjustment*`, `terminalValueSpec*`, `sensitivityConfigAddParameter`). Pass the object literal instead, e.g. `{ method: 'growth_pct', params: { rate: 0.05 } }`.
+
 ### Statements: scenario forecast overrides, rollups, capital-structure scenarios
 
 #### Added

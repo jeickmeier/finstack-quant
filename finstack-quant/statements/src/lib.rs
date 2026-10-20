@@ -76,7 +76,6 @@
 //! `CreditScorecardExtension`) live in the `finstack-quant-statements-analytics`
 //! crate.
 
-/// Normalization engine and add-back tracking for adjusted metrics.
 pub mod adjustments;
 /// Type-safe model builder API.
 pub mod builder;
