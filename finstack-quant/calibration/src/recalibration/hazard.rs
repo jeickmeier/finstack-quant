@@ -239,13 +239,8 @@ pub(crate) fn hazard_with_deal_quote_override(
         Pillar::Date(deal_override.contract_end),
         deal_override.spread_bp,
     );
-    let build_ctx = crate::build::BuildCtx::new(
-        hazard.base_date(),
-        1.0,
-        finstack_quant_core::HashMap::default(),
-    );
     let contractual_pillar =
-        crate::build::cds::resolve_cds_quote_dates(&deal_quote, &build_ctx)?.maturity;
+        crate::build::cds::cds_pillar_maturity(hazard.base_date(), deal_quote.pillar())?;
     let contractual_time = hazard.day_count().year_fraction(
         hazard.base_date(),
         contractual_pillar,
