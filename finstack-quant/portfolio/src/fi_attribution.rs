@@ -132,8 +132,8 @@
 //!   [`campisi_carino_link`]. `docs/REFERENCES.md#carino-1999`
 
 use crate::brinson::{
-    carino_link_effects, check_active_return_identity, check_net_weight, check_weights_sum,
-    CarinoPeriod, ScaledL1Norm,
+    carino_link_effects, check_identical_rows, check_net_weight, check_weights_sum,
+    validate_link_period, CarinoPeriod, LinkPeriod,
 };
 use crate::error::{Error, Result};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
@@ -751,135 +751,6 @@ pub struct FiCarinoLinkedResult {
     pub linked_selection: f64,
 }
 
-/// Validate one externally reachable single-period result before linking.
-fn validate_campisi_link_period(period: &FiAttributionResult, index: usize) -> Result<()> {
-    for (name, value) in [
-        ("portfolio_return", period.portfolio_return),
-        ("benchmark_return", period.benchmark_return),
-        ("active_return", period.active_return),
-        ("total_allocation", period.total_allocation),
-        ("total_active_carry", period.total_active_carry),
-        ("total_active_treasury", period.total_active_treasury),
-        ("total_active_spread", period.total_active_spread),
-        ("total_selection", period.total_selection),
-    ] {
-        if !value.is_finite() {
-            return Err(Error::invalid_input(format!(
-                "Campisi Carino period[{index}].{name} must be finite (got {value})"
-            )));
-        }
-    }
-
-    check_active_return_identity(
-        "Campisi",
-        index,
-        period.portfolio_return,
-        period.benchmark_return,
-        period.active_return,
-    )?;
-
-    const N_EFFECTS: usize = 5;
-    let mut sector_totals = [NeumaierAccumulator::new(); N_EFFECTS];
-    let mut effect_l1 = ScaledL1Norm::default();
-    for (sector_index, sector) in period.sectors.iter().enumerate() {
-        if !sector.total_active.is_finite() {
-            return Err(Error::invalid_input(format!(
-                "Campisi Carino period[{index}].sectors[{sector_index}] '{}' field total_active \
-                 must be finite (got {})",
-                sector.sector, sector.total_active
-            )));
-        }
-        let mut sector_sum = NeumaierAccumulator::new();
-        let mut sector_l1 = ScaledL1Norm::default();
-        for (effect_index, (name, value)) in [
-            ("allocation", sector.allocation),
-            ("active_carry", sector.active_carry),
-            ("active_treasury", sector.active_treasury),
-            ("active_spread", sector.active_spread),
-            ("selection", sector.selection),
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            if !value.is_finite() {
-                return Err(Error::invalid_input(format!(
-                    "Campisi Carino period[{index}].sectors[{sector_index}] '{}' field {name} \
-                     must be finite (got {value})",
-                    sector.sector
-                )));
-            }
-            sector_totals[effect_index].add(value);
-            sector_sum.add(value);
-            sector_l1.add(value);
-            effect_l1.add(value);
-        }
-        let actual_total = sector_sum.total();
-        let sector_residual = actual_total - sector.total_active;
-        if !sector_residual.is_finite() {
-            return Err(Error::invalid_input(format!(
-                "Campisi Carino period[{index}].sectors[{sector_index}] '{}' total_active \
-                 reconciliation residual must be finite",
-                sector.sector
-            )));
-        }
-        let sector_tolerance = sector_l1.tolerance();
-        if sector_residual.abs() > sector_tolerance {
-            return Err(Error::invalid_input(format!(
-                "Campisi Carino period[{index}].sectors[{sector_index}] '{}' total_active {} \
-                 does not reconcile to its five effects sum {actual_total} within scale-aware \
-                 tolerance {sector_tolerance}",
-                sector.sector, sector.total_active
-            )));
-        }
-    }
-    let tolerance = effect_l1.tolerance();
-
-    let declared_totals = [
-        ("total_allocation", period.total_allocation),
-        ("total_active_carry", period.total_active_carry),
-        ("total_active_treasury", period.total_active_treasury),
-        ("total_active_spread", period.total_active_spread),
-        ("total_selection", period.total_selection),
-    ];
-    let mut declared_sum = NeumaierAccumulator::new();
-    for ((name, declared), sector_total) in declared_totals.into_iter().zip(sector_totals) {
-        let actual = sector_total.total();
-        let residual = actual - declared;
-        if !residual.is_finite() {
-            return Err(Error::invalid_input(format!(
-                "Campisi Carino period[{index}] {name} reconciliation residual must be finite"
-            )));
-        }
-        if residual.abs() > tolerance {
-            return Err(Error::invalid_input(format!(
-                "Campisi Carino period[{index}] sector effects sum to {actual} for {name}, \
-                 which does not reconcile to the declared total {declared} within scale-aware \
-                 tolerance {tolerance} (scaled L1 effect scale {}, normalized L1 sum {})",
-                effect_l1.scale, effect_l1.normalized_sum
-            )));
-        }
-        declared_sum.add(declared);
-    }
-
-    let effect_total = declared_sum.total();
-    let reconciliation_residual = effect_total - period.active_return;
-    if !reconciliation_residual.is_finite() {
-        return Err(Error::invalid_input(format!(
-            "Campisi Carino period[{index}] effect reconciliation residual must be finite"
-        )));
-    }
-    if reconciliation_residual.abs() > tolerance {
-        return Err(Error::invalid_input(format!(
-            "Campisi Carino period[{index}] effect totals sum to {effect_total}, which does not \
-             reconcile to active_return {} within scale-aware tolerance {tolerance} \
-             (scaled L1 effect scale {}, normalized L1 sum {})",
-            period.active_return, effect_l1.scale, effect_l1.normalized_sum,
-        )));
-    }
-
-    Ok(())
-}
-
 /// Apply Carino (1999) smoothing to per-period Campisi results so the five
 /// arithmetic effects reconstruct the geometrically compounded active return.
 ///
@@ -905,28 +776,57 @@ fn validate_campisi_link_period(period: &FiAttributionResult, index: usize) -> R
 ///   reconciliation residual is non-finite; or a return is at or below
 ///   −100 % (Carino domain, see [`crate::brinson::carino_link`]).
 pub fn campisi_carino_link(periods: &[FiAttributionResult]) -> Result<FiCarinoLinkedResult> {
-    let Some(first) = periods.first() else {
+    if periods.is_empty() {
         return Err(Error::invalid_input(
             "Campisi Carino linking requires at least one period",
         ));
-    };
-    let sector_names: Vec<String> = first.sectors.iter().map(|e| e.sector.clone()).collect();
-    for (idx, p) in periods.iter().enumerate().skip(1) {
-        let same_order = p.sectors.len() == sector_names.len()
-            && p.sectors
-                .iter()
-                .zip(sector_names.iter())
-                .all(|(e, n)| e.sector == *n);
-        if !same_order {
-            return Err(Error::invalid_input(format!(
-                "Campisi Carino linking requires identical sector ordering across all periods \
-                 (period {idx} differs from period 0)"
-            )));
-        }
     }
-
+    check_identical_rows(
+        "Campisi",
+        periods
+            .iter()
+            .map(|p| p.sectors.iter().map(|e| e.sector.as_str())),
+    )?;
     for (index, p) in periods.iter().enumerate() {
-        validate_campisi_link_period(p, index)?;
+        validate_link_period(&LinkPeriod {
+            method: "Campisi",
+            index,
+            portfolio_return: p.portfolio_return,
+            benchmark_return: p.benchmark_return,
+            active_return: p.active_return,
+            totals: [
+                ("total_allocation", p.total_allocation),
+                ("total_active_carry", p.total_active_carry),
+                ("total_active_treasury", p.total_active_treasury),
+                ("total_active_spread", p.total_active_spread),
+                ("total_selection", p.total_selection),
+            ],
+            rows: p
+                .sectors
+                .iter()
+                .map(|e| {
+                    (
+                        e.sector.as_str(),
+                        [
+                            e.allocation,
+                            e.active_carry,
+                            e.active_treasury,
+                            e.active_spread,
+                            e.selection,
+                        ],
+                        e.total_active,
+                    )
+                })
+                .collect(),
+            effect_names: [
+                "allocation",
+                "active_carry",
+                "active_treasury",
+                "active_spread",
+                "selection",
+            ],
+            row_total_name: "total_active",
+        })?;
     }
 
     const N_EFFECTS: usize = 5;
@@ -951,6 +851,11 @@ pub fn campisi_carino_link(periods: &[FiAttributionResult]) -> Result<FiCarinoLi
         })
         .collect();
     let linked = carino_link_effects(&effect_periods)?;
+    let sector_names: Vec<String> = periods[0]
+        .sectors
+        .iter()
+        .map(|e| e.sector.clone())
+        .collect();
 
     let mut linked_sectors = Vec::with_capacity(sector_names.len());
     let mut totals = [NeumaierAccumulator::new(); N_EFFECTS];
@@ -1885,7 +1790,7 @@ mod tests {
         let err = campisi_carino_link(&[period])
             .expect_err("declared sector total must reconcile to its five effects");
         assert!(
-            err.to_string().contains("total_active") && err.to_string().contains("five effects"),
+            err.to_string().contains("total_active") && err.to_string().contains("5 effects"),
             "{err}"
         );
     }

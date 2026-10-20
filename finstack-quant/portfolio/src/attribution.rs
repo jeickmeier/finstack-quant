@@ -5,7 +5,7 @@
 
 use crate::error::{Error, Result};
 #[cfg(not(target_arch = "wasm32"))]
-use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
+use crate::evaluation::try_map_positions;
 use crate::evaluation::{
     supported_metrics, EvaluationProfile, PortfolioEvaluationPlan, PositionExecution,
 };
@@ -406,15 +406,17 @@ fn attribute_composite_primitives(
             .map_err(Error::Core)?
         };
         primitive.scale(exposure.quantity)?;
-        translate_primitive_attribution(
+        let opening_value = Money::new(value_t0.amount() * exposure.quantity, value_t0.currency())?;
+        finstack_quant_attribution::translate_to_target_currency(
             &mut primitive,
-            value_t0.amount() * exposure.quantity,
+            opening_value,
+            reporting_currency,
             market_t0,
             market_t1,
             as_of_t0,
             as_of_t1,
-            reporting_currency,
-        )?;
+        )
+        .map_err(Error::Core)?;
         add_primitive_attribution(&mut aggregate, primitive)?;
     }
 
@@ -426,89 +428,8 @@ fn attribute_composite_primitives(
     Ok(aggregate)
 }
 
-fn translate_primitive_attribution(
-    attribution: &mut PnlAttribution,
-    opening_value: f64,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    as_of_t0: Date,
-    as_of_t1: Date,
-    reporting_currency: Currency,
-) -> Result<()> {
-    let native_currency = attribution.total_pnl.currency();
-    let rate_t0 = crate::fx::convert_to_base(
-        Money::from((1_i64, native_currency)),
-        as_of_t0,
-        market_t0,
-        reporting_currency,
-    )?
-    .amount();
-    let rate_t1 = crate::fx::convert_to_base(
-        Money::from((1_i64, native_currency)),
-        as_of_t1,
-        market_t1,
-        reporting_currency,
-    )?
-    .amount();
-    let principal_translation = opening_value * (rate_t1 - rate_t0);
-    attribution.total_pnl = translated(attribution.total_pnl, rate_t1, reporting_currency)?;
-    attribution.total_pnl = Money::new(
-        attribution.total_pnl.amount() + principal_translation,
-        reporting_currency,
-    )?;
-    attribution.mark_to_market_pnl = attribution
-        .mark_to_market_pnl
-        .map(|value| {
-            Money::new(
-                value.amount() * rate_t1 + principal_translation,
-                reporting_currency,
-            )
-        })
-        .transpose()?;
-    attribution.fx_translation_pnl = Money::new(
-        attribution.fx_translation_pnl.amount() * rate_t1 + principal_translation,
-        reporting_currency,
-    )?;
-    // Endpoints travel at their own date's FX, so their difference stays the
-    // translated mark-to-market P&L above.
-    attribution.pv_t0 = attribution
-        .pv_t0
-        .map(|value| translated(value, rate_t0, reporting_currency))
-        .transpose()?;
-    attribution.pv_t1 = attribution
-        .pv_t1
-        .map(|value| translated(value, rate_t1, reporting_currency))
-        .transpose()?;
-    attribution.residual = translated(attribution.residual, rate_t1, reporting_currency)?;
-    attribution.carry_detail = None;
-    attribution.rates_detail = None;
-    attribution.credit_detail = None;
-    attribution.inflation_detail = None;
-    attribution.correlations_detail = None;
-    attribution.fx_detail = None;
-    attribution.vol_detail = None;
-    attribution.cross_factor_detail = None;
-    attribution.model_params_detail = None;
-    attribution.scalars_detail = None;
-    attribution.credit_factor_detail = None;
-    attribution.credit_carry_decomposition = None;
-    // A composite has no single step sequence; primitive step rows are dropped
-    // with the other per-primitive detail.
-    attribution.waterfall_steps.clear();
-    attribution.sensitivity_steps.clear();
-    attribution.for_each_money_mut(|money| {
-        *money = translated(*money, rate_t1, reporting_currency)?;
-        Ok(())
-    })?;
-    Ok(())
-}
-
-fn translated(value: Money, rate: f64, currency: Currency) -> finstack_quant_core::Result<Money> {
-    Money::new(value.amount() * rate, currency)
-}
-
 fn add_money(target: &mut Money, source: Money) -> finstack_quant_core::Result<()> {
-    *target = Money::new(target.amount() + source.amount(), target.currency())?;
+    *target = target.checked_add(source)?;
     Ok(())
 }
 
@@ -557,6 +478,9 @@ fn add_primitive_attribution(
         primitive.fx_translation_pnl,
     )?;
     aggregate.result_invalid |= primitive.result_invalid;
+    if aggregate.meta.fx_policy.is_none() {
+        aggregate.meta.fx_policy = primitive.meta.fx_policy;
+    }
     aggregate.meta.num_repricings += primitive.meta.num_repricings;
     aggregate.meta.notes.extend(primitive.meta.notes);
     Ok(())
@@ -803,24 +727,7 @@ pub(crate) fn reduce_prepared(
             })
         };
 
-    #[cfg(not(target_arch = "wasm32"))]
-    let position_results: Vec<Result<PositionAttributionData>> =
-        if portfolio.positions.len() >= POSITION_PARALLEL_MIN_POSITIONS {
-            use rayon::prelude::*;
-            portfolio
-                .positions
-                .par_iter()
-                .map(reduce_position)
-                .collect()
-        } else {
-            portfolio.positions.iter().map(reduce_position).collect()
-        };
-
-    #[cfg(target_arch = "wasm32")]
-    let position_results: Vec<Result<PositionAttributionData>> =
-        portfolio.positions.iter().map(reduce_position).collect();
-
-    let position_data = position_results.into_iter().collect::<Result<Vec<_>>>()?;
+    let position_data = try_map_positions(&portfolio.positions, reduce_position)?;
 
     aggregate_position_attributions(
         portfolio,
@@ -1198,6 +1105,96 @@ mod tests {
             .notes
             .iter()
             .any(|note| note.contains("frozen primitive")));
+        Ok(())
+    }
+
+    /// A foreign-currency primitive is translated into the composite's
+    /// reporting currency with factors at T1 FX plus the opening-value FX move,
+    /// and the composite records the FX policy it applied.
+    #[test]
+    fn composite_attribution_translates_foreign_primitives() -> Result<()> {
+        use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+
+        let spec = CompositeSpec::new(
+            "EUR-BASKET",
+            Currency::USD,
+            Money::from((100_i64, Currency::USD)),
+            vec![
+                CompositeLegSpec::new(
+                    "E",
+                    finstack_quant_valuations::instruments::InstrumentJson::Equity(
+                        finstack_quant_valuations::instruments::Equity::new(
+                            "E",
+                            "E",
+                            Currency::EUR,
+                        )
+                        .with_spot_id("E"),
+                    ),
+                    1.0,
+                ),
+                // A flat-price USD leg: no P&L, no translation.
+                CompositeLegSpec::new(
+                    "U",
+                    finstack_quant_valuations::instruments::InstrumentJson::Equity(
+                        finstack_quant_valuations::instruments::Equity::new(
+                            "U",
+                            "U",
+                            Currency::USD,
+                        )
+                        .with_spot_id("U"),
+                    ),
+                    1.0,
+                ),
+            ],
+            WeightingMethod::FixedQuantity,
+            RebalanceRule::Manual,
+        );
+        let composite = spec.initialize_fixed(date!(2025 - 01 - 01))?.instrument;
+        let portfolio = Portfolio::builder("PORTFOLIO")
+            .base_currency(Currency::USD)
+            .as_of(date!(2025 - 01 - 01))
+            .entity(Entity::new("ENTITY"))
+            .position(Position::new(
+                "P-EUR",
+                "ENTITY",
+                "EUR-BASKET",
+                Arc::new(composite),
+                2.0,
+                PositionUnit::Units,
+            )?)
+            .build()?;
+        let market = |spot: f64, eur_usd: f64| -> Result<MarketContext> {
+            let provider = Arc::new(SimpleFxProvider::new());
+            provider.set_quote(Currency::EUR, Currency::USD, eur_usd)?;
+            Ok(MarketContext::new()
+                .insert_price("E", MarketScalar::Unitless(spot))
+                .insert_price("U", MarketScalar::Unitless(50.0))
+                .insert_fx(FxMatrix::new(provider)))
+        };
+
+        let attribution = attribute_portfolio_pnl(
+            &portfolio,
+            &market(100.0, 1.1)?,
+            &market(110.0, 1.2)?,
+            date!(2025 - 01 - 01),
+            date!(2025 - 01 - 02),
+            &FinstackConfig::default(),
+            AttributionMethod::Parallel,
+        )?;
+        let position = attribution
+            .by_position
+            .get("P-EUR")
+            .ok_or_else(|| Error::validation("missing composite attribution"))?;
+        // Per unit: 10 EUR × 1.2 + 100 EUR × (1.2 − 1.1) = 22 USD; two units held.
+        assert_eq!(position.total_pnl.currency(), Currency::USD);
+        assert!((position.total_pnl.amount() - 44.0).abs() < 1.0e-9);
+        assert!((position.fx_translation_pnl.amount() - 20.0).abs() < 1.0e-9);
+        let fx_policy = position
+            .meta
+            .fx_policy
+            .as_ref()
+            .ok_or_else(|| Error::validation("composite FX policy not stamped"))?;
+        assert_eq!(fx_policy.target_currency, Some(Currency::USD));
         Ok(())
     }
 

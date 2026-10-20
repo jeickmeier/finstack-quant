@@ -763,9 +763,8 @@ impl<'a> CreditExposureMatrix<'a> {
         }
 
         let (up, down) = self.bump_contexts.get(curve_id, bump_size)?;
-        let pv_up = crate::sensitivity::raw_pv_in_base(instrument, up, as_of, self.base_currency)?;
-        let pv_down =
-            crate::sensitivity::raw_pv_in_base(instrument, down, as_of, self.base_currency)?;
+        let pv_up = crate::fx::raw_pv_in_base(instrument, up, as_of, self.base_currency)?;
+        let pv_down = crate::fx::raw_pv_in_base(instrument, down, as_of, self.base_currency)?;
         if !pv_up.is_finite() || !pv_down.is_finite() {
             return Err(Error::invalid_input(format!(
                 "non-finite bumped credit PV for position {position_index} on curve '{curve_id}' (up = {pv_up}, down = {pv_down})"

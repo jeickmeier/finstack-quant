@@ -319,11 +319,9 @@ impl FactorModel {
                         position.position_id
                     ))
                 })?;
-            let base_value = base_endpoint.amount;
-            let stressed_value = stressed_endpoint.amount;
             position_pnl.push((
                 position.position_id.clone(),
-                (stressed_value - base_value) * position.scale_factor(),
+                (stressed_endpoint - base_endpoint) * position.scale_factor(),
             ));
         }
 

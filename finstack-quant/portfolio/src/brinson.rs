@@ -305,80 +305,38 @@ pub fn carino_link(periods: &[BrinsonPeriodResult]) -> Result<CarinoLinkedAttrib
         ));
     }
 
-    for period in periods {
-        let mut sums = [NeumaierAccumulator::new(); 3];
-        for sector in &period.sectors {
-            let effects = [sector.allocation, sector.selection, sector.interaction];
-            let mut effect_sum = NeumaierAccumulator::new();
-            for effect in effects {
-                effect_sum.add(effect);
-            }
-            let expected = effect_sum.total();
-            if effects.iter().any(|value| !value.is_finite())
-                || !sector.total.is_finite()
-                || !expected.is_finite()
-                || (sector.total - expected).abs()
-                    > 3e-10
-                        * effects
-                            .iter()
-                            .map(|value| value.abs())
-                            .fold(1.0_f64, f64::max)
-            {
-                return Err(Error::invalid_input(
-                    "Brinson sector effects must be finite and reconcile to the sector total",
-                ));
-            }
-            for (sum, effect) in sums.iter_mut().zip(effects) {
-                sum.add(effect);
-            }
-        }
-        let totals = [
-            period.total_allocation,
-            period.total_selection,
-            period.total_interaction,
-        ];
-        let reconstructed = sums.iter().map(|sum| sum.total()).sum::<f64>();
-        let expected = period.portfolio_return - period.benchmark_return;
-        let scale = totals
+    check_identical_rows(
+        "Brinson",
+        periods
             .iter()
-            .map(|value| value.abs())
-            .fold(1.0_f64, f64::max)
-            .max(expected.abs());
-        let tolerance = 1e-10 * scale;
-        if !expected.is_finite()
-            || !period.total_excess_return.is_finite()
-            || !reconstructed.is_finite()
-            || sums.iter().zip(totals).any(|(sum, total)| {
-                !total.is_finite()
-                    || !sum.total().is_finite()
-                    || (sum.total() - total).abs() > tolerance
-            })
-            || (period.total_excess_return - expected).abs() > tolerance
-            || (reconstructed - expected).abs() > tolerance
-        {
-            return Err(Error::invalid_input("Brinson period effects must be finite and reconcile to portfolio minus benchmark return"));
-        }
-    }
-
-    // Enforce consistent sector ordering so summing per-sector across
-    // periods is well-defined.
-    let sector_names: Vec<String> = periods[0]
-        .sectors
-        .iter()
-        .map(|e| e.sector.clone())
-        .collect();
-    for (idx, p) in periods.iter().enumerate().skip(1) {
-        if p.sectors.len() != sector_names.len()
-            || !p
+            .map(|p| p.sectors.iter().map(|e| e.sector.as_str())),
+    )?;
+    for (index, p) in periods.iter().enumerate() {
+        validate_link_period(&LinkPeriod {
+            method: "Brinson",
+            index,
+            portfolio_return: p.portfolio_return,
+            benchmark_return: p.benchmark_return,
+            active_return: p.total_excess_return,
+            totals: [
+                ("total_allocation", p.total_allocation),
+                ("total_selection", p.total_selection),
+                ("total_interaction", p.total_interaction),
+            ],
+            rows: p
                 .sectors
                 .iter()
-                .zip(sector_names.iter())
-                .all(|(e, n)| e.sector == *n)
-        {
-            return Err(Error::invalid_input(format!(
-                "Carino linking requires identical sector ordering across all periods (period {idx} differs from period 0)"
-            )));
-        }
+                .map(|e| {
+                    (
+                        e.sector.as_str(),
+                        [e.allocation, e.selection, e.interaction],
+                        e.total,
+                    )
+                })
+                .collect(),
+            effect_names: ["allocation", "selection", "interaction"],
+            row_total_name: "total",
+        })?;
     }
 
     let effect_periods: Vec<CarinoPeriod<3>> = periods
@@ -394,6 +352,11 @@ pub fn carino_link(periods: &[BrinsonPeriodResult]) -> Result<CarinoLinkedAttrib
         })
         .collect();
     let linked = carino_link_effects(&effect_periods)?;
+    let sector_names: Vec<String> = periods[0]
+        .sectors
+        .iter()
+        .map(|e| e.sector.clone())
+        .collect();
 
     let mut linked_sectors = Vec::with_capacity(sector_names.len());
     let mut sum_alloc = NeumaierAccumulator::new();
@@ -681,6 +644,189 @@ pub(crate) fn check_net_weight(
 /// L1 effect norm so valid single-period outputs are not rejected solely
 /// because cancellation amplified floating-point noise.
 const LINK_RECONCILIATION_RELATIVE_TOLERANCE: f64 = 1e-10;
+/// One single-period attribution result, viewed for Carino-link validation.
+///
+/// Brinson, Campisi and grid linking all check an inbound period the same
+/// way before [`carino_link_effects`] scales it; only the effect names and
+/// whether per-row effects are linked differ.
+pub(crate) struct LinkPeriod<'a, const N: usize> {
+    /// Method label used in error messages (`"Brinson"`, `"Campisi"`, `"Grid"`).
+    pub(crate) method: &'a str,
+    /// Zero-based period index in the linked sequence.
+    pub(crate) index: usize,
+    /// Period portfolio return (decimal).
+    pub(crate) portfolio_return: f64,
+    /// Period benchmark return (decimal).
+    pub(crate) benchmark_return: f64,
+    /// Declared active return; must equal `portfolio_return - benchmark_return`.
+    pub(crate) active_return: f64,
+    /// Declared top-level effect totals, named for error messages.
+    pub(crate) totals: [(&'a str, f64); N],
+    /// Per-row `(label, effects, declared row total)`; empty when only the
+    /// top-level totals are linked.
+    pub(crate) rows: Vec<(&'a str, [f64; N], f64)>,
+    /// Per-row effect names, in the order of each row's effects array.
+    pub(crate) effect_names: [&'a str; N],
+    /// Field name of each row's declared total (`"total"`, `"total_active"`).
+    pub(crate) row_total_name: &'a str,
+}
+
+/// Validate one inbound period before Carino linking.
+///
+/// Checks that every consumed value is finite, the declared active return
+/// matches the return difference, each row's effects reconcile to its declared
+/// total, per-effect row sums reconcile to the declared totals, and the totals
+/// reconcile to the active return, all within the overflow-safe scale-aware
+/// tolerance of [`ScaledL1Norm`].
+///
+/// # Errors
+///
+/// [`Error::InvalidInput`] naming the failing period, row and field.
+pub(crate) fn validate_link_period<const N: usize>(period: &LinkPeriod<'_, N>) -> Result<()> {
+    let LinkPeriod { method, index, .. } = *period;
+    for (name, value) in [
+        ("portfolio_return", period.portfolio_return),
+        ("benchmark_return", period.benchmark_return),
+        ("active_return", period.active_return),
+    ] {
+        if !value.is_finite() {
+            return Err(Error::invalid_input(format!(
+                "{method} Carino linking requires finite period returns: \
+                 period[{index}].{name} must be finite (got {value})"
+            )));
+        }
+    }
+    for (name, value) in period.totals {
+        if !value.is_finite() {
+            return Err(Error::invalid_input(format!(
+                "{method} Carino period[{index}].{name} must be finite (got {value})"
+            )));
+        }
+    }
+    check_active_return_identity(
+        method,
+        index,
+        period.portfolio_return,
+        period.benchmark_return,
+        period.active_return,
+    )?;
+
+    let mut effect_l1 = ScaledL1Norm::default();
+    let mut row_totals = [NeumaierAccumulator::new(); N];
+    for (row_index, (label, effects, declared_total)) in period.rows.iter().enumerate() {
+        let total_name = period.row_total_name;
+        if !declared_total.is_finite() {
+            return Err(Error::invalid_input(format!(
+                "{method} Carino period[{index}].rows[{row_index}] '{label}' field \
+                 {total_name} must be finite (got {declared_total})"
+            )));
+        }
+        let mut row_sum = NeumaierAccumulator::new();
+        let mut row_l1 = ScaledL1Norm::default();
+        for ((name, value), total) in period.effect_names.iter().zip(effects).zip(&mut row_totals) {
+            if !value.is_finite() {
+                return Err(Error::invalid_input(format!(
+                    "{method} Carino period[{index}].rows[{row_index}] '{label}' field {name} \
+                     must be finite (got {value})"
+                )));
+            }
+            total.add(*value);
+            row_sum.add(*value);
+            row_l1.add(*value);
+            effect_l1.add(*value);
+        }
+        let actual = row_sum.total();
+        let residual = actual - declared_total;
+        let row_tolerance = row_l1.tolerance();
+        if !residual.is_finite() {
+            return Err(Error::invalid_input(format!(
+                "{method} Carino period[{index}].rows[{row_index}] '{label}' {total_name} \
+                 reconciliation residual must be finite"
+            )));
+        }
+        if residual.abs() > row_tolerance {
+            return Err(Error::invalid_input(format!(
+                "{method} Carino period[{index}].rows[{row_index}] '{label}' {total_name} \
+                 {declared_total} does not reconcile to its {N} effects sum {actual} within \
+                 scale-aware tolerance {row_tolerance}"
+            )));
+        }
+    }
+    if period.rows.is_empty() {
+        for (_, value) in period.totals {
+            effect_l1.add(value);
+        }
+    }
+    let tolerance = effect_l1.tolerance();
+
+    let mut declared_sum = NeumaierAccumulator::new();
+    for (index_in_totals, (name, declared)) in period.totals.into_iter().enumerate() {
+        if !period.rows.is_empty() {
+            let actual = row_totals[index_in_totals].total();
+            let residual = actual - declared;
+            if !residual.is_finite() {
+                return Err(Error::invalid_input(format!(
+                    "{method} Carino period[{index}] {name} reconciliation residual must be finite"
+                )));
+            }
+            if residual.abs() > tolerance {
+                return Err(Error::invalid_input(format!(
+                    "{method} Carino period[{index}] row effects sum to {actual} for {name}, \
+                     which does not reconcile to the declared total {declared} within \
+                     scale-aware tolerance {tolerance} (scaled L1 effect scale {}, normalized \
+                     L1 sum {})",
+                    effect_l1.scale, effect_l1.normalized_sum
+                )));
+            }
+        }
+        declared_sum.add(declared);
+    }
+
+    let effect_total = declared_sum.total();
+    let residual = effect_total - period.active_return;
+    if !residual.is_finite() {
+        return Err(Error::invalid_input(format!(
+            "{method} Carino period[{index}] effect reconciliation residual must be finite"
+        )));
+    }
+    if residual.abs() > tolerance {
+        return Err(Error::invalid_input(format!(
+            "{method} Carino period[{index}] effect totals sum to {effect_total}, which does \
+             not reconcile to active_return {} within scale-aware tolerance {tolerance} \
+             (scaled L1 effect scale {}, normalized L1 sum {})",
+            period.active_return, effect_l1.scale, effect_l1.normalized_sum
+        )));
+    }
+    Ok(())
+}
+
+/// Require every period to carry the same row labels in the same order, so
+/// summing per-row effects across periods is well-defined.
+///
+/// # Errors
+///
+/// [`Error::InvalidInput`] naming the first period whose labels differ from period 0.
+pub(crate) fn check_identical_rows<'a, I, L>(method: &str, periods: I) -> Result<()>
+where
+    I: IntoIterator<Item = L>,
+    L: IntoIterator<Item = &'a str>,
+{
+    let mut periods = periods.into_iter();
+    let Some(first) = periods.next() else {
+        return Ok(());
+    };
+    let first: Vec<&str> = first.into_iter().collect();
+    for (offset, labels) in periods.enumerate() {
+        if !labels.into_iter().eq(first.iter().copied()) {
+            return Err(Error::invalid_input(format!(
+                "{method} Carino linking requires identical sector ordering across all periods \
+                 (period {} differs from period 0)",
+                offset + 1
+            )));
+        }
+    }
+    Ok(())
+}
 
 /// Streaming L1 scale that avoids summing absolute values at their original
 /// magnitude.

@@ -2,8 +2,8 @@
 
 use crate::error::{Error, Result};
 #[cfg(not(target_arch = "wasm32"))]
-use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
-use crate::fx::convert_to_base;
+use crate::evaluation::try_map_positions;
+use crate::fx::{convert_to_base, spot_rate_to_base};
 use crate::position::Position;
 use crate::types::PositionId;
 use crate::Portfolio;
@@ -111,27 +111,11 @@ pub fn primitive_exposures(
     let report_position = |position: &Position| -> Result<PositionPrimitiveReport> {
         position_primitive_report(portfolio, position, market, metrics, &options)
     };
-    #[cfg(not(target_arch = "wasm32"))]
-    let per_position: Vec<Result<PositionPrimitiveReport>> =
-        if portfolio.positions().len() >= POSITION_PARALLEL_MIN_POSITIONS {
-            use rayon::prelude::*;
-            portfolio
-                .positions()
-                .par_iter()
-                .map(report_position)
-                .collect()
-        } else {
-            portfolio.positions().iter().map(report_position).collect()
-        };
-
-    #[cfg(target_arch = "wasm32")]
-    let per_position: Vec<Result<PositionPrimitiveReport>> =
-        portfolio.positions().iter().map(report_position).collect();
+    let per_position = try_map_positions(portfolio.positions(), report_position)?;
 
     let mut paths = Vec::new();
     let mut definitions = BTreeMap::<String, String>::new();
     for report in per_position {
-        let report = report?;
         for (instrument_id, definition) in report.definitions {
             register_definition(&mut definitions, &instrument_id, &definition)?;
         }
@@ -183,11 +167,11 @@ fn position_primitive_report(
                 market,
                 portfolio.base_currency,
             )?;
-            let fx_rate = reporting_fx_rate(
+            let fx_rate = spot_rate_to_base(
                 exposure.value.currency(),
-                portfolio.base_currency,
                 portfolio.as_of,
                 market,
+                portfolio.base_currency,
             )?;
             paths.push(PortfolioPrimitivePath {
                 position_id: position.position_id.clone(),
@@ -226,11 +210,11 @@ fn position_primitive_report(
         market,
         portfolio.base_currency,
     )?;
-    let fx_rate = reporting_fx_rate(
+    let fx_rate = spot_rate_to_base(
         result.value.currency(),
-        portfolio.base_currency,
         portfolio.as_of,
         market,
+        portfolio.base_currency,
     )?;
     Ok(PositionPrimitiveReport {
         definitions: vec![(instrument_id.clone(), definition.clone())],
@@ -267,15 +251,6 @@ fn register_definition(
             Ok(())
         }
     }
-}
-
-fn reporting_fx_rate(
-    from: Currency,
-    to: Currency,
-    as_of: finstack_quant_core::dates::Date,
-    market: &MarketContext,
-) -> Result<f64> {
-    Ok(convert_to_base(Money::from((1_i64, from)), as_of, market, to)?.amount())
 }
 
 fn aggregate_paths(

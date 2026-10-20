@@ -45,17 +45,13 @@ pub(crate) struct EvaluationInput<'a> {
     pub(crate) seed: Option<SelectiveSeed<'a>>,
 }
 
-#[derive(Clone, Copy)]
-pub(crate) struct RawPositionEndpoint {
-    pub(crate) amount: f64,
-}
-
 pub(crate) struct RawPortfolioEvaluation {
-    endpoints: Vec<RawPositionEndpoint>,
+    endpoints: Vec<f64>,
 }
 
 impl RawPortfolioEvaluation {
-    pub(crate) fn endpoint(&self, index: usize) -> Option<RawPositionEndpoint> {
+    /// Unscaled base-currency PV of the position at `index`.
+    pub(crate) fn endpoint(&self, index: usize) -> Option<f64> {
         self.endpoints.get(index).copied()
     }
 }
@@ -81,14 +77,13 @@ pub(crate) fn evaluate_portfolio(input: EvaluationInput<'_>) -> Result<Portfolio
         .map(|seed| (seed.reprice_indices.len(), seed.refresh_base_currency));
     let execution = resolve_execution(input.execution, position_count, selective_work);
 
-    let results = map_positions(
+    let position_values = map_positions(
         &input.portfolio.positions,
         input.seed.map(|seed| seed.reprice_indices),
         execution,
         |position| value_position(&input, position),
         |index, position| reuse_position(&input, index, position),
-    );
-    let position_values = collect_in_logical_order(results)?;
+    )?;
     assemble_valuation(position_values, input.portfolio, input.profile, input.as_of)
 }
 
@@ -108,17 +103,14 @@ pub(crate) fn evaluate_raw_portfolio(
     let selective_work = input.seed.map(|seed| (seed.reprice_indices.len(), false));
     let execution = resolve_execution(input.execution, position_count, selective_work);
 
-    let results = map_positions(
+    let endpoints = map_positions(
         &input.portfolio.positions,
         input.seed.map(|seed| seed.reprice_indices),
         execution,
         |position| raw_position_endpoint(&input, position),
         |index, position| reuse_raw_position(&input, index, position),
-    );
-
-    Ok(RawPortfolioEvaluation {
-        endpoints: collect_in_logical_order(results)?,
-    })
+    )?;
+    Ok(RawPortfolioEvaluation { endpoints })
 }
 
 fn resolve_execution(
@@ -154,14 +146,14 @@ fn resolve_execution(
 /// `reprice_indices` (all of them when `None`) and `reuse` the rest.
 ///
 /// Serial and parallel execution run the same per-position closure, so the
-/// result vector is identical for both.
+/// output and the reported (lowest-index) error are identical for both.
 fn map_positions<T: Send>(
     positions: &[Position],
     reprice_indices: Option<&[usize]>,
     execution: PositionExecution,
-    price: impl Fn(&Position) -> Result<T> + Sync,
-    reuse: impl Fn(usize, &Position) -> Result<T> + Sync,
-) -> Vec<Result<T>> {
+    price: impl Fn(&Position) -> Result<T> + Sync + Send,
+    reuse: impl Fn(usize, &Position) -> Result<T> + Sync + Send,
+) -> Result<Vec<T>> {
     let dirty_mask = reprice_indices.map(|indices| {
         let mut mask = vec![false; positions.len()];
         for index in indices {
@@ -171,7 +163,8 @@ fn map_positions<T: Send>(
         }
         mask
     });
-    let evaluate = |(index, position): (usize, &Position)| {
+    let evaluate = |index: usize| {
+        let position = &positions[index];
         if dirty_mask
             .as_ref()
             .is_none_or(|mask| mask.get(index).copied().unwrap_or(true))
@@ -182,23 +175,29 @@ fn map_positions<T: Send>(
         }
     };
 
-    #[cfg(not(target_arch = "wasm32"))]
     if execution == PositionExecution::Parallel {
-        use rayon::prelude::*;
-        return positions.par_iter().enumerate().map(evaluate).collect();
+        finstack_quant_core::parallel::try_map_ordered(0..positions.len(), evaluate)
+    } else {
+        (0..positions.len()).map(evaluate).collect()
     }
-    #[cfg(target_arch = "wasm32")]
-    let _ = execution;
-
-    positions.iter().enumerate().map(evaluate).collect()
 }
 
-fn collect_in_logical_order<T>(results: Vec<Result<T>>) -> Result<Vec<T>> {
-    let mut values = Vec::with_capacity(results.len());
-    for result in results {
-        values.push(result?);
+/// Map `items` in order on the Rayon pool once there are at least
+/// [`POSITION_PARALLEL_MIN_POSITIONS`] of them, serially below that (and on
+/// wasm32); the lowest-index error is returned either way.
+pub(crate) fn try_map_positions<T, R>(
+    items: &[T],
+    f: impl Fn(&T) -> Result<R> + Sync + Send,
+) -> Result<Vec<R>>
+where
+    T: Sync,
+    R: Send,
+{
+    if items.len() < POSITION_PARALLEL_MIN_POSITIONS {
+        items.iter().map(f).collect()
+    } else {
+        finstack_quant_core::parallel::try_map_ordered(items, f)
     }
-    Ok(values)
 }
 
 /// Value one position under the evaluation profile's metric and risk policy.
@@ -369,36 +368,29 @@ pub(crate) fn supported_metrics(
     instrument.applicable_metrics(menu, registry)
 }
 
-fn raw_position_endpoint(
-    input: &RawEvaluationInput<'_>,
-    position: &Position,
-) -> Result<RawPositionEndpoint> {
+fn raw_position_endpoint(input: &RawEvaluationInput<'_>, position: &Position) -> Result<f64> {
     // Preserve the historical factor-stress error taxonomy: raw pricing
     // failures remain their originating core/input/calibration variants.
-    let (amount, currency) = position
-        .instrument
-        .value_raw_with_currency(input.market, input.as_of)?;
+    let amount = crate::fx::raw_pv_in_base(
+        position.instrument.as_ref(),
+        input.market,
+        input.as_of,
+        input.portfolio.base_currency,
+    )?;
     if !amount.is_finite() {
         return Err(Error::validation(format!(
             "M-1: non-finite factor-stress PV for position '{}' ({amount})",
             position.position_id
         )));
     }
-    let amount = crate::fx::convert_to_base(
-        Money::new(amount, currency)?,
-        input.as_of,
-        input.market,
-        input.portfolio.base_currency,
-    )?
-    .amount();
-    Ok(RawPositionEndpoint { amount })
+    Ok(amount)
 }
 
 fn reuse_raw_position(
     input: &RawEvaluationInput<'_>,
     index: usize,
     position: &Position,
-) -> Result<RawPositionEndpoint> {
+) -> Result<f64> {
     input
         .seed
         .and_then(|seed| seed.prior.endpoint(index))

@@ -18,7 +18,7 @@
 
 use crate::error::{Error, Result};
 #[cfg(not(target_arch = "wasm32"))]
-use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
+use crate::evaluation::try_map_positions;
 use crate::types::{EntityId, PositionId};
 use crate::valuation::PortfolioValuation;
 use finstack_quant_core::currency::Currency;
@@ -325,34 +325,13 @@ pub fn aggregate_metrics(
             })
         };
 
-    #[cfg(not(target_arch = "wasm32"))]
-    let collected_results: Vec<Result<PositionMetricData>> =
-        if position_entries.len() >= POSITION_PARALLEL_MIN_POSITIONS {
-            use rayon::prelude::*;
-            position_entries
-                .par_iter()
-                .filter_map(|(position_id, position_value)| {
-                    collect_position((position_id, position_value))
-                })
-                .collect()
-        } else {
-            position_entries
-                .iter()
-                .filter_map(|(position_id, position_value)| {
-                    collect_position((position_id, position_value))
-                })
-                .collect()
-        };
-
-    #[cfg(target_arch = "wasm32")]
-    let collected_results: Vec<Result<PositionMetricData>> = position_entries
-        .iter()
-        .filter_map(|(position_id, position_value)| collect_position((position_id, position_value)))
-        .collect();
-
-    let collected = collected_results
+    let collected: Vec<PositionMetricData> =
+        try_map_positions(&position_entries, |&(position_id, position_value)| {
+            collect_position((position_id, position_value)).transpose()
+        })?
         .into_iter()
-        .collect::<Result<Vec<PositionMetricData>>>()?;
+        .flatten()
+        .collect();
 
     let mut metrics = aggregate_collected_metrics(collected);
     metrics

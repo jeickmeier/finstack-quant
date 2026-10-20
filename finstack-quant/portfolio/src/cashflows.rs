@@ -13,7 +13,7 @@
 
 use crate::error::{Error, Result};
 #[cfg(not(target_arch = "wasm32"))]
-use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
+use crate::evaluation::try_map_positions;
 use crate::types::PositionId;
 use crate::Portfolio;
 #[cfg(test)]
@@ -434,22 +434,9 @@ pub fn aggregate_full_cashflows(
         }
     };
 
-    #[cfg(not(target_arch = "wasm32"))]
-    let per_position: Vec<PositionCashflowResult> =
-        if portfolio.positions.len() >= POSITION_PARALLEL_MIN_POSITIONS {
-            use rayon::prelude::*;
-            portfolio
-                .positions
-                .par_iter()
-                .map(schedule_position)
-                .collect()
-        } else {
-            portfolio.positions.iter().map(schedule_position).collect()
-        };
-
-    #[cfg(target_arch = "wasm32")]
-    let per_position: Vec<PositionCashflowResult> =
-        portfolio.positions.iter().map(schedule_position).collect();
+    let per_position = try_map_positions(&portfolio.positions, |position| {
+        Ok(schedule_position(position))
+    })?;
 
     let mut events = Vec::new();
     let mut by_position: IndexMap<PositionId, Vec<PortfolioCashflowEvent>> = IndexMap::new();

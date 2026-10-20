@@ -28,5 +28,5 @@ pub use json::{
     DEFAULT_PNL_SCENARIO_POINTS,
 };
 pub use repricing_engine::{FactorPnlProfile, FullRepricingEngine};
+pub(crate) use traits::exact_factor_market_keys;
 pub use traits::FactorSensitivityEngine;
-pub(crate) use traits::{exact_factor_market_keys, raw_pv_in_base};
