@@ -138,7 +138,7 @@ description = "Run the workspace Rust tests with nextest (use rust-test-crate wh
 usage = '''
 flag "--slow" help="Run only the ignored (slow) tests"
 flag "--doctest" help="Run only the doctests (cargo test --doc)"
-flag "--coverage" help="Instrument with cargo llvm-cov; writes target/llvm-cov/html and coverage/rust/lcov.info"
+flag "--coverage" help="Instrument with cargo llvm-cov; writes coverage/rust/lcov.info, plus target/llvm-cov/html outside CI"
 '''
 run = '''
 if [ "${usage_doctest:-false}" = "true" ]; then
@@ -160,8 +160,13 @@ if [ "${usage_coverage:-false}" = "true" ]; then
   mkdir -p coverage/rust
   exclude='(tests?/|test-support/|target/|\.cargo/|finstack-quant-py/)'
   cargo llvm-cov report --remap-path-prefix --ignore-filename-regex "$exclude" --lcov --output-path coverage/rust/lcov.info
-  cargo llvm-cov report --remap-path-prefix --ignore-filename-regex "$exclude" --html --output-dir target/llvm-cov
-  echo "Coverage: target/llvm-cov/html/index.html, coverage/rust/lcov.info"
+  echo "Coverage: coverage/rust/lcov.info"
+  # Each report re-reads every instrumented binary (~4.5 min in CI), and CI
+  # uploads only the lcov file, so the HTML report is local-only.
+  if [ -z "${CI:-}" ]; then
+    cargo llvm-cov report --remap-path-prefix --ignore-filename-regex "$exclude" --html --output-dir target/llvm-cov
+    echo "Coverage: target/llvm-cov/html/index.html"
+  fi
 fi
 '''
 
