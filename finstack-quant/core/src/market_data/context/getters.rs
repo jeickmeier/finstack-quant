@@ -10,7 +10,7 @@ use crate::market_data::term_structures::{
     HazardCurve, InflationCurve, ParametricCurve, PriceCurve, PriceCurveKind,
 };
 use crate::types::CurveId;
-use crate::HashMap;
+use crate::FxHashMap;
 use crate::Result;
 
 use super::{CurveStorage, MarketContext};
@@ -22,21 +22,21 @@ impl MarketContext {
     }
 
     fn missing_curve_error(&self, id: &str) -> crate::Error {
-        // Sort for deterministic error messages (HashMap iteration order varies).
+        // Sort for deterministic error messages (FxHashMap iteration order varies).
         let mut available: Vec<&str> = self.curves.keys().map(|k| k.as_str()).collect();
         available.sort_unstable();
         crate::Error::missing_curve_with_suggestions(id, &available)
     }
 
     #[inline]
-    fn get_cloned<T>(&self, map: &HashMap<CurveId, Arc<T>>, id: &str) -> Result<Arc<T>> {
+    fn get_cloned<T>(&self, map: &FxHashMap<CurveId, Arc<T>>, id: &str) -> Result<Arc<T>> {
         map.get(id)
             .cloned()
             .ok_or_else(|| Self::not_found_error(id))
     }
 
     #[inline]
-    fn get_ref<'a, T>(&self, map: &'a HashMap<CurveId, T>, id: &str) -> Result<&'a T> {
+    fn get_ref<'a, T>(&self, map: &'a FxHashMap<CurveId, T>, id: &str) -> Result<&'a T> {
         map.get(id).ok_or_else(|| Self::not_found_error(id))
     }
 

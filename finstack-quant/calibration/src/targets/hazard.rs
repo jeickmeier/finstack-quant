@@ -18,7 +18,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
     HazardCalibrationInput, HazardCalibrationRecipe, HazardCurve,
 };
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations_core::market::conventions::{
@@ -159,7 +159,7 @@ pub(crate) fn validate_hazard_recipe_bindings(
     }
     let quote_refs: Vec<&CdsQuote> = quotes.iter().map(|(_, _, quote)| quote).collect();
     let conventions = resolve_hazard_conventions(params, &quote_refs)?;
-    let mut curve_ids = HashMap::default();
+    let mut curve_ids = FxHashMap::default();
     curve_ids.insert("discount".to_string(), params.discount_curve_id.to_string());
     curve_ids.insert("credit".to_string(), params.curve_id.to_string());
     let build_ctx = BuildCtx::new(params.base_date, params.notional, curve_ids)
@@ -348,7 +348,7 @@ impl HazardCurveTarget {
 
         let mut prepared_quotes: Vec<PreparedQuote<CdsQuote>> =
             Vec::with_capacity(cds_quotes.len());
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), params.discount_curve_id.to_string());
         curve_ids.insert("credit".to_string(), params.curve_id.to_string());
         let build_ctx = BuildCtx::new(params.base_date, params.notional, curve_ids)

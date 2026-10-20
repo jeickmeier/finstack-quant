@@ -1,6 +1,6 @@
 //! Shared fixtures and utilities for FX Spot tests.
 
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::{
     currency::Currency,
     dates::Date,
@@ -21,13 +21,13 @@ use time::Month;
 /// Mock FX provider for testing.
 #[derive(Clone)]
 pub struct MockFxProvider {
-    pub rates: HashMap<(Currency, Currency), f64>,
+    pub rates: FxHashMap<(Currency, Currency), f64>,
 }
 
 impl MockFxProvider {
     /// Create with standard rates
     pub fn standard() -> Self {
-        let mut rates = HashMap::default();
+        let mut rates = FxHashMap::default();
         rates.insert((Currency::EUR, Currency::USD), 1.20);
         rates.insert((Currency::GBP, Currency::USD), 1.40);
         rates.insert((Currency::USD, Currency::JPY), 110.0);

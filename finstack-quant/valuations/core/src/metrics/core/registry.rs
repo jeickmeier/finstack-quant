@@ -8,7 +8,7 @@ use super::ids::MetricId;
 use super::traits::{MetricCalculator, MetricContext};
 
 use crate::pricer::InstrumentType;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use std::sync::Arc;
 
 /// Metric-registration configuration errors.
@@ -43,13 +43,13 @@ pub enum MetricRegistryError {
 /// See unit tests and `examples/` for usage.
 #[derive(Clone)]
 pub struct MetricRegistry {
-    entries: HashMap<MetricId, MetricEntry>,
+    entries: FxHashMap<MetricId, MetricEntry>,
 }
 
 #[derive(Clone, Default)]
 struct MetricEntry {
     default: Option<Arc<dyn MetricCalculator>>,
-    per_instrument: HashMap<InstrumentType, Arc<dyn MetricCalculator>>,
+    per_instrument: FxHashMap<InstrumentType, Arc<dyn MetricCalculator>>,
 }
 
 impl MetricEntry {
@@ -70,7 +70,7 @@ impl MetricRegistry {
     /// See unit tests and `examples/` for usage.
     pub fn new() -> Self {
         Self {
-            entries: HashMap::default(),
+            entries: FxHashMap::default(),
         }
     }
 }
@@ -357,7 +357,7 @@ impl MetricRegistry {
     ///   every value produced here, including intermediate dependencies.
     ///
     /// # Returns
-    /// HashMap mapping metric IDs to computed values.
+    /// FxHashMap mapping metric IDs to computed values.
     ///
     /// # Errors
     /// Returns an error if:
@@ -383,7 +383,7 @@ impl MetricRegistry {
         &self,
         metric_ids: &[MetricId],
         context: &mut MetricContext,
-    ) -> finstack_quant_core::Result<HashMap<MetricId, f64>> {
+    ) -> finstack_quant_core::Result<FxHashMap<MetricId, f64>> {
         let _span = tracing::debug_span!(
             "metric_registry.compute",
             metric_count = metric_ids.len(),
@@ -426,7 +426,7 @@ impl MetricRegistry {
         }
 
         // Return only the requested metrics
-        let mut results = HashMap::default();
+        let mut results = FxHashMap::default();
         for id in metric_ids {
             if let Some(&value) = context.computed.get(id) {
                 results.insert(id.clone(), value);
@@ -518,8 +518,8 @@ impl MetricRegistry {
         context: &MetricContext,
     ) -> finstack_quant_core::Result<Vec<MetricId>> {
         let mut state = TopoSortState {
-            visited: finstack_quant_core::HashSet::default(),
-            temp_mark: finstack_quant_core::HashSet::default(),
+            visited: finstack_quant_core::FxHashSet::default(),
+            temp_mark: finstack_quant_core::FxHashSet::default(),
             order: Vec::new(),
             path: Vec::new(),
         };
@@ -596,9 +596,9 @@ impl MetricRegistry {
 /// sane argument count as it recurses.
 struct TopoSortState {
     /// Metrics already emitted to `order`.
-    visited: finstack_quant_core::HashSet<MetricId>,
+    visited: finstack_quant_core::FxHashSet<MetricId>,
     /// Metrics on the current DFS stack, for cycle detection.
-    temp_mark: finstack_quant_core::HashSet<MetricId>,
+    temp_mark: finstack_quant_core::FxHashSet<MetricId>,
     /// Resolved computation order, dependencies first.
     order: Vec<MetricId>,
     /// Current DFS path, for circular-dependency diagnostics.

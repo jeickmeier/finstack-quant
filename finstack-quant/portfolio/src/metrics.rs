@@ -24,7 +24,7 @@ use crate::valuation::PortfolioValuation;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
-use finstack_quant_core::HashSet;
+use finstack_quant_core::FxHashSet;
 use finstack_quant_valuations::metrics::MetricId;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -498,7 +498,7 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
     let mut entity_values: IndexMap<MetricId, IndexMap<EntityId, NeumaierAccumulator>> =
         IndexMap::new();
     let mut skipped_metrics: Vec<SkippedMetric> = Vec::new();
-    let mut unaggregated: HashSet<String> = HashSet::default();
+    let mut unaggregated: FxHashSet<String> = FxHashSet::default();
 
     for data in collected {
         let fx_rate = data.fx_rate;

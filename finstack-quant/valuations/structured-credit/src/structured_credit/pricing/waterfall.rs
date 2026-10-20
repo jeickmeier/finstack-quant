@@ -16,7 +16,7 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Error as CoreError;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 
 /// Returns the number of decimal places for currency-aware penny-safe allocation.
@@ -80,7 +80,7 @@ pub struct WaterfallContext<'a> {
     /// Current tranche balances (overrides `tranche.current_balance` when present).
     /// This ensures the waterfall uses up-to-date balances after principal payments
     /// and PIK accretion rather than stale original balances.
-    pub tranche_balances: Option<&'a HashMap<String, Money>>,
+    pub tranche_balances: Option<&'a FxHashMap<String, Money>>,
     /// Current per-asset balances, aligned by index with `pool.assets`.
     pub asset_balances: Option<&'a [f64]>,
     /// Live delinquency buckets and NPL flags for the borrowing-base
@@ -91,7 +91,7 @@ pub struct WaterfallContext<'a> {
     /// the closing `special_servicing` specs.
     pub special_serviced: Option<&'a [bool]>,
     /// Deferred interest claims carried from prior periods.
-    pub deferred_interest: Option<&'a HashMap<String, Money>>,
+    pub deferred_interest: Option<&'a FxHashMap<String, Money>>,
     /// Current reserve account balance (passed dynamically each period).
     /// Used by `PaymentCalculation::ReserveReplenishment` to compute shortfall.
     pub reserve_balance: Money,
@@ -200,7 +200,7 @@ pub fn execute_waterfall(
     let mut had_diversions = false;
     let mut diversion_reason = None;
 
-    let mut tranche_index = HashMap::default();
+    let mut tranche_index = FxHashMap::default();
     tranche_index.reserve(tranches.tranches.len());
     for (i, t) in tranches.tranches.iter().enumerate() {
         tranche_index.insert(t.id.as_str(), i);
@@ -311,7 +311,7 @@ pub fn execute_waterfall(
 
     // Net all principal paid during the period against the period-start balance
     // so regular and diverted tiers cannot retire the same notional twice.
-    let mut principal_paid_in_period: HashMap<String, Money> = HashMap::default();
+    let mut principal_paid_in_period: FxHashMap<String, Money> = FxHashMap::default();
 
     // Interest a `Reinvest` test retained as principal proceeds this period.
     let mut diverted_to_reinvestment = Money::from((0_i64, waterfall.currency));
@@ -524,7 +524,7 @@ pub(crate) struct AllocationContext<'a> {
     /// Tranche structure for looking up tranche data
     pub(crate) tranches: &'a TrancheStructure,
     /// O(1) lookup from tranche ID to index
-    pub(crate) tranche_index: HashMap<&'a str, usize>,
+    pub(crate) tranche_index: FxHashMap<&'a str, usize>,
     /// Current pool balance
     pub(crate) pool_balance: Money,
     /// Balance of the specially serviced collateral (special servicing fee base).
@@ -537,9 +537,9 @@ pub(crate) struct AllocationContext<'a> {
     /// Market context for rate lookups
     pub(crate) market: &'a MarketContext,
     /// Current tranche balances (overrides tranche.current_balance when present)
-    pub(crate) tranche_balances: Option<&'a HashMap<String, Money>>,
+    pub(crate) tranche_balances: Option<&'a FxHashMap<String, Money>>,
     /// Deferred interest claims carried from prior periods.
-    pub(crate) deferred_interest: Option<&'a HashMap<String, Money>>,
+    pub(crate) deferred_interest: Option<&'a FxHashMap<String, Money>>,
     /// Current reserve account balance (passed dynamically each period)
     pub(crate) reserve_balance: Money,
     /// Simulated shift applied to FLOATING tranche coupons (OAS rate
@@ -556,9 +556,9 @@ pub(crate) struct AllocationContext<'a> {
 /// Groups mutable state that is updated during allocation.
 pub(crate) struct AllocationOutput {
     /// Accumulated distributions by recipient
-    pub(crate) distributions: HashMap<RecipientType, Money>,
+    pub(crate) distributions: FxHashMap<RecipientType, Money>,
     /// The PRINCIPAL portion of `distributions`, per recipient.
-    pub(crate) principal_distributions: HashMap<RecipientType, Money>,
+    pub(crate) principal_distributions: FxHashMap<RecipientType, Money>,
     /// Payment records for audit trail
     pub(crate) payment_records: Vec<PaymentRecord>,
 }
@@ -566,11 +566,11 @@ pub(crate) struct AllocationOutput {
 impl AllocationOutput {
     /// Create new allocation state with pre-allocated capacity.
     pub(crate) fn with_capacity(estimated_recipients: usize) -> Self {
-        let mut distributions = HashMap::default();
+        let mut distributions = FxHashMap::default();
         distributions.reserve(estimated_recipients);
         Self {
             distributions,
-            principal_distributions: HashMap::default(),
+            principal_distributions: FxHashMap::default(),
             payment_records: Vec::with_capacity(estimated_recipients),
         }
     }
@@ -586,7 +586,7 @@ fn allocate_sequential(
     period_start: Date,
     diverted: bool,
     output: &mut AllocationOutput,
-    principal_paid_in_period: &mut HashMap<String, Money>,
+    principal_paid_in_period: &mut FxHashMap<String, Money>,
 ) -> Result<Money> {
     let currency = ctx.currency;
     let mut tier_total = Money::from((0_i64, currency));
@@ -696,7 +696,7 @@ fn allocate_pro_rata(
     period_start: Date,
     diverted: bool,
     output: &mut AllocationOutput,
-    principal_paid_in_period: &mut HashMap<String, Money>,
+    principal_paid_in_period: &mut FxHashMap<String, Money>,
 ) -> Result<Money> {
     let currency = ctx.currency;
     if recipients.is_empty() {
@@ -1020,8 +1020,8 @@ pub(crate) fn interest_claim_caps<'w>(
     waterfall: &'w Waterfall,
     afc: Option<&AfcSpec>,
     live_afc_cap: f64,
-) -> HashMap<&'w str, Option<f64>> {
-    let mut caps: HashMap<&'w str, Option<f64>> = HashMap::default();
+) -> FxHashMap<&'w str, Option<f64>> {
+    let mut caps: FxHashMap<&'w str, Option<f64>> = FxHashMap::default();
     for tier in &waterfall.tiers {
         for recipient in &tier.recipients {
             match &recipient.calculation {
@@ -1049,9 +1049,9 @@ pub(crate) struct SeniorFeeInputs<'a> {
     /// Cash the fee tier is measured against (pool interest for a period).
     pub available: Money,
     /// Current tranche balances, when known.
-    pub tranche_balances: Option<&'a HashMap<String, Money>>,
+    pub tranche_balances: Option<&'a FxHashMap<String, Money>>,
     /// Outstanding deferred interest, when known.
-    pub deferred_interest: Option<&'a HashMap<String, Money>>,
+    pub deferred_interest: Option<&'a FxHashMap<String, Money>>,
     /// Collateral balance the percentage-of-collateral fees accrue on.
     pub pool_balance: Money,
     /// Balance of the specially serviced collateral (special servicing fee base).
@@ -1091,10 +1091,10 @@ pub(crate) struct SeniorFeeInputs<'a> {
 pub(crate) fn senior_fee_accrual(
     waterfall: &Waterfall,
     tranches: &TrancheStructure,
-    tranche_index: &HashMap<&str, usize>,
+    tranche_index: &FxHashMap<&str, usize>,
     inputs: SeniorFeeInputs<'_>,
 ) -> Result<Money> {
-    let empty_in_period: HashMap<String, Money> = HashMap::default();
+    let empty_in_period: FxHashMap<String, Money> = FxHashMap::default();
     let mut total = Money::from((0_i64, waterfall.currency));
     let first_note_priority = waterfall
         .tiers
@@ -1149,7 +1149,7 @@ pub(crate) fn senior_fee_accrual(
 /// so no AFC override applies here.
 pub(super) fn coverage_inputs(
     waterfall: &Waterfall,
-) -> (HashMap<&str, Option<f64>>, Option<&CoverageRules>) {
+) -> (FxHashMap<&str, Option<f64>>, Option<&CoverageRules>) {
     let claim_caps = interest_claim_caps(waterfall, None, 0.0);
     let rules = waterfall
         .coverage_rules
@@ -1193,7 +1193,7 @@ pub(super) struct CoverageTestResult {
 /// later tiers (e.g. an OC/IC diversion into the senior principal tier) see
 /// the post-payment balance instead of the stale period-start snapshot.
 fn record_in_period_principal(
-    principal_paid_in_period: &mut HashMap<String, Money>,
+    principal_paid_in_period: &mut FxHashMap<String, Money>,
     calculation: &PaymentCalculation,
     paid: Money,
     currency: Currency,
@@ -1217,9 +1217,9 @@ fn calculate_payment_amount(
     calculation: &PaymentCalculation,
     available: Money,
     tranches: &TrancheStructure,
-    tranche_index: &HashMap<&str, usize>,
-    tranche_balances: Option<&HashMap<String, Money>>,
-    deferred_interest: Option<&HashMap<String, Money>>,
+    tranche_index: &FxHashMap<&str, usize>,
+    tranche_balances: Option<&FxHashMap<String, Money>>,
+    deferred_interest: Option<&FxHashMap<String, Money>>,
     pool_balance: Money,
     special_serviced_balance: Money,
     period_start: Date,
@@ -1228,7 +1228,7 @@ fn calculate_payment_amount(
     valuation_date: Date,
     market: &MarketContext,
     reserve_balance: Money,
-    principal_paid_in_period: &HashMap<String, Money>,
+    principal_paid_in_period: &FxHashMap<String, Money>,
     diverted: bool,
     floating_rate_shift: f64,
     equity_history: Option<&EquityHistory>,

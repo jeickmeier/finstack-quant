@@ -41,7 +41,7 @@
 use super::aggregation::{inter_bucket_pairwise, inter_bucket_plus_undiversified};
 use super::params::{self, fx, girr};
 use super::types::{CorrelationScenario, FrtbRiskClass, FrtbSensitivities};
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use std::collections::BTreeMap;
 
 /// Compute the curvature risk charge for a single risk class.
@@ -154,7 +154,7 @@ fn fx_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 
 // Generic bucketed curvature
 
 fn generic_curvature_bucketed(
-    curvatures: &HashMap<(String, u8), (f64, f64)>,
+    curvatures: &FxHashMap<(String, u8), (f64, f64)>,
     class: FrtbRiskClass,
     scenario: CorrelationScenario,
 ) -> f64 {

@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::types::CurveId;
-use crate::HashMap;
+use crate::FxHashMap;
 
 use super::{CurveStorage, MarketContext};
 
@@ -268,10 +268,10 @@ impl MarketContext {
     /// semantics: a scalar present in the current market but absent from the
     /// snapshot must not survive the restore.
     pub fn clear_market_scalars_mut(&mut self) -> &mut Self {
-        self.prices = Arc::new(HashMap::default());
-        self.series = Arc::new(HashMap::default());
-        self.inflation_indices = Arc::new(HashMap::default());
-        self.dividends = Arc::new(HashMap::default());
+        self.prices = Arc::new(FxHashMap::default());
+        self.series = Arc::new(FxHashMap::default());
+        self.inflation_indices = Arc::new(FxHashMap::default());
+        self.dividends = Arc::new(FxHashMap::default());
         self
     }
 }

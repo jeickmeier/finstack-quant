@@ -9,7 +9,7 @@ use crate::quotes::cds_tranche::CdsTrancheQuote;
 use crate::quotes::ids::Pillar;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, Tenor};
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations_credit::cds::{CdsConvention, CdsValuationConvention};
@@ -18,7 +18,7 @@ use rust_decimal::Decimal;
 #[test]
 fn test_build_cds_par_spread() {
     let as_of = Date::from_calendar_date(2025, time::Month::January, 10).unwrap();
-    let mut curve_ids = HashMap::default();
+    let mut curve_ids = FxHashMap::default();
     curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("credit".to_string(), "XYZ-CORP-SNR".to_string());
     let ctx = BuildCtx::new(as_of, 1_000_000.0, curve_ids);
@@ -60,7 +60,7 @@ fn test_build_cds_par_spread() {
 #[test]
 fn test_build_cds_upfront() {
     let as_of = Date::from_calendar_date(2025, time::Month::January, 10).unwrap();
-    let mut curve_ids = HashMap::default();
+    let mut curve_ids = FxHashMap::default();
     curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("credit".to_string(), "XYZ-CREDIT".to_string());
 
@@ -114,7 +114,7 @@ fn credit_coupon_anchors_follow_trade_date_across_all_quarterly_rolls() {
         for offset in -5..=5 {
             let trade = roll.add_days(offset).unwrap();
             let expected_start = if offset < 0 { prior } else { roll };
-            let mut curve_ids = HashMap::default();
+            let mut curve_ids = FxHashMap::default();
             curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
             curve_ids.insert("credit".to_string(), "CDX.NA.IG".to_string());
             let ctx = BuildCtx::new(trade, 1_000_000.0, curve_ids);
@@ -174,7 +174,7 @@ fn cds_coupon_anchor_cash_settlement_and_protection_step_in_remain_distinct() {
     use time::Month::{December, March};
 
     let trade = Date::from_calendar_date(2026, March, 18).unwrap();
-    let mut curve_ids = HashMap::default();
+    let mut curve_ids = FxHashMap::default();
     curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("credit".to_string(), "XYZ-CREDIT".to_string());
     let ctx = BuildCtx::new(trade, 1_000_000.0, curve_ids);

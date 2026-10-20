@@ -8,7 +8,7 @@ use super::{FxConversionPolicy, FxProvider};
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::InputError;
-use crate::{recover_lock as recover, HashMap};
+use crate::{recover_lock as recover, FxHashMap};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -41,8 +41,8 @@ use std::sync::{Arc, RwLock};
 /// ```
 #[derive(Default)]
 pub struct SimpleFxProvider {
-    quotes: RwLock<HashMap<(Currency, Currency), f64>>,
-    pinned_quotes: RwLock<HashMap<(Currency, Currency, Date, FxConversionPolicy), f64>>,
+    quotes: RwLock<FxHashMap<(Currency, Currency), f64>>,
+    pinned_quotes: RwLock<FxHashMap<(Currency, Currency, Date, FxConversionPolicy), f64>>,
     revision: AtomicU64,
 }
 
@@ -57,8 +57,8 @@ impl SimpleFxProvider {
     /// ```
     pub fn new() -> Self {
         Self {
-            quotes: RwLock::new(HashMap::default()),
-            pinned_quotes: RwLock::new(HashMap::default()),
+            quotes: RwLock::new(FxHashMap::default()),
+            pinned_quotes: RwLock::new(FxHashMap::default()),
             revision: AtomicU64::new(0),
         }
     }
@@ -145,7 +145,7 @@ impl SimpleFxProvider {
         &self,
         quotes: &[(Currency, Currency, Date, FxConversionPolicy, f64)],
     ) -> crate::Result<()> {
-        let mut validated = HashMap::default();
+        let mut validated = FxHashMap::default();
         for &(from, to, on, policy, rate) in quotes {
             let rate = super::validate_fx_rate(from, to, rate)?;
             if validated.insert((from, to, on, policy), rate).is_some() {
@@ -408,7 +408,7 @@ impl FxProvider for BumpedFxProvider {
         let mut quotes = self.original.snapshot_pinned_quotes();
         let from = self.override_from;
         let to = self.override_to;
-        let mut rates = HashMap::default();
+        let mut rates = FxHashMap::default();
         for &(base, quote, on, policy, rate) in &quotes {
             if base == from && quote == to {
                 rates.insert((on, policy), rate);

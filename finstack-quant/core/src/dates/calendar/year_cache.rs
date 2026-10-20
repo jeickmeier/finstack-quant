@@ -11,7 +11,7 @@ use time::{Date, Duration};
 use super::algo::{BASE_YEAR, END_YEAR};
 use super::business_days::HolidayCalendar;
 use super::types::Calendar;
-use crate::{recover_lock, HashMap};
+use crate::{recover_lock, FxHashMap};
 
 /// 366-day holiday mask plus inclusive business-day prefix sums for one year.
 #[derive(Clone, Copy)]
@@ -37,9 +37,9 @@ struct YearKey {
     rules_len: usize,
 }
 
-fn cache() -> &'static RwLock<HashMap<YearKey, YearBits>> {
-    static CACHE: OnceLock<RwLock<HashMap<YearKey, YearBits>>> = OnceLock::new();
-    CACHE.get_or_init(|| RwLock::new(HashMap::default()))
+fn cache() -> &'static RwLock<FxHashMap<YearKey, YearBits>> {
+    static CACHE: OnceLock<RwLock<FxHashMap<YearKey, YearBits>>> = OnceLock::new();
+    CACHE.get_or_init(|| RwLock::new(FxHashMap::default()))
 }
 
 impl YearBits {

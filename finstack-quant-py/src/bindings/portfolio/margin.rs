@@ -463,7 +463,7 @@ impl PyPortfolioMarginAggregator {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
         let market = extract_market_ref(py, market)?;
         let as_of = py_to_date(as_of)?;
-        let collateral: finstack_quant_core::HashMap<String, finstack_quant_core::money::Money> =
+        let collateral: finstack_quant_core::FxHashMap<String, finstack_quant_core::money::Money> =
             current_im_collateral
                 .unwrap_or_default()
                 .into_iter()

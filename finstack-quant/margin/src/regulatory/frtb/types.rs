@@ -4,7 +4,7 @@
 //! containers, and result types per BCBS d457.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use std::collections::BTreeMap;
 
 /// FRTB risk classes per BCBS d457.
@@ -261,69 +261,69 @@ pub struct FrtbSensitivities {
     /// FRTB risk-weight convention (`GIRR_DELTA_RISK_WEIGHTS` are stated
     /// in percent, e.g. `1.7` for 1.7%). See the module-level docs on
     /// sensitivity conventions.
-    pub girr_delta: HashMap<(Currency, String), f64>,
+    pub girr_delta: FxHashMap<(Currency, String), f64>,
     /// GIRR inflation delta by currency.
     ///
     /// Units: base-currency P&L per 1pp shift in inflation (same
     /// convention as [`Self::girr_delta`]).
-    pub girr_inflation_delta: HashMap<Currency, f64>,
+    pub girr_inflation_delta: FxHashMap<Currency, f64>,
     /// GIRR cross-currency basis delta by currency.
     ///
     /// Units: base-currency P&L per 1pp shift in the cross-currency
     /// basis (same convention as [`Self::girr_delta`]).
-    pub girr_xccy_basis_delta: HashMap<Currency, f64>,
+    pub girr_xccy_basis_delta: FxHashMap<Currency, f64>,
     /// GIRR vega by (currency, option_maturity, underlying_tenor).
-    pub girr_vega: HashMap<(Currency, String, String), f64>,
+    pub girr_vega: FxHashMap<(Currency, String, String), f64>,
     /// GIRR curvature: (currency) -> (cvr_up, cvr_down).
-    pub girr_curvature: HashMap<Currency, (f64, f64)>,
+    pub girr_curvature: FxHashMap<Currency, (f64, f64)>,
 
     /// CSR non-sec delta by (issuer, bucket, tenor, basis).
     /// The fourth key is the bond versus CDS curve identifier.
-    pub csr_nonsec_delta: HashMap<(String, u8, String, String), f64>,
+    pub csr_nonsec_delta: FxHashMap<(String, u8, String, String), f64>,
     /// CSR non-sec vega by (issuer, bucket, option_maturity).
-    pub csr_nonsec_vega: HashMap<(String, u8, String), f64>,
+    pub csr_nonsec_vega: FxHashMap<(String, u8, String), f64>,
     /// CSR non-sec curvature by (issuer, bucket) -> (cvr_up, cvr_down).
-    pub csr_nonsec_curvature: HashMap<(String, u8), (f64, f64)>,
+    pub csr_nonsec_curvature: FxHashMap<(String, u8), (f64, f64)>,
 
     /// CSR sec-CTP delta by (tranche, bucket, tenor, basis).
     /// The fourth key is the bond versus CDS curve identifier.
-    pub csr_sec_ctp_delta: HashMap<(String, u8, String, String), f64>,
+    pub csr_sec_ctp_delta: FxHashMap<(String, u8, String, String), f64>,
     /// CSR sec-CTP vega by (tranche, bucket, option_maturity).
-    pub csr_sec_ctp_vega: HashMap<(String, u8, String), f64>,
+    pub csr_sec_ctp_vega: FxHashMap<(String, u8, String), f64>,
     /// CSR sec-CTP curvature by (tranche, bucket) -> (cvr_up, cvr_down).
-    pub csr_sec_ctp_curvature: HashMap<(String, u8), (f64, f64)>,
+    pub csr_sec_ctp_curvature: FxHashMap<(String, u8), (f64, f64)>,
 
     /// CSR sec-non-CTP delta by (tranche, bucket, tenor, basis).
     /// The fourth key is the bond versus CDS curve identifier.
-    pub csr_sec_nonctp_delta: HashMap<(String, u8, String, String), f64>,
+    pub csr_sec_nonctp_delta: FxHashMap<(String, u8, String, String), f64>,
     /// CSR sec-non-CTP vega by (tranche, bucket, option_maturity).
-    pub csr_sec_nonctp_vega: HashMap<(String, u8, String), f64>,
+    pub csr_sec_nonctp_vega: FxHashMap<(String, u8, String), f64>,
     /// CSR sec-non-CTP curvature by (tranche, bucket) -> (cvr_up, cvr_down).
-    pub csr_sec_nonctp_curvature: HashMap<(String, u8), (f64, f64)>,
+    pub csr_sec_nonctp_curvature: FxHashMap<(String, u8), (f64, f64)>,
 
     /// Equity delta by (underlier, bucket).
-    pub equity_delta: HashMap<(String, u8), f64>,
+    pub equity_delta: FxHashMap<(String, u8), f64>,
     /// Equity repo-rate delta by (underlier, bucket), in base currency per one percentage-point rate shift.
-    pub equity_repo_delta: HashMap<(String, u8), f64>,
+    pub equity_repo_delta: FxHashMap<(String, u8), f64>,
     /// Equity vega by (underlier, bucket, option_maturity).
-    pub equity_vega: HashMap<(String, u8, String), f64>,
+    pub equity_vega: FxHashMap<(String, u8, String), f64>,
     /// Equity curvature by (underlier, bucket) -> (cvr_up, cvr_down).
-    pub equity_curvature: HashMap<(String, u8), (f64, f64)>,
+    pub equity_curvature: FxHashMap<(String, u8), (f64, f64)>,
 
     /// Commodity delta by (commodity_name, bucket, tenor, location).
     /// The fourth key is the delivery location.
-    pub commodity_delta: HashMap<(String, u8, String, String), f64>,
+    pub commodity_delta: FxHashMap<(String, u8, String, String), f64>,
     /// Commodity vega by (commodity_name, bucket, option_maturity).
-    pub commodity_vega: HashMap<(String, u8, String), f64>,
+    pub commodity_vega: FxHashMap<(String, u8, String), f64>,
     /// Commodity curvature by (commodity_name, bucket) -> (cvr_up, cvr_down).
-    pub commodity_curvature: HashMap<(String, u8), (f64, f64)>,
+    pub commodity_curvature: FxHashMap<(String, u8), (f64, f64)>,
 
     /// FX delta by currency pair.
-    pub fx_delta: HashMap<(Currency, Currency), f64>,
+    pub fx_delta: FxHashMap<(Currency, Currency), f64>,
     /// FX vega by (currency_pair, option_maturity).
-    pub fx_vega: HashMap<(Currency, Currency, String), f64>,
+    pub fx_vega: FxHashMap<(Currency, Currency, String), f64>,
     /// FX curvature by currency pair -> (cvr_up, cvr_down).
-    pub fx_curvature: HashMap<(Currency, Currency), (f64, f64)>,
+    pub fx_curvature: FxHashMap<(Currency, Currency), (f64, f64)>,
 
     /// Default risk positions by (issuer, rating, sector, seniority).
     pub drc_positions: Vec<DrcPosition>,
@@ -356,30 +356,30 @@ impl FrtbSensitivities {
     pub fn new(base_currency: Currency) -> Self {
         Self {
             base_currency,
-            girr_delta: HashMap::default(),
-            girr_inflation_delta: HashMap::default(),
-            girr_xccy_basis_delta: HashMap::default(),
-            girr_vega: HashMap::default(),
-            girr_curvature: HashMap::default(),
-            csr_nonsec_delta: HashMap::default(),
-            csr_nonsec_vega: HashMap::default(),
-            csr_nonsec_curvature: HashMap::default(),
-            csr_sec_ctp_delta: HashMap::default(),
-            csr_sec_ctp_vega: HashMap::default(),
-            csr_sec_ctp_curvature: HashMap::default(),
-            csr_sec_nonctp_delta: HashMap::default(),
-            csr_sec_nonctp_vega: HashMap::default(),
-            csr_sec_nonctp_curvature: HashMap::default(),
-            equity_delta: HashMap::default(),
-            equity_repo_delta: HashMap::default(),
-            equity_vega: HashMap::default(),
-            equity_curvature: HashMap::default(),
-            commodity_delta: HashMap::default(),
-            commodity_vega: HashMap::default(),
-            commodity_curvature: HashMap::default(),
-            fx_delta: HashMap::default(),
-            fx_vega: HashMap::default(),
-            fx_curvature: HashMap::default(),
+            girr_delta: FxHashMap::default(),
+            girr_inflation_delta: FxHashMap::default(),
+            girr_xccy_basis_delta: FxHashMap::default(),
+            girr_vega: FxHashMap::default(),
+            girr_curvature: FxHashMap::default(),
+            csr_nonsec_delta: FxHashMap::default(),
+            csr_nonsec_vega: FxHashMap::default(),
+            csr_nonsec_curvature: FxHashMap::default(),
+            csr_sec_ctp_delta: FxHashMap::default(),
+            csr_sec_ctp_vega: FxHashMap::default(),
+            csr_sec_ctp_curvature: FxHashMap::default(),
+            csr_sec_nonctp_delta: FxHashMap::default(),
+            csr_sec_nonctp_vega: FxHashMap::default(),
+            csr_sec_nonctp_curvature: FxHashMap::default(),
+            equity_delta: FxHashMap::default(),
+            equity_repo_delta: FxHashMap::default(),
+            equity_vega: FxHashMap::default(),
+            equity_curvature: FxHashMap::default(),
+            commodity_delta: FxHashMap::default(),
+            commodity_vega: FxHashMap::default(),
+            commodity_curvature: FxHashMap::default(),
+            fx_delta: FxHashMap::default(),
+            fx_vega: FxHashMap::default(),
+            fx_curvature: FxHashMap::default(),
             drc_positions: Vec::new(),
             rrao_exotic_notionals: Vec::new(),
         }

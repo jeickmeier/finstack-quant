@@ -153,13 +153,13 @@ fn resolve_cds_dates(
 /// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::currency::Currency;
-/// use finstack_quant_core::HashMap;
+/// use finstack_quant_core::FxHashMap;
 ///
 /// # fn example() -> finstack_quant_core::Result<()> {
 /// let ctx = BuildCtx::new(
 ///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
 ///     10_000_000.0,
-///     HashMap::default(),
+///     FxHashMap::default(),
 /// );
 ///
 /// let quote = CdsQuote::CdsParSpread {
@@ -188,13 +188,13 @@ fn resolve_cds_dates(
 /// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::currency::Currency;
-/// use finstack_quant_core::HashMap;
+/// use finstack_quant_core::FxHashMap;
 ///
 /// # fn example() -> finstack_quant_core::Result<()> {
 /// let ctx = BuildCtx::new(
 ///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
 ///     10_000_000.0,
-///     HashMap::default(),
+///     FxHashMap::default(),
 /// );
 ///
 /// let quote = CdsQuote::CdsUpfront {
@@ -323,7 +323,7 @@ mod tests {
     use crate::quotes::ids::{Pillar, QuoteId};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
-    use finstack_quant_core::HashMap;
+    use finstack_quant_core::FxHashMap;
     use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause,
     };
@@ -332,7 +332,7 @@ mod tests {
     fn cds_build_ctx() -> BuildCtx {
         let as_of =
             Date::from_calendar_date(2024, Month::January, 2).expect("valid CDS build date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "ABC-CORP".to_string());
         BuildCtx::new(as_of, 10_000_000.0, curve_ids)
@@ -435,7 +435,7 @@ mod tests {
         for ((ty, tm, td), (ey, em, ed)) in cases {
             let as_of =
                 Date::from_calendar_date(ty, tm, td).expect("valid CDS trade-date test case");
-            let mut curve_ids = HashMap::default();
+            let mut curve_ids = FxHashMap::default();
             curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
             curve_ids.insert("credit".to_string(), "ABC-CORP".to_string());
             let ctx = BuildCtx::new(as_of, 10_000_000.0, curve_ids);
@@ -471,7 +471,7 @@ mod tests {
     fn test_cds_tenor_pillar_runs_from_spot_not_prior_imm_start() -> Result<()> {
         let as_of = Date::from_calendar_date(2026, Month::May, 2)
             .expect("valid CDS spot-date regression date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "IBM-USD-SENIOR".to_string());
         let ctx = BuildCtx::new(as_of, 10_000_000.0, curve_ids);

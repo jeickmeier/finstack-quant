@@ -9,7 +9,7 @@
 //! roll-then-reprice theta capture both carry and roll-down. Vol surfaces,
 //! FX spot rates, and historical fixings remain static across the roll.
 
-use crate::HashMap;
+use crate::FxHashMap;
 use std::sync::Arc;
 
 use super::MarketContext;
@@ -86,7 +86,7 @@ impl MarketContext {
         // should rebuild them from rolled curves after this call.
         // Roll each curve forward, populating plain maps before wrapping them in
         // `Arc` for the new context (the other maps are shared by `Arc` clone).
-        let mut rolled_curves = HashMap::default();
+        let mut rolled_curves = FxHashMap::default();
         rolled_curves.reserve(self.curves.len());
         for (id, storage) in self.curves.iter() {
             let rolled_storage = storage.roll_forward_storage(days)?;

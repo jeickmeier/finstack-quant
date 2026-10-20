@@ -136,10 +136,8 @@ pub mod validation;
 /// Canonical serde representations used by generated JSON contracts.
 pub mod wire;
 
-/// Hash map type alias used across Finstack (`rustc_hash::FxHashMap`).
-pub use rustc_hash::FxHashMap as HashMap;
-/// Hash set type alias used across Finstack (`rustc_hash::FxHashSet`).
-pub use rustc_hash::FxHashSet as HashSet;
+/// Deterministic-hasher map and set used across Finstack (re-exported from `rustc_hash`).
+pub use rustc_hash::{FxHashMap, FxHashSet};
 
 pub use error::{format_chain, Error, ErrorKind, InputError, NonFiniteKind, Result};
 

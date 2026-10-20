@@ -227,7 +227,7 @@ pub fn compute_metrics(
     ctx: &MarketContext,
     base: Date,
     metric_ids: &[MetricId],
-) -> finstack_quant_core::HashMap<MetricId, f64> {
+) -> finstack_quant_core::FxHashMap<MetricId, f64> {
     let registry = finstack_quant_valuations::metrics::standard_registry();
 
     let base_val = deposit.value(ctx, base).unwrap();

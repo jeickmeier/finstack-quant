@@ -196,7 +196,7 @@ impl XccyBasisTarget {
         }
 
         if has_xccy {
-            let mut xccy_curve_ids = finstack_quant_core::HashMap::default();
+            let mut xccy_curve_ids = finstack_quant_core::FxHashMap::default();
             xccy_curve_ids.insert(
                 "foreign_discount".to_string(),
                 schema_params.curve_id.to_string(),

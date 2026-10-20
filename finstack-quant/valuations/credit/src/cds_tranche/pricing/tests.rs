@@ -345,7 +345,7 @@ fn test_hetero_matches_homogeneous_when_issuers_equal() {
     let index_data = ctx_base
         .get_credit_index("CDX.NA.IG.42")
         .expect("Credit index should exist in test context");
-    let mut issuer_curves = finstack_quant_core::HashMap::default();
+    let mut issuer_curves = finstack_quant_core::FxHashMap::default();
     for i in 0..10 {
         let id = format!("ISSUER-{:03}", i + 1);
         issuer_curves.insert(id, std::sync::Arc::clone(index_data.index_credit_curve()));
@@ -517,7 +517,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
     // shift it must still be classified homogeneous under the unified
     // tolerance.
     let build_ctx = |hazard_shift: f64| {
-        let mut issuer_curves = finstack_quant_core::HashMap::default();
+        let mut issuer_curves = finstack_quant_core::FxHashMap::default();
         for i in 0..20 {
             let id = format!("ISSUER-{:03}", i + 1);
             let hz = finstack_quant_core::market_data::term_structures::HazardCurve::builder(

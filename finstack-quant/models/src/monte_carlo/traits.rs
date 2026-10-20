@@ -68,7 +68,7 @@
 use super::paths::CashflowType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use smallvec::SmallVec;
 
 /// Random stream trait for generating random numbers.
@@ -325,7 +325,7 @@ fn parse_indexed_spot_key(key: &str) -> Option<usize> {
 #[derive(Debug, Clone, Default)]
 struct PathStateExtras {
     indexed_spots: SmallVec<[Option<f64>; 4]>,
-    dynamic: HashMap<&'static str, f64>,
+    dynamic: FxHashMap<&'static str, f64>,
     cashflows: Vec<(f64, f64, CashflowType)>,
 }
 
@@ -407,7 +407,7 @@ impl PathState {
     }
 
     /// Get a state variable by string key.
-    /// Routes known keys to the fixed array; unknown keys to the dynamic HashMap.
+    /// Routes known keys to the fixed array; unknown keys to the dynamic FxHashMap.
     pub fn get(&self, key: &str) -> Option<f64> {
         if let Some(sk) = resolve_key(key) {
             self.get_key(sk)
@@ -429,7 +429,7 @@ impl PathState {
     }
 
     /// Set a state variable by string key.
-    /// Routes known keys to the fixed array; unknown keys to the dynamic HashMap.
+    /// Routes known keys to the fixed array; unknown keys to the dynamic FxHashMap.
     pub fn set(&mut self, key: &'static str, value: f64) {
         if let Some(sk) = resolve_key(key) {
             self.set_key(sk, value);
@@ -458,14 +458,14 @@ impl PathState {
 
     /// Merge all state variables into `out` (clears `out` first).
     ///
-    /// Prefer this over [`Self::vars`] on hot paths to reuse a single `HashMap`
+    /// Prefer this over [`Self::vars`] on hot paths to reuse a single `FxHashMap`
     /// allocation instead of cloning the dynamic map and allocating a fresh map
     /// on every call.
     ///
     /// # Arguments
     ///
     /// * `out` - Caller-owned output buffer populated without allocating a replacement.
-    pub fn collect_vars(&self, out: &mut HashMap<&'static str, f64>) {
+    pub fn collect_vars(&self, out: &mut FxHashMap<&'static str, f64>) {
         out.clear();
 
         let dyn_len = self.extras().map(|e| e.dynamic.len()).unwrap_or(0);
@@ -511,11 +511,11 @@ impl PathState {
         }
     }
 
-    /// Collect all state variables into a HashMap.
+    /// Collect all state variables into a FxHashMap.
     /// Merges fixed-slot values with dynamic values. This allocates --
     /// prefer `get`/`get_key` or [`Self::collect_vars`] on hot paths.
-    pub fn vars(&self) -> HashMap<&'static str, f64> {
-        let mut map = HashMap::<&'static str, f64>::default();
+    pub fn vars(&self) -> FxHashMap<&'static str, f64> {
+        let mut map = FxHashMap::<&'static str, f64>::default();
         self.collect_vars(&mut map);
         map
     }
@@ -1021,7 +1021,7 @@ mod tests {
         assert_eq!(state.get("spot_1"), Some(120.0));
         assert_eq!(state.vars().get("spot_1"), Some(&120.0));
 
-        let mut buf = HashMap::<&'static str, f64>::default();
+        let mut buf = FxHashMap::<&'static str, f64>::default();
         state.collect_vars(&mut buf);
         assert_eq!(buf.get("spot_1"), Some(&120.0));
         buf.clear();

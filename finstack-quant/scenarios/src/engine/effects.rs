@@ -14,7 +14,7 @@ use finstack_quant_core::market_data::bumps::{BumpSpec, BumpType, MarketBump};
 use finstack_quant_core::market_data::context::CurveStorage;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::types::{CurveId, PriceId};
-use finstack_quant_core::HashSet;
+use finstack_quant_core::FxHashSet;
 
 /// Market change or warning an adapter produces for one operation, collected
 /// before mutation.
@@ -367,7 +367,7 @@ fn replace_curve_id(op: &OperationSpec) -> Option<&CurveId> {
 
 /// Length of the leading run of independent ParCDS / inflation replacements.
 pub(super) fn independent_replace_curve_run_len(ops: &[OperationSpec]) -> usize {
-    let mut seen: HashSet<&str> = HashSet::default();
+    let mut seen: FxHashSet<&str> = FxHashSet::default();
     let mut n = 0;
     for op in ops {
         let Some(id) = replace_curve_id(op) else {

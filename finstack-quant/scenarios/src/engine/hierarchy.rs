@@ -7,7 +7,7 @@ use finstack_quant_core::market_data::hierarchy::{
     HierarchyTarget, MarketDataHierarchy, ResolutionMode, ResolvedCurveMatch,
 };
 use finstack_quant_core::types::{CurveId, PriceId};
-use finstack_quant_core::{HashMap, HashSet};
+use finstack_quant_core::{FxHashMap, FxHashSet};
 
 struct HierarchyExpansion {
     matched_depth: usize,
@@ -42,13 +42,13 @@ fn resolve_hierarchy_matches(
 /// Collapse duplicate curve hits to a single match per `curve_id`, keeping the
 /// deepest `matched_depth` seen for each.
 fn dedup_matches_keep_deepest(matches: Vec<ResolvedCurveMatch>) -> Vec<ResolvedCurveMatch> {
-    let mut best: HashMap<CurveId, usize> = HashMap::default();
+    let mut best: FxHashMap<CurveId, usize> = FxHashMap::default();
     for m in &matches {
         best.entry(m.curve_id.clone())
             .and_modify(|d| *d = (*d).max(m.matched_depth))
             .or_insert(m.matched_depth);
     }
-    let mut seen: HashSet<CurveId> = HashSet::default();
+    let mut seen: FxHashSet<CurveId> = FxHashSet::default();
     let mut out = Vec::with_capacity(best.len());
     for m in matches {
         if seen.insert(m.curve_id.clone()) {
@@ -246,9 +246,9 @@ pub(super) fn expand_hierarchy_operations<'a>(
         slots.push(Slot::Expanded(expansions));
     }
 
-    let max_depth: HashMap<HierarchyExpansionKey, usize> =
+    let max_depth: FxHashMap<HierarchyExpansionKey, usize> =
         if matches!(mode, ResolutionMode::MostSpecificWins) {
-            let mut md: HashMap<HierarchyExpansionKey, usize> = HashMap::default();
+            let mut md: FxHashMap<HierarchyExpansionKey, usize> = FxHashMap::default();
             for slot in &slots {
                 if let Slot::Expanded(exps) = slot {
                     for exp in exps {
@@ -260,7 +260,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
             }
             md
         } else {
-            HashMap::default()
+            FxHashMap::default()
         };
 
     let mut result = Vec::with_capacity(operations.len());

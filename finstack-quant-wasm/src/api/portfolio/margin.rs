@@ -6,7 +6,7 @@ use crate::utils::input::from_js_json;
 use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use wasm_bindgen::prelude::*;
 
 /// Aggregates margin requirements across a portfolio by netting set
@@ -67,11 +67,11 @@ impl JsPortfolioMarginAggregator {
         current_im_collateral: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let as_of = js_date(&as_of, "asOf")?;
-        let collateral: HashMap<String, Money> = match current_im_collateral {
+        let collateral: FxHashMap<String, Money> = match current_im_collateral {
             Some(value) if !(value.is_null() || value.is_undefined()) => {
                 from_js_json(&value, "currentImCollateral")?
             }
-            _ => HashMap::default(),
+            _ => FxHashMap::default(),
         };
         let result = self
             .inner

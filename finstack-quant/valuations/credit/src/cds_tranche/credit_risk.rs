@@ -38,7 +38,7 @@ pub(super) fn replace_hazard(
         builder = builder.index_credit_curve(Arc::clone(&hazard));
     }
     if let Some(issuers) = index.issuer_credit_curves() {
-        let updated: finstack_quant_core::HashMap<_, _> = issuers
+        let updated: finstack_quant_core::FxHashMap<_, _> = issuers
             .iter()
             .map(|(issuer, curve)| {
                 let next = if curve.id() == hazard.id() {

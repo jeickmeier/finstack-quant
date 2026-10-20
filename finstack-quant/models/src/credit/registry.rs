@@ -4,7 +4,7 @@ use crate::credit::lgd::seniority::{BetaRecovery, SeniorityCalibration, Seniorit
 use crate::credit::pd::MasterScaleGrade;
 use finstack_quant_core::embedded_registry::EmbeddedJsonRegistry;
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_core::{Error, HashMap, InputError, Result};
+use finstack_quant_core::{Error, FxHashMap, InputError, Result};
 use serde::{Deserialize, Serialize};
 
 static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<CreditAssumptionRegistry> =
@@ -313,7 +313,7 @@ fn not_found(kind: &str, id: &str) -> Error {
 
 #[derive(Clone, Debug)]
 pub(crate) struct RatingFactorTableParts {
-    pub(crate) factors: HashMap<CreditRating, f64>,
+    pub(crate) factors: FxHashMap<CreditRating, f64>,
     pub(crate) agency: String,
     pub(crate) methodology: String,
     pub(crate) default_factor: f64,

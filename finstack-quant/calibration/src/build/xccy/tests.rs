@@ -10,7 +10,7 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::market::conventions::ids::XccyConventionId;
 
 fn xccy_build_ctx(as_of: Date) -> BuildCtx {
-    let mut curve_ids = finstack_quant_core::HashMap::default();
+    let mut curve_ids = finstack_quant_core::FxHashMap::default();
     curve_ids.insert("domestic_discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("foreign_discount".to_string(), "EUR-OIS".to_string());
     curve_ids.insert("domestic_forward".to_string(), "USD-SOFR-OIS".to_string());
@@ -79,7 +79,7 @@ fn test_build_xccy_basis_swap() {
 fn unregistered_forward_override_keeps_contractual_overnight_compounding() {
     let as_of =
         Date::from_calendar_date(2025, time::Month::January, 10).expect("valid XCCY build date");
-    let mut curve_ids = finstack_quant_core::HashMap::default();
+    let mut curve_ids = finstack_quant_core::FxHashMap::default();
     curve_ids.insert("domestic_discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("foreign_discount".to_string(), "EUR-OIS".to_string());
     curve_ids.insert(
@@ -117,7 +117,7 @@ fn unregistered_forward_override_keeps_contractual_overnight_compounding() {
 fn registered_term_forward_override_on_ois_convention_is_rejected() {
     let as_of =
         Date::from_calendar_date(2025, time::Month::January, 10).expect("valid XCCY build date");
-    let mut curve_ids = finstack_quant_core::HashMap::default();
+    let mut curve_ids = finstack_quant_core::FxHashMap::default();
     curve_ids.insert("domestic_discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("foreign_discount".to_string(), "EUR-OIS".to_string());
     curve_ids.insert("domestic_forward".to_string(), "USD-SOFR-3M".to_string());

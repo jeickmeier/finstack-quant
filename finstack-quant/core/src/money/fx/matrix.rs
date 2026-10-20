@@ -5,7 +5,7 @@ use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::{recover_lock, HashMap};
+use crate::{recover_lock, FxHashMap};
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     recover_lock(mutex.lock())
@@ -28,7 +28,7 @@ const MAX_STATE_ATTEMPTS: usize = 3;
 struct Pair(Currency, Currency);
 
 /// Caller-pinned and provider-pinned quote stores for one date/policy scope.
-type ScopedSnapshotQuotes = (HashMap<Pair, f64>, HashMap<Pair, f64>);
+type ScopedSnapshotQuotes = (FxHashMap<Pair, f64>, FxHashMap<Pair, f64>);
 
 /// Query-sensitive key for the provider-observed quote cache.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -72,9 +72,9 @@ fn canonical_orientation(from: Currency, to: Currency) -> (Currency, Currency, b
 /// Resolve `from → to` through the stores in priority order, each with
 /// reciprocal fallback.
 fn effective_snapshot_rate(
-    global: &HashMap<Pair, f64>,
-    pinned: &HashMap<Pair, f64>,
-    observed: &HashMap<Pair, f64>,
+    global: &FxHashMap<Pair, f64>,
+    pinned: &FxHashMap<Pair, f64>,
+    observed: &FxHashMap<Pair, f64>,
     from: Currency,
     to: Currency,
 ) -> crate::Result<Option<f64>> {
@@ -118,10 +118,10 @@ pub struct FxMatrix {
     provider: Arc<dyn FxProvider>,
     /// Explicit, pair-global quotes inserted by callers or restored from
     /// serialized state. These are authoritative constant rates (e.g. pegged
-    /// currencies), so the store is a plain `HashMap` that **never evicts** — a
+    /// currencies), so the store is a plain `FxHashMap` that **never evicts** — a
     /// seeded peg must never be silently dropped under cache pressure and then
     /// re-derived from the provider (which would be a silent mispricing).
-    quotes: Mutex<HashMap<Pair, f64>>,
+    quotes: Mutex<FxHashMap<Pair, f64>>,
     /// Query-sensitive quotes observed from providers or triangulation. This is
     /// the only genuinely bounded cache (governed by `config.cache_capacity`).
     observed_quotes: Mutex<
@@ -130,7 +130,7 @@ pub struct FxMatrix {
     /// Authoritative date/policy-scoped quotes pinned via [`FxMatrix::set_quote_on`].
     /// Unlike `observed_quotes`, this map never evicts, so a pinned fixing is
     /// never silently replaced by the provider under cache pressure.
-    pinned_quotes: Mutex<HashMap<QueryKey, f64>>,
+    pinned_quotes: Mutex<FxHashMap<QueryKey, f64>>,
     config: FxConfig,
     quote_revision: AtomicU64,
 }
@@ -168,11 +168,11 @@ impl FxProvider for ResolvedPairProvider {
     fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
         let mut quotes = self.matrix.provider.snapshot_quotes();
         let global = lock(&self.matrix.quotes);
-        let provider: HashMap<Pair, f64> = quotes
+        let provider: FxHashMap<Pair, f64> = quotes
             .iter()
             .map(|&(from, to, rate)| (Pair(from, to), rate))
             .collect();
-        let empty = HashMap::default();
+        let empty = FxHashMap::default();
         let lookup = |from, to| -> crate::Result<Option<f64>> {
             if from == to {
                 Ok(Some(1.0))
@@ -209,14 +209,14 @@ impl FxProvider for ResolvedPairProvider {
         }
         let global = lock(&self.matrix.quotes);
         let pinned = lock(&self.matrix.pinned_quotes);
-        let provider: HashMap<Pair, f64> = self
+        let provider: FxHashMap<Pair, f64> = self
             .matrix
             .provider
             .snapshot_quotes()
             .into_iter()
             .map(|(from, to, rate)| (Pair(from, to), rate))
             .collect();
-        let mut scopes: HashMap<_, ScopedSnapshotQuotes> = HashMap::default();
+        let mut scopes: FxHashMap<_, ScopedSnapshotQuotes> = FxHashMap::default();
         for &(from, to, on, policy, rate) in &quotes {
             scopes
                 .entry((on, policy))
@@ -231,7 +231,7 @@ impl FxProvider for ResolvedPairProvider {
                 .0
                 .insert(Pair(key.from, key.to), rate);
         }
-        let empty = HashMap::default();
+        let empty = FxHashMap::default();
         let Pair(from, to) = self.pair;
         let pivot = self.matrix.config.pivot_currency;
         for ((on, policy), (pinned, provider_pinned)) in scopes {
@@ -336,9 +336,9 @@ impl FxMatrix {
         observed_quotes.resize(capacity);
         Self {
             provider,
-            quotes: Mutex::new(HashMap::default()),
+            quotes: Mutex::new(FxHashMap::default()),
             observed_quotes: Mutex::new(observed_quotes),
-            pinned_quotes: Mutex::new(HashMap::default()),
+            pinned_quotes: Mutex::new(FxHashMap::default()),
             config,
             quote_revision: AtomicU64::new(0),
         }

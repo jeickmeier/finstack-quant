@@ -5,7 +5,7 @@
 //! correlation scenarios.
 
 use super::types::{DrcPosition, DrcSector, DrcSeniority};
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
@@ -106,7 +106,7 @@ pub fn drc_charge(positions: &[DrcPosition]) -> finstack_quant_core::Result<f64>
     }
     // Rank grows toward junior claims. Shorts can offset only equally senior
     // or more senior longs. Consume the most constrained longs first.
-    let mut buckets = HashMap::<DrcSector, [f64; 4]>::default();
+    let mut buckets = FxHashMap::<DrcSector, [f64; 4]>::default();
     for entry in obligors.values_mut() {
         for long_rank in (0..4).rev() {
             for short_rank in long_rank..4 {
@@ -137,9 +137,9 @@ pub fn drc_charge(positions: &[DrcPosition]) -> finstack_quant_core::Result<f64>
         .sum())
 }
 
-static DRC_RW_BY_BUCKET: LazyLock<finstack_quant_core::HashMap<u8, f64>> =
+static DRC_RW_BY_BUCKET: LazyLock<finstack_quant_core::FxHashMap<u8, f64>> =
     LazyLock::new(|| DRC_RISK_WEIGHTS.iter().copied().collect());
-static DRC_LGD_BY_SENIORITY: LazyLock<finstack_quant_core::HashMap<DrcSeniority, f64>> =
+static DRC_LGD_BY_SENIORITY: LazyLock<finstack_quant_core::FxHashMap<DrcSeniority, f64>> =
     LazyLock::new(|| DRC_LGD.iter().copied().collect());
 
 /// Look up DRC risk weight by rating bucket.

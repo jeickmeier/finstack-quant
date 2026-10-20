@@ -5,7 +5,7 @@
 
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use super::pool::{AssetPool, PoolAsset};
@@ -322,7 +322,7 @@ impl BorrowingBaseRules {
         let mut adjusted = eligible.clone();
         for limit in &self.concentration_limits {
             let cap = eligible_total * limit.max_pct / 100.0;
-            let mut groups: HashMap<String, f64> = HashMap::default();
+            let mut groups: FxHashMap<String, f64> = FxHashMap::default();
             for (index, asset) in pool.assets.iter().enumerate() {
                 if let Some(key) = concentration_key(limit.scope, asset) {
                     *groups.entry(key).or_insert(0.0) += adjusted[index];

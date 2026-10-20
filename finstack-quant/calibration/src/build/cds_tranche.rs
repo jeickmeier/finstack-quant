@@ -192,7 +192,7 @@ mod tests {
     use crate::quotes::ids::QuoteId;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{adjust, Date};
-    use finstack_quant_core::HashMap;
+    use finstack_quant_core::FxHashMap;
     use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause,
     };
@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn build_non_imm_tranche_allows_custom_schedule() {
         let as_of = Date::from_calendar_date(2024, Month::January, 2).expect("valid date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "CDX.NA.IG".to_string());
         let ctx = BuildCtx::new(as_of, 1_000_000.0, curve_ids);
@@ -259,7 +259,7 @@ mod tests {
     #[test]
     fn test_upfront_decimal_fraction_semantics() {
         let as_of = Date::from_calendar_date(2024, Month::January, 2).expect("valid date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "CDX.NA.IG".to_string());
         // Base notional of 100M -> tranche notional = 100M * (0.07 - 0.03) = 4M
@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn test_upfront_rejects_percentage_point_notation() {
         let as_of = Date::from_calendar_date(2024, Month::January, 2).expect("valid date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "CDX.NA.IG".to_string());
         let ctx = BuildCtx::new(as_of, 100_000_000.0, curve_ids);
@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn test_zero_upfront_no_payment() {
         let as_of = Date::from_calendar_date(2024, Month::January, 2).expect("valid date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "CDX.NA.IG".to_string());
         let ctx = BuildCtx::new(as_of, 100_000_000.0, curve_ids);

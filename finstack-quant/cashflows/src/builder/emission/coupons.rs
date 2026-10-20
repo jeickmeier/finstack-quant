@@ -501,7 +501,7 @@ fn project_segment_indices(
             constraints,
         } => {
             let mut accumulator = observations.accumulator(*day_count_basis, *constraints)?;
-            let mut raw_fixings = finstack_quant_core::HashMap::default();
+            let mut raw_fixings = finstack_quant_core::FxHashMap::default();
             for slice in observations.observations() {
                 if raw_fixings.contains_key(&slice.observation_date) {
                     continue;

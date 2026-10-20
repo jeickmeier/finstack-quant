@@ -19,7 +19,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use time::Month;
 
 fn base_discount_curve(base_date: finstack_quant_core::dates::Date) -> DiscountCurve {
@@ -64,7 +64,7 @@ fn explanation_not_computed_by_default() {
     let fwd_quotes = forward_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&ctx);
     cal_utils::extend_market_data(&mut market_data, &fwd_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("fwd".to_string(), cal_utils::quote_set_ids(&fwd_quotes));
 
     let plan = CalibrationPlan {
@@ -113,7 +113,7 @@ fn explanation_is_present_when_enabled() {
     let fwd_quotes = forward_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&ctx);
     cal_utils::extend_market_data(&mut market_data, &fwd_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("fwd".to_string(), cal_utils::quote_set_ids(&fwd_quotes));
 
     // The wire form is how hosts enable tracing: a JSON plan setting.

@@ -15,7 +15,7 @@ use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use time::Month;
 
 #[test]
@@ -71,7 +71,7 @@ fn plan_and_envelope_serde_roundtrip() {
     })];
     let mut market_data: Vec<MarketDatum> = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &usd_ois_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert(
         "usd_ois".to_string(),
         cal_utils::quote_set_ids(&usd_ois_quotes),
@@ -156,7 +156,7 @@ fn two_step_envelope(use_parallel: bool) -> CalibrationEnvelope {
     let mut market_data: Vec<MarketDatum> = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &quotes_a);
     cal_utils::extend_market_data(&mut market_data, &quotes_b);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("a".to_string(), cal_utils::quote_set_ids(&quotes_a));
     quote_sets.insert("b".to_string(), cal_utils::quote_set_ids(&quotes_b));
 

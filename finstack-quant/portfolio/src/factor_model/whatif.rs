@@ -10,7 +10,7 @@ use crate::Portfolio;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
-use finstack_quant_core::HashSet;
+use finstack_quant_core::FxHashSet;
 use finstack_quant_factor::risk::{FactorContribution, RiskDecomposition};
 use finstack_quant_factor::FactorId;
 
@@ -110,7 +110,7 @@ pub(super) fn position_what_if(
     };
     let mut scenario_positions = portfolio.positions().to_vec();
 
-    let mut changed = HashSet::default();
+    let mut changed = FxHashSet::default();
     for change in changes {
         match change {
             PositionChange::Remove { position_id } => {

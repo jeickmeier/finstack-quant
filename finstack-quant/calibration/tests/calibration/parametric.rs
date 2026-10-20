@@ -12,7 +12,7 @@ use finstack_quant_calibration::{CalibrationConfig, DiscountCurveSolveConfig};
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::term_structures::NsVariant;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use time::Month;
 
 use crate::calibration::calibration_support as cal_utils;
@@ -134,7 +134,7 @@ fn run_parametric_ns_with_config(
     let mut market_data: Vec<MarketDatum> = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &quotes);
 
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("ns_quotes".to_string(), cal_utils::quote_set_ids(&quotes));
 
     // Do not throw on bad fit — return the report so we can inspect residuals.

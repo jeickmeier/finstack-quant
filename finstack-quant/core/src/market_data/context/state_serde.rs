@@ -13,7 +13,7 @@ use crate::contract::{
 };
 use crate::types::CurveId;
 use crate::wire::SchemaVersion;
-use crate::HashSet;
+use crate::FxHashSet;
 
 use super::{CurveStorage, MarketContext};
 
@@ -230,7 +230,7 @@ fn duplicate_id_diagnostics(
     field: &str,
     ids: impl IntoIterator<Item = String>,
 ) {
-    let mut seen = HashSet::default();
+    let mut seen = FxHashSet::default();
     for (index, id) in ids.into_iter().enumerate() {
         if !seen.insert(id.clone()) {
             report.push_bounded(
@@ -311,7 +311,7 @@ fn validate_restore_references(
         state.vol_cubes.iter().map(|entry| entry.id().to_string()),
     );
 
-    let discount_ids: HashSet<&str> = state
+    let discount_ids: FxHashSet<&str> = state
         .curves
         .iter()
         .filter_map(|entry| match entry {
@@ -319,7 +319,7 @@ fn validate_restore_references(
             _ => None,
         })
         .collect();
-    let hazard_ids: HashSet<&str> = state
+    let hazard_ids: FxHashSet<&str> = state
         .curves
         .iter()
         .filter_map(|entry| match entry {
@@ -327,7 +327,7 @@ fn validate_restore_references(
             _ => None,
         })
         .collect();
-    let base_correlation_ids: HashSet<&str> = state
+    let base_correlation_ids: FxHashSet<&str> = state
         .curves
         .iter()
         .filter_map(|entry| match entry {
@@ -442,7 +442,7 @@ pub fn build_snapshot_fx_matrix(
 /// Values of `map` in ascending key order, each mapped through `f`.
 ///
 /// Persisted snapshots must not depend on hash-map iteration order.
-fn sorted_by_id<V, T>(map: &crate::HashMap<CurveId, V>, f: impl Fn(&CurveId, &V) -> T) -> Vec<T> {
+fn sorted_by_id<V, T>(map: &crate::FxHashMap<CurveId, V>, f: impl Fn(&CurveId, &V) -> T) -> Vec<T> {
     let mut keys: Vec<&CurveId> = map.keys().collect();
     keys.sort();
     keys.into_iter().map(|id| f(id, &map[id])).collect()

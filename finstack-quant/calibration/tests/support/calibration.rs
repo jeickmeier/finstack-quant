@@ -154,7 +154,7 @@ pub fn execute_step(
     let ids = quote_set_ids(quotes);
     extend_market_data(&mut data, quotes);
 
-    let mut quote_sets = finstack_quant_core::HashMap::default();
+    let mut quote_sets = finstack_quant_core::FxHashMap::default();
     quote_sets.insert("default".to_string(), ids);
 
     let plan = CalibrationPlan {

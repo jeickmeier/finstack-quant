@@ -9,7 +9,7 @@ use super::aggregation::{
 };
 use super::params::{self, commodity, csr, equity, fx, girr};
 use super::types::{CorrelationScenario, FrtbRiskClass, FrtbSensitivities};
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use std::collections::BTreeMap;
 
 /// Compute the vega risk charge for a single risk class under one
@@ -59,7 +59,7 @@ fn girr_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
     // MAR21.93.
     // Entry: (ws, option_maturity_years, underlying_tenor_years)
     type VegaEntry = (f64, (f64, f64)); // (weighted_vega, (option_maturity_years, underlying_tenor_years))
-    let mut by_currency: HashMap<_, Vec<VegaEntry>> = HashMap::default();
+    let mut by_currency: FxHashMap<_, Vec<VegaEntry>> = FxHashMap::default();
     for ((ccy, opt_mat, und_tenor), vega) in &sens.girr_vega {
         let ws = vega * girr::GIRR_VEGA_RISK_WEIGHT;
         // The engine validates tenor labels before this private stage.
@@ -158,7 +158,7 @@ fn fx_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
 
 /// Generic bucketed vega aggregation for (name, bucket, tenor) keys.
 fn generic_bucketed_vega(
-    sensitivities: &HashMap<(String, u8, String), f64>,
+    sensitivities: &FxHashMap<(String, u8, String), f64>,
     class: FrtbRiskClass,
     scenario: CorrelationScenario,
 ) -> f64 {

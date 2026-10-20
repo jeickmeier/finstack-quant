@@ -105,7 +105,7 @@ fn push_unique_key(keys: &mut Vec<MarketFactorKey>, key: MarketFactorKey) {
 }
 
 fn dependencies_intersect_factor(
-    dependencies: &finstack_quant_core::HashSet<MarketFactorKey>,
+    dependencies: &finstack_quant_core::FxHashSet<MarketFactorKey>,
     factor_keys: &[MarketFactorKey],
 ) -> bool {
     // FxMatrix rebuilds derived cross rates after any quote bump. A position
@@ -320,7 +320,7 @@ mod tests {
 
     #[test]
     fn any_fx_quote_affects_triangulated_fx_dependencies() {
-        let dependencies = finstack_quant_core::HashSet::from_iter([MarketFactorKey::fx(
+        let dependencies = finstack_quant_core::FxHashSet::from_iter([MarketFactorKey::fx(
             finstack_quant_core::currency::Currency::EUR,
             finstack_quant_core::currency::Currency::JPY,
         )]);

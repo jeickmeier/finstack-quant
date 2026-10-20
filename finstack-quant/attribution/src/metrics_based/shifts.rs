@@ -3,7 +3,7 @@ use finstack_quant_core::market_data::diff::{
     measure_discount_curve_shift, measure_inflation_index_shift, TenorSamplingMethod,
 };
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations::metrics::{parse_key_rate_label, MetricId};
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
@@ -22,8 +22,8 @@ pub(crate) fn extract_keyrate_per_curve(
     measures: &indexmap::IndexMap<MetricId, f64>,
     curve_ids: &[CurveId],
     metric_prefix: &str,
-) -> Result<HashMap<CurveId, Vec<(f64, f64)>>> {
-    let mut result = HashMap::default();
+) -> Result<FxHashMap<CurveId, Vec<(f64, f64)>>> {
+    let mut result = FxHashMap::default();
     for curve_id in curve_ids {
         let prefix = format!("{metric_prefix}::{curve_id}::");
         let mut buckets = measures
@@ -49,7 +49,7 @@ pub(crate) fn extract_keyrate_per_curve(
 }
 
 fn validate_curve_coverage<T>(
-    buckets: &HashMap<CurveId, T>,
+    buckets: &FxHashMap<CurveId, T>,
     curve_ids: &[CurveId],
     metric_prefix: &str,
 ) -> Result<()> {
@@ -89,9 +89,9 @@ pub(crate) fn extract_credit_keyrates(
     market_t0: &MarketContext,
     market_t1: &MarketContext,
     provider: &dyn RecalibrationProvider,
-) -> Result<HashMap<CurveId, Vec<CreditKeyRateBucket>>> {
+) -> Result<FxHashMap<CurveId, Vec<CreditKeyRateBucket>>> {
     use finstack_quant_calibration::quotes::cds::CdsQuote;
-    let mut result = HashMap::default();
+    let mut result = FxHashMap::default();
     for curve_id in curve_ids {
         let prefix = format!("bucketed_cs01::{curve_id}::");
         let supplied: indexmap::IndexMap<_, _> = measures

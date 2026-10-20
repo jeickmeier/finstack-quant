@@ -1280,7 +1280,7 @@ mod canonical_validation_tests {
     use crate::api::market_datum::{MarketDatum, PriceDatum};
     use crate::api::schema::CalibrationPlan;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::HashMap;
+    use finstack_quant_core::FxHashMap;
 
     #[test]
     fn duplicate_price_id_is_flagged() {
@@ -1321,7 +1321,7 @@ mod canonical_validation_tests {
     #[test]
     fn unresolved_quote_id_is_flagged() {
         use crate::quotes::ids::QuoteId;
-        let mut quote_sets = HashMap::default();
+        let mut quote_sets = FxHashMap::default();
         quote_sets.insert("usd".to_string(), vec![QuoteId::new("MISSING")]);
         let envelope = CalibrationEnvelope {
             schema_url: None,

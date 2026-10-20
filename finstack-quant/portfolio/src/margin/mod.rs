@@ -43,7 +43,7 @@
 //! let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
 //!
 //! // Calculate margin requirements
-//! let margin_results = aggregator.calculate(&portfolio, &market, as_of, &finstack_quant_core::HashMap::default())?;
+//! let margin_results = aggregator.calculate(&portfolio, &market, as_of, &finstack_quant_core::FxHashMap::default())?;
 //!
 //! // Get margin by netting set
 //! for (netting_set, margin) in &margin_results.by_netting_set {

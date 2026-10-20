@@ -31,7 +31,7 @@ pub use resolution::{
 };
 
 use crate::types::CurveId;
-use crate::HashMap;
+use crate::FxHashMap;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -239,7 +239,7 @@ impl MarketDataHierarchy {
             node: &HierarchyNode,
             expected_name: &str,
             path: &mut Vec<String>,
-            seen: &mut HashMap<CurveId, String>,
+            seen: &mut FxHashMap<CurveId, String>,
         ) -> crate::Result<()> {
             if expected_name.is_empty() || node.name().is_empty() {
                 return Err(crate::Error::Validation(
@@ -276,7 +276,7 @@ impl MarketDataHierarchy {
             Ok(())
         }
 
-        let mut seen = HashMap::default();
+        let mut seen = FxHashMap::default();
         let mut path = Vec::new();
         for (root_name, root) in &self.roots {
             visit(root, root_name, &mut path, &mut seen)?;

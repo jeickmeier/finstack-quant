@@ -5,7 +5,7 @@
 
 use super::{HierarchyNode, MarketDataHierarchy};
 use crate::types::CurveId;
-use crate::{HashMap, HashSet};
+use crate::{FxHashMap, FxHashSet};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -142,7 +142,7 @@ impl MarketDataHierarchy {
         match mode {
             ResolutionMode::Cumulative => matches,
             ResolutionMode::MostSpecificWins => {
-                let mut max_depth: HashMap<CurveId, usize> = HashMap::default();
+                let mut max_depth: FxHashMap<CurveId, usize> = FxHashMap::default();
                 for matched in &matches {
                     max_depth
                         .entry(matched.curve_id.clone())
@@ -150,7 +150,7 @@ impl MarketDataHierarchy {
                         .or_insert(matched.matched_depth);
                 }
 
-                let mut emitted = HashSet::default();
+                let mut emitted = FxHashSet::default();
                 matches
                     .into_iter()
                     .filter(|matched| {

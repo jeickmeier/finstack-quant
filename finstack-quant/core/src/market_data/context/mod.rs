@@ -65,7 +65,7 @@ use crate::dates::Date;
 use crate::money::fx::{FxMatrix, FxQuery};
 use crate::money::Money;
 use crate::types::CurveId;
-use crate::HashMap;
+use crate::FxHashMap;
 use crate::InputError;
 
 use super::{
@@ -104,7 +104,7 @@ pub enum ContextScratchBump {
         /// actually feeds a credit index. `None` means no credit indices were
         /// rebound, so the snapshot is skipped on the common rates path. The
         /// snapshot is a cheap `Arc` clone of the whole map (copy-on-write).
-        previous_credit_indices: Option<Arc<HashMap<CurveId, Arc<CreditIndexData>>>>,
+        previous_credit_indices: Option<Arc<FxHashMap<CurveId, Arc<CreditIndexData>>>>,
     },
     /// A bumped volatility surface.
     Surface {
@@ -151,37 +151,37 @@ pub struct MarketContext {
     // rehashing every map. Mutators use `Arc::make_mut`, so a bump that touches
     // one map copies only that map (copy-on-write) and leaves the rest shared.
     /// All curves stored in unified enum-based map
-    curves: Arc<HashMap<CurveId, CurveStorage>>,
+    curves: Arc<FxHashMap<CurveId, CurveStorage>>,
 
     /// Foreign-exchange matrix
     fx: Option<Arc<FxMatrix>>,
 
     /// Volatility surfaces
-    surfaces: Arc<HashMap<CurveId, Arc<VolSurface>>>,
+    surfaces: Arc<FxHashMap<CurveId, Arc<VolSurface>>>,
 
     /// Market scalars and prices
-    prices: Arc<HashMap<CurveId, MarketScalar>>,
+    prices: Arc<FxHashMap<CurveId, MarketScalar>>,
 
     /// Generic time series
-    series: Arc<HashMap<CurveId, ScalarTimeSeries>>,
+    series: Arc<FxHashMap<CurveId, ScalarTimeSeries>>,
 
     /// Inflation indices
-    inflation_indices: Arc<HashMap<CurveId, Arc<InflationIndex>>>,
+    inflation_indices: Arc<FxHashMap<CurveId, Arc<InflationIndex>>>,
 
     /// Credit index aggregates
-    credit_indices: Arc<HashMap<CurveId, Arc<CreditIndexData>>>,
+    credit_indices: Arc<FxHashMap<CurveId, Arc<CreditIndexData>>>,
 
     /// Shared dividend schedules keyed by `CurveId` (e.g., "AAPL-DIVS")
-    dividends: Arc<HashMap<CurveId, Arc<DividendSchedule>>>,
+    dividends: Arc<FxHashMap<CurveId, Arc<DividendSchedule>>>,
 
     /// FX delta-quoted volatility surfaces
-    fx_delta_vol_surfaces: Arc<HashMap<CurveId, Arc<FxDeltaVolSurface>>>,
+    fx_delta_vol_surfaces: Arc<FxHashMap<CurveId, Arc<FxDeltaVolSurface>>>,
 
     /// SABR volatility cubes (expiry x tenor x strike)
-    vol_cubes: Arc<HashMap<CurveId, Arc<VolCube>>>,
+    vol_cubes: Arc<FxHashMap<CurveId, Arc<VolCube>>>,
 
     /// Collateral CSA code mappings
-    collateral: Arc<HashMap<String, CurveId>>,
+    collateral: Arc<FxHashMap<String, CurveId>>,
 
     /// Optional market data hierarchy for organizational grouping.
     hierarchy: Option<MarketDataHierarchy>,
@@ -331,7 +331,7 @@ impl MarketContext {
         if self.credit_indices.is_empty() {
             return Vec::new();
         }
-        let mut rebuilt = HashMap::default();
+        let mut rebuilt = FxHashMap::default();
         rebuilt.reserve(self.credit_indices.len());
         let mut invalidated = Vec::new();
 

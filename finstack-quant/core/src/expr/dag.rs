@@ -6,7 +6,7 @@
 //! of interdependent formulas.
 
 use super::ast::*;
-use crate::{HashMap, HashSet};
+use crate::{FxHashMap, FxHashSet};
 use std::vec::Vec;
 
 /// A node in the execution DAG.
@@ -37,9 +37,9 @@ pub(crate) struct ExecutionPlan {
 #[derive(Default)]
 pub(crate) struct DagBuilder {
     /// Expression cache for deduplication.
-    expr_cache: HashMap<Expr, u64>,
+    expr_cache: FxHashMap<Expr, u64>,
     /// Node storage.
-    nodes: HashMap<u64, DagNode>,
+    nodes: FxHashMap<u64, DagNode>,
     /// Next available node ID.
     next_id: u64,
 }
@@ -126,15 +126,15 @@ impl DagBuilder {
 
     /// Build topological ordering of nodes.
     fn topological_sort(&self, root: u64) -> crate::Result<Vec<DagNode>> {
-        let mut visited = HashSet::default();
+        let mut visited = FxHashSet::default();
         let mut result = Vec::new();
-        let mut visiting = HashSet::default();
+        let mut visiting = FxHashSet::default();
 
         fn visit(
             node_id: u64,
-            nodes: &HashMap<u64, DagNode>,
-            visited: &mut HashSet<u64>,
-            visiting: &mut HashSet<u64>,
+            nodes: &FxHashMap<u64, DagNode>,
+            visited: &mut FxHashSet<u64>,
+            visiting: &mut FxHashSet<u64>,
             result: &mut Vec<DagNode>,
             depth: usize,
         ) -> crate::Result<()> {

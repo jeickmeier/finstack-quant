@@ -1,7 +1,7 @@
 //! Build context for quote-to-instrument construction.
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::{Error, HashMap, InputError, Result};
+use finstack_quant_core::{Error, FxHashMap, InputError, Result};
 
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_valuations_credit::cds::CdsValuationConvention;
@@ -35,10 +35,10 @@ use finstack_quant_valuations_credit::cds::CdsValuationConvention;
 /// ```rust,ignore
 /// use finstack_quant_calibration::build::BuildCtx;
 /// use finstack_quant_core::dates::Date;
-/// use finstack_quant_core::HashMap;
+/// use finstack_quant_core::FxHashMap;
 ///
 /// let as_of = Date::from_calendar_date(2024, time::Month::January, 2).unwrap();
-/// let mut curve_ids = HashMap::default();
+/// let mut curve_ids = FxHashMap::default();
 /// curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
 /// curve_ids.insert("forward".to_string(), "USD-SOFR".to_string());
 ///
@@ -50,12 +50,12 @@ use finstack_quant_valuations_credit::cds::CdsValuationConvention;
 /// ```rust,ignore
 /// use finstack_quant_calibration::build::BuildCtx;
 /// use finstack_quant_core::dates::Date;
-/// use finstack_quant_core::HashMap;
+/// use finstack_quant_core::FxHashMap;
 ///
 /// let ctx = BuildCtx::new(
 ///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
 ///     1_000_000.0,
-///     HashMap::default(), // Builders that require roles will fail closed.
+///     FxHashMap::default(), // Builders that require roles will fail closed.
 /// );
 /// ```
 #[derive(Debug, Clone)]
@@ -83,7 +83,7 @@ pub(crate) struct BuildCtx {
     ///
     /// Do not assume that a missing role always falls back to a currency-based ID.
     /// Consult the builder-specific docs when the distinction matters.
-    curve_ids: HashMap<String, String>,
+    curve_ids: FxHashMap<String, String>,
     /// Optional CDS valuation convention for instruments built from CDS quotes.
     cds_valuation_convention: Option<CdsValuationConvention>,
     /// Optional override for the OIS floating-leg compounding mode used when
@@ -101,7 +101,7 @@ pub(crate) struct BuildCtx {
 
 impl BuildCtx {
     /// Create a new build context.
-    pub(crate) fn new(as_of: Date, notional: f64, curve_ids: HashMap<String, String>) -> Self {
+    pub(crate) fn new(as_of: Date, notional: f64, curve_ids: FxHashMap<String, String>) -> Self {
         Self {
             as_of,
             notional,

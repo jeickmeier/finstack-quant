@@ -1364,8 +1364,8 @@ pub fn calculate_pool_stats(
     as_of: Date,
 ) -> finstack_quant_core::Result<PoolStats> {
     // Count unique obligors and industries
-    let mut obligors = finstack_quant_core::HashSet::default();
-    let mut industries = finstack_quant_core::HashSet::default();
+    let mut obligors = finstack_quant_core::FxHashSet::default();
+    let mut industries = finstack_quant_core::FxHashSet::default();
 
     for asset in &pool.assets {
         if let Some(ref obligor) = asset.obligor_id {

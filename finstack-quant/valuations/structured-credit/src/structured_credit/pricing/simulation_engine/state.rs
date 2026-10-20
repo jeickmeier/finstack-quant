@@ -12,10 +12,10 @@ pub(super) struct SimulationState<'a> {
     /// Total pool outstanding (sum of balances)
     pub(super) pool_outstanding: Money,
     pub(super) recovery_queue: RecoveryQueue,
-    pub(super) tranche_balances: HashMap<String, Money>,
+    pub(super) tranche_balances: FxHashMap<String, Money>,
     /// Deferred (PIK) interest per tranche, carried forward to next period.
-    pub(super) deferred_interest: HashMap<String, Money>,
-    pub(super) results: HashMap<String, TrancheCashflows>,
+    pub(super) deferred_interest: FxHashMap<String, Money>,
+    pub(super) results: FxHashMap<String, TrancheCashflows>,
     pub(super) prev_date: Option<Date>,
     pub(super) currency: Currency,
     pub(super) recovery_lag_months: u32,
@@ -53,7 +53,7 @@ pub(super) struct SimulationState<'a> {
     pub(super) reserve_covers_principal_at_final: bool,
     /// Net-WAC carryover outstanding per capped tranche: interest the
     /// available-funds cap withheld and not yet repaid from excess.
-    pub(super) carryover_balance: HashMap<String, Money>,
+    pub(super) carryover_balance: FxHashMap<String, Money>,
     /// Payment date of the early-amortization (or acceleration) event, once
     /// one has fired.
     pub(super) early_amortization_date: Option<Date>,
@@ -325,9 +325,9 @@ pub(super) fn step_down_metrics(
 /// preserved exactly, so FxHashMap bucket layout and every `.values()`
 /// iteration order downstream stay unchanged.
 pub(crate) struct StateTemplate {
-    results: HashMap<String, TrancheCashflows>,
-    tranche_balances: HashMap<String, Money>,
-    deferred_interest: HashMap<String, Money>,
+    results: FxHashMap<String, TrancheCashflows>,
+    tranche_balances: FxHashMap<String, Money>,
+    deferred_interest: FxHashMap<String, Money>,
     tranche_recipient_keys: Vec<RecipientType>,
     pool_state: PoolState,
     loss_alloc_order: Vec<usize>,
@@ -348,7 +348,7 @@ impl StateTemplate {
         let currency = pool.get_currency();
         let pool_balance_cleanup_threshold = embedded_registry()?.pool_balance_cleanup_threshold();
 
-        let results: HashMap<String, TrancheCashflows> = tranches
+        let results: FxHashMap<String, TrancheCashflows> = tranches
             .tranches
             .iter()
             .map(|t| {
@@ -375,7 +375,7 @@ impl StateTemplate {
             })
             .collect();
 
-        let tranche_balances: HashMap<String, Money> = tranches
+        let tranche_balances: FxHashMap<String, Money> = tranches
             .tranches
             .iter()
             .map(|t| (t.id.to_string(), t.current_balance))
@@ -398,7 +398,7 @@ impl StateTemplate {
 
         let pool_state = PoolState::from_pool(pool);
 
-        let deferred_interest: HashMap<String, Money> = tranches
+        let deferred_interest: FxHashMap<String, Money> = tranches
             .tranches
             .iter()
             .map(|t| (t.id.to_string(), t.deferred_interest))
@@ -504,7 +504,7 @@ impl<'a> SimulationState<'a> {
             incentive_fee: None,
             loss_recognition: LossRecognition::AtDefault,
             reserve_covers_principal_at_final: true,
-            carryover_balance: HashMap::default(),
+            carryover_balance: FxHashMap::default(),
             early_amortization_date: None,
             next_tranche_draw: 0,
             tranche_draws: Vec::new(),
@@ -561,7 +561,7 @@ impl<'a> SimulationState<'a> {
     /// Finalize tranche results and return them with the deal-level accounting.
     pub(super) fn finalize_with_diagnostics(
         mut self,
-    ) -> (HashMap<String, TrancheCashflows>, SimulationDiagnostics) {
+    ) -> (FxHashMap<String, TrancheCashflows>, SimulationDiagnostics) {
         let diagnostics = SimulationDiagnostics {
             periods: std::mem::take(&mut self.period_diagnostics),
             reserve_balance_path: std::mem::take(&mut self.reserve_balance_path),

@@ -66,7 +66,7 @@ impl TableEnvelope {
         metadata: IndexMap<String, serde_json::Value>,
     ) -> Result<Self> {
         let row_count = columns.first().map(TableColumn::len).unwrap_or(0);
-        let mut seen = crate::HashSet::default();
+        let mut seen = crate::FxHashSet::default();
 
         for column in &columns {
             if column.len() != row_count {

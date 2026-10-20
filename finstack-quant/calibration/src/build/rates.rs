@@ -53,13 +53,13 @@ use rust_decimal::Decimal;
 /// use finstack_quant_calibration::quotes::rates::RateQuote;
 /// use finstack_quant_core::types::IndexId;
 /// use finstack_quant_core::dates::Date;
-/// use finstack_quant_core::HashMap;
+/// use finstack_quant_core::FxHashMap;
 ///
 /// # fn example() -> finstack_quant_core::Result<()> {
 /// let ctx = BuildCtx::new(
 ///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
 ///     1_000_000.0,
-///     HashMap::default(),
+///     FxHashMap::default(),
 /// );
 ///
 /// let quote = RateQuote::Deposit {
@@ -82,13 +82,13 @@ use rust_decimal::Decimal;
 /// use finstack_quant_calibration::quotes::rates::RateQuote;
 /// use finstack_quant_core::types::IndexId;
 /// use finstack_quant_core::dates::Date;
-/// use finstack_quant_core::HashMap;
+/// use finstack_quant_core::FxHashMap;
 ///
 /// # fn example() -> finstack_quant_core::Result<()> {
 /// let ctx = BuildCtx::new(
 ///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
 ///     1_000_000.0,
-///     HashMap::default(),
+///     FxHashMap::default(),
 /// );
 ///
 /// let quote = RateQuote::Swap {
@@ -657,12 +657,12 @@ mod tests {
     use super::*;
     use crate::quotes::ids::{Pillar, QuoteId};
     use finstack_quant_core::types::IndexId;
-    use finstack_quant_core::HashMap;
+    use finstack_quant_core::FxHashMap;
 
     fn usd_build_ctx() -> BuildCtx {
         let as_of = Date::from_calendar_date(2024, time::Month::January, 2)
             .expect("valid USD rate build date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("forward".to_string(), "USD-SOFR".to_string());
         BuildCtx::new(as_of, 1_000_000.0, curve_ids)
@@ -958,7 +958,7 @@ mod tests {
     fn test_swap_enables_eom_when_start_is_month_end() -> Result<()> {
         let as_of = Date::from_calendar_date(2024, time::Month::January, 31)
             .expect("valid month-end swap build date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "GBP-SONIA-OIS".to_string());
         curve_ids.insert("forward".to_string(), "GBP-SONIA-OIS".to_string());
         let ctx = BuildCtx::new(as_of, 1_000_000.0, curve_ids);

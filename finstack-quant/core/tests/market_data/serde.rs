@@ -652,7 +652,7 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
         .unwrap();
 
     // Add issuer curves/weights/recoveries to cover optional-map serde paths.
-    let mut issuer_curves = finstack_quant_core::HashMap::default();
+    let mut issuer_curves = finstack_quant_core::FxHashMap::default();
     issuer_curves.insert("ISSUER1".to_string(), std::sync::Arc::new(hazard.clone()));
     let issuer2_haz = HazardCurve::builder("ISSUER2-HAZ")
         .base_date(d)
@@ -664,9 +664,9 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
         "ISSUER2".to_string(),
         std::sync::Arc::new(issuer2_haz.clone()),
     );
-    let mut issuer_recovery = finstack_quant_core::HashMap::default();
+    let mut issuer_recovery = finstack_quant_core::FxHashMap::default();
     issuer_recovery.insert("ISSUER1".to_string(), 0.35);
-    let mut issuer_weights = finstack_quant_core::HashMap::default();
+    let mut issuer_weights = finstack_quant_core::FxHashMap::default();
     issuer_weights.insert("ISSUER1".to_string(), 0.6);
     issuer_weights.insert("ISSUER2".to_string(), 0.4);
 
@@ -920,7 +920,7 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
         .build()
         .unwrap();
 
-    let mut issuer_curves = finstack_quant_core::HashMap::default();
+    let mut issuer_curves = finstack_quant_core::FxHashMap::default();
     issuer_curves.insert("ISSUER".to_string(), Arc::new(issuer_haz.clone()));
 
     let credit_index = CreditIndexData::builder()

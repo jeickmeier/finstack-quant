@@ -242,7 +242,7 @@ pub(crate) fn hazard_with_deal_quote_override(
     let build_ctx = crate::build::BuildCtx::new(
         hazard.base_date(),
         1.0,
-        finstack_quant_core::HashMap::default(),
+        finstack_quant_core::FxHashMap::default(),
     );
     let contractual_pillar =
         crate::build::cds::resolve_cds_quote_dates(&deal_quote, &build_ctx)?.maturity;
@@ -694,7 +694,7 @@ pub(crate) fn replay_hazard_at_horizon(
         ));
     }
     params.base_date = rolled.base_date();
-    let mut curve_ids = finstack_quant_core::HashMap::default();
+    let mut curve_ids = finstack_quant_core::FxHashMap::default();
     curve_ids.insert("discount".to_string(), params.discount_curve_id.to_string());
     curve_ids.insert("credit".to_string(), params.curve_id.to_string());
     let build_ctx = crate::build::BuildCtx::new(params.base_date, params.notional, curve_ids)

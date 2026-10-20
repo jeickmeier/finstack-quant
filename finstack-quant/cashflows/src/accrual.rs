@@ -539,7 +539,7 @@ fn build_period_inputs(
     frequency: Option<Tenor>,
 ) -> finstack_quant_core::Result<Vec<PeriodInputs>> {
     let mut result = Vec::with_capacity(periods.len());
-    let mut coupon_starts = finstack_quant_core::HashMap::default();
+    let mut coupon_starts = finstack_quant_core::FxHashMap::default();
     for period in periods {
         coupon_starts
             .entry((

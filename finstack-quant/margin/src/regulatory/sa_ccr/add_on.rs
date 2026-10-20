@@ -11,7 +11,7 @@
 use super::maturity_factor::{maturity_factor_margined, maturity_factor_unmargined};
 
 use super::types::{SaCcrAssetClass, SaCcrNettingSetConfig, SaCcrTrade};
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 
 /// IR supervisory correlation continuous-compounding rate per CRE52.54.
 const IR_SUPERVISORY_DISCOUNT_RATE: f64 = 0.05;
@@ -89,7 +89,7 @@ fn ir_add_on(trades: &[SaCcrTrade], config: &SaCcrNettingSetConfig) -> f64 {
     let sf = 0.005;
 
     // (D1, D2, D3) per hedging set.
-    let mut by_hs: HashMap<String, [f64; 3]> = HashMap::default();
+    let mut by_hs: FxHashMap<String, [f64; 3]> = FxHashMap::default();
     for trade in trades
         .iter()
         .filter(|t| t.asset_class == SaCcrAssetClass::InterestRate)

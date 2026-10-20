@@ -17,7 +17,7 @@ use std::sync::OnceLock;
 
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::{Error, HashMap, Result};
+use finstack_quant_core::{Error, FxHashMap, Result};
 use serde_json::Value;
 use tracing::{debug, info};
 
@@ -46,17 +46,17 @@ pub struct MarginRegistry {
     /// Workspace-wide default VM, IM, timing, and settlement settings.
     pub defaults: MarginDefaults,
     /// Regulatory schedule IM grids keyed by registry id such as `"bcbs_iosco"`.
-    pub schedule_im: HashMap<String, ScheduleImSchedule>,
+    pub schedule_im: FxHashMap<String, ScheduleImSchedule>,
     /// Default collateral haircuts keyed by collateral asset class.
-    pub collateral_asset_class_defaults: HashMap<CollateralAssetClass, AssetClassDefault>,
+    pub collateral_asset_class_defaults: FxHashMap<CollateralAssetClass, AssetClassDefault>,
     /// Eligible collateral schedules keyed by registry id.
-    pub collateral_schedules: HashMap<String, EligibleCollateralSchedule>,
+    pub collateral_schedules: FxHashMap<String, EligibleCollateralSchedule>,
     /// CCP conservative fallback parameters keyed by CCP identifier.
-    pub ccp: HashMap<String, CcpParams>,
+    pub ccp: FxHashMap<String, CcpParams>,
     /// Resolved default CCP conservative fallback parameters.
     pub ccp_default_params: CcpParams,
     /// SIMM parameter sets keyed by registry id such as `"v2_6"`.
-    pub simm: HashMap<String, SimmParams>,
+    pub simm: FxHashMap<String, SimmParams>,
 }
 
 /// Top-level default settings shared across margin methodologies.
@@ -151,7 +151,7 @@ pub struct ScheduleImSchedule {
     /// Margin period of risk in business days.
     pub mpor_days: u32,
     /// Decimal rates keyed by `(asset_class, maturity_bucket)`.
-    pub rates: HashMap<(ScheduleAssetClass, MaturityBucket), f64>,
+    pub rates: FxHashMap<(ScheduleAssetClass, MaturityBucket), f64>,
 }
 
 /// Boundaries, in years, for the schedule IM maturity buckets.
@@ -184,7 +184,7 @@ pub struct CcpParams {
 }
 
 struct ParsedCcpRegistry {
-    ccp: HashMap<String, CcpParams>,
+    ccp: FxHashMap<String, CcpParams>,
     ccp_default_params: CcpParams,
 }
 
@@ -196,7 +196,7 @@ pub struct SimmParams {
     /// Margin period of risk in business days.
     pub mpor_days: u32,
     /// Interest-rate delta risk weights keyed by tenor label.
-    pub ir_delta_weights: HashMap<String, f64>,
+    pub ir_delta_weights: FxHashMap<String, f64>,
     /// Credit-non-qualifying delta risk weight.
     pub cnq_delta_weight: f64,
     /// Equity delta risk weight.
@@ -208,11 +208,11 @@ pub struct SimmParams {
     /// Historical v2.6 regular/regular FX factors against USD use 0.5.
     pub fx_intra_bucket_correlation: f64,
     /// Cross-risk-class correlations keyed by risk-class pair.
-    pub risk_class_correlations: HashMap<(SimmRiskClass, SimmRiskClass), f64>,
+    pub risk_class_correlations: FxHashMap<(SimmRiskClass, SimmRiskClass), f64>,
     /// Commodity delta risk weights keyed by bucket label.
-    pub commodity_bucket_weights: HashMap<String, f64>,
+    pub commodity_bucket_weights: FxHashMap<String, f64>,
     /// Interest-rate tenor correlations keyed by ordered tenor pair.
-    pub ir_tenor_correlations: HashMap<(String, String), f64>,
+    pub ir_tenor_correlations: FxHashMap<(String, String), f64>,
     /// Inter-currency correlation γ for IR delta aggregation across currencies.
     /// Historical v2.6 paragraph 37 specifies 0.32.
     pub ir_inter_currency_correlation: f64,
@@ -231,7 +231,7 @@ pub struct SimmParams {
     /// Correlation of distinct IR subcurves within a currency (v2.6: 99.3%).
     pub ir_subcurve_correlation: f64,
     /// Commodity within-bucket factor correlations by numeric bucket.
-    pub commodity_intra_bucket_correlations: HashMap<String, f64>,
+    pub commodity_intra_bucket_correlations: FxHashMap<String, f64>,
     /// Interest-rate HVR for curvature scaling; historical v2.6 paragraph 34.
     pub ir_historical_volatility_ratio: f64,
     /// Equity HVR applied to volatility-weighted vega; paragraph 57.
@@ -251,31 +251,31 @@ pub struct SimmParams {
     /// Credit residual-bucket correlation for distinct risk factors; paragraphs 42 and 48.
     pub credit_residual_correlation: f64,
     /// Interest-rate delta weights in basis points for JPY by tenor.
-    pub ir_delta_weights_low: HashMap<String, f64>,
+    pub ir_delta_weights_low: FxHashMap<String, f64>,
     /// Interest-rate delta weights in basis points for high-volatility currencies by tenor.
-    pub ir_delta_weights_high: HashMap<String, f64>,
+    pub ir_delta_weights_high: FxHashMap<String, f64>,
     /// Raw DV01 thresholds in USD per bp, keyed by currency risk group.
-    pub ir_delta_concentration_thresholds: HashMap<String, f64>,
+    pub ir_delta_concentration_thresholds: FxHashMap<String, f64>,
     /// Volatility-weighted IR vega thresholds in USD, keyed by currency risk group.
-    pub ir_vega_concentration_thresholds: HashMap<String, f64>,
+    pub ir_vega_concentration_thresholds: FxHashMap<String, f64>,
     /// Raw FX delta thresholds in USD per one-percent relative move, keyed by category 1, 2 or 3.
-    pub fx_delta_concentration_thresholds: HashMap<String, f64>,
+    pub fx_delta_concentration_thresholds: FxHashMap<String, f64>,
     /// FX vega thresholds in USD keyed by ordered category pair, such as 1_2.
-    pub fx_vega_concentration_thresholds: HashMap<String, f64>,
+    pub fx_vega_concentration_thresholds: FxHashMap<String, f64>,
     /// Raw commodity delta thresholds in USD per one-percent relative move by numeric bucket.
-    pub commodity_delta_concentration_thresholds: HashMap<String, f64>,
+    pub commodity_delta_concentration_thresholds: FxHashMap<String, f64>,
     /// Commodity vega thresholds in USD by numeric bucket.
-    pub commodity_vega_concentration_thresholds: HashMap<String, f64>,
+    pub commodity_vega_concentration_thresholds: FxHashMap<String, f64>,
     /// Volatility-weighted vega concentration thresholds in USD for unclassified risk factors.
-    pub vega_concentration_thresholds: HashMap<SimmRiskClass, f64>,
+    pub vega_concentration_thresholds: FxHashMap<SimmRiskClass, f64>,
     /// Concentration thresholds keyed by SIMM risk class.
-    pub concentration_thresholds: HashMap<SimmRiskClass, f64>,
+    pub concentration_thresholds: FxHashMap<SimmRiskClass, f64>,
     /// Credit qualifying bucket risk weights keyed by [`SimmCreditSector`].
     ///
     /// Maps each ISDA SIMM credit qualifying sector bucket to its risk weight.
     /// When populated, enables bucket-level credit delta aggregation with
     /// intra/inter-bucket diversification per ISDA SIMM v2.6.
-    pub cq_bucket_weights: HashMap<SimmCreditSector, f64>,
+    pub cq_bucket_weights: FxHashMap<SimmCreditSector, f64>,
     /// Intra-bucket name correlation for credit qualifying delta.
     ///
     /// Per ISDA SIMM v2.6, the correlation between distinct names within the
@@ -285,11 +285,11 @@ pub struct SimmParams {
     ///
     /// Correlations between different ISDA SIMM credit qualifying sector
     /// buckets, keyed by ordered sector pair.
-    pub cq_inter_bucket_correlations: HashMap<(SimmCreditSector, SimmCreditSector), f64>,
+    pub cq_inter_bucket_correlations: FxHashMap<(SimmCreditSector, SimmCreditSector), f64>,
     /// Per-bucket concentration thresholds for credit qualifying delta.
     ///
     /// Thresholds apply to raw CS01 netted by issuer across tenors, before risk weighting.
-    pub cq_concentration_thresholds: HashMap<SimmCreditSector, f64>,
+    pub cq_concentration_thresholds: FxHashMap<SimmCreditSector, f64>,
     /// Commodity inter-bucket correlation matrix (17×17, row-major).
     ///
     /// Per ISDA SIMM v2.6 Table 11. Populated at registry load from the
@@ -381,12 +381,12 @@ pub fn build_registry(overlay: Option<&Value>) -> Result<MarginRegistry> {
     })
 }
 
-fn parse_schedule_im(value: Option<&Value>) -> Result<HashMap<String, ScheduleImSchedule>> {
+fn parse_schedule_im(value: Option<&Value>) -> Result<FxHashMap<String, ScheduleImSchedule>> {
     let Some(val) = value else {
         return Err(Error::Validation("schedule_im section missing".to_string()));
     };
     let file: wire::ScheduleImFile = serde_json::from_value(val.clone()).map_err(to_validation)?;
-    let mut map = HashMap::default();
+    let mut map = FxHashMap::default();
     for entry in file.entries {
         let record = entry.record;
         validate_non_negative("default_rate", record.default_rate)?;
@@ -417,7 +417,7 @@ fn parse_schedule_im(value: Option<&Value>) -> Result<HashMap<String, ScheduleIm
             )));
         }
         let default_asset_class = parse_schedule_asset_class(&record.default_asset_class)?;
-        let mut rates = HashMap::default();
+        let mut rates = FxHashMap::default();
         for rate in record.rates {
             validate_rate("schedule_im.rate", rate.rate)?;
             let asset_class = parse_schedule_asset_class(&rate.asset_class)?;
@@ -446,8 +446,8 @@ fn parse_schedule_im(value: Option<&Value>) -> Result<HashMap<String, ScheduleIm
 fn parse_collateral_schedules(
     value: Option<&Value>,
 ) -> Result<(
-    HashMap<CollateralAssetClass, AssetClassDefault>,
-    HashMap<String, EligibleCollateralSchedule>,
+    FxHashMap<CollateralAssetClass, AssetClassDefault>,
+    FxHashMap<String, EligibleCollateralSchedule>,
 )> {
     let Some(val) = value else {
         return Err(Error::Validation(
@@ -457,7 +457,7 @@ fn parse_collateral_schedules(
     let file: wire::CollateralSchedulesFile =
         serde_json::from_value(val.clone()).map_err(to_validation)?;
 
-    let mut defaults = HashMap::default();
+    let mut defaults = FxHashMap::default();
     for def in file.asset_class_defaults {
         let asset = parse_collateral_asset_class(&def.asset_class)?;
         validate_haircut("standard_haircut", def.standard_haircut)?;
@@ -475,7 +475,7 @@ fn parse_collateral_schedules(
         );
     }
 
-    let mut schedules = HashMap::default();
+    let mut schedules = FxHashMap::default();
     for entry in file.entries {
         let mut eligible = Vec::new();
         for elig in entry.record.eligible {
@@ -563,7 +563,7 @@ fn parse_ccp(value: Option<&Value>) -> Result<ParsedCcpRegistry> {
         return Err(Error::Validation("ccp section missing".to_string()));
     };
     let file: wire::CcpFile = serde_json::from_value(val.clone()).map_err(to_validation)?;
-    let mut map = HashMap::default();
+    let mut map = FxHashMap::default();
     let mut default_params: Option<CcpParams> = None;
     for entry in file.entries {
         validate_rate("ccp.conservative_rate", entry.record.conservative_rate)?;
@@ -597,12 +597,12 @@ fn parse_ccp(value: Option<&Value>) -> Result<ParsedCcpRegistry> {
     })
 }
 
-fn parse_simm(value: Option<&Value>) -> Result<HashMap<String, SimmParams>> {
+fn parse_simm(value: Option<&Value>) -> Result<FxHashMap<String, SimmParams>> {
     let Some(val) = value else {
         return Err(Error::Validation("simm section missing".to_string()));
     };
     let file: wire::SimmFile = serde_json::from_value(val.clone()).map_err(to_validation)?;
-    let mut map = HashMap::default();
+    let mut map = FxHashMap::default();
     for entry in file.entries {
         let record = entry.record;
         let version = parse_simm_version(entry.ids.first().map(String::as_str))?;
@@ -622,7 +622,7 @@ fn parse_simm(value: Option<&Value>) -> Result<HashMap<String, SimmParams>> {
             ));
         }
 
-        let mut correlations: HashMap<(SimmRiskClass, SimmRiskClass), f64> = HashMap::default();
+        let mut correlations: FxHashMap<(SimmRiskClass, SimmRiskClass), f64> = FxHashMap::default();
         for cor in record.risk_class_correlations {
             let a = parse_simm_risk_class(&cor.a)?;
             let b = parse_simm_risk_class(&cor.b)?;
@@ -842,17 +842,17 @@ fn parse_simm_credit_sector(value: &str) -> Result<SimmCreditSector> {
     })
 }
 
-fn parse_number_map(value: &Value, context: &str) -> Result<HashMap<String, f64>> {
+fn parse_number_map(value: &Value, context: &str) -> Result<FxHashMap<String, f64>> {
     let obj = value
         .as_object()
         .ok_or_else(|| Error::Validation(format!("{context} must be an object")))?;
-    let mut out = HashMap::default();
+    let mut out = FxHashMap::default();
     for (k, v) in obj {
         let num = v.as_f64().ok_or_else(|| {
             Error::Validation(format!("{context} value for key '{k}' must be a number"))
         })?;
         // Reject NaN / ±infinity at the trust boundary so a malformed
-        // overlay cannot inject non-finite values into a HashMap whose
+        // overlay cannot inject non-finite values into a FxHashMap whose
         // downstream validators only check non-negativity.
         if !num.is_finite() {
             return Err(Error::Validation(format!(
@@ -864,25 +864,25 @@ fn parse_number_map(value: &Value, context: &str) -> Result<HashMap<String, f64>
     Ok(out)
 }
 
-fn parse_cq_bucket_weights(value: &Value) -> Result<HashMap<SimmCreditSector, f64>> {
+fn parse_cq_bucket_weights(value: &Value) -> Result<FxHashMap<SimmCreditSector, f64>> {
     parse_credit_sector_number_map(value, "simm.cq_bucket_weights")
 }
 
-fn parse_cq_concentration_thresholds(value: &Value) -> Result<HashMap<SimmCreditSector, f64>> {
+fn parse_cq_concentration_thresholds(value: &Value) -> Result<FxHashMap<SimmCreditSector, f64>> {
     parse_credit_sector_number_map(value, "simm.cq_concentration_thresholds")
 }
 
 fn parse_credit_sector_number_map(
     value: &Value,
     context: &str,
-) -> Result<HashMap<SimmCreditSector, f64>> {
+) -> Result<FxHashMap<SimmCreditSector, f64>> {
     if value.is_null() {
         return Err(Error::Validation(format!("{context} missing")));
     }
     let obj = value
         .as_object()
         .ok_or_else(|| Error::Validation(format!("{context} must be an object")))?;
-    let mut out = HashMap::default();
+    let mut out = FxHashMap::default();
     for (k, v) in obj {
         let sector = parse_simm_credit_sector(k)?;
         let num = v.as_f64().ok_or_else(|| {
@@ -899,7 +899,7 @@ fn parse_credit_sector_number_map(
 
 fn parse_cq_inter_bucket_correlations(
     value: &Value,
-) -> Result<HashMap<(SimmCreditSector, SimmCreditSector), f64>> {
+) -> Result<FxHashMap<(SimmCreditSector, SimmCreditSector), f64>> {
     if value.is_null() {
         return Err(Error::Validation(
             "simm.cq_inter_bucket_correlations missing".to_string(),
@@ -908,7 +908,7 @@ fn parse_cq_inter_bucket_correlations(
     let obj = value.as_object().ok_or_else(|| {
         Error::Validation("simm.cq_inter_bucket_correlations must be an object".to_string())
     })?;
-    let mut out = HashMap::default();
+    let mut out = FxHashMap::default();
     for (k, v) in obj {
         let (a, b) = k.split_once("__").ok_or_else(|| {
             Error::Validation(format!(
@@ -939,14 +939,14 @@ fn parse_cq_inter_bucket_correlations(
 /// (`"tenor_a_tenor_b"`); tenor labels themselves must therefore not
 /// contain `_`. The embedded registry uses ISDA-standard labels (`2w`,
 /// `1m`, `3m`, ..., `30y`) which all satisfy this invariant.
-fn parse_ir_tenor_correlations(value: &Value) -> Result<HashMap<(String, String), f64>> {
+fn parse_ir_tenor_correlations(value: &Value) -> Result<FxHashMap<(String, String), f64>> {
     if value.is_null() {
-        return Ok(HashMap::default());
+        return Ok(FxHashMap::default());
     }
     let obj = value
         .as_object()
         .ok_or_else(|| Error::Validation("ir_tenor_correlations must be an object".to_string()))?;
-    let mut out = HashMap::default();
+    let mut out = FxHashMap::default();
     for (k, v) in obj {
         let (a, b) = k.split_once('_').ok_or_else(|| {
             Error::Validation(format!(
@@ -970,14 +970,14 @@ fn parse_ir_tenor_correlations(value: &Value) -> Result<HashMap<(String, String)
     Ok(out)
 }
 
-fn parse_concentration_thresholds(value: &Value) -> Result<HashMap<SimmRiskClass, f64>> {
+fn parse_concentration_thresholds(value: &Value) -> Result<FxHashMap<SimmRiskClass, f64>> {
     if value.is_null() {
-        return Ok(HashMap::default());
+        return Ok(FxHashMap::default());
     }
     let obj = value.as_object().ok_or_else(|| {
         Error::Validation("concentration_thresholds must be an object".to_string())
     })?;
-    let mut out = HashMap::default();
+    let mut out = FxHashMap::default();
     for (k, v) in obj {
         let rc = parse_simm_risk_class(k)?;
         let threshold = v.as_f64().ok_or_else(|| {
@@ -1036,7 +1036,7 @@ pub(crate) fn validate_simm_params(p: &SimmParams) -> Result<()> {
     }
     fn complete_positive_map(
         field: &str,
-        values: &HashMap<String, f64>,
+        values: &FxHashMap<String, f64>,
         keys: &[&str],
     ) -> Result<()> {
         for key in keys {

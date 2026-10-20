@@ -11,7 +11,7 @@ use crate::position::Position;
 use crate::types::{Entity, EntityId, PositionId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -57,7 +57,7 @@ pub struct Portfolio {
     ///
     /// Rebuilt automatically via [`rebuild_index`] when constructing a portfolio
     /// through the builder or `from_spec`.
-    pub(crate) position_index: HashMap<PositionId, usize>,
+    pub(crate) position_index: FxHashMap<PositionId, usize>,
 
     /// Inverted index mapping market factor keys to affected position indices.
     ///
@@ -213,9 +213,9 @@ impl Portfolio {
     /// duplicate position IDs or references an unknown book. Book memberships
     /// are rebuilt from the replacement positions. The portfolio is left unchanged on error.
     pub fn set_positions(&mut self, positions: Vec<Position>) -> Result<()> {
-        use finstack_quant_core::HashSet;
+        use finstack_quant_core::FxHashSet;
 
-        let mut seen_ids = HashSet::default();
+        let mut seen_ids = FxHashSet::default();
         for position in &positions {
             if !seen_ids.insert(&position.position_id) {
                 return Err(Error::validation(format!(
@@ -297,9 +297,9 @@ impl Portfolio {
     /// that is not present in [`Portfolio::entities`], or when a cycle is detected
     /// in the book hierarchy.
     pub fn validate(&self) -> Result<()> {
-        use finstack_quant_core::HashSet;
+        use finstack_quant_core::FxHashSet;
 
-        let mut seen_ids: finstack_quant_core::HashSet<_> = HashSet::default();
+        let mut seen_ids: finstack_quant_core::FxHashSet<_> = FxHashSet::default();
         for position in &self.positions {
             if !seen_ids.insert(&position.position_id) {
                 return Err(Error::validation(format!(
@@ -403,7 +403,7 @@ impl Portfolio {
             as_of: spec.as_of,
             entities: spec.entities,
             positions,
-            position_index: HashMap::default(),
+            position_index: FxHashMap::default(),
             dependency_index: DependencyIndex::default(),
             evaluation_state_id: 0,
             books: spec.books,

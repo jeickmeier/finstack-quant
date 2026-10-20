@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
 
 const DEFAULT_MAX_ENTRIES: usize = 4_096;
@@ -42,7 +42,7 @@ struct CacheEntry {
 }
 
 struct CacheState {
-    entries: HashMap<CacheKey, CacheEntry>,
+    entries: FxHashMap<CacheKey, CacheEntry>,
     least_recently_used: VecDeque<CacheKey>,
     encoded_bytes: usize,
     decode_count: usize,
@@ -51,7 +51,7 @@ struct CacheState {
 impl CacheState {
     fn new() -> Self {
         Self {
-            entries: HashMap::default(),
+            entries: FxHashMap::default(),
             least_recently_used: VecDeque::new(),
             encoded_bytes: 0,
             decode_count: 0,
@@ -250,12 +250,12 @@ mod tests {
 
     use super::CacheKey;
     use super::InstrumentArtifactCache;
-    use finstack_quant_core::HashMap;
+    use finstack_quant_core::FxHashMap;
 
     #[test]
     fn same_hash_with_different_version_axes_misses() {
         let baseline = CacheKey::new("sha256:same".to_string(), 1, "c1");
-        let mut entries = HashMap::default();
+        let mut entries = FxHashMap::default();
         entries.insert(baseline, ());
 
         assert!(!entries.contains_key(&CacheKey::new("sha256:same".to_string(), 2, "c1")));

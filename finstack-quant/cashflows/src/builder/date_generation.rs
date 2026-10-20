@@ -279,8 +279,8 @@ pub(crate) fn compile_periods(
 pub(crate) fn validate_unique_payment_dates(
     periods: &[SchedulePeriod],
 ) -> finstack_quant_core::Result<()> {
-    let mut period_map: finstack_quant_core::HashMap<Date, SchedulePeriod> =
-        finstack_quant_core::HashMap::default();
+    let mut period_map: finstack_quant_core::FxHashMap<Date, SchedulePeriod> =
+        finstack_quant_core::FxHashMap::default();
     period_map.reserve(periods.len());
     for period in periods {
         if let Some(previous) = period_map.insert(period.payment_date, *period) {
