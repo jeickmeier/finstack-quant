@@ -158,8 +158,7 @@ mod cases {
         let budget = Money::from_decimal(
             rust_decimal_macros::dec!(10557280.900008413701),
             Currency::USD,
-        )
-        .expect("decimal budget");
+        );
         let spent = recycle_reinvestment_principal(
             &mut state,
             budget,

@@ -383,22 +383,12 @@ impl ProtectionLegSpec {
         recovery_rate: f64,
         settlement_delay: u16,
     ) -> finstack_quant_core::Result<Self> {
-        Self::validate_recovery_rate(recovery_rate)?;
+        finstack_quant_core::validation::validate_recovery_rate(recovery_rate)?;
         Ok(Self {
             credit_curve_id: credit_curve_id.into(),
             recovery_rate,
             settlement_delay,
         })
-    }
-
-    /// Validate that recovery rate is within valid bounds [0, 1].
-    ///
-    /// Delegates to the shared internal recovery-rate validator.
-    ///
-    /// # Errors
-    /// Returns an error if recovery rate is outside the valid range.
-    pub fn validate_recovery_rate(recovery_rate: f64) -> finstack_quant_core::Result<()> {
-        finstack_quant_core::validation::validate_recovery_rate(recovery_rate)
     }
 }
 

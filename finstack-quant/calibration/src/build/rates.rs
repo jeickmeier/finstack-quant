@@ -11,7 +11,7 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::{Error, InputError, Result};
+use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::instruments::{
     FixedLegSpec, FloatLegSpec, Instrument, ListedFutureTerms, PayReceive, Position,
 };
@@ -374,9 +374,7 @@ fn build_deposit(
         .start_date(start)
         .maturity(end)
         .day_count(conv.day_count)
-        .fixed_rate_opt(Some(
-            Decimal::try_from(*rate).map_err(|_| InputError::ConversionOverflow)?,
-        ))
+        .fixed_rate_opt(Some(finstack_quant_core::decimal::f64_to_decimal(*rate)?))
         .discount_curve_id(CurveId::new(ctx.require_curve_id("discount")?.to_string()))
         .business_day_convention(conv.market_business_day_convention)
         .calendar_id_opt(Some(conv.market_calendar_id.clone().into()))
@@ -419,7 +417,7 @@ fn build_fra(
         .fixing_date(fixing)
         .start_date(start_date)
         .maturity(end_date)
-        .fixed_rate(Decimal::try_from(*rate).map_err(|_| InputError::ConversionOverflow)?)
+        .fixed_rate(finstack_quant_core::decimal::f64_to_decimal(*rate)?)
         .day_count(conv.day_count)
         .reset_lag_days(conv.default_reset_lag_days)
         .discount_curve_id(CurveId::new(ctx.require_curve_id("discount")?.to_string()))
@@ -550,8 +548,7 @@ fn build_swap(
         payment_lag_days: conv.default_payment_lag_days,
     };
 
-    let rate_decimal = Decimal::try_from(*rate)
-        .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
+    let rate_decimal = finstack_quant_core::decimal::f64_to_decimal(*rate)?;
     let compounding = match conv.kind {
         RateIndexKind::Term => FloatingLegCompounding::Simple,
         RateIndexKind::OvernightRfr => match ctx.ois_compounding_override() {
@@ -640,8 +637,7 @@ fn apply_swap_spread(swap: &mut InterestRateSwap, spread_decimal: &Option<f64>) 
         };
         return Err(finstack_quant_core::InputError::NonFiniteValue { kind }.into());
     }
-    swap.float_leg.spread_bp = Decimal::try_from(spread_bp_f64)
-        .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
+    swap.float_leg.spread_bp = finstack_quant_core::decimal::f64_to_decimal(spread_bp_f64)?;
     Ok(())
 }
 

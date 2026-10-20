@@ -428,8 +428,8 @@ impl MertonModel {
             1 => {
                 let (bracket_lo, bracket_hi) = brackets[0];
                 BrentSolver::new()
-                    .tolerance(1e-10)
-                    .bracket_bounds(bracket_lo, bracket_hi)
+                    .with_tolerance(1e-10)
+                    .with_bracket_bounds(bracket_lo, bracket_hi)
                     .solve(
                         |sigma| objective(sigma).unwrap_or(f64::NAN),
                         0.5 * (bracket_lo + bracket_hi),

@@ -504,8 +504,8 @@ pub fn chi_squared_quantile(p: f64, df: f64) -> crate::Result<f64> {
     // by a representable p < 1, including very small degrees of freedom.
     let log_max = (df + 64.0 * df.sqrt() + 128.0).ln();
     let log_quantile = BrentSolver::new()
-        .tolerance(1e-13)
-        .max_iterations(256)
+        .with_tolerance(1e-13)
+        .with_max_iterations(256)
         .solve_in_bracket(residual, log_min, log_max)
         .map_err(|error| {
             crate::Error::Validation(format!(

@@ -406,17 +406,7 @@ impl CorrelationFactor {
         if self.triangular {
             // Half-matrix path: entries above the diagonal are exactly zero,
             // so skipping them cannot change the running sum on finite input.
-            for (i, out) in correlated.iter_mut().enumerate() {
-                let row = i * n;
-                let mut sum = 0.0;
-                for (&f_j, &z_j) in self.factor[row..row + i + 1]
-                    .iter()
-                    .zip(independent[..=i].iter())
-                {
-                    sum += f_j * z_j;
-                }
-                *out = sum;
-            }
+            lower_triangular_mul(&self.factor, n, independent, correlated);
         } else {
             for (i, out) in correlated.iter_mut().enumerate() {
                 let mut sum = 0.0;
@@ -785,12 +775,6 @@ pub fn cholesky_decomposition(
     matrix: &[f64],
     n: usize,
 ) -> std::result::Result<Vec<f64>, CholeskyError> {
-    if square_len(n) != Some(matrix.len()) {
-        return Err(CholeskyError::DimensionMismatch {
-            expected: n,
-            actual: matrix.len(),
-        });
-    }
     let mut l = vec![0.0; matrix.len()];
     cholesky_decomposition_into(matrix, n, &mut l)?;
     Ok(l)
@@ -951,14 +935,21 @@ pub fn apply_lower_triangular(l: &[f64], n: usize, z: &[f64]) -> Result<Vec<f64>
     }
 
     let mut out = vec![0.0; n];
+    lower_triangular_mul(l, n, z, &mut out);
+    Ok(out)
+}
+
+/// `out = L z` for a row-major `n × n` lower-triangular `l`, reading only the
+/// lower half. Callers have checked `l.len() == n * n` and `z.len() == out.len() == n`.
+fn lower_triangular_mul(l: &[f64], n: usize, z: &[f64], out: &mut [f64]) {
     for (i, slot) in out.iter_mut().enumerate() {
+        let row = i * n;
         let mut sum = 0.0;
-        for (j, &z_j) in z.iter().enumerate().take(i + 1) {
-            sum += l[i * n + j] * z_j;
+        for (&l_j, &z_j) in l[row..=row + i].iter().zip(z[..=i].iter()) {
+            sum += l_j * z_j;
         }
         *slot = sum;
     }
-    Ok(out)
 }
 
 /// Solve linear system Ax = b using Cholesky decomposition L of A (A = L L^T).

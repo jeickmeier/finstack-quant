@@ -3,6 +3,7 @@
 use super::*;
 use crate::dates::DateExt;
 use crate::market_data::bumps::{BumpSpec, BumpUnits, Bumpable};
+use crate::math::units::ONE_BASIS_POINT;
 
 impl HazardCurve {
     /// Create a copy of this curve with its `recovery_rate` metadata overridden.
@@ -97,7 +98,9 @@ impl HazardCurve {
                 spread / (1.0 - self.recovery_rate)
             }
             // One basis point of intensity is 1e-4, kept as the exact product.
-            HazardBumpTarget::HazardRate if spec.units == BumpUnits::RateBp => spec.value * 1e-4,
+            HazardBumpTarget::HazardRate if spec.units == BumpUnits::RateBp => {
+                spec.value * ONE_BASIS_POINT
+            }
             HazardBumpTarget::HazardRate => spread,
         };
         // Clone the hazard array only, not the whole curve. Early returns below
@@ -224,7 +227,7 @@ impl HazardCurve {
                         .partition_point(|&knot| knot < *tenor)
                         .min(knots.len() - 1)
                 });
-            let shifted = hazard_rates[target_index] + bump_bp * 1e-4;
+            let shifted = hazard_rates[target_index] + bump_bp * ONE_BASIS_POINT;
             if !shifted.is_finite() || shifted < 0.0 {
                 return Err(crate::InputError::UnsupportedBump {
                     reason: "non-finite or negative hazard rate after tenor bump".to_string(),

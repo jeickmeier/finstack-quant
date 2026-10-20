@@ -26,6 +26,7 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 
 use serde::{Deserialize, Serialize};
 
+use crate::math::units::BASIS_POINTS_PER_UNIT;
 use crate::Result;
 use crate::{Error, InputError, NonFiniteKind};
 
@@ -179,36 +180,7 @@ impl Rate {
     /// * `bp` - Integer basis-point quote, where `500` is 5% (`0.05` decimal).
     ///   Negative quotes are valid because spreads and rates may be negative.
     pub fn from_bp(bp: i32) -> Self {
-        Self(bp as f64 / 10_000.0)
-    }
-
-    /// Create a rate from a floating-point basis-point quote.
-    ///
-    /// Whole quotes such as `250.0` match [`Self::from_bp`]. Fractional quotes
-    /// such as `62.5` are rejected: this is the integer basis-point constructor.
-    /// Parse `"62.5bp"` when the quote needs sub-bp precision.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Bps::try_new`]: a non-finite quote, a
-    /// fractional basis-point count, or a value outside the `i32` range.
-    ///
-    /// # Arguments
-    ///
-    /// * `bp` - Finite whole number of basis points, where `500.0` is 5%
-    ///   (`0.05` decimal). Fractional values are rejected.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::types::Rate;
-    ///
-    /// assert_eq!(Rate::try_from_bp(250.0)?, Rate::from_bp(250));
-    /// assert!(Rate::try_from_bp(62.5).is_err());
-    /// # Ok::<(), finstack_quant_core::Error>(())
-    /// ```
-    pub fn try_from_bp(bp: f64) -> Result<Self> {
-        Bps::try_new(bp).map(Bps::as_rate)
+        Self(bp as f64 / BASIS_POINTS_PER_UNIT)
     }
 
     /// Return the internal decimal representation (0.05 for 5%).
@@ -236,7 +208,7 @@ impl Rate {
     /// (`±21_474_836.47%`), prefer `(self.as_decimal() * 10_000.0).round() as i64`.
     #[must_use]
     pub fn as_bp(self) -> i32 {
-        (self.0 * 10_000.0).round() as i32
+        (self.0 * BASIS_POINTS_PER_UNIT).round() as i32
     }
 
     /// Get the rate as fractional basis points, without rounding.
@@ -361,9 +333,9 @@ impl std::str::FromStr for Rate {
         }
         let lower = trimmed.to_ascii_lowercase();
         let (number, divisor) = if let Some(num) = lower.strip_suffix("bps") {
-            (num, 10_000.0)
+            (num, BASIS_POINTS_PER_UNIT)
         } else if let Some(num) = lower.strip_suffix("bp") {
-            (num, 10_000.0)
+            (num, BASIS_POINTS_PER_UNIT)
         } else if let Some(num) = lower.strip_suffix('%') {
             let percent: f64 = num.trim().parse().map_err(|_| invalid())?;
             return Self::from_percent(percent);
@@ -479,7 +451,7 @@ impl Bps {
 
     /// Return the decimal-rate representation (100 bp = 0.01).
     pub fn as_decimal(self) -> f64 {
-        self.0 as f64 / 10_000.0
+        self.0 as f64 / BASIS_POINTS_PER_UNIT
     }
 
     /// Return the percentage representation (100 bp = 1.0).
@@ -616,10 +588,10 @@ impl From<Bps> for i32 {
 
 // NOTE: There is intentionally no `impl From<Bps> for f64`.
 //
-// `TryFrom<f64> for Bps` reads a basis-point count (25.0 → 25bp), so a
-// `From<Bps> for f64` returning the decimal (25bp → 0.0025) made the f64
-// conversions asymmetric: round-tripping 25bp through f64 yielded 0bp.
-// Use [`Bps::as_decimal`], [`Bps::as_percent`], or `f64::from(bp.as_bp())`.
+// There is no `From<Bps> for f64`: `Bps::try_new` reads an f64 as a
+// basis-point count (25.0 → 25bp), so an f64 conversion returning the decimal
+// (25bp → 0.0025) would be asymmetric with it. Use [`Bps::as_decimal`],
+// [`Bps::as_percent`], or `f64::from(bp.as_bp())`.
 
 impl Add for Bps {
     type Output = Self;

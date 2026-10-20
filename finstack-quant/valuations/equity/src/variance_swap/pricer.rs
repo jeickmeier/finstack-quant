@@ -199,7 +199,7 @@ pub(crate) fn get_historical_ohlc(
 ) -> Result<OhlcVecs> {
     let default_close = inst.close_series_id();
 
-    let method_label = inst.realized_var_method.label();
+    let method_label = inst.realized_var_method;
     let inst_id = inst.id.as_str().to_owned();
 
     let open_id = inst.open_series_id.as_deref().ok_or_else(|| {

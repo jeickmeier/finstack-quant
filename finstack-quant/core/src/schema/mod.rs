@@ -2,6 +2,11 @@
 
 use serde_json::Value;
 
+use crate::dates::{PeriodPlan, Schedule, ScheduleSpec};
+use crate::market_data::context::MarketContextState;
+use crate::market_data::surfaces::VolCubeExpirySlice;
+use crate::rating_scales::ScorecardScale;
+use crate::table::TableEnvelope;
 use crate::{Error, Result};
 
 mod externalize;
@@ -27,8 +32,9 @@ pub use registry::{
 /// Expands to a [`SchemaArtifact`] at
 /// `schemas/<family>/1/<file>.schema.json` whose `$id` is the matching
 /// `https://finstack_quant.dev/schemas/<family>/1/<file>.schema.json`. The
-/// title is the Rust type name, the description is `summary`, and the index
-/// kind is the named [`SchemaKind`] variant.
+/// title is the Rust type name (or the trailing `title = "..."` argument),
+/// the description is `summary`, and the index kind is the named
+/// [`SchemaKind`] variant.
 ///
 /// # Arguments
 ///
@@ -38,6 +44,7 @@ pub use registry::{
 /// * `$file` - Snake-case file stem inside the family's `1/` directory.
 /// * `$kind` - [`SchemaKind`] variant name: `Input`, `Output` or `Component`.
 /// * `$summary` - One sentence describing the contract.
+/// * `title = $title` - Optional schema title when it differs from the type name.
 ///
 /// # Examples
 ///
@@ -57,6 +64,16 @@ pub use registry::{
 #[macro_export]
 macro_rules! schema_artifact {
     ($ty:ident, $family:literal, $file:literal, $kind:ident, $summary:literal) => {
+        $crate::schema_artifact!(
+            $ty,
+            $family,
+            $file,
+            $kind,
+            $summary,
+            title = stringify!($ty)
+        )
+    };
+    ($ty:ident, $family:literal, $file:literal, $kind:ident, $summary:literal, title = $title:expr) => {
         $crate::schema::SchemaArtifact::new::<$ty>(
             concat!("schemas/", $family, "/1/", $file, ".schema.json"),
             concat!(
@@ -66,7 +83,7 @@ macro_rules! schema_artifact {
                 $file,
                 ".schema.json"
             ),
-            stringify!($ty),
+            $title,
             $summary,
         )
         .with_kind($crate::schema::SchemaKind::$kind)
@@ -151,65 +168,67 @@ fn vol_cube_expiry_slice_examples() -> Result<Vec<Value>> {
 /// generator, the contract tests and the bindings all render from one
 /// definition. Render an entry with [`SchemaArtifact::generate`].
 pub const ARTIFACTS: &[SchemaArtifact] = &[
-    SchemaArtifact::new::<crate::market_data::context::MarketContextState>(
-        "schemas/market_data/1/market_context_state.schema.json",
-        "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-        "Market Context State",
-        "Canonical v1 persisted snapshot of a complete market-data context.",
-    )
-    .with_kind(SchemaKind::Input)
+    crate::schema_artifact!(
+    MarketContextState,
+    "market_data",
+    "market_context_state",
+    Input,
+    "Canonical v1 persisted snapshot of a complete market-data context.",
+    title = "Market Context State"
+)
     .with_summary(
         "Curves, surfaces, prices, series and FX for one valuation date; the market input to \
              every pricing, scenario and attribution call.",
     )
     .with_examples(market_context_state_examples),
-    SchemaArtifact::new::<crate::table::TableEnvelope>(
-        "schemas/table/1/table_envelope.schema.json",
-        "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json",
-        "TableEnvelope",
-        "Column-oriented table with a shared row count and typed column storage.",
-    )
-    .with_kind(SchemaKind::Output)
+    crate::schema_artifact!(
+    TableEnvelope,
+    "table",
+    "table_envelope",
+    Output,
+    "Column-oriented table with a shared row count and typed column storage."
+)
     .with_examples(table_envelope_examples),
-    SchemaArtifact::new::<crate::dates::PeriodPlan>(
-        "schemas/dates/1/period_plan.schema.json",
-        "https://finstack_quant.dev/schemas/dates/1/period_plan.schema.json",
-        "PeriodPlan",
-        "Ordered reporting periods with their calendar bounds and actual/forecast flags.",
-    )
-    .with_kind(SchemaKind::Output)
+    crate::schema_artifact!(
+    PeriodPlan,
+    "dates",
+    "period_plan",
+    Output,
+    "Ordered reporting periods with their calendar bounds and actual/forecast flags."
+)
     .with_examples(period_plan_examples),
-    SchemaArtifact::new::<crate::dates::ScheduleSpec>(
-        "schemas/dates/1/schedule_spec.schema.json",
-        "https://finstack_quant.dev/schemas/dates/1/schedule_spec.schema.json",
-        "ScheduleSpec",
-        "Persisted inputs of a date schedule: range, frequency, stub, adjustment and lags.",
-    )
-    .with_kind(SchemaKind::Input)
+    crate::schema_artifact!(
+    ScheduleSpec,
+    "dates",
+    "schedule_spec",
+    Input,
+    "Persisted inputs of a date schedule: range, frequency, stub, adjustment and lags."
+)
     .with_examples(schedule_spec_examples),
-    SchemaArtifact::new::<crate::dates::Schedule>(
-        "schemas/dates/1/schedule.schema.json",
-        "https://finstack_quant.dev/schemas/dates/1/schedule.schema.json",
-        "Schedule",
-        "Generated accrual, payment and fixing dates with any construction warnings.",
-    )
-    .with_kind(SchemaKind::Output)
+    crate::schema_artifact!(
+    Schedule,
+    "dates",
+    "schedule",
+    Output,
+    "Generated accrual, payment and fixing dates with any construction warnings."
+)
     .with_examples(schedule_examples),
-    SchemaArtifact::new::<crate::rating_scales::ScorecardScale>(
-        "schemas/rating_scales/1/scorecard_scale.schema.json",
-        "https://finstack_quant.dev/schemas/rating_scales/1/scorecard_scale.schema.json",
-        "ScorecardScale",
-        "Named scorecard rating scale: rating levels ordered best to worst with score thresholds.",
-    )
-    .with_kind(SchemaKind::Output)
+    crate::schema_artifact!(
+    ScorecardScale,
+    "rating_scales",
+    "scorecard_scale",
+    Output,
+    "Named scorecard rating scale: rating levels ordered best to worst with score thresholds."
+)
     .with_examples(scorecard_scale_examples),
-    SchemaArtifact::new::<crate::market_data::surfaces::VolCubeExpirySlice>(
-        "schemas/market_data/1/vol_cube_expiry_slice.schema.json",
-        "https://finstack_quant.dev/schemas/market_data/1/vol_cube_expiry_slice.schema.json",
-        "Volatility Cube Expiry Slice",
-        "Tenor-by-strike volatility quotes at a fixed option expiry, preserving quote convention and displacement.",
-    )
-    .with_kind(SchemaKind::Output)
+    crate::schema_artifact!(
+    VolCubeExpirySlice,
+    "market_data",
+    "vol_cube_expiry_slice",
+    Output,
+    "Tenor-by-strike volatility quotes at a fixed option expiry, preserving quote convention and displacement.",
+    title = "Volatility Cube Expiry Slice"
+)
     .with_examples(vol_cube_expiry_slice_examples),
 ];
 

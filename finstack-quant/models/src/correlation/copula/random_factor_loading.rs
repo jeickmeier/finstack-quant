@@ -262,7 +262,7 @@ impl RandomFactorLoadingCopula {
         // correlation targets. Brent works in location space, with a bounded
         // scale since the loading standard deviation is at most 0.5.
         let tail = 40.0 * self.loading_volatility;
-        let result = BrentSolver::new().tolerance(1e-13).solve_in_bracket(
+        let result = BrentSolver::new().with_tolerance(1e-13).solve_in_bracket(
             |location| self.clipped_second_moment(location) - correlation,
             -tail,
             1.0 + tail,

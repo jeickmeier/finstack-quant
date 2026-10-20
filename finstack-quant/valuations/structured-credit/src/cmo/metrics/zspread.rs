@@ -79,10 +79,10 @@ pub(crate) fn calculate_tranche_zspread(
     // boundary (or a silent 0.0) as a converged spread.
     const MAX_ITERATIONS: usize = 100;
     let solver = BrentSolver::new()
-        .tolerance(1e-8)
-        .max_iterations(MAX_ITERATIONS)
-        .bracket_bounds(-0.10, 0.20)
-        .initial_bracket_size(Some(0.05));
+        .with_tolerance(1e-8)
+        .with_max_iterations(MAX_ITERATIONS)
+        .with_bracket_bounds(-0.10, 0.20)
+        .with_initial_bracket_size(Some(0.05));
 
     // Capture any pricing error from the objective so it can be propagated
     // after the solver finishes (`BrentSolver::solve` expects `Fn(f64) -> f64`).

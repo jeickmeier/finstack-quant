@@ -16,8 +16,7 @@ fn money_preserves_nonzero_amount_at_maximum_configured_scale() {
         .set_scale(Currency::USD, 28)
         .unwrap();
     let exact_amount = rust_decimal::Decimal::new(1, 28);
-    let money = Money::from_decimal_with_config(exact_amount, Currency::USD, &cfg)
-        .expect("smallest positive Decimal amount");
+    let money = Money::from_decimal_with_config(exact_amount, Currency::USD, &cfg);
     assert_eq!(money.amount_decimal(), exact_amount);
     assert_eq!(
         money.format_with(FormatOpts {
@@ -131,14 +130,12 @@ fn money_integer_tuple_conversion_is_exact_above_2_pow_53() {
     // represent 2^53 + 1 and would silently round it to 2^53.
     let v: i64 = (1_i64 << 53) + 1; // 9_007_199_254_740_993
     let m = Money::from((v, Currency::USD));
-    let exact =
-        Money::from_decimal(rust_decimal::Decimal::from(v), Currency::USD).expect("in range");
+    let exact = Money::from_decimal(rust_decimal::Decimal::from(v), Currency::USD);
     assert_eq!(m, exact);
 
     let u: u64 = (1_u64 << 53) + 1;
     let m = Money::from((u, Currency::USD));
-    let exact =
-        Money::from_decimal(rust_decimal::Decimal::from(u), Currency::USD).expect("in range");
+    let exact = Money::from_decimal(rust_decimal::Decimal::from(u), Currency::USD);
     assert_eq!(m, exact);
 }
 
@@ -151,18 +148,18 @@ fn configured_decimal_ingestion_preserves_precision() {
         .ingest_scale
         .set_scale(Currency::USD, 2)
         .expect("valid decimal scale");
-    let money = Money::from_decimal_with_config(amount, Currency::USD, &cfg).unwrap();
+    let money = Money::from_decimal_with_config(amount, Currency::USD, &cfg);
     assert_eq!(
         money,
-        Money::from_decimal("9007199254740993.12".parse().unwrap(), Currency::USD).unwrap()
+        Money::from_decimal("9007199254740993.12".parse().unwrap(), Currency::USD)
     );
-    assert_ne!(money, Money::from_decimal(amount, Currency::USD).unwrap());
+    assert_ne!(money, Money::from_decimal(amount, Currency::USD));
 }
 
 #[test]
 fn money_protocol_operations_preserve_currency_and_decimal_precision() {
-    let negative = Money::from_decimal("-2.355".parse().unwrap(), Currency::USD).unwrap();
-    let positive = Money::from_decimal("2.355".parse().unwrap(), Currency::USD).unwrap();
+    let negative = Money::from_decimal("-2.355".parse().unwrap(), Currency::USD);
+    let positive = Money::from_decimal("2.355".parse().unwrap(), Currency::USD);
     assert_eq!(negative.abs(), positive);
     assert_eq!(
         positive

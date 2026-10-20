@@ -189,7 +189,7 @@ fn get_historical_ohlc_with_dates(
         .clone()
         .unwrap_or_else(|| inst.series_id());
 
-    let method_label = inst.realized_var_method.label();
+    let method_label = inst.realized_var_method;
     let inst_id = inst.id.as_str().to_owned();
 
     let open_id = inst.open_series_id.as_deref().ok_or_else(|| {
@@ -320,7 +320,7 @@ fn require_close_to_close_forecast(inst: &FxVarianceSwap) -> Result<()> {
     if inst.realized_var_method.requires_ohlc() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "FX variance swap '{}': pre-settlement forecasting is supported only for close_to_close; {} requires an estimator-specific OHLC forecast model. Fully observed settlement remains supported.",
-            inst.id, inst.realized_var_method.label(),
+            inst.id, inst.realized_var_method,
         )));
     }
     Ok(())

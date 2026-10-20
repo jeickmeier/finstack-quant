@@ -93,8 +93,7 @@ pub(crate) fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result
             day_count: conv.day_count,
             business_day_convention: conv.business_day_convention,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
-            spread_bp: Decimal::try_from(basis_spread_bp)
-                .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?,
+            spread_bp: finstack_quant_core::decimal::f64_to_decimal(basis_spread_bp)?,
             payment_lag_days: base_index.default_payment_lag_days,
             calendar_id: Some(conv.base_calendar_id.clone().into()),
             reset_lag_days: base_index.default_reset_lag_days,

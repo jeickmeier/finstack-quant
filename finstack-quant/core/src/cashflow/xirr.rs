@@ -368,8 +368,8 @@ where
     }
 
     let log_growth = BrentSolver::new()
-        .tolerance(LOG_RATE_TOLERANCE)
-        .max_iterations(DEFAULT_MAX_ITERATIONS)
+        .with_tolerance(LOG_RATE_TOLERANCE)
+        .with_max_iterations(DEFAULT_MAX_ITERATIONS)
         .solve_in_bracket(npv, lower, upper)?;
     let rate = log_growth.exp_m1();
     // Rounding expm1 back into the rate domain can lose meaningful accuracy

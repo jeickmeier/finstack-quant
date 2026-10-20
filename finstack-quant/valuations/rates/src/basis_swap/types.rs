@@ -392,7 +392,7 @@ impl BasisSwap {
         }
 
         let spread_bp = leg.spread_bp.as_f64();
-        validation::validate_rate_magnitude(
+        crate::rate_validation::validate_rate_magnitude(
             spread_bp,
             5000.0,
             "BasisSwap leg spread",

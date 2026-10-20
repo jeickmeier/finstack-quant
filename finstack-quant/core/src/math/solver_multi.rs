@@ -396,7 +396,7 @@ impl LevenbergMarquardtSolver {
     ) -> Result<LmSolution>
     where
         Res: Fn(&[f64], &mut [f64]),
-        Jac: FnMut(&[f64], &[f64], &mut usize, &mut [f64]),
+        Jac: FnMut(&[f64], &mut usize, &mut [f64]),
     {
         if params.is_empty() || n_residuals == 0 {
             return Err(crate::Error::Validation(
@@ -433,24 +433,33 @@ impl LevenbergMarquardtSolver {
             "lm: start"
         );
 
-        for _iter in 0..self.max_iterations {
-            jacobian_evals += 1;
-            jacobian_func(&params, &resid_vec, &mut residual_evals, &mut jacobian);
-
-            if let Some(reason) = self.check_residual_norm(&resid_vec) {
-                tracing::debug!(iterations, resid_norm, ?reason, "lm: converged");
-                return Ok(LmSolution {
+        // Builds the result from the loop state at the definition site (macro hygiene).
+        macro_rules! finish {
+            ($reason:expr) => {
+                LmSolution {
                     params,
                     stats: LmStats {
                         iterations,
                         residual_evals,
                         jacobian_evals,
-                        termination_reason: reason,
+                        termination_reason: $reason,
                         final_residual_norm: resid_norm,
                         final_step_norm: last_step_norm,
                         lambda_final: lambda,
                     },
-                });
+                }
+            };
+        }
+        let raise = |lambda: f64| (lambda * LM_LAMBDA_FACTOR).min(LAMBDA_MAX);
+
+        for _iter in 0..self.max_iterations {
+            jacobian_evals += 1;
+            jacobian_func(&params, &mut residual_evals, &mut jacobian);
+
+            if resid_norm < self.tolerance {
+                let reason = LmTerminationReason::ConvergedResidualNorm;
+                tracing::debug!(iterations, resid_norm, ?reason, "lm: converged");
+                return Ok(finish!(reason));
             }
 
             match self.solve_normal_equations_into(
@@ -463,7 +472,7 @@ impl LevenbergMarquardtSolver {
             ) {
                 Ok(()) => {}
                 Err(_) => {
-                    lambda = (lambda * LM_LAMBDA_FACTOR).min(LAMBDA_MAX);
+                    lambda = raise(lambda);
                     continue;
                 }
             };
@@ -481,18 +490,7 @@ impl LevenbergMarquardtSolver {
                 .sqrt();
             last_step_norm = effective_step_norm;
             if effective_step_norm < LM_MIN_STEP_SIZE {
-                return Ok(LmSolution {
-                    params,
-                    stats: LmStats {
-                        iterations,
-                        residual_evals,
-                        jacobian_evals,
-                        termination_reason: LmTerminationReason::StepTooSmall,
-                        final_residual_norm: resid_norm,
-                        final_step_norm: last_step_norm,
-                        lambda_final: lambda,
-                    },
-                });
+                return Ok(finish!(LmTerminationReason::StepTooSmall));
             }
 
             residuals_func(&new_params, &mut new_resid);
@@ -507,7 +505,7 @@ impl LevenbergMarquardtSolver {
 
                 lambda = (lambda / LM_LAMBDA_FACTOR).max(LAMBDA_MIN);
             } else {
-                lambda = (lambda * LM_LAMBDA_FACTOR).min(LAMBDA_MAX);
+                lambda = raise(lambda);
             }
         }
 
@@ -523,23 +521,7 @@ impl LevenbergMarquardtSolver {
             category = "max_iterations_exceeded",
             "lm: bailout — max iterations reached without convergence"
         );
-        Ok(LmSolution {
-            params,
-            stats: LmStats {
-                iterations,
-                residual_evals,
-                jacobian_evals,
-                termination_reason: LmTerminationReason::MaxIterations,
-                final_residual_norm: resid_norm,
-                final_step_norm: last_step_norm,
-                lambda_final: lambda,
-            },
-        })
-    }
-
-    fn check_residual_norm(&self, r: &[f64]) -> Option<LmTerminationReason> {
-        let resid_norm: f64 = r.iter().map(|val| val * val).sum::<f64>().sqrt();
-        (resid_norm < self.tolerance).then_some(LmTerminationReason::ConvergedResidualNorm)
+        Ok(finish!(LmTerminationReason::MaxIterations))
     }
 
     /// Solve system of equations with explicit residual dimension and stats.
@@ -555,7 +537,7 @@ impl LevenbergMarquardtSolver {
         let n_params = initial.len();
         let mut jac_scratch = JacobianScratch::new(n_params, n_residuals);
 
-        let jacobian_func = |p: &[f64], _r: &[f64], eval_counter: &mut usize, out: &mut [f64]| {
+        let jacobian_func = |p: &[f64], eval_counter: &mut usize, out: &mut [f64]| {
             self.compute_jacobian_system_into(
                 &residuals,
                 p,
@@ -591,7 +573,7 @@ impl LevenbergMarquardtSolver {
         let mut jac_scratch = JacobianScratch::new(n_params, n_residuals);
         let mut jac_2d = vec![vec![0.0; n_params]; n_residuals];
 
-        let jacobian_func = |p: &[f64], _r: &[f64], eval_counter: &mut usize, out: &mut [f64]| {
+        let jacobian_func = |p: &[f64], eval_counter: &mut usize, out: &mut [f64]| {
             for row in jac_2d.iter_mut() {
                 row.fill(0.0);
             }

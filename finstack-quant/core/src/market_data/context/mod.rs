@@ -412,7 +412,7 @@ mod tests {
             .expect("valid rate");
         let ctx = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider)));
         let amount = rust_decimal::Decimal::from_str("10000000000000000.1").expect("valid decimal");
-        let eur = Money::from_decimal(amount, Currency::EUR).expect("representable amount");
+        let eur = Money::from_decimal(amount, Currency::EUR);
 
         let usd = ctx
             .convert_money(eur, Currency::USD, date!(2025 - 01 - 15))

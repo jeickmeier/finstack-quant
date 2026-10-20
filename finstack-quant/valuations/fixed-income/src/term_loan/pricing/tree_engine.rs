@@ -971,11 +971,10 @@ impl TermLoanTreePricer {
             }
         };
 
-        let mut solver = BrentSolver::new()
-            .tolerance(OAS_TOLERANCE_BP)
-            .initial_bracket_size(Some(OAS_INITIAL_BRACKET_BP));
-        solver.max_iterations = OAS_MAX_ITERATIONS;
-        solver
+        BrentSolver::new()
+            .with_tolerance(OAS_TOLERANCE_BP)
+            .with_initial_bracket_size(Some(OAS_INITIAL_BRACKET_BP))
+            .with_max_iterations(OAS_MAX_ITERATIONS)
             .solve(objective_fn, 0.0)
             .map_err(|e| match pricing_error.borrow_mut().take() {
                 Some(tree_err) => finstack_quant_core::Error::Validation(format!(

@@ -354,8 +354,8 @@ pub fn calculate_tranche_oas(
     };
 
     let solver = BrentSolver::new()
-        .tolerance(config.tolerance)
-        .initial_bracket_size(Some(0.05));
+        .with_tolerance(config.tolerance)
+        .with_initial_bracket_size(Some(0.05));
     let oas = solver.solve(objective, 0.0)?;
 
     // Per-scenario PVs at solved OAS for model price and Monte Carlo error.

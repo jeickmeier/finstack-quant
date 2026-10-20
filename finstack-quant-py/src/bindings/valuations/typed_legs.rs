@@ -967,10 +967,8 @@ impl PyProtectionLegSpec {
     fn from_json(json: &str) -> PyResult<Self> {
         let inner: finstack_quant_valuations::instruments::ProtectionLegSpec =
             serde_json::from_str(json).map_err(display_to_py)?;
-        finstack_quant_valuations::instruments::ProtectionLegSpec::validate_recovery_rate(
-            inner.recovery_rate,
-        )
-        .map_err(core_to_py)?;
+        finstack_quant_core::validation::validate_recovery_rate(inner.recovery_rate)
+            .map_err(core_to_py)?;
         Ok(Self { inner })
     }
 

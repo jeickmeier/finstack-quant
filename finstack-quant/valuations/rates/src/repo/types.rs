@@ -364,8 +364,7 @@ impl Repo {
         // Maturity is next business day after adjusted start
         let maturity = adj_start.add_business_days(1, calendar)?;
 
-        let repo_rate = Decimal::try_from(repo_rate)
-            .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
+        let repo_rate = finstack_quant_core::decimal::f64_to_decimal(repo_rate)?;
 
         Repo::builder()
             .id(id.into())
@@ -398,8 +397,7 @@ impl Repo {
     ) -> Result<Self> {
         let defaults =
             embedded_registry()?.repo_defaults(repo_specs_id(cash_amount.currency())?)?;
-        let repo_rate = Decimal::try_from(repo_rate)
-            .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
+        let repo_rate = finstack_quant_core::decimal::f64_to_decimal(repo_rate)?;
 
         Repo::builder()
             .id(id.into())
@@ -432,8 +430,7 @@ impl Repo {
     ) -> Result<Self> {
         let defaults =
             embedded_registry()?.repo_defaults(repo_specs_id(cash_amount.currency())?)?;
-        let repo_rate = Decimal::try_from(repo_rate)
-            .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
+        let repo_rate = finstack_quant_core::decimal::f64_to_decimal(repo_rate)?;
 
         Repo::builder()
             .id(id.into())

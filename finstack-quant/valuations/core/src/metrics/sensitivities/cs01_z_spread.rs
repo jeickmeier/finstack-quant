@@ -188,8 +188,8 @@ fn solve_anchor_spread(
         }
     };
     let solver = BrentSolver::new()
-        .tolerance(1e-10)
-        .initial_bracket_size(Some(0.05)); // ±500 bp
+        .with_tolerance(1e-10)
+        .with_initial_bracket_size(Some(0.05)); // ±500 bp
     let spread = solver.solve(objective, 0.0)?;
     let pv = price_at_spread(cached, spread, compounds_per_year)?;
     if !pv.is_finite() || (pv - target).abs() > target.abs().max(1.0) * 1e-8 {

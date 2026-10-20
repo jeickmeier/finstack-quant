@@ -2313,10 +2313,11 @@ export interface RateConstructor {
   /**
    * Create a rate from a whole number of basis points.
    *
-   * Delegates to Rust `Rate::try_from_bp`, which rejects fractional input
-   * rather than silently rounding it: a sub-bp rate quietly rounded to
-   * whole bp is a pricing bug, not a convenience. Use `new Rate(decimal)`,
-   * `Rate.fromPercent`, or `Rate.parse("62.5bp")` for sub-bp rates.
+   * Delegates to Rust `Rate::from_bp` (the twin of Python `Rate.from_bp`).
+   * Fractional input is rejected rather than silently rounded: a sub-bp
+   * rate quietly rounded to whole bp is a pricing bug, not a convenience.
+   * Use `new Rate(decimal)`, `Rate.fromPercent`, or `Rate.parse("62.5bp")`
+   * for sub-bp rates.
    *
    * @example
    * ```javascript
@@ -2325,7 +2326,7 @@ export interface RateConstructor {
    * ```
    * @param bp - Rate in whole basis points (e.g. `500` for 5%).
    * @returns The constructed `Rate`.
-   * @throws If `bp` is non-finite or not a whole number of basis points.
+   * @throws `TypeError` (kind `invalid_type`) if `bp` is not a whole number in the `i32` range.
    */
   fromBp(bp: number): Rate;
   /**

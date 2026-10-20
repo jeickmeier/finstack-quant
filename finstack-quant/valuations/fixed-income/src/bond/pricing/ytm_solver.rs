@@ -157,8 +157,8 @@ fn solve_ytm_timed_with(
     // bracket is found, or the objective is non-finite — so non-convergent
     // YTM solves surface as `Err`.
     let solver = BrentSolver::new()
-        .tolerance(tolerance)
-        .max_iterations(max_iterations);
+        .with_tolerance(tolerance)
+        .with_max_iterations(max_iterations);
     let ytm = solver.solve(price_fn, initial_guess)?;
 
     // If any pricing error occurred during objective evaluation, surface it

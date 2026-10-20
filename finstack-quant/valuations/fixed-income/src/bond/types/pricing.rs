@@ -426,20 +426,19 @@ impl Bond {
         self.instrument_pricing_overrides.validate()?;
         self.metric_pricing_overrides.validate()?;
         self.scenario_pricing_overrides.validate()?;
-        validation::validate_date_range_strict_with(
-            self.issue_date,
-            self.maturity,
-            |start, end| {
-                format!(
-                    "Bond issue date ({}) must be before maturity date ({})",
-                    start, end
-                )
-            },
-        )?;
+        validation::require_with(self.maturity > self.issue_date, || {
+            format!(
+                "Bond issue date ({}) must be before maturity date ({})",
+                self.issue_date, self.maturity
+            )
+        })?;
 
         validation::validate_money_finite(self.notional, "bond notional")?;
-        validation::validate_money_gt_with(self.notional, 0.0, |amount| {
-            format!("Bond notional must be positive, got {}", amount)
+        validation::require_with(self.notional.amount() > 0.0, || {
+            format!(
+                "Bond notional must be positive, got {}",
+                self.notional.amount()
+            )
         })?;
 
         // Validate coupon rate for fixed-rate bonds (including amortizing with fixed base)

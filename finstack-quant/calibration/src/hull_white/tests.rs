@@ -111,7 +111,7 @@ fn piecewise_cap_floor_bootstrap_recovers_synthetic_segments() {
             let target = hw1f_cap_floor_price_with_model(&generated, &discount, &forward, spec)
                 .expect("model price");
             let normal_vol = BrentSolver::new()
-                .tolerance(1.0e-12)
+                .with_tolerance(1.0e-12)
                 .solve_in_bracket(
                     |vol| {
                         bachelier_cap_floor_price(

@@ -25,6 +25,7 @@
 
 use crate::currency::Currency;
 use crate::dates::Date;
+use crate::math::units::BASIS_POINTS_PER_UNIT;
 use crate::types::CurveId;
 
 /// Mode of applying a bump.
@@ -419,7 +420,9 @@ impl BumpSpec {
     /// Returns `None` for other combinations (e.g. Multiplicative/Percent which isn't standard everywhere yet).
     pub fn resolve_standard_values(&self) -> Option<(f64, bool)> {
         match (self.mode, self.units) {
-            (BumpMode::Additive, BumpUnits::RateBp) => Some((self.value / 10_000.0, false)),
+            (BumpMode::Additive, BumpUnits::RateBp) => {
+                Some((self.value / BASIS_POINTS_PER_UNIT, false))
+            }
             (BumpMode::Additive, BumpUnits::Percent) => Some((self.value / 100.0, false)),
             (BumpMode::Additive, BumpUnits::Fraction) => Some((self.value, false)),
             (BumpMode::Multiplicative, BumpUnits::Factor) => Some((self.value, true)),

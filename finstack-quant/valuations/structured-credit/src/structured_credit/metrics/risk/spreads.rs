@@ -308,8 +308,8 @@ pub fn calculate_tranche_z_spread(
 
     // Solve the relative-price objective with a scale-independent tolerance.
     let solver = BrentSolver::new()
-        .tolerance(Z_SPREAD_SOLVER_TOLERANCE)
-        .initial_bracket_size(Some(Z_SPREAD_INITIAL_BRACKET));
+        .with_tolerance(Z_SPREAD_SOLVER_TOLERANCE)
+        .with_initial_bracket_size(Some(Z_SPREAD_INITIAL_BRACKET));
 
     let z_spread = solver.solve(objective, 0.0)?;
 

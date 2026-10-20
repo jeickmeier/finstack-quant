@@ -265,7 +265,12 @@ impl Swaption {
 
         let strike = self.strike_f64()?;
         validation::validate_f64_finite(strike, "swaption strike")?;
-        validation::validate_f64_abs_le(strike, 2.0, "swaption strike", Some(" (rate)"))?;
+        crate::rate_validation::validate_f64_abs_le(
+            strike,
+            2.0,
+            "swaption strike",
+            Some(" (rate)"),
+        )?;
 
         self.underlying_fixed_leg.validate()?;
         self.underlying_float_leg.validate()?;

@@ -328,12 +328,7 @@ impl CdsIndex {
         let business_day_convention = convention.get_spec()?.business_day_convention;
         let stub = convention.get_spec()?.stub;
 
-        let coupon_bp = Decimal::try_from(preset.coupon_bp).map_err(|e| {
-            finstack_quant_core::Error::Validation(format!(
-                "coupon_bp {} cannot be represented as Decimal: {}",
-                preset.coupon_bp, e
-            ))
-        })?;
+        let coupon_bp = finstack_quant_core::decimal::f64_to_decimal(preset.coupon_bp)?;
 
         Ok(Self {
             id: id.into(),

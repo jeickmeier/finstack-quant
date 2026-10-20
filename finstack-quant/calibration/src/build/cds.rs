@@ -17,7 +17,6 @@ use finstack_quant_valuations_core::instruments::{
 use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
 use finstack_quant_valuations_core::market::conventions::{CdsConventionSpec, ConventionRegistry};
 use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
-use rust_decimal::Decimal;
 
 /// Resolved CDS dates used by both builders and calibration prepared quotes.
 #[derive(Debug, Clone, Copy)]
@@ -254,7 +253,7 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
         ),
     };
 
-    ProtectionLegSpec::validate_recovery_rate(recovery_rate)?;
+    finstack_quant_core::validation::validate_recovery_rate(recovery_rate)?;
 
     let conv = registry.resolve_cds(convention_key)?;
     let dates = resolve_cds_dates(ctx, conv, pillar)?;
@@ -289,12 +288,7 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
             business_day_convention: conv.business_day_convention,
             calendar_id: Some(conv.calendar_id.clone().into()),
             day_count: conv.day_count,
-            coupon_bp: Decimal::try_from(spread_bp).map_err(|e| {
-                finstack_quant_core::Error::Validation(format!(
-                    "premium.coupon_bp {} cannot be represented as Decimal: {}",
-                    spread_bp, e
-                ))
-            })?,
+            coupon_bp: finstack_quant_core::decimal::f64_to_decimal(spread_bp)?,
             discount_curve_id: CurveId::new(discount_id),
         },
         protection_leg: ProtectionLegSpec {

@@ -142,11 +142,11 @@ fn money_from_amount_with_config(
     }
     if is_python_decimal(obj)? {
         let d = decimal_from_py(obj)?;
-        return from_decimal(d).map_err(core_to_py);
+        return Ok(from_decimal(d));
     }
     if let Ok(text) = obj.cast::<PyString>() {
         let d = finstack_quant_core::decimal::parse_decimal(text.to_str()?).map_err(core_to_py)?;
-        return from_decimal(d).map_err(core_to_py);
+        return Ok(from_decimal(d));
     }
     let amount: f64 = obj.extract().map_err(|_| PyTypeError::new_err(TYPE_MSG))?;
     from_f64(amount).map_err(core_to_py)
@@ -204,9 +204,7 @@ impl PyMoney {
     ) -> PyResult<Self> {
         let ccy = extract_currency(currency)?;
         let d = decimal_from_py(amount)?;
-        Money::from_decimal(d, ccy)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
+        Ok(Self::from_inner(Money::from_decimal(d, ccy)))
     }
 
     /// Construct from exact decimal text, rejecting inexact amounts.

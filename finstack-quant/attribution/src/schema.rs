@@ -7,7 +7,8 @@
 //! `generated_schema` produces only the raw derived document and drifts from
 //! the checked-in bytes.
 
-use finstack_quant_core::schema::{SchemaArtifact, SchemaKind};
+use crate::AttributionInputs;
+use finstack_quant_core::schema::SchemaArtifact;
 
 use crate::{AttributionEnvelope, AttributionResultEnvelope};
 
@@ -149,30 +150,33 @@ fn attribution_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>>
 
 /// The crate's complete schema registry, sorted by artifact path.
 pub const ARTIFACTS: &[SchemaArtifact] = &[
-    SchemaArtifact::new::<AttributionEnvelope>(
-        "schemas/attribution/1/attribution.schema.json",
-        "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
-        "Finstack Quant Attribution Specification",
+    finstack_quant_core::schema_artifact!(
+        AttributionEnvelope,
+        "attribution",
+        "attribution",
+        Input,
         "Complete specification for P&L attribution runs with instrument and market snapshots",
+        title = "Finstack Quant Attribution Specification"
     )
-    .with_kind(SchemaKind::Input)
     .with_summary("One multi-period P&L attribution run: positions, markets and method.")
     .with_examples(attribution_examples),
-    SchemaArtifact::new::<crate::AttributionInputs>(
-        "schemas/attribution/1/attribution_inputs.schema.json",
-        "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
-        "Finstack Quant Shared Attribution Inputs",
+    finstack_quant_core::schema_artifact!(
+        AttributionInputs,
+        "attribution",
+        "attribution_inputs",
+        Input,
         "Shared market snapshots, dates, method and options for a batch of instruments",
+        title = "Finstack Quant Shared Attribution Inputs"
     )
-    .with_kind(SchemaKind::Input)
     .with_summary("Shared attribution settings without an instrument payload."),
-    SchemaArtifact::new::<AttributionResultEnvelope>(
-        "schemas/attribution/1/attribution_result.schema.json",
-        "https://finstack_quant.dev/schemas/attribution/1/attribution_result.schema.json",
-        "Finstack Quant Attribution Result",
+    finstack_quant_core::schema_artifact!(
+        AttributionResultEnvelope,
+        "attribution",
+        "attribution_result",
+        Output,
         "Complete result of a P&L attribution run including factor decomposition and metadata",
+        title = "Finstack Quant Attribution Result"
     )
-    .with_kind(SchemaKind::Output)
     .with_summary("Attributed P&L by effect and grouping, with policy stamps.")
     .with_examples(attribution_result_examples),
 ];

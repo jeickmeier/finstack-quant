@@ -319,18 +319,14 @@ pub enum RealizedVarMethod {
     YangZhang,
 }
 
-impl RealizedVarMethod {
-    /// Returns the canonical string label for this method.
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::CloseToClose => "close_to_close",
-            Self::Parkinson => "parkinson",
-            Self::GarmanKlass => "garman_klass",
-            Self::RogersSatchell => "rogers_satchell",
-            Self::YangZhang => "yang_zhang",
-        }
+/// Displays the serde name (`close_to_close`, `yang_zhang`, ...).
+impl std::fmt::Display for RealizedVarMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
+}
 
+impl RealizedVarMethod {
     /// Returns `true` if this method requires OHLC data.
     pub fn requires_ohlc(self) -> bool {
         !matches!(self, Self::CloseToClose)
@@ -1574,7 +1570,7 @@ mod tests {
             RealizedVarMethod::YangZhang,
         ] {
             let label = crate::wire::serde_label(&method).expect("label");
-            assert_eq!(label, method.label());
+            assert_eq!(label, method.to_string());
             let parsed: RealizedVarMethod = crate::wire::serde_parse(&label).expect("parse");
             assert_eq!(parsed, method);
         }

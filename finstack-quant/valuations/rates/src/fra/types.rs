@@ -155,8 +155,11 @@ impl ForwardRateAgreement {
         validation::validate_date_range_strict(self.start_date, self.maturity, "FRA")?;
 
         validation::validate_money_finite(self.notional, "FRA notional")?;
-        validation::validate_money_gt_with(self.notional, 0.0, |amount| {
-            format!("FRA notional must be positive, got {}", amount)
+        validation::require_with(self.notional.amount() > 0.0, || {
+            format!(
+                "FRA notional must be positive, got {}",
+                self.notional.amount()
+            )
         })?;
 
         if let Some(observed) = self.observed_fixing {
@@ -302,7 +305,11 @@ impl ForwardRateAgreement {
         };
 
         // Warn if forward rate is outside reasonable bounds (likely data error)
-        if validation::rate_outside_range(forward_rate, MIN_REASONABLE_RATE, MAX_REASONABLE_RATE) {
+        if crate::rate_validation::rate_outside_range(
+            forward_rate,
+            MIN_REASONABLE_RATE,
+            MAX_REASONABLE_RATE,
+        ) {
             tracing::warn!(
                 instrument_id = %self.id.as_str(),
                 forward_rate,

@@ -41,6 +41,7 @@
 use super::context::MarketContext;
 use crate::currency::Currency;
 use crate::dates::Date;
+use crate::math::units::BASIS_POINTS_PER_UNIT;
 use crate::Result;
 
 use serde::{Deserialize, Serialize};
@@ -215,7 +216,7 @@ pub fn measure_discount_curve_shift(
     let tenors = method.tenors(Some(curve_t0.knots()));
     measure_average_shift(
         tenors,
-        10_000.0,
+        BASIS_POINTS_PER_UNIT,
         |t| curve_t0.zero_rate(t, crate::math::Compounding::Continuous),
         |t| curve_t1.zero_rate(t, crate::math::Compounding::Continuous),
     )
@@ -391,7 +392,7 @@ pub fn measure_per_tenor_credit_curve_shift(
     per_tenor_shifts(tenors, "zero-rate", |t| {
         (curve_t1.zero_rate(t, crate::math::Compounding::Continuous)
             - curve_t0.zero_rate(t, crate::math::Compounding::Continuous))
-            * 10_000.0
+            * BASIS_POINTS_PER_UNIT
     })
 }
 
@@ -420,7 +421,7 @@ pub fn measure_inflation_curve_shift(
     };
     measure_average_shift(
         STANDARD_TENORS,
-        10_000.0,
+        BASIS_POINTS_PER_UNIT,
         |t| zero_inflation(&curve_t0, t),
         |t| zero_inflation(&curve_t1, t),
     )
@@ -456,7 +457,7 @@ pub fn measure_inflation_index_shift(
             "inflation index levels must be finite and positive".to_string(),
         ));
     }
-    Ok((level_t1 / level_t0 - 1.0) * 10_000.0)
+    Ok((level_t1 / level_t0 - 1.0) * BASIS_POINTS_PER_UNIT)
 }
 
 /// Measure a declared inflation source using one canonical risk factor.

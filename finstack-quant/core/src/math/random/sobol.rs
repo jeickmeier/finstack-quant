@@ -220,10 +220,7 @@ impl SobolRng {
     /// index 0 and repeats the sequence.
     fn advance(&mut self) {
         if self.index + 1 == SOBOL_PERIOD {
-            self.index = 0;
-            for slot in &mut self.state {
-                *slot = 0;
-            }
+            self.reset();
             return;
         }
         let c = (self.index + 1).trailing_zeros() as usize;
@@ -393,10 +390,10 @@ impl SobolRng {
             self.dimension
         );
         for chunk in out.chunks_mut(self.dimension) {
-            for (d, slot) in chunk.iter_mut().enumerate().take(self.dimension) {
-                *slot = standard_normal_inv_cdf(self.owen_scramble(self.state[d], d));
+            self.fill_point(chunk);
+            for slot in chunk.iter_mut() {
+                *slot = standard_normal_inv_cdf(*slot);
             }
-            self.advance();
         }
     }
 }

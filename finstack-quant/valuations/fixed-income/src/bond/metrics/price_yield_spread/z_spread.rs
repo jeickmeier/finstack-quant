@@ -252,8 +252,8 @@ impl MetricCalculator for ZSpreadCalculator {
             Z_SPREAD_MAX_BRACKET_BP,
         )?;
         let solver = BrentSolver::new()
-            .tolerance(Z_SPREAD_TOLERANCE)
-            .initial_bracket_size(Some(bracket));
+            .with_tolerance(Z_SPREAD_TOLERANCE)
+            .with_initial_bracket_size(Some(bracket));
         let z = solver.solve(objective, 0.0)?;
 
         // Surface any pricing error that occurred inside the objective instead

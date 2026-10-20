@@ -256,19 +256,16 @@ impl Money {
     ///
     /// `rust_decimal::Decimal` already rejects `NaN` / `Infinity` at parse
     /// time, so callers parsing user-supplied strings will surface those errors
-    /// before reaching this constructor.
-    ///
-    /// # Errors
-    ///
-    /// Never fails: every `Decimal` has a finite `f64` view for
-    /// [`Self::amount`]. The `Result` matches the other `Money` constructors.
+    /// before reaching this constructor. Every `Decimal` has a finite `f64`
+    /// view for [`Self::amount`], so construction cannot fail.
     ///
     /// # Arguments
     ///
     /// * `amount` - Finite monetary quantity in major currency units before rounding
     /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
-    pub fn from_decimal(amount: rust_decimal::Decimal, currency: Currency) -> Result<Self, Error> {
-        Ok(Self { amount, currency })
+    #[must_use]
+    pub fn from_decimal(amount: rust_decimal::Decimal, currency: Currency) -> Self {
+        Self { amount, currency }
     }
 
     /// Construct from exact decimal text, rejecting any inexact representation.
@@ -304,9 +301,7 @@ impl Money {
     /// Returns `Error::Validation` when the text cannot be represented
     /// exactly as a `Decimal` (malformed input, non-finite tokens, mantissa
     /// precision beyond 96 bits, a malformed exponent, or an exponent whose
-    /// application would exceed the 28-digit scale or 96-bit mantissa), or
-    /// `InputError::ConversionOverflow` when the exact value cannot produce
-    /// the finite `f64` view used by [`Self::amount`].
+    /// application would exceed the 28-digit scale or 96-bit mantissa).
     ///
     /// # Examples
     /// ```rust
@@ -317,7 +312,10 @@ impl Money {
     /// assert_eq!(money.amount_decimal().to_string(), "1.245");
     /// ```
     pub fn from_decimal_str(amount: &str, currency: Currency) -> Result<Self, Error> {
-        Self::from_decimal(crate::decimal::parse_decimal(amount)?, currency)
+        Ok(Self::from_decimal(
+            crate::decimal::parse_decimal(amount)?,
+            currency,
+        ))
     }
 
     /// Construct from an exact Decimal using the configured ingest rounding policy.
@@ -327,15 +325,12 @@ impl Money {
     /// * `amount` - Exact monetary amount in major currency units, rounded without conversion through f64.
     /// * `currency` - ISO-4217 currency used to select the ingest scale.
     /// * `cfg` - Configuration supplying the currency scale override (or max(6, ISO minor-unit digits)) and rounding mode.
-    ///
-    /// # Errors
-    ///
-    /// Returns a conversion error if the rounded amount cannot provide an f64 view.
+    #[must_use]
     pub fn from_decimal_with_config(
         amount: rust_decimal::Decimal,
         currency: Currency,
         cfg: &FinstackConfig,
-    ) -> Result<Self, Error> {
+    ) -> Self {
         let scale = cfg.ingest_scale(currency) as i32;
         Self::from_decimal(
             super::rounding::round_decimal(amount, scale, cfg.rounding.mode),
@@ -992,7 +987,7 @@ mod tests {
         use core::str::FromStr;
 
         let amount = rust_decimal::Decimal::from_str("10000000000000000.1").expect("valid decimal");
-        let eur = Money::from_decimal(amount, Currency::EUR).expect("representable amount");
+        let eur = Money::from_decimal(amount, Currency::EUR);
         let usd = eur
             .convert_at_rate(Currency::USD, 2.0)
             .expect("valid conversion");
@@ -1012,10 +1007,8 @@ mod tests {
 
     #[test]
     fn hash_matches_equality_across_decimal_scale() {
-        let a = Money::from_decimal(rust_decimal::Decimal::new(10, 1), Currency::USD)
-            .expect("1.0 is representable");
-        let b = Money::from_decimal(rust_decimal::Decimal::new(100, 2), Currency::USD)
-            .expect("1.00 is representable");
+        let a = Money::from_decimal(rust_decimal::Decimal::new(10, 1), Currency::USD);
+        let b = Money::from_decimal(rust_decimal::Decimal::new(100, 2), Currency::USD);
         assert_eq!(a, b);
         assert_eq!(hash_of(a), hash_of(b));
     }

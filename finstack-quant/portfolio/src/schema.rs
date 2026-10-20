@@ -5,6 +5,9 @@
 //! definition. Render an entry with
 //! [`SchemaArtifact::generate`](finstack_quant_core::schema::SchemaArtifact::generate).
 
+use crate::materialization::MaterializationReport;
+use crate::optimization::PortfolioOptimizationResultWire;
+use crate::PortfolioMaterializationEnvelope;
 use crate::{
     attribution::ReconciliationReport, cashflows::CashflowAggregationOptions,
     cashflows::PortfolioCashflows, factor_model::CreditVolReport,
@@ -193,32 +196,36 @@ fn optimization_result_examples() -> Result<Vec<Value>> {
 
 /// The crate's complete schema registry, sorted by artifact path.
 pub const ARTIFACTS: &[SchemaArtifact] = &[
-    SchemaArtifact::new::<crate::materialization::MaterializationReport>(
-        "schemas/portfolio/1/materialization_report.schema.json",
-        "https://finstack_quant.dev/schemas/portfolio/1/materialization_report.schema.json",
-        "Materialization Report",
-        "Outcome metadata for one successful portfolio materialization.",
-    )
-    .with_kind(SchemaKind::Output)
+    finstack_quant_core::schema_artifact!(
+    MaterializationReport,
+    "portfolio",
+    "materialization_report",
+    Output,
+    "Outcome metadata for one successful portfolio materialization.",
+    title = "Materialization Report"
+)
     .with_summary("Retained diagnostics, bundle counts and phase timings from a portfolio load.")
     .with_examples(examples::materialization_report),
-    SchemaArtifact::new::<crate::PortfolioMaterializationEnvelope>(
-        "schemas/portfolio/1/portfolio_materialization.schema.json",
-        "https://finstack_quant.dev/schemas/portfolio/1/portfolio_materialization.schema.json",
-        "Portfolio Materialization Envelope",
-        "Strict, versioned, content-addressed portfolio materialization bundle.",
-    )
+    finstack_quant_core::schema_artifact!(
+    PortfolioMaterializationEnvelope,
+    "portfolio",
+    "portfolio_materialization",
+    Component,
+    "Strict, versioned, content-addressed portfolio materialization bundle.",
+    title = "Portfolio Materialization Envelope"
+)
     .with_packager(package_materialization_schema)
     .with_kind(SchemaKind::Input)
     .with_summary("Positions, books and their instruments as one content-addressed bundle.")
     .with_examples(materialization_examples),
-    SchemaArtifact::new::<crate::optimization::PortfolioOptimizationResultWire>(
-        "schemas/portfolio/1/portfolio_optimization_result.schema.json",
-        "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
-        "Portfolio Optimization Result",
-        "Canonical typed v1 output from portfolio optimization.",
-    )
-    .with_kind(SchemaKind::Output)
+    finstack_quant_core::schema_artifact!(
+    PortfolioOptimizationResultWire,
+    "portfolio",
+    "portfolio_optimization_result",
+    Output,
+    "Canonical typed v1 output from portfolio optimization.",
+    title = "Portfolio Optimization Result"
+)
     .with_summary("Optimizer weights and diagnostics.")
     .with_examples(optimization_result_examples),
     finstack_quant_core::schema_artifact!(

@@ -100,9 +100,9 @@ impl MetricCalculator for ImpliedVolCalculator {
             }
         };
         let solved = BrentSolver::new()
-            .tolerance(1e-12)
-            .max_iterations(100)
-            .bracket_bounds(lower, upper)
+            .with_tolerance(1e-12)
+            .with_max_iterations(100)
+            .with_bracket_bounds(lower, upper)
             .solve(objective, 0.25_f64.clamp(lower, upper));
         if let Some(error) = captured_err.take() {
             return Err(error);

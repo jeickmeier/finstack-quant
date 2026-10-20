@@ -148,6 +148,8 @@ pub mod ir_future;
 pub mod ir_future_option;
 /// IRS module - Interest rate swaps.
 pub mod irs;
+/// Rate-magnitude checks shared by the rates instruments.
+pub(crate) mod rate_validation;
 /// Repo module - Repurchase agreements.
 pub mod repo;
 /// Swaption module - Options on interest rate swaps.
