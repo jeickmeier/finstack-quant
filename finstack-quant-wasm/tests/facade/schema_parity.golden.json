@@ -1880,21 +1880,21 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
             "type_name": "ScenarioPnlBatchItem",
             "kind": "output",
-            "bytes": 86415
+            "bytes": 86423
           },
           {
             "path": "schemas/portfolio/1/scenario_pnl_view.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_view.schema.json",
             "type_name": "ScenarioPnlView",
             "kind": "output",
-            "bytes": 86204
+            "bytes": 86212
           },
           {
             "path": "schemas/portfolio/1/scenario_revalue_view.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json",
             "type_name": "ScenarioRevalueView",
             "kind": "output",
-            "bytes": 92656
+            "bytes": 92664
           },
           {
             "path": "schemas/portfolio/1/sector_period.schema.json",
@@ -2007,14 +2007,14 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1150259
+            "bytes": 1150267
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/horizon_result.schema.json",
             "type_name": "HorizonResult",
             "kind": "output",
-            "bytes": 142755
+            "bytes": 142763
           },
           {
             "path": "schemas/scenarios/1/horizon_summary.schema.json",
@@ -4402,7 +4402,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
             "type_name": "ScenarioPnlBatchItem",
             "kind": "output",
-            "bytes": 86415
+            "bytes": 86423
           },
           {
             "domain": "portfolio",
@@ -4410,7 +4410,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_view.schema.json",
             "type_name": "ScenarioPnlView",
             "kind": "output",
-            "bytes": 86204
+            "bytes": 86212
           },
           {
             "domain": "portfolio",
@@ -4418,7 +4418,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json",
             "type_name": "ScenarioRevalueView",
             "kind": "output",
-            "bytes": 92656
+            "bytes": 92664
           },
           {
             "domain": "portfolio",
@@ -4490,7 +4490,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1150259
+            "bytes": 1150267
           },
           {
             "domain": "scenarios",
@@ -4498,7 +4498,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/horizon_result.schema.json",
             "type_name": "HorizonResult",
             "kind": "output",
-            "bytes": 142755
+            "bytes": 142763
           },
           {
             "domain": "scenarios",
