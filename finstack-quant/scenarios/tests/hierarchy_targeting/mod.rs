@@ -3,6 +3,91 @@
 use finstack_quant_core::money::Money;
 use finstack_quant_scenarios::{OperationSpec, ScenarioSpec};
 
+/// A tag filter that matches both a parent node and one of its children
+/// reaches the child's curves twice. Each curve is shocked once, at its
+/// deepest match, and expansion follows the core `MostSpecificWins` order:
+/// curves matched only at the parent depth come before curves whose deepest
+/// match is the child.
+#[test]
+fn tag_filter_matching_parent_and_child_shocks_each_curve_once() {
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::hierarchy::{
+        HierarchyTarget, MarketDataHierarchy, TagFilter, TagPredicate,
+    };
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_scenarios::engine::ScenarioMarketTarget;
+    use finstack_quant_scenarios::{
+        AppliedShockTarget, CurveKind, ExecutionContext, ScenarioEngine,
+    };
+    use time::macros::date;
+
+    let hierarchy = MarketDataHierarchy::builder()
+        .add_node("Credit/US")
+        .tag("region", "us")
+        .add_node("Credit/US/Banks")
+        .tag("region", "us")
+        .curve_ids(&["BANK-5Y"])
+        .add_node("Credit/US/Energy")
+        .curve_ids(&["OXY-5Y"])
+        .build()
+        .expect("hierarchy should build");
+    let base = date!(2025 - 01 - 01);
+    let curve = |id: &str| {
+        DiscountCurve::builder(id)
+            .base_date(base)
+            .knots([(0.0, 1.0), (5.0, 0.90)])
+            .build()
+            .expect("curve should build")
+    };
+    let mut market = MarketContext::new()
+        .insert(curve("BANK-5Y"))
+        .insert(curve("OXY-5Y"));
+    market.set_hierarchy(hierarchy);
+
+    let scenario = ScenarioSpec {
+        id: "tagged".into(),
+        operations: vec![OperationSpec::HierarchyCurveParallelBp {
+            curve_kind: CurveKind::Discount,
+            target: HierarchyTarget {
+                path: vec!["Credit".into()],
+                tag_filter: Some(TagFilter {
+                    predicates: vec![TagPredicate::Equals {
+                        key: "region".into(),
+                        value: "us".into(),
+                    }],
+                }),
+            },
+            bp: 50.0,
+            discount_curve_id: None,
+        }],
+        ..Default::default()
+    };
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: None,
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of: base,
+    };
+    let report = ScenarioEngine::new()
+        .apply(&scenario, &mut ctx)
+        .expect("scenario should apply");
+
+    let shocked: Vec<&str> = report
+        .applied_shocks
+        .iter()
+        .map(|shock| match &shock.applies_to {
+            AppliedShockTarget::Market {
+                target: ScenarioMarketTarget::Curve { curve_id, .. },
+            } => curve_id.as_str(),
+            other => panic!("unexpected shock target {other:?}"),
+        })
+        .collect();
+    assert_eq!(shocked, vec!["OXY-5Y", "BANK-5Y"]);
+    assert_eq!(report.expanded_operations, 2);
+}
+
 /// Existing direct-targeted JSON must still deserialize correctly.
 #[test]
 fn existing_direct_target_json_round_trips() {

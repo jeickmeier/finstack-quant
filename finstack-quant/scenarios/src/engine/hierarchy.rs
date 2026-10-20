@@ -5,46 +5,16 @@ use crate::error::Result;
 use crate::spec::{CurveKind, OperationSpec};
 use crate::warning::Warning;
 use finstack_quant_core::market_data::hierarchy::{
-    HierarchyTarget, MarketDataHierarchy, ResolutionMode, ResolvedCurveMatch,
+    HierarchyTarget, MarketDataHierarchy, ResolutionMode,
 };
 use finstack_quant_core::types::{CurveId, PriceId};
-use finstack_quant_core::{HashMap, HashSet};
+use finstack_quant_core::HashMap;
 
 struct HierarchyExpansion {
     matched_depth: usize,
     operation: OperationSpec,
     /// Concrete market target the expanded operation shocks.
     key: ScenarioMarketTarget,
-}
-
-fn resolve_hierarchy_matches(
-    hierarchy: &MarketDataHierarchy,
-    target: &HierarchyTarget,
-) -> Vec<ResolvedCurveMatch> {
-    dedup_matches_keep_deepest(hierarchy.resolve_matches(target, ResolutionMode::Cumulative))
-}
-
-/// Collapse duplicate curve hits to a single match per `curve_id`, keeping the
-/// deepest `matched_depth` seen for each.
-fn dedup_matches_keep_deepest(matches: Vec<ResolvedCurveMatch>) -> Vec<ResolvedCurveMatch> {
-    let mut best: HashMap<CurveId, usize> = HashMap::default();
-    for m in &matches {
-        best.entry(m.curve_id.clone())
-            .and_modify(|d| *d = (*d).max(m.matched_depth))
-            .or_insert(m.matched_depth);
-    }
-    let mut seen: HashSet<CurveId> = HashSet::default();
-    let mut out = Vec::with_capacity(best.len());
-    for m in matches {
-        if seen.insert(m.curve_id.clone()) {
-            let depth = best[&m.curve_id];
-            out.push(ResolvedCurveMatch {
-                curve_id: m.curve_id,
-                matched_depth: depth,
-            });
-        }
-    }
-    out
 }
 
 /// Direct operations after hierarchy expansion, plus any skip/no-match warnings.
@@ -55,7 +25,9 @@ pub(super) struct ExpansionOutcome<'a> {
 
 /// Resolve one hierarchy target into direct operations.
 ///
-/// Emits [`Warning::HierarchyNoMatch`] when the target resolves to nothing and
+/// A tag filter can reach one curve at several depths; each curve expands
+/// once, at its deepest match ([`ResolutionMode::MostSpecificWins`] within the
+/// target). Emits [`Warning::HierarchyNoMatch`] when the target resolves to nothing and
 /// [`Warning::HierarchyResolvedIdSkipped`] for each resolved id absent from the
 /// operation's market collection.
 fn expand_target(
@@ -66,7 +38,7 @@ fn expand_target(
     exists: impl Fn(&CurveId) -> bool,
     mut make: impl FnMut(CurveId) -> (ScenarioMarketTarget, OperationSpec),
 ) -> Vec<HierarchyExpansion> {
-    let matches = resolve_hierarchy_matches(hierarchy, target);
+    let matches = hierarchy.resolve_matches(target, ResolutionMode::MostSpecificWins);
     if matches.is_empty() {
         warnings.push(Warning::HierarchyNoMatch {
             target_path: target.path.join("/"),
