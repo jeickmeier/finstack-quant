@@ -40,7 +40,7 @@ use finstack_quant_core::Result;
 use finstack_quant_models::volatility::measure_vol_surface_shift;
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::bump_surface_vol_absolute;
+use finstack_quant_valuations::metrics::{bump_surface_vol_absolute, STANDARD_BUCKETS_YEARS};
 use finstack_quant_valuations::recalibration::{
     HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
 };
@@ -733,11 +733,6 @@ pub(crate) fn attribute_pnl_taylor(
     Ok(attribution)
 }
 
-/// Standard key-rate bucket grid (years) used for key-rate-aware rate / forward
-/// curve attribution. Matches the DV01 calculator's standard bucket grid.
-const KEY_RATE_BUCKETS_YEARS: [f64; 11] =
-    [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0];
-
 /// One key-rate bucket's contribution to a rate/forward factor: the per-bucket
 /// DV01 (from a triangular bump) paired with the realized per-tenor curve move.
 struct KeyRateBucket {
@@ -856,7 +851,7 @@ fn compute_curve_factor(
                 market_t0.get_discount(curve_id.as_str())?,
                 market_t1.get_discount(curve_id.as_str())?,
             );
-            KEY_RATE_BUCKETS_YEARS
+            STANDARD_BUCKETS_YEARS
                 .iter()
                 .map(|&t| (curve_t1.zero(t) - curve_t0.zero(t)) * 10_000.0)
                 .collect()
@@ -866,25 +861,25 @@ fn compute_curve_factor(
                 market_t0.get_forward(curve_id.as_str())?,
                 market_t1.get_forward(curve_id.as_str())?,
             );
-            KEY_RATE_BUCKETS_YEARS
+            STANDARD_BUCKETS_YEARS
                 .iter()
                 .map(|&t| (curve_t1.rate(t) - curve_t0.rate(t)) * 10_000.0)
                 .collect()
         }
     };
 
-    let mut buckets: Vec<KeyRateBucket> = Vec::with_capacity(KEY_RATE_BUCKETS_YEARS.len());
+    let mut buckets: Vec<KeyRateBucket> = Vec::with_capacity(STANDARD_BUCKETS_YEARS.len());
     for (i, &move_bp) in per_tenor_move_bp.iter().enumerate() {
         let up = market_t0.bump([MarketBump::Curve {
             id: curve_id.clone(),
-            spec: key_rate_bump_on_grid(&KEY_RATE_BUCKETS_YEARS, i, config.rate_bump_bp),
+            spec: key_rate_bump_on_grid(&STANDARD_BUCKETS_YEARS, i, config.rate_bump_bp),
         }])?;
         *repricings += 1;
         let pv_up = instrument.value(&up, as_of_t0)?;
 
         let down = market_t0.bump([MarketBump::Curve {
             id: curve_id.clone(),
-            spec: key_rate_bump_on_grid(&KEY_RATE_BUCKETS_YEARS, i, -config.rate_bump_bp),
+            spec: key_rate_bump_on_grid(&STANDARD_BUCKETS_YEARS, i, -config.rate_bump_bp),
         }])?;
         *repricings += 1;
         let pv_down = instrument.value(&down, as_of_t0)?;
@@ -908,7 +903,7 @@ fn compute_curve_factor(
                 bump_curve_direction(
                     market_t0,
                     curve_id,
-                    &KEY_RATE_BUCKETS_YEARS,
+                    &STANDARD_BUCKETS_YEARS,
                     &per_tenor_move_bp,
                     scale,
                 )
@@ -930,12 +925,31 @@ fn compute_curve_factor(
         gamma_pnl,
         working: FactorWorking::KeyRate {
             unit: MoveUnit::BasisPoint,
-            buckets: KEY_RATE_BUCKETS_YEARS
+            buckets: STANDARD_BUCKETS_YEARS
                 .iter()
                 .zip(&buckets)
                 .map(|(&tenor_years, bucket)| (tenor_years, bucket.dv01, bucket.move_bp))
                 .collect(),
         },
+    })
+}
+
+/// Replay parameters of a calibrated hazard curve.
+///
+/// `operation` names the Taylor step in the error raised for a curve built
+/// without a calibration recipe.
+fn hazard_replay_params(
+    hazard: &finstack_quant_core::market_data::term_structures::HazardCurve,
+    operation: &str,
+) -> Result<finstack_quant_calibration::api::schema::HazardCurveParams> {
+    let recipe = hazard.hazard_calibration().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "{operation} requires a calibration recipe for '{}'",
+            hazard.id()
+        ))
+    })?;
+    serde_json::from_value(recipe.hazard_params().clone()).map_err(|error| {
+        finstack_quant_core::Error::Validation(format!("invalid hazard replay parameters: {error}"))
     })
 }
 
@@ -949,17 +963,7 @@ fn bump_credit_market(
     provider: &dyn RecalibrationProvider,
 ) -> Result<MarketContext> {
     if let Ok(hazard) = market.get_hazard(curve_id.as_str()) {
-        let recipe = hazard.hazard_calibration().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "Taylor quote-space credit risk requires a calibration recipe for '{curve_id}'"
-            ))
-        })?;
-        let params: finstack_quant_calibration::api::schema::HazardCurveParams =
-            serde_json::from_value(recipe.hazard_params().clone()).map_err(|error| {
-                finstack_quant_core::Error::Validation(format!(
-                    "invalid hazard replay parameters: {error}"
-                ))
-            })?;
+        let params = hazard_replay_params(&hazard, "Taylor quote-space credit risk")?;
         let source = Arc::new(market.clone());
         let bumped = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
             hazard,
@@ -989,17 +993,7 @@ fn bump_credit_keyrates(
     provider: &dyn RecalibrationProvider,
 ) -> Result<MarketContext> {
     if let Ok(hazard) = market.get_hazard(curve_id.as_str()) {
-        let recipe = hazard.hazard_calibration().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "Taylor credit gamma requires a replay recipe for '{curve_id}'"
-            ))
-        })?;
-        let params: finstack_quant_calibration::api::schema::HazardCurveParams =
-            serde_json::from_value(recipe.hazard_params().clone()).map_err(|error| {
-                finstack_quant_core::Error::Validation(format!(
-                    "invalid hazard parameters: {error}"
-                ))
-            })?;
+        let params = hazard_replay_params(&hazard, "Taylor credit gamma")?;
         let mut bumped = market.clone();
         for bucket in buckets {
             let quote_index = bucket.quote_index.ok_or_else(|| {
@@ -2311,9 +2305,9 @@ mod tests {
         mock.discount_curves = vec![CurveId::new("HEDGE")];
         let instrument: Arc<dyn Instrument> = Arc::new(mock);
         let opening = MarketContext::new().insert(flat_zero_curve("HEDGE", start, rate));
-        let mut moves = vec![0.0; KEY_RATE_BUCKETS_YEARS.len()];
+        let mut moves = vec![0.0; STANDARD_BUCKETS_YEARS.len()];
         for (tenor, movement) in [(1.0, 10.0), (5.0, -10.0)] {
-            let i = KEY_RATE_BUCKETS_YEARS
+            let i = STANDARD_BUCKETS_YEARS
                 .iter()
                 .position(|t| *t == tenor)
                 .unwrap();
@@ -2322,7 +2316,7 @@ mod tests {
         let closing = bump_curve_direction(
             &opening,
             &CurveId::new("HEDGE"),
-            &KEY_RATE_BUCKETS_YEARS,
+            &STANDARD_BUCKETS_YEARS,
             &moves,
             1.0,
         )

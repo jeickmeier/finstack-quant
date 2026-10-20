@@ -25,8 +25,9 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::diff::{measure_par_spread_shift, TenorSamplingMethod};
-use finstack_quant_core::market_data::scalars::MarketScalar;
+use finstack_quant_core::market_data::diff::{
+    measure_par_spread_shift, measure_scalar_absolute_shift, TenorSamplingMethod,
+};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IssuerId};
 use finstack_quant_core::Result;
@@ -122,6 +123,8 @@ pub(crate) const ADDER_MAGNITUDE_WARN_RATIO: f64 = 0.05;
 /// is numerically indistinguishable from a unit mismatch, so refusing to run
 /// would reject correct attributions. The note lands in the attribution's
 /// `meta.notes` on every method, alongside a `tracing::warn!`.
+///
+/// [`MarketScalar::Unitless`]: finstack_quant_core::market_data::scalars::MarketScalar::Unitless
 pub(crate) const FACTOR_UNIT_MISMATCH_RATIO: f64 = 99.0;
 
 /// What kind of cascade step a single bump represents.
@@ -512,21 +515,17 @@ pub(crate) fn plan_credit_cascade(
     }))
 }
 
-fn scalar_to_bp(scalar: &MarketScalar) -> f64 {
-    match scalar {
-        MarketScalar::Unitless(value) => *value,
-        MarketScalar::Price(money) => money.amount(),
-    }
-}
-
+/// Absolute move of a factor series between the two markets, read as bp.
+///
+/// `None` when the series is absent from either market or the two values
+/// are not comparable (a unitless value against a price, or prices in
+/// different currencies).
 fn factor_move_bp(
     factor_id: &str,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
 ) -> Option<f64> {
-    let t0 = market_t0.get_price(factor_id).ok().map(scalar_to_bp)?;
-    let t1 = market_t1.get_price(factor_id).ok().map(scalar_to_bp)?;
-    Some(t1 - t0)
+    measure_scalar_absolute_shift(factor_id, market_t0, market_t1).ok()
 }
 
 /// Apply a parallel **par CDS spread** shift (in bp) to every hazard curve in
@@ -989,6 +988,45 @@ mod tests {
              got warnings = {:?}",
             notes
         );
+    }
+
+    /// A factor series stored unitless at T0 and as a price at T1 has no
+    /// comparable move: it is treated as unobserved, so the whole par-spread
+    /// move lands in the adder instead of a meaningless difference.
+    #[test]
+    fn credit_cascade_ignores_a_factor_series_whose_units_change() {
+        let as_of_t0 = create_date(2025, Month::January, 1).unwrap();
+        let as_of_t1 = create_date(2025, Month::January, 2).unwrap();
+        let curve_id = CurveId::new("ISSUER-B-HAZ");
+        let model = make_model();
+        let instrument = canonical_credit_bond(curve_id.clone());
+        let market_t0 = MarketContext::new()
+            .insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
+            .insert_price("cdx.hy.5y", MarketScalar::Unitless(100.0));
+        let market_t1 = MarketContext::new()
+            .insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
+            .insert_price(
+                "cdx.hy.5y",
+                MarketScalar::Price(Money::from((125_i64, Currency::USD))),
+            );
+
+        let mut notes = Vec::new();
+        let cascade = plan_credit_cascade(&model, &instrument, &market_t0, &market_t1, &mut notes)
+            .unwrap()
+            .expect("cascade");
+
+        let systematic: f64 = cascade
+            .steps
+            .iter()
+            .filter(|step| {
+                !matches!(
+                    step.kind,
+                    CreditStepKind::Adder | CreditStepKind::CurveShape
+                )
+            })
+            .map(|step| step.delta_bp)
+            .sum();
+        assert_eq!(systematic, 0.0, "steps: {:?}", cascade.steps);
     }
 
     #[test]
