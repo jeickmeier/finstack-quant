@@ -128,7 +128,7 @@ pub use common_impl::parameters::trs_common::TrsScheduleSpec;
 
 pub use common_impl::listed::{
     FutureOptionExercise, FutureOptionModel, FutureOptionPremiumStyle, FutureOptionSettlement,
-    FutureOptionTerms, ListedDeliveryObligation, ListedFutureSettlement, ListedFutureTerms,
+    FutureOptionTerms, ListedFutureSettlement, ListedFutureTerms,
 };
 
 mod pricing_overrides;

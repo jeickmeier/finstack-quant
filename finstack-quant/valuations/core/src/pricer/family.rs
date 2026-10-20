@@ -207,11 +207,6 @@ impl Family {
     pub fn metrics(&'static self) -> &'static MetricRegistry {
         self.registries().metrics.as_ref()
     }
-
-    /// The family's shared metric registry as an `Arc` for pricing options.
-    pub fn shared_metrics(&'static self) -> Arc<MetricRegistry> {
-        Arc::clone(&self.registries().metrics)
-    }
 }
 
 impl std::fmt::Debug for Family {
@@ -243,9 +238,6 @@ mod tests {
             &family.shared_pricers(),
             &family.shared_pricers()
         ));
-        assert!(std::ptr::eq(
-            family.metrics(),
-            family.shared_metrics().as_ref()
-        ));
+        assert!(std::ptr::eq(family.metrics(), family.metrics()));
     }
 }

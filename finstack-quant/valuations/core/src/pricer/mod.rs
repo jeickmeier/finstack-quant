@@ -35,8 +35,6 @@ mod registry;
 pub use errors::{PricingError, PricingErrorContext};
 pub use family::{Family, RegisterMetrics, RegisterPricers};
 pub use keys::{parse_model_key, InstrumentType, ModelKey, PricerKey};
-#[doc(hidden)]
-pub use registry::stamp_results_meta;
 pub use registry::{expect_inst, Pricer, PricerRegistry, PricingDispatch};
 
 /// Register a [`GenericInstrumentPricer`](crate::instruments::pricing::GenericInstrumentPricer)

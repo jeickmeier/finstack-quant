@@ -24,11 +24,6 @@ pub struct InstrumentCurves {
 }
 
 impl InstrumentCurves {
-    /// Create an empty curve collection.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Iterate over every curve with its market role.
     pub fn all_with_kind(&self) -> impl Iterator<Item = (CurveId, RatesCurveKind)> + '_ {
         self.discount_curves

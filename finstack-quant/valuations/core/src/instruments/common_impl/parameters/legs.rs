@@ -32,16 +32,6 @@ pub enum PayReceive {
 }
 
 impl PayReceive {
-    /// Check if this is the payer side
-    pub fn is_payer(&self) -> bool {
-        matches!(self, Self::Pay)
-    }
-
-    /// Check if this is the receiver side
-    pub fn is_receiver(&self) -> bool {
-        matches!(self, Self::Receive)
-    }
-
     /// Returns the sign multiplier (+1.0 for Receive, -1.0 for Pay).
     pub fn sign(&self) -> f64 {
         match self {

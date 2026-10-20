@@ -128,15 +128,18 @@ fn test_convexity_adjustment_rate_dependency() {
     // level. The earlier dimensionally-wrong `0.5·σ²T·G(S)` formula returned
     // ~0.78 (7800 bp) for these inputs; a correct adjustment for a 20Y CMS,
     // 5Y to fixing, 20% vol is single-to-low-double-digit bp.
-    use finstack_quant_valuations_rates::cms_option::pricer::convexity_adjustment;
+    use finstack_quant_valuations_rates::cms_option::pricer::convexity_adjustment_with_frequency;
 
     let vol = 0.20;
     let time_to_fixing = 5.0;
     let swap_tenor = 20.0;
 
-    let adj_low_rate = convexity_adjustment(vol, time_to_fixing, swap_tenor, 0.01);
-    let adj_mid_rate = convexity_adjustment(vol, time_to_fixing, swap_tenor, 0.03);
-    let adj_high_rate = convexity_adjustment(vol, time_to_fixing, swap_tenor, 0.05);
+    let adj_low_rate =
+        convexity_adjustment_with_frequency(vol, time_to_fixing, swap_tenor, 0.01, 2.0, 0.0);
+    let adj_mid_rate =
+        convexity_adjustment_with_frequency(vol, time_to_fixing, swap_tenor, 0.03, 2.0, 0.0);
+    let adj_high_rate =
+        convexity_adjustment_with_frequency(vol, time_to_fixing, swap_tenor, 0.05, 2.0, 0.0);
 
     for adj in [adj_low_rate, adj_mid_rate, adj_high_rate] {
         assert!(
