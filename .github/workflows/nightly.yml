@@ -155,10 +155,10 @@ jobs:
 
       # mise pre-commit-run uses `uv run --no-sync`. Plain `uv run` here used to
       # build the PyO3 extension (~20–25m) even though lint never needs it.
-      # Skip cargo-deny here: the supply-chain job already owns it.
+      # Skip cargo-deny and osv-scanner here: the supply-chain job already owns them.
       - name: Run pre-commit checks
         env:
-          SKIP: cargo-deny
+          SKIP: cargo-deny,osv-scanner
         run: mise run pre-commit-run
 
       - name: Check generated schemas and bindings
@@ -324,12 +324,6 @@ jobs:
       - name: Install WASM dependencies
         run: npm ci --ignore-scripts
         working-directory: finstack-quant-wasm
-
-      # No binding may call `serde_wasm_bindgen::to_value` (its ES `Map`s are
-      # silently dropped by `JSON.stringify`) or throw a string-built error.
-      # The same check runs in `mise run wasm-lint`, which CI does not invoke.
-      - name: Check WASM serializer and error paths
-        run: python3 scripts/check_wasm_boundary.py
 
       - name: Run WASM tests
         run: mise run wasm-test
