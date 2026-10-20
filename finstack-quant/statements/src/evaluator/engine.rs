@@ -9,7 +9,7 @@ use crate::evaluator::formula_helpers::is_truthy;
 use crate::evaluator::monte_carlo::{
     MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults, PathResult,
 };
-use crate::evaluator::precedence::{resolve_node_value_with_policy, NodeValueSource};
+use crate::evaluator::precedence::{resolve_node_value, NodeValueSource};
 use crate::evaluator::results::{CellSource, EvalStats, EvalWarning, StatementResult};
 use crate::evaluator::{
     capital_structure_runtime, capital_structure_runtime::dependent_closure, PeriodHistory,
@@ -957,7 +957,7 @@ impl Evaluator {
             }
             let explicit_value_is_visible =
                 !period.is_actual || node_spec.explicit_value_is_visible(period, visibility_cutoff);
-            let source = resolve_node_value_with_policy(
+            let source = resolve_node_value(
                 node_spec,
                 period_id,
                 is_actual && explicit_value_is_visible,

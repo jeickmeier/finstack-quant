@@ -50,11 +50,11 @@ mod rollup;
 
 pub use cashflow_export::{node_to_dated_schedule, PeriodDateConvention};
 pub use context::EvaluationContext;
-pub use dag::{evaluate_order, DependencyGraph};
+pub use dag::DependencyGraph;
 pub use engine::{Evaluator, PreparedEvaluation};
 pub use formula::evaluate_formula;
 pub use monte_carlo::{MonteCarloConfig, MonteCarloResults, PercentileSeries};
-pub use period_history::PeriodHistory;
+pub(crate) use period_history::PeriodHistory;
 pub use results::{
     CapitalStructureClaimCategory, CapitalStructureWarning, CellSource, EvalStats, EvalWarning,
     NumericMode, StatementResult,

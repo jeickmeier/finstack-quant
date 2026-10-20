@@ -216,7 +216,9 @@ fn determine_base_value(
             }
         }
 
-        if let Some(val) = context.get_historical_value(node_spec.node_id.as_str(), &last_actual.id)
+        if let Some(val) = context
+            .history
+            .get_value(node_spec.node_id.as_str(), &last_actual.id)
         {
             return Ok(val);
         }

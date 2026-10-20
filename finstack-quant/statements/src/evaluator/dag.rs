@@ -155,7 +155,7 @@ impl DependencyGraph {
     /// Returns a circular-dependency error containing one representative cycle
     /// when same-period dependencies form a loop. Temporal `lag` and `shift`
     /// links are not graph edges and therefore do not cause this error.
-    pub fn detect_cycles(&self) -> Result<()> {
+    pub(crate) fn detect_cycles(&self) -> Result<()> {
         let mut visited: IndexSet<NodeId> = IndexSet::new();
         for node_id in self.dependencies.keys() {
             if let Some(cycle) = self.dfs_cycle(node_id.as_str(), &mut visited) {
@@ -290,7 +290,7 @@ fn add_dependency_edges(
 /// Returns an evaluation error if the graph contains a same-period cycle. The
 /// diagnostic lists the nodes that remain unprocessed so callers can locate
 /// the circular dependency.
-pub fn evaluate_order(graph: &DependencyGraph) -> Result<Vec<NodeId>> {
+pub(crate) fn evaluate_order(graph: &DependencyGraph) -> Result<Vec<NodeId>> {
     crate::utils::graph::toposort_ids(&graph.dependencies).map_err(|unprocessed| {
         Error::eval(format!(
             "Circular dependency detected in model. Affected nodes: {}",

@@ -230,7 +230,7 @@ fn evaluate_cumulative_function(
                         context.period_id
                     );
                     if let Some(id) = node_id {
-                        context.push_warning(EvalWarning::NonFiniteValue {
+                        context.warnings.push(EvalWarning::NonFiniteValue {
                             node_id: id.to_string(),
                             period: context.period_id,
                             value: product,

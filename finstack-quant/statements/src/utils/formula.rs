@@ -20,17 +20,11 @@ fn is_identifier_boundary(c: char) -> bool {
 /// * `formula` - The formula string to check
 /// * `start_idx` - Starting position of the identifier
 /// * `end_idx` - Ending position of the identifier (exclusive)
-/// * `allow_dot_after` - Whether to allow '.' after the identifier (for namespace prefixes)
 ///
 /// # Returns
 ///
 /// Returns true if the identifier is standalone (proper boundaries before and after).
-pub(crate) fn is_standalone_identifier(
-    formula: &str,
-    start_idx: usize,
-    end_idx: usize,
-    allow_dot_after: bool,
-) -> bool {
+pub(crate) fn is_standalone_identifier(formula: &str, start_idx: usize, end_idx: usize) -> bool {
     // `start_idx`/`end_idx` are BYTE offsets (from `str::find` + `str::len`), so
     // index via byte slices rather than `chars().nth()` (which counts chars and
     // would read the wrong boundary for any non-ASCII formula). Both offsets sit
@@ -41,13 +35,10 @@ pub(crate) fn is_standalone_identifier(
         .next_back()
         .is_none_or(|c| is_identifier_boundary(c) && c != '.');
 
-    let after_ok = formula[end_idx..].chars().next().is_none_or(|c| {
-        if allow_dot_after {
-            is_identifier_boundary(c)
-        } else {
-            is_identifier_boundary(c) && c != '.'
-        }
-    });
+    let after_ok = formula[end_idx..]
+        .chars()
+        .next()
+        .is_none_or(|c| is_identifier_boundary(c) && c != '.');
 
     before_ok && after_ok
 }
@@ -69,7 +60,7 @@ pub(crate) fn replace_standalone_identifier(
         }
         let abs_pos = idx + pos;
         let end_pos = abs_pos + identifier.len();
-        if is_standalone_identifier(&result, abs_pos, end_pos, false) {
+        if is_standalone_identifier(&result, abs_pos, end_pos) {
             result.replace_range(abs_pos..end_pos, replacement);
             idx = abs_pos + replacement.len();
         } else {
@@ -302,10 +293,10 @@ mod tests {
         let formula = "revenue - cogs";
 
         // "revenue" at position 0-7 should be standalone
-        assert!(is_standalone_identifier(formula, 0, 7, false));
+        assert!(is_standalone_identifier(formula, 0, 7));
 
         // "cogs" at position 10-14 should be standalone
-        assert!(is_standalone_identifier(formula, 10, 14, false));
+        assert!(is_standalone_identifier(formula, 10, 14));
     }
 
     #[test]
@@ -317,7 +308,7 @@ mod tests {
         let end = start + "revenue".len();
 
         assert!(
-            !is_standalone_identifier(formula, start, end, false),
+            !is_standalone_identifier(formula, start, end),
             "embedded identifiers should not be treated as standalone"
         );
     }
