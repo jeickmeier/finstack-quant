@@ -1,6 +1,7 @@
 //! Lightweight strategy-level allocation schemes.
 
 use crate::error::{Error, Result};
+use finstack_quant_core::math::stats::variance;
 use finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator};
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use rust_decimal::Decimal;
@@ -322,17 +323,7 @@ fn sample_volatility(strategy: &StrategyAllocationInput) -> Result<f64> {
             strategy.id
         )));
     }
-    let mean = neumaier_sum(strategy.returns.iter().copied()) / strategy.returns.len() as f64;
-    let variance = strategy
-        .returns
-        .iter()
-        .map(|value| {
-            let centered = *value - mean;
-            centered * centered
-        })
-        .sum::<f64>()
-        / (strategy.returns.len() - 1) as f64;
-    Ok(variance.sqrt())
+    Ok(variance(&strategy.returns).sqrt())
 }
 
 fn risk_budget_weights(
