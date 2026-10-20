@@ -1,9 +1,10 @@
 //! FX touch option pricer implementation.
 
-use crate::fx_touch_option::types::{BarrierDirection, FxTouchOption, PayoutTiming, TouchType};
+use crate::fx_touch_option::types::{FxTouchOption, TouchType};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{BarrierDirection, PayoutTiming};
 use finstack_quant_core::Result;
 
 pub(crate) fn compute_pv(
@@ -275,9 +276,9 @@ mod tests {
             .quote_currency(Currency::USD)
             .barrier(1.10)
             .touch_type(crate::fx_touch_option::TouchType::OneTouch)
-            .barrier_direction(crate::fx_touch_option::BarrierDirection::Down)
+            .barrier_direction(finstack_quant_core::types::BarrierDirection::Down)
             .payout_amount(Money::from((100_000_i64, Currency::USD)))
-            .payout_timing(crate::fx_touch_option::PayoutTiming::AtExpiry)
+            .payout_timing(finstack_quant_core::types::PayoutTiming::AtExpiry)
             .monitoring_start_date(date!(2024 - 01 - 01))
             .expiry(expiry)
             .day_count(DayCount::Act365F)
@@ -305,7 +306,7 @@ mod tests {
 
     fn build_no_touch(
         expiry: Date,
-        timing: crate::fx_touch_option::PayoutTiming,
+        timing: finstack_quant_core::types::PayoutTiming,
     ) -> finstack_quant_core::Result<FxTouchOption> {
         FxTouchOption::builder()
             .id(InstrumentId::new("FX-NOTOUCH-TEST"))
@@ -313,7 +314,7 @@ mod tests {
             .quote_currency(Currency::USD)
             .barrier(1.10)
             .touch_type(crate::fx_touch_option::TouchType::NoTouch)
-            .barrier_direction(crate::fx_touch_option::BarrierDirection::Down)
+            .barrier_direction(finstack_quant_core::types::BarrierDirection::Down)
             .payout_amount(Money::from((100_000_i64, Currency::USD)))
             .payout_timing(timing)
             .monitoring_start_date(date!(2024 - 01 - 01))
@@ -328,7 +329,7 @@ mod tests {
 
     #[test]
     fn no_touch_at_hit_is_rejected_during_construction() {
-        use crate::fx_touch_option::PayoutTiming;
+        use finstack_quant_core::types::PayoutTiming;
         let expiry = date!(2025 - 01 - 01);
 
         build_no_touch(expiry, PayoutTiming::AtExpiry).expect("no-touch at-expiry must construct");

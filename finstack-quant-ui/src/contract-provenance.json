@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "aa03a75841ef7e4b9ad9068ea79c4822dfa045644564f00c89e46af337a9cf74",
+          "sha256": "42bd0ea03c7c24951a7d65afce7e547702a4552a36e5ad5c8c5dc9013dd716a3",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -180,7 +180,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/trs_equity.schema.json",
-          "sha256": "3afb9ecb92de2fef4b76804f5d63d6ac072fec67980c4b79b3bfbaa71ed02359",
+          "sha256": "b52b2303851fd2ad0afbd09b819b2fc64ccc2ef7311f0b218dea96832563930b",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "23f9684fd864636d63318802093b7fbf0b4bbb628b019b5fc5b056ce21ad540b",
+          "sha256": "2ebb77f1f4be4bd99547520e896dcaa4340518984e2dde490f09e105ed10da05",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -425,7 +425,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fx/ndf.schema.json",
-          "sha256": "8df27759baf06b05e52baf72f38425d5f22e4698a1351ad4e4340d085b358e98",
+          "sha256": "80b4c77442f1c6ab191fa274a229cc12ddec018452e0d36e731e176565e36e98",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {

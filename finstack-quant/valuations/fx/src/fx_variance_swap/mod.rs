@@ -9,4 +9,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use types::{FxVarianceSwap, FxVarianceSwapBuilder, PayReceive};
+pub use types::{FxVarianceSwap, FxVarianceSwapBuilder};

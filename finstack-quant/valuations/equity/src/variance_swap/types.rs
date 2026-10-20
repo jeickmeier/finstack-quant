@@ -12,9 +12,7 @@ use time::macros::date;
 
 use super::pricer;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::{Attributes, MarketDependencies};
-
-pub use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::{Attributes, MarketDependencies, PayReceive};
 
 fn default_observation_business_day_convention() -> BusinessDayConvention {
     BusinessDayConvention::Following

@@ -518,11 +518,11 @@ mod tests {
     /// wiring, so the FX test cannot catch equity-side regressions.)
     #[test]
     fn spot_started_flat_surface_replicates_sigma_squared_with_dividends() {
-        use crate::variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use finstack_quant_valuations_core::instruments::Attributes;
+        use finstack_quant_valuations_core::instruments::PayReceive;
 
         let as_of = date!(2025 - 01 - 02);
         let maturity = date!(2026 - 01 - 02);
@@ -594,11 +594,11 @@ mod tests {
     /// structure, which is why a term-structured surface is essential here.
     #[test]
     fn forward_starting_swap_excludes_pre_start_variance() {
-        use crate::variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use finstack_quant_valuations_core::instruments::Attributes;
+        use finstack_quant_valuations_core::instruments::PayReceive;
 
         let as_of = date!(2024 - 07 - 01);
         let start = date!(2025 - 01 - 02); // ~6 months forward (business day)
@@ -741,12 +741,12 @@ mod tests {
     /// first-order near maturity.
     #[test]
     fn seasoned_mtm_uses_settlement_observation_weighting() {
-        use crate::variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use finstack_quant_valuations_core::instruments::Attributes;
+        use finstack_quant_valuations_core::instruments::PayReceive;
 
         // Weekend-skipping daily schedule, ~6 months, valued near maturity.
         let start = date!(2025 - 01 - 06); // Monday

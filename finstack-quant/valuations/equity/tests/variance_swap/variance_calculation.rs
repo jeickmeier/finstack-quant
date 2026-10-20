@@ -9,7 +9,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_equity::variance_swap::{PayReceive, VarianceSwap};
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_equity::variance_swap::VarianceSwap;
 
 #[test]
 fn first_ohlc_bar_contributes_to_realized_and_seasoned_variance() {

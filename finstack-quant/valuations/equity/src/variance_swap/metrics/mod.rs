@@ -172,7 +172,6 @@ mod expected_variance_tests {
     use crate::variance_swap::pricer::{
         compute_pv, partial_realized_variance, remaining_forward_variance,
     };
-    use crate::variance_swap::types::PayReceive;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -180,6 +179,7 @@ mod expected_variance_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_valuations_core::instruments::PayReceive;
     use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
     use std::sync::Arc;
     use time::macros::date;

@@ -130,7 +130,6 @@ impl MetricCalculator for VegaCalculator {
 #[cfg(test)]
 mod expected_variance_tests {
     use super::*;
-    use crate::fx_variance_swap::types::PayReceive;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -141,6 +140,7 @@ mod expected_variance_tests {
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_valuations_core::instruments::PayReceive;
     use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
     use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
     use std::sync::Arc;

@@ -118,7 +118,7 @@ pub use fx_future_option::FxFutureOption;
 pub use fx_option::FxOption;
 pub use fx_spot::FxSpot;
 pub use fx_swap::FxSwap;
-pub use fx_touch_option::{BarrierDirection, FxTouchOption, PayoutTiming, TouchType};
+pub use fx_touch_option::{FxTouchOption, TouchType};
 pub use fx_variance_swap::FxVarianceSwap;
 pub use ndf::Ndf;
 pub use quanto_option::QuantoOption;

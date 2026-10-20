@@ -7,7 +7,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};
+use finstack_quant_valuations::instruments::fx::ndf::Ndf;
+use finstack_quant_valuations::instruments::NdfQuoteConvention;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::pricer::{
     standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
