@@ -35,10 +35,10 @@ parallel, and SonarQube runs after all three test jobs:
 | Job | Command | Notes |
 | --- | --- | --- |
 | Supply-chain Security | `mise run all-audit` | `cargo deny check` (advisories, licenses, bans), then OSV-Scanner over `Cargo.lock`, `uv.lock` and `finstack-quant-wasm/package-lock.json`, filtered by `osv-scanner.toml`. |
-| Lint | `mise run pre-commit-run`, then `mise run gen-check` | `SKIP: cargo-deny`, which the supply-chain job owns. Clippy covers lib/bins/tests/examples (`--all-features`), not Criterion benches. |
+| Lint | `mise run pre-commit-run`, then `mise run gen-check` | `SKIP: cargo-deny,osv-scanner`, which the supply-chain job owns. Clippy covers lib/bins/tests/examples (`--all-features`), not Criterion benches. |
 | Test Rust | `mise run rust-test --coverage` | The fast nextest lib and integration targets under `cargo llvm-cov` (no doctests, no `#[ignore]`d tests); uploads `coverage/rust/lcov.info`. |
 | Test Python | `mise run python-test --coverage` | maturin dev build, then the fast pytest suite (`-m 'not slow and not doctest'`) with coverage; uploads `coverage/python/coverage.xml`. |
-| Test WASM | `python3 scripts/check_wasm_boundary.py`, then `mise run wasm-test` | Serializer and error-path check, then wasm-bindgen tests plus the Node facade suite (the documented code samples run under `--doctest`). |
+| Test WASM | `mise run wasm-test` | wasm-bindgen tests plus the Node facade suite and JSDoc sync check (the documented code samples run under `--doctest`). |
 | SonarQube | `SonarSource/sonarqube-scan-action` | `master` only, so it is skipped inside a release run. Scan only: it imports the two coverage artifacts and runs no tests and no clippy (`sonar.rust.clippy.enabled=false`; Lint owns clippy). |
 
 Three details worth knowing before editing:
