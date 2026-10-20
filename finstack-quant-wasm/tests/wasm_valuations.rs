@@ -135,7 +135,7 @@ fn invalid_structured_credit_instrument_json() -> String {
 }
 
 fn fx_option_instrument_json() -> String {
-    use finstack_quant_valuations::instruments::fx::FxOption;
+    use finstack_quant_valuations::instruments::FxOption;
     use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
 
     let option = FxOption::example().expect("fx option example");
@@ -331,6 +331,7 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
             JsValue::from(market),
             JsValue::from("not-a-date"),
             Some(JsValue::from(f64::NAN)),
+            None,
         )
         .unwrap_err(),
     ];
@@ -505,6 +506,7 @@ fn structured_credit_tranche_metrics_through_json() {
         JsValue::from(&mkt),
         JsValue::from("2024-01-01"),
         None,
+        None,
     )
     .expect("tranche metrics");
     let tm_parsed = js_object_to_json(&tm);
@@ -516,6 +518,7 @@ fn structured_credit_tranche_metrics_through_json() {
         JsValue::from(&mkt),
         JsValue::from("2024-01-01"),
         Some(JsValue::from(95.0)),
+        None,
     )
     .expect("tranche metrics @95");
     let cheap_parsed = js_object_to_json(&tm_cheap);
@@ -585,6 +588,7 @@ fn public_json_routes_validate_instrument_before_market_json_binding() {
         JsValue::from("not-market-json"),
         JsValue::from("not-a-date"),
         Some(JsValue::from(f64::NAN)),
+        None,
     )
     .is_err());
 }
