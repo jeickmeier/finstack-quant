@@ -104,30 +104,11 @@ pub fn solve_discount_margin(
     target: f64,
     guess: f64,
 ) -> Result<f64> {
-    // Keep the first repricing error and report it instead of a solver
-    // failure or a root found around it, as the bond YTM solver does. PV is
-    // decreasing in the margin and fails only where it diverges upward (a
-    // non-positive compounding base), so the residual there is large and
-    // positive.
-    let pricing_error: std::cell::RefCell<Option<finstack_quant_core::Error>> =
-        std::cell::RefCell::new(None);
-    let objective = |dm: f64| -> f64 {
-        match pv(dm) {
-            Ok(value) => value - target,
-            Err(err) => {
-                pricing_error.borrow_mut().get_or_insert(err);
-                1e12
-            }
-        }
-    };
-    let solver = BrentSolver::new()
+    // The first repricing error aborts the solve and is reported as-is.
+    let dm = BrentSolver::new()
         .tolerance(1e-10)
-        .initial_bracket_size(Some(0.05));
-    let solved = solver.solve(objective, guess);
-    if let Some(err) = pricing_error.into_inner() {
-        return Err(err);
-    }
-    let dm = solved?;
+        .initial_bracket_size(Some(0.05))
+        .solve_fallible(|dm| Ok(pv(dm)? - target), guess)?;
     if dm.abs() > DISCOUNT_MARGIN_BOUND {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Discount margin {} bp exceeds sanity bounds (±{} bp)",

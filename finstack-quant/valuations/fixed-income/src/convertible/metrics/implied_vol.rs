@@ -12,8 +12,6 @@
 //!
 //! Returned as a decimal fraction (e.g., 0.25 = 25% volatility).
 
-use std::cell::Cell;
-
 use crate::convertible::pricing::{calculate_accrued_interest, settlement_dirty_price};
 use crate::convertible::ConvertibleBond;
 use finstack_quant_core::math::solver::BrentSolver;
@@ -90,24 +88,11 @@ impl MetricCalculator for ImpliedVolCalculator {
                 "convertible clean-price quote is not bracketed on the selected lattice's admissible volatility interval [{lower}, {upper}]; dirty-price residuals per unit notional are {low_residual} and {high_residual}"
             )));
         }
-        let captured_err: Cell<Option<Error>> = Cell::new(None);
-        let objective = |volatility| match evaluate(volatility) {
-            Ok(residual) => residual,
-            Err(error) => {
-                let previous = captured_err.take();
-                captured_err.set(previous.or(Some(error)));
-                f64::NAN
-            }
-        };
-        let solved = BrentSolver::new()
+        let volatility = BrentSolver::new()
             .tolerance(1e-12)
             .max_iterations(100)
             .bracket_bounds(lower, upper)
-            .solve(objective, 0.25_f64.clamp(lower, upper));
-        if let Some(error) = captured_err.take() {
-            return Err(error);
-        }
-        let volatility = solved?;
+            .solve_fallible(&evaluate, 0.25_f64.clamp(lower, upper))?;
         let residual = evaluate(volatility)?;
         if residual.abs() > 1e-10 {
             return Err(Error::Validation(format!("convertible implied volatility failed repricing: dirty-price residual per unit notional {residual}")));

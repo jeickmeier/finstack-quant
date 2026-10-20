@@ -10,7 +10,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;
 use std::borrow::Cow;
-use std::cell::RefCell;
 
 /// Minimum absolute sensitivity value below which breakeven is undefined.
 const SENSITIVITY_FLOOR: f64 = 1e-12;
@@ -241,27 +240,12 @@ fn iterative_breakeven(
 
     let target = config.target;
 
-    // Brent rejects non-finite evaluations, so a NaN here surfaces as a generic
-    // "non-finite value" convergence error that hides the real cause (e.g. "no
-    // vol surface found"). Capture the first underlying error and re-raise it.
-    let first_error: RefCell<Option<finstack_quant_core::Error>> = RefCell::new(None);
-    let record = |err: finstack_quant_core::Error| {
-        let mut slot = first_error.borrow_mut();
-        if slot.is_none() {
-            *slot = Some(err);
-        }
-        f64::NAN
-    };
-
-    let objective = |delta: f64| -> f64 {
-        let bumped_market = match bump_market_for_target(context, &held_market, delta, target) {
-            Ok(market) => market,
-            Err(err) => return record(err),
-        };
-        match context.reprice_money(&bumped_market, rolled_date) {
-            Ok(pv) => carry_total + pv.amount() - base_pv_at_horizon,
-            Err(err) => record(err),
-        }
+    // A bump or repricing failure (e.g. "no vol surface found") aborts the
+    // solve and is surfaced as the real cause.
+    let objective = |delta: f64| -> Result<f64> {
+        let bumped_market = bump_market_for_target(context, &held_market, delta, target)?;
+        let pv = context.reprice_money(&bumped_market, rolled_date)?;
+        Ok(carry_total + pv.amount() - base_pv_at_horizon)
     };
 
     // No `BracketHint` is set deliberately. Core's hints are sized in absolute
@@ -269,14 +253,8 @@ fn iterative_breakeven(
     // basis points / vol points, so a hint would size the initial bracket ~100x
     // too small. The adaptive default (1% of the initial guess, floored at
     // 0.01) is correctly scaled for this objective.
-    let solved = BrentSolver::new()
+    BrentSolver::new()
         .tolerance(1e-8)
         .max_iterations(50)
-        .solve(objective, initial_guess);
-
-    match first_error.into_inner() {
-        // Prefer the underlying cause over the solver's non-finite report.
-        Some(err) if solved.is_err() => Err(err),
-        _ => solved,
-    }
+        .solve_fallible(objective, initial_guess)
 }

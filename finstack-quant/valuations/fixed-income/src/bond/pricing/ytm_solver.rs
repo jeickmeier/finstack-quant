@@ -9,7 +9,6 @@ use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use std::cell::RefCell;
 
 use super::quote_conversions::{
     bond_flow_times, flow_times, price_from_ytm_timed, YieldCompounding,
@@ -103,55 +102,19 @@ pub(crate) fn solve_ytm_timed(
 
     let initial_guess = initial_guess(cashflows, target_price, &spec)?;
 
-    // Capture first pricing error to avoid masking errors with 0.0.
-    // This pattern ensures the solver doesn't converge to fake roots when
-    // underlying pricing calculations fail (e.g., invalid dates, overflow).
-    let pricing_error: RefCell<Option<finstack_quant_core::Error>> = RefCell::new(None);
-
-    let price_fn = |y: f64| -> f64 {
-        match price_from_ytm_timed(cashflows, spec.frequency, y, spec.compounding) {
-            Ok(price) => price - target,
-            Err(e) => {
-                // Capture the first error for later reporting
-                let mut slot = pricing_error.borrow_mut();
-                if slot.is_none() {
-                    *slot = Some(e);
-                }
-                drop(slot);
-                // Return a large residual whose sign reflects price-vs-target,
-                // NOT the sign of `y`.
-                //
-                // The bond price is monotonically decreasing in yield, and
-                // `price_from_ytm_compounded_params` can only fail for a
-                // *yield-dependent* reason in the deep-negative-yield regime
-                // (a non-positive compounding base `1 + y/m <= 0`). There the
-                // true price diverges to `+infinity`, so `price - target` is
-                // unambiguously large and positive. Returning `+1e12` keeps
-                // the objective consistent with the monotone price/yield
-                // curve; the previous `sign(y)`-based residual could flip
-                // sign and manufacture a spurious bracket for Brent.
-                1e12
-            }
-        }
-    };
-
-    // Always use BrentSolver for robustness. `BrentSolver::solve` returns
-    // an explicit `SolverConvergenceFailed` error (rather than a silent
-    // last iterate) when the iteration cap is hit, no sign-changing
-    // bracket is found, or the objective is non-finite — so non-convergent
-    // YTM solves surface as `Err`.
-    let solver = BrentSolver::new()
+    // Brent returns an explicit `SolverConvergenceFailed` error (rather than
+    // a silent last iterate) when the iteration cap is hit, no sign-changing
+    // bracket is found, or the objective is non-finite. A pricing failure
+    // (e.g. a non-positive compounding base `1 + y/m <= 0` in the
+    // deep-negative-yield regime) aborts the solve and is reported as-is,
+    // so no fake root is found around it.
+    BrentSolver::new()
         .tolerance(YTM_TOLERANCE)
-        .max_iterations(YTM_MAX_ITERATIONS);
-    let ytm = solver.solve(price_fn, initial_guess)?;
-
-    // If any pricing error occurred during objective evaluation, surface it
-    // instead of returning a potentially meaningless yield.
-    if let Some(err) = pricing_error.into_inner() {
-        return Err(err);
-    }
-
-    Ok(ytm)
+        .max_iterations(YTM_MAX_ITERATIONS)
+        .solve_fallible(
+            |y| Ok(price_from_ytm_timed(cashflows, spec.frequency, y, spec.compounding)? - target),
+            initial_guess,
+        )
 }
 
 /// Current yield plus half the annualised pull-to-par, clamped to
