@@ -181,8 +181,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "PortfolioOptimizationResult",
         // portfolio margin aggregation
         "NettingSetMargin",
-        "PortfolioMarginAggregator",
         "PortfolioMarginResult",
+        "portfolio_margin",
         "schema",
     ];
 

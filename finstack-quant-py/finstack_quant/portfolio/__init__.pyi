@@ -69,7 +69,6 @@ __all__ = [
     "PortfolioBuilder",
     "PortfolioCashflows",
     "PortfolioError",
-    "PortfolioMarginAggregator",
     "PortfolioMarginResult",
     "PortfolioMetrics",
     "PortfolioOptimizationResult",
@@ -119,6 +118,7 @@ __all__ = [
     "net_in_currency_by_date",
     "optimize_portfolio",
     "parse_portfolio_spec_json",
+    "portfolio_margin",
     "primitive_exposures",
     "rebalance_from_spec",
     "replay_portfolio",
@@ -2871,16 +2871,16 @@ class PortfolioMarginResult:
     """
     Portfolio-wide margin results in the portfolio base currency.
 
-    Returned by :meth:`PortfolioMarginAggregator.calculate`. Totals are sums of
+    Returned by :func:`portfolio_margin`. Totals are sums of
     the per-netting-set results in :attr:`by_netting_set`; one-way IM
     collateral accounts are reported per CSA in :attr:`by_csa`.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import Portfolio, PortfolioMarginAggregator, PortfolioMarginResult
+    >>> from finstack_quant.portfolio import Portfolio, portfolio_margin
     >>> book = Portfolio.builder("book", "USD", "2025-01-01").build()
-    >>> result = PortfolioMarginAggregator.from_portfolio(book).calculate(book, MarketContext(), "2025-01-01")
+    >>> result = portfolio_margin(book, MarketContext(), "2025-01-01")
     >>> (result.base_currency, result.total_initial_margin.amount, len(result.by_netting_set))
     ('USD', 0.0, 0)
     >>> PortfolioMarginResult.from_json(result.to_json()).total_positions
@@ -3172,9 +3172,9 @@ class PortfolioMarginResult:
         Examples
         --------
         >>> from finstack_quant.core.market_data import MarketContext
-        >>> from finstack_quant.portfolio import Portfolio, PortfolioMarginAggregator
+        >>> from finstack_quant.portfolio import Portfolio, portfolio_margin
         >>> book = Portfolio.builder("book", "USD", "2025-01-01").build()
-        >>> result = PortfolioMarginAggregator.from_portfolio(book).calculate(book, MarketContext(), "2025-01-01")
+        >>> result = portfolio_margin(book, MarketContext(), "2025-01-01")
         >>> list(result.to_dataframe().columns)[:4]
         ['netting_set_id', 'csa_id', 'is_cleared', 'initial_margin']
         """
@@ -3184,108 +3184,65 @@ class PortfolioMarginResult:
         """Return the as-of date, totals and netting-set count."""
         ...
 
-class PortfolioMarginAggregator:
+def portfolio_margin(
+    portfolio: Portfolio | str,
+    market: MarketContext | str,
+    as_of: datetime.date | str,
+    current_im_collateral: dict[str, Money] | None = None,
+) -> PortfolioMarginResult:
     """
-    Aggregates margin requirements across a portfolio by netting set.
+    Calculate portfolio margin requirements by netting set.
 
-    Build one with :meth:`from_portfolio`, then call :meth:`calculate` for each
-    market snapshot. Positions are grouped by the netting set named on their
-    instrument's margin specification; initial margin is computed per netting
-    set from netted sensitivities and variation margin from netted
-    mark-to-market, both reported in the portfolio base currency.
+    Positions are grouped by the netting set named on their instrument's
+    margin specification; initial margin is computed per netting set from
+    netted sensitivities and variation margin from netted mark-to-market, both
+    reported in the portfolio base currency. Positions without margin metadata
+    are counted in ``positions_without_margin``.
+
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        A :class:`Portfolio` object, or a JSON-serialized ``PortfolioSpec``.
+        Its positions that carry margin metadata form the netting sets and its
+        base currency is the reporting currency.
+    market : MarketContext or str
+        Market data (object or JSON) for VM and SIMM sensitivity extraction,
+        including the FX matrix needed to report netting sets in the base
+        currency.
+    as_of : datetime.date or str
+        Valuation date of the margin run (date-like or ISO ``YYYY-MM-DD``).
+    current_im_collateral : dict[str, Money] or None, default None
+        One-way IM balances already held, keyed by CSA id, each in that CSA's
+        currency. ``None`` or a missing key means zero. Excludes VM and the
+        other party's segregated IM account.
+
+    Returns
+    -------
+    PortfolioMarginResult
+        Per-netting-set and portfolio-level margin in the base currency.
+
+    Raises
+    ------
+    PortfolioError
+        If positions in one netting set carry conflicting margin
+        specifications, ``current_im_collateral`` names an unknown CSA id, or a
+        required FX rate is unavailable.
+    TypeError
+        If ``as_of`` is neither a string nor date-like.
+    ValueError
+        If ``portfolio`` is a string that is not a valid ``PortfolioSpec``, or
+        ``as_of`` is a string that is not an ISO date.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import Portfolio, PortfolioMarginAggregator
+    >>> from finstack_quant.portfolio import Portfolio, portfolio_margin
     >>> book = Portfolio.builder("book", "USD", "2025-01-01").build()
-    >>> aggregator = PortfolioMarginAggregator.from_portfolio(book)
-    >>> result = aggregator.calculate(book, MarketContext(), "2025-01-01")
+    >>> result = portfolio_margin(book, MarketContext(), "2025-01-01")
     >>> (result.total_positions, result.positions_without_margin)
     (0, 0)
     """
-
-    @staticmethod
-    def from_portfolio(portfolio: Portfolio | str) -> PortfolioMarginAggregator:
-        """
-        Create an aggregator from a portfolio.
-
-        Parameters
-        ----------
-        portfolio : Portfolio or str
-            A :class:`Portfolio` object, or a JSON-serialized ``PortfolioSpec``.
-            Its positions that carry margin metadata seed the netting sets and
-            its base currency is the reporting currency.
-
-        Returns
-        -------
-        PortfolioMarginAggregator
-            Aggregator pre-populated with the portfolio's netting sets.
-
-        Raises
-        ------
-        PortfolioError
-            If positions in one netting set carry conflicting margin
-            specifications.
-        ValueError
-            If ``portfolio`` is a string that is not a valid ``PortfolioSpec``.
-
-        Examples
-        --------
-        >>> from finstack_quant.portfolio import Portfolio, PortfolioMarginAggregator
-        >>> book = Portfolio.builder("book", "USD", "2025-01-01").build()
-        >>> type(PortfolioMarginAggregator.from_portfolio(book)).__name__
-        'PortfolioMarginAggregator'
-        """
-        ...
-
-    def calculate(
-        self,
-        portfolio: Portfolio | str,
-        market: MarketContext | str,
-        as_of: datetime.date | str,
-        current_im_collateral: dict[str, Money] | None = None,
-    ) -> PortfolioMarginResult:
-        """
-        Calculate margin requirements for the portfolio.
-
-        Parameters
-        ----------
-        portfolio : Portfolio or str
-            Portfolio used for mark-to-market and sensitivity lookups; normally
-            the one passed to :meth:`from_portfolio`. A registered position
-            missing from it is reported in ``degraded_positions``.
-        market : MarketContext or str
-            Market data (object or JSON) for VM and SIMM sensitivity
-            extraction, including the FX matrix needed to report netting sets
-            in the base currency.
-        as_of : datetime.date or str
-            Valuation date of the margin run (date-like or ISO ``YYYY-MM-DD``).
-        current_im_collateral : dict[str, Money] or None, default None
-            One-way IM balances already held, keyed by CSA id, each in that
-            CSA's currency. ``None`` or a missing key means zero. Excludes VM
-            and the other party's segregated IM account.
-
-        Returns
-        -------
-        PortfolioMarginResult
-            Per-netting-set and portfolio-level margin in the base currency.
-
-        Raises
-        ------
-        PortfolioError
-            If ``current_im_collateral`` names an unknown CSA id, or a required
-            FX rate is unavailable.
-        TypeError
-            If ``as_of`` is neither a string nor date-like.
-        ValueError
-            If ``as_of`` is a string that is not an ISO date.
-        """
-        ...
-
-    def __repr__(self) -> str:
-        """Return a constant placeholder representation."""
-        ...
+    ...
 
 class PortfolioResult:
     """

@@ -1,7 +1,7 @@
 //! Integration tests for portfolio margin aggregation.
 //!
 //! Tests quantity scaling, netting-set aggregation and FX conversion through
-//! `PortfolioMarginAggregator::calculate`.
+//! `margin::portfolio_margin`.
 
 use crate::common::base_date;
 use finstack_quant_core::currency::Currency;
@@ -12,7 +12,7 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_margin::{Marginable, NettingSetId, SimmSensitivities};
 use finstack_quant_portfolio::types::DUMMY_ENTITY_ID;
 use finstack_quant_portfolio::{
-    margin::PortfolioMarginAggregator, margin::PortfolioMarginResult, position::Position,
+    margin::portfolio_margin, margin::PortfolioMarginResult, position::Position,
     position::PositionUnit, types::Entity, Portfolio,
 };
 use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
@@ -171,16 +171,13 @@ fn run_margin(
         builder = builder.position(position);
     }
     let portfolio = builder.build().expect("portfolio should build");
-    let mut aggregator =
-        PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
-    let result = aggregator
-        .calculate(
-            &portfolio,
-            &MarketContext::new(),
-            as_of,
-            &finstack_quant_core::HashMap::default(),
-        )
-        .expect("margin run should succeed");
+    let result = portfolio_margin(
+        &portfolio,
+        &MarketContext::new(),
+        as_of,
+        &finstack_quant_core::HashMap::default(),
+    )
+    .expect("margin run should succeed");
     // MO-16 is expected here: this fixture's netting set carries no CSA, so
     // its VM is the unadjusted gross MTM. That is recorded rather than passed
     // off as a netted call amount. Every other degradation is a real failure.
@@ -295,7 +292,7 @@ fn b6_short_position_nets_simm_sensitivities() {
     );
 }
 
-// Aggregation through `PortfolioMarginAggregator::calculate`.
+// Aggregation through `margin::portfolio_margin`.
 
 /// Build a portfolio with one unit position per instrument and run margin
 /// against `market`, asserting nothing degraded beyond the expected MO-16.
@@ -323,16 +320,13 @@ fn run_margin_for(
         builder = builder.position(position);
     }
     let portfolio = builder.build().expect("portfolio should build");
-    let mut aggregator =
-        PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
-    let result = aggregator
-        .calculate(
-            &portfolio,
-            market,
-            as_of,
-            &finstack_quant_core::HashMap::default(),
-        )
-        .expect("margin run should succeed");
+    let result = portfolio_margin(
+        &portfolio,
+        market,
+        as_of,
+        &finstack_quant_core::HashMap::default(),
+    )
+    .expect("margin run should succeed");
     let unexpected: Vec<_> = result
         .degraded_positions
         .iter()

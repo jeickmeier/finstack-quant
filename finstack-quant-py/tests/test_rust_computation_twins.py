@@ -186,7 +186,7 @@ def test_portfolio_input_errors_keep_their_rust_kind() -> None:
 
 
 def test_infeasible_rebalance_raises_portfolio_error() -> None:
-    """The method and ``rebalance_from_spec`` raise the same Rust-owned class."""
+    """``rebalance_from_spec`` raises the Rust-owned ``PortfolioError`` for an infeasible result."""
     from finstack_quant.portfolio import PositionFilter
 
     market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04))

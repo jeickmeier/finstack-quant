@@ -796,7 +796,6 @@ export type {
   PeriodDecomposition,
   Portfolio,
   PortfolioBuilder,
-  PortfolioMarginAggregator,
 };
 
 // --- core -----------------------------------------------------------------
@@ -877,12 +876,6 @@ interface Portfolio extends WasmOwned {}
  * calls.
  */
 interface FactorModel extends WasmOwned {}
-/**
- * Portfolio margin aggregator built once from a `Portfolio` and reused across
- * market snapshots; `calculate` returns netting-set initial and variation
- * margin as a plain `PortfolioMarginResult`.
- */
-interface PortfolioMarginAggregator extends WasmOwned {}
 
 /**
  * ISO-4217 currency code wrapper for JavaScript.
@@ -34663,61 +34656,6 @@ declare class FactorModel {
 }
 
 /**
- * Aggregates margin requirements across a portfolio by netting set (Rust
- * `PortfolioMarginAggregator`). Build one with `fromPortfolio`, then call
- * `calculate` for each market snapshot.
- * @example
- * ```typescript
- * import init, { core, portfolio } from "finstack-quant-wasm";
- * await init();
- * const book = portfolio.Portfolio.builder("book", "USD", "2025-01-01").build();
- * const market = new core.MarketContext();
- * const aggregator = portfolio.PortfolioMarginAggregator.fromPortfolio(book);
- * const margin = aggregator.calculate(book, market, "2025-01-01");
- * console.log(margin.total_initial_margin.amount, margin.netting_sets.length);
- * aggregator.free();
- * market.free();
- * book.free();
- * ```
- */
-declare class PortfolioMarginAggregator {
-  private constructor();
-  /**
-   * Create an aggregator from a portfolio.
-   * @param portfolio - Built portfolio whose positions carrying margin metadata seed the netting sets; its base currency is the reporting currency.
-   * @returns A reusable `PortfolioMarginAggregator` handle.
-   * @throws Error - Throws a `FinstackError` (kind `validation`) if positions in one netting set carry conflicting margin specifications.
-   */
-  static fromPortfolio(portfolio: Portfolio): PortfolioMarginAggregator;
-  /**
-   * Calculate margin requirements for the portfolio.
-   *
-   * Returns the `PortfolioMarginResult`: base-currency totals
-   * (`total_initial_margin`, signed `total_variation_margin`,
-   * `total_margin`), the one-way IM accounts `by_csa`, and `netting_sets`
-   * in ascending identifier order. Each netting set carries the netted SIMM
-   * `sensitivities` its initial margin was computed from and the
-   * per-risk-class `im_breakdown`.
-   * @param portfolio - Built portfolio used for mark-to-market and sensitivity lookups; normally the one passed to `fromPortfolio`.
-   * @param market - `core.MarketContext` handle supplying curves and quotes for VM and SIMM sensitivities, and the FX matrix for base-currency reporting.
-   * @param asOf - ISO-8601 valuation date of the margin run.
-   * @param currentImCollateral - Optional one-way IM balances already held, as an object (or JSON) keyed by CSA id with `Money` values (`{ amount, currency }`) in that CSA's currency. Omitted, `undefined`, `null` or a missing key means zero.
-   * @returns The `PortfolioMarginResult` as a plain object.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string or `currentImCollateral` is not a JSON string or plain object, and a `FinstackError` if `asOf` is not an ISO date, `currentImCollateral` does not match the schema or names an unknown CSA id, or a required FX rate is unavailable.
-   */
-  calculate(
-    portfolio: Portfolio,
-    market: MarketContext,
-    asOf: string,
-    currentImCollateral?: Record<string, MoneyValue> | string | null
-  ): PortfolioMarginResult;
-  /**
-   * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
-   */
-  free(): void;
-}
-
-/**
  * Namespaced TypeScript entry points for portfolio calculations and types.
  * @example
  * ```typescript
@@ -34746,9 +34684,32 @@ export interface PortfolioNamespace {
    */
   FactorModel: typeof FactorModel;
   /**
-   * Stateful portfolio margin aggregator: netting-set initial and variation margin.
+   * Calculate portfolio margin requirements by netting set (Rust
+   * `margin::portfolio_margin`).
+   * @example
+   * ```typescript
+   * import init, { core, portfolio } from "finstack-quant-wasm";
+   * await init();
+   * const book = portfolio.Portfolio.builder("book", "USD", "2025-01-01").build();
+   * const market = new core.MarketContext();
+   * const margin = portfolio.portfolioMargin(book, market, "2025-01-01");
+   * console.log(margin.total_initial_margin.amount, margin.netting_sets.length);
+   * market.free();
+   * book.free();
+   * ```
+   * @param portfolio - Built portfolio whose positions carrying margin metadata form the netting sets; its base currency is the reporting currency.
+   * @param market - `core.MarketContext` handle supplying curves and quotes for VM and SIMM sensitivities, and the FX matrix for base-currency reporting.
+   * @param asOf - ISO-8601 valuation date of the margin run.
+   * @param currentImCollateral - Optional one-way IM balances already held, as an object (or JSON) keyed by CSA id with `Money` values (`{ amount, currency }`) in that CSA's currency. Omitted, `undefined`, `null` or a missing key means zero.
+   * @returns The `PortfolioMarginResult` as a plain object.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string or `currentImCollateral` is not a JSON string or plain object, and a `FinstackError` if positions in one netting set carry conflicting margin specifications (kind `validation`), `asOf` is not an ISO date, `currentImCollateral` does not match the schema or names an unknown CSA id, or a required FX rate is unavailable.
    */
-  PortfolioMarginAggregator: typeof PortfolioMarginAggregator;
+  portfolioMargin(
+    portfolio: Portfolio,
+    market: MarketContext,
+    asOf: string,
+    currentImCollateral?: Record<string, MoneyValue> | string | null
+  ): PortfolioMarginResult;
   /**
    * Parse and validate a portfolio specification from JSON.
    *

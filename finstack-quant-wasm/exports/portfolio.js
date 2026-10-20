@@ -34,7 +34,7 @@ export const portfolio = {
   InstrumentArtifactCache: wasm.InstrumentArtifactCache,
   Portfolio: wasm.Portfolio,
   FactorModel: wasm.FactorModel,
-  PortfolioMarginAggregator: wasm.PortfolioMarginAggregator,
+  portfolioMargin: wasm.portfolioMargin,
   parsePortfolioSpecJson: wasm.parsePortfolioSpecJson,
   brinsonFachler: wasm.brinsonFachler,
   carinoLink: wasm.carinoLink,

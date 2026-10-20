@@ -3488,7 +3488,6 @@
       "InstrumentArtifactCache",
       "Portfolio",
       "PortfolioBuilder",
-      "PortfolioMarginAggregator",
       "aggregateFullCashflows",
       "aggregateMetrics",
       "allocateWeights",
@@ -3517,6 +3516,7 @@
       "parsePortfolioSpecJson",
       "portfolioAttributionExplainText",
       "portfolioAttributionReconciliationCheck",
+      "portfolioMargin",
       "portfolioMetricsGetMetric",
       "portfolioMetricsGetPositionMetrics",
       "portfolioMetricsGetTotal",
@@ -3568,11 +3568,8 @@
     ],
     "getters": []
   },
-  "portfolio.PortfolioMarginAggregator": {
-    "kind": "class",
-    "statics": ["fromPortfolio"],
-    "methods": ["calculate", "free"],
-    "getters": []
+  "portfolio.portfolioMargin": {
+    "kind": "function"
   },
   "portfolio.parsePortfolioSpecJson": {
     "kind": "function"

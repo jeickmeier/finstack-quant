@@ -30,7 +30,7 @@ where
 }
 
 /// Assemble a USD portfolio result from base-currency netting-set margins the
-/// way `PortfolioMarginAggregator::calculate` does.
+/// way `margin::portfolio_margin` does.
 fn portfolio_result(
     as_of: time::Date,
     margins: impl IntoIterator<Item = NettingSetMargin>,

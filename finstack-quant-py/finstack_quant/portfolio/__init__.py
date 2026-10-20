@@ -151,8 +151,8 @@ PortfolioOptimizationResult = _portfolio.PortfolioOptimizationResult
 CandidatePosition = _portfolio.CandidatePosition
 TradeUniverse = _portfolio.TradeUniverse
 NettingSetMargin = _portfolio.NettingSetMargin
-PortfolioMarginAggregator = _portfolio.PortfolioMarginAggregator
 PortfolioMarginResult = _portfolio.PortfolioMarginResult
+portfolio_margin = _portfolio.portfolio_margin
 schema = _portfolio.schema
 
 __all__ = [
@@ -192,7 +192,6 @@ __all__ = [
     "PortfolioBuilder",
     "PortfolioCashflows",
     "PortfolioError",
-    "PortfolioMarginAggregator",
     "PortfolioMarginResult",
     "PortfolioMetrics",
     "PortfolioOptimizationResult",
@@ -242,6 +241,7 @@ __all__ = [
     "net_in_currency_by_date",
     "optimize_portfolio",
     "parse_portfolio_spec_json",
+    "portfolio_margin",
     "primitive_exposures",
     "rebalance_from_spec",
     "replay_portfolio",
