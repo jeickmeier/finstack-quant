@@ -1,4 +1,4 @@
-//! Free-function twins of the Python `CalibrationResult` methods.
+//! Free-function twins of the Python `CalibrationResultEnvelope` methods.
 //!
 //! WASM calibration results are plain `CalibrationResultEnvelope` objects, so
 //! the Rust `CalibrationResult::step_report` and `CalibrationReport::quote_rows`
@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::*;
 
 /// Report of one calibration step, read from a calibration result.
 ///
-/// Free-function twin of Python `CalibrationResult.step_report` (Rust
+/// Free-function twin of Python `CalibrationResultEnvelope.step_report` (Rust
 /// `CalibrationResult::step_report`).
 /// @param result_json - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
 /// @param step_id - Identifier of the calibration step, as given in the plan.
@@ -38,7 +38,7 @@ pub fn calibration_result_step_report(
 
 /// Per-quote residual rows of one calibration step.
 ///
-/// Free-function twin of Python `CalibrationResult.residuals`, which returns
+/// Free-function twin of Python `CalibrationResultEnvelope.residuals`, which returns
 /// the same rows (Rust `CalibrationReport::quote_rows`) as a pandas
 /// `DataFrame`. `quote_value` is absent and `sensitivity` is `NaN` unless
 /// `CalibrationConfig.compute_diagnostics` was enabled.

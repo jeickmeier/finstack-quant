@@ -25,7 +25,7 @@
 //!   and step constructors, returning the plain serde objects (`fields` holds
 //!   their shared argument marshalling).
 //! - `hull_white`: direct Hull-White one-factor calibrators on curve handles.
-//! - `result`: free-function twins of the Python `CalibrationResult` methods.
+//! - `result`: free-function twins of the Python `CalibrationResultEnvelope` methods.
 
 // `EnvelopeError` / `ExecuteError` are intentionally large structured errors
 // (rich diagnostic payloads); boxing them would change their public API.
@@ -133,7 +133,7 @@ pub fn calibration_envelope_content_hash(envelope_json: JsValue) -> Result<Strin
 
 /// Canonical content hash of a calibration result envelope.
 ///
-/// Free-function twin of Python `CalibrationResult.content_hash` (Rust
+/// Free-function twin of Python `CalibrationResultEnvelope.content_hash` (Rust
 /// `CalibrationResultEnvelope::content_hash`): the result is strict-loaded
 /// (default load limits), then hashed over its canonical JSON.
 /// @param result_json - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).

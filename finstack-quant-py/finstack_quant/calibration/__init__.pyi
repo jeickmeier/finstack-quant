@@ -33,7 +33,7 @@ __all__ = [
     "CalibrationEnvelopeError",
     "CalibrationPlan",
     "CalibrationReport",
-    "CalibrationResult",
+    "CalibrationResultEnvelope",
     "CalibrationStep",
     "CalibrationValidationReport",
     "CdsQuote",
@@ -4400,7 +4400,7 @@ class CalibrationValidationReport:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
-class CalibrationResult:
+class CalibrationResultEnvelope:
     """Calibrated market plus the plan-level and per-step calibration reports.
 
     Examples:
@@ -4587,7 +4587,7 @@ class CalibrationResult:
         """
 
     @staticmethod
-    def from_json(json: str) -> CalibrationResult:
+    def from_json(json: str) -> CalibrationResultEnvelope:
         """
         Strictly load a result from JSON.
 
@@ -4600,7 +4600,7 @@ class CalibrationResult:
 
         Returns
         -------
-        CalibrationResult
+        CalibrationResultEnvelope
             The loaded result.
 
         Raises
@@ -4617,8 +4617,8 @@ class CalibrationResult:
 
         Examples
         --------
-        >>> from finstack_quant.calibration import CalibrationResult
-        >>> CalibrationResult.from_json("{")
+        >>> from finstack_quant.calibration import CalibrationResultEnvelope
+        >>> CalibrationResultEnvelope.from_json("{")
         Traceback (most recent call last):
         finstack_quant.portfolio.ContractValidationError: ...
         """
@@ -4718,7 +4718,7 @@ def dry_run(
 
 def calibrate(
     envelope: CalibrationEnvelope | dict[str, Any] | str,
-) -> CalibrationResult:
+) -> CalibrationResultEnvelope:
     """Execute a calibration plan and return the calibrated market and reports.
 
     Parameters
@@ -4729,7 +4729,7 @@ def calibrate(
 
     Returns
     -------
-    CalibrationResult
+    CalibrationResultEnvelope
         Calibrated market, plan-level report, per-step reports and residuals.
 
     Raises

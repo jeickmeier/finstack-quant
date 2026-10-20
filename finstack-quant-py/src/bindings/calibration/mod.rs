@@ -190,7 +190,7 @@ fn dry_run(py: Python<'_>, envelope: &Bound<'_, PyAny>) -> PyResult<PyCalibratio
 ///
 /// Returns
 /// -------
-/// CalibrationResult
+/// CalibrationResultEnvelope
 ///     Calibrated market, plan-level report, per-step reports and residuals.
 ///
 /// Raises
@@ -327,7 +327,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "CalibrationEnvelopeError",
                 "CalibrationPlan",
                 "CalibrationReport",
-                "CalibrationResult",
+                "CalibrationResultEnvelope",
                 "CalibrationStep",
                 "CalibrationValidationReport",
                 "CdsQuote",

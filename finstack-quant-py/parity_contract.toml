@@ -725,7 +725,7 @@ public = [
     "CalibrationEnvelopeError",
     "CalibrationPlan",
     "CalibrationReport",
-    "CalibrationResult",
+    "CalibrationResultEnvelope",
     "CalibrationStep",
     "CalibrationValidationReport",
     "CdsQuote",
@@ -1890,7 +1890,7 @@ js = "attribution.schema"
 
 [parity.modules."finstack_quant.calibration"]
 js = "calibration"
-types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationEnvelopeError = "CalibrationEnvelopeError", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResult = "CalibrationResult", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", CdsTrancheQuote = "CdsTrancheQuote", CollateralEntry = "CollateralEntry", DividendScheduleDatum = "DividendScheduleDatum", FxSpotDatum = "FxSpotDatum", InflationQuote = "InflationQuote", PriceDatum = "PriceDatum", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", ValidationConfig = "ValidationConfig", VolQuote = "VolQuote", XccyQuote = "XccyQuote" }
+types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationEnvelopeError = "CalibrationEnvelopeError", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResultEnvelope = "CalibrationResultEnvelope", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", CdsTrancheQuote = "CdsTrancheQuote", CollateralEntry = "CollateralEntry", DividendScheduleDatum = "DividendScheduleDatum", FxSpotDatum = "FxSpotDatum", InflationQuote = "InflationQuote", PriceDatum = "PriceDatum", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", ValidationConfig = "ValidationConfig", VolQuote = "VolQuote", XccyQuote = "XccyQuote" }
 
 [parity.modules."finstack_quant.calibration.hull_white"]
 js = "calibration"
@@ -2145,9 +2145,9 @@ pnlAttributionValidateCurrencies = "free-function twin of Python PnlAttribution.
 
 [parity.js."calibration".wasm_only]
 calibrationEnvelopeContentHash = "free-function twin of Python CalibrationEnvelope.content_hash (member rename)"
-calibrationResultContentHash = "free-function twin of Python CalibrationResult.content_hash (member rename)"
-calibrationResultResiduals = "free-function twin of Python CalibrationResult.residuals (Rust CalibrationReport::quote_rows of the step report; member rename)"
-calibrationResultStepReport = "free-function twin of Python CalibrationResult.step_report (Rust CalibrationResult::step_report; member rename)"
+calibrationResultContentHash = "free-function twin of Python CalibrationResultEnvelope.content_hash (member rename)"
+calibrationResultResiduals = "free-function twin of Python CalibrationResultEnvelope.residuals (Rust CalibrationReport::quote_rows of the step report; member rename)"
+calibrationResultStepReport = "free-function twin of Python CalibrationResultEnvelope.step_report (Rust CalibrationResult::step_report; member rename)"
 calibrationStepBaseCorrelation = "free-function twin of Python CalibrationStep.base_correlation (Rust CalibrationStep::from_wire_fields; member rename)"
 calibrationStepCapFloorHullWhite = "free-function twin of Python CalibrationStep.cap_floor_hull_white (Rust CalibrationStep::from_wire_fields; member rename)"
 calibrationStepDiscount = "free-function twin of Python CalibrationStep.discount (Rust CalibrationStep::from_wire_fields; member rename)"
@@ -2734,7 +2734,7 @@ renames = { explain = { js = "attribution.pnlAttributionExplainText", reason = "
 [parity.members."finstack_quant.calibration.CalibrationEnvelope"]
 renames = { content_hash = { js = "calibration.calibrationEnvelopeContentHash", reason = "WASM envelopes are plain objects; the Rust CalibrationEnvelope::content_hash method is a free function taking the envelope" } }
 
-[parity.members."finstack_quant.calibration.CalibrationResult"]
+[parity.members."finstack_quant.calibration.CalibrationResultEnvelope"]
 renames = { content_hash = { js = "calibration.calibrationResultContentHash", reason = "WASM calibration results are plain objects; the Rust CalibrationResultEnvelope::content_hash method is a free function taking the result" }, residuals = { js = "calibration.calibrationResultResiduals", reason = "WASM calibration results are plain objects; the free function returns the Rust CalibrationReport::quote_rows rows that Python frames as a pandas DataFrame" }, step_report = { js = "calibration.calibrationResultStepReport", reason = "WASM calibration results are plain objects; the Rust CalibrationResult::step_report method is a free function taking the result" } }
 
 [parity.members."finstack_quant.calibration.CalibrationStep".renames]

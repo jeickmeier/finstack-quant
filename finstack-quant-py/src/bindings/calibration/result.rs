@@ -1,4 +1,4 @@
-//! `CalibrationResult`: calibrated market plus plan-level and per-step reports.
+//! `CalibrationResultEnvelope`: calibrated market plus plan-level and per-step reports.
 
 use super::report::{quote_quality_dataframe, PyCalibrationReport};
 use crate::bindings::core::market_data::context::PyMarketContext;
@@ -25,7 +25,7 @@ use std::sync::OnceLock;
 /// >>> result.success
 /// True
 #[pyclass(
-    name = "CalibrationResult",
+    name = "CalibrationResultEnvelope",
     module = "finstack_quant.calibration",
     skip_from_py_object
 )]
@@ -271,7 +271,7 @@ impl PyCalibrationResult {
     fn __repr__(&self) -> String {
         let n = self.inner.result.step_reports.len();
         format!(
-            "CalibrationResult(success={}, steps={n}, iterations={}, max_residual_ratio={:.2e})",
+            "CalibrationResultEnvelope(success={}, steps={n}, iterations={}, max_residual_ratio={:.2e})",
             if self.inner.result.report.success {
                 "True"
             } else {

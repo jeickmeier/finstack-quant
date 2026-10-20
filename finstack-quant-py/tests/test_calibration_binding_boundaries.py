@@ -7,7 +7,7 @@ import pytest
 from finstack_quant.calibration import (
     CalibrationEnvelope,
     CalibrationPlan,
-    CalibrationResult,
+    CalibrationResultEnvelope,
     CalibrationStep,
     CdsQuote,
     CdsTrancheQuote,
@@ -115,7 +115,7 @@ def test_result_loading_rejects_metadata_beyond_canonical_depth_limit() -> None:
         "entries": [{"kind": "computation_step", "name": "probe", "description": "nested", "metadata": metadata}],
     }
     with pytest.raises(ContractLimitExceededError, match="depth"):
-        CalibrationResult.from_json(json.dumps(payload))
+        CalibrationResultEnvelope.from_json(json.dumps(payload))
 
 
 def test_cap_floor_quote_rejects_lognormal_construction_and_json() -> None:

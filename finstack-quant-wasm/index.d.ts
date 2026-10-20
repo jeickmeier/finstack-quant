@@ -30207,7 +30207,7 @@ export interface CalibrationNamespace {
    */
   calibrationEnvelopeContentHash(envelopeJson: CalibrationEnvelope | string): string;
   /**
-   * Canonical content hash of a calibration result envelope (twin of Python `CalibrationResult.content_hash`).
+   * Canonical content hash of a calibration result envelope (twin of Python `CalibrationResultEnvelope.content_hash`).
    * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
    * @returns `"sha256:<hex>"` content hash.
    * @throws Error - Throws a `CalibrationEnvelopeError` if the result is malformed, exceeds the default load limits, its schema marker is missing or unsupported, or it contains a non-finite number.
@@ -30226,7 +30226,7 @@ export interface CalibrationNamespace {
   /**
    * Report of one calibration step, read from a calibration result.
    *
-   * Free-function twin of Python `CalibrationResult.step_report` (Rust
+   * Free-function twin of Python `CalibrationResultEnvelope.step_report` (Rust
    * `CalibrationResult::step_report`).
    * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
    * @param stepId - Identifier of the calibration step, as given in the plan.
@@ -30240,7 +30240,7 @@ export interface CalibrationNamespace {
   /**
    * Per-quote residual rows of one calibration step.
    *
-   * Free-function twin of Python `CalibrationResult.residuals`, which returns
+   * Free-function twin of Python `CalibrationResultEnvelope.residuals`, which returns
    * the same rows (Rust `CalibrationReport::quote_rows`) as a pandas
    * `DataFrame`. `target_value`, `fitted_value` and `sensitivity` are `NaN`
    * unless `CalibrationConfig.compute_diagnostics` was enabled.
