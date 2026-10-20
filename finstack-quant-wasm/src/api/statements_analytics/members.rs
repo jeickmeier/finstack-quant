@@ -1,24 +1,16 @@
 //! Free-function twins of the Python analysis entry points and of the
 //! methods on plain-object analysis types.
 
+use super::parse_model;
 use crate::utils::input::{
-    from_js_json, js_f64, js_opt_f64, js_opt_string, js_string, js_string_seq, js_uint, json_text,
+    from_js_json, js_f64, js_opt_f64, js_opt_string, js_string, js_string_seq, js_uint,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::evaluator::StatementResult;
-use finstack_quant_statements::FinancialModelSpec;
 use finstack_quant_statements_analytics::analysis as fa;
 use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 use wasm_bindgen::prelude::*;
-
-fn present(value: Option<JsValue>) -> Option<JsValue> {
-    value.filter(|v| !v.is_null() && !v.is_undefined())
-}
-
-fn parse_model(model: &JsValue) -> Result<FinancialModelSpec, JsValue> {
-    FinancialModelSpec::from_json(&json_text(model, "model")?).map_err(to_js_err)
-}
 
 fn parse_periods(periods: &JsValue) -> Result<Vec<PeriodId>, JsValue> {
     js_string_seq(periods, "periods")?
@@ -65,13 +57,10 @@ pub fn evaluate_dcf(
     let terminal_value: TerminalValueSpec = from_js_json(&terminal_value, "terminalValue")?;
     let ufcf_node = js_opt_string(ufcf_node.as_ref(), "ufcfNode")?;
     let net_debt_override = js_opt_f64(net_debt_override.as_ref(), "netDebtOverride")?;
-    let options: fa::DcfOptions = match present(options) {
-        Some(options) => from_js_json(&options, "options")?,
-        None => fa::DcfOptions::default(),
-    };
-    let market: Option<finstack_quant_core::market_data::context::MarketContext> = present(market)
-        .map(|market| from_js_json(&market, "market"))
-        .transpose()?;
+    let options: fa::DcfOptions =
+        crate::utils::wire::js_opt_wire(options.as_ref(), "options")?.unwrap_or_default();
+    let market: Option<finstack_quant_core::market_data::context::MarketContext> =
+        crate::utils::wire::js_opt_wire(market.as_ref(), "market")?;
     let as_of = js_opt_string(as_of.as_ref(), "asOf")?
         .map(|date| crate::utils::parse_iso_date(&date))
         .transpose()?;
@@ -111,13 +100,10 @@ pub fn run_corporate_analysis(
     market: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let model = parse_model(&model)?;
-    let options: fa::CorporateAnalysisOptions = match present(options) {
-        Some(options) => from_js_json(&options, "options")?,
-        None => fa::CorporateAnalysisOptions::default(),
-    };
-    let market: Option<finstack_quant_core::market_data::context::MarketContext> = present(market)
-        .map(|market| from_js_json(&market, "market"))
-        .transpose()?;
+    let options: fa::CorporateAnalysisOptions =
+        crate::utils::wire::js_opt_wire(options.as_ref(), "options")?.unwrap_or_default();
+    let market: Option<finstack_quant_core::market_data::context::MarketContext> =
+        crate::utils::wire::js_opt_wire(market.as_ref(), "market")?;
     to_js_value(&fa::run_corporate_analysis(model, options, market).map_err(to_js_err)?)
 }
 
@@ -301,10 +287,7 @@ pub fn peer_set_from_universe(
     let subject: fa::CompanyMetrics = from_js_json(&subject, "subject")?;
     let universe: Vec<fa::CompanyMetrics> = from_js_json(&universe, "universe")?;
     let filter: fa::PeerFilter = from_js_json(&filter, "filter")?;
-    let period_basis: fa::PeriodBasis = match period_basis.as_string() {
-        Some(label) => finstack_quant_core::wire::serde_parse(&label).map_err(to_js_err)?,
-        None => from_js_json(&period_basis, "periodBasis")?,
-    };
+    let period_basis: fa::PeriodBasis = crate::utils::wire::js_wire(&period_basis, "periodBasis")?;
     to_js_value(&fa::PeerSet::from_universe(
         subject,
         &universe,

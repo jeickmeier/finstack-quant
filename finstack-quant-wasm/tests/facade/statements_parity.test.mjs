@@ -59,7 +59,11 @@ test('statements matches the cross-host golden', () => {
   const builtResult = evaluate(built);
 
   const config = INPUTS.normalization_config;
-  const oneOff = { id: 'one_off', name: 'One-off cost', value: { type: 'fixed', amounts: { [Q1]: 5.0 } } };
+  const oneOff = {
+    id: 'one_off',
+    name: 'One-off cost',
+    value: { type: 'fixed', amounts: { [Q1]: 5.0 } },
+  };
   const synergy = {
     id: 'synergy',
     name: 'Synergies',
@@ -67,10 +71,10 @@ test('statements matches the cross-host golden', () => {
   };
   let extended = { target_node: 'profit', adjustments: [] };
   extended = statements.normalizationConfigAddAdjustment(extended, oneOff);
-  extended = statements.normalizationConfigAddAdjustment(
-    extended,
-    { ...synergy, cap: { base_node: 'revenue', value: 0.05 } }
-  );
+  extended = statements.normalizationConfigAddAdjustment(extended, {
+    ...synergy,
+    cap: { base_node: 'revenue', value: 0.05 },
+  });
 
   const evaluator = new statements.Evaluator();
   evaluator.withChecks(INPUTS.check_suite);

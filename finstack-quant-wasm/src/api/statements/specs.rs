@@ -4,18 +4,13 @@
 //! `ForecastSpec`, `Adjustment`, `NormalizationConfig`, `CheckConfig` and `CheckSuiteSpec`
 //! is a function that returns (or takes) the plain object.
 
-use crate::utils::input::{
-    from_js_json, js_f64, js_f64_seq, js_opt_string, js_string, js_u64, js_uint,
-};
+use crate::utils::input::{from_js_json, js_string};
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::adjustments::{
     Adjustment, NormalizationConfig, NormalizationResult,
 };
 use finstack_quant_statements::checks::{BuiltinCheckSpec, CheckConfig};
 use finstack_quant_statements::evaluator::StatementResult;
-use finstack_quant_statements::types::ForecastSpec;
-use indexmap::IndexMap;
 use wasm_bindgen::prelude::*;
 
 /// Copy of a normalization configuration with one more adjustment.
@@ -54,9 +49,7 @@ pub fn normalization_config_add_adjustment(
 /// adjustment identifiers.
 #[wasm_bindgen(js_name = validateNormalizationConfigJson)]
 pub fn validate_normalization_config_json(json: JsValue) -> Result<String, JsValue> {
-    let config: NormalizationConfig = from_js_json(&json, "json")?;
-    config.validate().map_err(to_js_err)?;
-    serde_json::to_string(&config).map_err(to_js_err)
+    crate::api::statements::validated_json(&json, NormalizationConfig::validate)
 }
 
 fn normalized(results: &JsValue, config: &JsValue) -> Result<Vec<NormalizationResult>, JsValue> {

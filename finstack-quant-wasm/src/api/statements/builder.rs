@@ -10,6 +10,7 @@
 
 use super::handles::JsRegistry;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
+use crate::utils::wire::{js_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{Date, Period, PeriodId};
 use finstack_quant_core::money::Money;
@@ -59,10 +60,6 @@ fn meta_value(value: &JsValue) -> Result<serde_json::Value, JsValue> {
             .ok_or_else(|| invalid("value: a meta number must be finite"));
     }
     from_js_json(value, "value")
-}
-
-fn iso_date(value: &JsValue, label: &str) -> Result<Date, JsValue> {
-    crate::utils::parse_iso_date(&js_string(value, label)?)
 }
 
 /// Fluent builder for `FinancialModelSpec`.
@@ -476,8 +473,8 @@ impl JsModelBuilder {
         let id = js_string(&id, "id")?;
         let notional: Money = from_js_json(&notional, "notional")?;
         let coupon_rate = js_f64(&coupon_rate, "couponRate")?;
-        let issue = iso_date(&issue_date, "issueDate")?;
-        let maturity = iso_date(&maturity_date, "maturityDate")?;
+        let issue = js_date(&issue_date, "issueDate")?;
+        let maturity = js_date(&maturity_date, "maturityDate")?;
         let curve = js_string(&discount_curve_id, "discountCurveId")?;
         try_in_place!(self, |b| b.try_add_bond(
             id,
@@ -520,11 +517,10 @@ impl JsModelBuilder {
         let coupon_rate =
             finstack_quant_core::types::Rate::from_decimal(js_f64(&coupon_rate, "couponRate")?)
                 .map_err(to_js_err)?;
-        let issue_date = iso_date(&issue_date, "issueDate")?;
-        let maturity_date = iso_date(&maturity_date, "maturityDate")?;
+        let issue_date = js_date(&issue_date, "issueDate")?;
+        let maturity_date = js_date(&maturity_date, "maturityDate")?;
         let convention: finstack_quant_valuations::instruments::BondConvention =
-            finstack_quant_core::wire::serde_parse(&js_string(&convention, "convention")?)
-                .map_err(to_js_err)?;
+            js_wire(&convention, "convention")?;
         let params = BondConventionParams {
             id,
             notional,
@@ -566,8 +562,8 @@ impl JsModelBuilder {
             id: js_string(&id, "id")?,
             notional: from_js_json(&notional, "notional")?,
             fixed_rate: js_f64(&fixed_rate, "fixedRate")?,
-            start_date: iso_date(&start_date, "startDate")?,
-            maturity_date: iso_date(&maturity_date, "maturityDate")?,
+            start_date: js_date(&start_date, "startDate")?,
+            maturity_date: js_date(&maturity_date, "maturityDate")?,
             discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
             forward_curve_id: js_string(&forward_curve_id, "forwardCurveId")?,
         };
@@ -615,8 +611,8 @@ impl JsModelBuilder {
             id: js_string(&id, "id")?,
             notional: from_js_json(&notional, "notional")?,
             fixed_rate: js_f64(&fixed_rate, "fixedRate")?,
-            start_date: iso_date(&start_date, "startDate")?,
-            maturity_date: iso_date(&maturity_date, "maturityDate")?,
+            start_date: js_date(&start_date, "startDate")?,
+            maturity_date: js_date(&maturity_date, "maturityDate")?,
             discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
             forward_curve_id: js_string(&forward_curve_id, "forwardCurveId")?,
         };
@@ -694,8 +690,7 @@ impl JsModelBuilder {
     #[wasm_bindgen(js_name = fxPolicy)]
     pub fn fx_policy(&mut self, policy: JsValue) -> Result<(), JsValue> {
         let policy: finstack_quant_core::money::fx::FxConversionPolicy =
-            finstack_quant_core::wire::serde_parse(&js_string(&policy, "policy")?)
-                .map_err(to_js_err)?;
+            js_wire(&policy, "policy")?;
         replace_with!(self, |b| b.fx_policy(policy))
     }
 
