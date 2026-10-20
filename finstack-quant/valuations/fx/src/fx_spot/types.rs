@@ -509,31 +509,6 @@ impl FxSpot {
                 .with_settlement_days(2),
         )
     }
-
-    /// Standard FX pair name (e.g., "EURUSD")
-    pub fn pair_name(&self) -> String {
-        format!("{}{}", self.base_currency, self.quote_currency)
-    }
-
-    /// Check if this is a same-region pair that typically settles T+1.
-    ///
-    /// Returns `true` for pairs like USD/CAD and USD/TRY that conventionally
-    /// settle in one business day rather than the standard T+2.
-    ///
-    /// # Market Convention Reference
-    ///
-    /// Per Bloomberg/Reuters FX settlement conventions:
-    /// - **USD/CAD**: North American same-day zone (T+1)
-    /// - **USD/TRY**: Turkish Lira settles T+1 per Istanbul market convention
-    ///
-    /// When `settlement_days` is unset, [`Self::effective_settlement_date`]
-    /// uses this list to choose T+1 versus T+2.
-    pub fn is_t1_pair(&self) -> bool {
-        finstack_quant_core::dates::fx::fx_standard_settlement_days(
-            self.base_currency,
-            self.quote_currency,
-        ) == 1
-    }
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for FxSpot {
@@ -673,7 +648,6 @@ mod tests {
         let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD);
         assert_eq!(spot.base_currency, Currency::EUR);
         assert_eq!(spot.quote_currency, Currency::USD);
-        assert_eq!(spot.pair_name(), "EURUSD");
     }
 
     #[test]
@@ -845,27 +819,6 @@ mod tests {
             .effective_settlement_date(as_of)
             .expect("should compute");
         assert_eq!(settle, date(2025, Month::January, 16)); // Thursday (T+1)
-    }
-
-    #[test]
-    fn test_fx_spot_is_t1_pair() {
-        let usd_cad = FxSpot::new(InstrumentId::new("USDCAD"), Currency::USD, Currency::CAD);
-        assert!(usd_cad.is_t1_pair(), "USD/CAD should be T+1 pair");
-
-        let cad_usd = FxSpot::new(InstrumentId::new("CADUSD"), Currency::CAD, Currency::USD);
-        assert!(cad_usd.is_t1_pair(), "CAD/USD should be T+1 pair");
-
-        let usd_try = FxSpot::new(InstrumentId::new("USDTRY"), Currency::USD, Currency::TRY);
-        assert!(usd_try.is_t1_pair(), "USD/TRY should be T+1 pair");
-
-        let try_usd = FxSpot::new(InstrumentId::new("TRYUSD"), Currency::TRY, Currency::USD);
-        assert!(try_usd.is_t1_pair(), "TRY/USD should be T+1 pair");
-
-        let usd_mxn = FxSpot::new(InstrumentId::new("USDMXN"), Currency::USD, Currency::MXN);
-        assert!(!usd_mxn.is_t1_pair(), "USD/MXN should NOT be T+1 pair");
-
-        let eur_usd = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD);
-        assert!(!eur_usd.is_t1_pair(), "EUR/USD should NOT be T+1 pair");
     }
 
     #[test]

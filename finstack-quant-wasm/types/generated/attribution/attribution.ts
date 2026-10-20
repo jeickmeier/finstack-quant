@@ -3552,10 +3552,6 @@ export type FundEventKind = "contribution" | "distribution" | "proceeds";
  */
 export type CatchUpMode = "full" | "partial";
 /**
- * Clawback settlement trigger.
- */
-export type ClawbackSettle = "fund_end" | "periodic";
-/**
  * Waterfall allocation style.
  */
 export type WaterfallStyle = "european" | "american";
@@ -17781,7 +17777,8 @@ export interface PeFundWaterfallSpec {
   tranches: PeFundWaterfallTranche[];
 }
 /**
- * Clawback specification for GP carry reconciliation.
+ * Clawback specification for GP carry reconciliation, settled at fund end
+ * (the date of the last fund event).
  */
 export interface ClawbackSpec {
   /**
@@ -17789,10 +17786,6 @@ export interface ClawbackSpec {
    * fraction in `[0, 1]` (`0.2` = 20%)
    */
   holdback_decimal?: number | null;
-  /**
-   * When to settle clawback
-   */
-  settle_on: ClawbackSettle;
 }
 /**
  * Real estate asset valuation instrument.

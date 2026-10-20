@@ -338,7 +338,7 @@ fn test_ledger_export_formats() {
     let ledger = engine.run(&events).unwrap();
 
     // Test JSON export
-    let json = ledger.to_json().unwrap();
+    let json = serde_json::to_string(&ledger).unwrap();
     assert!(json.contains("rows"), "JSON should contain rows");
     assert!(json.contains("meta"), "JSON should contain metadata");
 }
@@ -451,7 +451,6 @@ fn test_waterfall_spec_serde_stability() {
         .promote_tier(0.0, 0.8, 0.2)
         .clawback(ClawbackSpec {
             holdback_decimal: Some(0.1),
-            settle_on: ClawbackSettle::FundEnd,
         })
         .build()
         .unwrap();

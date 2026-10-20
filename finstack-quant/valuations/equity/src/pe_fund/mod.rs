@@ -48,7 +48,7 @@ pub mod waterfall;
 
 pub use types::PrivateMarketsFund;
 pub use waterfall::{
-    AllocationLedger, AllocationRow, CatchUpMode, ClawbackSettle, ClawbackSpec,
-    EquityWaterfallEngine, FundEvent, FundEventKind, PeFundWaterfallSpec, PeFundWaterfallTranche,
-    WaterfallSpecBuilder, WaterfallStyle,
+    AllocationLedger, AllocationRow, CatchUpMode, ClawbackSpec, EquityWaterfallEngine, FundEvent,
+    FundEventKind, PeFundWaterfallSpec, PeFundWaterfallTranche, WaterfallSpecBuilder,
+    WaterfallStyle,
 };

@@ -4,7 +4,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::equity::pe_fund::{ClawbackSettle, ClawbackSpec};
+use finstack_quant_valuations::instruments::equity::pe_fund::ClawbackSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     CardPortfolioSpec, ExcessSpreadSpec, IncentiveFeeSpec, ReinvestmentCriteria,
     ShiftingInterestStep, StructuredCredit, TargetOcSpec,
@@ -89,7 +89,6 @@ fn retired_decimal_pct_keys_are_rejected() {
 
     let clawback = ClawbackSpec {
         holdback_decimal: Some(0.2),
-        settle_on: ClawbackSettle::FundEnd,
     };
     assert_rejects(&clawback, "holdback_decimal", "holdback_pct");
 

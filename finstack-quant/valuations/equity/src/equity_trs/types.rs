@@ -344,61 +344,6 @@ impl EquityTotalReturnSwap {
             .build()
     }
 
-    /// Creates an equity TRS that replicates an ETF.
-    ///
-    /// This is a convenience constructor for creating TRS positions that synthetically
-    /// replicate equity ETF exposure.
-    ///
-    /// # Arguments
-    /// * `etf_ticker` — ETF ticker symbol (e.g., "SPY", "QQQ")
-    /// * `spot_id` — Market data identifier for the ETF spot price
-    /// * `notional` — Notional amount in the ETF's currency
-    /// * `financing` — Financing leg specification
-    /// * `schedule` — Payment schedule specification
-    /// * `div_yield_id` — Optional dividend yield market data identifier
-    ///
-    /// # Example
-    ///
-    /// ```text
-    /// let spy_trs = EquityTotalReturnSwap::replicate_etf(
-    ///     "SPY",
-    ///     "SPY-SPOT",
-    ///     Money::from((10_000_000_i64, Currency::USD)),
-    ///     financing_spec,
-    ///     schedule_spec,
-    ///     Some("SPY-DIV"),
-    /// )?;
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the builder fails validation.
-    pub fn replicate_etf(
-        etf_ticker: &str,
-        spot_id: &str,
-        notional: Money,
-        financing: FinancingLegSpec,
-        schedule: TrsScheduleSpec,
-        div_yield_id: Option<&str>,
-    ) -> Result<Self> {
-        let mut underlying = EquityUnderlyingParams::new(etf_ticker, spot_id, notional.currency());
-        if let Some(div) = div_yield_id {
-            underlying = underlying.with_div_yield_id(div);
-        }
-
-        Self::builder()
-            .id(InstrumentId::new(format!("TRS-{}", etf_ticker)))
-            .notional(notional)
-            .underlying(underlying)
-            .financing_leg(financing)
-            .schedule(schedule)
-            .side(PayReceive::Receive)
-            .dividend_settlement(TrsDividendSettlement::OnDividendDate)
-            .initial_level_opt(None)
-            .attributes(Attributes::new())
-            .build()
-    }
-
     /// Validates the equity TRS configuration.
     ///
     /// # Errors

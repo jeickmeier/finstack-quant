@@ -70,38 +70,6 @@ pub(crate) fn realized_fraction_by_observations(inst: &FxVarianceSwap, as_of: Da
     ))
 }
 
-/// Fraction of the observation period elapsed at `as_of`, measured by the
-/// instrument's day-count convention.
-///
-/// This descriptive calendar-time fraction is not the contractual variance
-/// weight. Pricing normalizes expected squared returns by the full number of
-/// scheduled return samples, including weekends and irregular observation gaps.
-pub(crate) fn time_elapsed_fraction(inst: &FxVarianceSwap, as_of: Date) -> Result<f64> {
-    let final_observation_date = observation_dates(inst)?
-        .last()
-        .copied()
-        .unwrap_or(inst.maturity);
-    if as_of <= inst.start_date {
-        return Ok(0.0);
-    }
-    if as_of >= final_observation_date {
-        return Ok(1.0);
-    }
-    let total = inst.day_count.year_fraction(
-        inst.start_date,
-        final_observation_date,
-        DayCountContext::default(),
-    )?;
-    if total <= 0.0 {
-        return Ok(0.0);
-    }
-    let elapsed = inst
-        .day_count
-        .year_fraction(inst.start_date, as_of, DayCountContext::default())?
-        .clamp(0.0, total);
-    Ok((elapsed / total).clamp(0.0, 1.0))
-}
-
 fn realized_fraction_by_observations_with_dates(
     inst: &FxVarianceSwap,
     as_of: Date,
@@ -130,14 +98,6 @@ fn realized_fraction_by_observations_with_dates(
     } else {
         realized as f64 / total as f64
     }
-}
-
-pub(crate) fn get_historical_prices(
-    inst: &FxVarianceSwap,
-    context: &MarketContext,
-    as_of: Date,
-) -> Result<Vec<f64>> {
-    get_historical_prices_with_dates(inst, context, as_of, &observation_dates(inst)?)
 }
 
 fn get_historical_prices_with_dates(
@@ -961,7 +921,24 @@ mod tests {
 
         let count_w =
             realized_fraction_by_observations(&swap, as_of).expect("observation fraction");
-        let time_w = time_elapsed_fraction(&swap, as_of).expect("time fraction");
+        // Calendar-time weight over the observation window: the counterfactual
+        // the observation-count weighting replaces.
+        let final_observation = *observation_dates(&swap)
+            .expect("observation schedule")
+            .last()
+            .expect("observation dates");
+        let time_w = swap
+            .day_count
+            .year_fraction(swap.start_date, as_of, DayCountContext::default())
+            .expect("elapsed")
+            / swap
+                .day_count
+                .year_fraction(
+                    swap.start_date,
+                    final_observation,
+                    DayCountContext::default(),
+                )
+                .expect("window");
         assert!(
             (count_w - time_w).abs() > 1e-4,
             "schedule must make count weight ({count_w}) differ from time weight ({time_w})"

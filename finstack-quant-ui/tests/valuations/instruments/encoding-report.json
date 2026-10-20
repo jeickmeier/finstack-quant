@@ -6815,6 +6815,7 @@
           "#/$defs/OidEirSpec",
           "#/$defs/MaturityConstraints",
           "#/$defs/CollateralType/oneOf/1/properties/special",
+          "#/$defs/ClawbackSpec",
           "#/$defs/EquityBridge",
           "#/$defs/ValuationDiscounts",
           "#/$defs/CoverageRules",
@@ -7078,7 +7079,6 @@
           { "pointer": "#/$defs/d_1e501b18c12dfea3123d", "keyword": "oneOf" },
           { "pointer": "#/$defs/FundEventKind", "keyword": "oneOf" },
           { "pointer": "#/$defs/CatchUpMode", "keyword": "oneOf" },
-          { "pointer": "#/$defs/ClawbackSettle", "keyword": "oneOf" },
           { "pointer": "#/$defs/WaterfallStyle", "keyword": "oneOf" },
           { "pointer": "#/$defs/RealEstatePropertyType", "keyword": "oneOf" },
           {
@@ -18444,6 +18444,7 @@
           "#/$defs/OidEirSpec",
           "#/$defs/MaturityConstraints",
           "#/$defs/CollateralType/oneOf/1/properties/special",
+          "#/$defs/ClawbackSpec",
           "#/$defs/EquityBridge",
           "#/$defs/ValuationDiscounts",
           "#/$defs/CoverageRules",
@@ -18709,7 +18710,6 @@
           { "pointer": "#/$defs/FxConversionPolicy", "keyword": "oneOf" },
           { "pointer": "#/$defs/FundEventKind", "keyword": "oneOf" },
           { "pointer": "#/$defs/CatchUpMode", "keyword": "oneOf" },
-          { "pointer": "#/$defs/ClawbackSettle", "keyword": "oneOf" },
           { "pointer": "#/$defs/WaterfallStyle", "keyword": "oneOf" },
           { "pointer": "#/$defs/RealEstatePropertyType", "keyword": "oneOf" },
           {
@@ -33324,7 +33324,8 @@
           "#/$defs/d_00292b2cd9779815232f",
           "#/$defs/d_1d0c1815f8dd0715bd12",
           "#/$defs/d_e49387f97c0f9d510642",
-          "#/$defs/d_f80c8a31d359e1cb5dd4"
+          "#/$defs/d_f80c8a31d359e1cb5dd4",
+          "#/$defs/d_efbdfcaec74cc53cfacb"
         ],
         "uint": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
@@ -33349,7 +33350,6 @@
           { "pointer": "#/$defs/d_f80f2b90e7af690c5898", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_b556bbeb1ecf96c44c5a", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_5144f4488d69989e0b94", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_73647f17152be7a32b68", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_32abafa93903c314c0d7", "keyword": "oneOf" }
         ]

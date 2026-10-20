@@ -30,7 +30,7 @@ fn test_ndf_builder() {
     assert_eq!(ndf.base_currency, Currency::CNY);
     assert_eq!(ndf.settlement_currency, Currency::USD);
     assert_eq!(ndf.contract_rate, Some(7.25));
-    assert!(!ndf.is_fixed());
+    assert!(!ndf.observed_fixing.is_some());
 }
 
 #[test]
@@ -58,7 +58,7 @@ fn test_ndf_builder_with_optional_fields() {
     assert_eq!(ndf.observed_fixing, Some(7.30));
     assert_eq!(ndf.fixing_source, Some(NdfFixingSource::Cnhfix));
     assert!(ndf.foreign_discount_curve_id.is_some());
-    assert!(ndf.is_fixed());
+    assert!(ndf.observed_fixing.is_some());
     assert!(ndf.attributes.has_tag("ndf"));
 }
 
@@ -107,10 +107,10 @@ fn test_ndf_from_trade_date() {
 #[test]
 fn test_ndf_with_fixing_rate() {
     let ndf = Ndf::example().expect("example");
-    assert!(!ndf.is_fixed());
+    assert!(!ndf.observed_fixing.is_some());
 
     let fixed_ndf = ndf.with_observed_fixing(7.30).expect("valid rate");
-    assert!(fixed_ndf.is_fixed());
+    assert!(fixed_ndf.observed_fixing.is_some());
     assert_eq!(fixed_ndf.observed_fixing, Some(7.30));
 }
 

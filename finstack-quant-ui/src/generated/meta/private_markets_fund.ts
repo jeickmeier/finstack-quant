@@ -771,7 +771,7 @@ export default [
     "path": "#/$defs/d_32abafa93903c314c0d7/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/WaterfallStyle/oneOf/1",
     "const": "american",
-    "description": "American style: deal-by-deal allocation. Every event must carry a\nnon-empty `deal_id`; capital, preferred return, catch-up, and carry are\ntracked independently for each deal, while clawback remains a fund-level\nlifetime reconciliation. Periodic fund settlements do not reinstate an\nindividual deal's gross carry capacity or reassign returned capital to a\ndeal; later distributions continue to use that deal's original history."
+    "description": "American style: deal-by-deal allocation. Every event must carry a\nnon-empty `deal_id`; capital, preferred return, catch-up, and carry are\ntracked independently for each deal, while clawback remains a fund-level\nlifetime reconciliation settled once at fund end."
   },
   {
     "path": "#/$defs/d_40c29976c86ef72069c6",
@@ -1229,23 +1229,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/CreditStateVariable/oneOf/2",
     "const": "leverage",
     "description": "Use the leverage ratio."
-  },
-  {
-    "path": "#/$defs/d_73647f17152be7a32b68",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/ClawbackSettle",
-    "description": "Clawback settlement trigger."
-  },
-  {
-    "path": "#/$defs/d_73647f17152be7a32b68/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/ClawbackSettle/oneOf/0",
-    "const": "fund_end",
-    "description": "Settle at fund termination"
-  },
-  {
-    "path": "#/$defs/d_73647f17152be7a32b68/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/ClawbackSettle/oneOf/1",
-    "const": "periodic",
-    "description": "Settle at configured period ends before subsequent distributions.\nEuropean settlements update fund allocation balances. American settlements\nstay at fund level and do not rewrite individual deal entitlements."
   },
   {
     "path": "#/$defs/d_780b68ee5d41351b65ca",
@@ -5115,20 +5098,13 @@ export default [
   {
     "path": "#/$defs/d_efbdfcaec74cc53cfacb",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/ClawbackSpec",
-    "description": "Clawback specification for GP carry reconciliation."
+    "description": "Clawback specification for GP carry reconciliation, settled at fund end\n(the date of the last fund event)."
   },
   {
     "path": "#/$defs/d_efbdfcaec74cc53cfacb/properties/holdback_decimal",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/ClawbackSpec/properties/holdback_decimal",
     "description": "Optional share of GP carry held back until settlement, as a decimal\nfraction in `[0, 1]` (`0.2` = 20%)",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_efbdfcaec74cc53cfacb/properties/settle_on",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/ClawbackSpec/properties/settle_on",
-    "description": "When to settle clawback",
-    "ref": "#/$defs/ClawbackSettle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/ClawbackSettle"
   },
   {
     "path": "#/$defs/d_f118d5ecd284548a969c",

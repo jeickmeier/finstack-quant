@@ -261,16 +261,6 @@ impl EquityTotalReturnFuture {
     ) -> finstack_quant_core::Result<f64> {
         Ok(self.terms.point_delta()? * self.projection(market, as_of)?.spread_bp_derivative)
     }
-
-    /// P&L sensitivity to one accrued distribution index point.
-    pub fn distribution_delta(&self) -> finstack_quant_core::Result<f64> {
-        self.terms.point_delta()
-    }
-
-    /// P&L sensitivity to one accrued funding index point.
-    pub fn funding_delta(&self) -> finstack_quant_core::Result<f64> {
-        Ok(-self.terms.point_delta()?)
-    }
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for EquityTotalReturnFuture {
@@ -367,11 +357,6 @@ mod tests {
         assert!(
             (future.spread01(&market, as_of).expect("spread01") - 20.0 * 100.0e-4).abs() < 1.0e-12
         );
-        assert_eq!(
-            future.distribution_delta().expect("distribution delta"),
-            20.0
-        );
-        assert_eq!(future.funding_delta().expect("funding delta"), -20.0);
     }
 
     #[test]

@@ -190,12 +190,6 @@ impl Equity {
         self
     }
 
-    /// Set an explicit discrete dividend schedule.
-    pub fn with_discrete_dividends(mut self, dividends: Vec<(Date, f64)>) -> Self {
-        self.discrete_dividends = dividends;
-        self
-    }
-
     fn money_from_scalar(
         &self,
         scalar: &MarketScalar,
@@ -363,20 +357,6 @@ impl Equity {
             s0.amount() / df_horizon * (-dy * t).exp()
         };
         Money::new(fwd, self.currency)
-    }
-
-    /// Calculate forward total value for the position
-    pub fn forward_value(
-        &self,
-        market: &MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        t: f64,
-    ) -> finstack_quant_core::Result<Money> {
-        let per_share = self.forward_price_per_share(market, as_of, t)?;
-        Money::new(
-            per_share.amount() * self.effective_quantity(),
-            self.currency,
-        )
     }
 }
 

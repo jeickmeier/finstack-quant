@@ -406,11 +406,6 @@ impl VarianceSwap {
             .unwrap_or(self.final_observation_date()?))
     }
 
-    /// Get the discount curve ID for this variance swap.
-    pub fn get_discount_curve_id(&self) -> &CurveId {
-        &self.discount_curve_id
-    }
-
     /// Calculate payoff given realized variance.
     pub fn payoff(&self, realized_variance: f64) -> finstack_quant_core::Result<Money> {
         let variance_diff = realized_variance - self.strike_variance;
