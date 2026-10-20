@@ -522,3 +522,136 @@ fn capital_structure_reference_uses_result_cashflows() {
 
     assert!(result.passed);
 }
+
+fn predicate_check(formula: &str, tolerance: Option<f64>) -> FormulaCheckSpec {
+    FormulaCheckSpec {
+        id: "predicate".into(),
+        name: "Predicate".into(),
+        category: CheckCategory::InternalConsistency,
+        severity: Severity::Error,
+        formula: formula.into(),
+        message_template: "Predicate failed in {period}".into(),
+        tolerance,
+    }
+}
+
+fn insufficient_periods(result: &finstack_quant_statements::checks::CheckResult) -> Vec<PeriodId> {
+    result
+        .findings
+        .iter()
+        .filter(|finding| finding.message.contains("insufficient data"))
+        .filter_map(|finding| finding.period)
+        .collect()
+}
+
+// Non-finite and missing inputs are insufficient data, not failures
+
+#[test]
+fn non_finite_input_reports_insufficient_data() {
+    let model = ModelBuilder::new("test")
+        .periods("2025Q1..Q2", None)
+        .unwrap()
+        .value("leverage", &[(q(1), s(4.0)), (q(2), s(5.0))])
+        .build()
+        .unwrap();
+    let mut results = Evaluator::new().evaluate(&model).unwrap();
+    results
+        .nodes
+        .get_mut("leverage")
+        .unwrap()
+        .insert(q(2), f64::INFINITY);
+
+    for tolerance in [None, Some(0.5)] {
+        let formula = if tolerance.is_some() {
+            "leverage - 4"
+        } else {
+            "leverage < 6"
+        };
+        let result = predicate_check(formula, tolerance)
+            .execute(&CheckContext::new(&model, &results))
+            .unwrap();
+
+        assert!(result.passed, "{formula}: {:?}", result.findings);
+        assert_eq!(result.findings.len(), 1, "{formula}: {:?}", result.findings);
+        let finding = &result.findings[0];
+        assert_eq!(finding.severity, Severity::Warning);
+        assert_eq!(finding.period, Some(q(2)));
+        assert!(finding.message.contains("insufficient data"));
+        assert_eq!(finding.nodes, ["leverage"]);
+        assert!(finding.comparison.is_none());
+        // Only the judged period is recorded as a comparison.
+        assert_eq!(result.comparisons.len(), usize::from(tolerance.is_some()));
+    }
+}
+
+#[test]
+fn missing_input_cell_reports_insufficient_data() {
+    let model = ModelBuilder::new("test")
+        .periods("2025Q1..Q2", None)
+        .unwrap()
+        .value("revenue", &[(q(1), s(100.0)), (q(2), s(110.0))])
+        .build()
+        .unwrap();
+    let mut results = Evaluator::new().evaluate(&model).unwrap();
+    results
+        .nodes
+        .get_mut("revenue")
+        .unwrap()
+        .shift_remove(&q(2));
+
+    let result = predicate_check("revenue > 0", None)
+        .execute(&CheckContext::new(&model, &results))
+        .unwrap();
+
+    assert!(result.passed);
+    assert_eq!(insufficient_periods(&result), vec![q(2)]);
+}
+
+#[test]
+fn lag_before_first_period_reports_insufficient_data() {
+    let model = ModelBuilder::new("test")
+        .periods("2025Q1..Q3", None)
+        .unwrap()
+        .value(
+            "revenue",
+            &[(q(1), s(100.0)), (q(2), s(110.0)), (q(3), s(500.0))],
+        )
+        .build()
+        .unwrap();
+    let results = Evaluator::new().evaluate(&model).unwrap();
+
+    let result = predicate_check("revenue / lag(revenue, 1) - 1 < 0.5", None)
+        .execute(&CheckContext::new(&model, &results))
+        .unwrap();
+
+    // Q1 has no prior quarter, Q2 grows 10% and passes, Q3 grows 355% and fails.
+    assert!(!result.passed);
+    assert_eq!(insufficient_periods(&result), vec![q(1)]);
+    let failures: Vec<_> = result
+        .findings
+        .iter()
+        .filter(|finding| finding.severity == Severity::Error)
+        .collect();
+    assert_eq!(failures.len(), 1);
+    assert_eq!(failures[0].period, Some(q(3)));
+}
+
+#[test]
+fn division_by_zero_over_finite_inputs_still_fails() {
+    let model = ModelBuilder::new("test")
+        .periods("2025Q1..Q1", None)
+        .unwrap()
+        .value("debt", &[(q(1), s(300.0))])
+        .value("ebitda", &[(q(1), s(0.0))])
+        .build()
+        .unwrap();
+    let results = Evaluator::new().evaluate(&model).unwrap();
+
+    let result = predicate_check("debt / ebitda < 6", None)
+        .execute(&CheckContext::new(&model, &results))
+        .unwrap();
+
+    assert!(!result.passed);
+    assert!(insufficient_periods(&result).is_empty());
+    assert_eq!(result.findings[0].severity, Severity::Error);
+}

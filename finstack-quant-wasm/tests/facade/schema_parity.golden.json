@@ -2121,7 +2121,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
             "type_name": "CheckSuiteSpec",
             "kind": "input",
-            "bytes": 22285
+            "bytes": 22797
           },
           {
             "path": "schemas/statements/1/financial_model_spec.schema.json",
@@ -2164,6 +2164,13 @@
             "type_name": "NormalizationResult",
             "kind": "output",
             "bytes": 23140
+          },
+          {
+            "path": "schemas/statements/1/rollup_spec.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
+            "type_name": "RollupSpec",
+            "kind": "input",
+            "bytes": 3898
           },
           {
             "path": "schemas/statements/1/statement_result.schema.json",
@@ -4522,7 +4529,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
             "type_name": "CheckSuiteSpec",
             "kind": "input",
-            "bytes": 22285
+            "bytes": 22797
           },
           {
             "domain": "statements",
@@ -4571,6 +4578,14 @@
             "type_name": "NormalizationResult",
             "kind": "output",
             "bytes": 23140
+          },
+          {
+            "domain": "statements",
+            "path": "schemas/statements/1/rollup_spec.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
+            "type_name": "RollupSpec",
+            "kind": "input",
+            "bytes": 3898
           },
           {
             "domain": "statements",
