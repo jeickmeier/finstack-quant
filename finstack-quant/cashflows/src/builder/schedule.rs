@@ -641,11 +641,7 @@ impl CashFlowSchedule {
 
     fn validate_principal_balance(&self) -> finstack_quant_core::Result<()> {
         let initial = self.notional.initial;
-        if let Some(anchor) = self
-            .meta
-            .issue_date
-            .or_else(|| self.flows.first().map(|f| f.date))
-        {
+        if let Some(anchor) = self.funding_anchor() {
             let replay = self.replay_balances(anchor)?;
             let epsilon = (initial.amount().abs() * 1e-8).max(1e-6);
             for (position, (index, _, balance)) in replay.iter().enumerate() {
@@ -699,29 +695,14 @@ impl CashFlowSchedule {
 
     /// Internal future-flow filtering step for composed schedule normalization.
     pub(crate) fn normalize_public(mut self, as_of: Date) -> finstack_quant_core::Result<Self> {
-        if let Some(anchor) = self
-            .meta
-            .issue_date
-            .or_else(|| self.flows.first().map(|f| f.date))
-        {
+        if let Some(anchor) = self.funding_anchor() {
             let initial = self.notional.initial;
             let mut balance = initial;
-            let mut funding_skipped = false;
-            let mut order: Vec<usize> = (0..self.flows.len())
-                .filter(|&index| self.flows[index].amount.currency() == initial.currency())
-                .collect();
-            order.sort_by(|&left, &right| {
-                self.flows[left]
-                    .get_balance_date()
-                    .cmp(&self.flows[right].get_balance_date())
-                    .then_with(|| compare_flows(&self.flows[left], &self.flows[right]))
-            });
+            let order = self
+                .balance_replay_order(anchor, |flow| flow.amount.currency() == initial.currency());
             let mut pending_principal = Vec::new();
-            for index in order {
+            for (index, funding) in order {
                 let flow = &mut self.flows[index];
-                let funding =
-                    is_initial_funding_flow(flow, anchor, initial.amount(), funding_skipped);
-                funding_skipped |= funding;
                 let delta = flow_principal_delta(flow, funding)?;
                 if flow.get_balance_date() < as_of {
                     if let Some(delta) = delta {
@@ -991,35 +972,56 @@ impl CashFlowSchedule {
         &self,
         funding_anchor: Date,
     ) -> finstack_quant_core::Result<Vec<(usize, Money, Money)>> {
-        if self.flows.is_empty() {
-            return Ok(Vec::new());
+        let order = self.balance_replay_order(funding_anchor, |_| true);
+        let mut outstanding = self.notional.initial;
+        let mut replay = Vec::with_capacity(order.len());
+        for (idx, is_initial_funding) in order {
+            let before = outstanding;
+            apply_flow_to_outstanding(&mut outstanding, &self.flows[idx], is_initial_funding)?;
+            replay.push((idx, before, outstanding));
         }
-        let mut order: Vec<usize> = (0..self.flows.len()).collect();
-        order.sort_by(|left, right| {
-            let left = &self.flows[*left];
-            let right = &self.flows[*right];
+        Ok(replay)
+    }
+
+    /// Issue date, else the first flow date: where the issue funding row sits.
+    fn funding_anchor(&self) -> Option<Date> {
+        self.meta
+            .issue_date
+            .or_else(|| self.flows.first().map(|f| f.date))
+    }
+
+    /// Indices of the flows `keep` selects, in balance-replay order (economic
+    /// balance date, then schedule order), each paired with whether it is the
+    /// issue funding row that the opening notional already counts.
+    fn balance_replay_order(
+        &self,
+        funding_anchor: Date,
+        keep: impl Fn(&CashFlow) -> bool,
+    ) -> Vec<(usize, bool)> {
+        let mut order: Vec<usize> = (0..self.flows.len())
+            .filter(|&index| keep(&self.flows[index]))
+            .collect();
+        order.sort_by(|&left, &right| {
+            let (left, right) = (&self.flows[left], &self.flows[right]);
             left.get_balance_date()
                 .cmp(&right.get_balance_date())
                 .then_with(|| compare_flows(left, right))
         });
-        let mut outstanding = self.notional.initial;
-        let mut initial_funding_skipped = false;
         let initial_amount = self.notional.initial.amount();
-        let mut replay = Vec::with_capacity(order.len());
-        for idx in order {
-            let flow = &self.flows[idx];
-            let before = outstanding;
-            let is_initial_funding = is_initial_funding_flow(
-                flow,
-                funding_anchor,
-                initial_amount,
-                initial_funding_skipped,
-            );
-            initial_funding_skipped |= is_initial_funding;
-            apply_flow_to_outstanding(&mut outstanding, flow, is_initial_funding)?;
-            replay.push((idx, before, outstanding));
-        }
-        Ok(replay)
+        let mut funding_skipped = false;
+        order
+            .into_iter()
+            .map(|index| {
+                let funding = is_initial_funding_flow(
+                    &self.flows[index],
+                    funding_anchor,
+                    initial_amount,
+                    funding_skipped,
+                );
+                funding_skipped |= funding;
+                (index, funding)
+            })
+            .collect()
     }
 }
 

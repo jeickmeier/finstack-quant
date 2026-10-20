@@ -7,7 +7,7 @@ use rust_decimal::Decimal;
 
 use crate::builder::emission::{
     emit_amortization_on, emit_fees_on, emit_fixed_coupons_on, emit_float_coupons_on,
-    FloatEmissionOutput, ResolvedFloatMarket,
+    ResolvedFloatMarket,
 };
 use crate::builder::orchestrator::{
     apply_principal_event, BuildState, CompiledCashFlowPlan, PreparedAmortization,
@@ -16,67 +16,17 @@ use crate::builder::PrincipalExchange;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 
 impl CompiledCashFlowPlan {
-    /// Emit fixed and floating coupons, returning total PIK amount to capitalize.
-    fn emit_coupons(
-        &self,
-        d: Date,
-        state: &mut BuildState,
-        market: ResolvedFloatMarket<'_>,
-    ) -> finstack_quant_core::Result<f64> {
-        let ccy = self.notional.initial.currency();
-        let pik_f = emit_fixed_coupons_on(
-            d,
-            &self.fixed_schedules,
-            &state.outstanding_history,
-            state.outstanding,
-            ccy,
-            &mut state.flows,
-        )?;
-        let pik_fl = emit_float_coupons_on(
-            d,
-            &self.float_schedules,
-            &state.outstanding_history,
-            state.outstanding,
-            ccy,
-            market,
-            FloatEmissionOutput {
-                flows: &mut state.flows,
-                projected_fixings: &mut state.projected_fixings,
-            },
-        )?;
-        Ok(pik_f + pik_fl)
-    }
-
-    /// Emit amortization flows based on the amortization spec.
-    fn emit_amortization(
-        &self,
-        d: Date,
-        state: &mut BuildState,
-    ) -> finstack_quant_core::Result<()> {
-        let first_flow = state.flows.len();
-        let amort_setup = &self.amort_setup;
-        emit_amortization_on(
-            d,
-            self.notional.initial.currency(),
-            &mut state.outstanding,
-            amort_setup,
-            state.linear_between_installment,
-            amort_setup.final_amortization_date == Some(d),
-            &mut state.flows,
-        )?;
-        for flow in &mut state.flows[first_flow..] {
-            flow.principal_date = Some(d);
-            flow.date = amort_setup.payment_dates.get(&d).copied().unwrap_or(d);
-        }
-        Ok(())
-    }
-
     /// Emit amortization scheduled exactly on the issue date.
     pub(super) fn process_issue_amortization(
         &self,
         state: &mut BuildState,
     ) -> finstack_quant_core::Result<()> {
-        self.emit_amortization(self.issue, state)?;
+        emit_amortization_on(
+            self.issue,
+            self.notional.initial.currency(),
+            &self.amort_setup,
+            state,
+        )?;
         if let Some((_, balance)) = state.outstanding_history.last_mut() {
             *balance = state.outstanding;
         }
@@ -153,7 +103,9 @@ impl CompiledCashFlowPlan {
         state: &mut BuildState,
         market: ResolvedFloatMarket<'_>,
     ) -> finstack_quant_core::Result<()> {
-        let pik_to_add = self.emit_coupons(d, state, market)?;
+        let ccy = self.notional.initial.currency();
+        let pik_to_add = emit_fixed_coupons_on(d, &self.fixed_schedules, ccy, state)?
+            + emit_float_coupons_on(d, &self.float_schedules, ccy, market, state)?;
         if pik_to_add > 0.0 {
             state.outstanding = state
                 .outstanding
@@ -165,14 +117,14 @@ impl CompiledCashFlowPlan {
                 })?;
         }
         let funded = self.process_principal_events(d, state)?;
-        self.emit_amortization(d, state)?;
+        emit_amortization_on(d, ccy, &self.amort_setup, state)?;
         emit_fees_on(
             d,
             &self.periodic_fees,
             &self.fixed_fees,
             state.outstanding,
             &state.outstanding_history,
-            self.notional.initial.currency(),
+            ccy,
             &mut state.flows,
         )?;
         self.initialize_linear_between(d, state);

@@ -34,7 +34,7 @@ use super::date_generation::{
 use super::rate_helpers::FloatingRateParams;
 use super::specs::{
     CouponType, FeeAccrualBasis, FeeBase, FeeSpec, FixedCouponSpec, FloatingCouponSpec,
-    FloatingRateSpec, ScheduleParams,
+    ScheduleParams, StepUpCouponSpec,
 };
 use crate::DatedFlows;
 use finstack_quant_core::dates::calendar_by_id_strict;
@@ -280,26 +280,36 @@ pub(super) fn build_fee_schedules(
     Ok((periodic_fees, fixed_fees))
 }
 
+/// The public coupon spec a program piece was added with.
 #[derive(Debug, Clone)]
 pub(super) enum CouponSpec {
-    Fixed {
-        rate: Decimal,
-    },
-    Float {
-        rate_spec: FloatingRateSpec,
-    },
-    StepUp {
-        initial_rate: Decimal,
-        step_schedule: Vec<(finstack_quant_core::dates::Date, Decimal)>,
-    },
+    Fixed(FixedCouponSpec),
+    Float(FloatingCouponSpec),
+    StepUp(StepUpCouponSpec),
+}
+
+impl CouponSpec {
+    fn schedule(&self) -> &ScheduleParams {
+        match self {
+            Self::Fixed(spec) => &spec.schedule,
+            Self::Float(spec) => &spec.schedule,
+            Self::StepUp(spec) => &spec.schedule,
+        }
+    }
+
+    fn coupon_type(&self) -> CouponType {
+        match self {
+            Self::Fixed(spec) => spec.coupon_type,
+            Self::Float(spec) => spec.coupon_type,
+            Self::StepUp(spec) => spec.coupon_type,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub(super) struct CouponProgramPiece {
     pub(super) window: ProgramWindow,
-    pub(super) schedule: ScheduleParams,
     pub(super) coupon: CouponSpec,
-    pub(super) split: CouponType,
 }
 
 #[derive(Debug, Clone)]
@@ -519,8 +529,9 @@ pub(super) fn compute_coupon_schedules(
         let e = w[1];
 
         let chosen_coupon = select_coupon_piece(&coupon_pieces, s, e)?;
-        let split = select_payment_split(&payment_pieces, s, e, chosen_coupon.split)?;
-        let mut schedule = chosen_coupon.schedule.clone();
+        let split =
+            select_payment_split(&payment_pieces, s, e, chosen_coupon.coupon.coupon_type())?;
+        let mut schedule = chosen_coupon.coupon.schedule().clone();
         schedule.frequency = effective_frequency(schedule.frequency, schedule.roll_rule);
         schedule.stub = effective_stub(schedule.stub, schedule.roll_rule);
 
@@ -531,10 +542,10 @@ pub(super) fn compute_coupon_schedules(
         let calendar = calendar_by_id_strict(&schedule.calendar_id)?;
 
         match &chosen_coupon.coupon {
-            CouponSpec::Fixed { rate } => {
+            CouponSpec::Fixed(fixed) => {
                 let spec = FixedCouponSpec {
                     coupon_type: split,
-                    rate: *rate,
+                    rate: fixed.rate,
                     schedule: schedule.clone(),
                 };
                 let terminal = terminal_accrual_end(&periods, maturity);
@@ -545,10 +556,11 @@ pub(super) fn compute_coupon_schedules(
                     terminal_accrual_end: terminal,
                 });
             }
-            CouponSpec::StepUp {
+            CouponSpec::StepUp(StepUpCouponSpec {
                 initial_rate,
                 step_schedule,
-            } => {
+                ..
+            }) => {
                 if step_schedule.windows(2).any(|w| w[0].0 >= w[1].0) {
                     return Err(finstack_quant_core::Error::Validation(
                         "StepUp coupon schedule requires finite rates and strictly increasing effective dates".into(),
@@ -564,9 +576,9 @@ pub(super) fn compute_coupon_schedules(
                     periods: &periods,
                 }));
             }
-            CouponSpec::Float { rate_spec } => {
+            CouponSpec::Float(floating) => {
                 let spec = FloatingCouponSpec {
-                    rate_spec: rate_spec.clone(),
+                    rate_spec: floating.rate_spec.clone(),
                     coupon_type: split,
                     schedule: schedule.clone(),
                 };

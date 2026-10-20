@@ -51,7 +51,6 @@ mod orchestrator;
 mod overnight;
 pub(crate) mod periods;
 mod pipeline;
-mod principal;
 mod rate_helpers;
 pub(crate) mod schedule;
 mod specs;

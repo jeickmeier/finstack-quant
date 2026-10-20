@@ -1,5 +1,6 @@
 //! Coupon cashflow emission (fixed and floating).
 
+use crate::builder::orchestrator::BuildState;
 use crate::builder::FloatingLegCompounding;
 use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 use finstack_quant_core::currency::Currency;
@@ -202,11 +203,16 @@ fn resolve_floating_rate_fallback(
 pub(crate) fn emit_fixed_coupons_on(
     d: Date,
     fixed_schedules: &[FixedSchedule],
-    outstanding_history: &[(Date, Decimal)],
-    outstanding_fallback: Decimal,
     ccy: Currency,
-    out_flows: &mut Vec<CashFlow>,
+    state: &mut BuildState,
 ) -> finstack_quant_core::Result<f64> {
+    let BuildState {
+        flows: out_flows,
+        outstanding_history,
+        outstanding: outstanding_fallback,
+        ..
+    } = state;
+    let outstanding_fallback = *outstanding_fallback;
     let mut pik_to_add = 0.0;
 
     for schedule in fixed_schedules {
@@ -322,30 +328,6 @@ pub(crate) struct ResolvedFloatMarket<'a> {
     pub(crate) curves: &'a [Option<std::sync::Arc<ForwardCurve>>],
     /// Historical fixing series (`FIXING:{forward_curve_id}`), one per float schedule.
     pub(crate) fixings: &'a [Option<ScalarTimeSeries>],
-}
-
-/// Emit floating coupon cashflows on a specific date.
-///
-/// Processes all floating coupon schedules for the given date, looking up forward
-/// rates from the optional market context and computing coupon amounts based on
-/// `forward_rate * gearing + margin`. Splits into cash/PIK according to coupon type.
-/// Cash and PIK flows are appended directly into the provided `out_flows` buffer.
-///
-/// Seasoned coupons (observation dates before the curve base) resolve realized
-/// index fixings from `market.fixings` — the per-schedule `FIXING:{forward_curve_id}`
-/// series aligned with `market.curves` (exact-date observations for both
-/// overnight and term resets). Without a series, pre-base observations route
-/// through the spec's [`crate::builder::FloatingRateFallback`] policy.
-///
-/// # Returns
-///
-/// `pik_to_add` — the total PIK coupon amount (across every floating schedule
-/// processed on date `d`) that the caller must capitalize into the outstanding
-/// balance for subsequent periods. Cash flows are pushed into `out_flows` as a
-/// side effect; the return value is exclusively the PIK leg.
-pub(crate) struct FloatEmissionOutput<'a> {
-    pub flows: &'a mut Vec<CashFlow>,
-    pub projected_fixings: &'a mut Vec<crate::fixings::ProjectedFixing>,
 }
 
 #[derive(Clone, Copy)]
@@ -523,19 +505,40 @@ fn project_segment_indices(
     }
 }
 
+/// Emit floating coupon cashflows on a specific date.
+///
+/// Processes all floating coupon schedules for the given date, looking up forward
+/// rates from the optional market context and computing coupon amounts based on
+/// `forward_rate * gearing + margin`. Splits into cash/PIK according to coupon type.
+/// Cash and PIK flows are appended directly into the provided `out_flows` buffer.
+///
+/// Seasoned coupons (observation dates before the curve base) resolve realized
+/// index fixings from `market.fixings` — the per-schedule `FIXING:{forward_curve_id}`
+/// series aligned with `market.curves` (exact-date observations for both
+/// overnight and term resets). Without a series, pre-base observations route
+/// through the spec's [`crate::builder::FloatingRateFallback`] policy.
+///
+/// # Returns
+///
+/// `pik_to_add` — the total PIK coupon amount (across every floating schedule
+/// processed on date `d`) that the caller must capitalize into the outstanding
+/// balance for subsequent periods. Cash flows are pushed into `out_flows` as a
+/// side effect; the return value is exclusively the PIK leg.
 pub(crate) fn emit_float_coupons_on(
     d: Date,
     float_schedules: &[FloatSchedule],
-    outstanding_history: &[(Date, Decimal)],
-    outstanding_fallback: Decimal,
     ccy: Currency,
     market: ResolvedFloatMarket<'_>,
-    output: FloatEmissionOutput<'_>,
+    state: &mut BuildState,
 ) -> finstack_quant_core::Result<f64> {
-    let FloatEmissionOutput {
+    let BuildState {
         flows: out_flows,
         projected_fixings,
-    } = output;
+        outstanding_history,
+        outstanding: outstanding_fallback,
+        ..
+    } = state;
+    let outstanding_fallback = *outstanding_fallback;
     let mut pik_to_add = 0.0;
     for ((schedule, resolved_curve), resolved_fixing) in float_schedules
         .iter()
