@@ -8,8 +8,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
+    CommitmentStep, DrawEvent, OidEirSpec,
+};
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    self, CommitmentStep, DdtlSpec, DrawEvent, OidEirSpec, OidPolicy, TermLoan,
+    self, DdtlSpec, OidPolicy, TermLoan,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
@@ -36,7 +39,7 @@ fn term_loan_fixed_with_draws_and_fees() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate: 0.08 })
+        .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.08 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -45,7 +48,7 @@ fn term_loan_fixed_with_draws_and_fees() {
         .calendar_id_opt(None)
         .stub(finstack_quant_core::dates::StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(term_loan::AmortizationSpec::None)
+        .amortization(finstack_quant_cashflows::builder::AmortizationSpec::None)
         .coupon_type(finstack_quant_cashflows::builder::CouponType::Cash)
         .upfront_fee_opt(Some(
             finstack_quant_valuations::instruments::fixed_income::loan_terms::UpfrontFee::Amount(
@@ -110,7 +113,7 @@ fn term_loan_commitment_fee_step_downs() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate: 0.07 })
+        .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.07 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -119,7 +122,7 @@ fn term_loan_commitment_fee_step_downs() {
         .calendar_id_opt(None)
         .stub(finstack_quant_core::dates::StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(term_loan::AmortizationSpec::None)
+        .amortization(finstack_quant_cashflows::builder::AmortizationSpec::None)
         .coupon_type(finstack_quant_cashflows::builder::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
@@ -191,7 +194,7 @@ fn term_loan_commitment_fee_windowed_to_availability() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate: 0.065 })
+        .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.065 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -200,7 +203,7 @@ fn term_loan_commitment_fee_windowed_to_availability() {
         .calendar_id_opt(None)
         .stub(finstack_quant_core::dates::StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(term_loan::AmortizationSpec::None)
+        .amortization(finstack_quant_cashflows::builder::AmortizationSpec::None)
         .coupon_type(finstack_quant_cashflows::builder::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
@@ -248,7 +251,7 @@ fn term_loan_oid_eir_amortization_schedule() {
         .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate: 0.05 })
+        .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -257,7 +260,7 @@ fn term_loan_oid_eir_amortization_schedule() {
         .calendar_id_opt(None)
         .stub(finstack_quant_core::dates::StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(term_loan::AmortizationSpec::None)
+        .amortization(finstack_quant_cashflows::builder::AmortizationSpec::None)
         .coupon_type(finstack_quant_cashflows::builder::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
@@ -333,7 +336,7 @@ fn term_loan_pik_toggle_and_cash_sweep() {
         .notional_limit(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate: 0.06 })
+        .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -342,7 +345,7 @@ fn term_loan_pik_toggle_and_cash_sweep() {
         .calendar_id_opt(None)
         .stub(finstack_quant_core::dates::StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(term_loan::AmortizationSpec::None)
+        .amortization(finstack_quant_cashflows::builder::AmortizationSpec::None)
         .coupon_type(finstack_quant_cashflows::builder::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(None)
@@ -379,10 +382,12 @@ fn fixed_rate_margin_step_up_changes_coupon_from_effective_period() {
     let step_date = Date::from_calendar_date(2025, time::Month::July, 1).unwrap();
     let maturity = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
     let covenants = term_loan::TermLoanCovenantEvents {
-        margin_steps: vec![term_loan::MarginStep {
-            date: step_date,
-            delta_bp: rust_decimal_macros::dec!(200),
-        }],
+        margin_steps: vec![
+            finstack_quant_valuations::instruments::fixed_income::loan_terms::MarginStep {
+                date: step_date,
+                delta_bp: rust_decimal_macros::dec!(200),
+            },
+        ],
         ..Default::default()
     };
     let loan = TermLoan::builder()
@@ -391,7 +396,7 @@ fn fixed_rate_margin_step_up_changes_coupon_from_effective_period() {
         .notional_limit(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate: 0.06 })
+        .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -400,7 +405,7 @@ fn fixed_rate_margin_step_up_changes_coupon_from_effective_period() {
         .calendar_id_opt(None)
         .stub(finstack_quant_core::dates::StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(term_loan::AmortizationSpec::None)
+        .amortization(finstack_quant_cashflows::builder::AmortizationSpec::None)
         .coupon_type(finstack_quant_cashflows::builder::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(None)
@@ -441,14 +446,14 @@ fn term_loan_golden_pv_and_metrics() {
         .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate: 0.05 }) // 5%
+        .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.05 }) // 5%
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(term_loan::AmortizationSpec::None) // Bullet
+        .amortization(finstack_quant_cashflows::builder::AmortizationSpec::None) // Bullet
         .coupon_type(finstack_quant_cashflows::builder::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(None)
@@ -523,14 +528,18 @@ fn term_loan_amortizing_outstanding_path() {
         .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate: 0.05 })
+        .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(term_loan::AmortizationSpec::PercentOfRemainingPerPeriod { pct: 0.125 }) // 12.5% per quarter
+        .amortization(
+            finstack_quant_cashflows::builder::AmortizationSpec::PercentOfRemainingPerPeriod {
+                pct: 0.125,
+            },
+        ) // 12.5% per quarter
         .coupon_type(finstack_quant_cashflows::builder::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(None)

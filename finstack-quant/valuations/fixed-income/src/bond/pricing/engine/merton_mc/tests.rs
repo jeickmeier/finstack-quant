@@ -1,10 +1,10 @@
 use super::*;
-use crate::bond::pricing::engine::merton_mc::MertonMcCalibrationSpec;
 use finstack_quant_models::credit::toggle_exercise::ThresholdDirection;
 use finstack_quant_models::credit::{
     AssetDynamics, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,
     MertonBarrierType, MertonModel, ToggleExerciseModel,
 };
+use finstack_quant_valuations_core::instruments::MertonMcCalibrationSpec;
 
 fn test_merton() -> MertonModel {
     MertonModel::new_with_dynamics(

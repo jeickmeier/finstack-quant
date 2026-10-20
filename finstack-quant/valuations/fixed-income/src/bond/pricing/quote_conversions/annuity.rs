@@ -139,7 +139,7 @@ pub fn fixed_leg_annuity(
     let dc_ctx = DayCountContext {
         frequency,
         coupon_period: frequency.and_then(|frequency| {
-            super::icma_reference_period(
+            finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
                 day_count,
                 frequency,
                 schedule.iter().copied(),

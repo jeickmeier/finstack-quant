@@ -1,6 +1,7 @@
 //! Pricing tests for real estate assets.
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, StubKind, Tenor};
 use finstack_quant_core::dates::{DayCount, DayCountContext};
@@ -11,9 +12,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::equity::real_estate::{
     LeveredRealEstateEquity, RealEstateAsset, RealEstateValuationMethod,
 };
-use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    AmortizationSpec, RateSpec, TermLoan,
-};
+use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use finstack_quant_valuations::instruments::{Attributes, Bond, Instrument, RealEstateFinancing};
 use finstack_quant_valuations_test_support::date::date;
 

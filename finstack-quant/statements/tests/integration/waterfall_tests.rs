@@ -1,6 +1,7 @@
 //! Integration tests for Cash Flow Waterfall & Sweep Mechanics
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, PeriodId, StubKind, Tenor,
@@ -13,9 +14,7 @@ use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{EcfSweepSpec, WaterfallSpec};
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
-use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    AmortizationSpec, RateSpec, TermLoan,
-};
+use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use time::Month;
 
 #[test]

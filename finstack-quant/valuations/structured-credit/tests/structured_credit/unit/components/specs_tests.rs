@@ -10,9 +10,7 @@
 //! and re-exported from structured_credit. Core functionality is tested
 //! in the builder module tests.
 
-use finstack_quant_valuations_structured_credit::structured_credit::{
-    DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
-};
+use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 
 // Prepayment Model Spec Tests
 

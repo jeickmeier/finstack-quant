@@ -19,7 +19,6 @@ pub use annuity::{
     periods_per_year,
 };
 pub use compute::compute_quotes;
-pub use finstack_quant_valuations_core::instruments::BondQuoteInput;
 pub use spread_price::{price_from_dm, price_from_oas, price_from_z_spread};
 pub use types::{BondQuoteSet, YieldCompounding};
 pub use yield_price::{
@@ -28,7 +27,6 @@ pub use yield_price::{
 
 pub(crate) use annuity::floating_leg_pv_and_annuity;
 pub(crate) use compute::{clear_price_driving_overrides, settlement_dirty_from_quote_overrides};
-pub(crate) use finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period;
 pub(crate) use yield_price::{
     act365l_flow_times, bond_flow_times, clean_price_from_japanese_simple_yield,
     enumerate_exit_paths, exercise_redemption_amount, flow_times, japanese_simple_yield,

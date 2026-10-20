@@ -21,10 +21,11 @@ use finstack_quant_attribution::{
     ExecutionPolicy, TaylorAttributionConfig,
 };
 use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
-};
+use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::{
+    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+};
 use finstack_quant_valuations::metrics::MetricId;
 
 fn t0() -> Date {

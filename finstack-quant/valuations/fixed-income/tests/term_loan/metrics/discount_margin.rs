@@ -8,6 +8,7 @@
 
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::FloatingRateSpec;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -20,9 +21,7 @@ use finstack_quant_valuations_core::instruments::{
     InstrumentPricingOverrides, MarketQuoteOverrides,
 };
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_fixed_income::term_loan::{
-    AmortizationSpec, LoanCall, LoanCallSchedule, RateSpec, TermLoan,
-};
+use finstack_quant_valuations_fixed_income::term_loan::{LoanCall, LoanCallSchedule, TermLoan};
 use rust_decimal::Decimal;
 use time::macros::date;
 

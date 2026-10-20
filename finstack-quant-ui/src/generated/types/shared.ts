@@ -1954,7 +1954,7 @@ export type Date35 = string;
  * - **Withheld**: Reduces initial cash proceeds, increases effective yield
  * - **Separate**: May be accounted as upfront fee or amortized discount
  *
- * For effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].
+ * For effective interest rate (EIR) amortization schedules, see [`OidEirSpec`](crate::loan_terms::OidEirSpec).
  *
  * # Variants
  *
@@ -49795,9 +49795,7 @@ export interface EquityUnderlyingParams {
  * use finstack_quant_cashflows::builder::ScheduleParams;
  * use finstack_quant_valuations_core::instruments::{Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive};
  * use finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap;
- * use finstack_quant_valuations_fixed_income::fi_trs::{
- *     TrsScheduleSpec,
- * };
+ * use finstack_quant_valuations_core::instruments::TrsScheduleSpec;
  * use rust_decimal::Decimal;
  * use time::macros::date;
  *

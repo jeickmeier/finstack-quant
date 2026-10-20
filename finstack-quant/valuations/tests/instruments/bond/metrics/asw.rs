@@ -604,9 +604,8 @@ fn test_asw_market_forward_rejects_matured_schedule() {
 fn seasoned_asw_keeps_full_next_coupon_and_inverts_on_same_basis() {
     use finstack_quant_core::dates::{BusinessDayConvention, StubKind, Tenor};
     use finstack_quant_core::types::Rate;
-    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
-        compute_quotes, BondQuoteInput,
-    };
+    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::compute_quotes;
+    use finstack_quant_valuations::instruments::BondQuoteInput;
     use finstack_quant_valuations::instruments::PricingOptions;
     let as_of = date!(2025 - 07 - 01);
     let mut bond = Bond::fixed(

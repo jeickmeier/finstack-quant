@@ -6,6 +6,7 @@
 //! - Basic pool stats output consistency
 
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::DayCount;
@@ -15,8 +16,7 @@ use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_structured_credit::structured_credit::{
     calculate_pool_stats, AssetPool, CdrCalculator, CloWarfCalculator, CprCalculator, DealType,
-    DefaultModelSpec, PoolAsset, PrepaymentModelSpec, StructuredCredit, Tranche, TrancheSeniority,
-    TrancheStructure,
+    PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use std::sync::Arc;
 use time::Month;

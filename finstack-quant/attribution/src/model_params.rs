@@ -41,10 +41,10 @@ mod tests {
     use finstack_quant_core::dates::create_date;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-    use finstack_quant_valuations::instruments::fixed_income::convertible::{
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
+    use finstack_quant_valuations::instruments::{
         AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
     };
-    use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
     use time::Month;
 
     fn plain_bond() -> Arc<dyn Instrument> {

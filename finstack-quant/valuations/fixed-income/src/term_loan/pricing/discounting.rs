@@ -48,7 +48,7 @@
 //! - [`generate_cashflows`] for cashflow generation details
 //! - `TermLoan` for the instrument type
 
-use crate::term_loan::types::RateSpec;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::cashflow::npv;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -509,7 +509,7 @@ impl Pricer for TermLoanDiscountingPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::term_loan::spec::AmortizationSpec;
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_cashflows::builder::CouponType;
     use finstack_quant_cashflows::builder::FloatingRateSpec;
     use finstack_quant_core::cashflow::CFKind;
@@ -744,7 +744,7 @@ mod tests {
         let as_of = date(2025, 4, 15);
         let mut loan = floating_loan_for_fixings();
         loan.covenants = Some(crate::term_loan::TermLoanCovenantEvents {
-            margin_steps: vec![crate::term_loan::MarginStep {
+            margin_steps: vec![crate::loan_terms::MarginStep {
                 date: date(2025, 1, 1),
                 delta_bp: rust_decimal::Decimal::from(200),
             }],

@@ -27,6 +27,7 @@ fn test_term_loan_variant_serialization() {
 #[test]
 fn term_loan_capital_structure_evaluates_with_market() {
     use finstack_quant_cashflows::builder::CouponType;
+    use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -35,9 +36,6 @@ fn term_loan_capital_structure_evaluates_with_market() {
     use finstack_quant_core::types::CurveId;
     use finstack_quant_statements::builder::ModelBuilder;
     use finstack_quant_statements::evaluator::Evaluator;
-    use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-        AmortizationSpec, RateSpec,
-    };
     use time::macros::date;
 
     let issue = date!(2025 - 01 - 01);

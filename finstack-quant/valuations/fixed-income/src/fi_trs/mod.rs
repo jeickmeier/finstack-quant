@@ -11,5 +11,3 @@ pub(crate) mod pricer;
 mod types;
 
 pub use types::FiIndexTotalReturnSwap;
-
-pub use finstack_quant_valuations_core::instruments::TrsScheduleSpec;

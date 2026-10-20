@@ -17,6 +17,7 @@
 
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::FloatingRateSpec;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -30,8 +31,7 @@ use finstack_quant_valuations::instruments::fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, CashflowSpec,
 };
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    AmortizationSpec, LoanCall, LoanCallSchedule, LoanCallType, RateSpec, TermLoan,
-    TermLoanTreePricer,
+    LoanCall, LoanCallSchedule, LoanCallType, TermLoan, TermLoanTreePricer,
 };
 use finstack_quant_valuations::pricer::ModelKey;
 use finstack_quant_valuations::results::ValuationDetails;

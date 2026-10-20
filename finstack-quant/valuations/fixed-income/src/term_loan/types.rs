@@ -15,7 +15,8 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations_fixed_income::term_loan::{TermLoan, RateSpec};
+//! use finstack_quant_valuations_fixed_income::term_loan::TermLoan;
+//! use finstack_quant_cashflows::builder::RateSpec;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::dates::*;
@@ -45,13 +46,13 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
 
-use super::spec::{
-    AmortizationSpec, DdtlSpec, LoanCallSchedule, OidEirSpec, TermLoanCovenantEvents,
-};
+use super::spec::{DdtlSpec, LoanCallSchedule, TermLoanCovenantEvents};
+use crate::loan_terms::OidEirSpec;
 use crate::loan_terms::UpfrontFee;
+use finstack_quant_cashflows::builder::AmortizationSpec;
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::FloatingRateSpec;
-pub use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
@@ -681,11 +682,11 @@ impl TermLoan {
             availability_start: date!(2024 - 01 - 15),
             availability_end: date!(2025 - 01 - 15),
             draws: vec![
-                super::spec::DrawEvent {
+                crate::loan_terms::DrawEvent {
                     date: date!(2024 - 04 - 15),
                     amount: Money::from((10_000_000_i64, Currency::USD)),
                 },
-                super::spec::DrawEvent {
+                crate::loan_terms::DrawEvent {
                     date: date!(2024 - 07 - 15),
                     amount: Money::from((5_000_000_i64, Currency::USD)),
                 },
@@ -743,7 +744,7 @@ impl TermLoan {
                 super::spec::LoanCall {
                     date: date!(2025 - 01 - 15),
                     price_pct_of_par: 100.0,
-                    call_type: super::spec::LoanCallType::MakeWhole(super::spec::MakeWholeSpec {
+                    call_type: super::spec::LoanCallType::MakeWhole(crate::bond::MakeWholeSpec {
                         reference_curve_id: CurveId::new("USD-OIS"),
                         spread_bp: 50.0,
                     }),

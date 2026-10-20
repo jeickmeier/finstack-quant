@@ -1,5 +1,6 @@
 //! Financial regressions for residual coupon and principal-date reconstruction.
 
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::builder::{
     CashFlowMeta, CashFlowSchedule, CouponType, FixedCouponSpec, Notional, ScheduleParams,
 };
@@ -19,9 +20,7 @@ use finstack_quant_statements::capital_structure::{
 };
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
-use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    AmortizationSpec, RateSpec, TermLoan,
-};
+use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use rust_decimal::Decimal;
 use time::macros::date;
 

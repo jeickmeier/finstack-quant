@@ -12,12 +12,11 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::instruments::BondQuoteInput;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_core::pricer::ModelKey;
-use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::{
-    compute_quotes, BondQuoteInput,
-};
+use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::compute_quotes;
 use finstack_quant_valuations_fixed_income::bond::Bond;
 use time::macros::date;
 

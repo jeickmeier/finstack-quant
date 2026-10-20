@@ -83,8 +83,8 @@ pub(crate) fn clean_call_price(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::term_loan::{AmortizationSpec, RateSpec};
     use finstack_quant_cashflows::builder::CouponType;
+    use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
     use finstack_quant_core::money::Money;

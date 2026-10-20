@@ -37,7 +37,8 @@
 //! floating PIK is rejected in that mode rather than misstating
 //! path-dependent principal.
 
-use crate::term_loan::{RateSpec, TermLoan};
+use crate::term_loan::TermLoan;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
