@@ -96,7 +96,7 @@ test('object calibration inputs reject non-finite optional spreads before JSON c
   ]) {
     for (const operation of [
       calibration.calibrate,
-      calibration.validateCalibration,
+      calibration.validateCalibrationJson,
       calibration.dryRun,
     ]) {
       // The Rust `json_text` boundary rejects a non-finite number before any JSON is built.
@@ -122,7 +122,7 @@ test('object calibration inputs reject non-finite optional spreads before JSON c
 test('object calibration inputs preserve finite and absent optional spreads', () => {
   for (const spread of [null, 0, 0.001, -0.001]) {
     const envelope = swapEnvelope(spread);
-    const canonical = calibration.validateCalibration(envelope);
+    const canonical = JSON.parse(calibration.validateCalibrationJson(envelope));
     assert.equal(canonical.market_data[0].spread_decimal, spread);
     assert.equal(calibration.calibrate(envelope).result.report.success, true);
   }
@@ -133,7 +133,8 @@ test('calibration is owned only by the calibration namespace', () => {
     'calibrate',
     'calibrateBermudanLmmBaseVol',
     'dryRun',
-    'validateCalibration',
+    'dryRunJson',
+    'validateCalibrationJson',
   ]) {
     assert.equal(typeof calibration[name], 'function');
     assert.equal(valuations[name], undefined);
@@ -200,7 +201,7 @@ test('market re-ingestion requires an explicit supported schema version', () => 
 });
 
 test('malformed calibration input exposes canonical ingestion details', () => {
-  const error = captureError(() => calibration.validateCalibration('{ malformed'));
+  const error = captureError(() => calibration.validateCalibrationJson('{ malformed'));
 
   assertStructuredError(error);
   assert.equal(error.kind, 'strict_load');
@@ -211,7 +212,7 @@ test('malformed calibration input exposes canonical ingestion details', () => {
 });
 
 test('every envelope entry point reports malformed JSON with the same parse diagnostic', () => {
-  for (const name of ['calibrate', 'dryRun', 'validateCalibration']) {
+  for (const name of ['calibrate', 'dryRun', 'dryRunJson', 'validateCalibrationJson']) {
     const error = captureError(() => calibration[name]('not json'));
     assertStructuredError(error);
     assert.equal(error.kind, 'strict_load', name);
@@ -220,7 +221,7 @@ test('every envelope entry point reports malformed JSON with the same parse diag
   }
 });
 
-test('dryRun returns the typed report', () => {
+test('dryRun returns the typed report and dryRunJson its wire twin', () => {
   const envelope = {
     schema: 'finstack_quant.calibration/1',
     plan: {
@@ -243,6 +244,7 @@ test('dryRun returns the typed report', () => {
   assert.equal(typeof report, 'object');
   assert.equal(report.errors[0].kind, 'undefined_quote_set');
   assert.equal(report.dependency_graph.nodes[0].step_id, 'discount_step');
+  assert.deepEqual(report, JSON.parse(calibration.dryRunJson(envelope)));
 });
 
 test('unusable solver settings are rejected by validation and execution', () => {
@@ -250,7 +252,7 @@ test('unusable solver settings are rejected by validation and execution', () => 
   for (const solver of [{ tolerance: 0 }, { tolerance: -1 }, { max_iterations: 0 }]) {
     const envelope = structuredClone(EMPTY);
     envelope.plan.settings.solver = solver;
-    for (const name of ['calibrate', 'validateCalibration', 'dryRun']) {
+    for (const name of ['calibrate', 'validateCalibrationJson', 'dryRun']) {
       const error = captureError(() => calibration[name](envelope));
       assertStructuredError(error);
       assert.match(
@@ -281,7 +283,7 @@ test('Hull-White calibration requires an explicit quoted-volatility fit budget',
       ],
     },
   };
-  const error = captureError(() => calibration.validateCalibration(JSON.stringify(envelope)));
+  const error = captureError(() => calibration.validateCalibrationJson(JSON.stringify(envelope)));
   assertStructuredError(error);
   assert.equal(error.stage, 'ingestion');
   assert.match(error.message, /fit_tolerance/);
@@ -315,6 +317,7 @@ test('cap/floor Hull-White inputs require index conventions and reject frequency
   envelope.plan.steps[0].index_id = 'EUR-EURIBOR-3M';
   const report = calibration.dryRun(envelope);
   assert.ok(Array.isArray(report.errors));
+  assert.deepEqual(report, JSON.parse(calibration.dryRunJson(envelope)));
 
   envelope.plan.steps[0].payment_frequency = 'quarterly';
   const override = captureError(() => calibration.dryRun(envelope));
@@ -411,7 +414,7 @@ test('parametric calibration rejects a separate discount curve', () => {
 test('discount solve settings reject the removed curve-shape keys', () => {
   for (const key of ['interp_style', 'extrapolation_policy']) {
     const error = captureError(() =>
-      calibration.validateCalibration({
+      calibration.validateCalibrationJson({
         schema: 'finstack_quant.calibration/1',
         plan: { id: 'p', steps: [], settings: { discount_curve: { [key]: 'linear' } } },
       })
@@ -428,6 +431,6 @@ test('market freshness age is accepted as a plain number', () => {
     plan: { id: 'p', steps: [], settings: { market_freshness: { max_age_seconds: 3600 } } },
   };
   assert.deepEqual(calibration.dryRun(envelope).errors, []);
-  const canonical = calibration.validateCalibration(envelope);
+  const canonical = JSON.parse(calibration.validateCalibrationJson(envelope));
   assert.equal(canonical.plan.settings.market_freshness.max_age_seconds, 3600);
 });

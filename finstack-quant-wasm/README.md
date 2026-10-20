@@ -170,8 +170,8 @@ for (const instrumentJson of instruments) {
 `calibration.calibrate(envelope)` turns a quote envelope into a materialized market:
 `core.MarketContext.fromJson(calibrated.result.final_market)` is the handle above.
 Always inspect `calibrated.result.step_reports` and `calibrated.result.report` before
-using a calibrated market downstream. `calibration.validateCalibration` is the
-fast pre-flight that validates an envelope without solving.
+using a calibrated market downstream. `calibration.validateCalibrationJson` is the
+fast pre-flight that canonicalizes an envelope without solving.
 
 ### Initialization: web vs Node
 
@@ -239,8 +239,8 @@ diagnostics are available, and `error.report` then carries the serialized
 `ValidationReport`; a breached load limit gives `code` `limit_exceeded`. Their
 remaining failures are ordinary `FinstackError`s (an unknown entity or missing FX
 rate is `not_found`, a failed valuation carries the kind of its cause).
-The calibration envelope entry points (`calibrate`, `validateCalibration`,
-`dryRun`) throw `CalibrationEnvelopeError`, whose `kind` is the Rust execution
+The calibration envelope entry points (`calibrate`, `validateCalibrationJson`,
+`dryRun`, `dryRunJson`) throw `CalibrationEnvelopeError`, whose `kind` is the Rust execution
 category (`strict_load`, `solver_not_converged`, …) alongside the failing `stage`,
 `step_id`, `solver_diagnostics` and strict-load `diagnostics`. No export throws a bare string:
 `scripts/check_wasm_boundary.py` (run by `mise run wasm-lint`) rejects any

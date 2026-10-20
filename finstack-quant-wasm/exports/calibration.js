@@ -28,7 +28,9 @@ const bootstrapHullWhiteSigmaScheduleToCapFloors = (
 export const calibration = {
   calibrate: wasm.calibrate,
   validateCalibration: wasm.validateCalibration,
+  validateCalibrationJson: wasm.validateCalibrationJson,
   dryRun: wasm.dryRun,
+  dryRunJson: wasm.dryRunJson,
   calibrateBermudanLmmBaseVol: wasm.calibrateBermudanLmmBaseVol,
   calibrationEnvelopeContentHash: wasm.calibrationEnvelopeContentHash,
   calibrationResultContentHash: wasm.calibrationResultContentHash,

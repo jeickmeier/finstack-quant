@@ -124,7 +124,7 @@ test('calibration envelopes, results, dry runs and canonical JSON match the gene
     const name = file.replace(/\W/g, '_');
     const envelope = JSON.parse(readFileSync(new URL(file, EXAMPLES), 'utf8'));
     declarations.push([`${name}_input`, 'fq.CalibrationEnvelope', envelope]);
-    const canonical = calibration.validateCalibration(envelope);
+    const canonical = JSON.parse(calibration.validateCalibrationJson(envelope));
     declarations.push([`${name}_canonical`, 'fq.CalibrationEnvelope', canonical]);
     declarations.push([
       `${name}_dry_run`,

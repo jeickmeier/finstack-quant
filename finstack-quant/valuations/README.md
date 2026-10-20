@@ -206,7 +206,7 @@ Reachable from both host languages under the `valuations` namespace:
   exotic-rates coupon helpers, and the `instruments`,
   `composite`, `market`, `fx`, and `schema` namespaces. Reusable engines live
   under the sibling `models` namespace, and `calibrate` /
-  `validateCalibration` under the sibling `calibration` namespace.
+  `validateCalibrationJson` under the sibling `calibration` namespace.
 
 Bindings are thin wrappers — no pricing logic lives in them.
 

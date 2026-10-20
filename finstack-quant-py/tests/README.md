@@ -144,7 +144,7 @@ What `conftest.py` enforces before a fixture is allowed to run:
 - Rates and fixed-income fixtures must assert `dv01`; credit fixtures must
   assert both `dv01` and `cs01`.
 - The instrument and market payloads must validate — `MarketContext.from_json`
-  for snapshots, `validate_calibration` for envelopes.
+  for snapshots, `validate_calibration_json` for envelopes.
 
 Known unresolved external gaps are allowlisted per metric in
 `../../finstack-quant/valuations/tests/golden/known_non_executable.json`. A

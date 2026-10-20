@@ -124,6 +124,33 @@ pub(crate) fn extract_envelope(
     parse_envelope(py, &json)
 }
 
+/// Validate a calibration envelope and return its canonical (pretty-printed) JSON.
+///
+/// Parameters
+/// ----------
+/// envelope : CalibrationEnvelope | dict | str
+///     Typed envelope, dict, or JSON string using schema marker ``finstack_quant.calibration/1``.
+///
+/// Returns
+/// -------
+/// str
+///     Canonical pretty-printed envelope JSON.
+///
+/// Raises
+/// ------
+/// CalibrationEnvelopeError
+///     If strict loading or static validation rejects the envelope. Static
+///     validation is fail-fast (first error); use ``dry_run`` to list every
+///     static error. Strict-load failures carry ``diagnostics``.
+#[pyfunction]
+#[pyo3(text_signature = "(envelope)")]
+fn validate_calibration_json(py: Python<'_>, envelope: &Bound<'_, PyAny>) -> PyResult<String> {
+    validate_calibration(py, envelope)?
+        .inner
+        .to_json_pretty()
+        .map_err(|error| envelope_error_to_py(py, error))
+}
+
 /// Validate a calibration envelope and return it as a typed ``CalibrationEnvelope``.
 ///
 /// Parameters
@@ -179,6 +206,31 @@ fn dry_run(py: Python<'_>, envelope: &Bound<'_, PyAny>) -> PyResult<PyCalibratio
     Ok(PyCalibrationValidationReport::from_inner(
         validate_api::validate(&envelope),
     ))
+}
+
+/// JSON twin of ``dry_run``: the validation report as pretty-printed JSON.
+///
+/// Parameters
+/// ----------
+/// envelope : CalibrationEnvelope | dict | str
+///     Typed envelope, plan, dict, or JSON string.
+///
+/// Returns
+/// -------
+/// str
+///     Pretty-printed ``CalibrationValidationReport`` JSON.
+///
+/// Raises
+/// ------
+/// CalibrationEnvelopeError
+///     If the input cannot be strictly loaded as an envelope.
+#[pyfunction]
+#[pyo3(text_signature = "(envelope)")]
+fn dry_run_json(py: Python<'_>, envelope: &Bound<'_, PyAny>) -> PyResult<String> {
+    dry_run(py, envelope)?
+        .inner
+        .to_json_pretty()
+        .map_err(|error| envelope_error_to_py(py, error))
 }
 
 /// Execute a calibration plan and return the full result.
@@ -291,7 +343,9 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(calibrate, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(calibrate_bermudan_lmm_base_vol, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(dry_run, &m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(dry_run_json, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(validate_calibration, &m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(validate_calibration_json, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(
         validation::validate_butterfly_call_convexity,
         &m
@@ -347,6 +401,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "calibrate",
                 "calibrate_bermudan_lmm_base_vol",
                 "dry_run",
+                "dry_run_json",
                 "hull_white",
                 "schema",
                 "validate_butterfly_call_convexity",
@@ -354,6 +409,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "validate_calendar_spread",
                 "validate_calendar_spread_with_forwards",
                 "validate_calibration",
+                "validate_calibration_json",
                 "validate_surface",
                 "validate_surface_with_forwards",
                 "validate_vol_bounds",

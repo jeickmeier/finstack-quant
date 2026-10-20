@@ -550,8 +550,9 @@ fn calibration_dts_owns_calibration_surface() {
 
     for name in [
         "calibrate(",
-        "validateCalibration(",
+        "validateCalibrationJson(",
         "dryRun(",
+        "dryRunJson(",
         "calibrateBermudanLmmBaseVol(",
     ] {
         assert!(

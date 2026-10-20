@@ -53,6 +53,7 @@ __all__ = [
     "calibrate",
     "calibrate_bermudan_lmm_base_vol",
     "dry_run",
+    "dry_run_json",
     "hull_white",
     "schema",
     "validate_butterfly_call_convexity",
@@ -60,6 +61,7 @@ __all__ = [
     "validate_calendar_spread",
     "validate_calendar_spread_with_forwards",
     "validate_calibration",
+    "validate_calibration_json",
     "validate_surface",
     "validate_surface_with_forwards",
     "validate_vol_bounds",
@@ -4683,6 +4685,36 @@ def validate_calibration(
 
     """
 
+def validate_calibration_json(
+    envelope: CalibrationEnvelope | dict[str, Any] | str,
+) -> str:
+    """JSON twin of :func:`validate_calibration`.
+
+    Parameters
+    ----------
+    envelope : CalibrationEnvelope | dict | str
+        Typed envelope, plan, dict, or JSON string.
+
+    Returns
+    -------
+    str
+        Canonical pretty-printed envelope JSON.
+
+    Raises
+    ------
+    CalibrationEnvelopeError
+        If strict loading or static validation rejects the envelope.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, validate_calibration_json
+    >>> "finstack_quant.calibration/1" in validate_calibration_json(
+    ...     CalibrationEnvelope(CalibrationPlan([], id="smoke"))
+    ... )
+    True
+
+    """
+
 def dry_run(
     envelope: CalibrationEnvelope | dict[str, Any] | str,
 ) -> CalibrationValidationReport:
@@ -4713,6 +4745,34 @@ def dry_run(
     >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, dry_run
     >>> dry_run(CalibrationEnvelope(CalibrationPlan([], id="smoke"))).errors
     []
+
+    """
+
+def dry_run_json(
+    envelope: CalibrationEnvelope | dict[str, Any] | str,
+) -> str:
+    """JSON twin of :func:`dry_run`.
+
+    Parameters
+    ----------
+    envelope : CalibrationEnvelope | dict | str
+        Typed envelope, plan, dict, or JSON string.
+
+    Returns
+    -------
+    str
+        Pretty-printed ``CalibrationValidationReport`` JSON.
+
+    Raises
+    ------
+    CalibrationEnvelopeError
+        If the input cannot be strictly loaded as an envelope.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, dry_run_json
+    >>> "errors" in dry_run_json(CalibrationEnvelope(CalibrationPlan([], id="smoke")))
+    True
 
     """
 
