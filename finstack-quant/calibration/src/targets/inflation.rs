@@ -306,17 +306,14 @@ impl InflationCurveTarget {
                 &config,
                 success_tolerance,
             )?,
-            CalibrationMethod::GlobalSolve { .. } => GlobalFitOptimizer::optimize(
+            CalibrationMethod::GlobalSolve {
+                use_analytical_jacobian,
+            } => GlobalFitOptimizer::optimize(
                 &target,
                 &prepared_quotes,
                 &config,
                 success_tolerance,
-                matches!(
-                    params.method,
-                    CalibrationMethod::GlobalSolve {
-                        use_analytical_jacobian: true
-                    }
-                ),
+                use_analytical_jacobian,
             )?,
         };
 
