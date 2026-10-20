@@ -377,7 +377,7 @@ fn finite_diff(a: f64, b: f64) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::closed_form::vanilla::bs_price_unchecked;
+    use crate::closed_form::bs_price_unchecked;
 
     /// A wide, dense strike grid spanning deep into both wings. With this grid
     /// the discrete replication should reproduce flat-vol variance tightly.

@@ -511,7 +511,7 @@ fn test_market_context_stats_includes_vol_cubes() {
 // Normal (Bachelier) vol quoting tests
 
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
-use finstack_quant_models::closed_form::volatility::black_call;
+use finstack_quant_models::closed_form::black_call;
 use finstack_quant_models::volatility::implied_vol_bachelier;
 
 /// Positive-rates consistency: the Hagan normal vol from the cube must agree

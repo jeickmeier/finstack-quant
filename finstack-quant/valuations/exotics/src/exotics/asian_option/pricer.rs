@@ -533,7 +533,7 @@ pub(crate) fn compute_pv(
     pricer.price_internal(inst, curves, as_of)
 }
 
-use finstack_quant_models::closed_form::asian::arithmetic_asian_tw_price_times;
+use finstack_quant_models::closed_form::arithmetic_asian_tw_price_times;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::BlackScholesInputsDf;
 
 /// Underlying spot from `spot_id`, in the option currency when quoted as a price.
@@ -935,7 +935,7 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-    use finstack_quant_models::closed_form::asian::{geometric_asian_call, geometric_asian_put};
+    use finstack_quant_models::closed_form::{geometric_asian_call, geometric_asian_put};
     use finstack_quant_valuations_core::instruments::OptionType;
     use time::Month;
 
@@ -1056,7 +1056,7 @@ mod tests {
                     .expect("year fraction")
             })
             .collect();
-        let expected = finstack_quant_models::closed_form::asian::geometric_asian_price_times(
+        let expected = finstack_quant_models::closed_form::geometric_asian_price_times(
             spot,
             strike,
             t,
@@ -1130,7 +1130,7 @@ mod tests {
                     .expect("year fraction")
             })
             .collect();
-        let reference = finstack_quant_models::closed_form::asian::geometric_asian_price_times(
+        let reference = finstack_quant_models::closed_form::geometric_asian_price_times(
             spot,
             strike,
             t,
@@ -1191,7 +1191,7 @@ mod tests {
                     .expect("year fraction")
             })
             .collect();
-        let expected = finstack_quant_models::closed_form::asian::geometric_asian_price_times(
+        let expected = finstack_quant_models::closed_form::geometric_asian_price_times(
             spot,
             strike,
             t,

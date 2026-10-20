@@ -15,7 +15,7 @@ use finstack_quant_valuations_core::pricer::{
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
-use finstack_quant_models::closed_form::quanto::{quanto_call, quanto_put};
+use finstack_quant_models::closed_form::{quanto_call, quanto_put};
 
 /// Helper to collect inputs for quanto option pricing.
 fn collect_quanto_inputs(

@@ -13,8 +13,8 @@ instrument payoff logic is decoupled from lattice evolution through the
 
 Depends on `finstack_quant_core` for `MarketContext`, the `Discounting` trait,
 `HazardCurve`, `PiecewiseConstantCurve`, and `math::time_grid`, and on
-[`models::volatility::black`](../volatility/) — `binomial_tree.rs` uses
-`d1_d2` to feed the Leisen-Reimer Peizer-Pratt inversion. Consumed by the
+[`models::closed_form`](../closed_form/) — `binomial_tree.rs` uses
+`closed_form::d1_d2` to feed the Leisen-Reimer Peizer-Pratt inversion. Consumed by the
 instrument pricers listed under
 [Usage in the codebase](#usage-in-the-codebase).
 

@@ -106,7 +106,7 @@
 //! ## Geometric Average Asian Call
 //!
 //! ```
-//! use finstack_quant_models::closed_form::asian::geometric_asian_call;
+//! use finstack_quant_models::closed_form::geometric_asian_call;
 //!
 //! let spot = 100.0;
 //! let strike = 100.0;
@@ -128,7 +128,7 @@
 //! ## Arithmetic Average Asian Put (Approximation)
 //!
 //! ```
-//! use finstack_quant_models::closed_form::asian::arithmetic_asian_put_tw;
+//! use finstack_quant_models::closed_form::arithmetic_asian_put_tw;
 //!
 //! let spot = 100.0;
 //! let strike = 100.0;
@@ -150,7 +150,7 @@
 //!
 //! - Monte Carlo pricing for exact arithmetic average pricing
 
-use super::volatility::{black_call, black_put};
+use super::{black_call, black_put};
 use crate::types::OptionType;
 use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::Result;
@@ -937,7 +937,7 @@ mod tests {
         let vol = 0.2;
 
         let geo_asian = geometric_asian_call(spot, strike, time, rate, div_yield, vol, 12);
-        let vanilla = crate::closed_form::vanilla::bs_price_unchecked(
+        let vanilla = crate::closed_form::bs_price_unchecked(
             spot,
             strike,
             rate,

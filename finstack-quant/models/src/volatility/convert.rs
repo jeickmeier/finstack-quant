@@ -5,7 +5,7 @@
 //! explicit validation and deterministic solver behavior.
 
 use super::conventions::{validate_forward_for_convention, VolatilityConvention};
-use crate::closed_form::volatility::{bachelier_call, black_call};
+use crate::closed_form::{bachelier_call, black_call};
 use finstack_quant_core::error::InputError;
 use finstack_quant_core::math::BrentSolver;
 use finstack_quant_core::Result;
@@ -245,7 +245,7 @@ fn compute_initial_guess(
 mod tests {
     use super::VolatilityConvention;
     use super::*;
-    use crate::closed_form::volatility::{bachelier_call, black_call};
+    use crate::closed_form::{bachelier_call, black_call};
 
     fn atm_price(convention: VolatilityConvention, forward: f64, vol: f64, t: f64) -> f64 {
         match convention {

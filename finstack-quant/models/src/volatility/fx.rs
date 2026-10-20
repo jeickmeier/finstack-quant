@@ -573,7 +573,9 @@ pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
 /// * `vol` - Annualized Black volatility as a decimal.
 /// * `expiry` - Time to expiry in years.
 pub fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
-    finstack_quant_core::math::norm_cdf(super::black::d1_d2_black76(forward, strike, vol, expiry).0)
+    finstack_quant_core::math::norm_cdf(
+        crate::closed_form::d1_d2_black76(forward, strike, vol, expiry).0,
+    )
 }
 
 /// Evaluate an FX delta-quoted volatility artifact.

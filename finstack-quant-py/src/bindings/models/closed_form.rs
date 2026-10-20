@@ -22,13 +22,12 @@ use crate::bindings::pandas_utils::{
 };
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
-use finstack_quant_models::closed_form::implied_vol::{black76_implied_vol, bs_implied_vol};
 use finstack_quant_models::closed_form::{
     asian_option_price, bachelier_greeks, bachelier_price, barrier_call, barrier_put,
-    black76_greeks, black76_price, black_shifted_price, black_shifted_vega, bs_greeks, bs_price,
-    heston_price, lookback_option_price, quanto_option_price, vanilla_expiry_payoff, BsGreeks,
-    ForwardGreeks, HestonPricingParams, DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE,
-    DEFAULT_THETA_DAYS_PER_YEAR,
+    black76_greeks, black76_implied_vol, black76_price, black_shifted_price, black_shifted_vega,
+    bs_greeks, bs_implied_vol, bs_price, heston_price, lookback_option_price, quanto_option_price,
+    vanilla_expiry_payoff, BsGreeks, ForwardGreeks, HestonPricingParams, DEFAULT_ASIAN_AVERAGING,
+    DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
 };
 use finstack_quant_models::OptionType;
 use pyo3::prelude::*;

@@ -14,7 +14,7 @@
 //! # Examples
 //! ```rust
 //! use finstack_quant_models::OptionType;
-//! use finstack_quant_models::closed_form::dispatch::{
+//! use finstack_quant_models::closed_form::{
 //!     asian_option_price, barrier_call, barrier_put,
 //! };
 //!

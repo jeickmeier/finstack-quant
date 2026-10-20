@@ -153,11 +153,11 @@ fn test_cross_validation_with_core_heston() {
 
     let core_params = crate::volatility::heston::HestonParams::new(v0, kappa, theta, sigma_v, rho)
         .expect("valid Heston params");
-    let vol_price = crate::closed_form::heston::heston_call_price_fourier(
+    let vol_price = crate::closed_form::heston_call_price_fourier(
         spot,
         strike,
         time,
-        &crate::closed_form::heston::HestonPricingParams {
+        &crate::closed_form::HestonPricingParams {
             r,
             q,
             model: core_params,
@@ -208,11 +208,11 @@ fn test_cross_validation_deep_otm_wing_divergence_is_bounded() {
 
     let core_params = crate::volatility::heston::HestonParams::new(v0, kappa, theta, sigma_v, rho)
         .expect("valid Heston params");
-    let core_price = crate::closed_form::heston::heston_call_price_fourier(
+    let core_price = crate::closed_form::heston_call_price_fourier(
         spot,
         strike,
         time,
-        &crate::closed_form::heston::HestonPricingParams {
+        &crate::closed_form::HestonPricingParams {
             r,
             q,
             model: core_params,

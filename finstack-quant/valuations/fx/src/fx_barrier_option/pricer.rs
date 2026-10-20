@@ -277,7 +277,7 @@ fn validate_monitoring_state(
 }
 
 use finstack_quant_core::types::BarrierType as AnalyticalBarrierType;
-use finstack_quant_models::closed_form::barrier::{barrier_price, barrier_rebate, BarrierParams};
+use finstack_quant_models::closed_form::{barrier_price, barrier_rebate, BarrierParams};
 
 fn expired_barrier_value_per_unit(
     inst: &FxBarrierOption,
@@ -337,7 +337,7 @@ fn seasoned_breached_value_per_unit(
     discount_factor: f64,
 ) -> f64 {
     if inst.barrier_type.is_knock_in() {
-        finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
+        finstack_quant_models::closed_form::bs_price_unchecked(
             spot,
             inst.strike,
             r_dom,
@@ -626,7 +626,7 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::BarrierType;
     use finstack_quant_core::types::PayoutTiming;
-    use finstack_quant_models::closed_form::barrier::barrier_rebate;
+    use finstack_quant_models::closed_form::barrier_rebate;
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::OptionType;
     use std::sync::Arc;

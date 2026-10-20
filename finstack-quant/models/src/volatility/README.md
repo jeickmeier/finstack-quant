@@ -13,23 +13,21 @@ artifacts from `MarketContext`; valuations owns lookup and override precedence,
 then supplies a concrete `VolSource` to pricing code.
 
 Consumed by [`models::closed_form`](../closed_form/) and
-[`models::trees`](../trees/) (both use `black::d1_d2`), by
-`calibration::hull_white` (`normal::bachelier_price_with_annuity`), by
+[`models::trees`](../trees/), by
+`calibration::hull_white`, by
 `calibration::targets::vol` (`SabrCalibrator::calibrate`, the
 SABR slice fitter used by calibration's volatility surface step), and by the rates/FX/vol
 instrument pricers — `rates/{swaption, cap_floor, cms_option, cms_swap}`,
 the asset-owned futures-option instruments, `fx/fx_digital_option`,
-`exotics/range_accrual` — which reach for `normal::bachelier_price_with_annuity`,
-`black::{d1_d2, d1_black76, d1_d2_black76}`, and
-`SABRParameters` / `VolatilityConvention`.
+`exotics/range_accrual` — which reach for `SABRParameters` /
+`VolatilityConvention` here and for `closed_form::{d1_d2, d1_d2_black76,
+bachelier_price_with_annuity}`.
 
 ## Layout
 
 | File | Contents |
 |------|----------|
 | [`mod.rs`](mod.rs) | Re-exports |
-| [`black.rs`](black.rs) | `d1`, `d1_d2`, `d1_black76`, `d1_d2_black76` |
-| [`normal.rs`](normal.rs) | `bachelier_price_with_annuity` |
 | [`sabr/`](sabr/) | `SabrParameters`, `SabrCalibrator`, `SabrSmile` |
 | [`source.rs`](source.rs) | `VolSource` plus surface, cube, and FX delta-volatility evaluation/materialization |
 | [`arbitrage/`](arbitrage/) | Model-dependent volatility arbitrage checks |
@@ -38,7 +36,7 @@ the asset-owned futures-option instruments, `fx/fx_digital_option`,
 `norm_cdf` and `norm_pdf` are re-exported from `finstack_quant_core::math` for
 caller convenience; they are not defined here.
 
-## Black-Scholes helpers (`black.rs`)
+## Black-Scholes helpers (`closed_form::d1_d2*`, in [`closed_form/black.rs`](../closed_form/black.rs))
 
 All four functions are `#[inline]` — they sit inside Greeks and calibration
 loops.
@@ -62,7 +60,7 @@ Degenerate inputs (`t <= 0` or `σ <= 0`) return the limiting values:
 
 References: Black & Scholes (1973); Black (1976).
 
-## Bachelier / normal model (`normal.rs`)
+## Bachelier / normal model (`closed_form::bachelier_price_with_annuity`, in [`closed_form/bachelier.rs`](../closed_form/bachelier.rs))
 
 Arithmetic Brownian motion on the underlying, so negative forwards and strikes
 are admissible. This is the quoting convention for EUR/JPY/CHF swaptions and
@@ -193,12 +191,12 @@ forward-based call prices; carry is already in the smile's forward.
 | Model | Home |
 |-------|------|
 | Heston parameters, characteristic function, and calibration | `models::volatility::heston` |
-| Heston Fourier *pricing* | [`models::closed_form::heston`](../closed_form/heston/) |
+| Heston Fourier *pricing* | [`models::closed_form::heston_price`](../closed_form/heston/) |
 | Dupire local volatility (`LocalVolSurface::from_implied_vol(surface, forwards)`, one forward per expiry) | `models::volatility::local_vol` |
 | SVI surface | `models::volatility::svi` |
 | Rough Heston | `models::volatility::rough_heston` |
 | SABR parameters, smile, and calibration | `models::volatility::sabr` |
-| Black-76 / Bachelier pricing and vega | `models::closed_form::volatility` |
+| Black-76 / Bachelier pricing, vega and `d1`/`d2` | `models::closed_form` |
 | Normal↔lognormal conversion and implied-volatility inversion | `models::volatility` |
 
 ## Model selection
@@ -208,15 +206,16 @@ forward-based call prices; carry is already in the smile's forward.
 | Black-Scholes / Black-76 | Closed form, exact Greeks | No smile | Vanillas, quick marks |
 | Bachelier | Handles negative rates natively | No smile | Negative-rate swaptions and caps |
 | SABR | Market-standard smile fit, fast to evaluate | Expansion degrades past ~10Y and for ν > 1 | Rates and FX smile interpolation |
-| Heston (core + `closed_form::heston`) | Rich smile dynamics, semi-analytical | Five parameters to calibrate | Equity exotics, surface fitting |
+| Heston (core + `closed_form::heston_price`) | Rich smile dynamics, semi-analytical | Five parameters to calibrate | Equity exotics, surface fitting |
 | Local volatility (core) | Exact fit to the market surface | Unrealistic forward smile dynamics | Barrier pricing, local hedging |
 
 ## Example
 
 ```rust
 use finstack_quant_models::OptionType;
+use finstack_quant_core::math::norm_cdf;
+use finstack_quant_models::closed_form::{bachelier_price_with_annuity, d1_d2, d1_d2_black76};
 use finstack_quant_models::volatility::{
-    bachelier_price_with_annuity, d1_d2, d1_d2_black76, norm_cdf,
     SABRCalibrator, SABRModel, SABRParameters, SABRSmile, VolatilityConvention,
 };
 
@@ -287,7 +286,7 @@ and `with_atm_pinning(bool)`.
 **WASM** — `valuations` namespace: `SabrParameters`, `SabrModel`, `SabrSmile`,
 `SabrCalibrator`.
 
-`black.rs` and `normal.rs` are not bound directly; they surface through the
+The `d1`/`d2` helpers and `bachelier_price_with_annuity` (now in `closed_form`) are not bound directly; they surface through the
 instrument pricers and through `valuations.bs_price` / `bsPrice`.
 
 ## Verification
@@ -313,7 +312,7 @@ SABR ATM vol recovery, smile monotonicity, calibration round-trips, shifted
 SABR on negative rates, arbitrage detection and repair, χ(z) series/exact
 blending continuity, extreme ρ, the β ∈ {0, 0.5, 1} branches.
 
-`black.rs` and `normal.rs` carry **no tests of their own** — no `d₁`/`d₂`
+The `d1`/`d2` helpers and `bachelier_price_with_annuity` carry **no direct tests** — no `d₁`/`d₂`
 textbook check, no `t = 0` / `σ = 0` / ATM limit, no Bachelier reference value.
 They are exercised only indirectly, through the closed-form and instrument
 pricers that call them. Filling that gap is the first thing to do when

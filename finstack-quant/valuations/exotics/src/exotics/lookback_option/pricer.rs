@@ -262,7 +262,7 @@ pub(crate) fn compute_pv(
     pricer.price_internal(inst, curves, as_of)
 }
 
-use finstack_quant_models::closed_form::lookback::{
+use finstack_quant_models::closed_form::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
     floating_strike_lookback_put,
 };
@@ -604,7 +604,7 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-    use finstack_quant_models::closed_form::lookback::{
+    use finstack_quant_models::closed_form::{
         fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
         floating_strike_lookback_put,
     };

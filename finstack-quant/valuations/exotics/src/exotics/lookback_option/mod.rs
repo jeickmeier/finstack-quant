@@ -18,7 +18,7 @@
 //!
 //! - **Continuous monitoring**: Analytical formulas (Conze & Viswanathan 1991)
 //! - **Discrete monitoring**: Monte Carlo simulation
-//! - See [`models::closed_form::lookback`](finstack_quant_models::closed_form::lookback)
+//! - See [`models::closed_form::fixed_strike_lookback_call`](finstack_quant_models::closed_form::fixed_strike_lookback_call)
 //!
 //! # References
 //!
@@ -32,7 +32,7 @@
 //!
 //! - [`LookbackOption`] for instrument struct
 //! - [`LookbackType`] for fixed vs floating strike
-//! - [`models::closed_form::lookback`](finstack_quant_models::closed_form::lookback) for formulas
+//! - [`models::closed_form::fixed_strike_lookback_call`](finstack_quant_models::closed_form::fixed_strike_lookback_call) for formulas
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;

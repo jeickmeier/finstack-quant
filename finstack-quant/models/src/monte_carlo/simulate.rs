@@ -58,7 +58,7 @@
 //! - Hybrid scheme for the Volterra driver:
 //!   `docs/REFERENCES.md#bennedsen-lunde-pakkanen-2017`
 
-use crate::closed_form::heston::HestonPricingParams;
+use crate::closed_form::HestonPricingParams;
 use crate::monte_carlo::discretization::cheyette_rough::CheyetteRoughEuler;
 use crate::monte_carlo::discretization::euler::{EulerMaruyama, LogEuler};
 use crate::monte_carlo::discretization::exact::{ExactGbm, ExactMultiGbm};

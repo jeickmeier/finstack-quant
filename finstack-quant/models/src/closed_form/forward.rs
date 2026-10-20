@@ -1,7 +1,7 @@
 //! Checked forward-measure option entry points for host bindings.
 //!
 //! The leaf Black-76, Bachelier and shifted-Black formulas in
-//! [`super::volatility`] are infallible unit-annuity kernels that collapse
+//! [`super::black_call`] / [`super::bachelier_call`] are infallible unit-annuity kernels that collapse
 //! degenerate inputs to intrinsic value. The functions here are the checked,
 //! [`OptionType`]-dispatched twins the Python and WASM bindings call: each
 //! validates its model's input domain, picks the call or put leg, applies any
@@ -40,7 +40,7 @@
 use finstack_quant_core::{Error, Result};
 
 use super::vanilla::checked_closed_form_value;
-use super::volatility::{
+use super::{
     bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma, bachelier_put,
     bachelier_vega, black_call, black_delta_call, black_delta_put, black_gamma, black_put,
     black_vega,
@@ -264,7 +264,7 @@ pub fn black76_greeks(
 /// Undiscounted Bachelier (normal-model) price on a unit annuity.
 ///
 /// The canonical unit-annuity twin of
-/// [`super::volatility::bachelier_price_with_annuity`]; multiply by the
+/// [`super::bachelier_price_with_annuity`]; multiply by the
 /// discount factor or annuity for present value.
 ///
 /// # Arguments
@@ -423,7 +423,7 @@ mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used)]
 
     use super::*;
-    use crate::closed_form::implied_vol::black76_implied_vol;
+    use crate::closed_form::black76_implied_vol;
 
     #[test]
     fn black76_price_matches_discounted_leaf_formula() {
@@ -489,7 +489,7 @@ mod tests {
     #[test]
     fn bachelier_price_is_unit_annuity_twin_and_checks_domain() {
         let unit = bachelier_price(0.03, 0.025, 0.005, 2.0, OptionType::Put).unwrap();
-        let annuity = crate::closed_form::volatility::bachelier_price_with_annuity(
+        let annuity = crate::closed_form::bachelier_price_with_annuity(
             OptionType::Put,
             0.03,
             0.025,

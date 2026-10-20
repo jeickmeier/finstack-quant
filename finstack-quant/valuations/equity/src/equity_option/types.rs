@@ -914,7 +914,7 @@ mod tests {
         money::Money,
         types::{CurveId, InstrumentId},
     };
-    use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
+    use finstack_quant_models::closed_form::bs_price_unchecked;
     use finstack_quant_valuations_core::instruments::common_impl::{
         helpers::year_fraction, traits::Instrument,
     };
@@ -1052,7 +1052,7 @@ mod tests {
     /// `pricing::compute_pv`/`compute_greeks`, so both sides of these
     /// assertions run the same code — this cannot detect a formula error.
     /// Formula correctness is anchored non-circularly in
-    /// `models::closed_form::vanilla` (`analytic_greeks_match_finite_differences_of_price`,
+    /// `models::closed_form` (`analytic_greeks_match_finite_differences_of_price`,
     /// `hull_chapter19_worked_example_anchor`).
     #[test]
     fn npv_and_greeks_match_pricer_outputs() {

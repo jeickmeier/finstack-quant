@@ -1077,11 +1077,11 @@ mod tests {
 
         for &strike in &[80.0, 90.0, 100.0, 110.0, 120.0] {
             let rough_price = rough.price_european(spot, strike, r, q, t, true);
-            let heston_price = crate::closed_form::heston::heston_call_price_fourier(
+            let heston_price = crate::closed_form::heston_call_price_fourier(
                 spot,
                 strike,
                 t,
-                &crate::closed_form::heston::HestonPricingParams {
+                &crate::closed_form::HestonPricingParams {
                     r,
                     q,
                     model: standard,

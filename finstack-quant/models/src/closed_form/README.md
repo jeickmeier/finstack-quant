@@ -13,8 +13,8 @@ The module serves two roles:
 
 ## Position in the stack
 
-Within the crate, `closed_form` reaches for
-[`models::volatility::black`](../volatility/) (the `d1`/`d2` helpers) and for
+Within the crate, `closed_form` owns the Black-family `d1`/`d2` helpers
+(`closed_form::{d1_d2, d1_d2_black76}`, in [`black.rs`](black.rs)) and reaches for
 `crate::instruments::common_impl` — `parameters::OptionType` on every
 call/put-selecting entry point, and `helpers::get_unitless_scalar_strict` in
 the Heston parameter validator. From core it uses `math::special_functions`
@@ -36,7 +36,9 @@ by the Python/WASM bindings via [`dispatch.rs`](dispatch.rs).
 
 | File | Contents |
 |------|----------|
-| [`mod.rs`](mod.rs) | Re-exports and module-level references |
+| [`mod.rs`](mod.rs) | The `closed_form::` facade (children are private) and module-level references |
+| [`black.rs`](black.rs) | `d1_d2`, `d1_d2_black76`, unit-annuity Black-76 price and Greeks kernels |
+| [`bachelier.rs`](bachelier.rs) | Unit-annuity Bachelier price and Greeks kernels, `bachelier_price_with_annuity` |
 | [`vanilla.rs`](vanilla.rs) | Black-Scholes/Garman-Kohlhagen price, Greeks, Black-76, payoff and finiteness guards |
 | [`asian.rs`](asian.rs) | Geometric (Kemna-Vorst) and arithmetic (Turnbull-Wakeman) average-price options |
 | [`barrier.rs`](barrier.rs) | All eight continuously monitored barrier types, touch probabilities, rebates |

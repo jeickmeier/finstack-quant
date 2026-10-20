@@ -381,9 +381,7 @@ mod tests {
     }
 
     fn reference(v0: f64, sigma: f64) -> f64 {
-        use finstack_quant_models::closed_form::heston::{
-            heston_call_price_fourier, HestonPricingParams,
-        };
+        use finstack_quant_models::closed_form::{heston_call_price_fourier, HestonPricingParams};
         let params = HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, sigma, -0.7, v0)
             .expect("Heston parameters");
         heston_call_price_fourier(100.0, 100.0, 1.0, &params, None).expect("Fourier reference")

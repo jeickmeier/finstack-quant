@@ -250,7 +250,7 @@ fn discrete_lookback_observes_only_contractual_dates() {
     let t = DayCount::Act365F
         .year_fraction(as_of, expiry, DayCountContext::default())
         .expect("year fraction");
-    let black_scholes = finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
+    let black_scholes = finstack_quant_models::closed_form::bs_price_unchecked(
         100.0,
         100.0,
         0.05,

@@ -69,7 +69,7 @@ const HESTON_EXPONENT_REAL_LIMIT: f64 = 700.0;
 /// let params = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).unwrap();
 /// assert!(params.satisfies_feller());
 ///
-/// let call = finstack_quant_models::closed_form::heston::heston_call_price_fourier(100.0, 100.0, 1.0, &finstack_quant_models::closed_form::heston::HestonPricingParams { r: 0.05, q: 0.0, model: params }, None).expect("checked Heston price");
+/// let call = finstack_quant_models::closed_form::heston_call_price_fourier(100.0, 100.0, 1.0, &finstack_quant_models::closed_form::HestonPricingParams { r: 0.05, q: 0.0, model: params }, None).expect("checked Heston price");
 /// assert!(call > 0.0 && call < 100.0);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -499,11 +499,11 @@ mod tests {
     #[test]
     fn call_price_positive_and_bounded() {
         let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
-        let call = crate::closed_form::heston::heston_call_price_fourier(
+        let call = crate::closed_form::heston_call_price_fourier(
             100.0,
             100.0,
             1.0,
-            &crate::closed_form::heston::HestonPricingParams {
+            &crate::closed_form::HestonPricingParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
@@ -524,19 +524,19 @@ mod tests {
         let q = 0.02;
         let t = 1.0;
 
-        let call = crate::closed_form::heston::heston_call_price_fourier(
+        let call = crate::closed_form::heston_call_price_fourier(
             s,
             k,
             t,
-            &crate::closed_form::heston::HestonPricingParams { r, q, model: p },
+            &crate::closed_form::HestonPricingParams { r, q, model: p },
             None,
         )
         .expect("checked Heston price");
-        let put = crate::closed_form::heston::heston_put_price_fourier(
+        let put = crate::closed_form::heston_put_price_fourier(
             s,
             k,
             t,
-            &crate::closed_form::heston::HestonPricingParams { r, q, model: p },
+            &crate::closed_form::HestonPricingParams { r, q, model: p },
             None,
         )
         .expect("checked Heston price");
@@ -553,11 +553,11 @@ mod tests {
     #[test]
     fn moneyness_ordering() {
         let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
-        let itm = crate::closed_form::heston::heston_call_price_fourier(
+        let itm = crate::closed_form::heston_call_price_fourier(
             100.0,
             90.0,
             1.0,
-            &crate::closed_form::heston::HestonPricingParams {
+            &crate::closed_form::HestonPricingParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
@@ -565,11 +565,11 @@ mod tests {
             None,
         )
         .expect("checked Heston price");
-        let atm = crate::closed_form::heston::heston_call_price_fourier(
+        let atm = crate::closed_form::heston_call_price_fourier(
             100.0,
             100.0,
             1.0,
-            &crate::closed_form::heston::HestonPricingParams {
+            &crate::closed_form::HestonPricingParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
@@ -577,11 +577,11 @@ mod tests {
             None,
         )
         .expect("checked Heston price");
-        let otm = crate::closed_form::heston::heston_call_price_fourier(
+        let otm = crate::closed_form::heston_call_price_fourier(
             100.0,
             110.0,
             1.0,
-            &crate::closed_form::heston::HestonPricingParams {
+            &crate::closed_form::HestonPricingParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
@@ -600,11 +600,11 @@ mod tests {
         let var = vol * vol;
         // sigma_v → 0: Heston degenerates to Black-Scholes
         let p = HestonParams::new(var, 2.0, var, 1e-12, 0.0).expect("valid");
-        let heston = crate::closed_form::heston::heston_call_price_fourier(
+        let heston = crate::closed_form::heston_call_price_fourier(
             100.0,
             100.0,
             1.0,
-            &crate::closed_form::heston::HestonPricingParams {
+            &crate::closed_form::HestonPricingParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
@@ -654,11 +654,11 @@ mod tests {
 
         // The limiting price must match Black-Scholes at σ = √v̄ (≈ 23.5%),
         // not at √v0 = 10%.
-        let heston = crate::closed_form::heston::heston_call_price_fourier(
+        let heston = crate::closed_form::heston_call_price_fourier(
             100.0,
             100.0,
             t,
-            &crate::closed_form::heston::HestonPricingParams {
+            &crate::closed_form::HestonPricingParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
@@ -691,19 +691,19 @@ mod tests {
         let t: f64 = 0.5;
 
         for &strike in &[220.0_f64, 260.0, 300.0] {
-            let call = crate::closed_form::heston::heston_call_price_fourier(
+            let call = crate::closed_form::heston_call_price_fourier(
                 spot,
                 strike,
                 t,
-                &crate::closed_form::heston::HestonPricingParams { r, q, model: p },
+                &crate::closed_form::HestonPricingParams { r, q, model: p },
                 None,
             )
             .expect("checked Heston price");
-            let put = crate::closed_form::heston::heston_put_price_fourier(
+            let put = crate::closed_form::heston_put_price_fourier(
                 spot,
                 strike,
                 t,
-                &crate::closed_form::heston::HestonPricingParams { r, q, model: p },
+                &crate::closed_form::HestonPricingParams { r, q, model: p },
                 None,
             )
             .expect("checked Heston price");
@@ -746,11 +746,11 @@ mod tests {
     #[test]
     fn expired_option() {
         let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
-        let itm_call = crate::closed_form::heston::heston_call_price_fourier(
+        let itm_call = crate::closed_form::heston_call_price_fourier(
             100.0,
             90.0,
             0.0,
-            &crate::closed_form::heston::HestonPricingParams {
+            &crate::closed_form::HestonPricingParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
@@ -760,11 +760,11 @@ mod tests {
         .expect("checked Heston price");
         assert!((itm_call - 10.0).abs() < 1e-10, "Expired ITM call");
 
-        let otm_call = crate::closed_form::heston::heston_call_price_fourier(
+        let otm_call = crate::closed_form::heston_call_price_fourier(
             100.0,
             110.0,
             0.0,
-            &crate::closed_form::heston::HestonPricingParams {
+            &crate::closed_form::HestonPricingParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
@@ -774,11 +774,11 @@ mod tests {
         .expect("checked Heston price");
         assert!(otm_call.abs() < 1e-10, "Expired OTM call");
 
-        let itm_put = crate::closed_form::heston::heston_put_price_fourier(
+        let itm_put = crate::closed_form::heston_put_price_fourier(
             100.0,
             110.0,
             0.0,
-            &crate::closed_form::heston::HestonPricingParams {
+            &crate::closed_form::HestonPricingParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
@@ -792,11 +792,11 @@ mod tests {
     #[test]
     fn invalid_inputs_return_errors() {
         let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
-        let price = crate::closed_form::heston::heston_call_price_fourier(
+        let price = crate::closed_form::heston_call_price_fourier(
             100.0,
             0.0,
             1.0,
-            &crate::closed_form::heston::HestonPricingParams {
+            &crate::closed_form::HestonPricingParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
@@ -821,11 +821,11 @@ mod tests {
     fn public_heston_paths_share_short_expiry_convergence() {
         let params = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.7).expect("valid");
         for (t, expected) in [(0.001, 0.254803543342), (0.0001, 0.080038149868)] {
-            let scalar = crate::closed_form::heston::heston_call_price_fourier(
+            let scalar = crate::closed_form::heston_call_price_fourier(
                 100.0,
                 100.0,
                 t,
-                &finstack_quant_models::closed_form::heston::HestonPricingParams {
+                &finstack_quant_models::closed_form::HestonPricingParams {
                     r: 0.05,
                     q: 0.0,
                     model: params,
@@ -833,11 +833,11 @@ mod tests {
                 None,
             )
             .expect("checked Heston price");
-            let strip = crate::closed_form::heston::heston_call_prices_fourier(
+            let strip = crate::closed_form::heston_call_prices_fourier(
                 100.0,
                 &[100.0],
                 t,
-                &finstack_quant_models::closed_form::heston::HestonPricingParams {
+                &finstack_quant_models::closed_form::HestonPricingParams {
                     r: 0.05,
                     q: 0.0,
                     model: params,
@@ -855,11 +855,11 @@ mod tests {
         let params = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
         let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
 
-        let strip_prices = crate::closed_form::heston::heston_call_prices_fourier(
+        let strip_prices = crate::closed_form::heston_call_prices_fourier(
             100.0,
             &strikes,
             1.0,
-            &crate::closed_form::heston::HestonPricingParams {
+            &crate::closed_form::HestonPricingParams {
                 r: 0.05,
                 q: 0.02,
                 model: params,
@@ -870,11 +870,11 @@ mod tests {
 
         assert_eq!(strip_prices.len(), strikes.len());
         for (idx, &strike) in strikes.iter().enumerate() {
-            let single_price = crate::closed_form::heston::heston_call_price_fourier(
+            let single_price = crate::closed_form::heston_call_price_fourier(
                 100.0,
                 strike,
                 1.0,
-                &crate::closed_form::heston::HestonPricingParams {
+                &crate::closed_form::HestonPricingParams {
                     r: 0.05,
                     q: 0.02,
                     model: params,
@@ -900,22 +900,19 @@ mod tests {
         let q: f64 = 0.02;
         let t: f64 = 1.0;
         let strikes = [85.0, 95.0, 100.0, 105.0, 115.0];
-        let pricing = crate::closed_form::heston::HestonPricingParams {
+        let pricing = crate::closed_form::HestonPricingParams {
             r,
             q,
             model: params,
         };
 
-        let calls = crate::closed_form::heston::heston_call_prices_fourier(
-            spot, &strikes, t, &pricing, None,
-        )
-        .expect("checked Heston price");
+        let calls =
+            crate::closed_form::heston_call_prices_fourier(spot, &strikes, t, &pricing, None)
+                .expect("checked Heston price");
 
         for (&strike, &call) in strikes.iter().zip(calls.iter()) {
-            let put = crate::closed_form::heston::heston_put_price_fourier(
-                spot, strike, t, &pricing, None,
-            )
-            .expect("checked Heston price");
+            let put = crate::closed_form::heston_put_price_fourier(spot, strike, t, &pricing, None)
+                .expect("checked Heston price");
             let parity = call - put - (spot * (-q * t).exp() - strike * (-r * t).exp());
             assert!(
                 parity.abs() < 1e-12,
@@ -933,11 +930,11 @@ mod tests {
         let t = 0.005;
         let strikes = [95.0, 100.0, 105.0];
 
-        let strip_prices = crate::closed_form::heston::heston_call_prices_fourier(
+        let strip_prices = crate::closed_form::heston_call_prices_fourier(
             spot,
             &strikes,
             t,
-            &crate::closed_form::heston::HestonPricingParams {
+            &crate::closed_form::HestonPricingParams {
                 r,
                 q,
                 model: params,
@@ -947,11 +944,11 @@ mod tests {
         .expect("checked Heston price");
 
         for (idx, &strike) in strikes.iter().enumerate() {
-            let single_price = crate::closed_form::heston::heston_call_price_fourier(
+            let single_price = crate::closed_form::heston_call_price_fourier(
                 spot,
                 strike,
                 t,
-                &crate::closed_form::heston::HestonPricingParams {
+                &crate::closed_form::HestonPricingParams {
                     r,
                     q,
                     model: params,

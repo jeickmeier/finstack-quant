@@ -40,7 +40,7 @@
 //!
 //! ```
 //! use finstack_quant_core::math::norm_cdf;
-//! use finstack_quant_models::volatility::d1_d2;
+//! use finstack_quant_models::closed_form::d1_d2;
 //!
 //! let spot = 100.0;
 //! let strike = 105.0;
@@ -67,7 +67,6 @@
 //! - [`crate::closed_form`] for analytical formulas
 
 pub mod arbitrage;
-pub mod black;
 mod conventions;
 mod convert;
 mod dupire;
@@ -82,8 +81,6 @@ pub mod svi;
 /// Carr-Madan discrete variance replication for variance swaps.
 pub mod variance_replication;
 
-pub use crate::closed_form::volatility::bachelier_price_with_annuity;
-pub use black::{d1_d2, d1_d2_black76};
 pub use conventions::VolatilityConvention;
 pub use convert::convert_atm_volatility;
 pub use implied::{implied_vol_bachelier, implied_vol_black};

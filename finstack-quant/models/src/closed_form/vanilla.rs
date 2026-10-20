@@ -43,8 +43,8 @@
 //! - Garman, M. B., & Kohlhagen, S. W. (1983). "Foreign Currency Option Values." `docs/REFERENCES.md#garman-kohlhagen-1983`
 //!
 
+use crate::closed_form::d1_d2;
 use crate::types::OptionType;
-use crate::volatility::black::d1_d2;
 use finstack_quant_core::{Error, Result};
 use std::fmt;
 

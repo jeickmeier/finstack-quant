@@ -167,7 +167,7 @@ pub fn black76_implied_vol(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::closed_form::vanilla::bs_price_unchecked;
+    use crate::closed_form::bs_price_unchecked;
 
     #[test]
     fn solver_only_returns_ok_for_genuinely_converged_solutions() {

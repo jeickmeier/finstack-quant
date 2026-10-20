@@ -4,7 +4,7 @@
 //! consistently when the `serde` feature is enabled.
 #![allow(clippy::expect_used)]
 
-use crate::closed_form::heston::HestonPricingParams;
+use crate::closed_form::HestonPricingParams;
 use crate::monte_carlo::process::{
     brownian::BrownianParams, cir::CirParams, gbm::GbmParams, multi_ou::MultiOuParams,
     ou::HullWhite1FParams, schwartz_smith::SchwartzSmithParams,

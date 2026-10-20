@@ -11,7 +11,7 @@ use finstack_quant_core::dates::{DateExt, DayCountContext};
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::math::norm_pdf;
 use finstack_quant_core::Result;
-use finstack_quant_models::d1_d2_black76;
+use finstack_quant_models::closed_form::d1_d2_black76;
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
 use finstack_quant_valuations_core::metrics::bump_surface_vol_absolute;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;

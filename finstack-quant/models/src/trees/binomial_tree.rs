@@ -3,9 +3,9 @@
 //! Implements Cox-Ross-Rubinstein (CRR) and Leisen-Reimer binomial trees
 //! for American and Bermudan options on the shared recombining-lattice engine.
 
+use crate::closed_form::d1_d2;
 use crate::trees::NodeState;
 use crate::types::{OptionMarketParams, OptionType};
-use crate::volatility::black::d1_d2;
 use finstack_quant_core::math::map_exercise_dates_to_steps;
 use finstack_quant_core::validation::validate_f64_positive;
 use finstack_quant_core::HashSet;

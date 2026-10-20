@@ -6,7 +6,7 @@
 //! - **COS strip pricing** (`fourier::cos`): the strike-independent coefficient
 //!   `aₖ = Re[φ(uₖ)·exp(-i·uₖ·a)]` is precomputed once per strip instead of once
 //!   per strike inside `put_price`.
-//! - **Heston Fourier scalar pricing** (`closed_form::heston`): the
+//! - **Heston Fourier scalar pricing** (`closed_form::heston_call_price_fourier`): the
 //!   composite Gauss-Legendre grid is built once and shared across the two
 //!   Gil-Pelaez probabilities (j = 1, 2) rather than rebuilt twice per price.
 

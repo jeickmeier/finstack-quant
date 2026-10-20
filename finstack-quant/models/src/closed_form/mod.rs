@@ -116,7 +116,7 @@
 //!
 //! ```
 //! use finstack_quant_core::types::BarrierType;
-//! use finstack_quant_models::closed_form::barrier::{barrier_price, BarrierParams};
+//! use finstack_quant_models::closed_form::{barrier_price, BarrierParams};
 //! use finstack_quant_models::types::OptionType;
 //!
 //! let spot = 100.0;
@@ -134,30 +134,42 @@
 //!
 //! # See Also
 //!
-//! - [`vanilla`] for Black-Scholes pricing and Greeks (delta, gamma, vega, theta, rho)
-//! - [`asian`] for Asian option pricing
-//! - [`barrier`] for barrier option pricing
-//! - [`lookback`] for lookback option pricing
-//! - [`quanto`] for quanto option pricing
-//! - [`heston`] for stochastic volatility pricing
-//! - [`forward`] for checked Black-76 / Bachelier / shifted-Black prices and forward Greeks
-//! - [`dispatch`] for the string-selected exotic closed forms
+//! - [`bs_price`] / [`bs_greeks`] for Black-Scholes pricing and Greeks (delta, gamma, vega, theta, rho)
+//! - [`geometric_asian_call`] / [`arithmetic_asian_call_tw`] for Asian option pricing
+//! - [`barrier_price`] for barrier option pricing
+//! - [`fixed_strike_lookback_call`] / [`floating_strike_lookback_call`] for lookback option pricing
+//! - [`quanto_call`] for quanto option pricing
+//! - [`heston_price`] for stochastic volatility pricing
+//! - [`black76_price`] / [`bachelier_price`] for checked Black-76 / Bachelier / shifted-Black
+//!   prices and [`ForwardGreeks`]
+//! - [`black_call`] / [`bachelier_call`] for the unchecked unit-annuity Black-76 / Bachelier kernels
+//! - [`asian_option_price`] / [`barrier_call`] for the string-selected exotic closed forms
 
-pub mod asian;
-pub mod barrier;
-pub mod dispatch;
-pub mod forward;
-pub mod heston;
-pub mod implied_vol;
-pub mod lookback;
-pub mod quanto;
-pub mod vanilla;
-pub mod volatility;
+mod asian;
+mod bachelier;
+mod barrier;
+mod black;
+mod dispatch;
+mod forward;
+mod heston;
+mod implied_vol;
+mod lookback;
+mod quanto;
+mod vanilla;
 
 pub use asian::{
-    arithmetic_asian_call_tw, arithmetic_asian_put_tw, geometric_asian_call, geometric_asian_put,
+    arithmetic_asian_call_tw, arithmetic_asian_put_tw, arithmetic_asian_tw_price_times,
+    geometric_asian_call, geometric_asian_price_times, geometric_asian_put,
 };
-pub use barrier::{barrier_price, barrier_rebate};
+pub use bachelier::{
+    bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma,
+    bachelier_price_with_annuity, bachelier_put, bachelier_vega,
+};
+pub use barrier::{barrier_price, barrier_rebate, barrier_touch_probability, BarrierParams};
+pub use black::{
+    black_call, black_delta_call, black_delta_put, black_gamma, black_put, black_vega, d1_d2,
+    d1_d2_black76,
+};
 pub use dispatch::{
     asian_option_price, barrier_call, barrier_put, lookback_option_price, quanto_option_price,
     DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE,
@@ -166,7 +178,11 @@ pub use forward::{
     bachelier_greeks, bachelier_price, black76_greeks, black76_price, black_shifted_price,
     black_shifted_vega, ForwardGreeks,
 };
-pub use heston::{heston_call_price_fourier, heston_price, HestonPricingParams};
+pub use heston::{
+    heston_call_price_fourier, heston_price, HestonFourierSettings, HestonPricingParams,
+};
+#[cfg(test)]
+pub(crate) use heston::{heston_call_prices_fourier, heston_put_price_fourier};
 pub use implied_vol::{black76_implied_vol, bs_implied_vol};
 pub use lookback::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
@@ -174,11 +190,6 @@ pub use lookback::{
 };
 pub use quanto::{quanto_call, quanto_put};
 pub use vanilla::{
-    bs_greeks, bs_price, checked_closed_form_value, vanilla_expiry_payoff, BsGreeks,
-    DEFAULT_THETA_DAYS_PER_YEAR, ONE_PERCENT,
-};
-pub use volatility::{
-    bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma,
-    bachelier_price_with_annuity, bachelier_put, bachelier_vega, black_call, black_delta_call,
-    black_delta_put, black_gamma, black_put, black_vega,
+    bs_greeks, bs_greeks_unchecked, bs_price, bs_price_unchecked, checked_closed_form_value,
+    vanilla_expiry_payoff, BsGreeks, DEFAULT_THETA_DAYS_PER_YEAR, ONE_PERCENT,
 };

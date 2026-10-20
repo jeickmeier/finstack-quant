@@ -94,7 +94,7 @@
 //! # Examples
 //!
 //! ```
-//! use finstack_quant_models::closed_form::heston::HestonPricingParams;
+//! use finstack_quant_models::closed_form::HestonPricingParams;
 //! use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
 //!
 //! // Typical calibrated parameters for equity index
@@ -120,7 +120,7 @@
 use super::super::paths::ProcessParams;
 use super::super::traits::StochasticProcess;
 use super::metadata::ProcessMetadata;
-use crate::closed_form::heston::HestonPricingParams;
+use crate::closed_form::HestonPricingParams;
 
 /// Check the Feller condition `2κθ ≥ σ_v²` from raw variance-process parameters.
 ///

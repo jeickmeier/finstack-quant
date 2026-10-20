@@ -446,11 +446,11 @@ fn test_vol_models_quantlib_parity() {
                 *counts.entry("heston").or_default() += 1;
                 let params =
                     HestonParams::new(*v0, *kappa, *theta, *sigma, *rho).expect("valid Heston");
-                let call = finstack_quant_models::closed_form::heston::heston_call_price_fourier(
+                let call = finstack_quant_models::closed_form::heston_call_price_fourier(
                     *spot,
                     *strike,
                     *t,
-                    &finstack_quant_models::closed_form::heston::HestonPricingParams {
+                    &finstack_quant_models::closed_form::HestonPricingParams {
                         r: *rate,
                         q: *dividend_yield,
                         model: params,
@@ -458,11 +458,11 @@ fn test_vol_models_quantlib_parity() {
                     None,
                 )
                 .expect("checked Heston price");
-                let put = finstack_quant_models::closed_form::heston::heston_price(
+                let put = finstack_quant_models::closed_form::heston_price(
                     *spot,
                     *strike,
                     *t,
-                    &finstack_quant_models::closed_form::heston::HestonPricingParams {
+                    &finstack_quant_models::closed_form::HestonPricingParams {
                         r: *rate,
                         q: *dividend_yield,
                         model: params,
