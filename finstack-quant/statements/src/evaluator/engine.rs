@@ -36,20 +36,20 @@ type McZCache = IndexMap<NodeId, IndexMap<PeriodId, f64>>;
 /// evaluations of the same model structure without recompilation.
 pub struct PreparedEvaluation {
     /// Topologically sorted node evaluation order.
-    eval_order: Vec<NodeId>,
+    pub(super) eval_order: Vec<NodeId>,
     /// Map from node id to its column index in the evaluation order.
-    node_to_column: std::sync::Arc<IndexMap<NodeId, usize>>,
+    pub(super) node_to_column: std::sync::Arc<IndexMap<NodeId, usize>>,
     /// Dependency graph retained for downstream consumers such as capital structure affected-node computation.
     dag: DependencyGraph,
     /// Compiled expressions snapshotted at prepare time so prepared
     /// evaluations are independent of the evaluator's mutable compiled cache
     /// (which other `evaluate` calls may overwrite).
-    compiled_cache: std::sync::Arc<IndexMap<NodeId, Expr>>,
+    pub(super) compiled_cache: std::sync::Arc<IndexMap<NodeId, Expr>>,
     /// Fingerprint of the timeline, node structure, forecasts and declared units
     /// this plan was compiled from, rejecting changes beyond input values.
     formula_fingerprint: u64,
     /// Canonical units inferred and validated when the plan was prepared.
-    node_value_types: IndexMap<NodeId, NodeValueType>,
+    pub(super) node_value_types: IndexMap<NodeId, NodeValueType>,
 }
 
 /// Fingerprint the evaluation timeline and each node's calculation structure.
@@ -280,25 +280,65 @@ impl Evaluator {
         )>,
         visibility_cutoff: Option<finstack_quant_core::dates::Date>,
     ) -> Result<StatementResult> {
-        let market_ctx = capital_structure.map(|(market, _)| market);
-        let as_of = capital_structure.map(|(_, as_of)| as_of);
         let _span = tracing::info_span!(
             "statements.evaluate",
             model_id = model.id.as_str(),
             periods = model.periods.len(),
             nodes = model.nodes.len(),
-            has_market = market_ctx.is_some(),
+            has_market = capital_structure.is_some(),
             has_as_of = visibility_cutoff.is_some()
         )
         .entered();
         #[cfg(not(target_arch = "wasm32"))]
         let start = Instant::now();
 
-        let prepared = self.init_eval_plan(model)?;
+        let prepared = self.prepare(model)?;
         self.visibility_cutoff = visibility_cutoff;
+        let (mut results, all_warnings) =
+            self.evaluate_periods(model, &prepared, capital_structure)?;
 
+        self.finalize_results(
+            &mut results,
+            model,
+            &prepared,
+            EvalStats {
+                #[cfg(not(target_arch = "wasm32"))]
+                eval_time_ms: Some(start.elapsed().as_millis() as u64),
+                #[cfg(target_arch = "wasm32")]
+                eval_time_ms: None,
+                num_nodes: model.nodes.len(),
+                num_periods: model.periods.len(),
+                numeric_mode: crate::evaluator::NumericMode::Float64,
+                parallel: false,
+                warnings: all_warnings,
+            },
+        )?;
+
+        Ok(results)
+    }
+
+    /// Run every period in timeline order on a prepared plan.
+    ///
+    /// `capital_structure` is the market and cashflow date the model's
+    /// instruments are generated from; `None` skips the capital structure.
+    /// Shared by [`evaluate_inner`](Self::evaluate_inner) and
+    /// [`evaluate_prepared_inner`](Self::evaluate_prepared_inner).
+    fn evaluate_periods(
+        &mut self,
+        model: &FinancialModelSpec,
+        prepared: &PreparedEvaluation,
+        capital_structure: Option<(
+            &finstack_quant_core::market_data::context::MarketContext,
+            finstack_quant_core::dates::Date,
+        )>,
+    ) -> Result<(StatementResult, Vec<EvalWarning>)> {
+        let market_ctx = capital_structure.map(|(market, _)| market);
+        let as_of = capital_structure.map(|(_, as_of)| as_of);
+
+        // Only nodes whose formula or where clause reaches `cs.*` (and their
+        // dependents) need the capital-structure pass.
         let mut cs_seed_nodes = HashSet::new();
-        for (node_id, spec) in &model.nodes {
+        for (node_id, spec) in model.nodes.iter().filter(|_| capital_structure.is_some()) {
             let formula_references_cs = spec
                 .formula_text
                 .as_deref()
@@ -431,24 +471,7 @@ impl Evaluator {
             results.cs_cashflows = Some(cs_cashflows_accum);
         }
 
-        self.finalize_results(
-            &mut results,
-            model,
-            &prepared,
-            EvalStats {
-                #[cfg(not(target_arch = "wasm32"))]
-                eval_time_ms: Some(start.elapsed().as_millis() as u64),
-                #[cfg(target_arch = "wasm32")]
-                eval_time_ms: None,
-                num_nodes: model.nodes.len(),
-                num_periods: model.periods.len(),
-                numeric_mode: crate::evaluator::NumericMode::Float64,
-                parallel: false,
-                warnings: all_warnings,
-            },
-        )?;
-
-        Ok(results)
+        Ok((results, all_warnings))
     }
 
     /// Evaluate a financial model over all periods without market context.
@@ -482,21 +505,20 @@ impl Evaluator {
     /// otherwise fails, or final model checks fail.
     pub fn evaluate(&mut self, model: &FinancialModelSpec) -> Result<StatementResult> {
         let empty_market = finstack_quant_core::market_data::context::MarketContext::new();
-        let capital_structure = model
-            .capital_structure
-            .as_ref()
-            .zip(model.periods.first())
-            .map(|(_, first)| (&empty_market, first.start));
-        self.evaluate_inner(model, capital_structure, None)
-            .inspect_err(|err| {
-                tracing::error!(
-                    model_id = %model.id,
-                    periods = model.periods.len(),
-                    nodes = model.nodes.len(),
-                    error = %err,
-                    "statement evaluation failed"
-                );
-            })
+        self.evaluate_inner(
+            model,
+            contractual_capital_structure(model, &empty_market),
+            None,
+        )
+        .inspect_err(|err| {
+            tracing::error!(
+                model_id = %model.id,
+                periods = model.periods.len(),
+                nodes = model.nodes.len(),
+                error = %err,
+                "statement evaluation failed"
+            );
+        })
     }
 
     /// Prepare the evaluator for repeated evaluations of the same model structure.
@@ -519,7 +541,35 @@ impl Evaluator {
     ///
     /// * `model` - Validated model whose state and conventions drive the calculation.
     pub fn prepare(&mut self, model: &FinancialModelSpec) -> Result<PreparedEvaluation> {
-        self.init_eval_plan(model)
+        // Public Rust models are mutable and may be constructed without the
+        // builder. Revalidate formulas and infer units before compiling, rather
+        // than trusting a validation that preceded the caller's last mutation.
+        let mut validated = model.clone();
+        let analysis = validated.analyze_semantics()?;
+        self.compiled_cache = std::sync::Arc::new(analysis.compiled);
+        self.forecast_cache.clear();
+        self.visibility_cutoff = None;
+        let dag = analysis.graph?;
+        let eval_order = evaluate_order(&dag)?;
+        let node_to_column = std::sync::Arc::new(
+            eval_order
+                .iter()
+                .enumerate()
+                .map(|(i, node_id)| (node_id.clone(), i))
+                .collect(),
+        );
+        Ok(PreparedEvaluation {
+            eval_order,
+            node_to_column,
+            dag,
+            compiled_cache: std::sync::Arc::clone(&self.compiled_cache),
+            formula_fingerprint: formula_fingerprint(model),
+            node_value_types: validated
+                .nodes
+                .iter()
+                .map(|(id, node)| (id.clone(), node.value_type.unwrap_or(NodeValueType::Scalar)))
+                .collect(),
+        })
     }
 
     /// Evaluate a model reusing previously compiled formulas and evaluation order.
@@ -528,10 +578,11 @@ impl Evaluator {
     /// passed to [`prepare`](Self::prepare); only node *values* may differ. This
     /// avoids formula recompilation, DAG construction, and cycle detection on every
     /// call — typically saving 30-50 % of total evaluation time. Prepared
-    /// evaluation has no as-of visibility cutoff and does not evaluate the
-    /// capital structure; use [`evaluate`](Self::evaluate) or
-    /// [`evaluate_with_market`](Self::evaluate_with_market) when `cs.*`
-    /// values are needed.
+    /// evaluation has no as-of visibility cutoff and evaluates the capital
+    /// structure exactly as [`evaluate`](Self::evaluate) does (an empty market
+    /// as of the first period's start); use
+    /// [`evaluate_with_market`](Self::evaluate_with_market) for instruments
+    /// that need market data.
     ///
     /// # Errors
     ///
@@ -634,38 +685,12 @@ impl Evaluator {
             }
         }
 
-        let mut historical = std::sync::Arc::new(PeriodHistory::with_periods(
-            std::sync::Arc::clone(&prepared.node_to_column),
-            &model.periods,
-        ));
-        let historical_cs: std::sync::Arc<
-            IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
-        > = std::sync::Arc::new(IndexMap::new());
-        let mut all_warnings = Vec::new();
-        let mut results = StatementResult::new();
-
-        for period in &model.periods {
-            let (period_results, period_row, period_warnings, period_sources) = self
-                .evaluate_period(
-                    model,
-                    &period.id,
-                    period.is_actual,
-                    &prepared.eval_order,
-                    &historical,
-                    &historical_cs,
-                    None,
-                )?;
-            all_warnings.extend(period_warnings);
-            for (node_id, value) in &period_results {
-                results
-                    .nodes
-                    .entry(node_id.to_owned())
-                    .or_default()
-                    .insert(period.id, *value);
-            }
-            results.record_sources(period.id, period_sources);
-            std::sync::Arc::make_mut(&mut historical).push_row(period.id, period_row);
-        }
+        let empty_market = finstack_quant_core::market_data::context::MarketContext::new();
+        let (mut results, all_warnings) = self.evaluate_periods(
+            model,
+            prepared,
+            contractual_capital_structure(model, &empty_market),
+        )?;
 
         self.finalize_results(
             &mut results,
@@ -749,7 +774,7 @@ impl Evaluator {
             ));
         }
 
-        let prepared = self.init_eval_plan(model)?;
+        let prepared = self.prepare(model)?;
 
         let empty_history = std::sync::Arc::new(PeriodHistory::with_periods(
             std::sync::Arc::clone(&prepared.node_to_column),
@@ -856,41 +881,6 @@ impl Evaluator {
         };
 
         accumulator.finish()
-    }
-
-    /// Reset caches, build the dependency graph, compile formulas, and derive
-    /// the topological evaluation order. Shared by [`evaluate_inner`](Self::evaluate_inner),
-    /// [`prepare`](Self::prepare), and [`evaluate_monte_carlo`](Self::evaluate_monte_carlo).
-    fn init_eval_plan(&mut self, model: &FinancialModelSpec) -> Result<PreparedEvaluation> {
-        // Public Rust models are mutable and may be constructed without the
-        // builder. Revalidate formulas and infer units before compiling, rather
-        // than trusting a validation that preceded the caller's last mutation.
-        let mut validated = model.clone();
-        let analysis = validated.analyze_semantics()?;
-        self.compiled_cache = std::sync::Arc::new(analysis.compiled);
-        self.forecast_cache.clear();
-        self.visibility_cutoff = None;
-        let dag = analysis.graph?;
-        let eval_order = evaluate_order(&dag)?;
-        let node_to_column = std::sync::Arc::new(
-            eval_order
-                .iter()
-                .enumerate()
-                .map(|(i, node_id)| (node_id.clone(), i))
-                .collect(),
-        );
-        Ok(PreparedEvaluation {
-            eval_order,
-            node_to_column,
-            dag,
-            compiled_cache: std::sync::Arc::clone(&self.compiled_cache),
-            formula_fingerprint: formula_fingerprint(model),
-            node_value_types: validated
-                .nodes
-                .iter()
-                .map(|(id, node)| (id.clone(), node.value_type.unwrap_or(NodeValueType::Scalar)))
-                .collect(),
-        })
     }
 
     /// Populate value types, set metadata, and run the optional check suite.
@@ -1050,6 +1040,24 @@ impl Evaluator {
         let (results, warnings) = context.into_results();
         Ok((results, row, warnings, sources))
     }
+}
+
+/// The market/date pair a model's capital structure is generated from when
+/// the caller supplies no market: an empty market as of the first period's
+/// start, so fixed-rate debt needs no market data. `None` without a capital
+/// structure or periods.
+fn contractual_capital_structure<'m>(
+    model: &FinancialModelSpec,
+    empty_market: &'m finstack_quant_core::market_data::context::MarketContext,
+) -> Option<(
+    &'m finstack_quant_core::market_data::context::MarketContext,
+    finstack_quant_core::dates::Date,
+)> {
+    model
+        .capital_structure
+        .as_ref()
+        .zip(model.periods.first())
+        .map(|(_, first)| (empty_market, first.start))
 }
 
 impl Default for Evaluator {

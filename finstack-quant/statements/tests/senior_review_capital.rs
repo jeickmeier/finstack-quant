@@ -507,6 +507,25 @@ fn plain_evaluate_generates_fixed_rate_capital_structure_cashflows() {
         );
     }
 
+    // Prepared evaluation (sensitivity, goal seek) sees the same capital
+    // structure as plain evaluation.
+    let mut evaluator = Evaluator::new();
+    let plan = evaluator.prepare(&model).expect("prepare");
+    let prepared = evaluator
+        .evaluate_prepared(&model, &plan)
+        .expect("prepared evaluation");
+    assert_eq!(
+        serde_json::to_value(prepared.cs_cashflows.as_ref().expect("prepared cashflows"))
+            .expect("serialize"),
+        serde_json::to_value(cashflows).expect("serialize"),
+    );
+    for period in [q1, q2] {
+        assert_eq!(
+            prepared.get("interest", &period),
+            plain.get("interest", &period)
+        );
+    }
+
     // No as-of cutoff: an actual is used as given, where evaluating with a
     // market as of the first period's start would hide it until period end.
     model.periods[0].is_actual = true;
