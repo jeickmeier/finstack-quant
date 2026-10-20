@@ -102,7 +102,8 @@ impl JsForwardCurve {
     /// # Arguments
     ///
     /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
-    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count; a date
+    ///   on or before the base date reads the rate at curve time zero).
     ///
     /// @returns Simple forward rate as a decimal, annualized on the curve day count.
     /// @throws `TypeError` if `t` is neither a number nor a string;

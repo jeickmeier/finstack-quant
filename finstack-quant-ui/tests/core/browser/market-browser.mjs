@@ -74,7 +74,7 @@ try {
       .getByRole("region", { name: "Selected stored value", exact: true })
       .locator("pre")
       .textContent(),
-    '"NEG-RATES"',
+    '{"unitless":1.25}',
   );
   const pointer = await page.evaluate(() => window.marketProbe.negativePointer);
   await page.getByLabel("Search market data", { exact: true }).fill(pointer);

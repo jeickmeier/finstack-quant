@@ -3501,7 +3501,7 @@ export interface ForwardCurve extends WasmOwned {
    * accrual growth to the contractual index basis before calculating a coupon
    * with a different accrual convention. Rust instrument pricing performs this
    * conversion from the contractual schedule.
-   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
+   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count; a date on or before the base date reads the rate at curve time zero).
    * @returns Simple forward rate as a decimal, annualized on the curve day count.
    * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
