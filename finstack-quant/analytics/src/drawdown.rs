@@ -388,76 +388,6 @@ pub(crate) fn mean_drawdown(drawdowns: &[f64]) -> f64 {
     }
 }
 
-/// Calmar ratio = CAGR / |max drawdown| over the supplied active window.
-///
-/// This is the active-window ratio, not Young's 36-month CTA definition.
-///
-/// # Arguments
-///
-/// * `cagr_val` - Compound annual growth rate (already computed).
-/// * `max_dd` - Maximum drawdown depth (a negative number, e.g., `-0.25`
-///   for a 25% drawdown).
-///
-/// # Returns
-///
-/// The Calmar ratio (positive for positive CAGR, negative for negative CAGR).
-/// Returns `f64::INFINITY` if `max_dd` is zero and `cagr_val` is positive,
-/// `f64::NEG_INFINITY` if negative, or `0.0` if both are zero.
-///
-/// # References
-///
-/// - Young (1991): see docs/REFERENCES.md#youngCalmar1991
-#[must_use]
-pub(crate) fn calmar(cagr_val: f64, max_dd: f64) -> f64 {
-    ratio_or_sign_infinity(cagr_val, max_dd.abs())
-}
-
-/// Recovery factor: total return / |max drawdown|.
-///
-/// Measures how many times the portfolio has recovered its worst loss.
-/// A higher value indicates greater resilience.
-///
-/// # Arguments
-///
-/// * `total_return` - Total compounded return over the period.
-/// * `max_dd`       - Maximum drawdown (negative number, e.g. `−0.25`).
-///
-/// # Returns
-///
-/// The recovery factor. Returns `f64::INFINITY` if `max_dd` is zero and
-/// `total_return` is positive, `f64::NEG_INFINITY` if negative, or `0.0`
-/// if both are zero.
-#[must_use]
-pub(crate) fn recovery_factor(total_return: f64, max_dd: f64) -> f64 {
-    ratio_or_sign_infinity(total_return, max_dd.abs())
-}
-
-/// Martin ratio (Ulcer Performance Index): CAGR / Ulcer Index.
-///
-/// Measures return per unit of drawdown-based risk. Named after Peter
-/// Martin who introduced the Ulcer Index.
-///
-/// # Arguments
-///
-/// * `cagr_val` - Compound annual growth rate.
-/// * `ulcer`    - Ulcer Index (from [`ulcer_index`]).
-///
-/// # Returns
-///
-/// The Martin ratio. Sentinels follow the shared drawdown-ratio convention:
-///
-/// - `±∞` when `ulcer == 0.0` and `cagr_val ≠ 0.0` (positive numerator → `+∞`,
-///   negative → `−∞`)
-/// - `0.0` when both `cagr_val == 0.0` and `ulcer == 0.0`
-///
-/// # References
-///
-/// - Martin (1987): see docs/REFERENCES.md#martinUlcer1987
-#[must_use]
-pub(crate) fn martin_ratio(cagr_val: f64, ulcer: f64) -> f64 {
-    ratio_or_sign_infinity(cagr_val, ulcer)
-}
-
 /// Sterling ratio: risk-adjusted return using average drawdown.
 ///
 /// ```text
@@ -688,39 +618,6 @@ mod tests {
     }
 
     #[test]
-    fn calmar_hand_calc() {
-        assert!((calmar(0.15, -0.30) - 0.5).abs() < 1e-12);
-    }
-
-    #[test]
-    fn calmar_zero_dd() {
-        assert_eq!(calmar(0.15, 0.0), f64::INFINITY);
-        assert_eq!(calmar(-0.05, 0.0), f64::NEG_INFINITY);
-        assert_eq!(calmar(0.0, 0.0), 0.0);
-    }
-
-    #[test]
-    fn recovery_factor_hand_calc() {
-        assert!((recovery_factor(0.50, -0.25) - 2.0).abs() < 1e-12);
-        assert!((recovery_factor(-0.10, -0.30) - (-1.0 / 3.0)).abs() < 1e-12);
-    }
-
-    #[test]
-    fn recovery_factor_zero_dd() {
-        assert_eq!(recovery_factor(0.50, 0.0), f64::INFINITY);
-        assert_eq!(recovery_factor(-0.10, 0.0), f64::NEG_INFINITY);
-        assert_eq!(recovery_factor(0.0, 0.0), 0.0);
-    }
-
-    #[test]
-    fn martin_ratio_hand_calc() {
-        assert!((martin_ratio(0.10, 0.05) - 2.0).abs() < 1e-12);
-        assert_eq!(martin_ratio(0.10, 0.0), f64::INFINITY);
-        assert_eq!(martin_ratio(-0.05, 0.0), f64::NEG_INFINITY);
-        assert_eq!(martin_ratio(0.0, 0.0), 0.0);
-    }
-
-    #[test]
     fn sterling_ratio_hand_calc() {
         assert!((sterling_ratio(0.12, -0.10, 0.02) - 1.0).abs() < 1e-12);
         assert!((sterling_ratio(0.15, -0.06, 0.03) - 2.0).abs() < 1e-12);
@@ -770,8 +667,10 @@ mod tests {
         let pain = pain_index(&dd);
         let avg_episode_dd = mean_episode_drawdown(&dd, usize::MAX);
 
-        assert!(recovery_factor(crate::returns::comp_total(&returns), max_dd).is_finite());
-        assert!(martin_ratio(cagr_val, ulcer).is_finite());
+        assert!(
+            ratio_or_sign_infinity(crate::returns::comp_total(&returns), max_dd.abs()).is_finite()
+        );
+        assert!(ratio_or_sign_infinity(cagr_val, ulcer).is_finite());
         assert!(sterling_ratio(cagr_val, avg_episode_dd, 0.01).is_finite());
         assert!(pain_ratio(cagr_val, pain, 0.01).is_finite());
     }

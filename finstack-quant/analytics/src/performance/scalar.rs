@@ -5,14 +5,14 @@ use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, 
 
 use super::{invalid_return_series, Performance};
 use crate::drawdown::{
-    burke_ratio, calmar, deepest, martin_ratio, max_drawdown_duration, mean_drawdown,
-    mean_episode_drawdown, pain_index, pain_ratio, recovery_factor, sterling_ratio, ulcer_index,
-    worst_episode_depths,
+    burke_ratio, deepest, max_drawdown_duration, mean_drawdown, mean_episode_drawdown, pain_index,
+    pain_ratio, sterling_ratio, ulcer_index, worst_episode_depths,
 };
 use crate::returns::comp_total;
 use crate::risk_metrics;
 use crate::risk_metrics::CagrDayCount;
 use finstack_quant_core::dates::HolidayCalendar;
+use finstack_quant_core::math::stats::variance;
 
 impl Performance {
     /// Compound annual growth rate for each ticker.
@@ -112,7 +112,12 @@ impl Performance {
     /// One value per ticker in column order.
     pub fn volatility(&self, annualize: bool) -> Vec<f64> {
         self.map_tickers(|i| {
-            risk_metrics::volatility_with_annualize(self.active_returns(i), annualize, self.ann())
+            let returns = self.active_returns(i);
+            if annualize {
+                crate::volatility(returns, self.ann())
+            } else {
+                variance(returns).sqrt()
+            }
         })
     }
 
@@ -181,9 +186,18 @@ impl Performance {
     ///
     /// Propagates errors from [`Self::cagr`] when the active range cannot be
     /// annualized.
+    ///
+    /// # References
+    ///
+    /// - Young (1991): see docs/REFERENCES.md#youngCalmar1991
     pub fn calmar(&self) -> finstack_quant_core::Result<Vec<f64>> {
         let cagrs = self.cagr(CagrDayCount::default(), None)?;
-        Ok(self.map_tickers(|i| calmar(cagrs[i], deepest(self.active_drawdown_values(i)))))
+        Ok(self.map_tickers(|i| {
+            risk_metrics::ratio_or_sign_infinity(
+                cagrs[i],
+                deepest(self.active_drawdown_values(i)).abs(),
+            )
+        }))
     }
 
     /// Maximum drawdown for each ticker.
@@ -393,10 +407,18 @@ impl Performance {
     ///
     /// Propagates errors from [`Self::cagr`] when the active range cannot be
     /// annualized.
+    ///
+    /// # References
+    ///
+    /// - Martin (1987): see docs/REFERENCES.md#martinUlcer1987
     pub fn martin_ratio(&self) -> finstack_quant_core::Result<Vec<f64>> {
         let cagrs = self.cagr(CagrDayCount::default(), None)?;
-        Ok(self
-            .map_tickers(|i| martin_ratio(cagrs[i], ulcer_index(self.active_drawdown_values(i)))))
+        Ok(self.map_tickers(|i| {
+            risk_metrics::ratio_or_sign_infinity(
+                cagrs[i],
+                ulcer_index(self.active_drawdown_values(i)),
+            )
+        }))
     }
 
     /// Equal-weight Gaussian VaR for each ticker.
@@ -472,7 +494,7 @@ impl Performance {
         self.map_tickers(|i| {
             let total_ret = comp_total(self.active_returns(i));
             let max_dd = deepest(self.active_drawdown_values(i));
-            recovery_factor(total_ret, max_dd)
+            risk_metrics::ratio_or_sign_infinity(total_ret, max_dd.abs())
         })
     }
 
@@ -669,19 +691,21 @@ impl Performance {
             .map_tickers(|i| risk_metrics::value_at_risk_and_es(self.active_returns(i), confidence))
             .into_iter()
             .unzip();
-        let (skew, kurt): (Vec<f64>, Vec<f64>) = self
-            .map_tickers(|i| risk_metrics::skew_kurt(self.active_returns(i)))
-            .into_iter()
-            .unzip();
         let cagrs = self.cagr(CagrDayCount::default(), None)?;
         let drawdowns = self.max_drawdown();
         let calmars = cagrs
             .iter()
             .zip(&drawdowns)
-            .map(|(&growth, &drawdown)| calmar(growth, drawdown))
+            .map(|(&growth, &drawdown)| {
+                risk_metrics::ratio_or_sign_infinity(growth, drawdown.abs())
+            })
             .collect();
-        let recovery_factors =
-            self.map_tickers(|i| recovery_factor(comp_total(self.active_returns(i)), drawdowns[i]));
+        let recovery_factors = self.map_tickers(|i| {
+            risk_metrics::ratio_or_sign_infinity(
+                comp_total(self.active_returns(i)),
+                drawdowns[i].abs(),
+            )
+        });
         let metrics: [(&str, Vec<f64>); 22] = [
             ("cagr", cagrs),
             ("mean_return", self.mean_return(true)),
@@ -694,8 +718,8 @@ impl Performance {
             ("expected_shortfall", es),
             ("tracking_error", self.tracking_error()),
             ("information_ratio", self.information_ratio()),
-            ("skewness", skew),
-            ("kurtosis", kurt),
+            ("skewness", self.skewness()),
+            ("kurtosis", self.kurtosis()),
             ("geometric_mean", self.geometric_mean()),
             ("downside_deviation", self.downside_deviation(0.0)),
             ("omega_ratio", self.omega_ratio(0.0)),
@@ -736,7 +760,7 @@ mod from_returns_cagr_tests {
     }
 
     #[test]
-    fn batched_tail_and_moment_metrics_match_the_single_metric_methods() {
+    fn batched_var_and_es_match_the_single_metric_methods() {
         let dates = (1..=6).map(|day| d(2025, Month::January, day)).collect();
         let returns = vec![
             vec![0.01, -0.02, 0.015, 0.003, -0.01, 0.02],
@@ -756,10 +780,6 @@ mod from_returns_cagr_tests {
             .unzip();
         assert_eq!(var, perf.value_at_risk(0.95).expect("valid confidence"));
         assert_eq!(es, perf.expected_shortfall(0.95).expect("valid confidence"));
-        let (skew, kurt): (Vec<f64>, Vec<f64>) =
-            returns.iter().map(|r| risk_metrics::skew_kurt(r)).unzip();
-        assert_eq!(skew, perf.skewness());
-        assert_eq!(kurt, perf.kurtosis());
     }
 
     #[test]

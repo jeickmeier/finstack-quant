@@ -255,16 +255,6 @@ pub(crate) fn kurtosis(returns: &[f64]) -> f64 {
     kurt
 }
 
-/// Bias-corrected sample skewness and excess kurtosis in one pass.
-///
-/// Avoids running `moments4` twice when both metrics are needed (e.g. in
-/// summary outputs).
-#[must_use]
-pub(crate) fn skew_kurt(returns: &[f64]) -> (f64, f64) {
-    let (_, _, skew, kurt) = moments4(returns);
-    (skew, kurt)
-}
-
 /// Parametric (Gaussian) Value-at-Risk.
 ///
 /// Assumes normally distributed returns:

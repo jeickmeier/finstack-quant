@@ -211,38 +211,11 @@ pub(crate) fn mean_vol_annualized(returns: &[f64], ann_factor: f64) -> (f64, f64
     (m * ann_factor, var.sqrt() * ann_factor.sqrt())
 }
 
-/// Volatility (standard deviation of returns), optionally annualized.
-///
-/// Uses **sample** standard deviation (n-1 denominator), consistent with
-/// Bloomberg, QuantLib, and the `OnlineStats::variance()` convention.
-/// Annualizes by multiplying by `sqrt(ann_factor)` following the
-/// square-root-of-time rule.
-///
-/// # Arguments
-///
-/// * `returns`    - Slice of period simple returns.
-/// * `annualize`  - Whether to scale by `sqrt(ann_factor)`.
-/// * `ann_factor` - Number of periods per year (e.g., 252 daily, 12 monthly).
-///
-/// # Returns
-///
-/// Sample standard deviation of `returns` (n-1 denominator), annualized if requested.
-/// Returns `0.0` for an empty slice. When `annualize` is `true`, returns
-/// [`f64::NAN`] if `ann_factor` is not finite or is `<= 0`.
-#[must_use]
-pub(crate) fn volatility_with_annualize(returns: &[f64], annualize: bool, ann_factor: f64) -> f64 {
-    if invalid_annualization_factor(annualize, ann_factor) {
-        return f64::NAN;
-    }
-    let v = variance(returns).sqrt();
-    if annualize {
-        v * ann_factor.sqrt()
-    } else {
-        v
-    }
-}
-
 /// Annualized sample volatility (n−1 denominator) of one return series.
+///
+/// Uses the **sample** standard deviation, consistent with Bloomberg,
+/// QuantLib and `OnlineStats::variance()`, scaled by the square root of
+/// `periods_per_year` (square-root-of-time rule).
 ///
 /// # Arguments
 ///
@@ -256,7 +229,10 @@ pub(crate) fn volatility_with_annualize(returns: &[f64], annualize: bool, ann_fa
 /// when `periods_per_year` is not a positive finite number.
 #[must_use]
 pub fn volatility(returns: &[f64], periods_per_year: f64) -> f64 {
-    volatility_with_annualize(returns, true, periods_per_year)
+    if invalid_annualization_factor(true, periods_per_year) {
+        return f64::NAN;
+    }
+    variance(returns).sqrt() * periods_per_year.sqrt()
 }
 
 /// Sharpe ratio of one return series.
@@ -672,8 +648,6 @@ mod tests {
         assert!(mean_return(&r, true, 0.0).is_nan());
         assert!(mean_return(&r, true, -1.0).is_nan());
         assert!(mean_return(&r, true, f64::NAN).is_nan());
-        assert!(volatility_with_annualize(&r, true, 0.0).is_nan());
-        assert!(volatility_with_annualize(&r, true, f64::INFINITY).is_nan());
         assert!(volatility(&r, 0.0).is_nan());
         assert!(volatility(&r, f64::INFINITY).is_nan());
     }

@@ -358,15 +358,11 @@ fn pair_correlation(
     Ok(corr)
 }
 
-fn flatten_matrix(matrix: &[Vec<f64>]) -> Vec<f64> {
-    matrix.iter().flatten().copied().collect()
-}
-
 fn finalize_correlation_matrix(
     matrix: Vec<Vec<f64>>,
 ) -> finstack_quant_core::Result<(Vec<Vec<f64>>, bool)> {
     let n = matrix.len();
-    let flat = flatten_matrix(&matrix);
+    let flat: Vec<f64> = matrix.iter().flatten().copied().collect();
     if validate_correlation_matrix(&flat, n).is_ok() {
         return Ok((matrix, false));
     }
