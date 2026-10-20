@@ -745,13 +745,11 @@ public = [
     "calibrate",
     "calibrate_bermudan_lmm_base_vol",
     "dry_run",
-    "dry_run_json",
     "validate_butterfly_call_convexity",
     "validate_butterfly_spread",
     "validate_calendar_spread",
     "validate_calendar_spread_with_forwards",
     "validate_calibration",
-    "validate_calibration_json",
     "validate_surface",
     "validate_surface_with_forwards",
     "validate_vol_bounds",
@@ -777,7 +775,6 @@ symbols = [
     "api::validate::DependencyNode",
     "api::validate::parse_envelope",
     "api::validate::validate",
-    "api::validate::validate_fail_fast",
     "calibrate_bermudan_lmm_base_vol_from_json",
     "hull_white::SwapFrequency",
     "quotes::MarketQuote",
@@ -790,7 +787,7 @@ symbols = [
     "validation::CurveValidator",
     "validation::RateBoundsPolicy",
 ]
-note = "Engine execution plumbing, dependency-graph validation (`validate`, `validate_fail_fast`, `parse_envelope`) and the recalibration helpers (including `pricing_options`) are driven from Rust (and from the scenarios crate); hosts reach them through the calibration envelope entry points. `calibrate_from_json` and `calibrate_bermudan_lmm_base_vol_from_json` are Rust JSON twins of `calibrate` / `calibrate_bermudan_lmm_base_vol`, which both hosts call with parsed input. `MarketDatum`, `PriorMarketObject`, `StepParams`, `Pillar`, `QuoteId`, `SwapFrequency` and `RateBoundsPolicy` cross the boundary as wire values (dicts / strings in Python, generated TypeScript types in WASM), and `EnvelopeError` / `StrictLoadDiagnostic` surface as `CalibrationEnvelopeError` and its `diagnostics`. `MarketQuote` is the Rust umbrella over the typed quote classes. `CurveValidator` is a Rust trait over calibrated curves that the calibration steps apply after each solve (configured by `ValidationConfig`); the vol-surface checks are bound as the `validate_*` functions. Solver, target and prepared-plan internals are pub(crate), so there is nothing public to list for them. Canonical curve-based Hull-White entry points own model-time and projection defaults behind the existing Python functions; specialized callback variants with contractual schedules stay Rust-only."
+note = "Engine execution plumbing, dependency-graph validation (`validate`, `parse_envelope`) and the recalibration helpers (including `pricing_options`) are driven from Rust (and from the scenarios crate); hosts reach them through the calibration envelope entry points. `calibrate_from_json` and `calibrate_bermudan_lmm_base_vol_from_json` are Rust JSON twins of `calibrate` / `calibrate_bermudan_lmm_base_vol`, which both hosts call with parsed input. `MarketDatum`, `PriorMarketObject`, `StepParams`, `Pillar`, `QuoteId`, `SwapFrequency` and `RateBoundsPolicy` cross the boundary as wire values (dicts / strings in Python, generated TypeScript types in WASM), and `EnvelopeError` / `StrictLoadDiagnostic` surface as `CalibrationEnvelopeError` and its `diagnostics`. `MarketQuote` is the Rust umbrella over the typed quote classes. `CurveValidator` is a Rust trait over calibrated curves that the calibration steps apply after each solve (configured by `ValidationConfig`); the vol-surface checks are bound as the `validate_*` functions. Solver, target and prepared-plan internals are pub(crate), so there is nothing public to list for them. Canonical curve-based Hull-White entry points own model-time and projection defaults behind the existing Python functions; specialized callback variants with contractual schedules stay Rust-only."
 
 [crates.valuations]
 rust_crate = "finstack-quant-valuations"

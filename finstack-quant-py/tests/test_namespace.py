@@ -463,7 +463,6 @@ class TestValuationsNamespace:
             "calibrate",
             "calibrate_bermudan_lmm_base_vol",
             "dry_run",
-            "validate_calibration_json",
         ):
             assert name not in valuations.__all__
             assert not hasattr(valuations, name)
@@ -503,7 +502,6 @@ class TestCalibrationNamespace:
             "calibrate",
             "calibrate_bermudan_lmm_base_vol",
             "dry_run",
-            "dry_run_json",
             "hull_white",
             "schema",
             "validate_butterfly_call_convexity",
@@ -511,7 +509,6 @@ class TestCalibrationNamespace:
             "validate_calendar_spread",
             "validate_calendar_spread_with_forwards",
             "validate_calibration",
-            "validate_calibration_json",
             "validate_surface",
             "validate_surface_with_forwards",
             "validate_vol_bounds",

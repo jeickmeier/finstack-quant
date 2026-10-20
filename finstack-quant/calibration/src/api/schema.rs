@@ -452,16 +452,6 @@ impl CalibrationEnvelope {
         Ok(self)
     }
 
-    /// Serialize this request envelope as canonical pretty-printed JSON.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`super::errors::EnvelopeError::JsonSerialize`] if
-    /// serialization fails.
-    pub fn to_json_pretty(&self) -> Result<String, super::errors::EnvelopeError> {
-        super::validate::serialize_pretty_json(self, "CalibrationEnvelope")
-    }
-
     /// Compute the versioned SHA-256 hash of this request envelope's canonical JSON.
     ///
     /// # Errors

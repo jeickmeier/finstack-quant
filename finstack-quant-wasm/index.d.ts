@@ -27,8 +27,8 @@
 // (`result.result.report`) to confirm the curves actually fit before using
 // the market downstream.
 //
-// `validateCalibrationJson` is a fast pre-flight check that canonicalizes
-// the envelope without solving — use it to surface schema errors early.
+// `validateCalibration` is a fast pre-flight check that returns the
+// validated envelope without solving — use it to surface schema errors early.
 //
 // Errors: every thrown error is a `FinstackError` (`kind` mirrors the Rust
 // `ErrorKind`; a wrong-type argument is a `TypeError` with kind
@@ -30180,26 +30180,12 @@ export interface CalibrationNamespace {
    */
   calibrate(envelope: CalibrationEnvelope | string): CalibrationResultEnvelope;
   /**
-   * Validate and canonicalize a calibration envelope without solving it.
-   * @param envelope - Typed calibration envelope or its serialized JSON form.
-   * @returns Canonical pretty-printed calibration-envelope JSON.
-   * @throws Error - Throws a `CalibrationEnvelopeError` if the envelope is malformed, its calibration schema marker is missing, malformed, or unsupported, static envelope validation fails (fail-fast: first error; `dryRun` lists every static error), or the canonical envelope cannot be serialized.
-   */
-  validateCalibrationJson(envelope: CalibrationEnvelope | string): string;
-  /**
    * Return all static plan errors and dependencies without running solvers.
    * @returns `CalibrationValidationReport` object containing every static error and the dependency graph.
    * @param envelope - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
    * @throws Error - Throws a `CalibrationEnvelopeError` if the envelope is malformed, its schema marker is missing, malformed, or unsupported, the envelope structure is invalid, or the validation report cannot be converted to a JavaScript value. Semantic findings are returned in the report rather than thrown.
    */
   dryRun(envelope: CalibrationEnvelope | string): CalibrationValidationReport;
-  /**
-   * JSON wire twin of `dryRun`: the validation report as pretty-printed JSON.
-   * @returns Pretty-printed `CalibrationValidationReport` JSON.
-   * @param envelope - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
-   * @throws Error - Throws a `CalibrationEnvelopeError` if the envelope is malformed, its schema marker is missing, malformed, or unsupported, the envelope structure is invalid, or the validation report cannot be serialized. Semantic findings are returned in the report rather than thrown.
-   */
-  dryRunJson(envelope: CalibrationEnvelope | string): string;
   /**
    * Fit the Bermudan LMM loading scale from the market swaption surface.
    * @param instrument - Canonical Bermudan swaption instrument envelope, as a plain object or its JSON string.
@@ -30230,9 +30216,8 @@ export interface CalibrationNamespace {
   /**
    * Validate a calibration envelope and return it as a plain `CalibrationEnvelope` object.
    *
-   * Typed twin of `validateCalibrationJson`: the same strict load and
-   * fail-fast static validation, returning the envelope object instead of its
-   * pretty-printed JSON.
+   * Strict load plus fail-fast static validation (Rust
+   * `validate::parse_envelope` and `validate::validate_calibration`).
    * @param envelope - `CalibrationEnvelope` (object or JSON) with schema marker `finstack_quant.calibration/1`.
    * @returns The validated `CalibrationEnvelope` in canonical form.
    * @throws Error - Throws a `CalibrationEnvelopeError` if the envelope is malformed, its schema marker is missing or unsupported, or static validation fails (fail-fast: first error; `dryRun` lists every static error).
@@ -34154,8 +34139,8 @@ export interface FinstackError extends Error {
 }
 
 /**
- * Structured error thrown by `calibration.calibrate`, `validateCalibrationJson`,
- * `dryRun` and `dryRunJson`.
+ * Structured error thrown by `calibration.calibrate`, `validateCalibration` and
+ * `dryRun`.
  *
  * `kind` and `step_id` are independent: never use a step id as the category.
  */

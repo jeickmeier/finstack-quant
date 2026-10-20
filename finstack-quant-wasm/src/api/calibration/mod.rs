@@ -1,7 +1,7 @@
 //! WASM bindings for the calibration engine.
 //!
-//! Mirrors the Python `calibrate` / `validate_calibration_json` surface plus
-//! diagnostics (`dryRun` and its `dryRunJson` wire twin).
+//! Mirrors the Python `calibrate` / `validate_calibration` surface plus
+//! diagnostics (`dryRun`).
 //!
 //! # Number safety
 //!
@@ -9,10 +9,8 @@
 //! `crate::utils::to_js_value`, so counts (`iterations`, `residual_evals`,
 //! `lm_jacobian_evals`) arrive as JS numbers. That serializer refuses to emit
 //! an integer above `Number.MAX_SAFE_INTEGER` (2^53 − 1) instead of rounding
-//! it, so there is no silent loss on this path. Only the JSON-string surfaces
-//! (`validateCalibrationJson`, `dryRunJson`) hand the caller text whose
-//! integers `JSON.parse` would round above that limit; iteration counts stay
-//! under ~10⁴ for any non-pathological calibration.
+//! it, so there is no silent loss on this path; iteration counts stay under
+//! ~10⁴ for any non-pathological calibration.
 //!
 //! On error, the host functions throw a JS `Error` with `name =
 //! "CalibrationEnvelopeError"`. The error exposes `kind` (the execution
@@ -51,26 +49,10 @@ use finstack_quant_calibration::api::schema::CalibrationResultEnvelope;
 use finstack_quant_calibration::api::validate;
 use wasm_bindgen::prelude::*;
 
-/// Validate a calibration plan JSON and return the canonical (pretty-printed) form.
-/// @param json - `CalibrationEnvelope` as a plain object or its JSON string.
-///
-/// # Errors
-///
-/// Throws a `CalibrationEnvelopeError` if the envelope is malformed, its calibration
-/// schema marker is missing, malformed, or unsupported, static envelope
-/// validation fails (fail-fast: first error; `dryRun` lists every static
-/// error), or the canonical envelope cannot be serialized.
-#[wasm_bindgen(js_name = validateCalibrationJson)]
-pub fn validate_calibration_json(json: JsValue) -> Result<String, JsValue> {
-    let json: &str = &json_text(&json, "json")?;
-    validate::validate_calibration_json(json).map_err(|err| execute_error_to_js(err.into()))
-}
-
 /// Validate a calibration envelope and return it as a plain `CalibrationEnvelope` object.
 ///
-/// Typed twin of [`validate_calibration_json`]: the same strict load and
-/// fail-fast static validation, returning the envelope object instead of its
-/// pretty-printed JSON.
+/// Strict load plus fail-fast static validation (Rust
+/// `validate::parse_envelope` and `validate::validate_calibration`).
 /// @param envelope - `CalibrationEnvelope` (object or JSON) with schema marker `finstack_quant.calibration/1`.
 /// @returns The validated `CalibrationEnvelope` in canonical form.
 ///
@@ -84,7 +66,7 @@ pub fn validate_calibration(envelope: JsValue) -> Result<JsValue, JsValue> {
     let envelope: &str = &json_text(&envelope, "envelope")?;
     let parsed =
         validate::parse_envelope(envelope).map_err(|err| execute_error_to_js(err.into()))?;
-    validate::validate_fail_fast(&parsed).map_err(|err| execute_error_to_js(err.into()))?;
+    validate::validate_calibration(&parsed).map_err(|err| execute_error_to_js(err.into()))?;
     to_js_value(&parsed)
 }
 
@@ -175,8 +157,7 @@ pub fn calibration_result_content_hash(result_json: JsValue) -> Result<String, J
 ///
 /// Returns the `CalibrationValidationReport` as a plain object listing every
 /// static error found (`errors`) plus the dependency graph
-/// (`dependency_graph`). Microseconds. Use [`dry_run_json`] for the JSON
-/// wire string.
+/// (`dependency_graph`). Microseconds.
 /// @param envelope_json - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
 ///
 /// # Errors
@@ -191,21 +172,6 @@ pub fn dry_run(envelope_json: JsValue) -> Result<JsValue, JsValue> {
     let report =
         validate::dry_run(envelope_json).map_err(|error| execute_error_to_js(error.into()))?;
     to_js_value(&report)
-}
-
-/// JSON wire twin of [`dry_run`]: the validation report as pretty-printed JSON.
-/// @param envelope_json - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
-///
-/// # Errors
-///
-/// Throws a `CalibrationEnvelopeError` if the envelope is malformed, its schema
-/// marker is missing, malformed, or unsupported, the envelope structure is
-/// invalid, or the validation report cannot be serialized. Semantic findings
-/// are returned in the report rather than thrown.
-#[wasm_bindgen(js_name = dryRunJson)]
-pub fn dry_run_json(envelope_json: JsValue) -> Result<String, JsValue> {
-    let envelope_json: &str = &json_text(&envelope_json, "envelopeJson")?;
-    validate::dry_run_json(envelope_json).map_err(|error| execute_error_to_js(error.into()))
 }
 
 /// Calibrate the explicit Bermudan LMM loading scale from the market surface.
@@ -313,13 +279,6 @@ mod tests {
     }
 
     #[test]
-    fn validate_calibration_json_accepts_empty_plan() {
-        let json = empty_envelope_json();
-        let canonical = validate::validate_calibration_json(&json).expect("validate");
-        assert!(!canonical.is_empty());
-    }
-
-    #[test]
     fn validation_and_execution_reject_semantically_invalid_requests() {
         let mut value: serde_json::Value =
             serde_json::from_str(&empty_envelope_json()).expect("empty envelope parses");
@@ -335,7 +294,8 @@ mod tests {
 
         for error in [
             ExecuteError::from(
-                validate::validate_calibration_json(&json)
+                validate::parse_envelope(&json)
+                    .and_then(|envelope| validate::validate_calibration(&envelope))
                     .expect_err("validation must reject undefined quote sets"),
             ),
             engine::calibrate_from_json(&json)
@@ -360,7 +320,7 @@ mod tests {
     #[test]
     fn validate_calibration_returns_the_typed_envelope() {
         let envelope = validate::parse_envelope(&empty_envelope_json()).expect("parse");
-        validate::validate_fail_fast(&envelope).expect("validate");
+        validate::validate_calibration(&envelope).expect("validate");
         assert_eq!(envelope.plan.id, "empty");
         assert!(validate::parse_envelope("{ not json").is_err());
     }
@@ -370,23 +330,17 @@ mod tests {
         let json = empty_envelope_json();
         let report = validate::dry_run(&json).expect("dry_run");
         assert!(report.errors.is_empty());
-        let report_json = validate::dry_run_json(&json).expect("dry_run_json");
-        let parsed: serde_json::Value = serde_json::from_str(&report_json).expect("json");
-        assert!(parsed.get("errors").is_some());
-        assert!(parsed.get("dependency_graph").is_some());
     }
 
     #[test]
     fn dry_run_rejects_malformed_json() {
         assert!(validate::dry_run("not json").is_err());
-        assert!(validate::dry_run_json("not json").is_err());
     }
 
     #[test]
-    fn validate_calibration_json_preserves_parse_diagnostic() {
+    fn parse_envelope_preserves_parse_diagnostic() {
         let error = ExecuteError::from(
-            validate::validate_calibration_json("{ not valid json")
-                .expect_err("malformed JSON must error"),
+            validate::parse_envelope("{ not valid json").expect_err("malformed JSON must error"),
         );
         let details = error.details();
         assert_eq!(details.stage.as_str(), "ingestion");
@@ -396,22 +350,6 @@ mod tests {
             .details()
             .to_json()
             .contains("\"stage\":\"ingestion\""));
-    }
-
-    #[test]
-    fn validate_calibration_json_never_returns_empty_object_fallback() {
-        let json = empty_envelope_json();
-        let canonical = validate::validate_calibration_json(&json).expect("validate");
-        assert_ne!(
-            canonical, "{}",
-            "canonical envelope JSON must not collapse to an empty object"
-        );
-        let (reparsed, _report) = CalibrationEnvelope::from_slice_strict(
-            canonical.as_bytes(),
-            &finstack_quant_core::contract::LoadLimits::default(),
-        )
-        .expect("canonical JSON must round-trip strictly");
-        assert_eq!(reparsed.schema, CalibrationSchema::Calibration);
     }
 
     #[test]
