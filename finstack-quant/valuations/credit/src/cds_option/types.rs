@@ -608,7 +608,7 @@ impl CdsOption {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
-        super::metrics::delta::delta(self, market, as_of)
+        super::metrics::delta::delta_with_provider(self, market, as_of, None)
     }
 
     /// CDS option Γ for spread strikes: central difference of the Black-76
@@ -645,7 +645,7 @@ impl CdsOption {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
-        super::metrics::gamma::gamma(self, market, as_of)
+        super::metrics::gamma::gamma_with_provider(self, market, as_of, None)
     }
 
     /// Bloomberg CDSO Vega(1%) — one-sided forward difference of the

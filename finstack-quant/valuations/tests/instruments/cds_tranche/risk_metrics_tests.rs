@@ -558,9 +558,7 @@ fn test_upfront_equals_pv() {
     let as_of = base_date();
 
     // Act
-    let upfront = pricer
-        .calculate_model_upfront(&tranche, &market, as_of)
-        .unwrap();
+    let upfront = tranche.model_upfront(&market, as_of).unwrap();
     let pv = pricer
         .price_tranche(&tranche, &market, as_of)
         .unwrap()

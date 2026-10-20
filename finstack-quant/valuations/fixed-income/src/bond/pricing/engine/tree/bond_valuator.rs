@@ -132,24 +132,8 @@ impl BondValuator {
         as_of: Date,
     ) -> Result<Vec<f64>> {
         let discount_curve = market_context.get_discount(&bond.discount_curve_id)?;
-        Self::mandatory_grid_times_with_day_count(
-            bond,
-            market_context,
-            as_of,
-            discount_curve.day_count(),
-        )
-    }
-
-    /// Collect mandatory grid times on an explicitly selected model time
-    /// basis. The rates-credit lattice uses this with ACT/365F, while the
-    /// risk-free trees retain the discount curve's day count through
-    /// [`Self::mandatory_grid_times`].
-    pub(crate) fn mandatory_grid_times_with_day_count(
-        bond: &Bond,
-        market_context: &MarketContext,
-        as_of: Date,
-        grid_day_count: DayCount,
-    ) -> Result<Vec<f64>> {
+        // Grid times are measured on the discount curve's own day count.
+        let grid_day_count = discount_curve.day_count();
         let schedule = bond.full_cashflow_schedule(market_context)?;
         let flows = bond.pricing_dated_cashflows_from_schedule(&schedule, as_of, as_of)?;
         let event_dates = Self::exercise_event_dates(&schedule);

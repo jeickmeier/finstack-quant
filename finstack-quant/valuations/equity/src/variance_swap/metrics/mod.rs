@@ -166,9 +166,7 @@ impl MetricCalculator for VarianceVegaCalculator {
 #[cfg(test)]
 mod expected_variance_tests {
     use super::*;
-    use crate::variance_swap::pricer::{
-        compute_pv, partial_realized_variance, remaining_forward_variance,
-    };
+    use crate::variance_swap::pricer::compute_pv;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -248,9 +246,12 @@ mod expected_variance_tests {
         // Calendar-time blend, used only to prove the schedule is non-uniform so
         // this test is a real regression guard.
         let w = swap.time_elapsed_fraction(as_of);
-        let count_realized =
-            partial_realized_variance(&swap, &market, as_of).expect("obs-count realized");
-        let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
+        let count_realized = swap
+            .partial_realized_variance(&market, as_of)
+            .expect("obs-count realized");
+        let forward = swap
+            .remaining_forward_variance(&market, as_of)
+            .expect("forward");
         let count_blend = count_realized * w + forward * (1.0 - w);
 
         let base_value = swap.value(&market, as_of).expect("base value");

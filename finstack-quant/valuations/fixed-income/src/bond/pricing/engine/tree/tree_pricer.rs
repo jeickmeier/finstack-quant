@@ -388,19 +388,9 @@ impl TreePricer {
         oas_bp: f64,
     ) -> Result<f64> {
         Ok(self
-            .price_at_oas_outcome(bond, market_context, as_of, oas_bp)?
+            .prepare(bond, market_context, as_of)?
+            .price(oas_bp)?
             .amount)
-    }
-
-    /// Price once and retain any LSMC diagnostics without a second simulation.
-    pub(crate) fn price_at_oas_outcome(
-        &self,
-        bond: &Bond,
-        market_context: &MarketContext,
-        as_of: Date,
-        oas_bp: f64,
-    ) -> Result<TreePriceOutcome> {
-        self.prepare(bond, market_context, as_of)?.price(oas_bp)
     }
 
     /// Calibrate the configured model for `bond` once and return a pricer

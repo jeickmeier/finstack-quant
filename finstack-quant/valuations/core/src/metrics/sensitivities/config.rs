@@ -41,15 +41,11 @@ pub const STANDARD_BUCKET_LABELS: [&str; 11] = [
 /// assert_eq!(format_bucket_label(10.0), "10y");
 /// assert_eq!(format_bucket_label(0.75), "9m"); // non-standard
 /// ```
+///
+/// Returns `Cow<'static, str>` to avoid allocation for the 11 standard
+/// buckets (the common case in DV01/CS01 loops).
 #[inline]
-pub fn format_bucket_label(years: f64) -> String {
-    format_bucket_label_cow(years).into_owned()
-}
-
-/// Same as [`format_bucket_label`] but returns `Cow<'static, str>` to avoid
-/// allocation for the 11 standard buckets (the common case in DV01/CS01 loops).
-#[inline]
-pub fn format_bucket_label_cow(years: f64) -> std::borrow::Cow<'static, str> {
+pub fn format_bucket_label(years: f64) -> std::borrow::Cow<'static, str> {
     for (i, &bucket_time) in STANDARD_BUCKETS_YEARS.iter().enumerate() {
         if (years - bucket_time).abs() < 0.01 {
             return std::borrow::Cow::Borrowed(STANDARD_BUCKET_LABELS[i]);
@@ -74,7 +70,7 @@ pub fn format_bucket_label_cow(years: f64) -> std::borrow::Cow<'static, str> {
 pub fn format_key_rate_label(years: f64) -> String {
     let label = format_bucket_label(years);
     if parse_key_rate_label(&label).ok() == Some(years) {
-        label
+        label.into_owned()
     } else {
         format!("{years}y")
     }
@@ -382,11 +378,8 @@ mod tests {
         assert_eq!(format_bucket_label(10.0), "10y");
         assert_eq!(format_bucket_label(0.75), "9m");
         assert_eq!(format_bucket_label(1.4), "1y");
-        assert_eq!(
-            format_bucket_label_cow(5.0),
-            std::borrow::Cow::Borrowed("5y")
-        );
-        assert_eq!(format_bucket_label_cow(1.25).into_owned(), "1y");
+        assert_eq!(format_bucket_label(5.0), std::borrow::Cow::Borrowed("5y"));
+        assert_eq!(format_bucket_label(1.25).into_owned(), "1y");
     }
 
     #[test]

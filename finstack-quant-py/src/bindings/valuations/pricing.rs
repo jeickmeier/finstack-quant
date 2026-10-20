@@ -967,33 +967,6 @@ fn listed_product_catalog<'py>(
     serde_to_py(py, &rows)
 }
 
-/// Parse the instrument (before the market) and run the Rust
-/// `instrument_cashflows` export for the typed cashflow envelope.
-fn cashflow_envelope(
-    py: Python<'_>,
-    instrument: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-    model: &str,
-) -> PyResult<InstrumentCashflowEnvelope> {
-    let instrument = extract_instrument(instrument)?;
-    let instrument = py
-        .detach(move || instrument.into_parsed(None))
-        .map_err(core_to_py)?;
-    let market = extract_market(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let model = model.to_owned();
-    py.detach(move || {
-        finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
-            &instrument,
-            &market,
-            &as_of,
-            &model,
-        )
-        .map_err(core_to_py)
-    })
-}
-
 /// Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
 ///
 /// The Rust
@@ -1064,8 +1037,24 @@ fn instrument_cashflows(
     as_of: &Bound<'_, PyAny>,
     model: &str,
 ) -> PyResult<PyInstrumentCashflowEnvelope> {
-    cashflow_envelope(py, instrument, market, as_of, model)
-        .map(|inner| PyInstrumentCashflowEnvelope { inner })
+    // Parse the instrument before the market so instrument errors surface first.
+    let instrument = extract_instrument(instrument)?;
+    let instrument = py
+        .detach(move || instrument.into_parsed(None))
+        .map_err(core_to_py)?;
+    let market = extract_market(py, market)?;
+    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
+    let model = model.to_owned();
+    py.detach(move || {
+        finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
+            &instrument,
+            &market,
+            &as_of,
+            &model,
+        )
+        .map_err(core_to_py)
+    })
+    .map(|inner| PyInstrumentCashflowEnvelope { inner })
 }
 
 /// Cashflow export for one instrument: header fields plus per-flow rows.

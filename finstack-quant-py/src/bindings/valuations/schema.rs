@@ -257,14 +257,9 @@ fn validate_instrument_type_json(
     instrument_json: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
     let instrument_json = crate::bindings::extract::envelope_json_text(instrument_json)?;
-    validate_instance_as_type(instrument_type, &parse_instance(&instrument_json)?)
-}
-
-/// Validate a decoded payload against one instrument type's schema and
-/// return its canonical compact JSON.
-fn validate_instance_as_type(instrument_type: &str, instance: &Value) -> PyResult<String> {
-    canonical::validate_instrument_type_json(instrument_type, instance).map_err(core_to_py)?;
-    canonical_json(instance)
+    let instance = parse_instance(&instrument_json)?;
+    canonical::validate_instrument_type_json(instrument_type, &instance).map_err(core_to_py)?;
+    canonical_json(&instance)
 }
 
 /// Re-serialize a validated instance as canonical compact JSON.

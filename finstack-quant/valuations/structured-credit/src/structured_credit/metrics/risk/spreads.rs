@@ -586,7 +586,7 @@ pub struct BucketedCs01Calculator;
 impl MetricCalculator for BucketedCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         use finstack_quant_valuations_core::metrics::sensitivities::config::{
-            format_bucket_label_cow, STANDARD_BUCKETS_YEARS,
+            format_bucket_label, STANDARD_BUCKETS_YEARS,
         };
 
         let base_spread = context
@@ -650,7 +650,7 @@ impl MetricCalculator for BucketedCs01Calculator {
         let series: Vec<(std::borrow::Cow<'static, str>, f64)> = buckets
             .iter()
             .zip(bucket_pnl.iter())
-            .map(|(&t, &pnl)| (format_bucket_label_cow(t), pnl))
+            .map(|(&t, &pnl)| (format_bucket_label(t), pnl))
             .collect();
         let total: f64 = bucket_pnl.iter().sum();
 

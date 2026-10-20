@@ -1040,36 +1040,18 @@ impl<'a> EquityWaterfallEngine<'a> {
         Ok((-future_value).max(0.0))
     }
 
-    /// Calculate IRR for LP cashflows.
+    /// Calculate LP IRR to date from an LP-net cashflow history.
     ///
-    /// Delegates to the standalone [`super::metrics::calculate_irr`] routine
-    /// (same `(1 + r)^{-t}` discounting, day-count error propagation, and
-    /// multiple-root guard) using the waterfall's `day_count`.
-    ///
-    /// `base_date` must be the date of the first flow — the shared routine
-    /// anchors year fractions there.
-    fn calculate_irr(
-        &self,
-        flows: &[(Date, Money)],
-        base_date: Date,
-    ) -> finstack_quant_core::Result<f64> {
-        debug_assert!(
-            flows.first().is_none_or(|(d, _)| *d == base_date),
-            "waterfall IRR base_date must be the first flow's date"
-        );
-        let _ = base_date;
-        super::metrics::calculate_irr(flows, self.spec.day_count)
-    }
-
-    /// Calculate LP IRR to date from an LP-net cashflow history
-    /// .
+    /// Uses the standalone [`super::metrics::calculate_irr`] routine (same
+    /// `(1 + r)^{-t}` discounting, day-count error propagation, and
+    /// multiple-root guard) with the waterfall's `day_count`, anchoring year
+    /// fractions at the first flow.
     fn calculate_lp_irr_to_date(&self, lp_flows: &[(Date, Money)]) -> Option<f64> {
         if lp_flows.len() < 2 {
             return None;
         }
 
-        let base_date = lp_flows[0].0;
-        self.calculate_irr(lp_flows, base_date).ok()
+        super::metrics::calculate_irr(lp_flows, self.spec.day_count).ok()
     }
 
     /// Reconcile lifetime tiers without moving historical LP receipt dates.

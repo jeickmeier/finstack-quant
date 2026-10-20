@@ -664,11 +664,13 @@ pub fn build_with_metrics_dyn(
         .unwrap_or_else(MetricContext::default_config);
     let instrument_id = instrument.id().to_string();
     let measures = compute_metrics_dyn(instrument, curves, as_of, base_value, metrics, options)?;
-    let mut result = crate::results::ValuationResult::stamped_with_config(
+    // Stamp the exact `FinstackConfig` used during pricing so execution policy
+    // and reported metadata cannot disagree.
+    let mut result = crate::results::ValuationResult::stamped_with_meta(
         &instrument_id,
         as_of,
         base_value,
-        cfg.as_ref(),
+        finstack_quant_core::config::results_meta(cfg.as_ref()),
     );
     result.measures = measures;
     Ok(result)
@@ -1232,7 +1234,7 @@ pub fn resolve_inflation_lag(
 ///
 /// The index is cloned with the instrument's effective lag so a contract-level
 /// lag override is honored without mutating shared market data.
-pub fn realized_inflation_index_value(
+fn realized_inflation_index_value(
     index: &InflationIndex,
     unlagged_date: Date,
     effective_date: Date,
@@ -1287,22 +1289,31 @@ pub struct InflationReferenceValue {
     pub publication_date: Option<Date>,
 }
 
-/// Resolve a contractual reference CPI, applying month lag and daily weight once.
+/// Resolve a contractual reference CPI, applying month lag and daily weight
+/// once, together with the availability of every interpolation anchor.
+///
 /// Explicit monthly publication dates control availability independently of the
 /// observation lag. Without one, past reference anchors remain strictly required
-/// history; a stale feed cannot silently extend the forecast window.
-pub fn reference_inflation_value(
-    market: &MarketContext,
-    index_id: &str,
-    date: Date,
-    as_of: Date,
-    lag: InflationLag,
-    interpolation: SeriesInterpolation,
-) -> finstack_quant_core::Result<f64> {
-    Ok(resolve_reference_inflation(market, index_id, date, as_of, lag, interpolation)?.value)
-}
-
-/// Resolve reference CPI and the availability of every interpolation anchor.
+/// history; a stale feed cannot silently extend the forecast window. Known
+/// anchors read the inflation index history; unknown anchors are projected from
+/// the inflation curve with the same id.
+///
+/// # Arguments
+///
+/// * `market` - Market context holding the inflation index history and, for
+///   anchors not yet published by `as_of`, the inflation curve named `index_id`.
+/// * `index_id` - Identifier shared by the inflation index and inflation curve.
+/// * `date` - Contractual reference date before the observation lag is applied.
+/// * `as_of` - Valuation date deciding which anchors are published fixings.
+/// * `lag` - Observation lag: month lags keep the contractual month's daily
+///   weight, day lags shift the reference date itself.
+/// * `interpolation` - `Step` uses the first-of-month anchor only; `Linear`
+///   interpolates daily between consecutive monthly anchors.
+///
+/// # Errors
+///
+/// Returns an error when a required historical fixing or projection curve is
+/// missing, or when the lag moves the date out of range.
 pub fn resolve_reference_inflation(
     market: &MarketContext,
     index_id: &str,
@@ -1544,7 +1555,7 @@ mod realized_inflation_index_tests {
             .with_publication_dates(index.get_publication_dates())
             .expect("release dates");
         let stale_market = market.clone().insert_inflation_index(stale);
-        assert!(reference_inflation_value(
+        assert!(resolve_reference_inflation(
             &stale_market,
             "US-CPI",
             date!(2026 - 04 - 01),
@@ -1557,7 +1568,7 @@ mod realized_inflation_index_tests {
         let no_metadata = InflationIndex::new("US-CPI", vec![(december, 305.0)], Currency::USD)
             .expect("history with no publication policy");
         let no_metadata_market = market.insert_inflation_index(no_metadata);
-        assert!(reference_inflation_value(
+        assert!(resolve_reference_inflation(
             &no_metadata_market,
             "US-CPI",
             date!(2026 - 04 - 01),

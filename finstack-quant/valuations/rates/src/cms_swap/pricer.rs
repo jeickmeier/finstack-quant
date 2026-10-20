@@ -67,10 +67,6 @@ impl CmsSwapPricer {
         Money::new(npv, inst.notional.currency())
     }
 
-    fn price_internal(&self, inst: &CmsSwap, market: &MarketContext, as_of: Date) -> Result<Money> {
-        self.price_internal_with_convexity(inst, market, as_of, 1.0)
-    }
-
     /// Compute PV of the CMS leg.
     fn pv_cms_leg(
         &self,
@@ -160,7 +156,7 @@ impl Pricer for CmsSwapPricer {
             InstrumentType::CmsSwap,
         )?;
 
-        let pv = self.price_internal(cms, market, as_of)?;
+        let pv = self.price_internal_with_convexity(cms, market, as_of, 1.0)?;
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
     }
@@ -344,12 +340,6 @@ impl Pricer for CmsSwapReplicationPricer {
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
     }
-}
-
-/// Present value entry point for `Instrument::value`.
-pub(crate) fn compute_pv(inst: &CmsSwap, market: &MarketContext, as_of: Date) -> Result<Money> {
-    let pricer = CmsSwapPricer::new();
-    pricer.price_internal(inst, market, as_of)
 }
 
 /// Expected CMS coupon rate for one CMS leg period.

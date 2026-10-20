@@ -241,7 +241,7 @@ impl AsianOptionMcPricer {
     }
 
     /// Price an Asian option using Monte Carlo.
-    fn price_internal(
+    pub(crate) fn price_internal(
         &self,
         inst: &AsianOption,
         curves: &MarketContext,
@@ -521,16 +521,6 @@ impl Pricer for AsianOptionMcPricer {
 
         Ok(ValuationResult::stamped(asian.id(), as_of, pv))
     }
-}
-
-/// Present value using Monte Carlo.
-pub(crate) fn compute_pv(
-    inst: &AsianOption,
-    curves: &MarketContext,
-    as_of: Date,
-) -> finstack_quant_core::Result<Money> {
-    let pricer = AsianOptionMcPricer::new();
-    pricer.price_internal(inst, curves, as_of)
 }
 
 use finstack_quant_models::closed_form::asian::arithmetic_asian_tw_price_times;

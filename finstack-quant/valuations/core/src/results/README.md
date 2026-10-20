@@ -57,8 +57,7 @@ Constructors and builders:
 | Method | Use |
 |--------|-----|
 | `stamped(instrument_id, as_of, value)` | Default config metadata |
-| `stamped_with_config(...)` | Stamp from an explicit `FinstackConfig` |
-| `stamped_with_meta(...)` | Reuse a prebuilt `ResultsMeta` — build it once per batch with `finstack_quant_core::config::results_meta(&config)` to avoid re-deriving config per instrument |
+| `stamped_with_meta(...)` | Stamp from an explicit config: build `ResultsMeta` once per batch with `finstack_quant_core::config::results_meta(&config)` to avoid re-deriving config per instrument |
 | `with_measures`, `with_details`, `with_explanation` | Attach payloads |
 
 Accessors: `metric(MetricId)`, `metric_str(&str)`, `metric_series(&MetricId)`

@@ -65,17 +65,6 @@ fn parse_composite_envelope(json: &str) -> PyResult<CompositeInstrument> {
     finstack_quant_valuations::pricer::parse_typed_instrument_json(json).map_err(core_to_py)
 }
 
-fn composite_envelope_json(instrument: &CompositeInstrument) -> PyResult<String> {
-    to_json(
-        &InstrumentEnvelope::new(InstrumentJson::from(instrument.clone())),
-        "composite instrument envelope",
-    )
-}
-
-fn parse_observations(json: &str, what: &str) -> PyResult<Vec<CompositeMarketObservation>> {
-    parse_json(json, what)
-}
-
 /// Accept a ``CompositeMarketObservation`` array as a Python list of dicts,
 /// a JSON string, or ``None`` (no observations).
 fn observations_from_py(
@@ -88,7 +77,7 @@ fn observations_from_py(
         Some(obj) if obj.is_none() => Ok(Vec::new()),
         Some(obj) => {
             let json = crate::bindings::module_utils::py_to_json_string(py, obj, what)?;
-            parse_observations(&json, what)
+            parse_json(&json, what)
         }
     }
 }
@@ -1049,12 +1038,6 @@ pub struct PyCompositeInstrument {
     pub(crate) inner: CompositeInstrument,
 }
 
-impl PyCompositeInstrument {
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        composite_envelope_json(&self.inner)
-    }
-}
-
 #[pymethods]
 impl PyCompositeInstrument {
     /// Deserialize and validate a canonical composite instrument envelope.
@@ -1090,7 +1073,10 @@ impl PyCompositeInstrument {
     /// ValueError
     ///     If canonical serialization fails.
     fn to_json(&self) -> PyResult<String> {
-        self.envelope_json()
+        to_json(
+            &InstrumentEnvelope::new(InstrumentJson::from(self.inner.clone())),
+            "composite instrument envelope",
+        )
     }
 
     /// Support pickle through the canonical JSON round-trip.

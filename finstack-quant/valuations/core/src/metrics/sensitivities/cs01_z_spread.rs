@@ -463,7 +463,7 @@ where
             Vec::with_capacity(buckets.len());
         let mut total = NeumaierAccumulator::new();
         for (b, group) in groups.iter().enumerate() {
-            let label = super::config::format_bucket_label_cow(buckets[b]);
+            let label = super::config::format_bucket_label(buckets[b]);
             let cs01 = if group.is_empty() {
                 0.0
             } else {

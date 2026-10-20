@@ -45,15 +45,7 @@ impl MetricCalculator for GammaCalculator {
 }
 
 /// CDS option Γ, branched by strike kind (see the module docs).
-pub(crate) fn gamma(
-    option: &CdsOption,
-    curves: &MarketContext,
-    as_of: finstack_quant_core::dates::Date,
-) -> Result<f64> {
-    gamma_with_provider(option, curves, as_of, None)
-}
-
-fn gamma_with_provider(
+pub(crate) fn gamma_with_provider(
     option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,

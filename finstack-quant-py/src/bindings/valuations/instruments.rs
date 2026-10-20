@@ -298,13 +298,6 @@ type BondBuilderInner = finstack_quant_valuations::instruments::fixed_income::bo
 type TermLoanBuilderInner =
     finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanBuilder;
 
-/// Parse a `BondConvention` preset from its serde string.
-fn bond_convention_from_str(
-    value: &str,
-) -> PyResult<finstack_quant_valuations::instruments::BondConvention> {
-    enum_from_str(value, "convention")
-}
-
 /// Typed wrapper for the Rust `Bond` instrument.
 ///
 /// Construct via ``Bond.fixed`` (US corporate), ``Bond.with_convention`` (a
@@ -547,7 +540,10 @@ impl PyBond {
             rate_from_py(coupon_rate, "coupon_rate")?,
             py_to_date(issue_date)?,
             py_to_date(maturity)?,
-            bond_convention_from_str(convention)?,
+            enum_from_str::<finstack_quant_valuations::instruments::BondConvention>(
+                convention,
+                "convention",
+            )?,
             discount_curve_id,
         )
         .map_err(core_to_py)?;
@@ -731,7 +727,10 @@ impl PyBond {
             py_to_date(maturity)?,
             frequency.inner,
             day_count.inner,
-            bond_convention_from_str(convention)?,
+            enum_from_str::<finstack_quant_valuations::instruments::BondConvention>(
+                convention,
+                "convention",
+            )?,
             discount_curve_id,
         )
         .map_err(core_to_py)?;

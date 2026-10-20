@@ -322,30 +322,17 @@ impl Swaption {
         })
     }
 
-    fn underlying_fixed_leg_with_rate(&self, rate: Decimal) -> FixedLegSpec {
+    /// Underlying swap with a zero fixed rate on the receive side, used to
+    /// value the floating leg for the forward swap rate.
+    fn underlier_irs(&self) -> Result<InterestRateSwap> {
         let mut fixed = self.underlying_fixed_leg.clone();
-        fixed.rate = rate;
-        fixed
-    }
-
-    fn underlying_irs(&self, fixed_rate: f64, side: PayReceive) -> Result<InterestRateSwap> {
-        self.underlying_irs_with_float(fixed_rate, side, self.underlying_float_leg.clone())
-    }
-
-    fn underlying_irs_with_float(
-        &self,
-        fixed_rate: f64,
-        side: PayReceive,
-        float: FloatLegSpec,
-    ) -> Result<InterestRateSwap> {
-        let fixed_rate = finstack_quant_core::decimal::f64_to_decimal(fixed_rate)?;
-        let fixed = self.underlying_fixed_leg_with_rate(fixed_rate);
+        fixed.rate = finstack_quant_core::decimal::f64_to_decimal(0.0)?;
         let irs = InterestRateSwap::builder()
             .id(InstrumentId::new(format!("{}:UNDERLIER", self.id.as_str())))
             .notional(self.notional)
-            .side(side)
+            .side(PayReceive::Receive)
             .fixed_leg(fixed)
-            .float_leg(float)
+            .float_leg(self.underlying_float_leg.clone())
             .build()?;
         irs.validate()?;
         Ok(irs)
@@ -750,7 +737,7 @@ impl Swaption {
             return self.single_curve_forward_from_float_schedule(disc.as_ref(), as_of, annuity);
         }
 
-        let underlier = self.underlying_irs(0.0, PayReceive::Receive)?;
+        let underlier = self.underlier_irs()?;
         let pv_float = underlier.pv_float_leg(market, as_of)?;
         Ok(pv_float / (self.notional.amount() * annuity))
     }

@@ -395,21 +395,6 @@ impl ValuationResult {
         Self::stamped_with_meta(instrument_id, as_of, value, meta)
     }
 
-    /// Create a valuation result using a provided configuration.
-    ///
-    /// This helper ensures the metadata stamp matches the exact `FinstackConfig`
-    /// used during pricing, avoiding mismatches between execution policy and
-    /// reported metadata.
-    pub fn stamped_with_config(
-        instrument_id: &str,
-        as_of: Date,
-        value: Money,
-        cfg: &FinstackConfig,
-    ) -> Self {
-        let meta = results_meta(cfg);
-        Self::stamped_with_meta(instrument_id, as_of, value, meta)
-    }
-
     /// Create a valuation result with caller-provided metadata.
     ///
     /// Use this in hot paths when you already have `ResultsMeta` available
@@ -867,11 +852,11 @@ mod tests {
     }
 
     #[test]
-    fn stamped_with_config_round_trips_metadata_fields() {
+    fn stamped_with_meta_round_trips_config_metadata_fields() {
         let as_of = date!(2025 - 01 - 15);
         let pv = Money::from((1_i64, Currency::USD));
         let cfg = FinstackConfig::default();
-        let stamped = ValuationResult::stamped_with_config("CFG-1", as_of, pv, &cfg);
+        let stamped = ValuationResult::stamped_with_meta("CFG-1", as_of, pv, results_meta(&cfg));
         assert_eq!(stamped.instrument_id, "CFG-1");
         assert_eq!(
             stamped.meta.numeric_mode,

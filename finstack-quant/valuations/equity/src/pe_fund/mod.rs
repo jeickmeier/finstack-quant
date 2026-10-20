@@ -41,8 +41,6 @@
 //! - private markets metrics module for private markets metrics
 
 pub(crate) mod metrics;
-/// Private markets fund pricer implementation
-pub(crate) mod pricer;
 mod types;
 pub mod waterfall;
 

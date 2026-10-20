@@ -43,34 +43,26 @@ const YTM_TOLERANCE: f64 = 1e-12;
 /// inputs (negative flows, multiple IRRs) from looping.
 const YTM_MAX_ITERATIONS: usize = 50;
 
-/// Solve for yield-to-maturity with an explicit Brent tolerance and
-/// iteration cap.
+/// Solve quoted yield from contractual times already measured by the instrument.
 ///
 /// Seeds Brent with a current-yield plus pull-to-par guess; one-cashflow
-/// conventions with a closed-form inverse skip the root solve.
+/// conventions with a closed-form inverse skip the root solve. Brent runs with
+/// `YTM_TOLERANCE` on the yield axis and at most `YTM_MAX_ITERATIONS`.
+///
+/// # Arguments
+///
+/// * `cashflows` - Actual payment dates, contractual year fractions, and currency amounts.
+/// * `target_price` - Dirty currency price reproduced by discounting these flows.
+/// * `spec` - Notional, coupon, frequency, and compounding conventions for the yield solve.
 ///
 /// # Errors
 ///
 /// Returns `Err` when the target price is non-positive, the cashflows are
 /// empty, a pricing evaluation fails, or Brent does not converge.
-fn solve_ytm_with(
-    cashflows: &[(Date, Money)],
-    as_of: Date,
-    target_price: Money,
-    spec: YtmPricingSpec,
-    tolerance: f64,
-    max_iterations: usize,
-) -> Result<f64> {
-    let timed = flow_times(spec.day_count, spec.frequency, cashflows, as_of)?;
-    solve_ytm_timed_with(&timed, target_price, spec, tolerance, max_iterations)
-}
-
-fn solve_ytm_timed_with(
+pub(crate) fn solve_ytm_timed(
     cashflows: &[(Date, f64, Money)],
     target_price: Money,
     spec: YtmPricingSpec,
-    tolerance: f64,
-    max_iterations: usize,
 ) -> Result<f64> {
     let target = target_price.amount();
     if target <= 0.0 {
@@ -149,8 +141,8 @@ fn solve_ytm_timed_with(
     // bracket is found, or the objective is non-finite — so non-convergent
     // YTM solves surface as `Err`.
     let solver = BrentSolver::new()
-        .tolerance(tolerance)
-        .max_iterations(max_iterations);
+        .tolerance(YTM_TOLERANCE)
+        .max_iterations(YTM_MAX_ITERATIONS);
     let ytm = solver.solve(price_fn, initial_guess)?;
 
     // If any pricing error occurred during objective evaluation, surface it
@@ -214,14 +206,8 @@ pub fn solve_ytm(
     target_price: Money,
     spec: YtmPricingSpec,
 ) -> Result<f64> {
-    solve_ytm_with(
-        cashflows,
-        as_of,
-        target_price,
-        spec,
-        YTM_TOLERANCE,
-        YTM_MAX_ITERATIONS,
-    )
+    let timed = flow_times(spec.day_count, spec.frequency, cashflows, as_of)?;
+    solve_ytm_timed(&timed, target_price, spec)
 }
 
 /// Solve bond yield with contractual coupon boundaries for ACT/365L timing.
@@ -242,27 +228,6 @@ pub(crate) fn solve_bond_ytm(
 ) -> Result<f64> {
     let timed = bond_flow_times(bond, cashflows, as_of)?;
     solve_ytm_timed(&timed, target_price, spec)
-}
-
-/// Solve quoted yield from contractual times already measured by the instrument.
-///
-/// # Arguments
-///
-/// * `cashflows` - Actual payment dates, contractual year fractions, and currency amounts.
-/// * `target_price` - Dirty currency price reproduced by discounting these flows.
-/// * `spec` - Notional, coupon, frequency, and compounding conventions for the yield solve.
-pub(crate) fn solve_ytm_timed(
-    cashflows: &[(Date, f64, Money)],
-    target_price: Money,
-    spec: YtmPricingSpec,
-) -> Result<f64> {
-    solve_ytm_timed_with(
-        cashflows,
-        target_price,
-        spec,
-        YTM_TOLERANCE,
-        YTM_MAX_ITERATIONS,
-    )
 }
 
 #[cfg(test)]
@@ -582,53 +547,6 @@ mod tests {
             "an unreachable target price must surface as Err, not a fake yield \
              from a sign-flipped objective residual"
         );
-    }
-
-    /// Item 12 regression: a non-convergent YTM solve must return an explicit
-    /// error, never a silent last iterate. The configured `max_iterations` is
-    /// passed to Brent, so capping it at 1 with a tight tolerance forces Brent to bail
-    /// out with `SolverConvergenceFailed` instead of returning a fake yield.
-    #[test]
-    fn ytm_non_convergence_returns_error() {
-        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-        let mut cashflows = vec![];
-        for year in 1..=5 {
-            let date =
-                Date::from_calendar_date(2025 + year, Month::January, 1).expect("valid date");
-            let amt = if year < 5 { 50.0 } else { 1050.0 };
-            cashflows.push((
-                date,
-                Money::new(amt, Currency::USD).expect("valid money fixture"),
-            ));
-        }
-        let notional = Money::from((1000_i64, Currency::USD));
-
-        // One iteration is far too few for Brent to reach a 1e-15 residual.
-        let result = solve_ytm_with(
-            &cashflows,
-            as_of,
-            Money::from((950_i64, Currency::USD)),
-            YtmPricingSpec {
-                day_count: DayCount::Act365F,
-                notional,
-                coupon_rate: 0.05,
-                compounding: YieldCompounding::Street,
-                frequency: Tenor::annual(),
-            },
-            1e-15,
-            1,
-        );
-
-        assert!(
-            result.is_err(),
-            "non-convergent YTM solve must return Err, not a silent last iterate"
-        );
-        match result {
-            Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::SolverConvergenceFailed { .. },
-            )) => {}
-            other => panic!("expected SolverConvergenceFailed, got {other:?}"),
-        }
     }
 
     #[test]

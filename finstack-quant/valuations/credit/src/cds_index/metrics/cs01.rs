@@ -46,13 +46,7 @@ impl MetricCalculator for Cs01Calculator {
         )?
         .credit_spread_bump_bp;
         let idx: &CdsIndex = context.instrument_as()?;
-        crate::cds_index::pricer::CdsIndexPricer::new().cs01(
-            idx,
-            &context.curves,
-            context.as_of,
-            provider.as_ref(),
-            bump_bp,
-        )
+        idx.cs01_with_bump(&context.curves, context.as_of, provider.as_ref(), bump_bp)
     }
 }
 

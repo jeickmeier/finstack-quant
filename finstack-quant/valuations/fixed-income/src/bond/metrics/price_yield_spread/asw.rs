@@ -17,19 +17,8 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use rust_decimal::prelude::ToPrimitive;
-
-/// Forward curve for the asset-swap floating leg:
-/// `instrument_pricing_overrides.model_config.asw_forward_curve_id`. `None`
-/// selects the discount-ratio fallback.
-pub(crate) fn resolved_asw_forward_curve_id(bond: &Bond) -> Option<CurveId> {
-    bond.instrument_pricing_overrides
-        .model_config
-        .asw_forward_curve_id
-        .clone()
-}
 
 /// Coupon PV and independent floating-leg PV/annuity, all per original face
 /// and discounted to the settlement date. Coupon entitlement retains the
@@ -62,7 +51,13 @@ pub(crate) fn settlement_asw_components(
             / df_settlement
             / bond.notional.amount();
     }
-    let forward = resolved_asw_forward_curve_id(bond)
+    // Forward curve for the asset-swap floating leg; `None` selects the
+    // discount-ratio fallback.
+    let forward = bond
+        .instrument_pricing_overrides
+        .model_config
+        .asw_forward_curve_id
+        .clone()
         .map(|id| market.get_forward(&id))
         .transpose()?;
     let frequency = if let Some(curve) = &forward {
@@ -555,7 +550,11 @@ impl MetricCalculator for AssetSwapParCalculator {
         let discount_curve_id = bond.discount_curve_id.to_owned();
         let maturity = bond.maturity;
         let bond_day_count = bond.cashflow_spec.day_count();
-        let asw_forward_curve_id = resolved_asw_forward_curve_id(bond);
+        let asw_forward_curve_id = bond
+            .instrument_pricing_overrides
+            .model_config
+            .asw_forward_curve_id
+            .clone();
         let disc = context.curves.get_discount(&discount_curve_id)?;
 
         // The ASW fixed leg follows the bond's coupon conventions.
@@ -649,7 +648,10 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                     .quoted_clean_price_pct,
                 b.custom_cashflows.is_some(),
                 coupon_rate,
-                resolved_asw_forward_curve_id(b),
+                b.instrument_pricing_overrides
+                    .model_config
+                    .asw_forward_curve_id
+                    .clone(),
             )
         };
         let disc = context.curves.get_discount(&discount_curve_id)?;

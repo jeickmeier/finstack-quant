@@ -44,11 +44,8 @@ impl MetricCalculator for VegaCalculator {
         // strike volatility is appropriate for converting a quoted vega
         // notional, but it is not the derivative of PV when the market
         // forward variance differs from strike variance.
-        let forward_variance = super::super::pricer::remaining_forward_variance(
-            swap,
-            context.curves.as_ref(),
-            context.as_of,
-        )?;
+        let forward_variance =
+            swap.remaining_forward_variance(context.curves.as_ref(), context.as_of)?;
         let forward_vol = forward_variance.max(0.0).sqrt();
 
         // Discount factor to maturity

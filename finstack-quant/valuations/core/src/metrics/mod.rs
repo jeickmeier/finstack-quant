@@ -74,7 +74,7 @@ pub use sensitivities::config::{
     STANDARD_BUCKET_LABELS,
 };
 pub use sensitivities::cross_factor::CrossFactorPair;
-pub use sensitivities::theta::{collect_cashflows_in_period, collect_period_cash, PeriodCash};
+pub use sensitivities::theta::{collect_period_cash, PeriodCash};
 
 // Family-facing finite-difference helpers.
 //
