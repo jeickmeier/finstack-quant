@@ -32183,16 +32183,6 @@ export interface StatementsNamespace {
    */
   MixedNodeBuilder: MixedNodeBuilderConstructor;
   /**
-   * Start a model builder for the given identifier.
-   *
-   * Free-function twin of Python `FinancialModelSpec.builder` (Rust
-   * `FinancialModelSpec::builder`); the same as `new ModelBuilder(id)`.
-   * @param id - Model identifier stored on the built `FinancialModelSpec`.
-   * @returns A `ModelBuilder` waiting for `periods`.
-   * @throws Error - Throws a `TypeError` with kind `invalid_type` if `id` is not a string.
-   */
-  financialModelBuilder(id: string): ModelBuilder;
-  /**
    * Value of one node in one period.
    *
    * Free-function twin of Python `StatementResult.get` (Rust

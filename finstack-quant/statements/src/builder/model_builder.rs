@@ -81,8 +81,7 @@ pub struct Ready;
 /// Builder for financial models with compile-time type-state enforcement.
 ///
 /// The builder uses a type-state pattern to ensure correct usage:
-/// 1. Start with [`FinancialModelSpec::builder`](crate::types::FinancialModelSpec::builder)
-///    or `ModelBuilder::new()` → `ModelBuilder<NeedPeriods>`
+/// 1. Start with `ModelBuilder::new()` → `ModelBuilder<NeedPeriods>`
 /// 2. Call `.periods()` → `ModelBuilder<Ready>`
 /// 3. Add nodes, forecasts, etc.
 /// 4. Call `.build()` → `FinancialModelSpec`
@@ -90,11 +89,12 @@ pub struct Ready;
 /// # Example
 ///
 /// ```rust
-/// use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec, NodeType};
+/// use finstack_quant_statements::builder::ModelBuilder;
+/// use finstack_quant_statements::types::{AmountOrScalar, NodeType};
 /// use finstack_quant_core::dates::PeriodId;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let model = FinancialModelSpec::builder("test_model")
+/// let model = ModelBuilder::new("test_model")
 ///     .periods("2025Q1..Q4", None)?
 ///     .value("revenue", &[
 ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0)),
@@ -121,8 +121,13 @@ impl<State> ModelBuilder<State> {
     /// This is an advanced API for template builders that need to construct
     /// nodes programmatically. Prefer `.compute()` and `.value()` for
     /// standard model construction.
-    pub fn insert_node(&mut self, id: NodeId, spec: NodeSpec) -> &mut Self {
-        self.put_node(id, spec);
+    ///
+    /// # Arguments
+    ///
+    /// * `spec` - Node to insert under its own `node_id`, replacing any node
+    ///   already stored with that id.
+    pub fn insert_node(&mut self, spec: NodeSpec) -> &mut Self {
+        self.put_node(spec.node_id.clone(), spec);
         self
     }
 
@@ -934,6 +939,10 @@ impl ModelBuilder<Ready> {
     ) -> Result<()> {
         let mut namespace_cache: IndexMap<String, IndexSet<String>> = IndexMap::new();
         for (qualified_id, stored_metric) in registry.all_metrics() {
+            // A user node with a built-in metric's id wins, as documented.
+            if self.nodes.contains_key(qualified_id) {
+                continue;
+            }
             let namespace = qualified_id.split('.').next().unwrap_or("");
             let formula = if namespace.is_empty() {
                 stored_metric.definition.formula.clone()
@@ -1339,6 +1348,22 @@ impl MixedNodeBuilder {
 mod tests {
     use super::*;
     use crate::evaluator::Evaluator;
+
+    #[test]
+    fn builtin_metrics_do_not_overwrite_an_existing_node() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let builder = ModelBuilder::new("user-roe")
+            .periods("2025Q1..Q1", None)
+            .expect("valid periods")
+            .value("fin.roe", &[(period, AmountOrScalar::scalar(0.12))])
+            .with_builtin_metrics()
+            .expect("built-in catalog loads");
+
+        let roe = builder.nodes().get("fin.roe").expect("node kept");
+        assert_eq!(roe.node_type, NodeType::Value);
+        assert!(roe.formula_text.is_none());
+        assert!(builder.nodes().contains_key("fin.roa"));
+    }
 
     #[test]
     fn where_clause_targets_a_redefined_node_not_the_last_map_slot() {

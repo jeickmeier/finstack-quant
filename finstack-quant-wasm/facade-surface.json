@@ -4002,7 +4002,6 @@
       "checkReportHasErrors",
       "checkReportHasWarnings",
       "checkSuiteSpecBuiltinCheckNames",
-      "financialModelBuilder",
       "financialModelContentHash",
       "financialModelGetNode",
       "financialModelHasNode",
@@ -4135,9 +4134,6 @@
     "kind": "function"
   },
   "statements.parseAndCompile": {
-    "kind": "function"
-  },
-  "statements.financialModelBuilder": {
     "kind": "function"
   },
   "statements.statementResultGet": {

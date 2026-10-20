@@ -21,7 +21,7 @@ use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
 use finstack_quant_statements::capital_structure::{
     BondConventionParams, SwapConventions, SwapParams,
 };
-use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument, NodeId};
+use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
 use pyo3::prelude::*;
 
 /// Builder for financial models (type-state collapsed for Python).
@@ -51,16 +51,6 @@ use pyo3::prelude::*;
 #[pyclass(name = "ModelBuilder", module = "finstack_quant.statements")]
 pub struct PyModelBuilder {
     inner: Option<BuilderState>,
-}
-
-impl PyModelBuilder {
-    /// Shared constructor behind `ModelBuilder(id)` and
-    /// `FinancialModelSpec.builder(id)`.
-    pub(crate) fn start(id: &str) -> Self {
-        Self {
-            inner: Some(BuilderState::NeedPeriods(ModelBuilder::new(id))),
-        }
-    }
 }
 
 enum BuilderState {
@@ -210,14 +200,13 @@ impl PyMixedNodeBuilder {
 
 #[pymethods]
 impl PyModelBuilder {
-    /// Create a new model builder.
-    ///
-    /// :meth:`FinancialModelSpec.builder` is the canonical entry point and
-    /// returns exactly this value.
+    /// Create a new model builder awaiting ``periods(...)``.
     #[new]
     #[pyo3(text_signature = "(id)")]
     fn new(id: &str) -> Self {
-        Self::start(id)
+        Self {
+            inner: Some(BuilderState::NeedPeriods(ModelBuilder::new(id))),
+        }
     }
 
     /// Reconstruct a ready builder from an existing model specification.
@@ -626,13 +615,12 @@ impl PyModelBuilder {
         node: PyRef<'_, PyNodeSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec = node.inner.clone();
-        let id: NodeId = spec.node_id.clone();
         match slf.inner.as_mut() {
             Some(BuilderState::NeedPeriods(b)) => {
-                b.insert_node(id, spec);
+                b.insert_node(spec);
             }
             Some(BuilderState::Ready(b)) => {
-                b.insert_node(id, spec);
+                b.insert_node(spec);
             }
             None => return Err(Self::consumed_error()),
         }

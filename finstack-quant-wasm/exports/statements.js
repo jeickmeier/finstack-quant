@@ -21,7 +21,6 @@ export const statements = {
   financialModelContentHash: wasm.financialModelContentHash,
   parseFormula: wasm.parseFormula,
   parseAndCompile: wasm.parseAndCompile,
-  financialModelBuilder: wasm.financialModelBuilder,
   statementResultGet: wasm.statementResultGet,
   statementResultGetMoney: wasm.statementResultGetMoney,
   statementResultGetScalar: wasm.statementResultGetScalar,

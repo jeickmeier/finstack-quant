@@ -177,14 +177,6 @@ test('statements matches the cross-host golden', () => {
   assertMatches(plain(actual), EXPECTED.statements, 'statements');
 });
 
-test('financialModelBuilder is the ModelBuilder constructor', () => {
-  const builder = statements.financialModelBuilder('twin');
-  assert.ok(builder instanceof statements.ModelBuilder);
-  builder.periods('2025Q1..Q1');
-  builder.value('revenue', { [Q1]: 1.0 });
-  assert.deepEqual(statements.modelNodeIds(builder.build()), ['revenue']);
-});
-
 test('ModelBuilder.fromSpec resumes a model and periodsExplicit takes Period objects', () => {
   const resumed = statements.ModelBuilder.fromSpec(MODEL);
   resumed.compute('double', 'revenue * 2');

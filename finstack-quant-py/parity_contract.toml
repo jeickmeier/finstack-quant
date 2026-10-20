@@ -2418,7 +2418,6 @@ monteCarloPercentileByPeriod = "free-function twin of Python MonteCarloResults.p
 statementResultToTableLong = "free-function twin of Python StatementResult.to_arrow_long (WASM data types are plain objects)"
 statementResultToTableWide = "free-function twin of Python StatementResult.to_arrow_wide (WASM data types are plain objects)"
 financialModelContentHash = "free-function twin of Python FinancialModelSpec.content_hash (WASM data types are plain objects)"
-financialModelBuilder = "free-function twin of Python FinancialModelSpec.builder (WASM data types are plain objects)"
 statementResultGet = "free-function twin of Python StatementResult.get (WASM data types are plain objects)"
 statementResultGetMoney = "free-function twin of Python StatementResult.get_money (WASM data types are plain objects)"
 statementResultGetScalar = "free-function twin of Python StatementResult.get_scalar (WASM data types are plain objects)"
@@ -2900,7 +2899,7 @@ renames = { builtin_check_names = { js = "statements.checkSuiteSpecBuiltinCheckN
 renames = { validate = { js = "statements.validateEcfSweepSpecJson", reason = "WASM specs are plain objects; the Rust EcfSweepSpec::validate method runs inside the JSON validation function" } }
 
 [parity.members."finstack_quant.statements.FinancialModelSpec"]
-renames = { builder = { js = "statements.financialModelBuilder", reason = "WASM models are plain objects; the Rust FinancialModelSpec::builder entry point is a free function returning the ModelBuilder class" }, content_hash = { js = "statements.financialModelContentHash", reason = "WASM models are plain objects; the Rust FinancialModelSpec::content_hash method is a free function taking the object" }, get_node = { js = "statements.financialModelGetNode", reason = "WASM models are plain objects; the Rust FinancialModelSpec::get_node method is a free function taking the object" }, has_node = { js = "statements.financialModelHasNode", reason = "WASM models are plain objects; the Rust FinancialModelSpec::has_node method is a free function taking the object" }, node_ids = { js = "statements.modelNodeIds", reason = "WASM models are plain objects; the node-id accessor is a free function taking the model" } }
+renames = { content_hash = { js = "statements.financialModelContentHash", reason = "WASM models are plain objects; the Rust FinancialModelSpec::content_hash method is a free function taking the object" }, get_node = { js = "statements.financialModelGetNode", reason = "WASM models are plain objects; the Rust FinancialModelSpec::get_node method is a free function taking the object" }, has_node = { js = "statements.financialModelHasNode", reason = "WASM models are plain objects; the Rust FinancialModelSpec::has_node method is a free function taking the object" }, node_ids = { js = "statements.modelNodeIds", reason = "WASM models are plain objects; the node-id accessor is a free function taking the model" } }
 
 [parity.members."finstack_quant.statements.ForecastSpec"]
 excluded = { forward_fill = "literal", growth = "literal", curve = "literal", normal = "literal", log_normal = "literal", override = "literal", seasonal = "literal", time_series = "literal", fade_to_target = "literal", mean_reverting = "literal", bootstrap = "literal" }

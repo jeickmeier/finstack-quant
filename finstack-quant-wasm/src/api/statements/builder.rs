@@ -335,13 +335,12 @@ impl JsModelBuilder {
     #[wasm_bindgen(js_name = insertNode)]
     pub fn insert_node(&mut self, node: JsValue) -> Result<(), JsValue> {
         let spec: NodeSpec = from_js_json(&node, "node")?;
-        let id = spec.node_id.clone();
         match self.inner.as_mut() {
             Some(BuilderState::NeedPeriods(builder)) => {
-                builder.insert_node(id, spec);
+                builder.insert_node(spec);
             }
             Some(BuilderState::Ready(builder)) => {
-                builder.insert_node(id, spec);
+                builder.insert_node(spec);
             }
             None => return Err(consumed()),
         }
@@ -844,19 +843,4 @@ impl JsMixedNodeBuilder {
             inner: Some(BuilderState::Ready(ready)),
         })
     }
-}
-
-/// Start a model builder for the given identifier.
-///
-/// Free-function twin of Python `FinancialModelSpec.builder` (Rust
-/// `FinancialModelSpec::builder`); the same as `new ModelBuilder(id)`.
-/// @param id - Model identifier stored on the built `FinancialModelSpec`.
-/// @returns A `ModelBuilder` waiting for `periods`.
-///
-/// # Errors
-///
-/// Throws a `TypeError` with kind `invalid_type` if `id` is not a string.
-#[wasm_bindgen(js_name = financialModelBuilder)]
-pub fn financial_model_builder(id: JsValue) -> Result<JsModelBuilder, JsValue> {
-    JsModelBuilder::new(id)
 }

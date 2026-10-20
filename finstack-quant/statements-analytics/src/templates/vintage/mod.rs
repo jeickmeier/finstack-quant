@@ -2,7 +2,7 @@
 
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_statements::builder::{ModelBuilder, Ready};
-use finstack_quant_statements::types::{NodeId, NodeSpec, NodeType};
+use finstack_quant_statements::types::{NodeSpec, NodeType};
 
 /// Add a vintage buildup (cohort analysis) structure.
 ///
@@ -66,7 +66,7 @@ pub fn add_vintage_buildup(
         .with_name(format!("{} (Total)", name))
         .with_formula(formula);
 
-    builder.insert_node(NodeId::from(name), node);
+    builder.insert_node(node);
 
     builder
 }
