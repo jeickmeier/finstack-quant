@@ -19,7 +19,8 @@ use tracing::warn;
 use crate::builder::overnight::overnight_day_count_basis;
 use crate::builder::overnight::{OvernightObservationSchedule, OvernightRateConstraints};
 use crate::builder::rate_helpers::{
-    apply_bp_bounds, calculate_floating_rate, project_index_rate, project_overnight_rate,
+    apply_bp_bounds, calculate_floating_rate, observed_term_fixing, project_index_rate,
+    project_overnight_rate,
 };
 use crate::builder::{
     CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod, FloatingRateFallback,
@@ -449,10 +450,10 @@ fn project_segment_indices(
     let as_of = observation_date.unwrap_or(curve.base_date());
     match observation {
         FloatingRateObservation::Term { reset_date, .. } => {
-            let same_day_fixing_exists = *reset_date == as_of
-                && fixings.is_some_and(|series| series.value_on_exact(*reset_date).is_ok());
-            let index_rate = if *reset_date < as_of || same_day_fixing_exists {
-                require_fixing_value_exact(fixings, forward_curve_id, *reset_date, as_of)?
+            let index_rate = if let Some(fixing) =
+                observed_term_fixing(*reset_date, fixings, forward_curve_id, as_of)?
+            {
+                fixing
             } else {
                 project_index_rate(
                     *reset_date,

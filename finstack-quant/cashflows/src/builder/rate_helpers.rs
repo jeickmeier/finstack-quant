@@ -24,6 +24,8 @@
 //! `rate = cap( max( all_in_floor, (gearing * max(index, floor)) + spread ) )`
 
 use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::market_data::fixings::require_fixing_value_exact;
+use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::Result;
 
@@ -308,6 +310,36 @@ pub fn project_floating_rate(
         accrual_year_fraction,
     )?;
     Ok(calculate_floating_rate(index_rate, params))
+}
+
+/// Recorded term fixing for a reset, when one applies instead of a projection.
+///
+/// A fixing applies when the reset precedes `as_of`, or falls on `as_of` and
+/// that day's fixing is already published; otherwise `None` tells the caller
+/// to project the rate from its forward curve.
+///
+/// # Arguments
+///
+/// * `reset_date` - Fixing (reset) date of the term index.
+/// * `fixings` - Recorded `FIXING:{forward_curve_id}` series, when supplied.
+/// * `forward_curve_id` - Index curve identifier, used in error messages.
+/// * `as_of` - Valuation date separating realized from projected fixings.
+///
+/// # Errors
+///
+/// Returns an error when a past reset has no recorded fixing.
+pub fn observed_term_fixing(
+    reset_date: Date,
+    fixings: Option<&ScalarTimeSeries>,
+    forward_curve_id: &str,
+    as_of: Date,
+) -> Result<Option<f64>> {
+    let published_today = reset_date == as_of
+        && fixings.is_some_and(|series| series.value_on_exact(reset_date).is_ok());
+    if reset_date < as_of || published_today {
+        return require_fixing_value_exact(fixings, forward_curve_id, reset_date, as_of).map(Some);
+    }
+    Ok(None)
 }
 
 /// Project the one-day overnight index rate observed on a date.

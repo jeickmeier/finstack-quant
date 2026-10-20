@@ -23,12 +23,12 @@ pub(super) fn contractual_reset_date(start: Date, spec: &FloatingCouponSpec) -> 
         .fixing_calendar_id
         .as_deref()
         .unwrap_or(&spec.schedule.calendar_id);
-    let calendar = calendar_by_id_strict(calendar_id)?;
-    if spec.rate_spec.reset_lag_days == 0 {
-        return Ok(start);
-    }
-    let reset = start.add_business_days(-spec.rate_spec.reset_lag_days, calendar)?;
-    adjust(reset, spec.schedule.business_day_convention, calendar)
+    finstack_quant_cashflows::builder::compute_reset_date(
+        start,
+        spec.rate_spec.reset_lag_days,
+        spec.schedule.business_day_convention,
+        calendar_by_id_strict(calendar_id)?,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]

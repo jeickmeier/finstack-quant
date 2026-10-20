@@ -22,7 +22,7 @@ use finstack_quant_cashflows::builder::{
 use finstack_quant_cashflows::builder::{CouponType, FloatingCouponSpec};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::calendar_by_id_strict;
-use finstack_quant_core::dates::{adjust, Date, DateExt, DayCount, DayCountContext, Duration};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Duration};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::{fixing_series_id, require_fixing_value_exact};
 use finstack_quant_core::market_data::traits::Discounting;

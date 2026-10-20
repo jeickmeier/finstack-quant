@@ -16,7 +16,7 @@ use super::date_generation::{
 use super::specs::{RollRule, ScheduleParams};
 use finstack_quant_core::dates::calendar_by_id_strict;
 
-/// Compute reset date with calendar adjustment.
+/// Reset (fixing) date of a coupon that accrues from `accrual_start`.
 ///
 /// Market standard: reset dates are computed as `accrual_start - reset_lag_days`
 /// **business days** using the fixing calendar (or accrual calendar), then adjusted
@@ -27,7 +27,18 @@ use finstack_quant_core::dates::calendar_by_id_strict;
 /// positive reset lag; silently moving an explicit zero-lag reset earlier
 /// changes the contract and can incorrectly turn a new trade into a seasoned
 /// one that requires historical fixings.
-pub(crate) fn compute_reset_date(
+///
+/// # Arguments
+///
+/// * `accrual_start` - Contractual accrual start of the coupon.
+/// * `reset_lag_days` - Non-negative fixing lag in business days.
+/// * `business_day_convention` - Adjustment applied to the lagged date.
+/// * `cal` - Fixing calendar for the business-day lag and adjustment.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` for a negative lag; calendar errors propagate.
+pub fn compute_reset_date(
     accrual_start: Date,
     reset_lag_days: i32,
     business_day_convention: BusinessDayConvention,
