@@ -322,7 +322,7 @@
     },
     "FormulaCheckSpec": {
       "additionalProperties": false,
-      "description": "Serializable, runnable user-defined formula-check specification.\n\nFull suite definitions (built-in + formula) can be stored as a single JSON\ndocument and resolved directly with [`CheckSuiteSpec::resolve`].",
+      "description": "Serializable, runnable user-defined formula-check specification.\n\nFull suite definitions (built-in + formula) can be stored as a single JSON\ndocument and resolved directly with [`CheckSuiteSpec::resolve`].\n\nEach period ends in one of three verdicts: pass, fail (a finding with the\nconfigured `severity`), or insufficient data. A period has insufficient\ndata when a same-period input is missing or non-finite, or when the\nformula consumes a non-finite value, such as a lag or rolling window that\nreaches before the first period. It is reported as a `warning` finding\nnaming the inputs, records no comparison, and never fails the check. A\ndivision by zero over finite inputs is not missing data and still fails.",
       "properties": {
         "category": {
           "$ref": "#/$defs/CheckCategory",

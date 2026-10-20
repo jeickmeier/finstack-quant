@@ -6,6 +6,7 @@ import type {
   MetricMetadata,
   MoneyValue,
   ScenarioTable,
+  ScenarioResults,
   StatementResult,
   Explanation,
   CheckReport,
@@ -58,6 +59,21 @@ export interface StatementChecksRequest {
   readonly kind: "suite" | "three-statement" | "credit-underwriting";
   readonly configJson: string;
 }
+/** Native ScenarioSet JSON evaluated against one model; market and date are supplied together. */
+export interface StatementScenarioRequest {
+  readonly modelJson: string;
+  readonly scenarioSetJson: string;
+  readonly marketJson?: string;
+  readonly asOf?: string;
+}
+/** Roll an evaluated result of `modelJson` up to the native RollupSpec's frequency. */
+export interface StatementRollupRequest {
+  readonly modelJson: string;
+  readonly resultsJson: string;
+  readonly specJson: string;
+}
+/** Scenario name to its native statement result. */
+export type StatementScenarioResults = ScenarioResults;
 /** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
 export function resolveModel(model?: string | null): string {
   return model ?? "default";
@@ -119,6 +135,14 @@ export interface WorkerApi {
     request: StatementChecksRequest,
   ): Promise<Envelope<CheckReport>>;
   renderStatementChecks(reportJson: string): Promise<Envelope<string>>;
+  /** Evaluate every scenario natively, with the capital structure priced from the market when supplied. */
+  evaluateStatementScenarios(
+    request: StatementScenarioRequest,
+  ): Promise<Envelope<StatementScenarioResults>>;
+  /** Native rollup of an evaluated result to a coarser frequency. */
+  rollupStatement(
+    request: StatementRollupRequest,
+  ): Promise<Envelope<StatementResult>>;
   /** Static diagnostics as the exact `CalibrationValidationReport` wire JSON (native `dryRunJson`). */
   dryRun(envelopeJson: string): Promise<Envelope<string>>;
   calibrate(envelopeJson: string): Promise<Envelope<CalibrationResultEnvelope>>;

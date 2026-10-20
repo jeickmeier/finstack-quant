@@ -120,9 +120,13 @@ Item-level detail is in the rustdoc:
 ## Workflows
 
 **Scenarios and variance.** `ScenarioSet` is an ordered map of named
-`ScenarioDefinition`s, each with an optional `parent` and typed
-`AmountOrScalar` node overrides. Child overrides win over ancestors, and
-`trace` shows the resolution chain. `evaluate_all(&model)` runs every case;
+`ScenarioDefinition`s, each with an optional `parent`, typed
+`AmountOrScalar` node overrides and `forecast_overrides` that replace a node's
+whole `ForecastSpec` (method, curves, seeds, volatilities, bounds). Child
+overrides win over ancestors, and `trace` shows the resolution chain.
+`evaluate_all(&model)` runs every case, with a fixed-rate capital structure
+evaluated from an empty market; `evaluate_all_with_market(&model, &market,
+as_of)` prices market-dependent instruments;
 `diff(&results, baseline, comparison, metrics, periods)` returns a
 `ScenarioDiff`;
 `to_comparison_table` renders the set as a `TableEnvelope`.
@@ -233,7 +237,8 @@ are in [INVARIANTS.md](../../INVARIANTS.md).
   scorecard extensions, and the roll-forward / vintage / real-estate templates.
 - **WASM** — `statements_analytics` namespace in
   `finstack-quant-wasm/exports/statements_analytics.js`: `runSensitivity`,
-  `runVariance`, `evaluateScenarioSet`, `backtestForecast`,
+  `runVariance`, `evaluateScenarioSet`, `evaluateScenarioSetWithMarket`,
+  `backtestForecast`,
   `generateTornadoEntries`, `goalSeek`, `evaluateDcf`, `dcfSensitivity`,
   `evaluateLbo`, `runCorporateAnalysis`, `wacc`, `scenarioDiff`,
   `varianceBridge`, `explainFormula`, the `DependencyTracer`,

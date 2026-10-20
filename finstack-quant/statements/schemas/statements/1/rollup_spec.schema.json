@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "PeriodKind": {
+      "description": "Period frequency type.\n\nDefines the frequency of periodic schedules (cashflow rolls, return-series\nresampling, statement reporting). Each variant carries an implied\n\"periods-per-year\" used by [`PeriodKind::periods_per_year`] and by\ndownstream annualization helpers in `finstack-quant-analytics`.\n\n`Daily` follows the trading-day convention (252 per year), not the\ncalendar-day convention (365 per year). Use `Weekly` if you need\ncalendar-week granularity.\n\nParses the snake_case wire values via [`std::str::FromStr`]\n(for example, `\"quarterly\"` or `\"semi_annual\"`). The parser also accepts\nthe `\"semiannual\"` spelling and the pandas offset aliases `D`/`B`\n(daily), `W` (weekly), `M`/`ME` (monthly), `Q`/`QE` (quarterly) and\n`A`/`Y`/`YE` (annual); serde (de)serialization stays strict snake_case.",
+      "oneOf": [
+        {
+          "const": "daily",
+          "description": "Daily periods (252 trading days per year by convention)",
+          "type": "string"
+        },
+        {
+          "const": "quarterly",
+          "description": "Quarterly periods (4 per year)",
+          "type": "string"
+        },
+        {
+          "const": "monthly",
+          "description": "Monthly periods (12 per year)",
+          "type": "string"
+        },
+        {
+          "const": "weekly",
+          "description": "Weekly periods (ISO 8601 week-year, typically 52 or 53 per year)",
+          "type": "string"
+        },
+        {
+          "const": "semi_annual",
+          "description": "Semi-annual periods (2 per year)",
+          "type": "string"
+        },
+        {
+          "const": "annual",
+          "description": "Annual periods (1 per year)",
+          "type": "string"
+        }
+      ]
+    },
+    "RollupMethod": {
+      "description": "How one node's values combine over the source periods of a target period.",
+      "oneOf": [
+        {
+          "const": "sum",
+          "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nA missing source value leaves the target value missing.",
+          "type": "string"
+        },
+        {
+          "const": "period_end",
+          "description": "Take the last source period's value: balances such as cash, debt and\nequity, and trailing metrics such as last-twelve-month EBITDA.",
+          "type": "string"
+        },
+        {
+          "const": "formula",
+          "description": "Re-evaluate the node's formula (and `where` clause) on the rolled-up\nvalues: ratios such as margins, leverage and coverage. Time-series\nfunctions then run at the target frequency, so `lag(x, 1)` is the\nprior target period.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Target frequency and per-node methods for rolling statement results up to coarser periods.",
+  "examples": [
+    {
+      "frequency": "annual",
+      "methods": {
+        "cash": "period_end",
+        "ebitda_margin": "formula"
+      }
+    }
+  ],
+  "properties": {
+    "frequency": {
+      "$ref": "#/$defs/PeriodKind",
+      "description": "Target frequency: `quarterly`, `semi_annual` or `annual`. It must be\ncoarser than the model's periods and hold a whole number of them\n(monthly into quarterly, semi-annual or annual; quarterly into\nsemi-annual or annual; semi-annual into annual)."
+    },
+    "methods": {
+      "additionalProperties": {
+        "$ref": "#/$defs/RollupMethod"
+      },
+      "description": "Rollup method per node id. Nodes not listed are summed, so list\nbalances as `period_end` and ratios as `formula`.",
+      "type": "object"
+    }
+  },
+  "required": [
+    "frequency"
+  ],
+  "title": "RollupSpec",
+  "type": "object"
+}

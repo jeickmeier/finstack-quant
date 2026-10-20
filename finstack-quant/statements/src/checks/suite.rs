@@ -361,6 +361,14 @@ impl BuiltinCheckSpec {
 ///
 /// Full suite definitions (built-in + formula) can be stored as a single JSON
 /// document and resolved directly with [`CheckSuiteSpec::resolve`].
+///
+/// Each period ends in one of three verdicts: pass, fail (a finding with the
+/// configured `severity`), or insufficient data. A period has insufficient
+/// data when a same-period input is missing or non-finite, or when the
+/// formula consumes a non-finite value, such as a lag or rolling window that
+/// reaches before the first period. It is reported as a `warning` finding
+/// naming the inputs, records no comparison, and never fails the check. A
+/// division by zero over finite inputs is not missing data and still fails.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]

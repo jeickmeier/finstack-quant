@@ -7,6 +7,7 @@ export const statements_analytics = {
   runSensitivity: wasm.runSensitivity,
   runVariance: wasm.runVariance,
   evaluateScenarioSet: wasm.evaluateScenarioSet,
+  evaluateScenarioSetWithMarket: wasm.evaluateScenarioSetWithMarket,
   scenarioComparisonTable: wasm.scenarioComparisonTable,
   parameterSpecWithPercentages: wasm.parameterSpecWithPercentages,
   backtestForecast: wasm.backtestForecast,

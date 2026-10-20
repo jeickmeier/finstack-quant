@@ -144,6 +144,70 @@ impl PyStatementResult {
             .collect()
     }
 
+    /// Roll these results up to a coarser frequency, such as quarterly to annual.
+    ///
+    /// Each target period combines its source periods node by node: summed
+    /// by default (flows), the last source value for ``"period_end"`` nodes
+    /// (balances, LTM metrics), and the node's formula re-evaluated on the
+    /// rolled-up values for ``"formula"`` nodes (ratios). ``lag`` and other
+    /// time-series functions then step in target periods. Every target
+    /// period must be complete.
+    ///
+    /// Parameters
+    /// ----------
+    /// model : FinancialModelSpec | str
+    ///     The model these results were evaluated from, typed or its
+    ///     canonical JSON. It supplies the period dates and the formulas of
+    ///     ``"formula"`` nodes.
+    /// spec : RollupSpec | str
+    ///     Target frequency and per-node methods, typed or its JSON.
+    ///
+    /// Returns
+    /// -------
+    /// StatementResult
+    ///     Values keyed by the target periods (``"2025"``, ``"2025H1"``,
+    ///     ``"2025Q1"``; fiscal periods keep their ``FY`` prefix), with
+    ///     monetary values and value types. It carries no ``node_sources``,
+    ///     capital-structure cashflows or check report.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the JSON is malformed, the target frequency is not a whole
+    ///     multiple of the model's, a target period is incomplete, a method
+    ///     names an unknown node, a ``"formula"`` node has no formula or reads
+    ///     ``cs.*`` values, or a re-evaluated formula fails.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.statements import Evaluator, ModelBuilder, RollupSpec
+    /// >>> b = ModelBuilder("m")
+    /// >>> _ = b.periods("2025Q1..Q4", None)
+    /// >>> _ = b.value("revenue", [(f"2025Q{q}", 100.0) for q in range(1, 5)])
+    /// >>> _ = b.value("cash", [("2025Q1", 10.0), ("2025Q2", 20.0), ("2025Q3", 30.0), ("2025Q4", 40.0)])
+    /// >>> _ = b.compute("ebitda", "revenue * 0.25")
+    /// >>> _ = b.compute("margin", "ebitda / revenue")
+    /// >>> model = b.build()
+    /// >>> annual = Evaluator().evaluate(model).rollup(model, RollupSpec("annual", {"cash": "period_end", "margin": "formula"}))
+    /// >>> (annual.get("revenue", "2025"), annual.get("cash", "2025"), annual.get("margin", "2025"))
+    /// (400.0, 40.0, 0.25)
+    #[pyo3(text_signature = "($self, model, spec)")]
+    fn rollup(
+        &self,
+        py: Python<'_>,
+        model: &Bound<'_, PyAny>,
+        spec: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        let model = extract_model_ref(model)?;
+        let spec = super::rollup::extract_rollup_spec(spec)?;
+        let model_inner: &finstack_quant_statements::FinancialModelSpec = &model;
+        let result = &self.inner;
+        let inner = py
+            .detach(|| result.rollup(model_inner, &spec))
+            .map_err(statements_to_py)?;
+        Ok(Self { inner })
+    }
+
     /// Which evaluation layer produced each cell of the result.
     ///
     /// The evaluator resolves every (node, period) cell by the precedence
@@ -542,7 +606,10 @@ impl PyEvaluator {
     /// Evaluate a financial model.
     ///
     /// Releases the GIL for the duration of the DAG traversal so that other
-    /// Python threads can make progress while the Rust evaluator runs.
+    /// Python threads can make progress while the Rust evaluator runs. A
+    /// capital structure is evaluated from an empty market as of the first
+    /// period's start, so fixed-rate debt yields ``cs_cashflows``;
+    /// instruments that need market data need ``evaluate_with_market``.
     ///
     /// Parameters
     /// ----------
@@ -553,12 +620,14 @@ impl PyEvaluator {
     /// Returns
     /// -------
     /// StatementResult
-    ///     Evaluation results with per-node, per-period values.
+    ///     Evaluation results with per-node, per-period values and any
+    ///     capital-structure cashflows.
     ///
     /// Raises
     /// ------
     /// KeyError
-    ///     If a formula references a node that does not exist.
+    ///     If a formula references a node that does not exist, or a
+    ///     capital-structure instrument needs market data.
     /// ValueError
     ///     If the model JSON is malformed or evaluation fails (cyclic
     ///     dependencies, invalid formulas, forecast parameter errors).

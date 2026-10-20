@@ -106,6 +106,7 @@ __all__ = [
     "evaluate_dcf",
     "evaluate_lbo",
     "evaluate_scenario_set",
+    "evaluate_scenario_set_with_market",
     "explain_formula",
     "explain_formula_text",
     "generate_tornado_entries",
@@ -8188,12 +8189,16 @@ class ScenarioSet:
 
     Parameters
     ----------
-    scenarios : dict[str, dict[str, float | Money | dict[str, float | Money]]]
-        Scenario name to overrides. Each override value is either a model-wide
-        value applied to every forecast period (``{"revenue": 90.0}``) or a
+    scenarios : dict[str, dict[str, float | Money | dict[str, float | Money] | ForecastSpec]]
+        Scenario name to overrides. Each override value is a model-wide value
+        applied to every forecast period (``{"revenue": 90.0}``), a
         ``{period: value}`` dict applied to the named forecast periods only
-        (``{"growth": {"2025Q3": 0.02}}``); per-period values win over a
-        model-wide value for that period.
+        (``{"growth": {"2025Q3": 0.02}}``), or a ``ForecastSpec`` that
+        replaces the node's forecast (``{"revenue": ForecastSpec.growth(0.02)}``):
+        its method and every parameter, such as curves, seeds and
+        volatilities. Per-period values win over a model-wide value for that
+        period, and explicit values win over the forecast. Across a parent
+        chain the child's forecast replaces the parent's for the same node.
     parents : dict[str, str] | None
         Optional scenario name to parent scenario name for inheritance.
 
@@ -8204,9 +8209,12 @@ class ScenarioSet:
 
     Examples
     --------
+    >>> from finstack_quant.statements import ForecastSpec
     >>> from finstack_quant.statements_analytics import ScenarioSet
     >>> ScenarioSet({"base": {}, "down": {"revenue": {"2025Q2": 90.0}}}, parents={"down": "base"}).names
     ['base', 'down']
+    >>> ScenarioSet({"slow": {"revenue": ForecastSpec.growth(0.01)}}).names
+    ['slow']
     """
     def __init__(self, scenarios: Any, parents: Any | None = None) -> None: ...
     @staticmethod
@@ -10944,6 +10952,11 @@ def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
 def evaluate_scenario_set(model: Any, scenario_set: Any) -> ScenarioResults:
     """Evaluate all scenarios in a scenario set.
 
+    Like ``Evaluator.evaluate``, a capital structure is evaluated from an
+    empty market, which serves fixed-rate instruments; use
+    :func:`evaluate_scenario_set_with_market` for instruments that need market
+    data.
+
     Parameters
     ----------
     model : FinancialModelSpec | str
@@ -10960,9 +10973,13 @@ def evaluate_scenario_set(model: Any, scenario_set: Any) -> ScenarioResults:
     ------
     ValueError
         If the set is empty, a parent chain cycles, an override is
-        incompatible with its node, or evaluation fails.
+        incompatible with its node, a forecast override has invalid
+        parameters, or evaluation fails.
     KeyError
-        If an override names a node missing from the model.
+        If an override names a node missing from the model, or a
+        capital-structure instrument needs market data.
+    RuntimeError
+        If capital-structure cashflow generation or the waterfall fails.
 
     Examples
     --------
@@ -10972,6 +10989,62 @@ def evaluate_scenario_set(model: Any, scenario_set: Any) -> ScenarioResults:
     >>> _ = b.periods("2025Q1..Q2", None)
     >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
     >>> results = evaluate_scenario_set(b.build(), ScenarioSet({"base": {}, "down": {"revenue": 90.0}}))
+    >>> results.names
+    ['base', 'down']
+    """
+
+def evaluate_scenario_set_with_market(
+    model: Any, scenario_set: Any, market: MarketContext | str, as_of: Any
+) -> ScenarioResults:
+    """Evaluate all scenarios in a scenario set against a market as of a date.
+
+    Each scenario is evaluated like ``Evaluator.evaluate_with_market``: the
+    capital structure's instruments are priced from ``market`` as of
+    ``as_of`` (floating coupons, swaps, caps), so every result carries
+    ``cs_cashflows``, and explicit actuals not yet available at ``as_of`` are
+    hidden. The market is shared unchanged by every scenario.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec | str
+        A ``FinancialModelSpec`` object or a JSON string.
+    scenario_set : ScenarioSet | str
+        A typed scenario set or its JSON serialization.
+    market : MarketContext | str
+        Curves, fixings and FX the instruments are priced from, typed or its
+        canonical JSON.
+    as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
+        Valuation date for the instruments' cashflows and the cutoff for
+        explicit-value visibility; ISO ``YYYY-MM-DD`` strings are accepted.
+
+    Returns
+    -------
+    ScenarioResults
+        Typed mapping of scenario names to statement results.
+
+    Raises
+    ------
+    ValueError
+        If ``as_of`` is not date-like, the set is empty, a parent chain
+        cycles, an override is incompatible with its node, a forecast
+        override has invalid parameters, or evaluation fails.
+    KeyError
+        If an override names a node missing from the model, or an instrument
+        needs market data ``market`` lacks.
+    RuntimeError
+        If capital-structure cashflow generation or the waterfall fails.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.statements import ModelBuilder
+    >>> from finstack_quant.statements_analytics import ScenarioSet, evaluate_scenario_set_with_market
+    >>> b = ModelBuilder("m")
+    >>> _ = b.periods("2025Q1..Q2", None)
+    >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+    >>> results = evaluate_scenario_set_with_market(
+    ...     b.build(), ScenarioSet({"base": {}, "down": {"revenue": 90.0}}), MarketContext(), "2025-01-01"
+    ... )
     >>> results.names
     ['base', 'down']
     """

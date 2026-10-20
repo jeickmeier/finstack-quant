@@ -4,6 +4,7 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::bindings::statements::evaluator::PyStatementResult;
+use crate::bindings::statements::types::PyForecastSpec;
 use crate::errors::{core_to_py, display_to_py, serde_json_to_py, statements_to_py};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::types::AmountOrScalar;
@@ -62,31 +63,30 @@ fn extract_amount_or_scalar(value: &Bound<'_, PyAny>) -> PyResult<AmountOrScalar
     Ok(AmountOrScalar::scalar(value.extract()?))
 }
 
-/// Split a scenario's ``{node: value | {period: value}}`` dict into the
-/// model-wide and per-period override maps of a `ScenarioDefinition`.
-type OverrideMaps = (
-    IndexMap<String, AmountOrScalar>,
-    IndexMap<String, IndexMap<PeriodId, AmountOrScalar>>,
-);
-
-fn extract_overrides(value: &Bound<'_, PyAny>) -> PyResult<OverrideMaps> {
+/// Split a scenario's ``{node: value | {period: value} | ForecastSpec}`` dict
+/// into the overrides of a `ScenarioDefinition` (parent left unset).
+fn extract_overrides(value: &Bound<'_, PyAny>) -> PyResult<ScenarioDefinition> {
     let values = value.cast::<PyDict>()?;
-    let mut overrides = IndexMap::with_capacity(values.len());
-    let mut period_overrides: IndexMap<String, IndexMap<PeriodId, AmountOrScalar>> =
-        IndexMap::new();
+    let mut definition = ScenarioDefinition::default();
     for (node_id, value) in values.iter() {
         let node_id: String = node_id.extract()?;
-        if let Ok(by_period) = value.cast::<PyDict>() {
-            let entry = period_overrides.entry(node_id).or_default();
+        if let Ok(forecast) = value.extract::<PyRef<'_, PyForecastSpec>>() {
+            definition
+                .forecast_overrides
+                .insert(node_id, forecast.inner.clone());
+        } else if let Ok(by_period) = value.cast::<PyDict>() {
+            let entry = definition.period_overrides.entry(node_id).or_default();
             for (period, value) in by_period.iter() {
                 let period = parse_period(&period.extract::<String>()?)?;
                 entry.insert(period, extract_amount_or_scalar(&value)?);
             }
         } else {
-            overrides.insert(node_id, extract_amount_or_scalar(&value)?);
+            definition
+                .overrides
+                .insert(node_id, extract_amount_or_scalar(&value)?);
         }
     }
-    Ok((overrides, period_overrides))
+    Ok(definition)
 }
 
 /// One parameter to vary in a sensitivity run.
@@ -493,20 +493,32 @@ impl PyVarianceConfig {
 ///
 /// Parameters
 /// ----------
-/// scenarios : dict[str, dict[str, float | Money | dict[str, float | Money]]]
-///     Scenario name to overrides. Each override value is either a model-wide
-///     value applied to every forecast period (``{"revenue": 90.0}``) or a
+/// scenarios : dict[str, dict[str, float | Money | dict[str, float | Money] | ForecastSpec]]
+///     Scenario name to overrides. Each override value is a model-wide value
+///     applied to every forecast period (``{"revenue": 90.0}``), a
 ///     ``{period: value}`` dict applied to the named forecast periods only
-///     (``{"growth": {"2025Q3": 0.02}}``); per-period values win over a
-///     model-wide value for that period.
+///     (``{"growth": {"2025Q3": 0.02}}``), or a ``ForecastSpec`` that
+///     replaces the node's forecast (``{"revenue": ForecastSpec.growth(0.02)}``):
+///     its method and every parameter, such as curves, seeds and
+///     volatilities. Per-period values win over a model-wide value for that
+///     period, and explicit values win over the forecast.
 /// parents : dict[str, str] | None
 ///     Optional scenario name to parent scenario name for inheritance.
 ///
+/// Raises
+/// ------
+/// ValueError
+///     If a period id is malformed or an override value is not a number,
+///     ``Money``, period dict or ``ForecastSpec``.
+///
 /// Examples
 /// --------
+/// >>> from finstack_quant.statements import ForecastSpec
 /// >>> from finstack_quant.statements_analytics import ScenarioSet
 /// >>> ScenarioSet({"base": {}, "down": {"revenue": {"2025Q2": 90.0}}}, parents={"down": "base"}).names
 /// ['base', 'down']
+/// >>> ScenarioSet({"slow": {"revenue": ForecastSpec.growth(0.01)}}).names
+/// ['slow']
 #[pyclass(
     name = "ScenarioSet",
     module = "finstack_quant.statements_analytics",
@@ -525,20 +537,13 @@ impl PyScenarioSet {
         let mut definitions = IndexMap::with_capacity(scenarios.len());
         for (name, overrides) in scenarios.iter() {
             let name = name.extract::<String>()?;
-            let (overrides, period_overrides) = extract_overrides(&overrides)?;
-            let parent = parents
+            let mut definition = extract_overrides(&overrides)?;
+            definition.parent = parents
                 .and_then(|items| items.get_item(&name).transpose())
                 .transpose()?
                 .map(|value| value.extract::<String>())
                 .transpose()?;
-            definitions.insert(
-                name,
-                ScenarioDefinition {
-                    parent,
-                    overrides,
-                    period_overrides,
-                },
-            );
+            definitions.insert(name, definition);
         }
         Ok(Self {
             inner: RustScenarioSet {

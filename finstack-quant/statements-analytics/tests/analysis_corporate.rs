@@ -856,11 +856,8 @@ fn evaluate_dcf_with_market_uses_curve_for_cs_interest() {
         &DcfOptions::default(),
         None,
         None,
-    );
-    assert!(
-        no_market.is_err(),
-        "cs.interest requires market-backed statement evaluation"
-    );
+    )
+    .expect("a fixed-rate bond's contractual coupons need no market data");
 
     let missing_as_of = evaluate_dcf_with_market(
         &model,
@@ -902,5 +899,10 @@ fn evaluate_dcf_with_market_uses_curve_for_cs_interest() {
     assert!(
         q3_ufcf < 1_200_000.0,
         "Q3 UFCF must deduct the July coupon, got {q3_ufcf}"
+    );
+    let no_market_flows = no_market.dcf_instrument.expect("instrument").flows;
+    assert_eq!(
+        no_market_flows[1].1, q3_ufcf,
+        "the fixed coupon is the same with or without the market"
     );
 }

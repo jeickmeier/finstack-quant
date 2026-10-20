@@ -5,11 +5,12 @@ use std::sync::Arc;
 use finstack_quant_core::dates::PeriodId;
 use indexmap::IndexMap;
 
+use super::helpers::get_finite_node_value;
 use super::{
     Check, CheckComparison, CheckContext, CheckFinding, CheckResult, FormulaCheckSpec, Severity,
 };
 use crate::evaluator::{
-    formula::evaluate_formula, EvaluationContext, PeriodHistory, StatementResult,
+    formula::evaluate_formula, EvalWarning, EvaluationContext, PeriodHistory, StatementResult,
 };
 use crate::types::NodeId;
 use crate::Result;
@@ -59,10 +60,35 @@ impl Check for FormulaCheckSpec {
         let expression = crate::dsl::compiler::compile(&ast)?;
         let history = Arc::new(period_history(context.results, context.model));
         let historical_cashflows = Arc::new(period_cashflows(context.results, context.model));
+        // Same-period node inputs. Unknown identifiers are left to evaluation,
+        // which rejects them as a configuration error.
+        let current_inputs: Vec<NodeId> = crate::utils::formula::extract_direct_dependencies(&ast)
+            .into_iter()
+            .filter(|node| {
+                !node.as_str().starts_with("cs.")
+                    && (context.results.nodes.contains_key(node.as_str())
+                        || context.model.has_node(node.as_str()))
+            })
+            .collect();
         let mut findings = Vec::new();
         let mut comparisons = Vec::new();
 
         for period in &context.model.periods {
+            let unusable: Vec<NodeId> = current_inputs
+                .iter()
+                .filter(|node| get_finite_node_value(context.results, node, &period.id).is_none())
+                .cloned()
+                .collect();
+            if !unusable.is_empty() {
+                let names: Vec<&str> = unusable.iter().map(NodeId::as_str).collect();
+                findings.push(self.insufficient_data(
+                    period.id,
+                    format!("missing or non-finite inputs [{}]", names.join(", ")),
+                    unusable,
+                ));
+                continue;
+            }
+
             let mut evaluation = EvaluationContext::new_with_history(
                 period.id,
                 Arc::clone(&history),
@@ -81,6 +107,27 @@ impl Check for FormulaCheckSpec {
             }
 
             let value = evaluate_formula(&expression, &mut evaluation, Some(&self.id))?;
+            // A division by zero over finite inputs is a real defect in the
+            // checked figures, so it still fails below. Any other non-finite
+            // value reached the formula as data it could not judge: a lag or
+            // window reaching before the first period, or a non-finite value
+            // from history.
+            let divided_by_zero = evaluation
+                .warnings
+                .iter()
+                .any(|warning| matches!(warning, EvalWarning::DivisionByZero { .. }));
+            if !divided_by_zero && (!value.is_finite() || evaluation.non_finite_operand) {
+                findings.push(
+                    self.insufficient_data(
+                        period.id,
+                        "the formula consumed a non-finite value (for example a lag or rolling \
+                     window reaching before the first period)"
+                            .to_string(),
+                        current_inputs.clone(),
+                    ),
+                );
+                continue;
+            }
             let passes = if !value.is_finite() {
                 false
             } else if let Some(tolerance) = self.tolerance {
@@ -132,6 +179,28 @@ impl Check for FormulaCheckSpec {
             findings,
             comparisons,
         })
+    }
+}
+
+impl FormulaCheckSpec {
+    /// Warning for a period the formula cannot judge. It never fails the
+    /// check and carries no comparison, like the skipped periods of the
+    /// built-in identity checks.
+    fn insufficient_data(
+        &self,
+        period: PeriodId,
+        reason: String,
+        nodes: Vec<NodeId>,
+    ) -> CheckFinding {
+        CheckFinding {
+            check_id: self.id.clone(),
+            severity: Severity::Warning,
+            message: format!("{}: insufficient data for {period}: {reason}", self.name),
+            period: Some(period),
+            materiality: None,
+            nodes,
+            comparison: None,
+        }
     }
 }
 

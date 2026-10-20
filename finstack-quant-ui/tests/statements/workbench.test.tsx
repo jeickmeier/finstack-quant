@@ -12,6 +12,7 @@ import { createRequire } from "node:module";
 import model from "../../src/fixtures/statements/analyst-model.json";
 import rolledQ2 from "../../src/fixtures/statements/roll-forward-2025Q2.json";
 import { StatementsWorkbench } from "@/components/finstack/statements/blocks/statements-workbench/statements-workbench";
+import { reportStatementCell } from "@/components/finstack/statements/components/statement-grid/projection";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/hooks/shared/use-finstack/client", () => ({
@@ -44,6 +45,14 @@ beforeEach(() => {
       case "validateStatementFormula":
         native.parseAndCompile(arg);
         return native.parseFormula(arg);
+      case "rollupStatement":
+        return native.statementResultRollup(
+          arg.resultsJson,
+          arg.modelJson,
+          arg.specJson,
+        );
+      case "evaluateStatementScenarios":
+        return native.evaluateScenarioSet(arg.modelJson, arg.scenarioSetJson);
       default:
         throw new Error(`Unexpected worker call: ${method}`);
     }
@@ -216,4 +225,149 @@ it("changes a native forecast method and calculates a newly added metric", async
       }).textContent,
     ).toBe("0.463"),
   );
+});
+
+const canonicalModel = () =>
+  native.validateFinancialModelJson(JSON.stringify(model));
+const lastCall = (method: string) =>
+  call.mock.calls.findLast(([name]) => name === method)?.[1];
+
+it("rolls reported quarters up to native annual values with editable methods", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+    </FinstackQueryProvider>,
+  );
+  await screen.findByRole("region", { name: "Income statement" });
+  fireEvent.click(screen.getByRole("button", { name: "Annual" }));
+  const income = await screen.findByRole("region", {
+    name: "Income statement",
+  });
+  await within(income).findByRole("columnheader", { name: "2024 Historical" });
+  expect(
+    within(income).getByRole("columnheader", { name: "2025 Forecast" }),
+  ).toBeTruthy();
+  expect(
+    JSON.parse(lastCall("rollupStatement").specJson).methods,
+  ).toMatchObject({
+    debt_closing: "period_end",
+    leverage: "formula",
+    ebitda_margin_pct: "formula",
+  });
+  expect(JSON.parse(lastCall("rollupStatement").specJson).methods.revenue).toBe(
+    undefined,
+  );
+
+  const quarterly = new native.Evaluator().evaluate(canonicalModel());
+  const rolled = native.statementResultRollup(
+    JSON.stringify(quarterly),
+    canonicalModel(),
+    lastCall("rollupStatement").specJson,
+  );
+  const revenue = within(income).getByRole("button", {
+    name: "Revenue 2024, inspect value",
+  });
+  expect(revenue.textContent).toBe(
+    reportStatementCell(
+      {
+        periodId: "2024",
+        present: true,
+        text: "",
+        value: rolled.monetary_nodes.revenue["2024"],
+      },
+      "millions",
+    ),
+  );
+  expect(
+    within(income).queryByRole("button", { name: "Revenue 2024, edit value" }),
+  ).toBeNull();
+
+  fireEvent.change(
+    screen.getByRole("combobox", {
+      name: "Debt, opening balance roll-up method",
+    }),
+    { target: { value: "formula" } },
+  );
+  await waitFor(() =>
+    expect(
+      JSON.parse(lastCall("rollupStatement").specJson).methods.debt_opening,
+    ).toBe("formula"),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Reported" }));
+  await within(
+    await screen.findByRole("region", { name: "Income statement" }),
+  ).findByRole("button", { name: "Revenue 2024Q1, edit value" });
+});
+
+it("runs scenarios with forecast overrides and compares them natively", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+    </FinstackQueryProvider>,
+  );
+  await screen.findByRole("region", { name: "Income statement" });
+  fireEvent.click(screen.getByRole("button", { name: "2025Q3 Forecast" }));
+  fireEvent.click(screen.getByRole("button", { name: "Scenarios" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add scenario" }));
+  const card = screen.getByRole("region", { name: "Scenario scenario_2" });
+  fireEvent.change(
+    within(card).getByRole("combobox", {
+      name: "scenario_2 add forecast override",
+    }),
+    { target: { value: "revenue" } },
+  );
+  fireEvent.change(
+    within(card).getByRole("combobox", { name: "Revenue forecast method" }),
+    { target: { value: "growth_pct" } },
+  );
+  fireEvent.change(
+    within(card).getByRole("textbox", { name: /Growth per period/ }),
+    { target: { value: "-0.1" } },
+  );
+  fireEvent.click(
+    within(card).getByRole("button", { name: "Save to scenario" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Run scenarios" }));
+
+  const comparison = await screen.findByRole("region", {
+    name: "Scenario comparison",
+  });
+  const setJson = lastCall("evaluateStatementScenarios").scenarioSetJson;
+  expect(JSON.parse(setJson)).toEqual({
+    scenarios: {
+      base: {},
+      scenario_2: {
+        parent: "base",
+        forecast_overrides: {
+          revenue: { method: "growth_pct", params: { rate: -0.1 } },
+        },
+      },
+    },
+  });
+  const results = native.evaluateScenarioSet(canonicalModel(), setJson);
+  const revenueRow = within(comparison)
+    .getAllByRole("row")
+    .find((row) => row.querySelector("th")?.textContent === "Revenue")!;
+  const cells = [...revenueRow.querySelectorAll("td")].map(
+    (cell) => cell.textContent,
+  );
+  expect(cells).toEqual(
+    ["base", "scenario_2"].map((name) =>
+      reportStatementCell(
+        {
+          periodId: "2025Q3",
+          present: true,
+          text: "",
+          value: results[name].monetary_nodes.revenue["2025Q3"],
+        },
+        "millions",
+      ),
+    ),
+  );
+  expect(cells[0]).not.toBe(cells[1]);
+  expect(screen.getByRole("region", { name: "base statements" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "scenario_2" }));
+  expect(
+    await screen.findByRole("region", { name: "scenario_2 statements" }),
+  ).toBeTruthy();
 });

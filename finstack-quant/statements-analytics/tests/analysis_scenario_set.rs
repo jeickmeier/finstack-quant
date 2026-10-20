@@ -5,7 +5,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec};
+use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec, ForecastSpec};
 use finstack_quant_statements_analytics::analysis::{ScenarioDefinition, ScenarioSet};
 use indexmap::IndexMap;
 
@@ -43,6 +43,7 @@ fn evaluate_all_applies_overrides_and_evaluates() {
         ScenarioDefinition {
             parent: None,
             period_overrides: IndexMap::new(),
+            forecast_overrides: IndexMap::new(),
             overrides: IndexMap::new(),
         },
     );
@@ -54,6 +55,7 @@ fn evaluate_all_applies_overrides_and_evaluates() {
         ScenarioDefinition {
             parent: Some("base".to_string()),
             period_overrides: IndexMap::new(),
+            forecast_overrides: IndexMap::new(),
             overrides: downside_overrides,
         },
     );
@@ -106,6 +108,7 @@ fn diff_uses_variance_analyzer() {
         ScenarioDefinition {
             parent: None,
             period_overrides: IndexMap::new(),
+            forecast_overrides: IndexMap::new(),
             overrides: IndexMap::new(),
         },
     );
@@ -117,6 +120,7 @@ fn diff_uses_variance_analyzer() {
         ScenarioDefinition {
             parent: Some("base".to_string()),
             period_overrides: IndexMap::new(),
+            forecast_overrides: IndexMap::new(),
             overrides: downside_overrides,
         },
     );
@@ -193,6 +197,7 @@ fn evaluate_all_preserves_actual_history_when_applying_overrides() {
         ScenarioDefinition {
             parent: None,
             period_overrides: IndexMap::new(),
+            forecast_overrides: IndexMap::new(),
             overrides: IndexMap::new(),
         },
     );
@@ -204,6 +209,7 @@ fn evaluate_all_preserves_actual_history_when_applying_overrides() {
         ScenarioDefinition {
             parent: Some("base".to_string()),
             period_overrides: IndexMap::new(),
+            forecast_overrides: IndexMap::new(),
             overrides: downside_overrides,
         },
     );
@@ -275,6 +281,7 @@ fn comparison_table_emits_null_frac_on_zero_baseline() {
         ScenarioDefinition {
             parent: None,
             period_overrides: IndexMap::new(),
+            forecast_overrides: IndexMap::new(),
             overrides: IndexMap::new(),
         },
     );
@@ -285,6 +292,7 @@ fn comparison_table_emits_null_frac_on_zero_baseline() {
         ScenarioDefinition {
             parent: Some("base".to_string()),
             period_overrides: IndexMap::new(),
+            forecast_overrides: IndexMap::new(),
             overrides: upside_overrides,
         },
     );
@@ -333,6 +341,7 @@ fn monetary_scenario_overrides_preserve_and_validate_currency() {
             ScenarioDefinition {
                 parent: None,
                 period_overrides: IndexMap::new(),
+                forecast_overrides: IndexMap::new(),
                 overrides: IndexMap::from([(
                     "revenue".to_string(),
                     AmountOrScalar::amount(110_000.0, Currency::USD).expect("valid amount fixture"),
@@ -355,6 +364,7 @@ fn monetary_scenario_overrides_preserve_and_validate_currency() {
             ScenarioDefinition {
                 parent: None,
                 period_overrides: IndexMap::new(),
+                forecast_overrides: IndexMap::new(),
                 overrides: IndexMap::from([(
                     "revenue".to_string(),
                     AmountOrScalar::amount(110_000.0, Currency::EUR).expect("valid amount fixture"),
@@ -381,6 +391,7 @@ fn per_period_overrides_apply_to_one_forecast_period_and_win_over_model_wide() {
             parent: None,
             overrides: IndexMap::new(),
             period_overrides: IndexMap::new(),
+            forecast_overrides: IndexMap::new(),
         },
     );
     let mut q2_only = IndexMap::new();
@@ -395,6 +406,7 @@ fn per_period_overrides_apply_to_one_forecast_period_and_win_over_model_wide() {
             parent: Some("base".to_string()),
             overrides,
             period_overrides,
+            forecast_overrides: IndexMap::new(),
         },
     );
 
@@ -431,10 +443,251 @@ fn per_period_overrides_apply_to_one_forecast_period_and_win_over_model_wide() {
             parent: None,
             overrides: IndexMap::new(),
             period_overrides: bad,
+            forecast_overrides: IndexMap::new(),
         },
     );
     let err = ScenarioSet { scenarios }
         .evaluate_all(&model)
         .expect_err("non-forecast period is rejected");
     assert!(err.to_string().contains("not a forecast period"));
+}
+
+fn q(quarter: u8) -> PeriodId {
+    PeriodId::quarter(2025, quarter).expect("valid period fixture")
+}
+
+/// Revenue is actual in Q1 and grows 5% a quarter after; COGS is a formula.
+fn forecast_model() -> FinancialModelSpec {
+    ModelBuilder::new("forecast_scenarios")
+        .periods("2025Q1..Q4", Some("2025Q1"))
+        .expect("valid period range")
+        .value("revenue", &[(q(1), AmountOrScalar::scalar(100.0))])
+        .forecast("revenue", ForecastSpec::growth(0.05))
+        .compute("cogs", "revenue * 0.4")
+        .expect("valid formula")
+        .build()
+        .expect("valid model")
+}
+
+fn scenario(parent: Option<&str>, forecasts: &[(&str, ForecastSpec)]) -> ScenarioDefinition {
+    ScenarioDefinition {
+        parent: parent.map(str::to_string),
+        forecast_overrides: forecasts
+            .iter()
+            .map(|(node, spec)| ((*node).to_string(), spec.clone()))
+            .collect(),
+        ..ScenarioDefinition::default()
+    }
+}
+
+fn revenue_path(results: &finstack_quant_statements::evaluator::StatementResult) -> Vec<f64> {
+    (1..=4)
+        .map(|quarter| results.get("revenue", &q(quarter)).expect("revenue"))
+        .collect()
+}
+
+#[test]
+fn forecast_overrides_replace_methods_and_parameters_along_the_parent_chain() {
+    let model = forecast_model();
+    let set = ScenarioSet {
+        scenarios: IndexMap::from([
+            ("base".to_string(), scenario(None, &[])),
+            (
+                "curve".to_string(),
+                scenario(
+                    Some("base"),
+                    &[
+                        ("revenue", ForecastSpec::curve(vec![0.10, 0.0, -0.10])),
+                        // A formula node gains a forecast and becomes Mixed.
+                        ("cogs", ForecastSpec::forward_fill()),
+                    ],
+                ),
+            ),
+            (
+                "stochastic".to_string(),
+                scenario(
+                    Some("curve"),
+                    &[("revenue", ForecastSpec::normal(0.0, 5.0, 7))],
+                ),
+            ),
+            (
+                "reseeded".to_string(),
+                scenario(
+                    Some("curve"),
+                    &[("revenue", ForecastSpec::normal(0.0, 5.0, 8))],
+                ),
+            ),
+        ]),
+    };
+
+    let results = set.evaluate_all(&model).expect("evaluation succeeds");
+
+    let base = revenue_path(&results.scenarios["base"]);
+    assert!((base[3] - 100.0 * 1.05_f64.powi(3)).abs() < 1e-9);
+
+    let curve = &results.scenarios["curve"];
+    let expected = [100.0, 110.0, 110.0, 99.0];
+    for (actual, expected) in revenue_path(curve).iter().zip(expected) {
+        assert!((actual - expected).abs() < 1e-9, "{actual} vs {expected}");
+    }
+    // COGS carries its Q1 formula value forward instead of tracking revenue.
+    for quarter in 1..=4 {
+        assert_eq!(curve.get("cogs", &q(quarter)), Some(40.0));
+    }
+
+    // The child's stochastic spec replaces the parent's curve for revenue
+    // while the inherited COGS override still applies; the seed is a
+    // stochastic parameter the scenario controls.
+    let stochastic = &results.scenarios["stochastic"];
+    let stochastic_path = revenue_path(stochastic);
+    assert_eq!(stochastic_path[0], 100.0);
+    assert_ne!(stochastic_path, revenue_path(curve));
+    assert_ne!(
+        stochastic_path,
+        revenue_path(&results.scenarios["reseeded"])
+    );
+    assert_eq!(stochastic.get("cogs", &q(4)), Some(40.0));
+    let again = set.evaluate_all(&model).expect("evaluation succeeds");
+    assert_eq!(
+        revenue_path(&again.scenarios["stochastic"]),
+        stochastic_path
+    );
+
+    // The base model is untouched.
+    assert!(model.nodes["cogs"].forecast.is_none());
+}
+
+#[test]
+fn value_overrides_win_over_forecast_overrides() {
+    let model = forecast_model();
+    let mut definition = scenario(None, &[("revenue", ForecastSpec::curve(vec![0.5; 3]))]);
+    definition.period_overrides = IndexMap::from([(
+        "revenue".to_string(),
+        IndexMap::from([(q(3), AmountOrScalar::scalar(50.0))]),
+    )]);
+    let set = ScenarioSet {
+        scenarios: IndexMap::from([("mixed".to_string(), definition)]),
+    };
+
+    let results = set.evaluate_all(&model).expect("evaluation succeeds");
+    let path = revenue_path(&results.scenarios["mixed"]);
+
+    // Q2 and Q4 follow the overridden curve; Q3 is the explicit value, which
+    // replaces that output without restarting the forecast path.
+    assert_eq!(path, vec![100.0, 150.0, 50.0, 337.5]);
+}
+
+#[test]
+fn invalid_forecast_override_parameters_are_rejected_with_the_node() {
+    let model = forecast_model();
+    let mut typo = ForecastSpec::growth(0.05);
+    typo.params
+        .insert("rat".to_string(), serde_json::json!(0.1));
+    let set = ScenarioSet {
+        scenarios: IndexMap::from([("typo".to_string(), scenario(None, &[("revenue", typo)]))]),
+    };
+
+    let err = set
+        .evaluate_all(&model)
+        .expect_err("unknown forecast parameter");
+    let message = err.to_string();
+    assert!(message.contains("'revenue'"), "{message}");
+    assert!(message.contains("rat"), "{message}");
+
+    let missing = ScenarioSet {
+        scenarios: IndexMap::from([(
+            "missing".to_string(),
+            scenario(None, &[("nope", ForecastSpec::forward_fill())]),
+        )]),
+    };
+    let err = missing.evaluate_all(&model).expect_err("unknown node");
+    assert!(err.to_string().contains("'nope'"));
+
+    // The new field round-trips through the strict wire format.
+    let json = serde_json::to_string(&set).expect("serialize");
+    assert!(json.contains("forecast_overrides"));
+    let restored: ScenarioSet = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(
+        restored.scenarios["typo"].forecast_overrides["revenue"],
+        set.scenarios["typo"].forecast_overrides["revenue"]
+    );
+}
+
+#[test]
+fn scenarios_evaluate_the_capital_structure() {
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use time::Month;
+
+    let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let model = ModelBuilder::new("cs_scenarios")
+        .periods("2025Q1..Q4", None)
+        .expect("valid periods")
+        .value(
+            "revenue",
+            &(1..=4)
+                .map(|quarter| (q(quarter), AmountOrScalar::scalar(1_000.0)))
+                .collect::<Vec<_>>(),
+        )
+        .add_bond(
+            "BOND",
+            Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
+            0.05,
+            issue,
+            Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
+            "USD-OIS",
+        )
+        .expect("valid bond")
+        .compute("interest", "cs.interest_expense.total")
+        .expect("valid formula")
+        .build()
+        .expect("valid model");
+    let set = ScenarioSet {
+        scenarios: IndexMap::from([
+            ("base".to_string(), ScenarioDefinition::default()),
+            (
+                "downside".to_string(),
+                ScenarioDefinition {
+                    parent: Some("base".to_string()),
+                    overrides: IndexMap::from([(
+                        "revenue".to_string(),
+                        AmountOrScalar::scalar(900.0),
+                    )]),
+                    ..ScenarioDefinition::default()
+                },
+            ),
+        ]),
+    };
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder("USD-OIS")
+            .base_date(issue)
+            .knots([(0.0, 1.0), (5.0, 0.9)])
+            .build()
+            .expect("curve should build"),
+    );
+
+    let plain = set.evaluate_all(&model).expect("plain scenario evaluation");
+    let priced = set
+        .evaluate_all_with_market(&model, &market, issue)
+        .expect("market scenario evaluation");
+
+    for results in [&plain, &priced] {
+        for name in ["base", "downside"] {
+            let result = &results.scenarios[name];
+            let cashflows = result.cs_cashflows.as_ref().expect("cs_cashflows");
+            assert!(cashflows.by_instrument.contains_key("BOND"));
+            // The semi-annual coupon from 2025-01-01 pays on 1 July (Q3).
+            let interest = result.get("interest", &q(3)).expect("interest");
+            assert!(interest > 240.0 && interest < 260.0, "{name}: {interest}");
+        }
+        assert_eq!(
+            results.scenarios["downside"].get("revenue", &q(1)),
+            Some(900.0)
+        );
+    }
+    assert_eq!(
+        plain.scenarios["base"].get("interest", &q(3)),
+        priced.scenarios["base"].get("interest", &q(3))
+    );
 }

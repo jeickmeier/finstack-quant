@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
 
 type Node = FinancialModelSpecWire["nodes"][string];
-type Method = NonNullable<Node["forecast"]>["method"];
+export type ForecastSpecWire = NonNullable<Node["forecast"]>;
+type Method = ForecastSpecWire["method"];
 type Field = {
   key: string;
   label: string;
@@ -235,11 +236,15 @@ export function ForecastEditor({
   nodeId,
   node,
   onApply,
+  applyLabel = "Apply forecast",
 }: {
   model: FinancialModelSpecWire;
   nodeId: string;
+  /** The line whose forecast seeds the editor. */
   node: Node;
-  onApply: (json: string) => Promise<string | null>;
+  /** Receives the complete forecast spec; return an error message or null when accepted. */
+  onApply: (forecast: ForecastSpecWire) => Promise<string | null>;
+  applyLabel?: string;
 }) {
   const periods = model.periods
     .filter((period) => !period.is_actual)
@@ -311,10 +316,8 @@ export function ForecastEditor({
       }
       for (const key of ["min", "max"])
         if (draft[key]?.trim()) params[key] = numeric(key, draft[key]);
-      const next = structuredClone(model);
-      next.nodes[nodeId].forecast = { method, params };
       setSaving(true);
-      const message = await onApply(JSON.stringify(next));
+      const message = await onApply({ method, params });
       setSaving(false);
       setError(message);
     } catch (cause) {
@@ -457,7 +460,7 @@ export function ForecastEditor({
         disabled={saving}
         onClick={() => void apply()}
       >
-        {saving ? "Evaluating…" : "Apply forecast"}
+        {saving ? "Evaluating…" : applyLabel}
       </Button>
     </div>
   );

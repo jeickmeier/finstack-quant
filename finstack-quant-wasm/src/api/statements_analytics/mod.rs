@@ -99,13 +99,18 @@ pub fn run_variance(
 /// Evaluate all scenarios in a scenario set against a base model.
 ///
 /// Returns a structured JavaScript object mapping scenario names to their
-/// statement results.
+/// statement results. Like `Evaluator.evaluate`, a capital structure is
+/// evaluated from an empty market, which serves fixed-rate instruments; use
+/// `evaluateScenarioSetWithMarket` for instruments that need market data.
+/// A scenario's `forecast_overrides` replace whole node forecast specs.
 ///
 /// # Errors
 ///
 /// Rejects malformed model or scenario-set JSON, an empty scenario set,
-/// invalid parent chains, overrides of missing nodes, failure to evaluate any
-/// scenario, or failure to serialize the result map to JavaScript.
+/// invalid parent chains, overrides of missing nodes, invalid forecast
+/// overrides, a capital-structure instrument needing market data (kind
+/// `not_found`), failure to evaluate any scenario, or failure to serialize
+/// the result map to JavaScript.
 /// @param model_json - Financial-model specification JSON.
 /// @param scenario_set_json - Scenario-set JSON keyed by scenario name.
 #[wasm_bindgen(js_name = evaluateScenarioSet)]
@@ -123,6 +128,49 @@ pub fn evaluate_scenario_set(
     let results = scenario_set.evaluate_all(&model).map_err(to_js_err)?;
     // `ScenarioResults` is `#[serde(transparent)]`: its wire form is the
     // `{scenario_name: StatementResult}` map.
+    to_js_value(&results)
+}
+
+/// Evaluate all scenarios in a scenario set against a market as of a date.
+///
+/// Twin of Python `evaluate_scenario_set_with_market` (Rust
+/// `ScenarioSet::evaluate_all_with_market`). Each scenario is evaluated like
+/// `Evaluator.evaluateWithMarket`: capital-structure instruments are priced
+/// from `market` as of `asOf` (floating coupons, swaps, caps), so every result
+/// carries `cs_cashflows`, and explicit actuals not yet available at `asOf`
+/// are hidden. `evaluateScenarioSet` evaluates the capital structure from an
+/// empty market, which serves fixed-rate instruments only.
+///
+/// # Errors
+///
+/// Rejects malformed model, scenario-set or market input, an `asOf` that is
+/// not an ISO date, an empty scenario set, invalid parent chains, overrides
+/// of missing or incompatible nodes, invalid forecast overrides, an
+/// instrument needing market data `market` lacks (kind `not_found`), or a
+/// failure to evaluate any scenario.
+/// @param model_json - Financial-model specification JSON.
+/// @param scenario_set_json - Scenario-set JSON keyed by scenario name.
+/// @param market - `MarketContext` state supplying curves, fixings and FX (object or JSON), shared by every scenario.
+/// @param as_of - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility.
+/// @returns Map of scenario name to `StatementResult` plain object.
+#[wasm_bindgen(js_name = evaluateScenarioSetWithMarket)]
+pub fn evaluate_scenario_set_with_market(
+    model_json: JsValue,
+    scenario_set_json: JsValue,
+    market: JsValue,
+    as_of: JsValue,
+) -> Result<JsValue, JsValue> {
+    let model =
+        FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?).map_err(to_js_err)?;
+    let scenario_set: finstack_quant_statements_analytics::analysis::ScenarioSet =
+        serde_json::from_str(&json_text(&scenario_set_json, "scenarioSetJson")?)
+            .map_err(to_js_err)?;
+    let market: finstack_quant_core::market_data::context::MarketContext =
+        crate::utils::input::from_js_json(&market, "market")?;
+    let as_of = crate::utils::parse_iso_date(&js_string(&as_of, "asOf")?)?;
+    let results = scenario_set
+        .evaluate_all_with_market(&model, &market, as_of)
+        .map_err(to_js_err)?;
     to_js_value(&results)
 }
 
@@ -922,7 +970,7 @@ mod tests {
                 "upside".to_string() => finstack_quant_statements_analytics::analysis::ScenarioDefinition {
                     parent: None,
                     overrides,
-                    period_overrides: indexmap::IndexMap::new(),
+                    ..Default::default()
                 },
             },
         };

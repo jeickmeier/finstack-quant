@@ -819,6 +819,85 @@
       "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
       "type": "string"
     },
+    "ForecastMethod": {
+      "description": "Available forecast methods.",
+      "oneOf": [
+        {
+          "const": "forward_fill",
+          "description": "Carry last value forward",
+          "type": "string"
+        },
+        {
+          "const": "growth_pct",
+          "description": "Compound growth: `v[t] = v[t-1] * (1 + rate)`",
+          "type": "string"
+        },
+        {
+          "const": "curve_pct",
+          "description": "Period-specific growth rates: `v[t] = v[t-1] * (1 + curve[t])`",
+          "type": "string"
+        },
+        {
+          "const": "normal",
+          "description": "Sample from normal distribution (deterministic with seed)",
+          "type": "string"
+        },
+        {
+          "const": "log_normal",
+          "description": "Sample from log-normal distribution (deterministic with seed)",
+          "type": "string"
+        },
+        {
+          "const": "override",
+          "description": "Explicit period overrides",
+          "type": "string"
+        },
+        {
+          "const": "time_series",
+          "description": "Reference external time series",
+          "type": "string"
+        },
+        {
+          "const": "seasonal",
+          "description": "Seasonal pattern (additive/multiplicative)",
+          "type": "string"
+        },
+        {
+          "const": "fade_to_target",
+          "description": "Glide from the base value to a target level: linear, geometric\n(CAGR-to-terminal), or exponential (half-life) shape",
+          "type": "string"
+        },
+        {
+          "const": "mean_reverting",
+          "description": "Mean-reverting AR(1) path:\n`v[t] = v[t-1] + reversion_speed * (long_run_mean - v[t-1]) + std_dev * z[t]`",
+          "type": "string"
+        },
+        {
+          "const": "bootstrap",
+          "description": "Resample historical growth rates or level diffs (deterministic with seed)",
+          "type": "string"
+        }
+      ]
+    },
+    "ForecastSpec": {
+      "additionalProperties": false,
+      "description": "Forecast method specification.\n\nDefines how to forecast future values for a node.",
+      "properties": {
+        "method": {
+          "$ref": "#/$defs/ForecastMethod",
+          "description": "Forecast method"
+        },
+        "params": {
+          "additionalProperties": true,
+          "description": "Method-specific parameters",
+          "type": "object"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "type": "object"
+    },
     "Money": {
       "additionalProperties": false,
       "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
@@ -840,8 +919,15 @@
     },
     "ScenarioDefinition": {
       "additionalProperties": false,
-      "description": "Definition for a single named scenario.\n\nScenarios are attached to a base [`FinancialModelSpec`] and specify an\noptional parent plus typed scalar or monetary overrides for named nodes.\n\nThe JSON representation mirrors the design docs example:\n\n```json\n\"downside\": {\n  \"parent\": \"base\",\n  \"overrides\": { \"revenue_growth\": -0.05, \"margin\": -0.02 }\n}\n```",
+      "description": "Definition for a single named scenario.\n\nScenarios are attached to a base [`FinancialModelSpec`] and specify an\noptional parent plus typed scalar or monetary value overrides and forecast\nspecification overrides for named nodes.\n\nThe JSON representation mirrors the design docs example:\n\n```json\n\"downside\": {\n  \"parent\": \"base\",\n  \"overrides\": { \"revenue_growth\": -0.05, \"margin\": -0.02 }\n}\n```",
       "properties": {
+        "forecast_overrides": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ForecastSpec"
+          },
+          "description": "Forecast overrides for model nodes, keyed by `node_id`.\n\nEach entry replaces the node's whole [`ForecastSpec`] in this scenario:\nthe method and every parameter it reads (growth rates, `curve`\npaths, `seed`, `std_dev` and other stochastic parameters, external\n`series`, `min` / `max` bounds). A node without a forecast gains one.\nAcross a parent chain the child's spec replaces the parent's for the\nsame node. Parameters are validated when the scenario is evaluated.\n\nThe forecast fills forecast periods only, and explicit values still\nwin (`Value > Forecast > Formula`): a value override, a per-period\noverride or a model value in a forecast period hides the forecast in\nthat period.",
+          "type": "object"
+        },
         "overrides": {
           "additionalProperties": {
             "$ref": "#/$defs/AmountOrScalar"

@@ -46,6 +46,7 @@ export function createService(native: {
     | "parseAndCompile"
     | "parseFormula"
     | "Evaluator"
+    | "statementResultRollup"
   >;
   statements_analytics: Pick<
     typeof statements_analytics,
@@ -56,6 +57,8 @@ export function createService(native: {
     | "runThreeStatementChecks"
     | "runCreditUnderwritingChecks"
     | "renderCheckReportText"
+    | "evaluateScenarioSet"
+    | "evaluateScenarioSetWithMarket"
   >;
   valuations: Pick<typeof valuations, "instruments" | "valuationResultToJson">;
 }): WorkerApi {
@@ -231,6 +234,35 @@ export function createService(native: {
     renderStatementChecks(reportJson) {
       return result(() =>
         native.statements_analytics.renderCheckReportText(reportJson),
+      );
+    },
+    evaluateStatementScenarios(request) {
+      return result(() => {
+        const { modelJson, scenarioSetJson, marketJson, asOf } = request;
+        if (marketJson === undefined && asOf === undefined)
+          return native.statements_analytics.evaluateScenarioSet(
+            modelJson,
+            scenarioSetJson,
+          );
+        if (marketJson === undefined || asOf === undefined)
+          throw new TypeError(
+            "Statement market JSON and as-of date must be supplied together",
+          );
+        return native.statements_analytics.evaluateScenarioSetWithMarket(
+          modelJson,
+          scenarioSetJson,
+          marketJson,
+          asOf,
+        );
+      });
+    },
+    rollupStatement(request) {
+      return result(() =>
+        native.statements.statementResultRollup(
+          request.resultsJson,
+          request.modelJson,
+          request.specJson,
+        ),
       );
     },
     dryRun(json) {

@@ -9,7 +9,7 @@ use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::capital_structure::CapitalStructureCashflows;
 use finstack_quant_statements::checks::{CheckReport, Severity};
-use finstack_quant_statements::evaluator::StatementResult;
+use finstack_quant_statements::evaluator::{RollupSpec, StatementResult};
 use finstack_quant_statements::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
 
@@ -38,6 +38,37 @@ pub fn statement_result_get(
 ) -> Result<Option<f64>, JsValue> {
     let result: StatementResult = from_js_json(&result_json, "resultJson")?;
     Ok(result.get(&js_string(&node_id, "nodeId")?, &period_id(&period)?))
+}
+
+/// Roll a statement result up to a coarser frequency, such as quarterly to annual.
+///
+/// Free-function twin of Python `StatementResult.rollup` (Rust
+/// `StatementResult::rollup`). Each target period combines its source
+/// periods node by node: summed by default (flows), the last source value
+/// for `period_end` nodes (balances, LTM metrics), and the node's formula
+/// re-evaluated on the rolled-up values for `formula` nodes (ratios). Every
+/// target period must be complete.
+/// @param result_json - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
+/// @param model - The `FinancialModelSpec` the result was evaluated from (object or JSON); it supplies the period dates and the formulas of `formula` nodes.
+/// @param spec - `RollupSpec`: target `frequency` (`"quarterly"`, `"semi_annual"` or `"annual"`) and per-node `methods` (`"sum"` default, `"period_end"`, `"formula"`) (object or JSON).
+/// @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), without `node_sources`, capital-structure cashflows or a check report.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if an input is malformed, the target
+/// frequency is not a whole multiple of the model's, a target period is
+/// incomplete, a method names an unknown node, a `formula` node has no
+/// formula or reads `cs.*` values, or a re-evaluated formula fails.
+#[wasm_bindgen(js_name = statementResultRollup)]
+pub fn statement_result_rollup(
+    result_json: JsValue,
+    model: JsValue,
+    spec: JsValue,
+) -> Result<JsValue, JsValue> {
+    let result: StatementResult = from_js_json(&result_json, "resultJson")?;
+    let model = FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+    let spec: RollupSpec = from_js_json(&spec, "spec")?;
+    to_js_value(&result.rollup(&model, &spec).map_err(to_js_err)?)
 }
 
 /// Monetary value of one node in one period.

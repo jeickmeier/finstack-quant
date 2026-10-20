@@ -39,6 +39,7 @@ NumericMode = _statements.NumericMode
 PaymentClassSpec = _statements.PaymentClassSpec
 PikToggleSpec = _statements.PikToggleSpec
 Registry = _statements.Registry
+RollupSpec = _statements.RollupSpec
 StatementResult = _statements.StatementResult
 WaterfallSpec = _statements.WaterfallSpec
 merge_into_results = _statements.merge_into_results
@@ -79,6 +80,7 @@ __all__: list[str] = [
     "PaymentClassSpec",
     "PikToggleSpec",
     "Registry",
+    "RollupSpec",
     "StatementResult",
     "WaterfallSpec",
     "merge_into_results",

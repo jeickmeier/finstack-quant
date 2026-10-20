@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
-      "bytes": 22285,
+      "bytes": 22797,
       "kind": "input",
       "path": "schemas/statements/1/check_suite_spec.schema.json",
       "summary": "Serializable check suite: built-in checks, formula checks and filtering configuration.",
@@ -62,6 +62,15 @@
       "summary": "Per-period normalization outcome: base value, applied adjustments and final value.",
       "title": "NormalizationResult",
       "type_name": "NormalizationResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
+      "bytes": 3898,
+      "kind": "input",
+      "path": "schemas/statements/1/rollup_spec.schema.json",
+      "summary": "Target frequency and per-node methods for rolling statement results up to coarser periods.",
+      "title": "RollupSpec",
+      "type_name": "RollupSpec"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
