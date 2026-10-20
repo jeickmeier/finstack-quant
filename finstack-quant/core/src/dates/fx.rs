@@ -28,7 +28,6 @@
 //!   <https://www.cmegroup.com/content/dam/cmegroup/documents/ebs_value-date-calendar.pdf>.
 
 use crate::currency::Currency;
-use crate::dates::calendar::business_days::add_business_days_on;
 use crate::dates::{
     adjust, calendar_by_id_strict, resolve_calendar, BusinessDayConvention, CompositeCalendar,
     Date, DateExt, HolidayCalendar,
@@ -178,26 +177,28 @@ pub fn fx_spot_date(
     let usd_counts_business_days = USD_BUSINESS_DAY_COUNT_CURRENCIES
         .iter()
         .any(|currency| *currency == base_currency || *currency == quote_currency);
+    // Every lag is at most `MAX_FX_SPOT_LAG_DAYS`, so the `i32` casts are exact.
     let leg = |currency: Currency, calendar: &dyn HolidayCalendar| -> Result<Date> {
-        let lag = leg_lag(currency);
+        let lag = leg_lag(currency) as i32;
         if currency == Currency::USD {
             // US holidays are good intermediate days unless the pair needs
             // clear US business days.
             if usd_counts_business_days {
-                add_business_days_on(trade_date, lag, usd_cal)
+                trade_date.add_business_days(lag, usd_cal)
             } else {
-                add_weekdays_on(trade_date, lag)
+                trade_date.add_weekdays(lag)
             }
         } else {
-            add_business_days_on(trade_date, lag, calendar)
+            trade_date.add_business_days(lag, calendar)
         }
     };
+    let settlement_days = settlement_days as i32;
     let mut date = leg(base_currency, base_cal)?
         .max(leg(quote_currency, quote_cal)?)
-        .max(add_weekdays_on(trade_date, settlement_days)?);
+        .max(trade_date.add_weekdays(settlement_days)?);
     let is_cross = base_currency != Currency::USD && quote_currency != Currency::USD;
     if is_cross && usd_counts_business_days {
-        date = date.max(add_business_days_on(trade_date, settlement_days, usd_cal)?);
+        date = date.max(trade_date.add_business_days(settlement_days, usd_cal)?);
     }
     let final_calendars = [base_cal, quote_cal, usd_cal];
     adjust(
@@ -205,12 +206,6 @@ pub fn fx_spot_date(
         BusinessDayConvention::Following,
         &CompositeCalendar::new(&final_calendars),
     )
-}
-
-fn add_weekdays_on(start: Date, n_days: u32) -> Result<Date> {
-    let n_days = i32::try_from(n_days)
-        .map_err(|_| Error::Validation("weekday offset exceeds the supported range".into()))?;
-    start.add_weekdays(n_days)
 }
 
 /// Roll a trade date to spot under the pair's contractual spot lag.
@@ -298,7 +293,6 @@ pub fn add_fx_standard_tenor(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::calendar::business_days::add_business_days_on;
     use crate::dates::{
         adjust, calendar_by_id_strict, create_date, resolve_joint_calendar, WEEKENDS_ONLY,
     };
@@ -327,12 +321,12 @@ mod tests {
     #[test]
     fn fx_date_range_boundaries_return_errors() {
         assert!(resolve_joint_calendar(None, None)
-            .and_then(|cal| add_business_days_on(Date::MAX, 1, cal))
+            .and_then(|cal| Date::MAX.add_business_days(1, cal))
             .is_err());
         assert!(spot(Date::MAX, Currency::EUR, Currency::USD, 1, None, None, None).is_err());
         assert_eq!(
             resolve_joint_calendar(None, None)
-                .and_then(|cal| add_business_days_on(Date::MAX, 0, cal))
+                .and_then(|cal| Date::MAX.add_business_days(0, cal))
                 .unwrap(),
             Date::MAX
         );
@@ -357,7 +351,7 @@ mod tests {
         // Test with weekends-only calendars (no holidays)
         let start = create_date(2024, Month::January, 15).unwrap(); // Monday
         let result = resolve_joint_calendar(None, None)
-            .and_then(|cal| add_business_days_on(start, 2, cal))
+            .and_then(|cal| start.add_business_days(2, cal))
             .expect("Should succeed with no holidays");
 
         // 2 business days from Monday (Jan 15) should be Wednesday (Jan 17)
@@ -372,7 +366,7 @@ mod tests {
         let start = create_date(2024, Month::January, 12).unwrap(); // Friday before MLK day (Jan 15, 2024)
 
         let result = resolve_joint_calendar(Some("nyse"), None)
-            .and_then(|cal| add_business_days_on(start, 3, cal))
+            .and_then(|cal| start.add_business_days(3, cal))
             .expect("Should succeed");
 
         // From Friday Jan 12:
@@ -392,7 +386,7 @@ mod tests {
         let start = create_date(2024, Month::December, 23).unwrap(); // Monday before Christmas
 
         let result = resolve_joint_calendar(None, Some("gblo"))
-            .and_then(|cal| add_business_days_on(start, 3, cal))
+            .and_then(|cal| start.add_business_days(3, cal))
             .expect("Should succeed");
 
         // From Monday Dec 23:
@@ -413,7 +407,7 @@ mod tests {
         let start = create_date(2023, Month::December, 29).unwrap(); // Friday before New Year
 
         let result = resolve_joint_calendar(Some("nyse"), Some("gblo"))
-            .and_then(|cal| add_business_days_on(start, 2, cal))
+            .and_then(|cal| start.add_business_days(2, cal))
             .expect("Should succeed");
 
         // From Friday Dec 29:
@@ -431,7 +425,7 @@ mod tests {
         let trade_date = create_date(2024, Month::January, 12).unwrap(); // Friday before MLK day
 
         let spot_date = resolve_joint_calendar(Some("nyse"), None)
-            .and_then(|cal| add_business_days_on(trade_date, 2, cal))
+            .and_then(|cal| trade_date.add_business_days(2, cal))
             .expect("Should succeed");
 
         // From Friday Jan 12, T+2 joint business days:
@@ -494,7 +488,7 @@ mod tests {
         // Edge case: adding 0 days should return the start date
         let start = create_date(2024, Month::January, 15).unwrap();
         let result = resolve_joint_calendar(None, None)
-            .and_then(|cal| add_business_days_on(start, 0, cal))
+            .and_then(|cal| start.add_business_days(0, cal))
             .expect("Should succeed");
 
         assert_eq!(result, start, "Adding 0 days should return start date");
@@ -524,7 +518,7 @@ mod tests {
     fn test_joint_business_days_unknown_calendar() {
         let trade_date = create_date(2024, Month::January, 15).unwrap();
         let result = resolve_joint_calendar(Some("unknown_cal"), None)
-            .and_then(|cal| add_business_days_on(trade_date, 2, cal));
+            .and_then(|cal| trade_date.add_business_days(2, cal));
 
         assert!(result.is_err(), "Unknown calendar should error");
     }
@@ -554,7 +548,7 @@ mod tests {
 
         // The symmetric joint rule (pre-fix behavior) lands one day later.
         let symmetric = resolve_joint_calendar(Some("target2"), Some("usny"))
-            .and_then(|cal| add_business_days_on(trade, 2, cal))
+            .and_then(|cal| trade.add_business_days(2, cal))
             .expect("symmetric roll");
         assert_eq!(symmetric, create_date(2025, Month::July, 8).unwrap());
     }
@@ -772,7 +766,7 @@ mod tests {
         let trade = create_date(2025, Month::July, 2).unwrap();
 
         let spot_two_cal = resolve_joint_calendar(Some("target2"), Some("jpto"))
-            .and_then(|cal| add_business_days_on(trade, 2, cal))
+            .and_then(|cal| trade.add_business_days(2, cal))
             .expect("two-calendar roll");
         assert_eq!(
             spot_two_cal,
@@ -781,7 +775,7 @@ mod tests {
         );
 
         let spot_with_usd = calendar_by_id_strict("target2+jpto+usny")
-            .and_then(|cal| add_business_days_on(trade, 2, cal))
+            .and_then(|cal| trade.add_business_days(2, cal))
             .expect("three-calendar roll");
         assert_eq!(
             spot_with_usd,

@@ -164,35 +164,31 @@ mod tests {
     }
 
     fn string_column<'a>(table: &'a TableEnvelope, name: &str) -> &'a [String] {
-        table
-            .column(name)
-            .expect("column should exist")
-            .as_strings()
-            .expect("column should be string")
+        match &table.column(name).expect("column should exist").data {
+            finstack_quant_core::table::TableColumnData::String(values) => values,
+            other => panic!("column should be string, got {other:?}"),
+        }
     }
 
     fn nullable_string_column<'a>(table: &'a TableEnvelope, name: &str) -> &'a [Option<String>] {
-        table
-            .column(name)
-            .expect("column should exist")
-            .as_nullable_strings()
-            .expect("column should be nullable string")
+        match &table.column(name).expect("column should exist").data {
+            finstack_quant_core::table::TableColumnData::NullableString(values) => values,
+            other => panic!("column should be nullable string, got {other:?}"),
+        }
     }
 
     fn float_column<'a>(table: &'a TableEnvelope, name: &str) -> &'a [f64] {
-        table
-            .column(name)
-            .expect("column should exist")
-            .as_f64()
-            .expect("column should be float")
+        match &table.column(name).expect("column should exist").data {
+            finstack_quant_core::table::TableColumnData::Float64(values) => values,
+            other => panic!("column should be float, got {other:?}"),
+        }
     }
 
     fn nullable_float_column<'a>(table: &'a TableEnvelope, name: &str) -> &'a [Option<f64>] {
-        table
-            .column(name)
-            .expect("column should exist")
-            .as_nullable_f64()
-            .expect("column should be nullable float")
+        match &table.column(name).expect("column should exist").data {
+            finstack_quant_core::table::TableColumnData::NullableFloat64(values) => values,
+            other => panic!("column should be nullable float, got {other:?}"),
+        }
     }
 
     #[test]

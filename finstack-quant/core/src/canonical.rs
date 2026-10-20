@@ -62,11 +62,11 @@ pub fn to_canonical_bytes<T: Serialize>(value: &T) -> crate::Result<Vec<u8>> {
 ///
 /// Returns [`crate::Error::Internal`] if the canonical JSON tree cannot be
 /// encoded.
-pub fn canonical_bytes_of_value(value: &Value) -> crate::Result<Vec<u8>> {
+fn canonical_bytes_of_value(value: &Value) -> crate::Result<Vec<u8>> {
     // `serde_json::Map` is a `BTreeMap` (the `preserve_order` feature is off),
     // so object keys are already byte-ordered; see `map_keys_iterate_sorted`.
     serde_json::to_vec(value)
-        .map_err(|error| crate::Error::internal(format!("canonical JSON encoding failed: {error}")))
+        .map_err(|error| crate::Error::Internal(format!("canonical JSON encoding failed: {error}")))
 }
 
 /// Compute a versioned SHA-256 digest over a value's canonical JSON bytes.
@@ -109,7 +109,7 @@ fn canonical_value_error(error: CanonicalValueError) -> crate::Error {
             crate::Error::from(InputError::NonFiniteValue { kind })
         }
         CanonicalValueError::Custom(message) => {
-            crate::Error::internal(format!("canonical JSON serialization failed: {message}"))
+            crate::Error::Internal(format!("canonical JSON serialization failed: {message}"))
         }
     }
 }

@@ -1016,7 +1016,6 @@ mod tests {
                 );
             }
         }
-        assert!(f.is_full_rank());
     }
 
     #[test]

@@ -478,14 +478,6 @@ mod tests {
                 "computation",
             ),
             (
-                Error::Input(InputError::TooLarge {
-                    what: "arena".to_string(),
-                    requested_bytes: 8,
-                    limit_bytes: 4,
-                }),
-                "computation",
-            ),
-            (
                 Error::MetricCalculationFailed {
                     metric_id: "dv01".to_string(),
                     cause: Box::new(Error::Calibration {

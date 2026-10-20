@@ -573,14 +573,12 @@ impl InflationIndex {
         // O(1) endpoint reads. This is called once per coupon period during
         // inflation-linked bond pricing, so it must not materialize the whole
         // observation history (a 40-year monthly CPI series is ~480 prints).
-        let start_date = self
-            .series
-            .first_date()
-            .ok_or_else(|| Error::internal("inflation index observations missing first date"))?;
-        let end_date = self
-            .series
-            .last_date()
-            .ok_or_else(|| Error::internal("inflation index observations missing last date"))?;
+        let start_date = self.series.first_date().ok_or_else(|| {
+            Error::Internal("inflation index observations missing first date".into())
+        })?;
+        let end_date = self.series.last_date().ok_or_else(|| {
+            Error::Internal("inflation index observations missing last date".into())
+        })?;
 
         Ok((start_date, end_date))
     }
@@ -594,10 +592,9 @@ impl InflationIndex {
 
     /// Retrieve the latest stored observation without lag or seasonality.
     pub(crate) fn get_latest_observation(&self) -> Result<(Date, f64)> {
-        let date = self
-            .series
-            .last_date()
-            .ok_or_else(|| Error::internal("inflation index observations missing last date"))?;
+        let date = self.series.last_date().ok_or_else(|| {
+            Error::Internal("inflation index observations missing last date".into())
+        })?;
         Ok((date, self.series.value_on_exact(date)?))
     }
 

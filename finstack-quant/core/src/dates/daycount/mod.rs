@@ -642,29 +642,6 @@ impl DayCount {
         }
     }
 
-    /// Calendar days between two dates (signed: negative when `end < start`).
-    ///
-    /// This is a thin convenience wrapper around `(end - start).whole_days()`.
-    /// It counts raw calendar days without regard for any day-count convention,
-    /// business-day calendar, or holiday schedule.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount};
-    /// use time::Month;
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-    /// let end   = Date::from_calendar_date(2025, Month::February, 1).expect("Valid date");
-    /// assert_eq!(DayCount::calendar_days(start, end), 31);
-    ///
-    /// // Negative when end < start
-    /// assert_eq!(DayCount::calendar_days(end, start), -31);
-    /// ```
-    pub fn calendar_days(start: Date, end: Date) -> i64 {
-        (end - start).whole_days()
-    }
-
     /// Canonical snake_case names accepted by [`FromStr`](std::str::FromStr),
     /// in declaration order.
     pub const NAMES: &'static [&'static str] = &[

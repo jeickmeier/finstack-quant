@@ -12,8 +12,5 @@ mod load;
 
 pub use descriptor::ContractDescriptor;
 pub use diagnostics::{ContractError, Diagnostic, LoadPhase, Severity, ValidationReport};
-pub use limits::{
-    LoadLimits, DEFAULT_MAX_ARTIFACTS, DEFAULT_MAX_BYTES, DEFAULT_MAX_DEPTH,
-    DEFAULT_MAX_DIAGNOSTICS, DEFAULT_MAX_POSITIONS,
-};
+pub use limits::{LoadLimits, DEFAULT_MAX_BYTES};
 pub use load::{check_json_limits, deserialize_json_value, parse_json_value};

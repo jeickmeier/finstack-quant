@@ -416,7 +416,7 @@ where
 /// tolerance cannot be met within `max_depth` recursion levels. The error payload
 /// includes the error estimate, the interval midpoint, and the depth reached. Callers
 /// handling pathological integrands should increase `max_depth` or switch to a
-/// non-adaptive rule such as [`gauss_legendre_integrate`].
+/// non-adaptive rule such as [`gauss_legendre_integrate_composite`].
 ///
 /// # Algorithm
 ///
@@ -658,16 +658,7 @@ fn gl_nodes_weights(order: usize) -> Result<(&'static [f64], &'static [f64]), Er
 /// | 8 | Degree 15 | Standard accuracy |
 /// | 16 | Degree 31 | High precision |
 ///
-/// # Example
-///
-/// ```rust
-/// use finstack_quant_core::math::integration::gauss_legendre_integrate;
-///
-/// // Integrate x³ from -1 to 1 (exact answer: 0)
-/// let integral = gauss_legendre_integrate(|x| x.powi(3), -1.0, 1.0, 4).expect("Valid order");
-/// assert!(integral.abs() < 1e-10);
-/// ```
-pub fn gauss_legendre_integrate<F2>(f: F2, a: f64, b: f64, order: usize) -> Result<f64, Error>
+fn gauss_legendre_integrate<F2>(f: F2, a: f64, b: f64, order: usize) -> Result<f64, Error>
 where
     F2: Fn(f64) -> f64,
 {
@@ -758,7 +749,7 @@ pub fn gauss_legendre_grid(
 ///
 /// Returns [`Error::Validation`] when:
 /// - `panels` is zero
-/// - `order` is unsupported (see [`gauss_legendre_integrate`])
+/// - `order` is unsupported (supported orders: 2, 4, 8, 16)
 ///
 /// # Complexity
 ///
@@ -918,6 +909,88 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_gauss_legendre_basic() {
+        // x² on [0,1] = 1/3
+        let f = |x: f64| x * x;
+
+        // Test different orders
+        let result2 = gauss_legendre_integrate(f, 0.0, 1.0, 2).expect("supported order");
+        let result4 = gauss_legendre_integrate(f, 0.0, 1.0, 4).expect("supported order");
+        let result8 = gauss_legendre_integrate(f, 0.0, 1.0, 8).expect("supported order");
+
+        let exact = 1.0 / 3.0;
+
+        // All should be accurate for polynomial
+        assert!((result2 - exact).abs() < 1e-10);
+        assert!((result4 - exact).abs() < 1e-10);
+        assert!((result8 - exact).abs() < 1e-10);
+    }
+    #[test]
+    fn test_gauss_legendre_invalid_bounds() {
+        let f = |x: f64| x;
+
+        // Infinite bounds
+        assert!(gauss_legendre_integrate(f, 0.0, f64::INFINITY, 4).is_err());
+        assert!(gauss_legendre_integrate(f, f64::NEG_INFINITY, 0.0, 4).is_err());
+
+        // NaN bounds
+        assert!(gauss_legendre_integrate(f, 0.0, f64::NAN, 4).is_err());
+    }
+    #[test]
+    fn test_gauss_legendre_equal_bounds() {
+        let f = |x: f64| x * x;
+
+        // Equal bounds should give 0
+        let result = gauss_legendre_integrate(f, 5.0, 5.0, 4).expect("supported order");
+        assert!(result.abs() < 1e-12);
+    }
+    #[test]
+    fn test_gauss_legendre_invalid_order() {
+        let f = |x: f64| x;
+
+        // Unsupported order
+        assert!(gauss_legendre_integrate(f, 0.0, 1.0, 3).is_err());
+        assert!(gauss_legendre_integrate(f, 0.0, 1.0, 7).is_err());
+    }
+    // ── H3 regression: large-bounds/small-width midpoint safety ──
+    //
+    // With a = 1e14 and b = 1e14 + 1 the naive midpoint (a+b)/2 has catastrophic
+    // cancellation on 64-bit floats; a + 0.5*(b-a) is stable. Integrand is
+    // constant 1, so the exact answer is 1.0.
+    #[test]
+    fn test_gauss_legendre_large_bounds_small_width_midpoint() {
+        let a = 1.0e14_f64;
+        let b = a + 1.0;
+        let result = gauss_legendre_integrate(|_| 1.0, a, b, 4).expect("valid");
+        assert!(
+            (result - 1.0).abs() < 1e-6,
+            "Integral of 1 over [1e14, 1e14+1] should be 1.0, got {result}"
+        );
+    }
+    // ── H2 guard: tiny-but-nonzero interval must not collapse to zero ──
+    //
+    // The `a == b` shortcut is intentional for exact zero-width intervals.
+    // Confirm a very small but nonzero interval is still integrated.
+    #[test]
+    fn test_gauss_legendre_tiny_nonzero_interval_not_collapsed() {
+        // Interval width = 1e-12; integrand = 1; exact answer ≈ 1e-12
+        let a = 1.0_f64;
+        let b = 1.0 + 1.0e-12;
+        let result = gauss_legendre_integrate(|_| 1.0, a, b, 4).expect("valid");
+        // Must be positive — interval must not be treated as zero-width.
+        assert!(
+            result > 0.0,
+            "Tiny nonzero interval must not be treated as zero-width; got {result}"
+        );
+        // Result should match (b - a) to within floating-point precision of that subtraction.
+        let width = b - a;
+        assert!(
+            (result - width).abs() / width < 1.0e-10,
+            "Expected ~{width}, got {result}"
+        );
+    }
 
     #[test]
     fn test_simpson_rule() {

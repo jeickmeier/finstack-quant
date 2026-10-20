@@ -349,11 +349,6 @@ pub struct CorrelationFactor {
     factor: Vec<f64>,
     /// Matrix dimension.
     n: usize,
-    /// Number of numerically non-zero pivots (effective rank).
-    ///
-    /// For well-conditioned correlation matrices this equals `n`. For
-    /// near-singular matrices it may be smaller.
-    effective_rank: usize,
     /// Whether [`Self::factor`] is exactly lower triangular (all entries
     /// above the diagonal are `+0.0`).
     ///
@@ -366,27 +361,6 @@ pub struct CorrelationFactor {
 }
 
 impl CorrelationFactor {
-    /// Matrix dimension.
-    #[must_use]
-    pub fn n(&self) -> usize {
-        self.n
-    }
-
-    /// Effective numerical rank (number of pivots above relative tolerance).
-    ///
-    /// For a well-conditioned full-rank correlation matrix this equals `n`.
-    /// For a rank-deficient or near-singular matrix it is less than `n`.
-    #[must_use]
-    pub fn effective_rank(&self) -> usize {
-        self.effective_rank
-    }
-
-    /// Whether the matrix is numerically full-rank.
-    #[must_use]
-    pub fn is_full_rank(&self) -> bool {
-        self.effective_rank == self.n
-    }
-
     /// Factor matrix in original variable order (n×n, row-major).
     ///
     /// The returned matrix satisfies `factor * factor^T = correlation` in
@@ -466,17 +440,13 @@ impl CorrelationFactor {
     ///
     /// * `factor` - Row-major `n × n` factor; length must be `n * n`.
     /// * `n` - Matrix dimension implied by `factor`.
-    /// * `effective_rank` - Number of retained pivots; must satisfy
-    ///   `effective_rank <= n`.
     #[must_use]
-    pub fn from_parts(factor: Vec<f64>, n: usize, effective_rank: usize) -> Self {
+    pub fn from_parts(factor: Vec<f64>, n: usize) -> Self {
         debug_assert_eq!(Some(factor.len()), n.checked_mul(n));
-        debug_assert!(effective_rank <= n);
         let triangular = is_exactly_lower_triangular(&factor, n);
         Self {
             factor,
             n,
-            effective_rank,
             triangular,
         }
     }
@@ -534,12 +504,11 @@ fn is_exactly_lower_triangular(factor: &[f64], n: usize) -> bool {
 /// // Well-conditioned 2×2
 /// let corr = vec![1.0, 0.5, 0.5, 1.0];
 /// let f = cholesky_correlation(&corr, 2).unwrap();
-/// assert!(f.is_full_rank());
+/// assert_eq!(f.factor_matrix().len(), 4);
 ///
 /// // Near-singular (rho ≈ 1): pivoted Cholesky handles it gracefully
 /// let near_singular = vec![1.0, 0.9999999, 0.9999999, 1.0];
-/// let f2 = cholesky_correlation(&near_singular, 2).unwrap();
-/// assert!(f2.effective_rank() <= 2);
+/// assert!(cholesky_correlation(&near_singular, 2).is_ok());
 /// ```
 pub fn cholesky_correlation(
     matrix: &[f64],
@@ -550,7 +519,7 @@ pub fn cholesky_correlation(
     // absorbed into an Ok(NaN factor).
     check_square_finite(matrix, n)?;
     if n == 0 {
-        return Ok(CorrelationFactor::from_parts(vec![], 0, 0));
+        return Ok(CorrelationFactor::from_parts(vec![], 0));
     }
 
     // Maximum diagonal value — used to set relative tolerance.
@@ -671,7 +640,7 @@ pub fn cholesky_correlation(
     // `from_parts` inspects the unpermuted factor. Unit-diagonal correlation
     // inputs typically swap, but a covariance already in pivot order can still
     // come out exactly lower triangular.
-    Ok(CorrelationFactor::from_parts(l_orig, n, effective_rank))
+    Ok(CorrelationFactor::from_parts(l_orig, n))
 }
 
 // ─── Symmetric eigendecomposition (shared helper) ──────────────────────────────
@@ -1380,6 +1349,15 @@ pub fn ledoit_wolf_shrinkage(
 mod tests {
     use super::*;
 
+    /// Numerical rank of a pivoted factor: the retained pivots are exactly
+    /// the columns holding a non-zero entry.
+    fn rank(factor: &CorrelationFactor) -> usize {
+        let n = factor.n;
+        (0..n)
+            .filter(|&j| (0..n).any(|i| factor.factor[i * n + j] != 0.0))
+            .count()
+    }
+
     /// A dimension whose square overflows `usize` on this target, so an
     /// unchecked `n * n` wraps (to 0 for `2^(BITS/2)`) and a wrong-length
     /// buffer would pass the size check.
@@ -1476,7 +1454,7 @@ mod tests {
 
     /// Reference dense multiply — the pre-optimization `apply` loop.
     fn dense_apply(factor: &CorrelationFactor, independent: &[f64], correlated: &mut [f64]) {
-        let n = factor.n();
+        let n = factor.n;
         for (i, out) in correlated.iter_mut().enumerate() {
             let mut sum = 0.0;
             for (j, &z_j) in independent.iter().enumerate() {
@@ -1539,7 +1517,7 @@ mod tests {
     fn triangular_fast_path_matches_dense_multiply_bit_for_bit() {
         let n = 8usize;
         let l = lower_triangular_factor(n);
-        let factor = CorrelationFactor::from_parts(l, n, n);
+        let factor = CorrelationFactor::from_parts(l, n);
         assert!(
             factor.triangular,
             "n=8 lower-triangular factor must enter the half-matrix path"
@@ -1570,7 +1548,7 @@ mod tests {
         // Callers may hand a full (non-triangular) matrix to `from_parts`;
         // it must take the dense path.
         let corr = vec![1.0, 0.5, 0.5, 1.0];
-        let factor = CorrelationFactor::from_parts(corr.clone(), 2, 2);
+        let factor = CorrelationFactor::from_parts(corr.clone(), 2);
         let z = [0.3, -0.7];
 
         let mut via_apply = vec![0.0; 2];
@@ -1789,8 +1767,8 @@ mod tests {
     fn pivoted_cholesky_2x2_well_conditioned() {
         let corr = vec![1.0, 0.5, 0.5, 1.0];
         let f = cholesky_correlation(&corr, 2).expect("should succeed");
-        assert!(f.is_full_rank());
-        assert_eq!(f.effective_rank(), 2);
+        assert_eq!(rank(&f), f.n);
+        assert_eq!(rank(&f), 2);
 
         // Reconstruction: L * L^T should recover original matrix.
         let recon = mat_mul_lt(f.factor_matrix(), 2);
@@ -1858,7 +1836,7 @@ mod tests {
     fn pivoted_cholesky_identity_2x2() {
         let identity = vec![1.0, 0.0, 0.0, 1.0];
         let f = cholesky_correlation(&identity, 2).expect("should succeed");
-        assert!(f.is_full_rank());
+        assert_eq!(rank(&f), f.n);
         let recon = mat_mul_lt(f.factor_matrix(), 2);
         for i in 0..4 {
             assert!((recon[i] - identity[i]).abs() < 1e-12);
@@ -1873,7 +1851,7 @@ mod tests {
             m[i * n + i] = 1.0;
         }
         let f = cholesky_correlation(&m, n).expect("identity must succeed");
-        assert_eq!(f.effective_rank(), 3);
+        assert_eq!(rank(&f), 3);
         let recon = mat_mul_lt(f.factor_matrix(), n);
         for i in 0..n * n {
             assert!((recon[i] - m[i]).abs() < 1e-12);
@@ -1890,7 +1868,7 @@ mod tests {
         let near_singular = vec![1.0, rho, rho, 1.0];
         let f = cholesky_correlation(&near_singular, 2).expect("pivoted must not reject near-PSD");
         // Effective rank may be 1 or 2 depending on exact arithmetic.
-        assert!(f.effective_rank() <= 2);
+        assert!(rank(&f) <= 2);
         // L * L^T should approximate original (within numerical tolerance for
         // near-singular matrix).
         let recon = mat_mul_lt(f.factor_matrix(), 2);
@@ -1910,7 +1888,7 @@ mod tests {
         let f = cholesky_correlation(&corr, 3).expect("rank-deficient PSD must succeed");
         // Matrix is rank 2 so effective_rank should be 2.
         assert_eq!(
-            f.effective_rank(),
+            rank(&f),
             2,
             "expected rank 2 for perfectly linearly dependent matrix"
         );
@@ -1952,7 +1930,7 @@ mod tests {
 
         let rank_one = [1.0; 9];
         let factor = cholesky_correlation(&rank_one, 3).expect("uncoupled zero residual is PSD");
-        assert_eq!(factor.effective_rank(), 1);
+        assert_eq!(rank(&factor), 1);
         assert_eq!(mat_mul_lt(factor.factor_matrix(), 3), rank_one);
     }
 
@@ -1971,7 +1949,7 @@ mod tests {
         for scale in [1e-16, 1.0, 1e16] {
             let scaled = covariance.map(|value| value * scale);
             let factor = cholesky_correlation(&scaled, 2).expect("scaled SPD covariance");
-            assert_eq!(factor.effective_rank(), 2);
+            assert_eq!(rank(&factor), 2);
             for (actual, expected) in mat_mul_lt(factor.factor_matrix(), 2).iter().zip(covariance) {
                 assert!((actual / scale - expected).abs() < 1e-12);
             }
@@ -2009,7 +1987,7 @@ mod tests {
         // pivot was chosen first.
         let corr = vec![1.0, 0.3, 0.8, 0.3, 1.0, 0.2, 0.8, 0.2, 1.0];
         let f = cholesky_correlation(&corr, 3).expect("must succeed");
-        assert!(f.is_full_rank());
+        assert_eq!(rank(&f), f.n);
 
         // Reconstruction confirms ordering.
         let recon = mat_mul_lt(f.factor_matrix(), 3);

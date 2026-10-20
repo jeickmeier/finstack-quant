@@ -796,11 +796,7 @@ mod tests {
                 .report
                 .meta
                 .as_ref()
-                .and_then(|meta| meta
-                    .rounding
-                    .get_output_scale_by_currency()
-                    .get(&Currency::USD))
-                .copied(),
+                .map(|meta| meta.rounding.output_scale(Currency::USD)),
             Some(4),
             "scenario provenance must use the caller's active configuration"
         );

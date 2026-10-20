@@ -54,13 +54,14 @@ fn parallel_stamps_configured_rounding_context() {
 
     let rounding = attribution.meta.rounding;
     assert_eq!(
-        rounding.get_output_scale_by_currency().get(&Currency::USD),
-        Some(&4),
+        rounding.output_scale(Currency::USD),
+        4,
         "Output scale for USD should reflect configured rounding"
     );
     assert_eq!(
-        rounding.get_ingest_scale_by_currency().get(&Currency::USD),
-        Some(&4),
+        serde_json::to_value(&rounding).expect("rounding serializes")["ingest_scale_by_currency"]
+            ["USD"],
+        serde_json::json!(4),
         "Ingest scale for USD should reflect configured rounding"
     );
 }
@@ -129,19 +130,14 @@ fn all_methods_stamp_configured_rounding_context() {
 
     let assert_stamp = |attr: &PnlAttribution, method: &str| {
         assert_eq!(
-            attr.meta
-                .rounding
-                .get_output_scale_by_currency()
-                .get(&Currency::USD),
-            Some(&4),
+            attr.meta.rounding.output_scale(Currency::USD),
+            4,
             "{method}: output scale must reflect the configured rounding"
         );
         assert_eq!(
-            attr.meta
-                .rounding
-                .get_ingest_scale_by_currency()
-                .get(&Currency::USD),
-            Some(&4),
+            serde_json::to_value(&attr.meta.rounding).expect("rounding serializes")
+                ["ingest_scale_by_currency"]["USD"],
+            serde_json::json!(4),
             "{method}: ingest scale must reflect the configured rounding"
         );
     };
@@ -186,8 +182,7 @@ fn all_methods_stamp_configured_rounding_context() {
     )
     .expect("metrics-based attribution should succeed");
     assert_eq!(
-        metrics_based.meta.rounding.get_output_scale_by_currency(),
-        default_rounding.get_output_scale_by_currency(),
+        metrics_based.meta.rounding, default_rounding,
         "metrics-based must stamp the default rounding context"
     );
 }

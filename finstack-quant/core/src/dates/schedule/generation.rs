@@ -136,11 +136,8 @@ impl BuilderInternal {
         if n == 0 {
             return Ok(Some(anchor));
         }
-        let count_i32 =
-            i32::try_from(tenor.count()).map_err(|_| crate::InputError::InvalidTenor {
-                tenor: tenor.to_string(),
-                reason: format!("count {} exceeds i32::MAX", tenor.count()),
-            })?;
+        // `Tenor::new` bounds the count (at most 73,200 days), so the cast is exact.
+        let count_i32 = tenor.count() as i32;
         let checked_mul_i32 = |lhs: i32, rhs: i32| -> crate::Result<i32> {
             lhs.checked_mul(rhs).ok_or_else(|| {
                 crate::Error::from(crate::InputError::InvalidTenor {
@@ -176,10 +173,7 @@ impl BuilderInternal {
         };
         match tenor.unit() {
             crate::dates::TenorUnit::Months => add_months(checked_mul_i32(n, count_i32)?),
-            crate::dates::TenorUnit::Years => {
-                let years = checked_mul_i32(n, count_i32)?;
-                add_months(checked_mul_i32(years, 12)?)
-            }
+            crate::dates::TenorUnit::Years => add_months(checked_mul_i32(n, count_i32 * 12)?),
             crate::dates::TenorUnit::Weeks => add_days(checked_mul_i64(
                 checked_mul_i64(i64::from(n), i64::from(tenor.count()))?,
                 7,

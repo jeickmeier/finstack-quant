@@ -227,12 +227,7 @@ impl Tenor {
             TenorUnit::Months => MAX_TENOR_MONTHS,
             TenorUnit::Years => MAX_TENOR_YEARS,
         };
-        let conversion_ok = match unit {
-            TenorUnit::Weeks => count.checked_mul(7).is_some(),
-            TenorUnit::Years => count.checked_mul(12).is_some(),
-            TenorUnit::Days | TenorUnit::Months => true,
-        };
-        if count == 0 || count > max_count || !conversion_ok {
+        if count == 0 || count > max_count {
             return Err(InputError::InvalidTenor {
                 tenor: format!("{count}{}", unit.designator()),
                 reason: if count == 0 {
@@ -592,34 +587,12 @@ impl Tenor {
     ) -> crate::Result<Date> {
         use crate::dates::date_extensions::DateExt;
 
+        // `new` bounds every count (at most 2,400 months), so the casts are exact.
         let raw_date: crate::Result<Date> = match self.unit {
             TenorUnit::Days => date.add_days(i64::from(self.count)),
             TenorUnit::Weeks => date.add_days(i64::from(self.count) * 7),
-            TenorUnit::Months => {
-                let count_i32 =
-                    i32::try_from(self.count).map_err(|_| InputError::InvalidTenor {
-                        tenor: self.to_string(),
-                        reason: format!("count {} exceeds i32::MAX", self.count),
-                    })?;
-                date.add_months(count_i32)
-            }
-            TenorUnit::Years => {
-                let count_i32 =
-                    i32::try_from(self.count).map_err(|_| InputError::InvalidTenor {
-                        tenor: self.to_string(),
-                        reason: format!("count {} exceeds i32::MAX", self.count),
-                    })?;
-                let months = count_i32
-                    .checked_mul(12)
-                    .ok_or_else(|| InputError::InvalidTenor {
-                        tenor: self.to_string(),
-                        reason: format!(
-                            "year tenor {} exceeds supported month range after conversion",
-                            self.count
-                        ),
-                    })?;
-                date.add_months(months)
-            }
+            TenorUnit::Months => date.add_months(self.count as i32),
+            TenorUnit::Years => date.add_months((self.count * 12) as i32),
         };
         let raw_date = raw_date?;
 

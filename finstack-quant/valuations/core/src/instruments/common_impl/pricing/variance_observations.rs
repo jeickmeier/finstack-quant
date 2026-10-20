@@ -26,24 +26,6 @@ impl ResolvedVarianceCalendar {
             }
         }
     }
-
-    fn adjust(
-        &self,
-        date: Date,
-        business_day_convention: BusinessDayConvention,
-    ) -> finstack_quant_core::Result<Date> {
-        adjust(date, business_day_convention, self.0)
-    }
-
-    fn add_business_days(&self, date: Date, count: u32) -> finstack_quant_core::Result<Date> {
-        date.add_business_days(
-            i32::try_from(count).map_err(|_| finstack_quant_core::InputError::InvalidTenor {
-                tenor: format!("{count}D"),
-                reason: "day count exceeds supported range".to_string(),
-            })?,
-            self.0,
-        )
-    }
 }
 
 /// Generate a strictly validated, calendar-adjusted observation schedule.
@@ -71,11 +53,13 @@ pub fn variance_observation_dates(
 
     let mut dates = if frequency.unit() == TenorUnit::Days {
         let mut dates = Vec::new();
-        let mut current = calendar.adjust(start, business_day_convention)?;
-        let end = calendar.adjust(maturity, business_day_convention)?;
+        // A day tenor counts at most `MAX_TENOR_DAYS` (73,200), so the cast is exact.
+        let step = frequency.count() as i32;
+        let mut current = adjust(start, business_day_convention, calendar.0)?;
+        let end = adjust(maturity, business_day_convention, calendar.0)?;
         while current <= end {
             dates.push(current);
-            current = calendar.add_business_days(current, frequency.count())?;
+            current = current.add_business_days(step, calendar.0)?;
         }
         if dates.last() != Some(&end) {
             dates.push(end);
@@ -89,7 +73,7 @@ pub fn variance_observation_dates(
             .build()?
             .dates
             .into_iter()
-            .map(|date| calendar.adjust(date, business_day_convention))
+            .map(|date| adjust(date, business_day_convention, calendar.0))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?
     };
 

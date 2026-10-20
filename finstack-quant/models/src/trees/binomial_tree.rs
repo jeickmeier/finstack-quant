@@ -45,26 +45,26 @@ impl OptionValuator {
     fn ex_spot(&self, state: &NodeState) -> Result<f64> {
         let spot = state
             .spot()
-            .ok_or_else(|| Error::internal("option node state missing spot"))?;
+            .ok_or_else(|| Error::Internal("option node state missing spot".into()))?;
         match &self.ex_dividend_values {
             None => Ok(spot),
             Some(remaining) => remaining
                 .get(state.step)
                 .map(|value| spot + value)
-                .ok_or_else(|| Error::internal("missing discrete-dividend tree step")),
+                .ok_or_else(|| Error::Internal("missing discrete-dividend tree step".into())),
         }
     }
 
     fn cum_spot(&self, state: &NodeState) -> Result<f64> {
         let spot = state
             .spot()
-            .ok_or_else(|| Error::internal("option node state missing spot"))?;
+            .ok_or_else(|| Error::Internal("option node state missing spot".into()))?;
         match &self.cum_dividend_values {
             None => Ok(spot),
             Some(remaining) => remaining
                 .get(state.step)
                 .map(|value| spot + value)
-                .ok_or_else(|| Error::internal("missing discrete-dividend tree step")),
+                .ok_or_else(|| Error::Internal("missing discrete-dividend tree step".into())),
         }
     }
 }

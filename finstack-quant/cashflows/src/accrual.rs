@@ -614,7 +614,9 @@ fn build_period_inputs(
                 ))
                 .copied()
                 .ok_or_else(|| {
-                    finstack_quant_core::Error::internal("coupon payment has no accrual start")
+                    finstack_quant_core::Error::Internal(
+                        "coupon payment has no accrual start".into(),
+                    )
                 })?,
             calendar_id: p.bucket.calendar_id.clone(),
             coupon_period,

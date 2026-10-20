@@ -139,7 +139,7 @@ pub fn kind_to_py(kind: finstack_quant_core::ErrorKind, message: String) -> PyEr
 ///   CalendarNotFound, FxTriangulationFailed}`) → `KeyError`
 /// - Calibration, solver, and operational failures (`Error::{Calibration,
 ///   Internal, CircularDependency}`, `InputError::{SolverConvergenceFailed,
-///   VolatilityConversionFailed, TooLarge}`) → `RuntimeError`
+///   VolatilityConversionFailed}`) → `RuntimeError`
 /// - `MetricCalculationFailed` → classified recursively by its underlying cause
 /// - Everything else → `ValueError`
 pub fn core_to_py(e: finstack_quant_core::Error) -> PyErr {

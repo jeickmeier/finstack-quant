@@ -29,8 +29,6 @@ pub(crate) struct ExecutionPlan {
     pub nodes: Vec<DagNode>,
     /// Root node id (the final output).
     pub root: u64,
-    /// Execution metadata.
-    pub meta: crate::config::ResultsMeta,
 }
 
 /// DAG builder that detects shared sub-expressions and builds optimized execution plans.
@@ -46,11 +44,7 @@ pub(crate) struct DagBuilder {
 
 impl DagBuilder {
     /// Build an execution plan for one root expression.
-    pub(crate) fn build_plan(
-        &mut self,
-        expr: Expr,
-        meta: crate::config::ResultsMeta,
-    ) -> crate::Result<ExecutionPlan> {
+    pub(crate) fn build_plan(&mut self, expr: Expr) -> crate::Result<ExecutionPlan> {
         self.expr_cache.clear();
         self.nodes.clear();
         self.next_id = 0;
@@ -58,7 +52,7 @@ impl DagBuilder {
         let root = self.process_expression(expr, 0)?;
         let nodes = self.topological_sort(root)?;
 
-        Ok(ExecutionPlan { nodes, root, meta })
+        Ok(ExecutionPlan { nodes, root })
     }
 
     /// Process an expression tree, deduplicating shared sub-expressions.
@@ -186,22 +180,6 @@ impl DagBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{ResultsMeta, RoundingContext, NUMERIC_MODE_F64};
-
-    fn meta() -> ResultsMeta {
-        crate::config::results_meta(&crate::config::FinstackConfig::default())
-    }
-
-    fn explicit_meta() -> ResultsMeta {
-        ResultsMeta {
-            numeric_mode: NUMERIC_MODE_F64.to_owned(),
-            rounding: RoundingContext::default(),
-            fx_policy_applied: None,
-            parallel: false,
-            timestamp: None,
-            version: None,
-        }
-    }
 
     #[test]
     fn dag_builder_deduplicates_structurally_identical_nodes() {
@@ -210,7 +188,7 @@ mod tests {
         let b = Expr::call(Function::Pow, vec![Expr::column("x"), Expr::literal(3.0)]);
 
         let plan = builder
-            .build_plan(Expr::bin_op(BinOp::Add, a, b), meta())
+            .build_plan(Expr::bin_op(BinOp::Add, a, b))
             .expect("valid expressions should build a DAG plan");
         assert_eq!(plan.nodes.len(), 4, "column, literal, pow, add");
         assert_eq!(plan.nodes.last().map(|node| node.id), Some(plan.root));
@@ -225,7 +203,7 @@ mod tests {
         let round = Expr::call(Function::Round, vec![col, lit]);
 
         let plan = builder
-            .build_plan(Expr::bin_op(BinOp::Mul, pow, round), meta())
+            .build_plan(Expr::bin_op(BinOp::Mul, pow, round))
             .expect("valid expressions should build a DAG plan");
         assert_eq!(plan.nodes.len(), 5);
 
@@ -285,7 +263,7 @@ mod tests {
 
         let mut builder = DagBuilder::default();
         let err = builder
-            .build_plan(expr, meta())
+            .build_plan(expr)
             .expect_err("deeply nested AST should fail with a depth guard");
         assert!(
             err.to_string().contains("maximum DAG recursion depth"),
@@ -302,7 +280,7 @@ mod tests {
 
         let mut builder = DagBuilder::default();
         let plan = builder
-            .build_plan(expr, meta())
+            .build_plan(expr)
             .expect("AST below the depth limit should build a plan");
         assert_eq!(plan.nodes.len(), MAX_DAG_RECURSION_DEPTH - 1);
     }
@@ -315,7 +293,7 @@ mod tests {
         let sqrt_abs = Expr::call(Function::Sqrt, vec![abs_x]);
 
         let plan = builder
-            .build_plan(sqrt_abs, explicit_meta())
+            .build_plan(sqrt_abs)
             .expect("valid expressions should build a DAG plan");
 
         let mut found_column = false;

@@ -915,13 +915,8 @@ mod tests {
             },
         )?;
 
-        let usd_scale = result
-            .meta
-            .rounding
-            .get_output_scale_by_currency()
-            .get(&Currency::USD)
-            .copied();
-        assert_eq!(usd_scale, Some(4), "meta should reflect provided config");
+        let usd_scale = result.meta.rounding.output_scale(Currency::USD);
+        assert_eq!(usd_scale, 4, "meta should reflect provided config");
         Ok(())
     }
 

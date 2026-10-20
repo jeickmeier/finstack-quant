@@ -133,10 +133,7 @@ impl CdsPricer {
             && cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
             && period.accrual_end > period.accrual_start
         {
-            let days = finstack_quant_core::dates::DayCount::calendar_days(
-                period.accrual_start,
-                period.accrual_end,
-            ) + 1;
+            let days = (period.accrual_end - period.accrual_start).whole_days() + 1;
             return Ok((days.max(0) as f64) / 360.0);
         }
         // The contractual final Act/360 coupon includes the unadjusted
@@ -146,10 +143,7 @@ impl CdsPricer {
             && period.is_final
             && period.accrual_end > period.accrual_start
         {
-            let days = finstack_quant_core::dates::DayCount::calendar_days(
-                period.accrual_start,
-                period.accrual_end,
-            ) + 1;
+            let days = (period.accrual_end - period.accrual_start).whole_days() + 1;
             return Ok((days.max(0) as f64) / 360.0);
         }
 
@@ -210,7 +204,7 @@ impl CdsPricer {
         if matches!(policy, AccrualDayCountPolicy::CdswInclusive)
             && cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
         {
-            let days = finstack_quant_core::dates::DayCount::calendar_days(last_coupon, as_of) + 1;
+            let days = (as_of - last_coupon).whole_days() + 1;
             return Ok((days.max(0) as f64) / 360.0);
         }
 

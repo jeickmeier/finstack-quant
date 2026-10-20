@@ -125,8 +125,9 @@ pub(crate) fn option_risk_bond_and_base_price(
         Some(oas) => oas,
         None => super::price_yield_spread::oas::oas_decimal_from_quote_overrides(bond, context)?
             .ok_or_else(|| {
-                finstack_quant_core::Error::internal(
-                    "bond option risk found a price-driving quote but could not resolve its OAS",
+                finstack_quant_core::Error::Internal(
+                    "bond option risk found a price-driving quote but could not resolve its OAS"
+                        .into(),
                 )
             })?,
     };

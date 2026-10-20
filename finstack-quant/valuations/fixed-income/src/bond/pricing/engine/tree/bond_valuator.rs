@@ -1115,8 +1115,8 @@ impl BondValuator {
             )));
         }
         if self.step_discount_factors.len() != self.time_steps.len() {
-            return Err(finstack_quant_core::Error::internal(
-                "BondValuator discount-factor and time grids differ in length",
+            return Err(finstack_quant_core::Error::Internal(
+                "BondValuator discount-factor and time grids differ in length".into(),
             ));
         }
 

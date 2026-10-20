@@ -43,7 +43,7 @@ pub(super) fn build_overnight_coupon(
     spec: &FloatingCouponSpec,
 ) -> Result<(OvernightCoupon, FloatingRateObservation)> {
     let method = spec.rate_spec.compounding.ok_or_else(|| {
-        Error::internal("bond hazard LSMC overnight replay has no compounding method")
+        Error::Internal("bond hazard LSMC overnight replay has no compounding method".into())
     })?;
     let day_count = spec
         .rate_spec
@@ -266,7 +266,7 @@ pub(super) fn build_make_whole_claim(
     times: &[f64],
 ) -> Result<(usize, MakeWholeBasis)> {
     let spec = call.make_whole.as_ref().ok_or_else(|| {
-        Error::internal("bond hazard LSMC attempted to build an absent make-whole claim")
+        Error::Internal("bond hazard LSMC attempted to build an absent make-whole claim".into())
     })?;
     let reference = market.get_discount(&spec.reference_curve_id)?;
     let base_grid = relative_curve_grid(discount, as_of, times, 0.0)?;
@@ -535,16 +535,16 @@ pub(super) fn path_state(
     let first = path
         .first()
         .map(|state| state.step)
-        .ok_or_else(|| Error::internal("bond hazard LSMC sampled path is empty"))?;
+        .ok_or_else(|| Error::Internal("bond hazard LSMC sampled path is empty".into()))?;
     let offset = step.checked_sub(first).ok_or_else(|| {
-        Error::internal(format!(
+        Error::Internal(format!(
             "bond hazard LSMC step {step} precedes sampled segment start {first}"
         ))
     })?;
     path.get(offset)
         .filter(|state| state.step == step)
         .ok_or_else(|| {
-            Error::internal(format!(
+            Error::Internal(format!(
                 "bond hazard LSMC step {step} is outside sampled segment"
             ))
         })

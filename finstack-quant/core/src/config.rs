@@ -547,16 +547,6 @@ fn ingest_scale_from_map(
 }
 
 impl RoundingContext {
-    /// Borrow the validated ingest overrides captured by this rounding snapshot.
-    pub fn get_ingest_scale_by_currency(&self) -> &BTreeMap<crate::currency::Currency, u32> {
-        &self.ingest_scale_by_currency
-    }
-
-    /// Borrow the validated output overrides captured by this rounding snapshot.
-    pub fn get_output_scale_by_currency(&self) -> &BTreeMap<crate::currency::Currency, u32> {
-        &self.output_scale_by_currency
-    }
-
     /// Effective output scale for the provided currency within this context.
     #[inline]
     pub fn output_scale(&self, ccy: crate::currency::Currency) -> u32 {

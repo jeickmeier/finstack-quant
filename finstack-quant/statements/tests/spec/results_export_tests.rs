@@ -8,19 +8,17 @@ fn string_column<'a>(
     table: &'a finstack_quant_core::table::TableEnvelope,
     name: &str,
 ) -> &'a [String] {
-    table
-        .column(name)
-        .unwrap()
-        .as_strings()
-        .expect("expected string column")
+    match &table.column(name).unwrap().data {
+        finstack_quant_core::table::TableColumnData::String(values) => values,
+        other => panic!("expected string column, got {other:?}"),
+    }
 }
 
 fn float_column<'a>(table: &'a finstack_quant_core::table::TableEnvelope, name: &str) -> &'a [f64] {
-    table
-        .column(name)
-        .unwrap()
-        .as_f64()
-        .expect("expected float column")
+    match &table.column(name).unwrap().data {
+        finstack_quant_core::table::TableColumnData::Float64(values) => values,
+        other => panic!("expected float column, got {other:?}"),
+    }
 }
 
 #[test]

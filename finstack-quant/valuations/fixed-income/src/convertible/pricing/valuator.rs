@@ -82,7 +82,7 @@ impl ConvertibleBondValuator {
     ) -> Result<Self> {
         // Use effective conversion ratio (includes anti-dilution adjustments)
         let conversion_ratio = bond.effective_conversion_ratio().ok_or_else(|| {
-            Error::internal("convertible tree pricer requires effective conversion ratio")
+            Error::Internal("convertible tree pricer requires effective conversion ratio".into())
         })?;
 
         // Date mapping uses the same ACT/365F clock as the equity process.

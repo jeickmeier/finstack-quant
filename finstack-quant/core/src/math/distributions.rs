@@ -549,8 +549,6 @@ fn chi_squared_log_cdf(shape: f64, log_x: f64, log_gamma_next: f64) -> f64 {
     (largest + ((log_term - largest).exp() + (log_shifted - largest).exp()).ln()).min(0.0)
 }
 
-// Student's t Distribution (Sampler)
-
 #[cfg(test)]
 mod tests {
     use super::*;

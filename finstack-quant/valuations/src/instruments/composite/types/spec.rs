@@ -742,7 +742,7 @@ impl CompositeSpec {
                 })?;
             let compiled = CompiledExpr::new(expression.clone())?;
             let evaluated = compiled.eval(&context, &refs)?;
-            let quantity = evaluated.values.first().copied().ok_or_else(|| {
+            let quantity = evaluated.first().copied().ok_or_else(|| {
                 Error::Validation(format!(
                     "quantity expression for leg '{}' returned no value",
                     leg.instrument_id

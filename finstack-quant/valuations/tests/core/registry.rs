@@ -271,14 +271,7 @@ fn metric_attachment_preserves_the_model_result_envelope() {
         Some(time::OffsetDateTime::UNIX_EPOCH)
     );
     assert_eq!(result.meta.version.as_deref(), Some("model-version"));
-    assert_eq!(
-        result
-            .meta
-            .rounding
-            .get_output_scale_by_currency()
-            .get(&Currency::USD),
-        Some(&4)
-    );
+    assert_eq!(result.meta.rounding.output_scale(Currency::USD), 4);
     assert_eq!(
         result
             .measures
@@ -465,13 +458,8 @@ fn non_discounting_risk_only_metrics_preserve_config_metadata() {
         .expect("hazard-rate pricing with config should succeed");
 
     assert_eq!(
-        result
-            .meta
-            .rounding
-            .get_output_scale_by_currency()
-            .get(&Currency::USD)
-            .copied(),
-        Some(4),
+        result.meta.rounding.output_scale(Currency::USD),
+        4,
         "risk-only split path should preserve caller config metadata",
     );
 }

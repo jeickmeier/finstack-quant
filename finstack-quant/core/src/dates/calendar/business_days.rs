@@ -614,17 +614,6 @@ pub fn resolve_joint_calendar(
     }
 }
 
-pub(in crate::dates) fn add_business_days_on(
-    start: Date,
-    n_days: u32,
-    calendar: &dyn HolidayCalendar,
-) -> crate::Result<Date> {
-    use crate::dates::DateExt;
-    let n_days = i32::try_from(n_days)
-        .map_err(|_| Error::Validation("business-day offset exceeds the supported range".into()))?;
-    start.add_business_days(n_days, calendar)
-}
-
 #[cfg(test)]
 mod serde_tests {
     use super::*;

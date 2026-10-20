@@ -42,7 +42,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Controls whether detailed execution traces are captured during computation.
 /// When disabled, there is zero runtime overhead.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct ExplainOpts {
@@ -63,29 +63,6 @@ impl ExplainOpts {
             enabled: true,
             max_entries: Some(1000),
         }
-    }
-
-    /// Create options with explanation disabled (zero overhead).
-    pub fn disabled() -> Self {
-        Self {
-            enabled: false,
-            max_entries: None,
-        }
-    }
-
-    /// Create options with a custom entry limit.
-    pub fn with_max_entries(max_entries: usize) -> Self {
-        Self {
-            enabled: true,
-            max_entries: Some(max_entries),
-        }
-    }
-}
-
-impl Default for ExplainOpts {
-    /// Default is disabled (zero overhead).
-    fn default() -> Self {
-        Self::disabled()
     }
 }
 
@@ -141,11 +118,6 @@ impl ExplanationTrace {
     /// Check if the trace was truncated.
     pub fn is_truncated(&self) -> bool {
         self.truncated.unwrap_or(false)
-    }
-
-    /// Serialize to pretty-printed JSON.
-    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string_pretty(self)
     }
 }
 
@@ -215,8 +187,7 @@ mod tests {
             None,
         );
 
-        let json = trace
-            .to_json_pretty()
+        let json = serde_json::to_string_pretty(&trace)
             .expect("JSON serialization should succeed in test");
         assert!(json.contains("\"type\": \"calibration\""));
         assert!(json.contains("\"kind\": \"computation_step\""));

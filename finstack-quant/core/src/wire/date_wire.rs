@@ -16,15 +16,3 @@ pub struct DateWire(
     #[cfg_attr(feature = "json-schema", schemars(with = "String", extend("format" = "date")))]
     pub  Date,
 );
-
-impl From<Date> for DateWire {
-    fn from(value: Date) -> Self {
-        Self(value)
-    }
-}
-
-impl From<DateWire> for Date {
-    fn from(value: DateWire) -> Self {
-        value.0
-    }
-}

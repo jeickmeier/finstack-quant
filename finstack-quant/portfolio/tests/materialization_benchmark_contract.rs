@@ -188,7 +188,10 @@ fn validation_only_checks_semantics_without_building_positions_or_indices() {
     assert!(Portfolio::validate_materialization(
         &fixture.bytes,
         &cache,
-        &LoadLimits::default().with_max_positions(7),
+        &LoadLimits {
+            max_positions: 7,
+            ..LoadLimits::default()
+        },
     )
     .is_err());
 }

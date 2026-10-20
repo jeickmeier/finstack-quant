@@ -51,8 +51,8 @@ impl FxProvider for MockFxProvider {
         if let Some(&rate) = self.rates.get(&(to, from)) {
             return Ok(1.0 / rate);
         }
-        Err(finstack_quant_core::Error::internal(
-            "test FX provider missing requested currency pair",
+        Err(finstack_quant_core::Error::Internal(
+            "test FX provider missing requested currency pair".into(),
         ))
     }
 }
@@ -160,5 +160,7 @@ pub fn calculate_metric(
         .compute(std::slice::from_ref(&metric), context)?
         .get(&metric)
         .copied()
-        .ok_or_else(|| finstack_quant_core::Error::internal("registered metric result missing"))
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Internal("registered metric result missing".into())
+        })
 }

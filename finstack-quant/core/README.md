@@ -121,8 +121,8 @@ evaluator over `&[f64]` columns. `Expr`/`ExprNode` build the AST and
 elementwise subset (`abs`, `pow`, `round`, `clamp`, operators, conditionals)
 and rejects the windowed, cumulative, reducing and period-aware functions,
 which only the `statements` per-period evaluator runs. `SimpleContext` maps
-column names to positions and `EvaluationResult` carries values plus
-metadata. The in-workspace caller of `CompiledExpr::eval` is the valuations
+column names to positions and `eval` returns one value per row. The
+in-workspace caller of `CompiledExpr::eval` is the valuations
 composite instrument.
 
 ### Serialization, schema, and contracts
@@ -130,7 +130,7 @@ composite instrument.
 | Path | What it is |
 |------|------------|
 | `table::{TableEnvelope, TableColumn, TableColumnData, TableColumnRole}` | The canonical columnar interchange type. |
-| `canonical::{to_canonical_bytes, canonical_bytes_of_value, content_hash, CANONICAL_VERSION}` | Deterministic JSON bytes (recursively key-sorted, array order preserved, non-finite floats rejected) and versioned content hashes. |
+| `canonical::{to_canonical_bytes, content_hash, CANONICAL_VERSION}` | Deterministic JSON bytes (recursively key-sorted, array order preserved, non-finite floats rejected) and versioned content hashes. |
 | `contract::{ContractDescriptor, LoadLimits, Diagnostic, Severity, LoadPhase, ValidationReport, ContractError}` | Shared vocabulary for loading persisted artifacts under resource limits. |
 | `schema` | Deterministic JSON Schema assembly: `SerdeSchema`, `SchemaArtifact`, `ARTIFACTS`, `COMMON_SCHEMA_DEFINITIONS`, `run_schema_generator`, `run_schema_index_generator`, `project_llm`. |
 | `wire` | Canonical serde representations for types whose storage form cannot describe its own JSON contract to `schemars`. |
