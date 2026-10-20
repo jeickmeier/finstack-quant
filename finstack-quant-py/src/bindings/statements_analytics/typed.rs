@@ -5,9 +5,9 @@ use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::bindings::statements::evaluator::PyStatementResult;
+use crate::bindings::statements::parse_period_id;
 use crate::bindings::statements::types::PyForecastSpec;
 use crate::errors::{core_to_py, statements_to_py};
-use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::types::AmountOrScalar;
 use finstack_quant_statements_analytics::analysis::{
     BridgeChart as RustBridgeChart, BridgeStep as RustBridgeStep,
@@ -42,10 +42,6 @@ const SENSITIVITY_TAIL_COLUMNS: [ColumnSchema<'static>; 3] =
 const BRIDGE_STEP_COLUMNS: [ColumnSchema<'static>; 2] =
     [("driver", "str"), ("contribution", "float64")];
 
-fn parse_period(period: &str) -> PyResult<PeriodId> {
-    period.parse().map_err(crate::errors::core_to_py)
-}
-
 /// Parse the serde name of a [`SensitivityMode`] (`"diagonal"`, `"full_grid"`, `"tornado"`).
 fn parse_sensitivity_mode(mode: &str) -> PyResult<SensitivityMode> {
     finstack_quant_core::wire::serde_parse(mode).map_err(core_to_py)
@@ -77,7 +73,7 @@ fn extract_overrides(value: &Bound<'_, PyAny>) -> PyResult<ScenarioDefinition> {
         } else if let Ok(by_period) = value.cast::<PyDict>() {
             let entry = definition.period_overrides.entry(node_id).or_default();
             for (period, value) in by_period.iter() {
-                let period = parse_period(&period.extract::<String>()?)?;
+                let period = parse_period_id(&period.extract::<String>()?)?;
                 entry.insert(period, extract_amount_or_scalar(&value)?);
             }
         } else {
@@ -131,7 +127,7 @@ impl PyParameterSpec {
         Ok(Self {
             inner: RustParameterSpec::new(
                 node_id,
-                parse_period(period)?,
+                parse_period_id(period)?,
                 base_value,
                 perturbations,
             ),
@@ -166,7 +162,7 @@ impl PyParameterSpec {
         Ok(Self {
             inner: RustParameterSpec::with_percentages(
                 node_id,
-                parse_period(period)?,
+                parse_period_id(period)?,
                 base_value,
                 pct_range,
             ),
@@ -216,7 +212,7 @@ fn extract_parameter_spec(value: &Bound<'_, PyAny>) -> PyResult<RustParameterSpe
         })?;
     Ok(RustParameterSpec::new(
         node_id,
-        parse_period(&period)?,
+        parse_period_id(&period)?,
         base_value,
         perturbations,
     ))
@@ -306,11 +302,11 @@ impl PySensitivityConfig {
     ) -> PyResult<()> {
         let spec = match (perturbations, pct) {
             (Some(values), None) => {
-                RustParameterSpec::new(node_id, parse_period(period)?, base_value, values)
+                RustParameterSpec::new(node_id, parse_period_id(period)?, base_value, values)
             }
             (None, Some(pct_range)) => RustParameterSpec::with_percentages(
                 node_id,
-                parse_period(period)?,
+                parse_period_id(period)?,
                 base_value,
                 pct_range,
             ),
@@ -392,7 +388,7 @@ impl PyVarianceConfig {
     ) -> PyResult<Self> {
         let periods = periods
             .iter()
-            .map(|period| parse_period(period))
+            .map(|period| parse_period_id(period))
             .collect::<PyResult<Vec<_>>>()?;
         Ok(Self {
             inner: RustVarianceConfig::new(baseline_label, comparison_label, metrics, periods),
@@ -746,7 +742,7 @@ impl PySensitivityResult {
         period: &str,
     ) -> PyResult<Option<f64>> {
         self.inner
-            .get_value(scenario_index, node_id, &parse_period(period)?)
+            .get_value(scenario_index, node_id, &parse_period_id(period)?)
             .map_err(statements_to_py)
     }
 

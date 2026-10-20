@@ -10,6 +10,7 @@ use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::extract::extract_results_ref;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
+use crate::bindings::statements::parse_period_id;
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::evaluator::StatementResult;
@@ -25,10 +26,6 @@ const SERIES_COLUMNS: [ColumnSchema<'static>; 4] = [
     ("interest_coverage", "float64"),
     ("free_cash_flow", "float64"),
 ];
-
-fn parse_period(period: &str) -> PyResult<PeriodId> {
-    period.parse().map_err(core_to_py)
-}
 
 /// One period's structured credit metrics.
 #[pyclass(
@@ -203,7 +200,7 @@ impl_repr_html_via_dataframe!(PyCreditAssessment);
 #[pyo3(text_signature = "(results, period)")]
 fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCreditAssessment> {
     let results = extract_results_ref(results)?;
-    let period = parse_period(period)?;
+    let period = parse_period_id(period)?;
     Ok(PyCreditAssessment {
         inner: CreditAssessment::compute(&results, period),
     })
@@ -242,7 +239,7 @@ fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCre
 #[pyo3(text_signature = "(results, period)")]
 fn credit_assessment_report_text(results: &Bound<'_, PyAny>, period: &str) -> PyResult<String> {
     let results = extract_results_ref(results)?;
-    let period = parse_period(period)?;
+    let period = parse_period_id(period)?;
     Ok(CreditAssessmentReport::new(&results, period).to_string())
 }
 
@@ -370,7 +367,7 @@ fn pl_summary_report(
     let results = extract_results_ref(results)?.into_owned();
     let periods = periods
         .iter()
-        .map(|p| parse_period(p))
+        .map(|p| parse_period_id(p))
         .collect::<PyResult<Vec<_>>>()?;
     Ok(PyPLSummaryReport {
         results,

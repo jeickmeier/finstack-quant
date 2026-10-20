@@ -12,16 +12,12 @@ use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe, serde_object_to_single_row_dataframe_with_schema,
 };
+use crate::bindings::statements::parse_period_id;
 use crate::bindings::statements::types::PyFinancialModelSpec;
-use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements_analytics::templates::real_estate as rust_re;
 use pyo3::prelude::*;
 
 use super::templates_common::{extract_builder, finish_builder};
-
-fn parse_period(s: &str) -> PyResult<PeriodId> {
-    s.parse().map_err(crate::errors::core_to_py)
-}
 
 /// Rent step that resets the base rent starting at ``start`` (inclusive).
 #[pyclass(
@@ -40,7 +36,7 @@ impl PyRentStepSpec {
     fn new(start: &str, rent: f64) -> PyResult<Self> {
         Ok(Self {
             inner: rust_re::RentStepSpec {
-                start: parse_period(start)?,
+                start: parse_period_id(start)?,
                 rent,
             },
         })
@@ -90,7 +86,7 @@ impl PyFreeRentWindowSpec {
     fn new(start: &str, periods: u32) -> PyResult<Self> {
         Ok(Self {
             inner: rust_re::FreeRentWindowSpec {
-                start: parse_period(start)?,
+                start: parse_period_id(start)?,
                 periods,
             },
         })
@@ -319,8 +315,8 @@ impl PyLeaseSpec {
     ) -> PyResult<Self> {
         let inner = rust_re::LeaseSpec {
             node_id: node_id.to_string(),
-            start: parse_period(start)?,
-            end: end.map(parse_period).transpose()?,
+            start: parse_period_id(start)?,
+            end: end.map(parse_period_id).transpose()?,
             base_rent,
             growth_rate,
             growth_convention: growth_convention.to_rust()?,

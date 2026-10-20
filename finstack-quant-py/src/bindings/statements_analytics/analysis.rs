@@ -16,6 +16,7 @@ use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
 };
+use crate::bindings::statements::parse_period_id;
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::statements_analytics::typed::{
     PyBridgeChart, PyScenarioDiff, PyScenarioResults, PyScenarioSet, PySensitivityConfig,
@@ -169,7 +170,7 @@ fn generate_tornado_entries(
 ) -> PyResult<Vec<PyTornadoEntry>> {
     let result = extract_sensitivity_result(result)?;
     let period_id: Option<finstack_quant_core::dates::PeriodId> =
-        period.map(|p| p.parse().map_err(core_to_py)).transpose()?;
+        period.map(parse_period_id).transpose()?;
     Ok(
         finstack_quant_statements_analytics::analysis::generate_tornado_entries(
             &result,
@@ -423,7 +424,7 @@ fn scenario_diff(
     let results = results.inner.clone();
     let periods = periods
         .iter()
-        .map(|period| period.parse().map_err(core_to_py))
+        .map(|period| parse_period_id(period))
         .collect::<PyResult<Vec<_>>>()?;
     let baseline = baseline.to_string();
     let comparison = comparison.to_string();
@@ -498,7 +499,7 @@ fn variance_bridge(
 ) -> PyResult<PyBridgeChart> {
     let base = extract_results_ref(base)?.into_owned();
     let comparison = extract_results_ref(comparison)?.into_owned();
-    let period = period.parse().map_err(core_to_py)?;
+    let period = parse_period_id(period)?;
     let target_metric = target_metric.to_string();
     let baseline_label = baseline_label.to_string();
     let comparison_label = comparison_label.to_string();
@@ -836,8 +837,8 @@ fn goal_seek(
     bounds: Option<(f64, f64)>,
 ) -> PyResult<PyGoalSeekResult> {
     let model = extract_model_ref(model)?.into_owned();
-    let tp: finstack_quant_core::dates::PeriodId = target_period.parse().map_err(core_to_py)?;
-    let dp: finstack_quant_core::dates::PeriodId = driver_period.parse().map_err(core_to_py)?;
+    let tp = parse_period_id(target_period)?;
+    let dp = parse_period_id(driver_period)?;
     let target_node = target_node.to_owned();
     let driver_node = driver_node.to_owned();
 
@@ -956,7 +957,7 @@ impl PyDependencyTracer {
         period: &str,
     ) -> PyResult<String> {
         let results = extract_results_ref(results)?;
-        let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(core_to_py)?;
+        let pid = parse_period_id(period)?;
         let tracer = finstack_quant_statements_analytics::analysis::DependencyTracer::new(
             &self.model,
             &self.graph,
@@ -1276,7 +1277,7 @@ fn explain_formula(
 ) -> PyResult<PyExplanation> {
     let model = extract_model_ref(model)?;
     let results = extract_results_ref(results)?;
-    let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(core_to_py)?;
+    let pid = parse_period_id(period)?;
 
     let inner = finstack_quant_statements_analytics::analysis::explain_formula(
         &model, &results, node_id, &pid,
