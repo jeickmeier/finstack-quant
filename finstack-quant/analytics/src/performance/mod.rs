@@ -152,6 +152,33 @@ fn validate_strictly_ascending_dates(dates: &[Date]) -> finstack_quant_core::Res
     Ok(())
 }
 
+/// Shape checks shared by [`Performance::new`] and [`Performance::from_returns`]:
+/// non-empty columns and dates, strictly ascending dates, and one ticker name
+/// per column. `what` names the value columns (`"prices"` / `"returns"`) in
+/// the error text.
+fn check_panel_inputs(
+    dates: &[Date],
+    n_columns: usize,
+    n_names: usize,
+    what: &str,
+) -> finstack_quant_core::Result<()> {
+    if n_columns == 0 || dates.is_empty() {
+        return Err(
+            invalid_return_series("<panel>", 0, format!("{what} or dates is empty")).into(),
+        );
+    }
+    validate_strictly_ascending_dates(dates)?;
+    if n_names != n_columns {
+        return Err(invalid_return_series(
+            "<panel>",
+            0,
+            format!("ticker_names.len() = {n_names} does not match {what}.len() = {n_columns}"),
+        )
+        .into());
+    }
+    Ok(())
+}
+
 fn valid_price(value: f64) -> bool {
     value.is_finite() && value > 0.0
 }
@@ -494,22 +521,7 @@ impl Performance {
         benchmark_ticker: Option<&str>,
         frequency: PeriodKind,
     ) -> finstack_quant_core::Result<Self> {
-        if prices.is_empty() || dates.is_empty() {
-            return Err(invalid_return_series("<panel>", 0, "prices or dates is empty").into());
-        }
-        validate_strictly_ascending_dates(&dates)?;
-        if ticker_names.len() != prices.len() {
-            return Err(invalid_return_series(
-                "<panel>",
-                0,
-                format!(
-                    "ticker_names.len() = {} does not match prices.len() = {}",
-                    ticker_names.len(),
-                    prices.len()
-                ),
-            )
-            .into());
-        }
+        check_panel_inputs(&dates, prices.len(), ticker_names.len(), "prices")?;
 
         let mut returns_matrix: Vec<Vec<f64>> = Vec::with_capacity(prices.len());
         let mut return_spans: Vec<TickerSpan> = Vec::with_capacity(prices.len());
@@ -567,22 +579,7 @@ impl Performance {
         benchmark_ticker: Option<&str>,
         frequency: PeriodKind,
     ) -> finstack_quant_core::Result<Self> {
-        if returns.is_empty() || dates.is_empty() {
-            return Err(invalid_return_series("<panel>", 0, "returns or dates is empty").into());
-        }
-        validate_strictly_ascending_dates(&dates)?;
-        if ticker_names.len() != returns.len() {
-            return Err(invalid_return_series(
-                "<panel>",
-                0,
-                format!(
-                    "ticker_names.len() = {} does not match returns.len() = {}",
-                    ticker_names.len(),
-                    returns.len()
-                ),
-            )
-            .into());
-        }
+        check_panel_inputs(&dates, returns.len(), ticker_names.len(), "returns")?;
 
         let mut all_returns: Vec<Vec<f64>> = Vec::with_capacity(returns.len());
         let mut return_spans: Vec<TickerSpan> = Vec::with_capacity(returns.len());
