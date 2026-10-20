@@ -731,7 +731,7 @@ fn scenarios_dts_matches_structured_surface() {
     );
     assert!(contains_ignoring_ws(
         &dts,
-        "computeHorizonReturn(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, scenarioJson: JsonInput, method?: 'parallel' | 'waterfall' | 'metrics_based' | 'taylor', configJson?: JsonInput, calendarId?: string): HorizonReport;",
+        "computeHorizonReturn(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, scenarioJson: JsonInput, method?: JsonInput, configJson?: JsonInput, calendarId?: string): HorizonReport;",
     ));
     assert!(declares_type(&dts, "HorizonResult"));
     assert!(contains_ignoring_ws(
