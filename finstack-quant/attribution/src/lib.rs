@@ -183,7 +183,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_factor::credit::hierarchy::CreditFactorModel;
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
-use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
 
@@ -250,6 +250,10 @@ pub struct AttributionRequest<'a> {
     /// default menu narrowed to what the instrument supports; a named
     /// metric is not narrowed and errors if it is inapplicable.
     pub metrics: Option<&'a [MetricId]>,
+    /// Metrics-based only: pricing options for the T₀ metrics and the T₁
+    /// value, with `config` attached. `None` uses the calibration crate's
+    /// cached recalibration provider.
+    pub pricing_options: Option<&'a PricingOptions>,
 }
 
 impl<'a> AttributionRequest<'a> {
@@ -257,7 +261,7 @@ impl<'a> AttributionRequest<'a> {
     /// strict waterfall validation, no cross-factor detail, no model-parameter
     /// snapshot, no credit-factor model, default detail options, no
     /// prepared endpoints, the pricing currency, the method's default
-    /// tolerances and the default metric menu.
+    /// tolerances, the default metric menu and the default pricing options.
     ///
     /// # Arguments
     ///
@@ -297,6 +301,7 @@ impl<'a> AttributionRequest<'a> {
             tolerance_abs: None,
             tolerance_pct: None,
             metrics: None,
+            pricing_options: None,
         }
     }
 }

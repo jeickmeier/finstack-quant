@@ -61,8 +61,8 @@
 use std::sync::Arc;
 
 use finstack_quant_attribution::{
-    attribute_pnl, attribute_pnl_metrics_based, default_attribution_metrics, AttributionFactor,
-    AttributionMethod, AttributionRequest, ExecutionPolicy, PnlAttribution,
+    attribute_pnl, AttributionFactor, AttributionMethod, AttributionRequest, ExecutionPolicy,
+    PnlAttribution,
 };
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::dates::{calendar_by_id_strict, Date, HolidayCalendar};
@@ -368,53 +368,11 @@ impl HorizonAnalysis {
         as_of_t0: Date,
         as_of_t1: Date,
     ) -> crate::Result<(Money, Money, PnlAttribution)> {
-        if matches!(self.attribution_method, AttributionMethod::MetricsBased) {
-            let window_days = (as_of_t1 - as_of_t0).whole_days();
-            let metrics_instrument = if window_days > 0 {
-                let mut producer = instrument.clone_box();
-                if let Some(overrides) = producer.get_metric_pricing_overrides_mut() {
-                    let days = u32::try_from(window_days).map_err(|_| {
-                        crate::Error::Validation(format!(
-                            "horizon of {window_days} days exceeds the theta horizon range"
-                        ))
-                    })?;
-                    overrides.theta_period = Some(finstack_quant_core::dates::Tenor::new(
-                        days,
-                        finstack_quant_core::dates::TenorUnit::Days,
-                    )?);
-                }
-                Arc::from(producer)
-            } else {
-                Arc::clone(instrument)
-            };
-            let metrics = finstack_quant_valuations::metrics::standard_registry()
-                .applicable_subset(&default_attribution_metrics(), instrument.key());
-            let val_t0 = metrics_instrument.price_with_metrics(
-                market_t0,
-                as_of_t0,
-                &metrics,
-                self.pricing_options(),
-            )?;
-            let val_t1 =
-                instrument.price_with_metrics(market_t1, as_of_t1, &[], self.pricing_options())?;
-            let attribution = attribute_pnl_metrics_based(
-                &metrics_instrument,
-                market_t0,
-                market_t1,
-                &val_t0,
-                &val_t1,
-                as_of_t0,
-                as_of_t1,
-            )?;
-            return Ok((val_t0.value, val_t1.value, attribution));
-        }
-
-        let initial_value = instrument.value(market_t0, as_of_t0)?;
-        let terminal_value = instrument.value(market_t1, as_of_t1)?;
+        let pricing_options = self.pricing_options();
         let request = AttributionRequest {
             execution_policy: ExecutionPolicy::Parallel,
             strict_validation: false,
-            prepared_endpoints: Some((initial_value, terminal_value)),
+            pricing_options: Some(&pricing_options),
             ..AttributionRequest::new(
                 instrument,
                 market_t0,
@@ -425,7 +383,15 @@ impl HorizonAnalysis {
             )
         };
         let attribution = attribute_pnl(&self.attribution_method, &request)?;
-        Ok((initial_value, terminal_value, attribution))
+        // Every method stamps the endpoint values it priced.
+        match (attribution.pv_t0, attribution.pv_t1) {
+            (Some(initial_value), Some(terminal_value)) => {
+                Ok((initial_value, terminal_value, attribution))
+            }
+            _ => Err(crate::Error::Internal(
+                "attribution did not stamp its endpoint values".to_string(),
+            )),
+        }
     }
 }
 

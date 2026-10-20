@@ -6,9 +6,7 @@
 use crate::error::{Error, Result};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
-use crate::evaluation::{
-    supported_metrics, EvaluationProfile, PortfolioEvaluationPlan, PositionExecution,
-};
+use crate::evaluation::{EvaluationProfile, PortfolioEvaluationPlan, PositionExecution};
 use crate::portfolio::Portfolio;
 use crate::types::PositionId;
 use crate::valuation::{
@@ -24,7 +22,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::instrument_json_of;
-use finstack_quant_valuations::instruments::{CompositeInstrument, Instrument, PricingOptions};
+use finstack_quant_valuations::instruments::{CompositeInstrument, Instrument};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -247,51 +245,22 @@ fn attribute_composite_primitives(
             Arc::from(definition.clone().into_boxed().map_err(Error::Core)?);
         let value_t0 = instrument.value(market_t0, as_of_t0).map_err(Error::Core)?;
         let value_t1 = instrument.value(market_t1, as_of_t1).map_err(Error::Core)?;
-        let mut primitive = if matches!(method, AttributionMethod::MetricsBased) {
-            let options = PricingOptions::default().with_config(config);
-            // The attribution metric list is a cross-instrument menu: narrow
-            // it to what this primitive's own instrument type supports so an
-            // unsupported entry is dropped here rather than failing the whole
-            // composite.
-            let metrics = supported_metrics(
-                instrument.as_ref(),
-                &default_attribution_metrics(),
-                &options,
-            );
-            let result_t0 = instrument
-                .price_with_metrics(market_t0, as_of_t0, &metrics, options.clone())
-                .map_err(|error| Error::Core(error.into()))?;
-            let result_t1 = instrument
-                .price_with_metrics(market_t1, as_of_t1, &metrics, options)
-                .map_err(|error| Error::Core(error.into()))?;
-            attribute_pnl_metrics_based(
-                &instrument,
-                market_t0,
-                market_t1,
-                &result_t0,
-                &result_t1,
-                as_of_t0,
-                as_of_t1,
-            )
-            .map_err(Error::Core)?
-        } else {
-            finstack_quant_attribution::attribute_pnl(
-                method,
-                &AttributionRequest {
-                    strict_validation: false,
-                    prepared_endpoints: Some((value_t0, value_t1)),
-                    ..AttributionRequest::new(
-                        &instrument,
-                        market_t0,
-                        market_t1,
-                        as_of_t0,
-                        as_of_t1,
-                        config,
-                    )
-                },
-            )
-            .map_err(Error::Core)?
-        };
+        let mut primitive = finstack_quant_attribution::attribute_pnl(
+            method,
+            &AttributionRequest {
+                strict_validation: false,
+                prepared_endpoints: Some((value_t0, value_t1)),
+                ..AttributionRequest::new(
+                    &instrument,
+                    market_t0,
+                    market_t1,
+                    as_of_t0,
+                    as_of_t1,
+                    config,
+                )
+            },
+        )
+        .map_err(Error::Core)?;
         primitive.scale(exposure.quantity)?;
         translate_to_target_currency(
             &mut primitive,
@@ -949,6 +918,89 @@ mod tests {
             .notes
             .iter()
             .any(|note| note.contains("frozen primitive")));
+        Ok(())
+    }
+
+    /// Composite legs are attributed exactly like the same instruments on
+    /// their own. Over a multi-day window the metrics-based carry needs theta
+    /// priced over that window; the composite's former private dispatch
+    /// priced the default horizon and failed for coupon-paying legs.
+    #[test]
+    fn composite_metrics_based_carry_matches_the_standalone_legs() -> Result<()> {
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        use finstack_quant_valuations::instruments::{Bond, InstrumentJson};
+
+        let as_of_t0 = date!(2025 - 01 - 01);
+        let as_of_t1 = date!(2025 - 01 - 31);
+        let bond = |id: &str, coupon: f64| -> Result<Bond> {
+            Ok(Bond::fixed(
+                id,
+                Money::from((1_000_000_i64, Currency::USD)),
+                finstack_quant_core::types::Rate::from_decimal(coupon).expect("valid rate"),
+                date!(2024 - 01 - 01),
+                date!(2030 - 01 - 01),
+                finstack_quant_core::dates::StubKind::ShortFront,
+                "USD-OIS",
+            )?)
+        };
+        let legs = [bond("LEG-A", 0.05)?, bond("LEG-B", 0.03)?];
+        let market = |base, rate: f64| -> Result<MarketContext> {
+            let curve = DiscountCurve::builder("USD-OIS")
+                .base_date(base)
+                .knots([(0.0, 1.0), (10.0, (-rate * 10.0_f64).exp())])
+                .build()?;
+            Ok(MarketContext::new().insert(curve))
+        };
+        let market_t0 = market(as_of_t0, 0.04)?;
+        let market_t1 = market(as_of_t1, 0.041)?;
+        let config = FinstackConfig::default();
+
+        let mut standalone_carry = 0.0;
+        for leg in &legs {
+            let instrument: Arc<dyn Instrument> = Arc::new(leg.clone());
+            standalone_carry += finstack_quant_attribution::attribute_pnl(
+                &AttributionMethod::MetricsBased,
+                &AttributionRequest::new(
+                    &instrument,
+                    &market_t0,
+                    &market_t1,
+                    as_of_t0,
+                    as_of_t1,
+                    &config,
+                ),
+            )?
+            .carry
+            .amount();
+        }
+
+        let spec = CompositeSpec::new(
+            "TWO-BONDS",
+            Currency::USD,
+            Money::from((2_000_000_i64, Currency::USD)),
+            legs.iter()
+                .map(|leg| {
+                    CompositeLegSpec::new(leg.id.as_str(), InstrumentJson::Bond(leg.clone()), 1.0)
+                })
+                .collect(),
+            WeightingMethod::FixedQuantity,
+            RebalanceRule::Manual,
+        );
+        let composite = spec.initialize_fixed(as_of_t0)?.instrument;
+        let composite_attribution = attribute_composite_primitives(
+            &composite,
+            &market_t0,
+            &market_t1,
+            as_of_t0,
+            as_of_t1,
+            &config,
+            &AttributionMethod::MetricsBased,
+        )?;
+
+        assert!(
+            (composite_attribution.carry.amount() - standalone_carry).abs() < 1.0e-6,
+            "composite carry {} vs standalone legs {standalone_carry}",
+            composite_attribution.carry,
+        );
         Ok(())
     }
 

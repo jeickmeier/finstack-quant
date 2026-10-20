@@ -355,8 +355,11 @@ pub(crate) fn attribute_request(request: &crate::AttributionRequest<'_>) -> Resu
 
     // Attach FinstackConfig so sensitivity bump knobs (e.g. rate_bump_bp)
     // reach the producer instead of silently falling back to defaults.
-    let pricing_options =
-        finstack_quant_calibration::recalibration::pricing_options().with_config(config);
+    let pricing_options = request
+        .pricing_options
+        .cloned()
+        .unwrap_or_else(finstack_quant_calibration::recalibration::pricing_options)
+        .with_config(config);
     let val_t0 = metrics_instrument.price_with_metrics(
         market_t0,
         as_of_t0,
