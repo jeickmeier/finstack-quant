@@ -376,45 +376,6 @@ fn pl_summary_report(
     })
 }
 
-/// Generate a P&L summary report as formatted text.
-///
-/// Parameters
-/// ----------
-/// results : StatementResult | str
-///     A ``StatementResult`` object or a JSON string.
-/// line_items : list[str]
-///     Node ids to include as rows.
-/// periods : list[str]
-///     Period-id strings for columns.
-///
-/// Returns
-/// -------
-/// str
-///     Formatted P&L summary report text (same as
-///     ``pl_summary_report(...).to_text()``).
-///
-/// Raises
-/// ------
-/// ValueError
-///     If a period does not parse or ``results`` is malformed JSON.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements import ModelBuilder, Evaluator
-/// >>> from finstack_quant.statements_analytics import pl_summary_report_text
-/// >>> b = ModelBuilder("m"); b.periods("2025Q1..Q2", None); b.value("revenue", [("2025Q1", 1.0), ("2025Q2", 2.0)])
-/// >>> pl_summary_report_text(Evaluator().evaluate(b.build()), ["revenue"], ["2025Q1"]).startswith("P&L Summary")
-/// True
-#[pyfunction]
-#[pyo3(text_signature = "(results, line_items, periods)")]
-fn pl_summary_report_text(
-    results: &Bound<'_, PyAny>,
-    line_items: Vec<String>,
-    periods: Vec<String>,
-) -> PyResult<String> {
-    Ok(pl_summary_report(results, line_items, periods)?.to_text())
-}
-
 /// Register report types and functions.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCreditAssessmentPoint>()?;
@@ -423,6 +384,5 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(credit_assessment, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(credit_assessment_report_text, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(pl_summary_report, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(pl_summary_report_text, m)?)?;
     Ok(())
 }

@@ -1351,7 +1351,7 @@ status = "exists"
 [crates.statements_analytics.modules]
 analysis                    = { python = "finstack_quant.statements_analytics.analysis",         status = "missing", note = "Bindings are currently exported from finstack_quant.statements_analytics root" }
 comps                       = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "analysis::comps is pub(crate) in Rust — not a crate-boundary module — reached only via the flattened comparable-company functions/types re-exported through analysis and bound flat on finstack_quant.statements_analytics" }
-extensions                  = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "Credit-scorecard and corkscrew extensions exposed flat on finstack_quant.statements_analytics (ScorecardMetric/Config/Report, CreditScorecardExtension, AccountType, CorkscrewAccount/Config/Report, CorkscrewExtension, validate_scorecard_config)" }
+extensions                  = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "Credit-scorecard and corkscrew extensions exposed flat on finstack_quant.statements_analytics (ScorecardMetric/Config/Report, CreditScorecardExtension, AccountType, CorkscrewAccount/Config/Report, CorkscrewExtension)" }
 templates                   = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "Vintage, roll-forward, and real-estate template mutators return FinancialModelSpec directly and are exported flat with their typed spec classes. WASM binds the same seven add* functions (model in, extended model out) with the spec types as plain objects." }
 
 # Rust-only surfaces (categories, not every name), deliberately unbound in
@@ -1463,13 +1463,11 @@ public = [
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",
     "explain_formula",
-    "explain_formula_text",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",
     "percentile_rank",
     "pl_summary_report",
-    "pl_summary_report_text",
     "regression_fair_value",
     "render_check_report_html",
     "render_check_report_text",
@@ -1481,7 +1479,6 @@ public = [
     "run_variance",
     "scenario_diff",
     "score_relative_value",
-    "validate_scorecard_config",
     "variance_bridge",
     "wacc",
     "z_score",
@@ -2457,6 +2454,9 @@ checkSuiteSpecBuiltinCheckNames = "free-function twin of Python CheckSuiteSpec.b
 checkConfigValidate = "free-function twin of Python CheckConfig.validate (WASM data types are plain objects)"
 
 [parity.js."statements_analytics".wasm_only]
+explainFormulaText = "one-call twin of explainFormula + explanationToText, kept in WASM because explainFormula returns NaN as a JS number that explanationToText cannot re-read"
+plSummaryReportText = "text twin of Python pl_summary_report(...).to_text() (WASM reports are plain objects)"
+validateScorecardConfig = "free-function twin of Python ScorecardConfig.validate (WASM data types are plain objects)"
 scenarioComparisonTable = "free-function twin of Python ScenarioResults.to_comparison_table (WASM data types are plain objects)"
 parameterSpecWithPercentages = "free-function twin of Python ParameterSpec.with_percentages (WASM data types are plain objects)"
 validateLeaseSpecJson = "free-function twin of Python LeaseSpec.validate (WASM data types are plain objects)"

@@ -438,19 +438,11 @@ impl PyCreditScorecardExtension {
     }
 }
 
-/// Validate a [`ScorecardConfig`] payload (typed object) without executing.
-#[pyfunction]
-fn validate_scorecard_config(config: &PyScorecardConfig) -> PyResult<()> {
-    rust_scorecards::CreditScorecardExtension::validate_config(&config.inner)
-        .map_err(crate::errors::statements_to_py)
-}
-
 /// Register scorecard types and functions on the parent module.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyScorecardMetric>()?;
     m.add_class::<PyScorecardConfig>()?;
     m.add_class::<PyScorecardReport>()?;
     m.add_class::<PyCreditScorecardExtension>()?;
-    m.add_function(pyo3::wrap_pyfunction!(validate_scorecard_config, m)?)?;
     Ok(())
 }

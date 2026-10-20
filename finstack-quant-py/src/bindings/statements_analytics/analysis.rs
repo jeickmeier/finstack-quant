@@ -1286,52 +1286,6 @@ fn explain_formula(
     Ok(PyExplanation { inner })
 }
 
-/// Get a detailed text explanation for a formula.
-///
-/// Parameters
-/// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string.
-/// results : StatementResult | str
-///     A ``StatementResult`` object or a JSON string.
-/// node_id : str
-///     Node whose formula to explain.
-/// period : str
-///     Period string.
-///
-/// Returns
-/// -------
-/// str
-///     Human-readable multi-line explanation (``explain_formula(...).to_text()``).
-///
-/// Raises
-/// ------
-/// KeyError
-///     If ``node_id`` is not in the model or has no value at ``period``.
-/// ValueError
-///     If ``period`` does not parse or a payload is malformed JSON.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements import Evaluator, ModelBuilder
-/// >>> from finstack_quant.statements_analytics import explain_formula_text
-/// >>> b = ModelBuilder("m")
-/// >>> _ = b.periods("2025Q1..Q1", None)
-/// >>> _ = b.value("revenue", [("2025Q1", 100.0)])
-/// >>> _ = b.compute("profit", "revenue * 0.5")
-/// >>> model = b.build()
-/// >>> explain_formula_text(model, Evaluator().evaluate(model), "profit", "2025Q1").splitlines()[0]
-/// 'profit [2025Q1] = 50.00'
-#[pyfunction]
-fn explain_formula_text(
-    model: &Bound<'_, PyAny>,
-    results: &Bound<'_, PyAny>,
-    node_id: &str,
-    period: &str,
-) -> PyResult<String> {
-    Ok(explain_formula(model, results, node_id, period)?.to_text())
-}
-
 /// Register analysis functions and classes.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDependencyTracer>()?;
@@ -1353,6 +1307,5 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(backtest_forecast, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(goal_seek, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(explain_formula, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(explain_formula_text, m)?)?;
     Ok(())
 }
