@@ -23,10 +23,11 @@ from finstack_quant.portfolio import (
     Portfolio,
     aggregate_metrics,
     attribute_portfolio_pnl,
-    carino_link_from_sector_periods,
+    brinson_fachler,
+    carino_link,
     compute_factor_sensitivities,
     decompose_factor_risk,
-    replay_portfolio_json,
+    replay_portfolio,
     twrr_linked,
     value_portfolio,
 )
@@ -259,14 +260,13 @@ def test_attribution_nested_serialization_releases_gil() -> None:
     assert len(json.loads(by_position_json)) == 256
 
 
-def test_replay_parse_compute_and_serialize_release_gil() -> None:
+def test_replay_parse_and_compute_release_gil() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(500))
     snapshots_json = _replay_snapshots_json(20)
 
-    result_json = _assert_releases_gil(lambda: replay_portfolio_json(portfolio, snapshots_json, '{"mode":"pv_only"}'))
-    result = json.loads(result_json)
+    typed = _assert_releases_gil(lambda: replay_portfolio(portfolio, snapshots_json, '{"mode":"pv_only"}'))
+    result = json.loads(typed.to_json())
 
-    assert isinstance(result_json, str)
     assert len(result["steps"]) == 20
     assert result["summary"]["num_steps"] == 20
 
@@ -275,7 +275,7 @@ def test_replay_detached_parse_preserves_value_error_mapping() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(1))
 
     with pytest.raises(ValueError, match="invalid snapshots JSON"):
-        replay_portfolio_json(portfolio, "{}", '{"mode":"pv_only"}')
+        replay_portfolio(portfolio, "{}", '{"mode":"pv_only"}')
 
 
 def test_factor_stress_releases_gil_and_returns_position_results() -> None:
@@ -353,9 +353,10 @@ def test_large_carino_parse_compute_and_serialize_release_gil() -> None:
             "benchmark_return": 0.0,
         },
     ]
-    periods_json = json.dumps([period] * 10_000)
+    period_result = json.loads(brinson_fachler(json.dumps(period)).to_json())
+    periods_json = json.dumps([period_result] * 10_000)
 
-    result_json = _assert_releases_gil(lambda: carino_link_from_sector_periods(periods_json).to_json())
+    result_json = _assert_releases_gil(lambda: carino_link(periods_json).to_json())
     result = json.loads(result_json)
 
     assert len(result["periods"]) == 10_000

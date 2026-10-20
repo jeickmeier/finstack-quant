@@ -6,7 +6,7 @@ use super::JsPortfolio;
 use crate::api::core::market_context::JsMarketContext;
 use crate::api::models::factor::credit::JsCreditFactorModel;
 use crate::utils::date::parse_iso_date;
-use crate::utils::input::{from_js_json, js_bool, js_string, json_text};
+use crate::utils::input::{from_js_json, js_bool, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_factor::{FactorId, FactorModelConfig};
 use finstack_quant_portfolio::allocation::{self, WeightAllocationSpec};
@@ -242,8 +242,8 @@ impl JsFactorModel {
 /// Allocate strategy weights from a `WeightAllocationSpec`.
 ///
 /// Returns the `WeightAllocationResult` object (`scheme`, per-strategy
-/// `allocations` and portfolio `diagnostics`); `allocateWeightsJson` returns
-/// the same result as a JSON string.
+/// `allocations` and portfolio `diagnostics`). A spec that allocates without
+/// error is valid.
 /// @param spec - `WeightAllocationSpec` object or JSON selecting the allocation scheme, the strategy inputs and any covariance data the scheme needs.
 /// @returns The `WeightAllocationResult`.
 ///
@@ -257,43 +257,6 @@ pub fn allocate_weights(spec: JsValue) -> Result<JsValue, JsValue> {
     let spec: WeightAllocationSpec = from_js_json(&spec, "spec")?;
     let result = allocation::allocate_weights(&spec).map_err(to_js_err)?;
     to_js_value(&result)
-}
-
-/// Allocate strategy weights and return the result as wire JSON.
-///
-/// Wire twin of `allocateWeights` (Rust `allocate_weights_json`).
-/// @param spec_json - `WeightAllocationSpec` object or JSON.
-/// @returns Compact JSON of the `WeightAllocationResult`.
-///
-/// # Errors
-///
-/// Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON
-/// string or plain object, and a `FinstackError` (kind `validation`) if it
-/// does not match the `WeightAllocationSpec` schema or violates a scheme
-/// invariant.
-#[wasm_bindgen(js_name = allocateWeightsJson)]
-pub fn allocate_weights_json(spec_json: JsValue) -> Result<String, JsValue> {
-    let spec_json = json_text(&spec_json, "specJson")?;
-    allocation::allocate_weights_json(&spec_json).map_err(to_js_err)
-}
-
-/// Validate a strategy allocation specification and return its canonical JSON.
-///
-/// The spec is parsed and executed solely for validation; the allocation
-/// itself is discarded (Rust `validate_allocation_json`).
-/// @param spec_json - `WeightAllocationSpec` object or JSON.
-/// @returns The canonical compact JSON of the accepted spec.
-///
-/// # Errors
-///
-/// Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON
-/// string or plain object, and a `FinstackError` (kind `validation`) if it
-/// does not match the `WeightAllocationSpec` schema or violates a scheme
-/// invariant.
-#[wasm_bindgen(js_name = validateAllocationJson)]
-pub fn validate_allocation_json(spec_json: JsValue) -> Result<String, JsValue> {
-    let spec_json = json_text(&spec_json, "specJson")?;
-    allocation::validate_allocation_json(&spec_json).map_err(to_js_err)
 }
 
 /// Build a credit volatility report from a risk decomposition and a credit factor model.

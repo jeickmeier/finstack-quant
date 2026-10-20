@@ -127,24 +127,6 @@
       "type_name": "FiCarinoLinkedResult"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_period_input.schema.json",
-      "bytes": 4924,
-      "kind": "input",
-      "path": "schemas/portfolio/1/fi_period_input.schema.json",
-      "summary": "One attribution period's raw inputs for multi-period linking.",
-      "title": "FiPeriodInput",
-      "type_name": "FiPeriodInput"
-    },
-    {
-      "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_reconciliation_report.schema.json",
-      "bytes": 1061,
-      "kind": "output",
-      "path": "schemas/portfolio/1/fi_reconciliation_report.schema.json",
-      "summary": "Report from reconciling the five effect totals against the active return, mirroring `crate::attribution` reconciliation conventions.",
-      "title": "FiReconciliationReport",
-      "type_name": "FiReconciliationReport"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_carino_linked_result.schema.json",
       "bytes": 8971,
       "kind": "output",
@@ -263,10 +245,10 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/reconciliation_report.schema.json",
-      "bytes": 969,
+      "bytes": 1101,
       "kind": "output",
       "path": "schemas/portfolio/1/reconciliation_report.schema.json",
-      "summary": "Report from reconciling position-level P&L attribution against portfolio totals.",
+      "summary": "Report from reconciling an attribution's effect buckets against its total.",
       "title": "ReconciliationReport",
       "type_name": "ReconciliationReport"
     },

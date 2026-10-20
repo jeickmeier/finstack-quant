@@ -229,18 +229,22 @@ fn fi_snapshot(
     }
 }
 
-/// A portfolio overweight Industrials and longer in duration than its benchmark.
-fn fi_period_input_value(delta_spread: f64) -> crate::fi_attribution::FiPeriodInput {
-    crate::fi_attribution::FiPeriodInput {
-        portfolio: vec![
-            fi_snapshot("Industrials", 0.6, 0.012, 5.6, delta_spread),
-            fi_snapshot("Financials", 0.4, 0.015, 4.4, 0.0),
-        ],
-        benchmark: vec![
-            fi_snapshot("Industrials", 0.5, 0.011, 5.0, delta_spread),
-            fi_snapshot("Financials", 0.5, 0.014, 4.0, 0.0),
-        ],
-    }
+/// One period's Campisi attribution of a portfolio overweight Industrials and
+/// longer in duration than its benchmark.
+fn fi_period_result(delta_spread: f64) -> Result<crate::fi_attribution::FiAttributionResult> {
+    let portfolio = [
+        fi_snapshot("Industrials", 0.6, 0.012, 5.6, delta_spread),
+        fi_snapshot("Financials", 0.4, 0.015, 4.4, 0.0),
+    ];
+    let benchmark = [
+        fi_snapshot("Industrials", 0.5, 0.011, 5.0, delta_spread),
+        fi_snapshot("Financials", 0.5, 0.014, 4.0, 0.0),
+    ];
+    Ok(crate::fi_attribution::campisi_attribution(
+        &portfolio,
+        &benchmark,
+        &fi_config_value(),
+    )?)
 }
 
 fn fi_config_value() -> crate::fi_attribution::FiAttributionConfig {
@@ -253,28 +257,11 @@ pub(super) fn fi_attribution_config() -> Result<Vec<Value>> {
     example(&fi_config_value())
 }
 
-pub(super) fn fi_period_input() -> Result<Vec<Value>> {
-    example(&fi_period_input_value(-0.0005))
-}
-
 pub(super) fn fi_carino_linked_result() -> Result<Vec<Value>> {
-    example(&crate::fi_attribution::campisi_carino_link_from_snapshots(
-        &[
-            fi_period_input_value(-0.0005),
-            fi_period_input_value(0.0003),
-        ],
-        &fi_config_value(),
-    )?)
-}
-
-pub(super) fn fi_reconciliation_report() -> Result<Vec<Value>> {
-    let period = fi_period_input_value(-0.0005);
-    let result = crate::fi_attribution::campisi_attribution(
-        &period.portfolio,
-        &period.benchmark,
-        &fi_config_value(),
-    )?;
-    example(&result.reconciliation_check(1e-9))
+    example(&crate::fi_attribution::campisi_carino_link(&[
+        fi_period_result(-0.0005)?,
+        fi_period_result(0.0003)?,
+    ])?)
 }
 
 // ---------------------------------------------------------------------------

@@ -162,13 +162,18 @@ pub struct PortfolioAttribution {
     pub result_invalid: bool,
 }
 
-/// Report from reconciling position-level P&L attribution against portfolio totals.
+/// Report from reconciling an attribution's effect buckets against its total.
 ///
-/// Verifies that the sum of all factor P&L buckets plus FX translation equals `total_pnl`.
+/// Returned by [`PortfolioAttribution::reconciliation_check`] (factor P&L
+/// buckets plus FX translation against `total_pnl`) and by
+/// [`crate::fi_attribution::FiAttributionResult::reconciliation_check`] (the
+/// five Campisi effect totals against the active return).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ReconciliationReport {
-    /// Total residual: `total_pnl - (sum of factor buckets + fx_translation_pnl)`.
+    /// Total minus the sum of its effect buckets: `total_pnl - (factor buckets
+    /// + fx_translation_pnl)` for P&L attribution, `active_return - (allocation
+    /// + carry + treasury + spread + selection)` for Campisi attribution.
     pub total_residual: f64,
     /// Whether the reconciliation passes within tolerance.
     pub is_reconciled: bool,

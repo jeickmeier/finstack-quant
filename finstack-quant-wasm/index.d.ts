@@ -246,7 +246,6 @@ import type {
   FactorPnlProfile,
   FiAttributionResult,
   FiCarinoLinkedResult,
-  FiReconciliationReport,
   GridAttributionResult,
   GridCarinoLinkedResult,
   LinkedReturn,
@@ -481,7 +480,6 @@ export type {
   FactorPnlProfile,
   FiAttributionResult,
   FiCarinoLinkedResult,
-  FiReconciliationReport,
   GridAttributionResult,
   GridCarinoLinkedResult,
   LinkedReturn,
@@ -34750,33 +34748,21 @@ export interface PortfolioNamespace {
    * Binds Rust `carino_link`: accepts a chronological JSON array of
    * `BrinsonPeriodResult` objects (for example `brinsonFachler` outputs) and
    * returns a structured `CarinoLinkedAttribution` object whose linked effects
-   * reconstruct the geometrically compounded active return. Use
-   * `carinoLinkFromSectorPeriods` to link raw sector inputs instead.
+   * reconstruct the geometrically compounded active return. To link raw sector
+   * inputs, attribute each period with `brinsonFachler` first.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param periodsJson - Chronological JSON array of `BrinsonPeriodResult` objects with identical sector ordering in every period.
    * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, the sequence is empty or changes sector ordering, or a period return is non-finite or at most `-1`.
    */
   carinoLink(periodsJson: JsonInput): CarinoLinkedAttribution;
   /**
-   * Compute Carino-linked multi-period Brinson attribution from raw sector
-   * periods.
-   *
-   * Binds Rust `carino_link_from_sector_periods`: runs `brinsonFachler` on
-   * each period, then Carino-links the results. Returns a structured
-   * `CarinoLinkedAttribution` object.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param periodsJson - Chronological JSON array of periods, each an array of `SectorPeriod` objects (`sector`, `portfolio_weight`, `benchmark_weight`, `portfolio_return`, `benchmark_return`).
-   * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, any period fails Brinson validation, the sequence is empty or changes sector ordering, or a period return is non-finite or at most `-1`.
-   */
-  carinoLinkFromSectorPeriods(periodsJson: JsonInput): CarinoLinkedAttribution;
-  /**
    * Compute a single-period Campisi fixed-income attribution from JSON.
    *
    * Decomposes both sides into carry / treasury / spread / selection and
    * splits the active return into allocation plus four active component
-   * effects (Campisi 2000). Returns a structured `FiAttributionResult` object;
-   * `JSON.stringify` it to chain into `campisiCarinoLink` or
-   * `campisiReconciliationCheck`.
+   * effects (Campisi 2000). Returns a structured `FiAttributionResult` object
+   * to chain into `campisiCarinoLink` or
+   * `fiAttributionResultReconciliationCheck`.
    *
    * Every snapshot must use the quote-reproducing `z_spread` basis:
    * `spread_duration` is the canonical Z-spread duration, and `spread` plus
@@ -34803,11 +34789,10 @@ export interface PortfolioNamespace {
   /**
    * Carino-link already-computed single-period Campisi results.
    *
-   * Binds Rust `campisi_carino_link`. Each period carries its own
-   * already-applied `period_years`, so periods of *different* lengths (e.g.
-   * act/365 calendar months) link correctly here; prefer this entry point
-   * whenever the periods are not all the same length. Returns a structured
-   * `FiCarinoLinkedResult` object.
+   * Binds Rust `campisi_carino_link`. Attribute each period with
+   * `campisiAttribution` first; each period carries its own already-applied
+   * `period_years`, so periods of *different* lengths (e.g. act/365 calendar
+   * months) link correctly. Returns a structured `FiCarinoLinkedResult` object.
    *
    * Throws if no periods are supplied, sector ordering differs, a consumed
    * top-level return/effect, per-sector linked effect, or sector `total_active`
@@ -34823,36 +34808,24 @@ export interface PortfolioNamespace {
    */
   campisiCarinoLink(periodsJson: JsonInput): FiCarinoLinkedResult;
   /**
-   * Compute per-period Campisi attributions from snapshots and Carino-link them.
-   *
-   * Binds Rust `campisi_carino_link_from_snapshots`. One shared config — hence
-   * one shared `period_years` — is applied to every period, so this entry point
-   * is only correct for equal-length periods; use `campisiCarinoLink` for
-   * unequal periods. Returns a structured `FiCarinoLinkedResult` object.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param periodsJson - Canonical JSON array of `FiPeriodInput` objects, each holding `portfolio` and `benchmark` arrays of `FiPositionSnapshot`.
-   * @param configJson - Canonical JSON `FiAttributionConfig` applied to every period; `period_years` is its only field and is required (no default).
-   * @throws Error - Throws a JavaScript exception if either JSON input is malformed, any period fails Campisi attribution validation, the computed periods fail Carino linking validation, or the result cannot be converted to a JavaScript value.
-   */
-  campisiCarinoLinkFromSnapshots(
-    periodsJson: JsonInput,
-    configJson: JsonInput
-  ): FiCarinoLinkedResult;
-  /**
    * Reconcile the five Campisi effect totals against the active return.
    *
-   * Binds the Rust method `FiAttributionResult::reconciliation_check`. The
+   * Binds the Rust method `FiAttributionResult::reconciliation_check` (Python
+   * `FiAttributionResult.reconciliation_check`); WASM results are plain
+   * objects, so the method is a free function taking the object. The
    * decomposition reconciles by construction (selection is the residual), so
-   * this is a floating-point sanity gate rather than a model check; without it
-   * callers must re-sum the five totals by hand. Returns a structured
-   * `FiReconciliationReport` object with `total_residual`, `is_reconciled`
-   * and `tolerance`.
+   * this is a floating-point sanity gate rather than a model check. Returns a
+   * structured `ReconciliationReport` object with `total_residual`,
+   * `is_reconciled` and `tolerance`.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param resultJson - Canonical JSON `FiAttributionResult` as returned by `campisiAttribution` (`JSON.stringify` its structured result); unknown fields are rejected.
+   * @param result - `FiAttributionResult` object or JSON as returned by `campisiAttribution`; unknown fields are rejected.
    * @param tolerance - Absolute reconciliation tolerance in return units; `1e-10` suits return-space values.
-   * @throws Error - Throws a JavaScript exception if `resultJson` is malformed or does not match `FiAttributionResult`, or if the reconciliation report cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if `result` is malformed or does not match `FiAttributionResult`, or if the reconciliation report cannot be converted to a JavaScript value.
    */
-  campisiReconciliationCheck(resultJson: JsonInput, tolerance: number): FiReconciliationReport;
+  fiAttributionResultReconciliationCheck(
+    result: FiAttributionResult | string,
+    tolerance: number
+  ): ReconciliationReport;
   /**
    * Build a duration-cell base-return table from a reference universe.
    *
@@ -35243,32 +35216,13 @@ export interface PortfolioNamespace {
    * Allocate strategy weights from a `WeightAllocationSpec`.
    *
    * Returns the `WeightAllocationResult` object (`scheme`, per-strategy
-   * `allocations` and portfolio `diagnostics`); `allocateWeightsJson` returns
-   * the same result as a JSON string.
+   * `allocations` and portfolio `diagnostics`). A spec that allocates without
+   * error is valid.
    * @param spec - `WeightAllocationSpec` object or JSON selecting the allocation scheme, the strategy inputs and any covariance data the scheme needs.
    * @returns The `WeightAllocationResult`.
    * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `spec` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
    */
   allocateWeights(spec: WeightAllocationSpec | string): WeightAllocationResult;
-  /**
-   * Allocate strategy weights and return the result as wire JSON.
-   *
-   * Wire twin of `allocateWeights` (Rust `allocate_weights_json`).
-   * @param specJson - `WeightAllocationSpec` object or JSON.
-   * @returns Compact JSON of the `WeightAllocationResult`.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
-   */
-  allocateWeightsJson(specJson: WeightAllocationSpec | string): string;
-  /**
-   * Validate a strategy allocation specification and return its canonical JSON.
-   *
-   * The spec is parsed and executed solely for validation; the allocation
-   * itself is discarded (Rust `validate_allocation_json`).
-   * @param specJson - `WeightAllocationSpec` object or JSON.
-   * @returns The canonical compact JSON of the accepted spec.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
-   */
-  validateAllocationJson(specJson: WeightAllocationSpec | string): string;
   /**
    * Decompose every portfolio position into primitive economic exposures.
    *
@@ -35487,9 +35441,9 @@ export interface PortfolioNamespace {
   /**
    * Look up one metric's portfolio-wide total, failing when it was not aggregated.
    *
-   * Twin of Python `PortfolioResult.require_metric` (Rust
-   * `PortfolioMetrics::require_total`, which `PortfolioResult::require_metric`
-   * calls on its metrics).
+   * Twin of Python `PortfolioMetrics.require_total` (Rust
+   * `PortfolioMetrics::require_total`); WASM results are plain objects, so the
+   * method is a free function taking the object.
    * @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
    * @param metricId - Fully qualified metric key (for example `dv01` or `bucketed_dv01::USD-OIS::10y`).
    * @returns The aggregated total in base-currency metric units.

@@ -108,19 +108,6 @@ impl PyPortfolioCashflows {
         self.inner.events.len()
     }
 
-    /// Number of positions represented in the ladder (contributing events or
-    /// recorded as issues).
-    #[getter]
-    fn num_positions(&self) -> usize {
-        self.inner.by_position.len()
-    }
-
-    /// Number of extraction issues recorded during aggregation.
-    #[getter]
-    fn num_issues(&self) -> usize {
-        self.inner.issues.len()
-    }
-
     /// Flat position-scaled events as a list of JSON-shaped dicts (payment
     /// date order). Each carries ``position_id``, ``instrument_id``,
     /// ``instrument_type``, ``date``, ``amount`` (``{"amount", "currency"}``),

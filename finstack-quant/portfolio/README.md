@@ -57,8 +57,8 @@ through its module path. See the rustdoc for detail
 | Module | Entry points |
 |--------|--------------|
 | `attribution` | `attribute_portfolio_pnl` → `PortfolioAttribution`; re-exports `AttributionMethod`, `PnlAttribution` and friends from `finstack-quant-attribution` |
-| `brinson` | `brinson_fachler`, `carino_link`, `carino_link_from_sector_periods` |
-| `fi_attribution` | `campisi_attribution`, `campisi_carino_link`, `campisi_carino_link_from_snapshots` |
+| `brinson` | `brinson_fachler`, `carino_link` |
+| `fi_attribution` | `campisi_attribution`, `campisi_carino_link` |
 | `grid_attribution` | `grid_attribution`, `grid_carino_link` |
 | `factor_brinson` | `factor_brinson_attribution` |
 | `excess_return` | `excess_returns`, `cell_returns_from_curves`, `cell_returns_from_reference` |

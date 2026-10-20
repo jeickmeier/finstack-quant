@@ -36,17 +36,13 @@ const EXPORTED_KEYS = [
   'aggregateFullCashflows',
   'aggregateMetrics',
   'allocateWeights',
-  'allocateWeightsJson',
   'applyScenarioAndRevalue',
   'attributePortfolioPnl',
   'brinsonFachler',
   'buildCreditVolReport',
   'campisiAttribution',
   'campisiCarinoLink',
-  'campisiCarinoLinkFromSnapshots',
-  'campisiReconciliationCheck',
   'carinoLink',
-  'carinoLinkFromSectorPeriods',
   'cellReturnsFromCurves',
   'cellReturnsFromReference',
   'collapseToBaseByDateKind',
@@ -60,6 +56,7 @@ const EXPORTED_KEYS = [
   'decomposeFactorRisk',
   'excessReturns',
   'factorBrinsonAttribution',
+  'fiAttributionResultReconciliationCheck',
   'gridAttribution',
   'gridCarinoLink',
   'mwrXirr',
@@ -89,7 +86,6 @@ const EXPORTED_KEYS = [
   'sensitivityMatrixPositionDeltas',
   'twrrLinked',
   'twrrModifiedDietz',
-  'validateAllocationJson',
   'valuePortfolio',
 ];
 
@@ -186,8 +182,7 @@ test('portfolio.decomposeFactorRisk rejects malformed matrices and missing repor
 test('portfolio Campisi exports keep their declared arity', () => {
   assert.equal(portfolio.campisiAttribution.length, 3);
   assert.equal(portfolio.campisiCarinoLink.length, 1);
-  assert.equal(portfolio.campisiCarinoLinkFromSnapshots.length, 2);
-  assert.equal(portfolio.campisiReconciliationCheck.length, 2);
+  assert.equal(portfolio.fiAttributionResultReconciliationCheck.length, 2);
 });
 
 // Same lesson as the Campisi arity gate above, applied to the credit
@@ -358,14 +353,15 @@ test('portfolio.campisiCarinoLink accepts huge finite cancelling effects', () =>
   assert.equal(linked.linked_active_carry, -1e308);
 });
 
-test('portfolio.campisiCarinoLinkFromSnapshots links raw snapshot periods', () => {
-  const period = {
-    portfolio: JSON.parse(CAMPISI_PORTFOLIO),
-    benchmark: JSON.parse(CAMPISI_BENCHMARK),
-  };
+test('portfolio.campisiCarinoLink links per-period campisiAttribution results', () => {
+  const result = portfolio.campisiAttribution(
+    CAMPISI_PORTFOLIO,
+    CAMPISI_BENCHMARK,
+    campisiConfig(0.25)
+  );
   const linked = assertStructured(
-    portfolio.campisiCarinoLinkFromSnapshots(JSON.stringify([period, period]), campisiConfig(0.25)),
-    'campisiCarinoLinkFromSnapshots result'
+    portfolio.campisiCarinoLink([result, result]),
+    'campisiCarinoLink result'
   );
   const geometric = linked.portfolio_return_compounded - linked.benchmark_return_compounded;
   const reconstructed =
@@ -376,16 +372,12 @@ test('portfolio.campisiCarinoLinkFromSnapshots links raw snapshot periods', () =
     linked.linked_selection;
   assert.ok(Math.abs(reconstructed - geometric) < 1e-10);
 
-  // The two link entry points take different payloads and are not aliases.
+  // Raw snapshot periods are not `FiAttributionResult`s.
+  const period = {
+    portfolio: JSON.parse(CAMPISI_PORTFOLIO),
+    benchmark: JSON.parse(CAMPISI_BENCHMARK),
+  };
   assert.throws(() => portfolio.campisiCarinoLink(JSON.stringify([period])));
-  assert.throws(() =>
-    portfolio.campisiCarinoLinkFromSnapshots(
-      JSON.stringify([
-        portfolio.campisiAttribution(CAMPISI_PORTFOLIO, CAMPISI_BENCHMARK, campisiConfig(0.25)),
-      ]),
-      campisiConfig(0.25)
-    )
-  );
 });
 
 test('portfolio.campisiAttribution fails closed on a zero-net-weight sector', () => {
@@ -438,16 +430,15 @@ test('portfolio.campisiAttribution fails closed on a zero-net-weight sector', ()
   assert.ok(Math.abs(reconstructed - result.active_return) < 1e-12);
 });
 
-test('portfolio.campisiReconciliationCheck reports the residual and fails closed', () => {
+test('portfolio.fiAttributionResultReconciliationCheck reports the residual and fails closed', () => {
   const result = portfolio.campisiAttribution(
     CAMPISI_PORTFOLIO,
     CAMPISI_BENCHMARK,
     campisiConfig(0.25)
   );
-  const resultJson = JSON.stringify(result);
   const report = assertStructured(
-    portfolio.campisiReconciliationCheck(resultJson, 1e-10),
-    'campisiReconciliationCheck result'
+    portfolio.fiAttributionResultReconciliationCheck(result, 1e-10),
+    'fiAttributionResultReconciliationCheck result'
   );
   assert.equal(report.is_reconciled, true);
   assert.equal(report.tolerance, 1e-10);
@@ -457,13 +448,16 @@ test('portfolio.campisiReconciliationCheck reports the residual and fails closed
   // active_return has been tampered with breaks the identity at 1e-10 and
   // passes only under an absurdly loose tolerance.
   const tampered = JSON.stringify({ ...result, active_return: result.active_return + 0.01 });
-  assert.equal(portfolio.campisiReconciliationCheck(tampered, 1e-10).is_reconciled, false);
-  assert.equal(portfolio.campisiReconciliationCheck(tampered, 1.0).is_reconciled, true);
+  assert.equal(
+    portfolio.fiAttributionResultReconciliationCheck(tampered, 1e-10).is_reconciled,
+    false
+  );
+  assert.equal(portfolio.fiAttributionResultReconciliationCheck(tampered, 1.0).is_reconciled, true);
 
   // `FiAttributionResult` denies unknown fields, so a stale key fails closed
   // instead of being silently dropped into a report that still "reconciles".
   const withBogus = JSON.stringify({ ...result, bogus_field: 1.0 });
-  assert.throws(() => portfolio.campisiReconciliationCheck(withBogus, 1e-10));
+  assert.throws(() => portfolio.fiAttributionResultReconciliationCheck(withBogus, 1e-10));
   assert.throws(() => portfolio.campisiCarinoLink(`[${withBogus}]`));
 });
 
@@ -993,23 +987,15 @@ test('portfolio.brinsonFachler and carinoLink return structured attributions', (
   const reconstructed = single.total_allocation + single.total_selection + single.total_interaction;
   assert.ok(Math.abs(reconstructed - single.total_excess_return) < 1e-12);
 
+  // carinoLink binds Rust `carino_link`: it links precomputed period results
+  // (the brinsonFachler output), like campisiCarinoLink and gridCarinoLink.
   const linked = assertStructured(
-    portfolio.carinoLinkFromSectorPeriods(
-      JSON.stringify([JSON.parse(sectors), JSON.parse(sectors)])
-    ),
-    'carinoLinkFromSectorPeriods result'
+    portfolio.carinoLink(JSON.stringify([single, single])),
+    'carinoLink result'
   );
   const geometric = linked.portfolio_return_compounded - linked.benchmark_return_compounded;
   const sum = linked.linked_allocation + linked.linked_selection + linked.linked_interaction;
   assert.ok(Math.abs(sum - geometric) < 1e-10);
-
-  // carinoLink binds Rust `carino_link`: it links precomputed period results
-  // (the brinsonFachler output), like campisiCarinoLink and gridCarinoLink.
-  const precomputed = assertStructured(
-    portfolio.carinoLink(JSON.stringify([single, single])),
-    'carinoLink result'
-  );
-  assert.deepEqual(precomputed, linked);
   assert.throws(
     () => portfolio.carinoLink(JSON.stringify([JSON.parse(sectors), JSON.parse(sectors)])),
     (error) => error instanceof Error && error.kind === 'validation'

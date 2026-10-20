@@ -211,13 +211,11 @@ def test_brinson_fachler_returns_typed_result() -> None:
 
 
 def test_carino_link_returns_typed_result() -> None:
-    periods = json.dumps([json.loads(_brinson_sectors()), json.loads(_brinson_sectors())])
-    result = pf.carino_link_from_sector_periods(periods)
+    period = pf.brinson_fachler(_brinson_sectors())
+    result = pf.carino_link([period, period])
     expected = json.loads(result.to_json())
-    # `carino_link` binds Rust `carino_link`: it links the precomputed
-    # per-period results and reaches the same answer.
-    period_result = json.loads(pf.brinson_fachler(_brinson_sectors()).to_json())
-    precomputed = json.dumps([period_result, period_result])
+    # Typed per-period results and their JSON link to the same answer.
+    precomputed = json.dumps([json.loads(period.to_json()), json.loads(period.to_json())])
     assert json.loads(pf.carino_link(precomputed).to_json()) == expected
 
     _assert_contract(result, pf.CarinoLinkedAttribution)
@@ -275,24 +273,21 @@ def test_campisi_carino_link_returns_typed_result() -> None:
     ]
 
 
-def test_campisi_carino_link_from_snapshots_returns_typed_result() -> None:
-    periods = json.dumps([
-        {"portfolio": json.loads(_CAMPISI_PORTFOLIO), "benchmark": json.loads(_CAMPISI_BENCHMARK)},
-        {"portfolio": json.loads(_CAMPISI_PORTFOLIO), "benchmark": json.loads(_CAMPISI_BENCHMARK)},
-    ])
-    result = pf.campisi_carino_link_from_snapshots(periods, _CAMPISI_CONFIG)
+def test_campisi_carino_link_accepts_typed_results() -> None:
+    period = pf.campisi_attribution(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG)
+    result = pf.campisi_carino_link([period, period])
     expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.FiCarinoLinkedResult)
     assert result.linked_selection == pytest.approx(expected["linked_selection"])
 
 
-def test_campisi_reconciliation_check_returns_typed_report() -> None:
-    period = pf.campisi_attribution(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG).to_json()
-    report = pf.campisi_reconciliation_check(period, 1e-10)
+def test_fi_attribution_reconciliation_check_returns_typed_report() -> None:
+    period = pf.campisi_attribution(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG)
+    report = pf.FiAttributionResult.from_json(period.to_json()).reconciliation_check(1e-10)
     expected = json.loads(report.to_json())
 
-    _assert_contract(report, pf.FiReconciliationReport)
+    _assert_contract(report, pf.ReconciliationReport)
     assert report.is_reconciled is expected["is_reconciled"]
     assert report.total_residual == pytest.approx(expected["total_residual"], abs=1e-15)
     assert report.tolerance == pytest.approx(1e-10)
@@ -503,7 +498,7 @@ def test_scenario_pnl_batch_returns_typed_items() -> None:
     scenarios_json = _scenario_batch_json()
 
     batch = pf.scenario_pnl_batch(portfolio, scenarios_json, market)
-    expected = json.loads(pf.scenario_pnl_batch_json(portfolio, scenarios_json, market))
+    expected = [json.loads(item.to_json()) for item in batch]
 
     assert isinstance(batch, list)
     assert [item.scenario_id for item in batch] == ["up_10bp", "down_15bp"]
@@ -520,4 +515,4 @@ def test_json_twins_return_wire_strings() -> None:
     """Every ``_json`` twin returns a parseable JSON string."""
     assert isinstance(json.loads(pf.brinson_fachler(_brinson_sectors()).to_json()), dict)
     assert isinstance(json.loads(pf.twrr_linked(json.dumps([0.01]), 0.0).to_json()), dict)
-    assert isinstance(json.loads(pf.allocate_weights_json(_ALLOCATION_SPEC)), dict)
+    assert isinstance(json.loads(pf.allocate_weights(_ALLOCATION_SPEC).to_json()), dict)

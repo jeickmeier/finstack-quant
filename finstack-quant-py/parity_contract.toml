@@ -1554,7 +1554,7 @@ error        = { python = "finstack_quant.portfolio",              status = "fla
 excess_return = { python = "finstack_quant.portfolio",             status = "flattened", note = "Duration-matched credit excess return functions (cell_returns_from_reference, cell_returns_from_curves, excess_returns) are exported flat on finstack_quant.portfolio (Dynkin, Hyman & Vankudre 1998, Appendix B); duration_cell_label remains Rust-only" }
 factor_brinson = { python = "finstack_quant.portfolio",            status = "flattened", note = "Jeet-Partani (2023) factor-Brinson unified attribution (factor_brinson_attribution) is exported flat on finstack_quant.portfolio" }
 factor_model = { python = "finstack_quant.portfolio",              status = "flattened", note = "FactorModel is bound flat on finstack_quant.portfolio as a stateful handle (Python FactorModel.from_config, WASM portfolio.FactorModel.fromConfig; Rust FactorModel::from_config) with assign_factors (-> FactorAssignmentReport), compute_sensitivities, analyze, position_what_if, factor_stress and factor_stress_pnl (-> StressPnl). allocation and credit-vol report adapters are flat too; pure risk kernels are owned by finstack_quant.models.factor.risk." }
-fi_attribution = { python = "finstack_quant.portfolio",            status = "flattened", note = "Campisi fixed-income benchmark attribution (campisi_attribution, campisi_carino_link, campisi_carino_link_from_snapshots, campisi_reconciliation_check) is exported flat on finstack_quant.portfolio; campisi_reconciliation_check and the FiAttributionResult.reconciliation_check method bind the Rust method FiAttributionResult::reconciliation_check; the linking/reconciliation functions accept the typed results as well as their JSON; the typed results (FiAttributionResult, FiCarinoLinkedResult) are Python-bound, and WASM returns them as plain objects" }
+fi_attribution = { python = "finstack_quant.portfolio",            status = "flattened", note = "Campisi fixed-income benchmark attribution (campisi_attribution, campisi_carino_link) is exported flat on finstack_quant.portfolio; the FiAttributionResult.reconciliation_check method binds the Rust method FiAttributionResult::reconciliation_check and returns the shared ReconciliationReport (WASM: the free function fiAttributionResultReconciliationCheck taking the plain result object); campisi_carino_link accepts the typed results as well as their JSON; the typed results (FiAttributionResult, FiCarinoLinkedResult) are Python-bound, and WASM returns them as plain objects" }
 grid_attribution = { python = "finstack_quant.portfolio",          status = "flattened", note = "Hierarchical duration-cell x sector grid attribution (grid_attribution, grid_carino_link) is exported flat on finstack_quant.portfolio (Dynkin, Hyman & Vankudre 1998, Appendix A; Carino 1999 linking)" }
 grouping     = { python = "finstack_quant.portfolio.grouping",     status = "missing", note = "Attribute/book grouping and aggregation helpers (incl. aggregate_by_book) are bound in no host; Rust-only. The Python root does NOT carry them." }
 margin       = { python = "finstack_quant.portfolio",              status = "flattened", note = "The portfolio-margin surface re-exported at the Rust root is bound flat on finstack_quant.portfolio: PortfolioMarginAggregator is a stateful handle in both hosts (Python PortfolioMarginAggregator.from_portfolio / calculate(portfolio, market, as_of, current_im_collateral=None), WASM portfolio.PortfolioMarginAggregator.fromPortfolio / calculate; Rust PortfolioMarginAggregator::from_portfolio / calculate), and PortfolioMarginResult / NettingSetMargin are typed Python wrappers (one getter per Rust field, to_json/from_json/pickle, to_dataframe: per-netting-set rows on the result, per-risk-class IM breakdown on the netting set) and plain objects of the schema-generated TypeScript types in WASM. NettingSetMargin.sensitivities returns the margin SimmSensitivities wrapper; by_csa values are margin ImCollateralResult. Host idioms: PortfolioMarginResult.by_netting_set is a dict keyed by NettingSetId in ascending identifier order (the wire form and the WASM object carry the same rows as the netting_sets array), and NettingSetMargin.is_cleared is a property (Rust method NettingSetMargin::is_cleared), like NettingSetId.is_cleared. Rust-only: NettingSetMargin::new / with_simm_breakdown (results are produced by the aggregator)." }
@@ -1606,7 +1606,6 @@ public = [
     "FactorPnlProfile",
     "FiAttributionResult",
     "FiCarinoLinkedResult",
-    "FiReconciliationReport",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",
@@ -1658,7 +1657,6 @@ public = [
     "aggregate_full_cashflows",
     "aggregate_metrics",
     "allocate_weights",
-    "allocate_weights_json",
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
     "brinson_fachler",
@@ -1666,10 +1664,7 @@ public = [
 
     "campisi_attribution",
     "campisi_carino_link",
-    "campisi_carino_link_from_snapshots",
-    "campisi_reconciliation_check",
     "carino_link",
-    "carino_link_from_sector_periods",
     "cell_returns_from_curves",
     "cell_returns_from_reference",
     "compute_factor_sensitivities",
@@ -1686,13 +1681,10 @@ public = [
     "primitive_exposures",
     "rebalance_from_spec",
     "replay_portfolio",
-    "replay_portfolio_json",
     "scenario_pnl",
     "scenario_pnl_batch",
-    "scenario_pnl_batch_json",
     "twrr_linked",
     "twrr_modified_dietz",
-    "validate_allocation_json",
     "value_portfolio",
 ]
 
@@ -2084,8 +2076,7 @@ js = "portfolio"
 # Error classes: WASM throws `FinstackError` for portfolio failures and one
 # `ContractValidationError` (told apart by `code` and the `report` diagnostics)
 # for every persisted-contract failure, so the Python subclasses map to those.
-types = { BrinsonPeriodResult = "BrinsonPeriodResult", CandidatePosition = "CandidatePosition", CarinoLinkedAttribution = "CarinoLinkedAttribution", Constraint = "Constraint", ContractLimitExceededError = "ContractValidationError", ContractValidationError = "ContractValidationError", CreditVolReport = "CreditVolReport", DurationCellTable = "DurationCellTable", ExcessReturnResult = "ExcessReturnResult", FactorAssignmentReport = "FactorAssignmentReport", FactorBrinsonResult = "FactorBrinsonResult", FactorContributionDelta = "FactorContributionDelta", FactorPnlProfile = "FactorPnlProfile", FiAttributionResult = "FiAttributionResult", FiCarinoLinkedResult = "FiCarinoLinkedResult", FiReconciliationReport = "FiReconciliationReport", GridAttributionResult = "GridAttributionResult", GridCarinoLinkedResult = "GridCarinoLinkedResult", Inequality = "Inequality", LevelVolContribution = "LevelVolContribution", LinkedReturn = "LinkedReturn", MalformedContractSchemaError = "ContractValidationError", MaterializationReport = "MaterializationReport", MetricExpr = "MetricExpr", MissingContractVersionError = "ContractValidationError", MissingMetricPolicy = "MissingMetricPolicy", NettingSetMargin = "NettingSetMargin", Objective = "Objective", OptimizationStatus = "OptimizationStatus", PerPositionMetric = "PerPositionMetric", PortfolioAttribution = "PortfolioAttribution", PortfolioCashflows = "PortfolioCashflows", PortfolioError = "FinstackError", PortfolioMarginResult = "PortfolioMarginResult", PortfolioMetrics = "PortfolioMetrics", PortfolioOptimizationResult = "PortfolioOptimizationResult", PortfolioOptimizationSpec = "PortfolioOptimizationSpec", PortfolioPrimitiveExposureReport = "PortfolioPrimitiveExposureReport", PortfolioResult = "PortfolioResult", PortfolioValuation = "PortfolioValuation", PositionAssignment = "PositionAssignment", PositionFilter = "PositionFilter", PositionValue = "PositionValue", PositionVolContribution = "PositionVolContribution", ReconciliationReport = "ReconciliationReport", ReplayResult = "ReplayResult", ScenarioPnl = "ScenarioPnl", ScenarioPnlBatchItem = "ScenarioPnlBatchItem", SensitivityMatrix = "SensitivityMatrixJson", StressPnl = "StressPnl", StressResult = "StressResult", TradeDirection = "TradeDirection", TradeSpec = "TradeSpec", TradeType = "TradeType", TradeUniverse = "TradeUniverse", UnmatchedEntry = "UnmatchedEntry", UnsupportedContractVersionError = "ContractValidationError", WeightAllocationResult = "WeightAllocationResult", WeightingScheme = "WeightingScheme", WhatIfResult = "WhatIfResult" }
-renames = { replay_portfolio_json = { js = "portfolio.replayPortfolio", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, scenario_pnl_batch_json = { js = "portfolio.scenarioPnlBatch", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" } }
+types = { BrinsonPeriodResult = "BrinsonPeriodResult", CandidatePosition = "CandidatePosition", CarinoLinkedAttribution = "CarinoLinkedAttribution", Constraint = "Constraint", ContractLimitExceededError = "ContractValidationError", ContractValidationError = "ContractValidationError", CreditVolReport = "CreditVolReport", DurationCellTable = "DurationCellTable", ExcessReturnResult = "ExcessReturnResult", FactorAssignmentReport = "FactorAssignmentReport", FactorBrinsonResult = "FactorBrinsonResult", FactorContributionDelta = "FactorContributionDelta", FactorPnlProfile = "FactorPnlProfile", FiAttributionResult = "FiAttributionResult", FiCarinoLinkedResult = "FiCarinoLinkedResult", GridAttributionResult = "GridAttributionResult", GridCarinoLinkedResult = "GridCarinoLinkedResult", Inequality = "Inequality", LevelVolContribution = "LevelVolContribution", LinkedReturn = "LinkedReturn", MalformedContractSchemaError = "ContractValidationError", MaterializationReport = "MaterializationReport", MetricExpr = "MetricExpr", MissingContractVersionError = "ContractValidationError", MissingMetricPolicy = "MissingMetricPolicy", NettingSetMargin = "NettingSetMargin", Objective = "Objective", OptimizationStatus = "OptimizationStatus", PerPositionMetric = "PerPositionMetric", PortfolioAttribution = "PortfolioAttribution", PortfolioCashflows = "PortfolioCashflows", PortfolioError = "FinstackError", PortfolioMarginResult = "PortfolioMarginResult", PortfolioMetrics = "PortfolioMetrics", PortfolioOptimizationResult = "PortfolioOptimizationResult", PortfolioOptimizationSpec = "PortfolioOptimizationSpec", PortfolioPrimitiveExposureReport = "PortfolioPrimitiveExposureReport", PortfolioResult = "PortfolioResult", PortfolioValuation = "PortfolioValuation", PositionAssignment = "PositionAssignment", PositionFilter = "PositionFilter", PositionValue = "PositionValue", PositionVolContribution = "PositionVolContribution", ReconciliationReport = "ReconciliationReport", ReplayResult = "ReplayResult", ScenarioPnl = "ScenarioPnl", ScenarioPnlBatchItem = "ScenarioPnlBatchItem", SensitivityMatrix = "SensitivityMatrixJson", StressPnl = "StressPnl", StressResult = "StressResult", TradeDirection = "TradeDirection", TradeSpec = "TradeSpec", TradeType = "TradeType", TradeUniverse = "TradeUniverse", UnmatchedEntry = "UnmatchedEntry", UnsupportedContractVersionError = "ContractValidationError", WeightAllocationResult = "WeightAllocationResult", WeightingScheme = "WeightingScheme", WhatIfResult = "WhatIfResult" }
 
 [parity.modules."finstack_quant.portfolio.schema"]
 js = "portfolio.schema"
@@ -2356,6 +2347,7 @@ collapseToBaseByDateKind = "free-function twin of Python PortfolioCashflows.coll
 portfolioMetricsSeries = "free-function twin of Python PortfolioMetrics.metric_series (Rust PortfolioMetrics::metric_series; member rename)"
 portfolioAttributionExplainText = "free-function twin of Python PortfolioAttribution.explain (Rust PortfolioAttribution::explain; member rename)"
 portfolioAttributionReconciliationCheck = "free-function twin of Python PortfolioAttribution.reconciliation_check (Rust PortfolioAttribution::reconciliation_check; member rename)"
+fiAttributionResultReconciliationCheck = "free-function twin of Python FiAttributionResult.reconciliation_check (Rust FiAttributionResult::reconciliation_check; member rename)"
 portfolioValuationGetPositionValue = "free-function twin of Python PortfolioValuation.get_position_value (Rust PortfolioValuation::get_position_value; member rename)"
 portfolioValuationGetEntityValue = "free-function twin of Python PortfolioValuation.get_entity_value (Rust PortfolioValuation::get_entity_value; member rename)"
 portfolioMetricsGetMetric = "free-function twin of Python PortfolioMetrics.get_metric (Rust PortfolioMetrics::get_metric; member rename)"
@@ -2368,7 +2360,7 @@ constraintExposureLimit = "free-function twin of Python Constraint.exposure_limi
 constraintExposureMinimum = "free-function twin of Python Constraint.exposure_minimum (Rust Constraint::exposure_minimum; member rename)"
 constraintMaxTurnover = "free-function twin of Python Constraint.max_turnover (Rust Constraint::max_turnover; member rename)"
 constraintWeightBounds = "free-function twin of Python Constraint.weight_bounds (Rust Constraint::weight_bounds; member rename)"
-portfolioMetricsRequireTotal = "free-function twin of Python PortfolioResult.require_metric (Rust PortfolioMetrics::require_total; member rename)"
+portfolioMetricsRequireTotal = "free-function twin of Python PortfolioMetrics.require_total (Rust PortfolioMetrics::require_total; member rename)"
 portfolioOptimizationResultToTradeList = "free-function twin of Python PortfolioOptimizationResult.to_trade_list (Rust PortfolioOptimizationResultWire::to_trade_list; member rename)"
 sensitivityMatrixDelta = "free-function twin of Python SensitivityMatrix.delta (Rust SensitivityMatrix::delta; member rename)"
 sensitivityMatrixFactorDeltas = "free-function twin of Python SensitivityMatrix.factor_deltas (Rust SensitivityMatrix::factor_deltas; member rename)"
@@ -2992,7 +2984,7 @@ excluded = { metric_bound = "literal", with_label = "literal" }
 renames = { budget = { js = "portfolio.constraintBudget", reason = "WASM constraints are plain objects; Rust Constraint::budget validates its inputs, so it is a free function returning the object" }, exposure_limit = { js = "portfolio.constraintExposureLimit", reason = "WASM constraints are plain objects; Rust Constraint::exposure_limit validates its inputs, so it is a free function returning the object" }, exposure_minimum = { js = "portfolio.constraintExposureMinimum", reason = "WASM constraints are plain objects; Rust Constraint::exposure_minimum validates its inputs, so it is a free function returning the object" }, max_turnover = { js = "portfolio.constraintMaxTurnover", reason = "WASM constraints are plain objects; Rust Constraint::max_turnover validates its inputs, so it is a free function returning the object" }, weight_bounds = { js = "portfolio.constraintWeightBounds", reason = "WASM constraints are plain objects; Rust Constraint::weight_bounds validates its inputs, so it is a free function returning the object" } }
 
 [parity.members."finstack_quant.portfolio.FiAttributionResult"]
-renames = { reconciliation_check = { js = "portfolio.campisiReconciliationCheck", reason = "WASM results are plain objects; the Rust FiAttributionResult::reconciliation_check method is the free function campisiReconciliationCheck taking the object" } }
+renames = { reconciliation_check = { js = "portfolio.fiAttributionResultReconciliationCheck", reason = "WASM results are plain objects; the Rust FiAttributionResult::reconciliation_check method is a free function taking the object" } }
 
 [parity.members."finstack_quant.portfolio.Inequality"]
 excluded = { eq = "literal", ge = "literal", le = "literal" }
@@ -3025,16 +3017,13 @@ excluded = { by_date_json = "literal", events_json = "literal", issues_json = "l
 renames = { collapse_to_base_by_date_kind = { js = "portfolio.collapseToBaseByDateKind", reason = "WASM results are plain objects; the Rust PortfolioCashflows::collapse_to_base_by_date_kind method is a free function taking the object" }, collapse_to_base_by_date_kind_json = { js = "portfolio.collapseToBaseByDateKind", reason = "Python-only JSON-string exit of collapse_to_base_by_date_kind; the WASM function returns the same ladder as a plain object" }, net_in_currency_by_date = { js = "portfolio.netInCurrencyByDate", reason = "WASM results are plain objects; the Rust PortfolioCashflows::net_in_currency_by_date method is a free function taking the object" } }
 
 [parity.members."finstack_quant.portfolio.PortfolioMetrics"]
-renames = { get_metric = { js = "portfolio.portfolioMetricsGetMetric", reason = "WASM results are plain objects; the Rust PortfolioMetrics::get_metric method is a free function taking the object" }, get_position_metrics = { js = "portfolio.portfolioMetricsGetPositionMetrics", reason = "WASM results are plain objects; the Rust PortfolioMetrics::get_position_metrics method is a free function taking the object" }, get_total = { js = "portfolio.portfolioMetricsGetTotal", reason = "WASM results are plain objects; the Rust PortfolioMetrics::get_total method is a free function taking the object" }, metric_series = { js = "portfolio.portfolioMetricsSeries", reason = "WASM results are plain objects; the Rust PortfolioMetrics::metric_series method is a free function taking the object" } }
+renames = { get_metric = { js = "portfolio.portfolioMetricsGetMetric", reason = "WASM results are plain objects; the Rust PortfolioMetrics::get_metric method is a free function taking the object" }, get_position_metrics = { js = "portfolio.portfolioMetricsGetPositionMetrics", reason = "WASM results are plain objects; the Rust PortfolioMetrics::get_position_metrics method is a free function taking the object" }, get_total = { js = "portfolio.portfolioMetricsGetTotal", reason = "WASM results are plain objects; the Rust PortfolioMetrics::get_total method is a free function taking the object" }, metric_series = { js = "portfolio.portfolioMetricsSeries", reason = "WASM results are plain objects; the Rust PortfolioMetrics::metric_series method is a free function taking the object" }, require_total = { js = "portfolio.portfolioMetricsRequireTotal", reason = "WASM results are plain objects; the Rust PortfolioMetrics::require_total method is a free function taking the object" } }
 
 [parity.members."finstack_quant.portfolio.PortfolioOptimizationResult"]
 renames = { binding_constraints = { js = "portfolio.portfolioOptimizationResultBindingConstraints", reason = "WASM results are plain objects; the Rust PortfolioOptimizationResultWire::binding_constraints method is a free function taking the object" }, new_position_trades = { js = "portfolio.portfolioOptimizationResultNewPositionTrades", reason = "WASM results are plain objects; the Rust PortfolioOptimizationResultWire::new_position_trades method is a free function taking the object" }, to_trade_list = { js = "portfolio.portfolioOptimizationResultToTradeList", reason = "WASM results are plain objects; the Rust PortfolioOptimizationResultWire::to_trade_list method is a free function taking the object" } }
 
 [parity.members."finstack_quant.portfolio.PortfolioOptimizationSpec"]
 excluded = { new = "literal", portfolio_spec_json = "literal", with_constraint = "literal", with_label = "literal", with_missing_metric_policy = "literal", with_objective = "literal", with_trade_universe = "literal", with_weighting = "literal" }
-
-[parity.members."finstack_quant.portfolio.PortfolioResult"]
-renames = { get_metric = { js = "portfolio.portfolioMetricsGetTotal", reason = "Rust PortfolioResult::get_metric is PortfolioMetrics::get_total of its metrics; no WASM export produces the PortfolioResult envelope (S12), so the twin takes the aggregateMetrics result" }, require_metric = { js = "portfolio.portfolioMetricsRequireTotal", reason = "Rust PortfolioResult::require_metric is PortfolioMetrics::require_total of its metrics; no WASM export produces the PortfolioResult envelope (S12), so the twin takes the aggregateMetrics result" } }
 
 [parity.members."finstack_quant.portfolio.PortfolioValuation"]
 excluded = { to_arrow_positions = "arrow" }

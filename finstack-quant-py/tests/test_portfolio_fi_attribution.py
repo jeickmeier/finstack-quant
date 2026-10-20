@@ -145,12 +145,12 @@ def test_campisi_attribution_rejects_unknown_and_missing_config_fields() -> None
         campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(stale)).to_json()
 
 
-def test_campisi_carino_link_from_snapshots_reconstructs_compounded_active_return() -> None:
-    """Linked effects reconstruct the geometric active return."""
-    from finstack_quant.portfolio import campisi_carino_link_from_snapshots
+def test_campisi_attribution_then_carino_link_reconstructs_compounded_active_return() -> None:
+    """Per-period attributions, Carino-linked, reconstruct the geometric active return."""
+    from finstack_quant.portfolio import campisi_attribution, campisi_carino_link
 
-    period = {"portfolio": _portfolio(), "benchmark": _benchmark()}
-    result = json.loads(campisi_carino_link_from_snapshots(json.dumps([period, period]), json.dumps(_CONFIG)).to_json())
+    period = campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
+    result = json.loads(campisi_carino_link([period, period]).to_json())
 
     geometric_active = result["portfolio_return_compounded"] - result["benchmark_return_compounded"]
     reconstructed = (
@@ -186,20 +186,6 @@ def test_campisi_carino_link_from_snapshots_reconstructs_compounded_active_retur
     assert result["periods"][0]["total_active_carry"] == pytest.approx(0.00103125, abs=1e-12)
 
 
-def test_campisi_carino_link_from_snapshots_accepts_keyword_arguments() -> None:
-    """The advertised ``text_signature`` names are the real keyword names."""
-    from finstack_quant.portfolio import campisi_carino_link_from_snapshots
-
-    period = {"portfolio": _portfolio(), "benchmark": _benchmark()}
-    result = json.loads(
-        campisi_carino_link_from_snapshots(
-            periods_json=json.dumps([period, period]),
-            config_json=json.dumps(_CONFIG),
-        ).to_json()
-    )
-    assert len(result["linked_sectors"]) == 2
-
-
 def test_campisi_accepts_zero_and_negative_spread_levels() -> None:
     """The spread *level* never enters the arithmetic, so it is unconstrained.
 
@@ -209,19 +195,15 @@ def test_campisi_accepts_zero_and_negative_spread_levels() -> None:
     quote-reproducing Z-spreads (including negative levels on rich bonds) are
     ordinary inputs and must not perturb any effect.
     """
-    from finstack_quant.portfolio import campisi_carino_link_from_snapshots
-
-    def _period(p_spread: float, b_spread: float) -> dict[str, object]:
-        return {
-            "portfolio": [_snap("CORP", 1.00, 0.0120, 0.060, 4.0, 3.8, p_spread, -0.0010, 0.0020)],
-            "benchmark": [_snap("CORP", 1.00, 0.0090, 0.055, 5.0, 4.8, b_spread, -0.0010, 0.0020)],
-        }
+    from finstack_quant.portfolio import campisi_attribution, campisi_carino_link
 
     def _link(p_spread: float, b_spread: float) -> dict[str, object]:
-        period = _period(p_spread, b_spread)
-        return json.loads(
-            campisi_carino_link_from_snapshots(json.dumps([period, period]), json.dumps(_CONFIG)).to_json()
+        period = campisi_attribution(
+            json.dumps([_snap("CORP", 1.00, 0.0120, 0.060, 4.0, 3.8, p_spread, -0.0010, 0.0020)]),
+            json.dumps([_snap("CORP", 1.00, 0.0090, 0.055, 5.0, 4.8, b_spread, -0.0010, 0.0020)]),
+            json.dumps(_CONFIG),
         )
+        return json.loads(campisi_carino_link([period, period]).to_json())
 
     baseline = _link(0.0150, 0.0120)
     # w_p (-SD_p ds - (-SD_b ds)) = 1.0 x (-3.8 + 4.8) x 0.0020 per period.
@@ -368,18 +350,6 @@ def test_campisi_attribution_rejects_zero_net_weight_sector() -> None:
     assert reconstructed == pytest.approx(result["active_return"], abs=1e-12)
 
 
-def test_campisi_carino_link_from_snapshots_rejects_bad_json_and_domain_errors() -> None:
-    """The snapshot-based linked entry point maps parse and domain failures."""
-    from finstack_quant.portfolio import PortfolioError, campisi_carino_link_from_snapshots
-
-    with pytest.raises(ValueError, match="periods JSON"):
-        campisi_carino_link_from_snapshots("not json", json.dumps(_CONFIG)).to_json()
-    with pytest.raises(ValueError, match="config JSON"):
-        campisi_carino_link_from_snapshots(json.dumps([]), "not json").to_json()
-    with pytest.raises(PortfolioError, match="at least one period"):
-        campisi_carino_link_from_snapshots(json.dumps([]), json.dumps(_CONFIG)).to_json()
-
-
 def test_campisi_carino_link_rejects_bad_json_and_domain_errors() -> None:
     """The results-based linked entry point maps parse and domain failures."""
     from finstack_quant.portfolio import PortfolioError, campisi_attribution, campisi_carino_link
@@ -461,12 +431,12 @@ def test_campisi_result_denies_unknown_fields_on_every_input_path() -> None:
     """A stale or misspelled key must fail closed, not be silently dropped.
 
     ``FiAttributionResult`` is an *input* type: :func:`campisi_carino_link` and
-    :func:`campisi_reconciliation_check` both deserialize it. Silently ignoring
+    :meth:`FiAttributionResult.from_json` both deserialize it. Silently ignoring
     an unknown key would let a hand-assembled or stale payload flow through and
     still "reconcile", because linking reads the period returns rather than the
     supplied ``active_return``.
     """
-    from finstack_quant.portfolio import campisi_attribution, campisi_carino_link, campisi_reconciliation_check
+    from finstack_quant.portfolio import FiAttributionResult, campisi_attribution, campisi_carino_link
 
     result = json.loads(
         campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
@@ -474,31 +444,34 @@ def test_campisi_result_denies_unknown_fields_on_every_input_path() -> None:
 
     # Our own output round-trips: deny_unknown_fields must not reject it.
     campisi_carino_link(json.dumps([result])).to_json()
-    campisi_reconciliation_check(json.dumps(result), 1e-10).to_json()
+    FiAttributionResult.from_json(json.dumps(result)).reconciliation_check(1e-10).to_json()
 
     top_level = {**result, "bogus_field": 1.0}
     with pytest.raises(ValueError, match="period results JSON"):
         campisi_carino_link(json.dumps([top_level])).to_json()
-    with pytest.raises(ValueError, match="result JSON"):
-        campisi_reconciliation_check(json.dumps(top_level), 1e-10).to_json()
+    with pytest.raises(ValueError, match="FiAttributionResult JSON"):
+        FiAttributionResult.from_json(json.dumps(top_level))
 
     nested_sector = json.loads(json.dumps(result))
     nested_sector["sectors"][0]["bogus_field"] = 1.0
-    with pytest.raises(ValueError, match="result JSON"):
-        campisi_reconciliation_check(json.dumps(nested_sector), 1e-10).to_json()
+    with pytest.raises(ValueError, match="FiAttributionResult JSON"):
+        FiAttributionResult.from_json(json.dumps(nested_sector))
 
     nested_components = json.loads(json.dumps(result))
     nested_components["portfolio_components"]["bogus_field"] = 1.0
-    with pytest.raises(ValueError, match="result JSON"):
-        campisi_reconciliation_check(json.dumps(nested_components), 1e-10).to_json()
+    with pytest.raises(ValueError, match="FiAttributionResult JSON"):
+        FiAttributionResult.from_json(json.dumps(nested_components))
 
 
 def test_campisi_reconciliation_check_reports_residual_and_honours_tolerance() -> None:
     """The reconciliation gate is reachable from Python and its tolerance bites."""
-    from finstack_quant.portfolio import campisi_attribution, campisi_reconciliation_check
+    from finstack_quant.portfolio import FiAttributionResult, ReconciliationReport, campisi_attribution
 
-    result_json = campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
-    report = json.loads(campisi_reconciliation_check(result_json, 1e-10).to_json())
+    typed = campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
+    checked = typed.reconciliation_check(1e-10)
+    assert isinstance(checked, ReconciliationReport)
+    report = json.loads(checked.to_json())
+    result_json = typed.to_json()
 
     assert report["is_reconciled"] is True
     assert report["tolerance"] == pytest.approx(1e-10)
@@ -517,14 +490,14 @@ def test_campisi_reconciliation_check_reports_residual_and_honours_tolerance() -
 
     # Tolerance is load-bearing: a tampered active_return breaks the identity.
     tampered = {**result, "active_return": result["active_return"] + 0.01}
-    assert json.loads(campisi_reconciliation_check(json.dumps(tampered), 1e-10).to_json())["is_reconciled"] is False
-    assert json.loads(campisi_reconciliation_check(json.dumps(tampered), 1.0).to_json())["is_reconciled"] is True
+    tampered_result = FiAttributionResult.from_json(json.dumps(tampered))
+    assert tampered_result.reconciliation_check(1e-10).is_reconciled is False
+    assert tampered_result.reconciliation_check(1.0).is_reconciled is True
 
 
 def test_campisi_reconciliation_check_accepts_keyword_arguments() -> None:
     """Keyword names match the documented ``text_signature``."""
-    from finstack_quant.portfolio import campisi_attribution, campisi_reconciliation_check
+    from finstack_quant.portfolio import campisi_attribution
 
-    result_json = campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
-    report = json.loads(campisi_reconciliation_check(result_json=result_json, tolerance=1e-10).to_json())
-    assert report["is_reconciled"] is True
+    result = campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
+    assert result.reconciliation_check(tolerance=1e-10).is_reconciled is True

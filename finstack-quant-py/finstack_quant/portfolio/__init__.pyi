@@ -49,7 +49,6 @@ __all__ = [
     "FactorPnlProfile",
     "FiAttributionResult",
     "FiCarinoLinkedResult",
-    "FiReconciliationReport",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",
@@ -101,17 +100,13 @@ __all__ = [
     "aggregate_full_cashflows",
     "aggregate_metrics",
     "allocate_weights",
-    "allocate_weights_json",
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
     "brinson_fachler",
     "build_credit_vol_report",
     "campisi_attribution",
     "campisi_carino_link",
-    "campisi_carino_link_from_snapshots",
-    "campisi_reconciliation_check",
     "carino_link",
-    "carino_link_from_sector_periods",
     "cell_returns_from_curves",
     "cell_returns_from_reference",
     "compute_factor_sensitivities",
@@ -128,14 +123,11 @@ __all__ = [
     "primitive_exposures",
     "rebalance_from_spec",
     "replay_portfolio",
-    "replay_portfolio_json",
     "scenario_pnl",
     "scenario_pnl_batch",
-    "scenario_pnl_batch_json",
     "schema",
     "twrr_linked",
     "twrr_modified_dietz",
-    "validate_allocation_json",
     "value_portfolio",
 ]
 
@@ -989,7 +981,12 @@ class PositionValue:
 
 class ReconciliationReport:
     """
-    Reconciliation of portfolio factor buckets against ``total_pnl``.
+    Reconciliation of an attribution's effect buckets against its total.
+
+    Returned by :meth:`PortfolioAttribution.reconciliation_check` (factor
+    buckets plus FX translation against ``total_pnl``, in the portfolio base
+    currency) and by :meth:`FiAttributionResult.reconciliation_check` (the five
+    Campisi effect totals against ``active_return``, in return units).
 
     Examples
     --------
@@ -1002,12 +999,13 @@ class ReconciliationReport:
     @property
     def total_residual(self) -> float:
         """
-        Unexplained base-currency amount after all buckets are summed.
+        Unexplained amount after all buckets are summed.
 
         Returns
         -------
         float
-            Residual in the portfolio base currency.
+            Residual in the portfolio base currency (P&L attribution) or in
+            return units (Campisi attribution).
 
         Notes
         -----
@@ -1023,7 +1021,8 @@ class ReconciliationReport:
         Returns
         -------
         bool
-            ``False`` when attribution was flagged invalid, regardless of residual.
+            ``False`` when a P&L attribution was flagged invalid, regardless
+            of residual.
 
         Notes
         -----
@@ -1034,12 +1033,12 @@ class ReconciliationReport:
     @property
     def tolerance(self) -> float:
         """
-        Absolute base-currency tolerance used for the check.
+        Absolute tolerance used for the check.
 
         Returns
         -------
         float
-            Tolerance in base-currency units.
+            Tolerance in the units of ``total_residual``.
 
         Notes
         -----
@@ -2097,22 +2096,6 @@ class PortfolioValuation:
         """
         ...
 
-    @property
-    def has_degraded_risk(self) -> bool:
-        """
-        Whether any position carries incomplete risk metrics.
-
-        Returns
-        -------
-        bool
-            ``True`` when ``degraded_positions`` is non-empty.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the derived value.
-        """
-        ...
-
     def get_position_value(self, position_id: str) -> PositionValue:
         """
         Look up one position's valuation.
@@ -2235,7 +2218,7 @@ class PortfolioCashflows:
     >>> cashflows = PortfolioCashflows.from_json(
     ...     '{"events":[],"by_position":{},"by_date":{},"position_summaries":{},"issues":[]}'
     ... )
-    >>> (cashflows.num_positions, cashflows.num_issues)
+    >>> (len(cashflows.by_position), len(cashflows.issues))
     (0, 0)
     """
 
@@ -2266,7 +2249,7 @@ class PortfolioCashflows:
         >>> cashflows = PortfolioCashflows.from_json(
         ...     '{"events":[],"by_position":{},"by_date":{},"position_summaries":{},"issues":[]}'
         ... )
-        >>> (cashflows.num_positions, cashflows.num_issues)
+        >>> (len(cashflows.by_position), len(cashflows.issues))
         (0, 0)
         """
         ...
@@ -2352,36 +2335,6 @@ class PortfolioCashflows:
         ------
         ValueError
             If the result cannot be serialized into a pandas object.
-        """
-        ...
-
-    @property
-    def num_positions(self) -> int:
-        """
-        Number of positions represented in the ladder.
-        Returns
-        -------
-        int
-            Number of positions with schedule entries, including empty schedules.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
-    def num_issues(self) -> int:
-        """
-        Number of diagnostic issues recorded on the ladder.
-        Returns
-        -------
-        int
-            Number of cashflow-schedule extraction issues recorded in the ladder.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
         """
         ...
 
@@ -3328,8 +3281,8 @@ class PortfolioResult:
     """
     Typed wrapper around a ``PortfolioResult`` envelope.
 
-    Use the scalar accessors (``total_value``, ``get_metric``) to read single
-    values without re-parsing the JSON envelope.
+    Read scalars through its components: ``result.valuation.total_value`` and
+    ``result.metrics.get_total(metric_id)`` / ``require_total(metric_id)``.
 
     Examples
     --------
@@ -3354,7 +3307,7 @@ class PortfolioResult:
     ...     "metrics": {"aggregated": {}, "by_position": {}},
     ...     "meta": {"numeric_mode": "f64", "rounding": rounding},
     ... }
-    >>> PortfolioResult.from_json(json.dumps(doc)).total_value
+    >>> PortfolioResult.from_json(json.dumps(doc)).valuation.total_value
     0.0
     """
 
@@ -3405,7 +3358,7 @@ class PortfolioResult:
         ... )
         >>> metrics = PortfolioMetrics.from_json('{"aggregated": {}, "by_position": {}}')
         >>> result = PortfolioResult(valuation, metrics)
-        >>> (result.total_value, result.meta["fx_policy_applied"], "timestamp" in result.meta)
+        >>> (result.valuation.total_value, result.meta["fx_policy_applied"], "timestamp" in result.meta)
         (0.0, 'cashflow_date', False)
         >>> result.to_json() == PortfolioResult(valuation, metrics).to_json()
         True
@@ -3507,7 +3460,7 @@ class PortfolioResult:
         ...     "metrics": {"aggregated": {}, "by_position": {}},
         ...     "meta": {"numeric_mode": "f64", "rounding": rounding},
         ... }
-        >>> PortfolioResult.from_json(json.dumps(doc)).total_value
+        >>> PortfolioResult.from_json(json.dumps(doc)).valuation.total_value
         0.0
         """
         ...
@@ -3524,64 +3477,6 @@ class PortfolioResult:
         ------
         ValueError
             If the value cannot be serialized to JSON.
-        """
-        ...
-
-    @property
-    def total_value(self) -> float:
-        """
-        Total value stored in the result envelope.
-
-        Returns
-        -------
-        float
-            Total value stored in the result envelope.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    def get_metric(self, metric_id: str) -> float | None:
-        """
-        Return a metric value, or ``None`` when it is absent.
-
-        Parameters
-        ----------
-        metric_id : str
-            Fully qualified metric key, such as ``"pv01::usd_ois"``.
-
-        Returns
-        -------
-        float | None
-            Aggregated scalar stored under ``metric_id``, or ``None`` when the
-            result contains no matching metric.
-
-        Notes
-        -----
-        This method does not raise; a missing result is ``None`` rather than an exception.
-        """
-        ...
-
-    def require_metric(self, metric_id: str) -> float:
-        """
-        Return a metric value, raising ``KeyError`` when it is absent.
-
-        Parameters
-        ----------
-        metric_id : str
-            Fully qualified metric key that must be present in the result.
-
-        Returns
-        -------
-        float
-            Aggregated scalar stored under the fully qualified ``metric_id``.
-
-        Raises
-        ------
-        KeyError
-            If ``metric_id`` is absent from the result.
         """
         ...
 
@@ -3828,6 +3723,40 @@ class PortfolioMetrics:
         Notes
         -----
         This method does not raise; an absent key yields ``None``.
+        """
+        ...
+
+    def require_total(self, metric_id: str) -> float:
+        """
+        Portfolio total of one aggregated metric, raising when it is absent.
+
+        Binds the Rust method ``PortfolioMetrics::require_total``.
+
+        Parameters
+        ----------
+        metric_id : str
+            Fully qualified metric key (for example ``"dv01"`` or
+            ``"bucketed_dv01::USD-OIS::10y"``).
+
+        Returns
+        -------
+        float
+            Sum across positions in the portfolio base currency.
+
+        Raises
+        ------
+        KeyError
+            If no aggregate was produced for ``metric_id``.
+
+        Examples
+        --------
+        >>> from finstack_quant.portfolio import PortfolioMetrics
+        >>> metrics = PortfolioMetrics.from_json('{"aggregated":{},"by_position":{}}')
+        >>> try:
+        ...     metrics.require_total("dv01")
+        ... except KeyError:
+        ...     print("missing")
+        missing
         """
         ...
 
@@ -4391,7 +4320,7 @@ def aggregate_full_cashflows(
     >>> from finstack_quant.portfolio import Portfolio, aggregate_full_cashflows
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> cashflows = aggregate_full_cashflows(Portfolio.from_spec(spec), MarketContext())
-    >>> (cashflows.num_positions, cashflows.num_issues)
+    >>> (len(cashflows.by_position), len(cashflows.issues))
     (0, 0)
     """
     ...
@@ -4598,54 +4527,6 @@ def scenario_pnl_batch(
     >>> from finstack_quant.portfolio import Portfolio, scenario_pnl_batch
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> scenario_pnl_batch(Portfolio.from_spec(spec), "[]", MarketContext())
-    []
-    """
-    ...
-
-def scenario_pnl_batch_json(
-    portfolio: Portfolio | str,
-    scenarios: list[ScenarioSpec | str] | str,
-    market: MarketContext | str,
-) -> str:
-    """
-    Compute ordered batch scenario P&L and return wire JSON.
-
-    Wire twin of :func:`scenario_pnl_batch`: same inputs and validation,
-    returning the canonical JSON array string instead of typed items.
-
-    Parameters
-    ----------
-    portfolio : Portfolio or str
-        Built portfolio or canonical ``PortfolioSpec`` JSON.
-    scenarios : list[ScenarioSpec | str] | str
-        Ordered scenarios (typed objects, JSON strings, or one JSON array
-        string); order is preserved.
-    market : MarketContext or str
-        Unshocked market context or canonical market JSON.
-
-    Returns
-    -------
-    str
-        Canonical JSON array. Each item has ``scenario_id``, ``pnl`` (the
-        same base-currency ``ScenarioPnl`` shape returned by
-        :func:`scenario_pnl`), and ``report``. ``"[]"`` in, ``"[]"`` out.
-
-    Raises
-    ------
-    ValueError
-        If ``scenarios`` cannot deserialize to an ordered array of
-        valid ``ScenarioSpec`` values.
-    PortfolioError
-        If scenario application, valuation, or base-currency P&L
-        differencing fails.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import Portfolio, scenario_pnl_batch_json
-    >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> json.loads(scenario_pnl_batch_json(Portfolio.from_spec(spec), "[]", MarketContext()))
     []
     """
     ...
@@ -4864,8 +4745,8 @@ def allocate_weights(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame)
     -------
     WeightAllocationResult
         Typed result with ``scheme``, ``allocations`` and ``diagnostics``
-        getters plus ``to_dataframe()``; use :func:`allocate_weights_json`
-        serialize with ``to_json()`` for the wire string.
+        getters plus ``to_dataframe()``; serialize with ``to_json()`` for the
+        wire string. A spec that allocates without error is valid.
 
     Raises
     ------
@@ -4883,80 +4764,6 @@ def allocate_weights(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame)
     >>> spec = '{"scheme":"equal","total_capital":1000.0,"strategies":[{"id":"a"},{"id":"b"}]}'
     >>> [entry["weight"] for entry in allocate_weights(spec).allocations]
     [0.5, 0.5]
-    """
-    ...
-
-def allocate_weights_json(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> str:
-    """
-    Allocate strategy weights from a JSON specification as wire JSON.
-
-    Wire twin of :func:`allocate_weights`: same signed-capital, largest-remainder
-    rounding and validation, returning the canonical JSON string instead of the
-    typed wrapper.
-
-    Parameters
-    ----------
-    spec_json : str | dict | list | pandas.DataFrame
-        JSON-serialized ``WeightAllocationSpec`` selecting the scheme,
-        finite signed total capital, strategy inputs, and any covariance data.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``WeightAllocationResult`` wire document.
-
-    Raises
-    ------
-    ValueError
-        If the JSON is malformed, required fields are missing, the scheme is
-        unsupported, or the selected scheme cannot be evaluated.
-    PortfolioError
-        If scheme invariants fail or capital cannot be represented at the
-        requested rounding precision.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import allocate_weights_json
-    >>> spec = '{"scheme":"equal","total_capital":1000.0,"strategies":[{"id":"a"},{"id":"b"}]}'
-    >>> [entry["weight"] for entry in json.loads(allocate_weights_json(spec))["allocations"]]
-    [0.5, 0.5]
-    """
-    ...
-
-def validate_allocation_json(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> str:
-    """
-    Validate a strategy allocation JSON specification.
-
-    Performs the same Rust-side parse and semantic validation used by
-    :func:`allocate_weights`, including allocation and capital rounding, then
-    discards the allocation result.
-
-    Parameters
-    ----------
-    spec_json : str | dict | list | pandas.DataFrame
-        JSON-serialized allocation specification.
-
-    Returns
-    -------
-    str
-        Canonical compact JSON of the accepted specification.
-
-    Raises
-    ------
-    ValueError
-        If the specification is malformed or invalid.
-    PortfolioError
-        If scheme invariants fail or capital cannot be represented at the
-        requested rounding precision.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import validate_allocation_json
-    >>> spec = '{"scheme":"equal","total_capital":1000.0,"strategies":[{"id":"a"},{"id":"b"}]}'
-    >>> json.loads(validate_allocation_json(spec))["scheme"]
-    'equal'
     """
     ...
 
@@ -4999,7 +4806,7 @@ class ReplayResult:
         Parameters
         ----------
         json : str
-            JSON produced by :meth:`to_json` or :func:`replay_portfolio_json`.
+            JSON produced by :meth:`to_json`.
 
         Returns
         -------
@@ -5134,8 +4941,8 @@ def replay_portfolio(
     -------
     ReplayResult
         Typed result with ``steps``, ``summary`` and ``skipped_dates``
-        getters plus ``to_dataframe()``; use :func:`replay_portfolio_json`
-        serialize with ``to_json()`` for the wire string.
+        getters plus ``to_dataframe()``; serialize with ``to_json()`` for the
+        wire string.
 
     Raises
     ------
@@ -5151,51 +4958,6 @@ def replay_portfolio(
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> try:
     ...     replay_portfolio(spec, [], {"mode": "pv_only"})
-    ... except ValueError as exc:
-    ...     print("must be non-empty" in str(exc))
-    True
-    """
-    ...
-
-def replay_portfolio_json(
-    portfolio: Portfolio | str,
-    snapshots: list[tuple[datetime.date | str, MarketContext | str]] | list[dict[str, Any]] | str,
-    config: dict[str, Any] | str,
-) -> str:
-    """
-    Replay a portfolio through dated market snapshots and return wire JSON.
-
-    Wire twin of :func:`replay_portfolio`: same inputs and validation,
-    returning the canonical JSON string instead of the typed wrapper.
-
-    Parameters
-    ----------
-    portfolio : Portfolio or str
-        Typed :class:`Portfolio` or JSON ``PortfolioSpec``.
-    snapshots : list[tuple[date, MarketContext | str]] | list[dict] | str
-        Dated market snapshots (see :func:`replay_portfolio`).
-    config : dict | str
-        ``ReplayConfig`` as a dict or JSON string (see
-        :func:`replay_portfolio`).
-
-    Returns
-    -------
-    str
-        JSON-serialized ``ReplayResult`` wire document.
-
-    Raises
-    ------
-    ValueError
-        If an input is malformed (including a config without ``mode``).
-    PortfolioError
-        If a snapshot valuation fails under a strict error policy.
-
-    Examples
-    --------
-    >>> from finstack_quant.portfolio import replay_portfolio_json
-    >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> try:
-    ...     replay_portfolio_json(spec, "[]", '{"mode":"pv_only"}')
     ... except ValueError as exc:
     ...     print("must be non-empty" in str(exc))
     True
@@ -5410,14 +5172,13 @@ class CarinoLinkedAttribution:
     """
     Carino-linked multi-period Brinson attribution result.
 
-    Returned by :func:`carino_link` and
-    :func:`carino_link_from_sector_periods`. The linked per-sector effects sum
-    to the geometrically compounded active return exactly.
+    Returned by :func:`carino_link`. The linked per-sector effects sum to the
+    geometrically compounded active return exactly.
 
     Examples
     --------
     >>> import json
-    >>> from finstack_quant.portfolio import carino_link_from_sector_periods
+    >>> from finstack_quant.portfolio import brinson_fachler, carino_link
     >>> period = [
     ...     {
     ...         "sector": "A",
@@ -5427,7 +5188,7 @@ class CarinoLinkedAttribution:
     ...         "benchmark_return": 0.01,
     ...     }
     ... ]
-    >>> result = carino_link_from_sector_periods(json.dumps([period, period]))
+    >>> result = carino_link([brinson_fachler(json.dumps(p)) for p in [period, period]])
     >>> round(result.linked_selection, 4)
     0.0203
     """
@@ -5664,9 +5425,9 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
     Carino-link already-computed single-period Brinson-Fachler results.
 
     Binds Rust ``carino_link``, like :func:`campisi_carino_link` and
-    :func:`grid_carino_link`; use :func:`carino_link_from_sector_periods` to
-    link raw sector inputs instead. The same input the WASM ``carinoLink``
-    takes.
+    :func:`grid_carino_link`. To link raw sector inputs, attribute each period
+    first: ``carino_link([brinson_fachler(p) for p in periods])``. The same
+    input the WASM ``carinoLink`` takes.
 
     Parameters
     ----------
@@ -5710,60 +5471,6 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
     >>> result = json.loads(brinson_fachler(json.dumps(period)).to_json())
     >>> linked = carino_link(json.dumps([result, result]))
     >>> round(linked.linked_selection, 4)
-    0.0203
-    """
-    ...
-
-def carino_link_from_sector_periods(
-    periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-) -> CarinoLinkedAttribution:
-    """
-    Compute Carino-linked multi-period Brinson attribution from raw sector periods.
-
-    Binds Rust ``carino_link_from_sector_periods``: runs
-    :func:`brinson_fachler` on each period, then Carino-links the results.
-    The same input the WASM ``carinoLinkFromSectorPeriods`` takes.
-
-    Parameters
-    ----------
-    periods_json : str | dict | list | pandas.DataFrame
-        JSON array of periods, where each period is an array of ``SectorPeriod``
-        objects (same schema as :func:`brinson_fachler`).
-
-    Returns
-    -------
-    CarinoLinkedAttribution
-        Typed result with linked per-sector effects and compounded returns;
-        use serialize with ``to_json()`` for the wire string.
-
-    Raises
-    ------
-    PortfolioError
-        If any period fails Brinson validation, the sequence is empty or
-        changes sector ordering, or a period return is non-finite or at most
-        ``-1``.
-    ValueError
-        If ``periods_json`` is malformed.
-
-    Sources
-    -------
-    See ``docs/REFERENCES.md#carino-1999``.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import carino_link_from_sector_periods
-    >>> period = [
-    ...     {
-    ...         "sector": "A",
-    ...         "portfolio_weight": 1.0,
-    ...         "benchmark_weight": 1.0,
-    ...         "portfolio_return": 0.02,
-    ...         "benchmark_return": 0.01,
-    ...     }
-    ... ]
-    >>> result = carino_link_from_sector_periods(json.dumps([period, period]))
-    >>> round(result.linked_selection, 4)
     0.0203
     """
     ...
@@ -5992,14 +5699,14 @@ class FiAttributionResult:
         """
         ...
 
-    def reconciliation_check(self, tolerance: float) -> FiReconciliationReport:
+    def reconciliation_check(self, tolerance: float) -> ReconciliationReport:
         """
         Reconcile the five Campisi effect totals against the active return.
 
         Binds the Rust method
-        ``finstack_quant_portfolio::FiAttributionResult::reconciliation_check``;
-        :func:`campisi_reconciliation_check` is the free-function form that
-        also accepts the JSON wire shape.
+        ``finstack_quant_portfolio::FiAttributionResult::reconciliation_check``.
+        For a result held as JSON, rebuild it first with
+        :meth:`FiAttributionResult.from_json`.
 
         Parameters
         ----------
@@ -6009,9 +5716,9 @@ class FiAttributionResult:
 
         Returns
         -------
-        FiReconciliationReport
+        ReconciliationReport
             Typed report with ``total_residual``, ``is_reconciled`` and
-            ``tolerance``.
+            ``tolerance`` (residual and tolerance in return units).
 
         Notes
         -----
@@ -6092,8 +5799,7 @@ class FiCarinoLinkedResult:
     """
     Multi-period Carino-linked Campisi attribution result.
 
-    Returned by :func:`campisi_carino_link` and
-    :func:`campisi_carino_link_from_snapshots`. The five linked totals sum to
+    Returned by :func:`campisi_carino_link`. The five linked totals sum to
     the geometrically compounded active return.
 
     Examples
@@ -6321,137 +6027,6 @@ class FiCarinoLinkedResult:
         """
         ...
 
-class FiReconciliationReport:
-    """
-    Reconciliation report for the five Campisi effect totals.
-
-    Returned by :func:`campisi_reconciliation_check`. A floating-point sanity
-    gate, not a model check: the Campisi decomposition reconciles by
-    construction because selection is the residual.
-
-    Examples
-    --------
-    >>> from finstack_quant.portfolio import FiReconciliationReport
-    >>> doc = '{"total_residual": 0.0, "is_reconciled": true, "tolerance": 1e-10}'
-    >>> FiReconciliationReport.from_json(doc).is_reconciled
-    True
-    """
-
-    @property
-    def total_residual(self) -> float:
-        """
-        Active return minus the sum of the five effect totals.
-
-        Returns
-        -------
-        float
-            The stored value from the canonical Rust result.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
-    def is_reconciled(self) -> bool:
-        """
-        Whether the residual is within tolerance.
-
-        Returns
-        -------
-        bool
-            The stored flag from the canonical Rust result.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
-    def tolerance(self) -> float:
-        """
-        Absolute tolerance that was applied, in return units.
-
-        Returns
-        -------
-        float
-            The stored value from the canonical Rust result.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def to_dataframe(self) -> pd.DataFrame:
-        """
-        Single-row pandas DataFrame view of the report.
-
-        Columns: ``total_residual``, ``is_reconciled``, ``tolerance``. The schema is pinned, so an empty result keeps the
-        same dtypes as a populated one.
-
-        Returns
-        -------
-        pd.DataFrame
-            One row per entry, with the pinned column schema above.
-
-        Raises
-        ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
-        """
-        ...
-
-    def to_json(self) -> str:
-        """
-        Serialize this result to canonical JSON.
-
-        Returns
-        -------
-        str
-            Canonical JSON representation, suitable for a matching
-            :meth:`from_json` call.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized to JSON.
-        """
-        ...
-
-    @staticmethod
-    def from_json(json: str) -> FiReconciliationReport:
-        """
-        Deserialize a ``FiReconciliationReport`` from canonical JSON.
-
-        Parameters
-        ----------
-        json : str
-            Canonical payload produced by :meth:`to_json` or the paired
-            ``*_json`` wire function.
-
-        Returns
-        -------
-        FiReconciliationReport
-            Validated instance reconstructed from the canonical JSON payload.
-
-        Raises
-        ------
-        ValueError
-            If the payload is malformed or does not match the serialized
-            ``FiReconciliationReport`` schema.
-
-        Examples
-        --------
-        >>> from finstack_quant.portfolio import FiReconciliationReport
-        >>> doc = '{"total_residual": 0.0, "is_reconciled": true, "tolerance": 1e-10}'
-        >>> FiReconciliationReport.from_json(doc).is_reconciled
-        True
-        """
-        ...
-
 def campisi_attribution(
     portfolio_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
     benchmark_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
@@ -6554,19 +6129,17 @@ def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.Data
 
     Each period result already carries its own applied ``period_years``, so
     periods of *different* lengths link correctly here (e.g. act/365 calendar
-    months: 31/365, 28/365, 31/365). Use this entry point for real day counts;
-    :func:`campisi_carino_link_from_snapshots` applies one shared
-    ``period_years`` to every period and is only correct for equal-length
-    periods.
+    months: 31/365, 28/365, 31/365). Attribute each period with
+    :func:`campisi_attribution` first:
+    ``campisi_carino_link([campisi_attribution(p, b, c) for p, b, c in periods])``.
 
     Parameters
     ----------
-    periods_json : str | dict | list | pandas.DataFrame
+    periods_json : list[FiAttributionResult] | str | list[dict]
         Chronological list of typed ``FiAttributionResult`` objects (as
-        returned by :func:`campisi_attribution`) or their JSON form, each the
-        parsed output of :func:`campisi_attribution` (or
-        ``FiAttributionResult.to_json()``). Every period
-        must carry the same sector ordering. Unknown fields are rejected.
+        returned by :func:`campisi_attribution`) or their JSON form
+        (``FiAttributionResult.to_json()``). Every period must carry the same
+        sector ordering. Unknown fields are rejected.
 
     Returns
     -------
@@ -6625,172 +6198,10 @@ def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.Data
     ...         "delta_spread": 0.0,
     ...     }
     ... ]
-    >>> period = json.loads(
-    ...     campisi_attribution(json.dumps(portfolio), json.dumps(benchmark), '{"period_years":0.25}').to_json()
-    ... )
-    >>> linked = campisi_carino_link(json.dumps([period, period]))
+    >>> period = campisi_attribution(json.dumps(portfolio), json.dumps(benchmark), '{"period_years":0.25}')
+    >>> linked = campisi_carino_link([period, period])
     >>> round(linked.linked_selection, 6)
     0.013195
-    """
-    ...
-
-def campisi_carino_link_from_snapshots(
-    periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    config_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-) -> FiCarinoLinkedResult:
-    """
-    Compute Carino-linked multi-period Campisi attribution from period JSON.
-
-    Binds Rust ``finstack_quant_portfolio::campisi_carino_link_from_snapshots``.
-
-    One ``config_json`` — and therefore one ``period_years`` — is applied to
-    every period, so this entry point is only correct when all periods have the
-    same length. For mixed-length periods (real day counts), compute each
-    period with :func:`campisi_attribution` and link the results with
-    :func:`campisi_carino_link`.
-
-    Parameters
-    ----------
-    periods_json : str | dict | list | pandas.DataFrame
-        JSON array of period objects, each with ``portfolio`` and
-        ``benchmark`` arrays of ``FiPositionSnapshot`` (same schema as
-        :func:`campisi_attribution`).
-    config_json : str | dict | list | pandas.DataFrame
-        JSON ``FiAttributionConfig`` shared across periods; ``period_years`` is
-        its only field and is required (no default).
-
-    Returns
-    -------
-    FiCarinoLinkedResult
-        Typed result whose five linked totals sum to the geometrically
-        compounded active return; use
-        serialize with ``to_json()`` for the wire string.
-
-    Raises
-    ------
-    PortfolioError
-        If ``periods_json`` is empty, any period fails Campisi validation, or
-        sector orderings differ across periods.
-    ValueError
-        If any JSON argument is malformed.
-
-    Sources
-    -------
-    See ``docs/REFERENCES.md#carino-1999``.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import campisi_carino_link_from_snapshots
-    >>> portfolio = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.02,
-    ...         "yield_annual": 0.04,
-    ...         "modified_duration": 5.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> benchmark = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.01,
-    ...         "yield_annual": 0.03,
-    ...         "modified_duration": 4.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> periods = json.dumps([{"portfolio": portfolio, "benchmark": benchmark}])
-    >>> result = campisi_carino_link_from_snapshots(periods, '{"period_years":0.25}')
-    >>> round(result.linked_selection, 4)
-    0.0065
-    """
-    ...
-
-def campisi_reconciliation_check(
-    result_json: FiAttributionResult | str | dict[str, Any] | list[Any] | pd.DataFrame, tolerance: float
-) -> FiReconciliationReport:
-    """
-    Reconcile the five Campisi effect totals against the active return.
-
-    Binds the Rust method
-    ``finstack_quant_portfolio::FiAttributionResult::reconciliation_check``
-    (a method in Rust, exposed here as a JSON function on the namespace).
-
-    The Campisi decomposition reconciles by construction because selection is
-    the residual, so this is a floating-point sanity gate rather than a model
-    check. Without it callers must re-sum ``total_allocation``,
-    ``total_active_carry``, ``total_active_treasury``, ``total_active_spread``
-    and ``total_selection`` by hand.
-
-    Parameters
-    ----------
-    result_json : FiAttributionResult | str | dict | list | pandas.DataFrame
-        Typed ``FiAttributionResult`` (as returned by
-        :func:`campisi_attribution`) or its JSON form, as returned by
-        :func:`campisi_attribution` (or
-        ``FiAttributionResult.to_json()``). Unknown fields are rejected.
-    tolerance : float
-        Absolute tolerance in return units; ``1e-10`` is appropriate for
-        return-space values.
-
-    Returns
-    -------
-    FiReconciliationReport
-        Typed report with ``total_residual`` (``active_return`` minus the
-        five totals), ``is_reconciled`` and the applied ``tolerance``; use
-        serialize with ``to_json()`` for the wire string.
-
-    Raises
-    ------
-    ValueError
-        If ``result_json`` is malformed or carries unknown fields.
-
-    Sources
-    -------
-    See ``docs/REFERENCES.md#campisi-2000``.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import campisi_attribution, campisi_reconciliation_check
-    >>> portfolio = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.02,
-    ...         "yield_annual": 0.04,
-    ...         "modified_duration": 5.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> benchmark = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.01,
-    ...         "yield_annual": 0.03,
-    ...         "modified_duration": 4.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> result = campisi_attribution(json.dumps(portfolio), json.dumps(benchmark), '{"period_years":0.25}').to_json()
-    >>> campisi_reconciliation_check(result, 1e-10).is_reconciled
-    True
     """
     ...
 

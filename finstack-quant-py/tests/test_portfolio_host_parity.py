@@ -36,8 +36,7 @@ from finstack_quant.portfolio import (
     allocate_weights,
     attribute_portfolio_pnl,
     build_credit_vol_report,
-    scenario_pnl_batch_json,
-    validate_allocation_json,
+    scenario_pnl_batch,
     value_portfolio,
 )
 
@@ -213,10 +212,10 @@ def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
     position_metrics = metrics.get_position_metrics("POS-1")
     return {
         "allocate_weights": json.loads(allocate_weights(allocation).to_json()),
-        "validate_allocation_json": json.loads(validate_allocation_json(allocation)),
-        "scenario_pnl_batch": json.loads(
-            scenario_pnl_batch_json(portfolio, json.dumps(inputs["scenarios"]), market_t0)
-        ),
+        "scenario_pnl_batch": [
+            json.loads(item.to_json())
+            for item in scenario_pnl_batch(portfolio, json.dumps(inputs["scenarios"]), market_t0)
+        ],
         "attribute_portfolio_pnl": json.loads(attribution.to_json()),
         "attribution_explain": attribution.explain(),
         "attribution_reconciliation_check": json.loads(

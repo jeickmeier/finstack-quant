@@ -1,7 +1,15 @@
-//! Strategy-level allocation JSON API tests.
+//! Strategy-level allocation API tests.
 
-use finstack_quant_portfolio::allocation::allocate_weights_json;
+use finstack_quant_portfolio::allocation::{allocate_weights, WeightAllocationSpec};
 use serde_json::{json, Value};
+
+/// Parse a JSON-literal spec, run the typed allocation, and return the result as JSON.
+fn allocate(spec: &Value) -> finstack_quant_portfolio::Result<Value> {
+    let spec: WeightAllocationSpec =
+        serde_json::from_value(spec.clone()).expect("spec matches WeightAllocationSpec");
+    let result = allocate_weights(&spec)?;
+    Ok(serde_json::to_value(result).expect("serializable allocation result"))
+}
 
 #[test]
 fn allocate_weights_supports_equal_fixed_and_inverse_volatility() {
@@ -11,8 +19,7 @@ fn allocate_weights_supports_equal_fixed_and_inverse_volatility() {
         "strategies": [{"id": "value:1"}, {"id": "carry:1"}],
         "money_decimal_places": 2
     });
-    let out = allocate_weights_json(&equal.to_string()).expect("equal allocation");
-    let result: Value = serde_json::from_str(&out).expect("equal JSON");
+    let result = allocate(&equal).expect("equal allocation");
     assert_eq!(result["scheme"], "equal");
     assert!((result["allocations"][0]["weight"].as_f64().expect("weight") - 0.5).abs() < 1e-12);
     assert_eq!(result["allocations"][0]["capital"], 500.0);
@@ -26,8 +33,7 @@ fn allocate_weights_supports_equal_fixed_and_inverse_volatility() {
         ],
         "money_decimal_places": 2
     });
-    let out = allocate_weights_json(&fixed.to_string()).expect("fixed allocation");
-    let result: Value = serde_json::from_str(&out).expect("fixed JSON");
+    let result = allocate(&fixed).expect("fixed allocation");
     assert!((result["allocations"][1]["weight"].as_f64().expect("weight") - 0.75).abs() < 1e-12);
 
     let inverse_vol = json!({
@@ -39,8 +45,7 @@ fn allocate_weights_supports_equal_fixed_and_inverse_volatility() {
         ],
         "money_decimal_places": 2
     });
-    let out = allocate_weights_json(&inverse_vol.to_string()).expect("inverse vol allocation");
-    let result: Value = serde_json::from_str(&out).expect("inverse vol JSON");
+    let result = allocate(&inverse_vol).expect("inverse vol allocation");
     let low_weight = result["allocations"][0]["weight"]
         .as_f64()
         .expect("low weight");
@@ -64,8 +69,7 @@ fn allocate_weights_solves_diagonal_risk_budget() {
         "money_decimal_places": 2
     });
 
-    let out = allocate_weights_json(&spec.to_string()).expect("risk budget allocation");
-    let result: Value = serde_json::from_str(&out).expect("risk budget JSON");
+    let result = allocate(&spec).expect("risk budget allocation");
     assert_eq!(result["scheme"], "risk_budget");
     let first = result["allocations"][0]["weight"]
         .as_f64()
@@ -92,9 +96,7 @@ fn allocate_weights_accepts_singular_psd_covariance() {
         "money_decimal_places": 2
     });
 
-    let out =
-        allocate_weights_json(&spec.to_string()).expect("rank-one PSD covariance should be valid");
-    let result: Value = serde_json::from_str(&out).expect("risk budget JSON");
+    let result = allocate(&spec).expect("rank-one PSD covariance should be valid");
     assert!(
         (result["allocations"][0]["weight"]
             .as_f64()
@@ -124,7 +126,7 @@ fn allocate_weights_rejects_invalid_fixed_weights() {
         ]
     });
 
-    let err = allocate_weights_json(&spec.to_string()).expect_err("fixed weights must sum to one");
+    let err = allocate(&spec).expect_err("fixed weights must sum to one");
     assert!(err.to_string().contains("sum"));
 }
 
@@ -137,8 +139,7 @@ fn single_strategy_inverse_volatility_does_not_require_returns() {
         "money_decimal_places": 2
     });
 
-    let out = allocate_weights_json(&spec.to_string()).expect("single strategy inverse-vol");
-    let result: Value = serde_json::from_str(&out).expect("allocation JSON");
+    let result = allocate(&spec).expect("single strategy inverse-vol");
     assert_eq!(result["allocations"][0]["weight"], 1.0);
     assert!(result["allocations"][0].get("volatility").is_none());
 }
@@ -151,7 +152,7 @@ fn single_strategy_risk_budget_still_validates_budget() {
         "strategies": [{"id": "only"}],
         "covariance": [[0.04]]
     });
-    let err = allocate_weights_json(&missing.to_string()).expect_err("missing risk budget");
+    let err = allocate(&missing).expect_err("missing risk budget");
     assert!(err.to_string().contains("risk_budget"));
 
     let wrong_sum = json!({
@@ -160,8 +161,7 @@ fn single_strategy_risk_budget_still_validates_budget() {
         "strategies": [{"id": "only", "risk_budget": 0.5}],
         "covariance": [[0.04]]
     });
-    let err =
-        allocate_weights_json(&wrong_sum.to_string()).expect_err("risk budget must sum to one");
+    let err = allocate(&wrong_sum).expect_err("risk budget must sum to one");
     assert!(err.to_string().contains("sum"));
 }
 
@@ -174,10 +174,7 @@ fn capital_rounding_preserves_sign_and_budget_with_deterministic_ties() {
             "strategies": [{"id": "a"}, {"id": "b"}, {"id": "c"}, {"id": "d"}],
             "money_decimal_places": 2
         });
-        let result: Value = serde_json::from_str(
-            &allocate_weights_json(&spec.to_string()).expect("signed minor-unit allocation"),
-        )
-        .unwrap();
+        let result: Value = allocate(&spec).expect("signed minor-unit allocation");
         let capitals: Vec<f64> = result["allocations"]
             .as_array()
             .unwrap()
@@ -209,10 +206,7 @@ fn capital_rounding_assigns_largest_remainders_and_keeps_zero_weights_zero() {
         ],
         "money_decimal_places": 2
     });
-    let result: Value = serde_json::from_str(
-        &allocate_weights_json(&spec.to_string()).expect("largest remainder allocation"),
-    )
-    .unwrap();
+    let result: Value = allocate(&spec).expect("largest remainder allocation");
     let capitals: Vec<f64> = result["allocations"]
         .as_array()
         .unwrap()
@@ -228,7 +222,7 @@ fn allocation_rejects_minor_unit_overflow_instead_of_serializing_null_capital() 
         "scheme": "equal", "total_capital": 1e308,
         "strategies": [{"id": "only"}], "money_decimal_places": 2
     });
-    let error = allocate_weights_json(&spec.to_string())
-        .expect_err("finite capital with overflowing rounded minor units must fail");
+    let error =
+        allocate(&spec).expect_err("finite capital with overflowing rounded minor units must fail");
     assert!(error.to_string().contains("finite minor units"));
 }

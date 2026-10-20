@@ -365,21 +365,22 @@ class TestResultAccessors:
 
     def test_total_value_property(self) -> None:
         result = PortfolioResult.from_json(_result_json())
-        assert result.total_value == pytest.approx(TOTAL_BASE_AMOUNT)
+        assert result.valuation.total_value == pytest.approx(TOTAL_BASE_AMOUNT)
 
-    def test_get_metric_method(self) -> None:
+    def test_metric_totals_through_metrics(self) -> None:
         metrics = {"dv01": {"metric_id": "dv01", "total": 12.5, "by_entity": {}}}
         result = PortfolioResult.from_json(_result_json(metrics))
-        assert result.get_metric("dv01") == pytest.approx(12.5)
-        assert result.get_metric("absent") is None
+        assert result.metrics.get_total("dv01") == pytest.approx(12.5)
+        assert result.metrics.require_total("dv01") == pytest.approx(12.5)
+        assert result.metrics.get_total("absent") is None
 
-    def test_require_metric_raises_key_error(self) -> None:
+    def test_require_total_raises_key_error(self) -> None:
         result = PortfolioResult.from_json(_result_json())
         with pytest.raises(KeyError):
-            result.require_metric("absent")
+            result.metrics.require_total("absent")
 
     def test_typed_components_round_trip(self) -> None:
         result = PortfolioResult.from_json(_result_json())
         rebuilt = PortfolioResult(result.valuation, result.metrics)
-        assert rebuilt.total_value == pytest.approx(result.total_value)
+        assert rebuilt.valuation.total_value == pytest.approx(result.valuation.total_value)
         assert "rounding" in rebuilt.meta

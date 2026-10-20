@@ -376,36 +376,6 @@
         "leverage": 0.9999999999999999
       }
     },
-    "validate_allocation_json": {
-      "scheme": "inverse_volatility",
-      "total_capital": 1000000.0,
-      "strategies": [
-        {
-          "id": "S1",
-          "fixed_weight": null,
-          "returns": [
-            0.01,
-            -0.02,
-            0.015,
-            0.005
-          ],
-          "risk_budget": null
-        },
-        {
-          "id": "S2",
-          "fixed_weight": null,
-          "returns": [
-            0.002,
-            -0.001,
-            0.003,
-            0.001
-          ],
-          "risk_budget": null
-        }
-      ],
-      "covariance": null,
-      "money_decimal_places": 10
-    },
     "scenario_pnl_batch": [
       {
         "scenario_id": "up_10bp",

@@ -4,16 +4,12 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::portfolio::metrics::PyPortfolioMetrics;
 use crate::bindings::portfolio::valuation::PyPortfolioValuation;
 use crate::errors::display_to_py;
-use crate::errors::portfolio_to_py;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use pyo3::types::PyModule;
 
 /// Combined portfolio result envelope: a ``PortfolioValuation``, the
 /// aggregated ``PortfolioMetrics`` and the calculation metadata stamp.
-///
-/// Exposes cheap scalar accessors (``total_value``, ``get_metric``) that
-/// avoid the full JSON re-parse previously required by the JSON-only API.
 #[pyclass(
     name = "PortfolioResult",
     module = "finstack_quant.portfolio",
@@ -130,28 +126,8 @@ impl PyPortfolioResult {
         serde_to_py(py, &self.inner.meta)
     }
 
-    /// Total portfolio value in base currency.
-    #[getter]
-    fn total_value(&self) -> f64 {
-        self.inner.total_value().amount()
-    }
-
-    /// Retrieve an aggregated metric by id. Returns ``None`` if absent.
-    #[pyo3(text_signature = "(self, metric_id)")]
-    fn get_metric(&self, metric_id: &str) -> Option<f64> {
-        self.inner.get_metric(metric_id)
-    }
-
-    /// Retrieve a metric and raise ``KeyError`` if it is missing.
-    #[pyo3(text_signature = "(self, metric_id)")]
-    fn require_metric(&self, metric_id: &str) -> PyResult<f64> {
-        self.inner
-            .require_metric(metric_id)
-            .map_err(portfolio_to_py)
-    }
-
     fn __repr__(&self) -> String {
-        let total = self.inner.total_value();
+        let total = &self.inner.valuation.total_base_currency;
         format!(
             "PortfolioResult(total={} {})",
             total.amount(),

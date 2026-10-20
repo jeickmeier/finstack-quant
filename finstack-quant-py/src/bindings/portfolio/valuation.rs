@@ -259,12 +259,6 @@ impl PyPortfolioValuation {
         finstack_quant_core::wire::serde_label(&self.inner.fx_collapse_policy).map_err(core_to_py)
     }
 
-    /// Whether any position carries incomplete risk metrics.
-    #[getter]
-    fn has_degraded_risk(&self) -> bool {
-        self.inner.has_degraded_risk()
-    }
-
     /// Look up one position's valuation.
     ///
     /// Raises ``KeyError`` when ``position_id`` is not in the valuation.

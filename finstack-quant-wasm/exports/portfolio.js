@@ -38,15 +38,9 @@ export const portfolio = {
   parsePortfolioSpecJson: wasm.parsePortfolioSpecJson,
   brinsonFachler: wasm.brinsonFachler,
   carinoLink: wasm.carinoLink,
-  carinoLinkFromSectorPeriods: wasm.carinoLinkFromSectorPeriods,
   campisiAttribution: wasm.campisiAttribution,
-  // ⚠️ campisiCarinoLink links precomputed results and carries no shared
-  // period_years, so it is the correct entry point for unequal-length
-  // periods (e.g. act/365 months). campisiCarinoLinkFromSnapshots applies one
-  // config to every period and is only correct for equal-length periods.
   campisiCarinoLink: wasm.campisiCarinoLink,
-  campisiCarinoLinkFromSnapshots: wasm.campisiCarinoLinkFromSnapshots,
-  campisiReconciliationCheck: wasm.campisiReconciliationCheck,
+  fiAttributionResultReconciliationCheck: wasm.fiAttributionResultReconciliationCheck,
   cellReturnsFromReference: wasm.cellReturnsFromReference,
   cellReturnsFromCurves: wasm.cellReturnsFromCurves,
   excessReturns: wasm.excessReturns,
@@ -74,8 +68,6 @@ export const portfolio = {
   decomposeFactorRisk: wasm.decomposeFactorRisk,
   PortfolioBuilder: wasm.PortfolioBuilder,
   allocateWeights: wasm.allocateWeights,
-  allocateWeightsJson: wasm.allocateWeightsJson,
-  validateAllocationJson: wasm.validateAllocationJson,
   buildCreditVolReport: wasm.buildCreditVolReport,
   // Raw export is prefixed: `primitiveExposures` is also the composite
   // namespace name (valuations.composite), so the raw names must differ.

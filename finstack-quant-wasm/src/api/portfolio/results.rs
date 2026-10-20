@@ -237,9 +237,9 @@ pub fn portfolio_optimization_result_binding_constraints(
 
 /// Look up one metric's portfolio-wide total, failing when it was not aggregated.
 ///
-/// Twin of Python `PortfolioResult.require_metric` (Rust
-/// `PortfolioMetrics::require_total`, which `PortfolioResult::require_metric`
-/// calls on its metrics).
+/// Twin of Python `PortfolioMetrics.require_total` (Rust
+/// `PortfolioMetrics::require_total`); WASM results are plain objects, so the
+/// method is a free function taking the object.
 /// @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
 /// @param metric_id - Fully qualified metric key (for example `dv01` or `bucketed_dv01::USD-OIS::10y`).
 /// @returns The aggregated total in base-currency metric units.

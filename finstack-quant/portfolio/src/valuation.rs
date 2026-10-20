@@ -178,16 +178,6 @@ impl PortfolioValuation {
     pub fn get_entity_value(&self, entity_id: &str) -> Option<&Money> {
         self.by_entity.get(entity_id)
     }
-
-    /// Whether any position fell back to PV-only because its risk metrics
-    /// failed.
-    ///
-    /// Equivalent to `!self.degraded_positions.is_empty()`. Provided as a
-    /// named predicate so risk-report dashboards can read intent off the
-    /// call site instead of reasoning about empty-vector semantics.
-    pub fn has_degraded_risk(&self) -> bool {
-        !self.degraded_positions.is_empty()
-    }
 }
 
 /// Which metric set to offer every position in the portfolio.

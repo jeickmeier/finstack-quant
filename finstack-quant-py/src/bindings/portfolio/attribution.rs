@@ -11,12 +11,14 @@ use crate::errors::{display_to_py, portfolio_to_py, serde_json_to_py};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Reconciliation of the portfolio factor buckets against ``total_pnl``.
+/// Reconciliation of an attribution's effect buckets against its total.
 ///
-/// Returned by :meth:`PortfolioAttribution.reconciliation_check`. The residual
-/// is ``total_pnl - (sum of factor buckets + fx_translation_pnl)`` in the
-/// portfolio base currency; ``is_reconciled`` is forced ``False`` when the
-/// attribution was flagged invalid, whatever the numeric residual.
+/// Returned by :meth:`PortfolioAttribution.reconciliation_check`, where the
+/// residual is ``total_pnl - (sum of factor buckets + fx_translation_pnl)`` in
+/// the portfolio base currency and ``is_reconciled`` is forced ``False`` when
+/// the attribution was flagged invalid, and by
+/// :meth:`FiAttributionResult.reconciliation_check`, where it is
+/// ``active_return`` minus the five Campisi effect totals in return units.
 #[pyclass(
     name = "ReconciliationReport",
     module = "finstack_quant.portfolio",
@@ -36,19 +38,21 @@ crate::bindings::macros::wire_methods!(
 
 #[pymethods]
 impl PyReconciliationReport {
-    /// Unexplained base-currency amount after all buckets are summed.
+    /// Unexplained amount after all buckets are summed (base currency for P&L
+    /// attribution, return units for Campisi attribution).
     #[getter]
     fn total_residual(&self) -> f64 {
         self.inner.total_residual
     }
 
-    /// Whether ``abs(total_residual) <= tolerance`` and the attribution is valid.
+    /// Whether ``abs(total_residual) <= tolerance`` (and, for P&L attribution,
+    /// the attribution is valid).
     #[getter]
     fn is_reconciled(&self) -> bool {
         self.inner.is_reconciled
     }
 
-    /// Absolute base-currency tolerance used for the check.
+    /// Absolute tolerance used for the check, in the units of ``total_residual``.
     #[getter]
     fn tolerance(&self) -> f64 {
         self.inner.tolerance

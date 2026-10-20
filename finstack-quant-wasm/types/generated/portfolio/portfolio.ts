@@ -3372,96 +3372,6 @@ export interface FiLinkedSectorEffect {
   [k: string]: unknown;
 }
 /**
- * One attribution period's raw inputs for multi-period linking.
- */
-export interface FiPeriodInput {
-  /**
-   * Benchmark snapshots for the period.
-   */
-  benchmark: FiPositionSnapshot[];
-  /**
-   * Portfolio snapshots for the period.
-   */
-  portfolio: FiPositionSnapshot[];
-}
-/**
- * Plain-data snapshot of one position (or pre-aggregated bucket) for one
- * attribution period.
- *
- * Weights are fractions of the whole portfolio (or benchmark) and must sum
- * to 1.0 within each side. Returns, yields and spreads are decimals
- * (`0.02` = 2 %); durations are in years.
- */
-export interface FiPositionSnapshot {
-  /**
-   * Absolute change in the quote-reproducing Z-spread over the period
-   * (decimal).
-   *
-   * Must use the same Z-spread basis as [`Self::spread_duration`] and
-   * [`Self::spread`].
-   */
-  delta_spread: number;
-  /**
-   * Change in the treasury/benchmark yield relevant to this position's
-   * duration bucket over the period (decimal).
-   */
-  delta_treasury_yield: number;
-  /**
-   * Modified duration in years at period start.
-   */
-  modified_duration: number;
-  /**
-   * Sector bucket label (industry / quality / any grouping).
-   */
-  sector: string;
-  /**
-   * Quote-reproducing Z-spread at period start (decimal).
-   *
-   * Carried for provenance and downstream reporting only — the
-   * decomposition never divides by it, so any finite value (including zero
-   * and negative levels) is accepted. See "Why there is no DTS spread mode"
-   * in the module docs.
-   */
-  spread: number;
-  /**
-   * Quote-reproducing Z-spread duration in years at period start.
-   *
-   * Must use the same Z-spread basis as [`Self::spread`] and
-   * [`Self::delta_spread`]; OAS, G-spread, and discount-margin durations
-   * are not compatible inputs.
-   */
-  spread_duration: number;
-  /**
-   * Realized total return for the period (decimal).
-   */
-  total_return: number;
-  /**
-   * Weight as a fraction of the whole side at period start.
-   */
-  weight: number;
-  /**
-   * Annualized yield at period start (decimal; e.g. YTM).
-   */
-  yield_annual: number;
-}
-/**
- * Report from reconciling the five effect totals against the active return, mirroring `crate::attribution` reconciliation conventions.
- */
-export interface FiReconciliationReport {
-  /**
-   * Whether the residual is within tolerance.
-   */
-  is_reconciled: boolean;
-  /**
-   * Tolerance used for the check.
-   */
-  tolerance: number;
-  /**
-   * `active_return − (allocation + carry + treasury + spread + selection)`.
-   */
-  total_residual: number;
-}
-/**
  * Detailed attribution for FX rate changes.
  *
  * Provides per-currency-pair breakdown.
@@ -5692,7 +5602,7 @@ export interface PositionResidualContribution {
   [k: string]: unknown;
 }
 /**
- * Report from reconciling position-level P&L attribution against portfolio totals.
+ * Report from reconciling an attribution's effect buckets against its total.
  */
 export interface ReconciliationReport {
   /**
@@ -5704,7 +5614,9 @@ export interface ReconciliationReport {
    */
   tolerance: number;
   /**
-   * Total residual: `total_pnl - (sum of factor buckets + fx_translation_pnl)`.
+   * Total minus the sum of its effect buckets: `total_pnl - (factor buckets
+   * + fx_translation_pnl)` for P&L attribution, `active_return - (allocation
+   * + carry + treasury + spread + selection)` for Campisi attribution.
    */
   total_residual: number;
   [k: string]: unknown;

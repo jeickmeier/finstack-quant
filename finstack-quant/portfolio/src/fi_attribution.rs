@@ -131,6 +131,7 @@
 //!   Performance Measurement*, 3(4), 5–14 — multi-period smoothing applied by
 //!   [`campisi_carino_link`]. `docs/REFERENCES.md#carino-1999`
 
+use crate::attribution::ReconciliationReport;
 use crate::brinson::{
     carino_link_effects, check_identical_rows, check_net_weight, check_weights_sum,
     validate_link_period, CarinoPeriod, LinkPeriod,
@@ -291,20 +292,6 @@ pub struct FiAttributionResult {
     pub total_selection: f64,
 }
 
-/// Report from reconciling the five effect totals against the active return,
-/// mirroring [`crate::attribution`] reconciliation conventions.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct FiReconciliationReport {
-    /// `active_return − (allocation + carry + treasury + spread + selection)`.
-    pub total_residual: f64,
-    /// Whether the residual is within tolerance.
-    pub is_reconciled: bool,
-    /// Tolerance used for the check.
-    pub tolerance: f64,
-}
-
 impl FiAttributionResult {
     /// Check that the five effect totals reconstruct the active return.
     ///
@@ -347,7 +334,7 @@ impl FiAttributionResult {
     /// assert!(report.is_reconciled);
     /// # Ok::<(), finstack_quant_portfolio::Error>(())
     /// ```
-    pub fn reconciliation_check(&self, tolerance: f64) -> FiReconciliationReport {
+    pub fn reconciliation_check(&self, tolerance: f64) -> ReconciliationReport {
         let mut acc = NeumaierAccumulator::new();
         acc.add(self.total_allocation);
         acc.add(self.total_active_carry);
@@ -355,7 +342,7 @@ impl FiAttributionResult {
         acc.add(self.total_active_spread);
         acc.add(self.total_selection);
         let total_residual = self.active_return - acc.total();
-        FiReconciliationReport {
+        ReconciliationReport {
             total_residual,
             is_reconciled: total_residual.abs() <= tolerance,
             tolerance,
@@ -695,17 +682,6 @@ pub fn campisi_attribution(
     })
 }
 
-/// One attribution period's raw inputs for multi-period linking.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct FiPeriodInput {
-    /// Portfolio snapshots for the period.
-    pub portfolio: Vec<FiPositionSnapshot>,
-    /// Benchmark snapshots for the period.
-    pub benchmark: Vec<FiPositionSnapshot>,
-}
-
 /// Carino-linked per-sector FI effects summed across periods.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -895,30 +871,6 @@ pub fn campisi_carino_link(periods: &[FiAttributionResult]) -> Result<FiCarinoLi
         linked_active_spread,
         linked_selection,
     })
-}
-
-/// Compute per-period Campisi attributions and Carino-link them.
-///
-/// Canonical entry point for bindings that receive raw period snapshots.
-///
-/// # Arguments
-///
-/// * `periods` - Chronologically ordered period inputs. Every period must
-///   produce the same sector set in the same first-seen order.
-/// * `config` - Shared period length.
-///
-/// # Errors
-///
-/// Propagates any [`campisi_attribution`] or [`campisi_carino_link`] error.
-pub fn campisi_carino_link_from_snapshots(
-    periods: &[FiPeriodInput],
-    config: &FiAttributionConfig,
-) -> Result<FiCarinoLinkedResult> {
-    let results = periods
-        .iter()
-        .map(|p| campisi_attribution(&p.portfolio, &p.benchmark, config))
-        .collect::<Result<Vec<_>>>()?;
-    campisi_carino_link(&results)
 }
 
 #[cfg(test)]
@@ -1514,12 +1466,9 @@ mod tests {
     #[test]
     fn campisi_carino_link_matches_compounded_active_return() {
         let config = FiAttributionConfig { period_years: 0.25 };
-        let period = FiPeriodInput {
-            portfolio: golden_portfolio(),
-            benchmark: golden_benchmark(),
-        };
-        let linked = campisi_carino_link_from_snapshots(&[period.clone(), period], &config)
-            .expect("carino link");
+        let period = campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config)
+            .expect("campisi attribution");
+        let linked = campisi_carino_link(&[period.clone(), period]).expect("carino link");
 
         // Compounded returns (hand-worked): 1.01441^2 − 1, 1.01365^2 − 1.
         let rp = 1.01441_f64.powi(2) - 1.0;

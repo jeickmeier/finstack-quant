@@ -1743,20 +1743,6 @@
             "bytes": 15100
           },
           {
-            "path": "schemas/portfolio/1/fi_period_input.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_period_input.schema.json",
-            "type_name": "FiPeriodInput",
-            "kind": "input",
-            "bytes": 4924
-          },
-          {
-            "path": "schemas/portfolio/1/fi_reconciliation_report.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_reconciliation_report.schema.json",
-            "type_name": "FiReconciliationReport",
-            "kind": "output",
-            "bytes": 1061
-          },
-          {
             "path": "schemas/portfolio/1/grid_carino_linked_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_carino_linked_result.schema.json",
             "type_name": "GridCarinoLinkedResult",
@@ -1852,7 +1838,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/reconciliation_report.schema.json",
             "type_name": "ReconciliationReport",
             "kind": "output",
-            "bytes": 969
+            "bytes": 1101
           },
           {
             "path": "schemas/portfolio/1/reference_return.schema.json",
@@ -4246,22 +4232,6 @@
           },
           {
             "domain": "portfolio",
-            "path": "schemas/portfolio/1/fi_period_input.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_period_input.schema.json",
-            "type_name": "FiPeriodInput",
-            "kind": "input",
-            "bytes": 4924
-          },
-          {
-            "domain": "portfolio",
-            "path": "schemas/portfolio/1/fi_reconciliation_report.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_reconciliation_report.schema.json",
-            "type_name": "FiReconciliationReport",
-            "kind": "output",
-            "bytes": 1061
-          },
-          {
-            "domain": "portfolio",
             "path": "schemas/portfolio/1/grid_carino_linked_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_carino_linked_result.schema.json",
             "type_name": "GridCarinoLinkedResult",
@@ -4370,7 +4340,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/reconciliation_report.schema.json",
             "type_name": "ReconciliationReport",
             "kind": "output",
-            "bytes": 969
+            "bytes": 1101
           },
           {
             "domain": "portfolio",

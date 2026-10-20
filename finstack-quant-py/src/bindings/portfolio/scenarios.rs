@@ -9,7 +9,6 @@ use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::bindings::pandas_utils::ColumnSchema;
 use crate::bindings::portfolio::valuation::PyPortfolioValuation;
 use crate::bindings::scenarios::engine::PyApplicationReport;
-use crate::errors::display_to_py;
 use crate::errors::portfolio_to_py;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
@@ -113,35 +112,6 @@ fn scenario_pnl(
     ))
 }
 
-/// Run the canonical Rust batch engine for both batch entry points.
-fn run_scenario_pnl_batch(
-    py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
-    scenarios: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
-) -> PyResult<Vec<finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem>> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let scenarios = extract_scenario_specs(py, scenarios)?;
-    let market = extract_market_ref(py, market)?;
-    let config = finstack_quant_core::config::FinstackConfig::default();
-
-    // Extract plain Rust references before detaching: the typed access
-    // wrappers own PyRefs and are not Ungil, while their Rust inners are
-    // Send + Sync. Parsing happens above, so the complete batch evaluation
-    // releases the GIL without touching Python state.
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
-    py.detach(|| {
-        finstack_quant_portfolio::scenarios::scenario_pnl_batch(
-            portfolio_ref,
-            &scenarios,
-            market_ref,
-            &config,
-        )
-    })
-    .map_err(portfolio_to_py)
-}
-
 /// Compute ordered portfolio P&L for a batch of scenarios.
 ///
 /// Parameters
@@ -164,8 +134,8 @@ fn run_scenario_pnl_batch(
 /// list[ScenarioPnlBatchItem]
 ///     One ordered item per input scenario, each carrying ``scenario_id``,
 ///     a typed ``pnl`` (:class:`ScenarioPnl`) and ``report``
-///     (:class:`~finstack_quant.scenarios.ApplicationReport`). Use
-///     :func:`scenario_pnl_batch_json` for the raw wire string.
+///     (:class:`~finstack_quant.scenarios.ApplicationReport`); each item's
+///     ``to_json()`` gives its wire form.
 ///
 /// Raises
 /// ------
@@ -182,35 +152,31 @@ fn scenario_pnl_batch(
     scenarios: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<crate::bindings::portfolio::scenarios::PyScenarioPnlBatchItem>> {
-    let results = run_scenario_pnl_batch(py, portfolio, scenarios, market)?;
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let scenarios = extract_scenario_specs(py, scenarios)?;
+    let market = extract_market_ref(py, market)?;
+    let config = finstack_quant_core::config::FinstackConfig::default();
+
+    // Extract plain Rust references before detaching: the typed access
+    // wrappers own PyRefs and are not Ungil, while their Rust inners are
+    // Send + Sync. Parsing happens above, so the complete batch evaluation
+    // releases the GIL without touching Python state.
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let results = py
+        .detach(|| {
+            finstack_quant_portfolio::scenarios::scenario_pnl_batch(
+                portfolio_ref,
+                &scenarios,
+                market_ref,
+                &config,
+            )
+        })
+        .map_err(portfolio_to_py)?;
     Ok(results
         .into_iter()
         .map(|inner| crate::bindings::portfolio::scenarios::PyScenarioPnlBatchItem { inner })
         .collect())
-}
-
-/// Compute ordered batch scenario P&L and return wire JSON.
-///
-/// Wire twin of :func:`scenario_pnl_batch`; same inputs, JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     A canonical JSON array with one ordered object per input scenario:
-///     ``{"scenario_id": ..., "pnl": ..., "report": ...}``. ``pnl`` and
-///     ``report`` use the same stable JSON shapes returned separately by
-///     :func:`scenario_pnl`. An empty scenario array returns ``"[]"``.
-#[pyfunction]
-#[pyo3(text_signature = "(portfolio, scenarios, market)")]
-fn scenario_pnl_batch_json(
-    py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
-    scenarios: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
-) -> PyResult<String> {
-    let results = run_scenario_pnl_batch(py, portfolio, scenarios, market)?;
-    py.detach(move || serde_json::to_string(&results))
-        .map_err(display_to_py)
 }
 
 /// Column schema for [`PyScenarioPnl::to_dataframe`].
@@ -420,6 +386,5 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(apply_scenario_and_revalue, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(scenario_pnl, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(scenario_pnl_batch, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(scenario_pnl_batch_json, m)?)?;
     Ok(())
 }

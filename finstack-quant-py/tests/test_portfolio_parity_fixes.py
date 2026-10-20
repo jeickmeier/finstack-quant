@@ -136,7 +136,7 @@ class TestValuationAndResult:
         valuation = value_portfolio(_portfolio(), _market())
         assert isinstance(valuation, PortfolioValuation)
         assert valuation.as_of == AS_OF
-        assert not valuation.has_degraded_risk
+        assert valuation.degraded_positions == []
         metrics = aggregate_metrics(valuation, "USD", _market(), AS_OF)
         assert metrics.get_total("dv01") is not None
         assert metrics.get_total("theta") is None
@@ -161,11 +161,11 @@ class TestValuationAndResult:
         valuation = value_portfolio(_portfolio(), _market())
         metrics = aggregate_metrics(valuation, "USD", _market(), AS_OF)
         result = PortfolioResult(valuation, metrics)
-        assert result.total_value == pytest.approx(valuation.total_value)
+        assert result.valuation.total_value == pytest.approx(valuation.total_value)
         assert isinstance(result.valuation, PortfolioValuation)
         assert isinstance(result.metrics, PortfolioMetrics)
         assert "rounding" in result.meta
-        assert result.get_metric("dv01") == pytest.approx(metrics.get_total("dv01"))
+        assert result.metrics.require_total("dv01") == pytest.approx(metrics.get_total("dv01"))
 
 
 class TestScenarioInputs:
@@ -189,8 +189,7 @@ class TestCashflows:
     def test_typed_accessors_and_collapse_frame(self) -> None:
         cfs = aggregate_full_cashflows(_portfolio(), _market())
         assert isinstance(cfs, PortfolioCashflows)
-        assert cfs.num_positions == 1
-        assert cfs.num_issues == 0
+        assert len(cfs.by_position) == 1
         assert cfs.events
         assert cfs.by_position["P1"]
         assert cfs.issues == []
@@ -450,8 +449,9 @@ class TestOptimizationAndResultsAudit:
         )
         report = fi.reconciliation_check(1e-9)
         assert report.is_reconciled
-        assert report.to_json() == pf.campisi_reconciliation_check(fi, 1e-9).to_json()
-        assert report.to_json() == pf.campisi_reconciliation_check(fi.to_json(), 1e-9).to_json()
+        assert isinstance(report, pf.ReconciliationReport)
+        rebuilt = pf.FiAttributionResult.from_json(fi.to_json())
+        assert report.to_json() == rebuilt.reconciliation_check(1e-9).to_json()
         linked = pf.campisi_carino_link([fi, fi])
         assert linked.to_json() == pf.campisi_carino_link([json.loads(fi.to_json())] * 2).to_json()
 

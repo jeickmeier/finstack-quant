@@ -120,6 +120,30 @@ impl PyPortfolioMetrics {
         self.inner.get_total(metric_id)
     }
 
+    /// Portfolio total of one aggregated metric, raising when it is absent.
+    ///
+    /// Binds the Rust method ``PortfolioMetrics::require_total``.
+    ///
+    /// Parameters
+    /// ----------
+    /// metric_id : str
+    ///     Fully qualified metric identifier (for example ``"dv01"`` or
+    ///     ``"bucketed_dv01::USD-OIS::10y"``).
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     The aggregated portfolio total in the portfolio base currency.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If no aggregate was produced for ``metric_id``.
+    #[pyo3(text_signature = "(self, metric_id)")]
+    fn require_total(&self, metric_id: &str) -> PyResult<f64> {
+        self.inner.require_total(metric_id).map_err(portfolio_to_py)
+    }
+
     /// Metric values excluded from aggregation because they were non-finite.
     ///
     /// A non-empty list means aggregation is incomplete; each entry records the

@@ -15,8 +15,7 @@ use crate::{
     factor_brinson::FactorBrinsonResult, factor_model::CreditVolReport,
     factor_model::FactorAssignmentReport, factor_model::PositionChange, factor_model::StressPnl,
     factor_model::StressResult, factor_model::WhatIfResult, fi_attribution::FiAttributionConfig,
-    fi_attribution::FiCarinoLinkedResult, fi_attribution::FiPeriodInput,
-    fi_attribution::FiReconciliationReport, grid_attribution::GridCarinoLinkedResult,
+    fi_attribution::FiCarinoLinkedResult, grid_attribution::GridCarinoLinkedResult,
     grid_attribution::GridPosition, margin::PortfolioMarginResult,
     optimization::PortfolioOptimizationSpec, performance::DatedCashflow, performance::LinkedReturn,
     performance::TwrrPeriod, primitive::PortfolioPrimitiveExposureReport, replay::ReplayConfig,
@@ -352,24 +351,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     .with_packager(package_materialization_schema)
     .with_examples(examples::fi_carino_linked_result),
     finstack_quant_core::schema_artifact!(
-        FiPeriodInput,
-        "portfolio",
-        "fi_period_input",
-        Input,
-        "One attribution period's raw inputs for multi-period linking."
-    )
-    .with_packager(package_materialization_schema)
-    .with_examples(examples::fi_period_input),
-    finstack_quant_core::schema_artifact!(
-        FiReconciliationReport,
-        "portfolio",
-        "fi_reconciliation_report",
-        Output,
-        "Report from reconciling the five effect totals against the active return, mirroring `crate::attribution` reconciliation conventions."
-    )
-    .with_packager(package_materialization_schema)
-    .with_examples(examples::fi_reconciliation_report),
-    finstack_quant_core::schema_artifact!(
         GridCarinoLinkedResult,
         "portfolio",
         "grid_carino_linked_result",
@@ -464,7 +445,7 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "portfolio",
         "reconciliation_report",
         Output,
-        "Report from reconciling position-level P&L attribution against portfolio totals."
+        "Report from reconciling an attribution's effect buckets against its total."
     )
     .with_packager(package_materialization_schema)
     .with_examples(examples::reconciliation_report),

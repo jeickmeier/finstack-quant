@@ -53,15 +53,11 @@ const book = portfolio.Portfolio.fromSpec(inputs.portfolio_spec);
 const marketT0 = core.MarketContext.fromJson(inputs.market_t0);
 const marketT1 = core.MarketContext.fromJson(inputs.market_t1);
 
-test('allocateWeights and its JSON twins match Python', () => {
+test('allocateWeights matches Python', () => {
   assertClose(wire(portfolio.allocateWeights(inputs.allocation_spec)), expected.allocate_weights);
   assertClose(
-    JSON.parse(portfolio.allocateWeightsJson(JSON.stringify(inputs.allocation_spec))),
+    wire(portfolio.allocateWeights(JSON.stringify(inputs.allocation_spec))),
     expected.allocate_weights
-  );
-  assertClose(
-    JSON.parse(portfolio.validateAllocationJson(inputs.allocation_spec)),
-    expected.validate_allocation_json
   );
   assert.throws(
     () => portfolio.allocateWeights({ ...inputs.allocation_spec, scheme: 'nope' }),

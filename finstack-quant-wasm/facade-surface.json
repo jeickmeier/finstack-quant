@@ -3488,17 +3488,13 @@
       "aggregateFullCashflows",
       "aggregateMetrics",
       "allocateWeights",
-      "allocateWeightsJson",
       "applyScenarioAndRevalue",
       "attributePortfolioPnl",
       "brinsonFachler",
       "buildCreditVolReport",
       "campisiAttribution",
       "campisiCarinoLink",
-      "campisiCarinoLinkFromSnapshots",
-      "campisiReconciliationCheck",
       "carinoLink",
-      "carinoLinkFromSectorPeriods",
       "cellReturnsFromCurves",
       "cellReturnsFromReference",
       "collapseToBaseByDateKind",
@@ -3512,6 +3508,7 @@
       "decomposeFactorRisk",
       "excessReturns",
       "factorBrinsonAttribution",
+      "fiAttributionResultReconciliationCheck",
       "gridAttribution",
       "gridCarinoLink",
       "mwrXirr",
@@ -3541,7 +3538,6 @@
       "sensitivityMatrixPositionDeltas",
       "twrrLinked",
       "twrrModifiedDietz",
-      "validateAllocationJson",
       "valuePortfolio"
     ]
   },
@@ -3586,19 +3582,13 @@
   "portfolio.carinoLink": {
     "kind": "function"
   },
-  "portfolio.carinoLinkFromSectorPeriods": {
-    "kind": "function"
-  },
   "portfolio.campisiAttribution": {
     "kind": "function"
   },
   "portfolio.campisiCarinoLink": {
     "kind": "function"
   },
-  "portfolio.campisiCarinoLinkFromSnapshots": {
-    "kind": "function"
-  },
-  "portfolio.campisiReconciliationCheck": {
+  "portfolio.fiAttributionResultReconciliationCheck": {
     "kind": "function"
   },
   "portfolio.cellReturnsFromReference": {
@@ -3677,12 +3667,6 @@
     "getters": []
   },
   "portfolio.allocateWeights": {
-    "kind": "function"
-  },
-  "portfolio.allocateWeightsJson": {
-    "kind": "function"
-  },
-  "portfolio.validateAllocationJson": {
     "kind": "function"
   },
   "portfolio.buildCreditVolReport": {

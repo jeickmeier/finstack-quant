@@ -386,30 +386,6 @@ pub fn carino_link(periods: &[BrinsonPeriodResult]) -> Result<CarinoLinkedAttrib
     })
 }
 
-/// Compute Brinson-Fachler attribution for each period and Carino-link the
-/// resulting effects across the full horizon.
-///
-/// This is the canonical entry point for bindings that receive raw sector
-/// period inputs rather than precomputed [`BrinsonPeriodResult`] values.
-///
-/// # Arguments
-///
-/// * `periods` - Chronologically ordered period slices of raw sector inputs;
-///   each slice must satisfy [`brinson_fachler`] weight and finiteness rules.
-///
-/// # Errors
-///
-/// Returns any validation error from [`brinson_fachler`] or [`carino_link`].
-pub fn carino_link_from_sector_periods(
-    periods: &[Vec<SectorPeriod>],
-) -> Result<CarinoLinkedAttribution> {
-    let period_results = periods
-        .iter()
-        .map(|sectors| brinson_fachler(sectors))
-        .collect::<Result<Vec<_>>>()?;
-    carino_link(&period_results)
-}
-
 /// One period's returns and per-row effect vector for Carino linking.
 ///
 /// `rows` is one `[f64; N]` effect vector per attribution row (sector, or a

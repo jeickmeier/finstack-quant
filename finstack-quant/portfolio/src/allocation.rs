@@ -106,8 +106,6 @@ pub struct AllocationDiagnostics {
 
 /// Allocate strategy weights from a typed specification.
 ///
-/// This is the canonical entry point. Use [`allocate_weights_json`] only at
-/// wire boundaries that must exchange JSON documents.
 /// Capital retains the sign of `total_capital` and sums to its rounded total.
 /// Minor units are assigned by largest fractional remainder, with ties awarded
 /// in strategy input order; zero-weight strategies receive zero capital.
@@ -174,49 +172,6 @@ pub fn allocate_weights(spec: &WeightAllocationSpec) -> Result<WeightAllocationR
             weights_sum: neumaier_sum(weights.iter().copied()),
             leverage: neumaier_sum(weights.iter().map(|weight| weight.abs())),
         },
-    })
-}
-
-/// Allocate strategy weights from a JSON specification.
-///
-/// Wire-boundary wrapper over [`allocate_weights`].
-///
-/// # Errors
-///
-/// Returns [`Error::ValidationFailed`] when inputs violate scheme invariants or
-/// capital cannot be represented at the requested rounding precision.
-///
-/// # Arguments
-///
-/// * `spec_json` - UTF-8 JSON [`WeightAllocationSpec`] selecting the
-///   allocation scheme, strategy inputs, and any required covariance data.
-pub fn allocate_weights_json(spec_json: &str) -> Result<String> {
-    let spec = WeightAllocationSpec::from_json(spec_json)?;
-    let result = allocate_weights(&spec)?;
-    serde_json::to_string(&result)
-        .map_err(|err| Error::InvalidInput(format!("failed to serialize allocation result: {err}")))
-}
-
-/// Validate a strategy allocation JSON specification and return its canonical form.
-///
-/// # Errors
-///
-/// Returns [`Error::ValidationFailed`] when inputs violate scheme invariants or
-/// capital cannot be represented at the requested rounding precision.
-///
-/// # Arguments
-///
-/// * `spec_json` - UTF-8 JSON [`WeightAllocationSpec`] to parse and execute
-///   solely for validation; the allocation result itself is discarded.
-///
-/// # Returns
-///
-/// The canonical compact JSON re-serialization of the accepted spec.
-pub fn validate_allocation_json(spec_json: &str) -> Result<String> {
-    let spec = WeightAllocationSpec::from_json(spec_json)?;
-    allocate_weights(&spec)?;
-    serde_json::to_string(&spec).map_err(|err| {
-        Error::InvalidInput(format!("failed to canonicalize allocation spec: {err}"))
     })
 }
 
