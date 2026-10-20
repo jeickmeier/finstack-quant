@@ -155,7 +155,8 @@ fn contract_diagnostic(error: &EnvelopeError) -> Diagnostic {
     .with_contract(CALIBRATION_CONTRACT.id)
 }
 
-fn escape_json_pointer(segment: &str) -> String {
+/// Escape one RFC 6901 JSON-pointer segment (`~` -> `~0`, `/` -> `~1`).
+pub(super) fn escape_json_pointer(segment: &str) -> String {
     segment.replace('~', "~0").replace('/', "~1")
 }
 

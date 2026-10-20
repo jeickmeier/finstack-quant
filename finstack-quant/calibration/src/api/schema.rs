@@ -103,7 +103,7 @@ fn prefix_json_pointer(prefix: &str, child: Option<&str>) -> String {
     match child {
         None | Some("") => prefix.to_string(),
         Some(pointer) if pointer.starts_with('/') => format!("{prefix}{pointer}"),
-        Some(pointer) => format!("{prefix}/{}", pointer.replace('~', "~0").replace('/', "~1")),
+        Some(pointer) => format!("{prefix}/{}", super::validate::escape_json_pointer(pointer)),
     }
 }
 
@@ -490,8 +490,8 @@ impl CalibrationEnvelope {
     /// Returns [`ContractError`] for malformed JSON, resource-limit failures,
     /// a missing or malformed schema marker, an unsupported schema version, or
     /// an invalid calibration-envelope shape. Semantic findings are returned
-    /// in the bounded validation report so `dry_run` can report all findings;
-    /// execution rejects that report before constructing market state.
+    /// as contract diagnostics in the bounded validation report rather than as
+    /// an error. ([`super::validate::dry_run`] reports them as `EnvelopeError`s.)
     pub fn from_slice_strict(
         bytes: &[u8],
         limits: &LoadLimits,
