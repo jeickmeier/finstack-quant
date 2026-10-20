@@ -38,10 +38,14 @@ parallel, and SonarQube runs after all three test jobs:
 | Test WASM | `python3 scripts/check_wasm_boundary.py`, then `mise run wasm-test` | Serializer and error-path check, then wasm-bindgen tests plus the Node facade suite (the documented code samples run under `--doctest`). |
 | SonarQube | `SonarSource/sonarqube-scan-action` | `master` only, so it is skipped inside a release run. Scan only: it imports the two coverage artifacts and runs no tests and no clippy (`sonar.rust.clippy.enabled=false`; Lint owns clippy). |
 
-Two details worth knowing before editing:
+Three details worth knowing before editing:
 
 - The cargo-heavy jobs add 10 GB of swap (`pierotofy/set-swap-space`); the
   workspace has OOM'd linking without it.
+- Every `Swatinem/rust-cache` step follows `rustup toolchain uninstall
+  stable`. rust-cache keys on the version of every installed toolchain, and the
+  runner image's preinstalled `stable` changes between images; without the step
+  the key flips and the job builds cold. The builds use the toolchain mise pins.
 - `nightly.yml` has no workflow-level `concurrency`. As a called workflow it
   would share the release run's group and cancel or deadlock it.
 
