@@ -10,6 +10,7 @@
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::extract::{extract_market_opt, extract_model_ref};
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
     serde_to_py, ColumnSchema,
@@ -158,34 +159,12 @@ impl PyTerminalValueSpec {
         serde_to_py(py, &value)
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "TerminalValueSpec"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid tagged ``TerminalValueSpec`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid TerminalValueSpec JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("TerminalValueSpec", &self.inner)
     }
 }
+
+wire_methods!(PyTerminalValueSpec, TerminalValueSpec, "TerminalValueSpec");
 
 /// Structured enterprise-to-equity bridge.
 ///
@@ -297,34 +276,12 @@ impl PyEquityBridge {
         self.inner.net_adjustment()
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "EquityBridge"))
-    }
-
-    /// Deserialize from canonical JSON (unknown fields are rejected).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``EquityBridge`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid EquityBridge JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("EquityBridge", &self.inner)
     }
 }
+
+wire_methods!(PyEquityBridge, EquityBridge, "EquityBridge");
 
 /// Equity-level valuation discounts (DLOM, DLOC, other).
 ///
@@ -388,34 +345,16 @@ impl PyValuationDiscounts {
         self.inner.other_discount
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "ValuationDiscounts"))
-    }
-
-    /// Deserialize from canonical JSON (unknown fields are rejected).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``ValuationDiscounts`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid ValuationDiscounts JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ValuationDiscounts", &self.inner)
     }
 }
+
+wire_methods!(
+    PyValuationDiscounts,
+    ValuationDiscounts,
+    "ValuationDiscounts"
+);
 
 fn extract_terminal_value(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<TerminalValueSpec> {
     if let Ok(typed) = obj.extract::<PyRef<'_, PyTerminalValueSpec>>() {
@@ -596,41 +535,17 @@ impl PyCorporateValuationResult {
         )
     }
 
-    /// Serialize to canonical JSON (``Money`` fields as ``{"amount", "currency"}``).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "CorporateValuationResult"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``CorporateValuationResult`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid CorporateValuationResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CorporateValuationResult", &self.inner)
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(
+    PyCorporateValuationResult,
+    CorporateValuationResult,
+    "CorporateValuationResult"
+);
+impl_repr_html_via_dataframe!(PyCorporateValuationResult);
 
 /// Tornado ranking of the headline DCF assumptions by enterprise-value impact.
 ///
@@ -719,40 +634,17 @@ impl PyDcfSensitivityResult {
         serde_rows_to_dataframe_with_schema(py, &rows, &TORNADO_COLUMNS)
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "DcfSensitivityResult"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``DcfSensitivityResult`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid DcfSensitivityResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("DcfSensitivityResult", &self.inner)
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(
+    PyDcfSensitivityResult,
+    DcfSensitivityResult,
+    "DcfSensitivityResult"
+);
+impl_repr_html_via_dataframe!(PyDcfSensitivityResult);
 
 /// Node mappings that switch on the LBO model check suite.
 ///
@@ -812,34 +704,12 @@ impl PyLboCheckMappings {
         }
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "LboCheckMappings"))
-    }
-
-    /// Deserialize from canonical JSON (unknown fields are rejected).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``LboCheckMappings`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid LboCheckMappings JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("LboCheckMappings", &self.inner)
     }
 }
+
+wire_methods!(PyLboCheckMappings, LboCheckMappings, "LboCheckMappings");
 
 /// Outputs of an LBO evaluation in the model currency.
 ///
@@ -988,40 +858,13 @@ impl PyLboResult {
         )
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "LboResult"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``LboResult`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid LboResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("LboResult", &self.inner)
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(PyLboResult, LboResult, "LboResult");
+impl_repr_html_via_dataframe!(PyLboResult);
 
 /// Orchestrated statement + equity + credit analysis envelope.
 ///
@@ -1112,30 +955,6 @@ impl PyCorporateAnalysis {
         serde_rows_to_dataframe_with_schema(py, &rows, &CREDIT_COLUMNS)
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "CorporateAnalysis"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``CorporateAnalysis`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid CorporateAnalysis JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CorporateAnalysis(statement_nodes={}, equity={}, credit_instruments={}, ev_suppressed_non_positive={})",
@@ -1150,6 +969,8 @@ impl PyCorporateAnalysis {
         )
     }
 }
+
+wire_methods!(PyCorporateAnalysis, CorporateAnalysis, "CorporateAnalysis");
 
 /// Evaluate DCF valuation on a financial model.
 ///

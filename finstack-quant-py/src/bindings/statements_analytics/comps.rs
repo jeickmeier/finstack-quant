@@ -11,6 +11,7 @@
 //! - Multi-dimension composite rich/cheap scoring
 //!   (`score_relative_value` -> `RelativeValueResult`).
 
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_statements_analytics::analysis::{
     compute_multiple as core_compute_multiple, peer_stats as core_peer_stats,
@@ -28,7 +29,7 @@ use crate::bindings::pandas_utils::{
     ColumnSchema,
 };
 use crate::bindings::statements_analytics::extract_serde_any;
-use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
+use crate::errors::{core_to_py, display_to_py};
 
 /// Column schema for `RelativeValueResult.to_dataframe`.
 const DIMENSION_COLUMNS: [ColumnSchema<'static>; 6] = [
@@ -169,34 +170,12 @@ impl PyCompanyMetrics {
         self.inner.get(name)
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "CompanyMetrics"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``CompanyMetrics`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid CompanyMetrics JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CompanyMetrics", &self.inner)
     }
 }
+
+wire_methods!(PyCompanyMetrics, CompanyMetrics, "CompanyMetrics");
 
 /// Convert a ``{metric_name: value}`` dict into a `CompanyMetrics`.
 ///
@@ -372,34 +351,12 @@ impl PyPeerFilter {
         self.inner.accepts(&company.inner)
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "PeerFilter"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``PeerFilter`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid PeerFilter JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("PeerFilter", &self.inner)
     }
 }
+
+wire_methods!(PyPeerFilter, PeerFilter, "PeerFilter");
 
 /// A subject company alongside its comparison peers.
 ///
@@ -604,30 +561,6 @@ impl PyPeerSet {
         self.inner.peer_count()
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "PeerSet"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``PeerSet`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner =
-            serde_json::from_str(json).map_err(|e| serde_json_to_py(e, "invalid PeerSet JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "PeerSet(subject='{}', peers={}, period_basis='{}')",
@@ -637,6 +570,8 @@ impl PyPeerSet {
         )
     }
 }
+
+wire_methods!(PyPeerSet, PeerSet, "PeerSet");
 
 /// One weighted rich/cheap scoring dimension.
 ///
@@ -730,34 +665,12 @@ impl PyScoringDimension {
         finstack_quant_core::wire::serde_label(&self.inner.direction).map_err(core_to_py)
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "ScoringDimension"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``ScoringDimension`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid ScoringDimension JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ScoringDimension", &self.inner)
     }
 }
+
+wire_methods!(PyScoringDimension, ScoringDimension, "ScoringDimension");
 
 /// Descriptive statistics of a peer distribution.
 ///
@@ -844,34 +757,12 @@ impl PyPeerStats {
         )
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "PeerStats"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``PeerStats`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid PeerStats JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("PeerStats", &self.inner)
     }
 }
+
+wire_methods!(PyPeerStats, PeerStats, "PeerStats");
 
 /// Single-factor OLS fit evaluated at the subject.
 ///
@@ -945,34 +836,12 @@ impl PyRegressionResult {
         )
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "RegressionResult"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``RegressionResult`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid RegressionResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RegressionResult", &self.inner)
     }
 }
+
+wire_methods!(PyRegressionResult, RegressionResult, "RegressionResult");
 
 /// Decomposed score of one dimension in a `RelativeValueResult`.
 #[pyclass(
@@ -1113,30 +982,6 @@ impl PyRelativeValueResult {
         serde_rows_to_dataframe_with_schema(py, &rows, &DIMENSION_COLUMNS)
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "RelativeValueResult"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``RelativeValueResult`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid RelativeValueResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "RelativeValueResult(company_id='{}', composite_score={}, confidence={}, peer_count={}, dimensions={})",
@@ -1147,13 +992,14 @@ impl PyRelativeValueResult {
             self.inner.dimensions.len()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(
+    PyRelativeValueResult,
+    RelativeValueResult,
+    "RelativeValueResult"
+);
+impl_repr_html_via_dataframe!(PyRelativeValueResult);
 
 /// Percentile rank of ``value`` within ``values`` (0-1 scale).
 ///

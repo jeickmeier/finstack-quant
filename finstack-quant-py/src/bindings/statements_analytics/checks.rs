@@ -7,9 +7,10 @@
 //! point accepts the typed object or its canonical JSON string.
 
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
+use crate::bindings::macros::wire_methods;
 use crate::bindings::statements::checks::{PyCheckReport, PyCheckSuiteSpec};
 use crate::bindings::statements_analytics::extract_serde_any;
-use crate::errors::{serde_json_to_py, statements_to_py};
+use crate::errors::statements_to_py;
 use finstack_quant_statements::checks::{CheckReport, CheckSuite, CheckSuiteSpec};
 use finstack_quant_statements::types::NodeId;
 use finstack_quant_statements_analytics::analysis::{CreditMapping, ThreeStatementMapping};
@@ -356,34 +357,16 @@ impl PyThreeStatementMapping {
         node_strings(&self.inner.all_nodes())
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "ThreeStatementMapping"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``ThreeStatementMapping`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid ThreeStatementMapping JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ThreeStatementMapping", &self.inner)
     }
 }
+
+wire_methods!(
+    PyThreeStatementMapping,
+    ThreeStatementMapping,
+    "ThreeStatementMapping"
+);
 
 /// Node-id mapping for the credit-underwriting check suite.
 ///
@@ -509,34 +492,12 @@ impl PyCreditMapping {
         self.inner.coverage_min_warn
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "CreditMapping"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``CreditMapping`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid CreditMapping JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CreditMapping", &self.inner)
     }
 }
+
+wire_methods!(PyCreditMapping, CreditMapping, "CreditMapping");
 
 /// Extract a `ThreeStatementMapping` from the typed object, a dict, or JSON.
 pub(crate) fn extract_three_statement_mapping(

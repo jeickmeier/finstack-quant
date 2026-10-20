@@ -2,10 +2,11 @@
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::types::PyForecastSpec;
-use crate::errors::{core_to_py, display_to_py, serde_json_to_py, statements_to_py};
+use crate::errors::{core_to_py, statements_to_py};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::types::AmountOrScalar;
 use finstack_quant_statements_analytics::analysis::{
@@ -196,34 +197,12 @@ impl PyParameterSpec {
         self.inner.perturbations.clone()
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "ParameterSpec"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``ParameterSpec`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid ParameterSpec JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ParameterSpec", &self.inner)
     }
 }
+
+wire_methods!(PyParameterSpec, RustParameterSpec, "ParameterSpec");
 
 fn extract_parameter_spec(value: &Bound<'_, PyAny>) -> PyResult<RustParameterSpec> {
     if let Ok(spec) = value.extract::<PyRef<'_, PyParameterSpec>>() {
@@ -356,26 +335,6 @@ impl PySensitivityConfig {
             .collect()
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Analysis mode: ``"diagonal"``, ``"full_grid"``, or ``"tornado"`` (the
     /// serde name, identical to ``to_json``).
     #[getter]
@@ -405,6 +364,12 @@ impl PySensitivityConfig {
     }
 }
 
+wire_methods!(
+    PySensitivityConfig,
+    RustSensitivityConfig,
+    "SensitivityConfig"
+);
+
 /// Configuration for comparing two statement results.
 #[pyclass(
     name = "VarianceConfig",
@@ -432,26 +397,6 @@ impl PyVarianceConfig {
         Ok(Self {
             inner: RustVarianceConfig::new(baseline_label, comparison_label, metrics, periods),
         })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
     /// Label for the baseline scenario (e.g. ``"management_case"``).
@@ -487,6 +432,8 @@ impl PyVarianceConfig {
         crate::bindings::repr_support::repr_from_serde("VarianceConfig", &self.inner)
     }
 }
+
+wire_methods!(PyVarianceConfig, RustVarianceConfig, "VarianceConfig");
 
 /// Named scenario definitions for statement-model evaluation.
 ///
@@ -551,26 +498,6 @@ impl PyScenarioSet {
         })
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Scenario names in definition (insertion) order.
     #[getter]
     fn names(&self) -> Vec<String> {
@@ -610,6 +537,8 @@ impl PyScenarioSet {
     }
 }
 
+wire_methods!(PyScenarioSet, RustScenarioSet, "ScenarioSet");
+
 /// One parameter's downside and upside impact in a tornado chart.
 ///
 /// Examples
@@ -638,17 +567,6 @@ impl PyTornadoEntry {
 #[pymethods]
 impl PyTornadoEntry {
     /// Deserialize one tornado entry from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this entry to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Statement sensitivity parameter key in ``node@period`` form; DCF entries
     /// use assumption identifiers such as ``wacc`` or ``g``.
     #[getter]
@@ -674,12 +592,6 @@ impl PyTornadoEntry {
         self.inner.swing()
     }
 
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "TornadoEntry(parameter_id='{}', downside={}, upside={})",
@@ -687,6 +599,8 @@ impl PyTornadoEntry {
         )
     }
 }
+
+wire_methods!(PyTornadoEntry, RustTornadoEntry, "TornadoEntry");
 
 /// Typed root result for statement sensitivity analysis.
 #[pyclass(
@@ -702,25 +616,6 @@ pub struct PySensitivityResult {
 #[pymethods]
 impl PySensitivityResult {
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     fn __len__(&self) -> usize {
         self.inner.len()
     }
@@ -876,6 +771,12 @@ impl PySensitivityResult {
     }
 }
 
+wire_methods!(
+    PySensitivityResult,
+    RustSensitivityResult,
+    "SensitivityResult"
+);
+
 /// One typed variance-report row.
 #[pyclass(
     name = "VarianceRow",
@@ -953,25 +854,6 @@ pub struct PyVarianceReport {
 #[pymethods]
 impl PyVarianceReport {
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Label for the baseline scenario (e.g. ``"management_case"``).
     #[getter]
     fn baseline_label(&self) -> &str {
@@ -1028,17 +910,6 @@ impl PyVarianceReport {
         serde_rows_to_dataframe_with_schema(py, &rows, &VARIANCE_ROW_COLUMNS)
     }
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -1048,6 +919,9 @@ impl PyVarianceReport {
         crate::bindings::repr_support::repr_from_serde("VarianceReport", &self.inner)
     }
 }
+
+wire_methods!(PyVarianceReport, RustVarianceReport, "VarianceReport");
+impl_repr_html_via_dataframe!(PyVarianceReport);
 
 /// Typed evaluated results for a set of named scenarios.
 ///
@@ -1066,25 +940,6 @@ pub struct PyScenarioResults {
 #[pymethods]
 impl PyScenarioResults {
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: ScenarioResults = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Evaluated scenario names, in the order the scenario set defined them.
     #[getter]
     fn names(&self) -> Vec<String> {
@@ -1169,6 +1024,8 @@ impl PyScenarioResults {
     }
 }
 
+wire_methods!(PyScenarioResults, ScenarioResults, "ScenarioResults");
+
 impl PyScenarioResults {
     /// Build the canonical comparison table shared by `to_comparison_table`
     /// and `to_dataframe`.
@@ -1197,27 +1054,6 @@ pub struct PyScenarioDiff {
 #[pymethods]
 impl PyScenarioDiff {
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a scenario diff from its canonical JSON form.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: RustScenarioDiff = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to canonical JSON (``baseline``, ``comparison``, ``variance``).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Name of the scenario used as the baseline of the diff.
     #[getter]
     fn baseline(&self) -> &str {
@@ -1261,18 +1097,10 @@ impl PyScenarioDiff {
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.variance().to_dataframe(py)
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(PyScenarioDiff, RustScenarioDiff, "ScenarioDiff");
+impl_repr_html_via_dataframe!(PyScenarioDiff);
 
 /// One driver step in a bridge decomposition.
 #[pyclass(
@@ -1329,25 +1157,6 @@ pub struct PyBridgeChart {
 #[pymethods]
 impl PyBridgeChart {
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Node identifier of the metric this bridge decomposes (e.g.
     /// ``"ebitda"``).
     #[getter]
@@ -1432,17 +1241,6 @@ impl PyBridgeChart {
         self.inner.unexplained
     }
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -1452,6 +1250,9 @@ impl PyBridgeChart {
         crate::bindings::repr_support::repr_from_serde("BridgeChart", &self.inner)
     }
 }
+
+wire_methods!(PyBridgeChart, RustBridgeChart, "BridgeChart");
+impl_repr_html_via_dataframe!(PyBridgeChart);
 
 pub fn register(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyParameterSpec>()?;

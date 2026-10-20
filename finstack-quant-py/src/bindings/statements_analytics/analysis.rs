@@ -12,6 +12,7 @@
 //! failures and `ValueError` otherwise.
 
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
 };
@@ -603,36 +604,12 @@ impl PyForecastMetrics {
         labeled_values_to_series(py, &labels, values, "forecast_metrics")
     }
 
-    /// Serialize to canonical JSON; a non-finite metric (``mape`` with no
-    /// non-zero actual) is written as ``"nan"``, ``"inf"`` or ``"-inf"`` so
-    /// the document round-trips through :meth:`from_json`.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "ForecastMetrics"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``ForecastMetrics`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid ForecastMetrics JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ForecastMetrics", &self.inner)
     }
 }
+
+wire_methods!(PyForecastMetrics, ForecastMetrics, "ForecastMetrics");
 
 /// Compute forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE).
 ///
@@ -1090,31 +1067,6 @@ impl PyDependencyTree {
             .collect()
     }
 
-    /// Serialize to canonical JSON (identical to the WASM ``DependencyTracer.dependencyTree`` output).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "DependencyTree"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``DependencyTree`` document (unknown
-    ///     fields are rejected).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid DependencyTree JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "DependencyTree(node_id={:?}, children={})",
@@ -1123,6 +1075,8 @@ impl PyDependencyTree {
         )
     }
 }
+
+wire_methods!(PyDependencyTree, DependencyTree, "DependencyTree");
 
 /// One component of a formula explanation.
 #[pyclass(
@@ -1269,42 +1223,13 @@ impl PyExplanation {
         serde_rows_to_dataframe_with_schema(py, &rows, &EXPLANATION_COLUMNS)
     }
 
-    /// Serialize to canonical JSON (identical to the WASM ``explainFormula``
-    /// output); a non-finite ``final_value`` or step ``value`` is written as
-    /// ``"nan"``, ``"inf"`` or ``"-inf"`` so the document round-trips.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "Explanation"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``Explanation`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid Explanation JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("Explanation", &self.inner)
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(PyExplanation, Explanation, "Explanation");
+impl_repr_html_via_dataframe!(PyExplanation);
 
 /// Explain a formula for a specific node and period.
 ///
