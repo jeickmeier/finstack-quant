@@ -52,7 +52,7 @@
 //!     1.0,
 //!     PositionUnit::Units,
 //! ).expect("test should succeed")
-//!  .with_text_attribute("asset_class", "cash");
+//!  .with_attribute("asset_class", "cash");
 //!
 //! let portfolio = Portfolio::builder("MY_FUND")
 //!     .base_currency(Currency::USD)

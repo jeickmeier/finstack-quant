@@ -137,7 +137,7 @@ impl Portfolio {
     ///
     /// Call this after mutating `positions` directly to keep the O(1) lookup
     /// and the selective-repricing index valid.
-    pub fn rebuild_index(&mut self) {
+    pub(crate) fn rebuild_index(&mut self) {
         self.position_index = self
             .positions
             .iter()

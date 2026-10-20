@@ -411,7 +411,7 @@ impl FactorModel {
     ///
     /// - `docs/REFERENCES.md#meucci-risk-and-asset-allocation`
     /// - `docs/REFERENCES.md#tasche-2008-capital-allocation`
-    pub fn analyze_with_sensitivities(
+    pub(crate) fn analyze_with_sensitivities(
         &self,
         portfolio: &Portfolio,
         market: &MarketContext,

@@ -139,7 +139,11 @@ impl Constraint {
             label: None,
             metric: super::types::MetricExpr::WeightedSum {
                 metric: super::types::PerPositionMetric::AttributeIndicator(
-                    crate::types::AttributeTest::text_eq(key, value),
+                    crate::types::AttributeTest::new(
+                        key,
+                        crate::types::ComparisonOp::Eq,
+                        crate::types::AttributeValue::Text(value.into()),
+                    ),
                 ),
                 filter: None,
             },
@@ -167,7 +171,11 @@ impl Constraint {
             label: None,
             metric: super::types::MetricExpr::WeightedSum {
                 metric: super::types::PerPositionMetric::AttributeIndicator(
-                    crate::types::AttributeTest::text_eq(key, value),
+                    crate::types::AttributeTest::new(
+                        key,
+                        crate::types::ComparisonOp::Eq,
+                        crate::types::AttributeValue::Text(value.into()),
+                    ),
                 ),
                 filter: None,
             },

@@ -483,9 +483,9 @@ fn summable_metrics_scale_with_quantity_and_short_sign() {
     let long_metrics = metrics.get_position_metrics("LONG").unwrap();
     let short_metrics = metrics.get_position_metrics("SHORT").unwrap();
 
-    assert_eq!(long_metrics.get("ytm"), Some(&0.05));
-    assert_eq!(short_metrics.get("ytm"), Some(&0.05));
-    assert_eq!(long_metrics.get("dv01"), Some(&5.0));
-    assert_eq!(short_metrics.get("dv01"), Some(&-7.5));
+    assert_eq!(long_metrics.metrics.get("ytm"), Some(&0.05));
+    assert_eq!(short_metrics.metrics.get("ytm"), Some(&0.05));
+    assert_eq!(long_metrics.metrics.get("dv01"), Some(&5.0));
+    assert_eq!(short_metrics.metrics.get("dv01"), Some(&-7.5));
     assert_eq!(metrics.get_total("dv01"), Some(-2.5));
 }

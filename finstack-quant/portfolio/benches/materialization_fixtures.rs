@@ -128,7 +128,7 @@ pub fn build_fixture(
         .collect();
 
     let envelope = PortfolioMaterializationEnvelope {
-        schema: finstack_quant_portfolio::materialization::PortfolioMaterializationSchema::CURRENT,
+        schema: finstack_quant_portfolio::materialization::PortfolioMaterializationSchema::Materialization,
         portfolio: PortfolioHeader {
             id: format!("materialization-{}", fixture_name(kind)),
             name: Some("Phase 7 deterministic benchmark".to_string()),

@@ -16,7 +16,7 @@ depends on it; only the `finstack-quant` umbrella crate and the Python/WASM
 binding crates do.
 
 Cargo features: `json-schema` (default; `schemars` derives, the schema
-registry and the `gen_materialization_schemas` binary). Rayon parallelism is
+registry and the `gen_portfolio_schemas` binary). Rayon parallelism is
 unconditional — there is no feature flag for it.
 
 ## Public surface
@@ -124,7 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         1.0,
         PositionUnit::Units,
     )?
-    .with_text_attribute("asset_class", "cash");
+    .with_attribute("asset_class", "cash");
 
     let portfolio = Portfolio::builder("MY_FUND")
         .base_currency(Currency::USD)
@@ -227,7 +227,7 @@ This crate owns two checked-in JSON Schemas in
 [`schemas/index.json`](schemas/index.json). Regenerate and verify with:
 
 ```bash
-cargo run -p finstack-quant-portfolio --bin gen_materialization_schemas -- --write
+cargo run -p finstack-quant-portfolio --bin gen_portfolio_schemas -- --write
 mise run rust-check-schemas
 ```
 

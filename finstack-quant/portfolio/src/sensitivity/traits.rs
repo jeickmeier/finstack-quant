@@ -1,4 +1,4 @@
-//! Finite-difference and repricing utilities for portfolio sensitivities.
+//! Sensitivity engine trait and the repricing helpers both engines share.
 //!
 use crate::dependencies::{resolved_dependencies, MarketFactorKey};
 use finstack_quant_core::currency::Currency;

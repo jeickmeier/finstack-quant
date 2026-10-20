@@ -113,9 +113,6 @@ impl JsPortfolio {
     }
 
     /// Base currency code.
-    ///
-    /// Renamed from the historical `baseCcy` to the full-word camelCase
-    /// convention used everywhere else (matches Python `base_currency`).
     #[wasm_bindgen(getter, js_name = baseCurrency)]
     pub fn base_currency(&self) -> String {
         self.inner.base_currency.to_string()

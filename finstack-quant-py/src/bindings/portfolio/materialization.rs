@@ -293,7 +293,7 @@ impl PyPortfolio {
         let bytes = extract_bundle_bytes(bundle)?;
         let cache = cache
             .map(|value| Arc::clone(&value.inner))
-            .unwrap_or_else(|| Arc::new(InstrumentArtifactCache::new()));
+            .unwrap_or_else(|| Arc::new(InstrumentArtifactCache::default()));
         let limits = LoadLimits::default();
         let (portfolio, report) = py
             .detach(move || RustPortfolio::from_materialization(&bytes, &cache, &limits))
@@ -340,7 +340,7 @@ impl PyPortfolio {
         let bytes = extract_bundle_bytes(bundle)?;
         let cache = cache
             .map(|value| Arc::clone(&value.inner))
-            .unwrap_or_else(|| Arc::new(InstrumentArtifactCache::new()));
+            .unwrap_or_else(|| Arc::new(InstrumentArtifactCache::default()));
         let limits = LoadLimits::default();
         match py.detach(move || RustPortfolio::validate_materialization(&bytes, &cache, &limits)) {
             Ok(report) => Ok(PyMaterializationReport::from_inner(report)

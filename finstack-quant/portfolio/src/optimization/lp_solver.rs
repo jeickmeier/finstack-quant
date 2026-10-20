@@ -858,8 +858,10 @@ mod tests {
         };
 
         let matching = per_position_metric_value(
-            &PerPositionMetric::AttributeIndicator(crate::types::AttributeTest::text_eq(
-                "rating", "CCC",
+            &PerPositionMetric::AttributeIndicator(crate::types::AttributeTest::new(
+                "rating",
+                crate::types::ComparisonOp::Eq,
+                "CCC",
             )),
             &feat,
             MissingMetricPolicy::Zero,
@@ -868,8 +870,10 @@ mod tests {
         assert_eq!(matching, 1.0);
 
         let non_matching = per_position_metric_value(
-            &PerPositionMetric::AttributeIndicator(crate::types::AttributeTest::text_eq(
-                "rating", "BBB",
+            &PerPositionMetric::AttributeIndicator(crate::types::AttributeTest::new(
+                "rating",
+                crate::types::ComparisonOp::Eq,
+                "BBB",
             )),
             &feat,
             MissingMetricPolicy::Zero,

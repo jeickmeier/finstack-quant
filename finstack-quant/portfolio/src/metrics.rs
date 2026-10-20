@@ -25,7 +25,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::HashSet;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::metrics::{is_additive_metric, MetricId};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -87,7 +87,7 @@ pub struct AggregatedMetric {
 /// instrument type no such exposure, so the total is complete without it. Such
 /// narrowing is reported per position on
 /// [`PositionValue::inapplicable_metrics`](crate::valuation::PositionValue::inapplicable_metrics).
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioMetrics {
     /// Aggregated metrics (summable only)
@@ -135,23 +135,6 @@ pub struct PositionMetrics {
     pub currency: Currency,
     /// Raw metric values for the position.
     pub metrics: IndexMap<MetricId, f64>,
-}
-
-impl std::ops::Deref for PositionMetrics {
-    type Target = IndexMap<MetricId, f64>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.metrics
-    }
-}
-
-impl<'a> IntoIterator for &'a PositionMetrics {
-    type Item = (&'a MetricId, &'a f64);
-    type IntoIter = indexmap::map::Iter<'a, MetricId, f64>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.metrics.iter()
-    }
 }
 
 impl PortfolioMetrics {
@@ -234,57 +217,6 @@ pub struct SkippedMetric {
     pub metric_id: String,
     /// The non-finite value that was encountered.
     pub value: f64,
-}
-
-impl Default for PortfolioMetrics {
-    fn default() -> Self {
-        Self {
-            aggregated: IndexMap::new(),
-            by_position: IndexMap::new(),
-            skipped_metrics: Vec::new(),
-            degraded_positions: Vec::new(),
-            unaggregated_metrics: Vec::new(),
-        }
-    }
-}
-
-/// Metrics that can be meaningfully summed across positions.
-///
-/// These metrics scale linearly with position size and can be aggregated.
-///
-/// Bucketed metrics (e.g. key-rate DV01) are stored in `ValuationResult::measures`
-/// using composite keys of the form:
-///
-/// - `bucketed_dv01::2y`
-/// - `bucketed_cs01::5y`
-///
-/// To support portfolio-level aggregation of these series, `is_summable` performs
-/// a prefix match on the base metric ID rather than requiring an exact key match.
-///
-/// Membership is an explicit allowlist rather than a registry-driven property:
-/// a metric is listed only when it is currency-denominated and linear in
-/// position size, so that FX conversion plus summation yields a number with a
-/// portfolio-level meaning. Metrics that appear per position but are absent
-/// here are reported on
-/// [`PortfolioMetrics::unaggregated_metrics`] so the omission is visible.
-/// Check if a metric can be summed across positions.
-///
-/// This treats both base IDs (e.g. `bucketed_dv01`) and structured
-/// composite keys (e.g. `bucketed_dv01::2y`) as summable so that
-/// key-rate / bucketed series aggregate correctly.
-///
-/// # Arguments
-///
-/// * `metric_id` - Metric identifier to test.
-///
-/// # Returns
-///
-/// `true` when the metric is safe to sum across positions after any required
-/// FX conversion.
-pub(crate) fn is_summable(metric_id: &str) -> bool {
-    metric_id
-        .parse::<MetricId>()
-        .is_ok_and(|id| finstack_quant_valuations::metrics::is_additive_metric(&id))
 }
 
 /// Aggregate metrics from portfolio valuation results.
@@ -378,8 +310,7 @@ pub fn aggregate_metrics(
                     .measures
                     .iter()
                     .map(|(id, v)| {
-                        let scaled =
-                            scale_position_metric(id.as_str(), *v, position_value.metric_scale);
+                        let scaled = scale_position_metric(id, *v, position_value.metric_scale);
                         (id.clone(), scaled)
                     })
                     .collect();
@@ -470,8 +401,13 @@ fn fx_rate_for_position(
     })
 }
 
-fn scale_position_metric(metric_id: &str, value: f64, metric_scale: f64) -> f64 {
-    if is_summable(metric_id) {
+/// Scale a position metric by the position size when it is additive.
+///
+/// Only metrics on the `is_additive_metric` allowlist (currency-denominated and
+/// linear in position size, including bucketed composite keys) scale; ratios such
+/// as `ytm` or `duration` are size-independent and pass through unchanged.
+fn scale_position_metric(metric_id: &MetricId, value: f64, metric_scale: f64) -> f64 {
+    if is_additive_metric(metric_id) {
         value * metric_scale
     } else {
         value
@@ -506,7 +442,7 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
 
         for (metric_id, value) in &data.metrics {
             let metric_name = metric_id.as_str();
-            if !is_summable(metric_name) {
+            if !is_additive_metric(metric_id) {
                 unaggregated.insert(metric_name.to_string());
             } else {
                 if !value.is_finite() {
@@ -620,25 +556,29 @@ mod tests {
         assert!(serde_json::from_value::<PortfolioMetrics>(position).is_err());
     }
 
+    fn is_additive(metric: &str) -> bool {
+        is_additive_metric(&metric.parse::<MetricId>().expect("metric id"))
+    }
+
     #[test]
     fn test_is_summable() {
-        assert!(is_summable("dv01"));
-        assert!(is_summable("cs01"));
-        assert!(is_summable("fx_delta"));
-        assert!(is_summable("index_delta"));
-        assert!(!is_summable("delta"));
-        assert!(!is_summable("gamma"));
-        assert!(!is_summable("vega"));
-        assert!(is_summable("delta::AAPL"));
-        assert!(is_summable("gamma::SPX"));
-        assert!(is_summable("vega::SPX_VOL"));
-        assert!(!is_summable("ytm"));
-        assert!(!is_summable("duration"));
+        assert!(is_additive("dv01"));
+        assert!(is_additive("cs01"));
+        assert!(is_additive("fx_delta"));
+        assert!(is_additive("index_delta"));
+        assert!(!is_additive("delta"));
+        assert!(!is_additive("gamma"));
+        assert!(!is_additive("vega"));
+        assert!(is_additive("delta::AAPL"));
+        assert!(is_additive("gamma::SPX"));
+        assert!(is_additive("vega::SPX_VOL"));
+        assert!(!is_additive("ytm"));
+        assert!(!is_additive("duration"));
 
-        assert!(is_summable("bucketed_dv01::2y"));
-        assert!(is_summable("bucketed_cs01::AAA::5y"));
-        assert!(is_summable("bucketed_vega::SURFACE::1y"));
-        assert!(!is_summable("unknown::2y"));
+        assert!(is_additive("bucketed_dv01::2y"));
+        assert!(is_additive("bucketed_cs01::AAA::5y"));
+        assert!(is_additive("bucketed_vega::SURFACE::1y"));
+        assert!(!is_additive("unknown::2y"));
     }
 
     #[test]

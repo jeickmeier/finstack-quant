@@ -8,8 +8,6 @@
 //! cashflows. In full-attribution mode, `attribution.total_pnl` includes those
 //! payments. A coupon or redemption therefore creates an expected difference
 //! between these explicitly distinct measures; cash is not reinvested here.
-//!
-//! This module is only available when the `scenarios` feature is enabled.
 
 use crate::attribution::{attribution_endpoint_profile, reduce_prepared, PortfolioAttribution};
 use crate::error::{Error, Result};

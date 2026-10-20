@@ -4,7 +4,6 @@ use super::constraints::Constraint;
 use super::types::{MissingMetricPolicy, Objective, WeightingScheme};
 use super::universe::TradeUniverse;
 use crate::portfolio::Portfolio;
-use indexmap::IndexMap;
 
 /// Complete optimization problem specification.
 #[derive(Clone, Debug)]
@@ -30,9 +29,6 @@ pub struct PortfolioOptimizationProblem {
 
     /// Optional label for auditability.
     pub label: Option<String>,
-
-    /// Additional metadata for auditability.
-    pub meta: IndexMap<String, serde_json::Value>,
 }
 
 impl PortfolioOptimizationProblem {
@@ -61,7 +57,6 @@ impl PortfolioOptimizationProblem {
             constraints: vec![Constraint::Budget { rhs: 1.0 }],
             missing_metric_policy: MissingMetricPolicy::Zero,
             label: None,
-            meta: IndexMap::new(),
         }
     }
 

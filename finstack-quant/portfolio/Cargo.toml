@@ -43,8 +43,8 @@ json-schema = [
 ]
 
 [[bin]]
-name = "gen_materialization_schemas"
-path = "src/bin/gen_materialization_schemas.rs"
+name = "gen_portfolio_schemas"
+path = "src/bin/gen_schemas.rs"
 required-features = ["json-schema"]
 test = false
 

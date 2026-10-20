@@ -241,7 +241,7 @@ impl Book {
     /// use finstack_quant_portfolio::book::Book;
     ///
     /// let book = Book::new("credit", Some("Credit".to_string()));
-    /// assert!(book.is_root());
+    /// assert!(book.parent_id.is_none());
     /// assert_eq!(book.name.as_deref(), Some("Credit"));
     /// ```
     pub fn new(id: impl Into<BookId>, name: Option<String>) -> Self {
@@ -269,15 +269,6 @@ impl Book {
     pub fn with_parent(mut self, parent_id: impl Into<BookId>) -> Self {
         self.parent_id = Some(parent_id.into());
         self
-    }
-
-    /// Check if this is a root book (no parent).
-    ///
-    /// # Returns
-    ///
-    /// `true` when the book has no parent reference.
-    pub fn is_root(&self) -> bool {
-        self.parent_id.is_none()
     }
 
     /// Check if this book contains a specific position.
@@ -327,24 +318,6 @@ impl Book {
             self.child_book_ids.push(child_id);
         }
     }
-
-    /// Remove a position from this book.
-    ///
-    /// # Arguments
-    ///
-    /// * `position_id` - Position identifier to remove.
-    pub fn remove_position(&mut self, position_id: &PositionId) {
-        self.position_ids.retain(|id| id != position_id);
-    }
-
-    /// Remove a child book from this book.
-    ///
-    /// # Arguments
-    ///
-    /// * `child_id` - Child book identifier to remove.
-    pub fn remove_child(&mut self, child_id: &BookId) {
-        self.child_book_ids.retain(|id| id != child_id);
-    }
 }
 
 #[cfg(test)]
@@ -371,7 +344,7 @@ mod tests {
         let book = Book::new("americas", Some("Americas".to_string()));
         assert_eq!(book.id, BookId::new("americas"));
         assert_eq!(book.name, Some("Americas".to_string()));
-        assert!(book.is_root());
+        assert!(book.parent_id.is_none());
         assert!(book.position_ids.is_empty());
         assert!(book.child_book_ids.is_empty());
     }
@@ -381,7 +354,7 @@ mod tests {
         let book = Book::new("credit", Some("Credit".to_string())).with_parent("americas");
         assert_eq!(book.id, BookId::new("credit"));
         assert_eq!(book.parent_id, Some(BookId::new("americas")));
-        assert!(!book.is_root());
+        assert!(book.parent_id.is_some());
     }
 
     #[test]
@@ -410,31 +383,5 @@ mod tests {
         // Adding again should not duplicate
         book.add_child(child_id);
         assert_eq!(book.child_book_ids.len(), 1);
-    }
-
-    #[test]
-    fn test_book_remove_position() {
-        let mut book = Book::new("ig", Some("Investment Grade".to_string()));
-        let pos_id = PositionId::new("pos1");
-
-        book.add_position(pos_id.clone());
-        assert!(book.contains_position(&pos_id));
-
-        book.remove_position(&pos_id);
-        assert!(!book.contains_position(&pos_id));
-        assert!(book.position_ids.is_empty());
-    }
-
-    #[test]
-    fn test_book_remove_child() {
-        let mut book = Book::new("americas", Some("Americas".to_string()));
-        let child_id = BookId::new("credit");
-
-        book.add_child(child_id.clone());
-        assert!(book.contains_child(&child_id));
-
-        book.remove_child(&child_id);
-        assert!(!book.contains_child(&child_id));
-        assert!(book.child_book_ids.is_empty());
     }
 }

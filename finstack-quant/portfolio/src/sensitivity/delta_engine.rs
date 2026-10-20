@@ -1,4 +1,4 @@
-//! Finite-difference and repricing utilities for portfolio sensitivities.
+//! Central-difference factor sensitivity engine.
 //!
 use super::traits::{
     mapping_bumps_fx, raw_pv_in_base, FactorRepricingPlan, FactorSensitivityEngine,

@@ -1,4 +1,5 @@
-//! Portfolio-level factor assignment, decomposition, and what-if analysis.
+//! Factor assignment report: which factors each position maps to and which
+//! dependencies matched no factor.
 //!
 use crate::types::PositionId;
 use finstack_quant_core::types::Attributes;

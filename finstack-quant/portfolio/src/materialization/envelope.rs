@@ -19,11 +19,6 @@ pub enum PortfolioMaterializationSchema {
     Materialization,
 }
 
-impl PortfolioMaterializationSchema {
-    /// The exact marker required by every persisted materialization envelope.
-    pub const CURRENT: Self = Self::Materialization;
-}
-
 /// Strict, versioned portfolio materialization bundle.
 ///
 /// Unlike [`crate::portfolio::PortfolioSpec`], this database-oriented format

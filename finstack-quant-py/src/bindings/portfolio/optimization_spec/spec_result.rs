@@ -185,7 +185,7 @@ impl PyTradeUniverse {
     /// Universe where all existing positions are tradeable and no candidates exist.
     #[classmethod]
     fn all_positions(_cls: &Bound<'_, PyType>) -> Self {
-        Self::from_inner(TradeUniverse::all_positions())
+        Self::from_inner(TradeUniverse::default())
     }
 
     /// Universe where only positions matching ``filter`` may trade.

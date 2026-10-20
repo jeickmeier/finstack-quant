@@ -51,7 +51,7 @@ GENERATORS = (
     Generator(Path("finstack-quant/scenarios"), "gen_scenario_schemas"),
     Generator(Path("finstack-quant/statements"), "gen_statement_schemas"),
     Generator(Path("finstack-quant/valuations"), "gen_schemas"),
-    Generator(Path("finstack-quant/portfolio"), "gen_materialization_schemas"),
+    Generator(Path("finstack-quant/portfolio"), "gen_portfolio_schemas"),
 )
 
 # Globs for generator-owned files. Every match must be a listed artifact: this

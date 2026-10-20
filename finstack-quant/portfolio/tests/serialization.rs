@@ -40,8 +40,8 @@ fn test_position_spec_roundtrip() {
         PositionUnit::Units,
     )
     .unwrap()
-    .with_text_attribute("rating", "AAA")
-    .with_text_attribute("sector", "Banking");
+    .with_attribute("rating", "AAA")
+    .with_attribute("sector", "Banking");
 
     // Convert to spec
     let spec = position.to_spec();
@@ -99,7 +99,7 @@ fn test_portfolio_spec_serialization() {
         PositionUnit::Units,
     )
     .unwrap()
-    .with_text_attribute("rating", "AAA");
+    .with_attribute("rating", "AAA");
 
     let pos2 = Position::new(
         "POS_002",
@@ -110,7 +110,7 @@ fn test_portfolio_spec_serialization() {
         PositionUnit::Units,
     )
     .unwrap()
-    .with_text_attribute("rating", "AA");
+    .with_attribute("rating", "AA");
 
     let portfolio = Portfolio::builder("TEST_PORTFOLIO")
         .name("Test Portfolio")

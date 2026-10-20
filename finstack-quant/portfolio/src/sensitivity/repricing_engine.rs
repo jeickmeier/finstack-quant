@@ -1,4 +1,4 @@
-//! Finite-difference and repricing utilities for portfolio sensitivities.
+//! Full-repricing engine for per-factor scenario P&L profiles.
 //!
 use super::delta_engine::{mapping_to_market_bumps, validate_position_weights};
 use super::traits::{mapping_bumps_fx, raw_pv_in_base, FactorRepricingPlan};
@@ -78,7 +78,7 @@ impl<'de> serde::Deserialize<'de> for FactorPnlProfile {
 
 /// Symmetric grid of scenario shifts used by the full repricing engine.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ScenarioGrid {
+pub(crate) struct ScenarioGrid {
     shifts: Vec<f64>,
 }
 

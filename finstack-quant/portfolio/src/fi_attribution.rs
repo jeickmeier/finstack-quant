@@ -155,27 +155,6 @@ pub struct FiAttributionConfig {
     pub period_years: f64,
 }
 
-impl FiAttributionConfig {
-    /// Create a config for the given period length.
-    ///
-    /// # Arguments
-    ///
-    /// * `period_years` - Attribution period length in years; must be finite
-    ///   and positive.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_portfolio::fi_attribution::FiAttributionConfig;
-    ///
-    /// let config = FiAttributionConfig::new(0.25);
-    /// assert_eq!(config.period_years, 0.25);
-    /// ```
-    pub fn new(period_years: f64) -> Self {
-        Self { period_years }
-    }
-}
-
 /// Plain-data snapshot of one position (or pre-aggregated bucket) for one
 /// attribution period.
 ///
@@ -363,7 +342,7 @@ impl FiAttributionResult {
     /// };
     /// let portfolio = vec![bucket("GOVT", 1.0, 0.016, 0.04, 5.0)];
     /// let benchmark = vec![bucket("GOVT", 1.0, 0.015, 0.04, 5.5)];
-    /// let result = campisi_attribution(&portfolio, &benchmark, &FiAttributionConfig::new(0.25))?;
+    /// let result = campisi_attribution(&portfolio, &benchmark, &FiAttributionConfig { period_years: 0.25 })?;
     /// let report = result.reconciliation_check(1e-10);
     /// assert!(report.is_reconciled);
     /// # Ok::<(), finstack_quant_portfolio::Error>(())
@@ -586,7 +565,7 @@ fn aggregate_side(
 /// };
 /// let portfolio = vec![bucket("GOVT", 0.6, 0.016, 0.04, 5.0), bucket("CORP", 0.4, 0.012, 0.06, 4.0)];
 /// let benchmark = vec![bucket("GOVT", 0.5, 0.015, 0.04, 5.5), bucket("CORP", 0.5, 0.011, 0.055, 4.5)];
-/// let result = campisi_attribution(&portfolio, &benchmark, &FiAttributionConfig::new(0.25))?;
+/// let result = campisi_attribution(&portfolio, &benchmark, &FiAttributionConfig { period_years: 0.25 })?;
 /// assert!(result.reconciliation_check(1e-10).is_reconciled);
 /// # Ok::<(), finstack_quant_portfolio::Error>(())
 /// ```
@@ -1103,7 +1082,7 @@ mod tests {
 
     #[test]
     fn campisi_single_period_matches_hand_worked_golden() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let r = campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config)
             .expect("valid golden inputs");
 
@@ -1165,7 +1144,7 @@ mod tests {
     /// sector exists on only one side (zero weight on the other).
     #[test]
     fn campisi_handles_one_sided_sector() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let portfolio = vec![
             snap("CORE", 0.80, 0.0150, 0.048, 5.0, 0.0, 0.0, -0.0010, 0.0),
             snap(
@@ -1226,7 +1205,7 @@ mod tests {
     /// ```
     #[test]
     fn campisi_off_benchmark_sector_uses_benchmark_total_return_convention() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let portfolio = vec![
             snap("CORE", 0.80, 0.0150, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             snap("EXTRA", 0.20, 0.0210, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
@@ -1263,7 +1242,7 @@ mod tests {
     /// for the underweight is unchanged.
     #[test]
     fn campisi_benchmark_only_sector_reports_benchmark_rate_for_portfolio_return() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let portfolio = vec![snap("CORE", 1.0, 0.0150, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)];
         let benchmark = vec![
             snap("CORE", 0.80, 0.0140, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
@@ -1297,7 +1276,7 @@ mod tests {
     /// against performance data. It must fail closed instead.
     #[test]
     fn campisi_rejects_zero_net_weight_sector_on_portfolio_side() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let portfolio = vec![
             snap("CORE", 1.00, 0.0150, 0.048, 5.0, 0.0, 0.0, -0.0010, 0.0),
             snap("HEDGE", 0.50, 0.0400, 0.060, 3.0, 0.0, 0.0, -0.0010, 0.0),
@@ -1329,7 +1308,7 @@ mod tests {
     /// return.
     #[test]
     fn campisi_rejects_zero_net_weight_sector_on_benchmark_side() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let portfolio = vec![snap(
             "CORE", 1.0, 0.0150, 0.048, 5.0, 0.0, 0.0, -0.0010, 0.0,
         )];
@@ -1376,7 +1355,7 @@ mod tests {
     /// is legitimate and must still be accepted, with a bounded allocation.
     #[test]
     fn campisi_rejects_near_zero_net_weight_sector_before_rate_blows_up() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let fixture = |eps: f64| {
             let portfolio = vec![
                 snap("CORE", 0.70, 0.0150, 0.048, 5.0, 0.0, 0.0, -0.0010, 0.0),
@@ -1443,7 +1422,7 @@ mod tests {
     /// decomposition for every net-short sector.
     #[test]
     fn campisi_attributes_net_short_sector() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let portfolio = vec![
             snap("CORE", 1.20, 0.0150, 0.048, 5.0, 0.0, 0.0, -0.0010, 0.0),
             snap("SHORT", -0.20, 0.0100, 0.030, 2.0, 0.0, 0.0, -0.0010, 0.0),
@@ -1481,7 +1460,7 @@ mod tests {
 
     #[test]
     fn campisi_rejects_weights_not_summing_to_one() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let mut portfolio = golden_portfolio();
         portfolio[0].weight = 0.10; // now sums to 0.80
         let err = campisi_attribution(&portfolio, &golden_benchmark(), &config)
@@ -1494,7 +1473,7 @@ mod tests {
     /// the documented ±1e-6 boundary so loosening or tightening it fails here.
     #[test]
     fn campisi_weight_tolerance_is_pinned_at_1e_minus_6() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
 
         let mut just_over = golden_portfolio();
         just_over[0].weight += 2e-6; // sums to 1 + 2e-6 > tolerance
@@ -1512,7 +1491,7 @@ mod tests {
 
     #[test]
     fn campisi_rejects_non_finite_inputs() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let mut portfolio = golden_portfolio();
         portfolio[2].delta_spread = f64::NAN;
         let err = campisi_attribution(&portfolio, &golden_benchmark(), &config)
@@ -1522,7 +1501,7 @@ mod tests {
 
     #[test]
     fn campisi_rejects_bad_period_years() {
-        let mut config = FiAttributionConfig::new(0.0);
+        let mut config = FiAttributionConfig { period_years: 0.0 };
         let err = campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config)
             .expect_err("period_years must be positive");
         assert!(err.to_string().contains("period_years"), "{err}");
@@ -1532,7 +1511,7 @@ mod tests {
 
     #[test]
     fn campisi_rejects_empty_sides() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         assert!(campisi_attribution(&[], &golden_benchmark(), &config).is_err());
         assert!(campisi_attribution(&golden_portfolio(), &[], &config).is_err());
     }
@@ -1580,7 +1559,7 @@ mod tests {
     /// spread), which pinned a mode that no longer exists.
     #[test]
     fn campisi_spread_level_is_inert_and_may_be_zero_or_negative() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let build = |p_spread: f64, b_spread: f64| {
             (
                 vec![snap(
@@ -1629,7 +1608,7 @@ mod tests {
     /// sum times the uniform scale `geometric_active / arithmetic_active`.
     #[test]
     fn campisi_carino_link_matches_compounded_active_return() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let period = FiPeriodInput {
             portfolio: golden_portfolio(),
             benchmark: golden_benchmark(),
@@ -1725,7 +1704,7 @@ mod tests {
 
     #[test]
     fn campisi_link_rejects_active_return_mismatch() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let mut period =
             campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config).unwrap();
         period.active_return += 0.001;
@@ -1740,7 +1719,7 @@ mod tests {
 
     #[test]
     fn campisi_link_rejects_materially_tampered_top_level_totals() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let mut period =
             campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config).unwrap();
         period.total_selection += 0.001;
@@ -1755,7 +1734,7 @@ mod tests {
 
     #[test]
     fn campisi_link_rejects_non_finite_and_inconsistent_sector_effects() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let period =
             campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config).unwrap();
 
@@ -1806,7 +1785,7 @@ mod tests {
 
     #[test]
     fn campisi_link_rejects_active_mismatch_when_additive_return_scale_overflows() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let mut period =
             campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config).unwrap();
         neutralize_campisi_effects(&mut period);
@@ -1821,7 +1800,7 @@ mod tests {
 
     #[test]
     fn campisi_link_rejects_non_finite_expected_active_explicitly() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let mut period =
             campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config).unwrap();
         neutralize_campisi_effects(&mut period);
@@ -1840,7 +1819,7 @@ mod tests {
 
     #[test]
     fn campisi_link_accepts_huge_finite_cancelling_effects() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let mut period =
             campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config).unwrap();
         neutralize_campisi_effects(&mut period);
@@ -1860,7 +1839,7 @@ mod tests {
 
     #[test]
     fn campisi_link_rejects_non_finite_reconciliation_residual_explicitly() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let mut period =
             campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config).unwrap();
         neutralize_campisi_effects(&mut period);
@@ -1886,7 +1865,7 @@ mod tests {
 
     #[test]
     fn campisi_link_rejects_non_finite_sector_total_active() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let mut period =
             campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config).unwrap();
         period.sectors[0].total_active = f64::NAN;
@@ -1898,7 +1877,7 @@ mod tests {
 
     #[test]
     fn campisi_link_rejects_inconsistent_sector_total_active() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let mut period =
             campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config).unwrap();
         period.sectors[0].total_active += 0.001;
@@ -1913,7 +1892,7 @@ mod tests {
 
     #[test]
     fn campisi_link_accepts_generated_near_cancelling_output() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let eps = 1.1e-6;
         let portfolio = vec![
             snap("CORE", 0.70, 0.4, 0.048, 5.0, 0.0, 0.0, -0.001, 0.0),
@@ -1960,7 +1939,7 @@ mod tests {
     fn campisi_carino_link_rejects_empty_and_inconsistent_periods() {
         assert!(campisi_carino_link(&[]).is_err());
 
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let p1 = campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config)
             .expect("period 1");
         let mut p2 = p1.clone();
@@ -1975,7 +1954,7 @@ mod tests {
     /// dropped into a result that then "reconciles" on partial data.
     #[test]
     fn attribution_result_round_trips_and_denies_unknown_fields() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let result = campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config)
             .expect("golden inputs");
         let json = serde_json::to_string(&result).expect("serialize result");
@@ -2016,7 +1995,7 @@ mod tests {
     /// bindings as JSON, so its report must serialize under stable names.
     #[test]
     fn reconciliation_report_serializes_under_stable_names() {
-        let config = FiAttributionConfig::new(0.25);
+        let config = FiAttributionConfig { period_years: 0.25 };
         let result = campisi_attribution(&golden_portfolio(), &golden_benchmark(), &config)
             .expect("golden inputs");
         let json =

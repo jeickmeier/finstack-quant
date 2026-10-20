@@ -67,7 +67,6 @@ export const portfolio = {
   optimizePortfolio: wasm.optimizePortfolio,
   rebalanceFromSpec: wasm.rebalanceFromSpec,
   replayPortfolio: wasm.replayPortfolio,
-  // so large MarketContext JSON is parsed once into a core.MarketContext handle.
   computeFactorSensitivities: wasm.computeFactorSensitivities,
   computePnlProfiles: wasm.computePnlProfiles,
   // Takes the computeFactorSensitivities wire object; malformed dimensions

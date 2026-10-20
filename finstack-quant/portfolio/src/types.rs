@@ -170,14 +170,6 @@ pub enum AttributeValue {
 }
 
 impl AttributeValue {
-    /// Return the text value if this is a `Text` variant.
-    pub fn as_text(&self) -> Option<&str> {
-        match self {
-            Self::Text(s) => Some(s),
-            Self::Number(_) => None,
-        }
-    }
-
     /// Return the numeric value if this is a `Number` variant.
     pub fn as_number(&self) -> Option<f64> {
         match self {
@@ -309,16 +301,6 @@ impl AttributeTest {
         }
     }
 
-    /// Convenience: text equality test.
-    pub fn text_eq(key: impl Into<String>, value: impl Into<String>) -> Self {
-        Self::new(key, ComparisonOp::Eq, AttributeValue::Text(value.into()))
-    }
-
-    /// Convenience: numeric comparison test.
-    pub fn numeric(key: impl Into<String>, op: ComparisonOp, value: f64) -> Self {
-        Self::new(key, op, AttributeValue::Number(value))
-    }
-
     /// Evaluate this test against a set of attributes.
     ///
     /// Returns `false` if the key is absent or types are incompatible
@@ -436,7 +418,7 @@ mod tests {
     #[test]
     fn test_attribute_value_text() {
         let v = AttributeValue::Text("CCC".to_string());
-        assert_eq!(v.as_text(), Some("CCC"));
+        assert_eq!(v, AttributeValue::from("CCC"));
         assert_eq!(v.as_number(), None);
         assert_eq!(format!("{v}"), "CCC");
     }
@@ -444,7 +426,6 @@ mod tests {
     #[test]
     fn test_attribute_value_number() {
         let v = AttributeValue::Number(72.5);
-        assert_eq!(v.as_text(), None);
         assert_eq!(v.as_number(), Some(72.5));
         assert_eq!(format!("{v}"), "72.5");
     }
@@ -481,30 +462,30 @@ mod tests {
             "rating".to_string(),
             AttributeValue::Text("CCC".to_string()),
         )]);
-        assert!(AttributeTest::text_eq("rating", "CCC").evaluate(&attrs));
-        assert!(!AttributeTest::text_eq("rating", "BB").evaluate(&attrs));
-        assert!(!AttributeTest::text_eq("missing", "CCC").evaluate(&attrs));
+        assert!(AttributeTest::new("rating", ComparisonOp::Eq, "CCC").evaluate(&attrs));
+        assert!(!AttributeTest::new("rating", ComparisonOp::Eq, "BB").evaluate(&attrs));
+        assert!(!AttributeTest::new("missing", ComparisonOp::Eq, "CCC").evaluate(&attrs));
     }
 
     #[test]
     fn test_attribute_test_numeric_comparisons() {
         let attrs = IndexMap::from([("score".to_string(), AttributeValue::Number(650.0))]);
-        assert!(AttributeTest::numeric("score", ComparisonOp::Ge, 600.0).evaluate(&attrs));
-        assert!(!AttributeTest::numeric("score", ComparisonOp::Lt, 600.0).evaluate(&attrs));
-        assert!(AttributeTest::numeric("score", ComparisonOp::Le, 650.0).evaluate(&attrs));
-        assert!(AttributeTest::numeric("score", ComparisonOp::Eq, 650.0).evaluate(&attrs));
-        assert!(!AttributeTest::numeric("score", ComparisonOp::Ne, 650.0).evaluate(&attrs));
-        assert!(AttributeTest::numeric("score", ComparisonOp::Gt, 600.0).evaluate(&attrs));
+        assert!(AttributeTest::new("score", ComparisonOp::Ge, 600.0).evaluate(&attrs));
+        assert!(!AttributeTest::new("score", ComparisonOp::Lt, 600.0).evaluate(&attrs));
+        assert!(AttributeTest::new("score", ComparisonOp::Le, 650.0).evaluate(&attrs));
+        assert!(AttributeTest::new("score", ComparisonOp::Eq, 650.0).evaluate(&attrs));
+        assert!(!AttributeTest::new("score", ComparisonOp::Ne, 650.0).evaluate(&attrs));
+        assert!(AttributeTest::new("score", ComparisonOp::Gt, 600.0).evaluate(&attrs));
     }
 
     #[test]
     fn numeric_eq_uses_tolerance_but_ordering_is_exact() {
         let attrs = IndexMap::from([("score".to_string(), AttributeValue::Number(600.0 + 1e-10))]);
 
-        assert!(AttributeTest::numeric("score", ComparisonOp::Eq, 600.0).evaluate(&attrs));
-        assert!(!AttributeTest::numeric("score", ComparisonOp::Ne, 600.0).evaluate(&attrs));
-        assert!(AttributeTest::numeric("score", ComparisonOp::Gt, 600.0).evaluate(&attrs));
-        assert!(!AttributeTest::numeric("score", ComparisonOp::Le, 600.0).evaluate(&attrs));
+        assert!(AttributeTest::new("score", ComparisonOp::Eq, 600.0).evaluate(&attrs));
+        assert!(!AttributeTest::new("score", ComparisonOp::Ne, 600.0).evaluate(&attrs));
+        assert!(AttributeTest::new("score", ComparisonOp::Gt, 600.0).evaluate(&attrs));
+        assert!(!AttributeTest::new("score", ComparisonOp::Le, 600.0).evaluate(&attrs));
     }
 
     #[test]
@@ -513,6 +494,6 @@ mod tests {
             "rating".to_string(),
             AttributeValue::Text("CCC".to_string()),
         )]);
-        assert!(!AttributeTest::numeric("rating", ComparisonOp::Gt, 5.0).evaluate(&attrs));
+        assert!(!AttributeTest::new("rating", ComparisonOp::Gt, 5.0).evaluate(&attrs));
     }
 }
