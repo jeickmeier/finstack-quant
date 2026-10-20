@@ -30,9 +30,6 @@
 //! Bloomberg CDSO terminal expects the same.
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::dates::{
-    adjust, calendar_by_id_strict, BusinessDayConvention, DateExt, HolidayCalendar,
-};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::instruments::Attributes;
@@ -530,29 +527,6 @@ impl CdsOption {
         Ok(((self.expiry - as_of).whole_days() as f64 / 365.0).max(0.0))
     }
 
-    /// Effective settlement (payment) date of the option premium. Defaults to
-    /// the underlying CDS convention's settlement lag from the next
-    /// business day after `as_of`.
-    #[doc(hidden)]
-    pub fn effective_premium_settlement_date(
-        &self,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<Date> {
-        if let Some(date) = self.premium_settlement_date {
-            return Ok(date);
-        }
-
-        let calendar = self.standard_calendar()?;
-        let trade_date = adjust(as_of, BusinessDayConvention::Following, calendar)?;
-        trade_date.add_business_days(
-            self.underlying_convention
-                .get_spec()?
-                .settlement_days
-                .into(),
-            calendar,
-        )
-    }
-
     /// Effective contractual running coupon `c` of the synthetic underlying
     /// CDS, in basis points. Returns the explicitly-set `coupon_bp` when
     /// present (e.g., the 100 bp standard CDX coupon), otherwise falls back
@@ -597,11 +571,6 @@ impl CdsOption {
                 .min(as_of),
             ProtectionStartConvention::Forward => self.expiry,
         }
-    }
-
-    fn standard_calendar(&self) -> finstack_quant_core::Result<&'static dyn HolidayCalendar> {
-        let calendar_id = self.underlying_convention.get_spec()?.calendar_id.as_str();
-        calendar_by_id_strict(calendar_id)
     }
 
     /// CDS option Δ for spread strikes: closed-form Black-76 N(d₁) on the
@@ -814,16 +783,7 @@ mod tests {
         )
         .expect("valid option");
 
-        // T+3 BD from 2026-05-02 (Sat) is 2026-05-07 (Thu) under the
-        // ISDA-NA weekend calendar.
         let as_of = date!(2026 - 05 - 02);
-        assert_eq!(
-            option
-                .effective_premium_settlement_date(as_of)
-                .expect("cash settlement date"),
-            date!(2026 - 05 - 07)
-        );
-
         // No explicit underlying_start_date → default Spot convention uses
         // the standard prior CDS roll relative to valuation date.
         assert_eq!(

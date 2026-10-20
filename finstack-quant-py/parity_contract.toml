@@ -947,8 +947,7 @@ public = [
 # collateral analytics (total/performing balance, wac, weighted_avg_spread_bp,
 # weighted_avg_maturity, diversity_score, assets_by_obligor/industry) and
 # calculate_pool_stats returns PoolStats. Rust-only: value_tranche*,
-# calculate_smm/calculate_default_rate, current_loss_percentage,
-# AssetPool::add_bond/wal_from_cashflows. TrancheAccrualPeriod,
+# AssetPool::add_bond. TrancheAccrualPeriod,
 # CoverageTestSpec, CoverageTrigger, DelinquencyModel, CardPortfolioSpec and the
 # CMBS PoolAsset sub-specs stay dict/JSON sub-fields. WASM stays JSON-first;
 # its TrancheMetrics shape carries the *_to_call twins.

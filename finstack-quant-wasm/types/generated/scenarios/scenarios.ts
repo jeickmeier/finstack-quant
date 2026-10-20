@@ -17255,10 +17255,9 @@ export interface AssetPool {
   /**
    * Cumulative scheduled amortization (level-pay principal for amortizing assets).
    *
-   * Part of the original-balance denominator in
-   * [`current_loss_percentage`](super::StructuredCredit::current_loss_percentage),
-   * so it must be stated: omitting it understates the denominator and
-   * overstates the reported loss rate.
+   * Part of the reconstructed original balance
+   * ([`AssetPool::original_balance_or_reconstructed`]) when no explicit
+   * `original_balance` is supplied.
    */
   cumulative_scheduled_amortization: Money;
   /**

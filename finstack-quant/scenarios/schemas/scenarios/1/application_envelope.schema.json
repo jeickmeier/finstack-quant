@@ -1404,7 +1404,7 @@
         },
         "cumulative_scheduled_amortization": {
           "$ref": "#/$defs/Money",
-          "description": "Cumulative scheduled amortization (level-pay principal for amortizing assets).\n\nPart of the original-balance denominator in\n[`current_loss_percentage`](super::StructuredCredit::current_loss_percentage),\nso it must be stated: omitting it understates the denominator and\noverstates the reported loss rate."
+          "description": "Cumulative scheduled amortization (level-pay principal for amortizing assets).\n\nPart of the reconstructed original balance\n([`AssetPool::original_balance_or_reconstructed`]) when no explicit\n`original_balance` is supplied."
         },
         "currency": {
           "$ref": "#/$defs/Currency",

@@ -50,7 +50,7 @@
       "type": "number"
     },
     "weighted_avg_maturity": {
-      "description": "Weighted average maturity (WAM) in years.\n\nFor weighted average life use\n[`AssetPool::wal_from_cashflows`].",
+      "description": "Weighted average maturity (WAM) in years.\n\nFor weighted average life use\n[`weighted_average_life_from_principal`](finstack_quant_cashflows::builder::weighted_average_life_from_principal).",
       "format": "double",
       "type": "number"
     },

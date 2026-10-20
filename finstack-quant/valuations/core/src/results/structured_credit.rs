@@ -294,11 +294,6 @@ impl TranchePricingResult {
         self.credit_duration = duration;
         self
     }
-
-    /// Tranche thickness in percent of the capital structure (`detach_pct - attach_pct`).
-    pub fn thickness(&self) -> f64 {
-        self.detach_pct - self.attach_pct
-    }
 }
 
 /// Stochastic pricing mode.
@@ -419,7 +414,6 @@ mod tests {
         let tranche = TranchePricingResult::new("A".to_string(), TrancheSeniority::Senior, npv)
             .with_subordination(20.0, 100.0);
 
-        assert!((tranche.thickness() - 80.0).abs() < 1e-10);
         assert_eq!(
             serde_json::to_value(&tranche).expect("serialize")["seniority"],
             "senior"

@@ -1364,7 +1364,7 @@ export default [
   {
     "path": "#/$defs/AssetPool/properties/cumulative_scheduled_amortization",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AssetPool/properties/cumulative_scheduled_amortization",
-    "description": "Cumulative scheduled amortization (level-pay principal for amortizing assets).\n\nPart of the original-balance denominator in\n[`current_loss_percentage`](super::StructuredCredit::current_loss_percentage),\nso it must be stated: omitting it understates the denominator and\noverstates the reported loss rate.",
+    "description": "Cumulative scheduled amortization (level-pay principal for amortizing assets).\n\nPart of the reconstructed original balance\n([`AssetPool::original_balance_or_reconstructed`]) when no explicit\n`original_balance` is supplied.",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },

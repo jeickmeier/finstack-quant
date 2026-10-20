@@ -12,11 +12,9 @@
 //! - CS01 (parallel par-spread rebootstrap)
 //! - Correlation01 (per 1% correlation change)
 //! - Recovery01 (per 1% recovery change)
-//! - TailDependence (copula tail dependence coefficient)
 
 mod cs01;
 mod recovery01;
-mod tail_dependence;
 
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::Result;
@@ -43,10 +41,6 @@ pub(crate) fn register_cds_tranche_metrics(
         (
             MetricId::Recovery01,
             Arc::new(recovery01::Recovery01Calculator),
-        ),
-        (
-            MetricId::custom("tail_dependence"),
-            Arc::new(tail_dependence::TailDependenceCalculator),
         ),
     ] {
         registry.register_metric(id, calculator, &[InstrumentType::CdsTranche])?;

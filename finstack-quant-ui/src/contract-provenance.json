@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "1e5b9a03f5a61e493ddf0165901dd5f3e7e5282472efe0620d1c1d08eb358e99",
+          "sha256": "9b3741dbc79b85c0d6f336c603148deda7c8f03f9f0d2db5caf871921402adb0",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "4acd32df154db2c296c8f0d4c5c3192be34657221242aeb365ea1698f5004771",
+          "sha256": "0075e2e7793973b5075df7fe83660a05b7a7673a1ecb8941e38d91bd06edb3d3",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -285,7 +285,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
-          "sha256": "ffb1b1b205799cc0e50a7fdc12bab1ce4d4725926762f0a6f3be6ce38ebc979a",
+          "sha256": "d2a9a91ce9aaadf3fd0ab6f82fc98115498cf725afe153dbbc08153aa8e958b4",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -334,7 +334,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
-          "sha256": "5e36f0185e0f8092bc64098d97bb83282296149e0e0b1622f72ae3cb9e1cb67c",
+          "sha256": "0d0bd28aba9b8c61fb3ddc68cd3c767eef9e2ed0d3df4b164dfc13d53a1bc686",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {

@@ -977,50 +977,6 @@ mod cases {
         // Degenerate non-positive price falls back to 1:1 par recycling.
     }
 
-    fn empty_tranche_cashflows(id: &str, currency: Currency) -> TrancheCashflows {
-        TrancheCashflows {
-            tranche_id: id.to_string(),
-            cashflows: Vec::new(),
-            detailed_flows: Vec::new(),
-            accrual_periods: Vec::new(),
-            interest_flows: Vec::new(),
-            principal_flows: Vec::new(),
-            pik_flows: Vec::new(),
-            deferred_flows: Vec::new(),
-            writedown_flows: Vec::new(),
-            final_balance: Money::from((0_i64, currency)),
-            total_interest: Money::from((0_i64, currency)),
-            total_principal: Money::from((0_i64, currency)),
-            total_pik: Money::from((0_i64, currency)),
-            total_deferred: Money::from((0_i64, currency)),
-            total_writedown: Money::from((0_i64, currency)),
-        }
-    }
-
-    #[test]
-    fn aggregate_tranche_cashflows_errors_on_incompatible_same_date_amounts() {
-        let pay_date = Date::from_calendar_date(2026, Month::January, 15).expect("valid date");
-        let mut usd = empty_tranche_cashflows("AAA", Currency::USD);
-        usd.cashflows
-            .push((pay_date, Money::from((100_i64, Currency::USD))));
-
-        let mut eur = empty_tranche_cashflows("BBB", Currency::EUR);
-        eur.cashflows
-            .push((pay_date, Money::from((50_i64, Currency::EUR))));
-
-        let mut results = HashMap::default();
-        results.insert(usd.tranche_id.clone(), usd);
-        results.insert(eur.tranche_id.clone(), eur);
-
-        let err = aggregate_tranche_cashflows(&results)
-            .expect_err("currency mismatch should not be silently dropped");
-
-        assert!(matches!(
-            err,
-            finstack_quant_core::Error::CurrencyMismatch { .. }
-        ));
-    }
-
     // ── W-25: cleanup-call redemption must include accrued interest ──────
 
     fn cleanup_test_date() -> Date {

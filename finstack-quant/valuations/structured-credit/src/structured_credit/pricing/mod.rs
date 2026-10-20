@@ -20,7 +20,6 @@ pub use waterfall::execute_waterfall;
 
 use crate::structured_credit::pricing::simulation_engine::DeterministicPoolFlowSource;
 use crate::structured_credit::types::{StructuredCredit, TrancheCashflows};
-use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::HashMap;
@@ -74,22 +73,4 @@ pub fn run_simulation_with_diagnostics(
     }
     let mut source = DeterministicPoolFlowSource;
     simulation_engine::simulate_with_source(instrument, market, effective_as_of, &mut source)
-}
-
-/// Generate aggregated deterministic cashflows for all tranches.
-///
-/// # Arguments
-///
-/// * `instrument` - Validated structured-credit deal to project through its
-///   deterministic pool and waterfall model.
-/// * `market` - Market context used for rate resets and projection inputs.
-/// * `as_of` - Requested valuation date used to select known versus projected
-///   cashflows.
-pub fn generate_cashflows(
-    instrument: &StructuredCredit,
-    market: &MarketContext,
-    as_of: Date,
-) -> Result<DatedFlows> {
-    let full_results = run_simulation(instrument, market, as_of)?;
-    simulation_engine::aggregate_tranche_cashflows(&full_results)
 }

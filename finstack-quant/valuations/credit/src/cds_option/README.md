@@ -24,8 +24,7 @@ Import path:
 | `CdsOptionStrikeKind` | Discriminant for branching pricing and metric paths. |
 | `ProtectionStartConvention` | `Spot` (default) or `Forward`. |
 
-Useful methods on `CdsOption`: `effective_premium_settlement_date(as_of)`, and the
-direct Greek entry points `delta`, `gamma`, `vega`, `theta` and
+Useful methods on `CdsOption`: the direct Greek entry points `delta`, `gamma`, `vega`, `theta` and
 `implied_vol(curves, as_of, target_price, initial_guess)`. Each is the same
 computation the corresponding metric calculator registers.
 

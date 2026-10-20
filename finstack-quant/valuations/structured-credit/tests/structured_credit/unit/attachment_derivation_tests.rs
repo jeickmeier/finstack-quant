@@ -90,7 +90,6 @@ fn derived_points_follow_balance_shares_in_priority_order() {
             ("E".to_string(), 0.0, 10.0),
         ]
     );
-    assert!(structure.tranches[2].is_first_loss());
     assert_eq!(structure.tranches[0].thickness(), 60.0);
 
     // Input order does not matter: the shares stack by payment priority.
