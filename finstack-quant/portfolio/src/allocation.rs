@@ -2,6 +2,8 @@
 
 use crate::error::{Error, Result};
 use finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator};
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 const WEIGHT_TOLERANCE: f64 = 1e-9;
@@ -496,69 +498,86 @@ fn risk_contribution_fractions(weights: &[f64], covariance: &[f64]) -> Result<Ve
         .collect())
 }
 
+/// Splits `total_capital` across `weights` in minor units with the
+/// largest-remainder rule, conserving the rounded budget exactly.
+///
+/// Minor units are counted in `Decimal`: at the default ten decimal places a
+/// capital of 1e6 is already 1e16 minor units, past f64's 2^53 integer range,
+/// where f64 floors lose their remainders and their sum drifts off the budget.
 fn rounded_capitals(total_capital: f64, weights: &[f64], decimal_places: u32) -> Result<Vec<f64>> {
-    let scale = 10_f64.powi(decimal_places as i32);
-    let target_units = (total_capital.abs() * scale).round();
-    let weights_sum = neumaier_sum(weights.iter().copied());
-    if !target_units.is_finite()
-        || !weights_sum.is_finite()
-        || weights_sum <= 0.0
-        || weights
-            .iter()
-            .any(|weight| !weight.is_finite() || *weight < 0.0)
-    {
-        return Err(Error::invalid_input(
+    let not_representable = || {
+        Error::invalid_input(
             "allocation capital rounding requires finite minor units and nonnegative weights",
-        ));
+        )
+    };
+    if weights
+        .iter()
+        .any(|weight| !weight.is_finite() || *weight < 0.0)
+    {
+        return Err(not_representable());
     }
+    let scale = Decimal::from(10_u64.pow(decimal_places));
+    let target_units = Decimal::from_f64(total_capital.abs())
+        .and_then(|capital| capital.checked_mul(scale))
+        .ok_or_else(not_representable)?
+        .round();
+    let weights = weights
+        .iter()
+        .map(|weight| Decimal::from_f64(*weight).ok_or_else(not_representable))
+        .collect::<Result<Vec<_>>>()?;
+    let weights_sum = weights
+        .iter()
+        .try_fold(Decimal::ZERO, |sum, weight| sum.checked_add(*weight))
+        .ok_or_else(not_representable)?;
+    if weights_sum <= Decimal::ZERO {
+        return Err(not_representable());
+    }
+
     let mut units = Vec::with_capacity(weights.len());
     let mut remainders = Vec::with_capacity(weights.len());
     for (idx, weight) in weights.iter().enumerate() {
         // Normalize the accepted sum-to-one tolerance before rounding so the
         // minor-unit budget is conserved even for caller-supplied fixed weights.
-        let exact_units = target_units * (*weight / weights_sum);
+        let exact_units = (*weight / weights_sum)
+            .checked_mul(target_units)
+            .ok_or_else(not_representable)?;
         let whole_units = exact_units.floor();
         units.push(whole_units);
-        remainders.push((idx, exact_units - whole_units));
-    }
-    let residual = (target_units - neumaier_sum(units.iter().copied())).round();
-    let fractional_count = remainders
-        .iter()
-        .filter(|(_, fraction)| *fraction > 0.0)
-        .count();
-    if !residual.is_finite() || residual < 0.0 || residual > fractional_count as f64 {
-        return Err(Error::invalid_input(
-            "allocation capital is not representable at the requested rounding precision",
-        ));
-    }
-    remainders.sort_by(|left, right| {
-        right
-            .1
-            .total_cmp(&left.1)
-            .then_with(|| left.0.cmp(&right.0))
-    });
-    for (rank, (idx, _)) in remainders.into_iter().enumerate() {
-        if rank as f64 >= residual {
-            break;
+        if *weight > Decimal::ZERO {
+            remainders.push((idx, exact_units - whole_units));
         }
-        let adjusted = units[idx] + 1.0;
-        if adjusted <= units[idx] {
-            return Err(Error::invalid_input(
+    }
+    let residual = target_units - units.iter().copied().sum::<Decimal>();
+    // Each positive weight contributes a remainder in [0, 1), so the floors
+    // fall short of the budget by fewer units than there are positive
+    // weights; Decimal's 28-digit normalization keeps that bound.
+    let residual = usize::try_from(residual.to_i64().unwrap_or(-1))
+        .ok()
+        .filter(|residual| *residual <= remainders.len())
+        .ok_or_else(|| {
+            Error::invalid_input(
                 "allocation capital is not representable at the requested rounding precision",
-            ));
-        }
-        units[idx] = adjusted;
+            )
+        })?;
+    remainders.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
+    for (idx, _) in remainders.into_iter().take(residual) {
+        units[idx] += Decimal::ONE;
     }
-    let capitals: Vec<f64> = units
+
+    let sign = if total_capital.is_sign_negative() {
+        -Decimal::ONE
+    } else {
+        Decimal::ONE
+    };
+    units
         .into_iter()
-        .map(|units| total_capital.signum() * units / scale)
-        .collect();
-    if capitals.iter().any(|capital| !capital.is_finite()) {
-        return Err(Error::invalid_input(
-            "allocation rounded capital must be finite",
-        ));
-    }
-    Ok(capitals)
+        .map(|units| {
+            (sign * units / scale)
+                .to_f64()
+                .filter(|capital| capital.is_finite())
+                .ok_or_else(|| Error::invalid_input("allocation rounded capital must be finite"))
+        })
+        .collect()
 }
 
 fn validate_weights_sum_to_one(weights: &[f64], label: &str) -> Result<()> {
@@ -645,6 +664,48 @@ mod tests {
         );
         assert_eq!(result.allocations[2].weight, 0.0);
         assert_eq!(result.allocations[2].capital, 0.0);
+    }
+
+    #[test]
+    fn capital_rounding_conserves_budget_beyond_f64_integer_precision() {
+        // 1e7 at 10 decimal places is 1e17 minor units, past 2^53: f64 minor
+        // units lose their fractional remainders and their sum drifts from the
+        // budget, so allocation used to fail depending on the weights' last bits.
+        let weights = [
+            0.19330633454364168,
+            0.15538965898731819,
+            0.08594177409210618,
+            0.1996966265689855,
+            0.3656656058079483,
+        ];
+        let spec = WeightAllocationSpec {
+            scheme: AllocationScheme::Fixed,
+            total_capital: 10_000_000.0,
+            strategies: weights
+                .iter()
+                .enumerate()
+                .map(|(idx, weight)| StrategyAllocationInput {
+                    id: format!("s{idx}"),
+                    fixed_weight: Some(*weight),
+                    returns: Vec::new(),
+                    risk_budget: None,
+                })
+                .collect(),
+            covariance: None,
+            money_decimal_places: 10,
+        };
+
+        let result = allocate_weights(&spec).expect("large capital must allocate");
+        for (allocation, weight) in result.allocations.iter().zip(weights) {
+            assert!(
+                (allocation.capital - 10_000_000.0 * weight).abs() <= 1e-8,
+                "{}: capital {} for weight {weight}",
+                allocation.id,
+                allocation.capital
+            );
+        }
+        let total = neumaier_sum(result.allocations.iter().map(|a| a.capital));
+        assert!((total - 10_000_000.0).abs() <= 1e-8, "capitals sum to {total}");
     }
 
     #[test]

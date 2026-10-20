@@ -22,6 +22,7 @@ finstack-quant-scenarios = { path = "../scenarios", version = "0.11.0", default-
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+rust_decimal = { workspace = true }
 schemars = { workspace = true, optional = true }
 indexmap = { workspace = true, features = ["serde"] }
 tracing = { version = "0.1", default-features = false }
@@ -50,7 +51,6 @@ test = false
 
 [dev-dependencies]
 criterion = { workspace = true }
-rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
 jsonschema = { version = "0.28", default-features = false }
 
