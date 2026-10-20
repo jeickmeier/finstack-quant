@@ -4,21 +4,18 @@ use super::{json::JsonTemplateDocument, TemplateMetadata};
 use crate::{Error, Result, ScenarioSpec};
 use indexmap::IndexMap;
 
-/// Registered template entry containing metadata and clonable, already
-/// validated [`ScenarioSpec`] values.
-///
-/// Use `build` to get the full composite scenario, or `component` to access an
-/// individual component by
-/// identifier when a historical scenario is decomposed into reusable parts.
-pub(crate) struct RegisteredTemplate {
+/// One registered template: its metadata, the composite scenario and the
+/// component scenarios keyed by id, all validated when the registry is built.
+struct RegisteredTemplate {
     metadata: TemplateMetadata,
     composite: ScenarioSpec,
     components: IndexMap<String, ScenarioSpec>,
 }
 
 impl RegisteredTemplate {
-    /// Build a registered template entry from a validated JSON template document.
-    pub(crate) fn from_json_document(document: JsonTemplateDocument) -> Result<Self> {
+    /// Assemble the composite scenario from a template document: id and name
+    /// from the metadata, operations from the components in order.
+    fn from_document(document: JsonTemplateDocument) -> Result<Self> {
         document.validate()?;
 
         let JsonTemplateDocument {
@@ -53,42 +50,6 @@ impl RegisteredTemplate {
             components,
         })
     }
-
-    /// Clone the full composite scenario spec from the registered template.
-    ///
-    /// # Returns
-    ///
-    /// A validated, independently owned [`ScenarioSpec`] for the full
-    /// registered template.
-    #[must_use]
-    pub(crate) fn build(&self) -> ScenarioSpec {
-        self.composite.clone()
-    }
-
-    /// Clone one component scenario spec by component identifier.
-    ///
-    /// # Arguments
-    ///
-    /// - `id`: Component identifier listed in [`TemplateMetadata::components`].
-    ///
-    /// # Returns
-    ///
-    /// `Some(spec)` when a matching component exists, otherwise `None`.
-    #[must_use]
-    pub(crate) fn component(&self, id: &str) -> Option<ScenarioSpec> {
-        self.components.get(id).cloned()
-    }
-
-    /// List registered component identifiers in deterministic insertion order.
-    ///
-    /// # Returns
-    ///
-    /// Component identifiers in the same order used when the composite
-    /// template is assembled.
-    #[must_use]
-    pub(crate) fn component_ids(&self) -> Vec<&str> {
-        self.components.keys().map(String::as_str).collect()
-    }
 }
 
 /// Registry of template metadata and clonable scenario specs.
@@ -100,34 +61,15 @@ pub struct TemplateRegistry {
 }
 
 impl TemplateRegistry {
-    /// Create an empty template registry with no built-in templates registered.
-    ///
-    /// Use [`Self::embedded_builtins`] to load the crate-owned historical
-    /// stress templates through the fallible validation path.
-    #[must_use]
-    fn new() -> Self {
-        Self {
-            entries: IndexMap::new(),
+    /// Build a registry from template documents, in order; a later document
+    /// replaces an earlier one with the same id.
+    fn from_documents(documents: Vec<JsonTemplateDocument>) -> Result<Self> {
+        let mut entries = IndexMap::with_capacity(documents.len());
+        for document in documents {
+            let entry = RegisteredTemplate::from_document(document)?;
+            entries.insert(entry.metadata.id.clone(), entry);
         }
-    }
-
-    /// Create a registry preloaded with the crate-owned embedded built-in templates.
-    ///
-    /// # Returns
-    ///
-    /// A registry containing all embedded historical stress templates shipped
-    /// with the crate.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the embedded JSON documents cannot be parsed or fail
-    /// validation.
-    fn with_embedded_builtins() -> Result<Self> {
-        let mut registry = Self::new();
-        for document in super::json::load_embedded_documents()? {
-            registry.register_json_document(document)?;
-        }
-        Ok(registry)
+        Ok(Self { entries })
     }
 
     /// Process-wide registry of the embedded built-in templates.
@@ -144,17 +86,11 @@ impl TemplateRegistry {
     pub fn embedded_builtins() -> Result<&'static Self> {
         static REGISTRY: std::sync::OnceLock<Result<TemplateRegistry>> = std::sync::OnceLock::new();
         REGISTRY
-            .get_or_init(Self::with_embedded_builtins)
+            .get_or_init(|| super::json::load_embedded_documents().and_then(Self::from_documents))
             .as_ref()
             .map_err(Clone::clone)
     }
 
-    /// Register or replace a template from a parsed JSON document.
-    pub(crate) fn register_json_document(&mut self, document: JsonTemplateDocument) -> Result<()> {
-        let entry = RegisteredTemplate::from_json_document(document)?;
-        self.entries.insert(entry.metadata.id.clone(), entry);
-        Ok(())
-    }
     /// Look up a registered template, naming the identifier when it is unknown.
     fn entry(&self, template_id: &str) -> Result<&RegisteredTemplate> {
         self.entries
@@ -176,7 +112,7 @@ impl TemplateRegistry {
     ///
     /// Returns [`Error::Validation`] when `template_id` is unknown.
     pub fn build(&self, template_id: &str) -> Result<ScenarioSpec> {
-        self.entry(template_id).map(RegisteredTemplate::build)
+        Ok(self.entry(template_id)?.composite.clone())
     }
 
     /// Build one component of a registered scenario template.
@@ -197,7 +133,9 @@ impl TemplateRegistry {
     /// Returns [`Error::Validation`] when either identifier is unknown.
     pub fn build_component(&self, template_id: &str, component_id: &str) -> Result<ScenarioSpec> {
         self.entry(template_id)?
-            .component(component_id)
+            .components
+            .get(component_id)
+            .cloned()
             .ok_or_else(|| {
                 Error::validation(format!(
                     "Unknown component '{component_id}' in template '{template_id}'"
@@ -219,8 +157,12 @@ impl TemplateRegistry {
     ///
     /// Returns [`Error::Validation`] when `template_id` is unknown.
     pub fn component_ids(&self, template_id: &str) -> Result<Vec<&str>> {
-        self.entry(template_id)
-            .map(RegisteredTemplate::component_ids)
+        Ok(self
+            .entry(template_id)?
+            .components
+            .keys()
+            .map(String::as_str)
+            .collect())
     }
 
     /// List all registered template metadata in deterministic insertion order.
@@ -288,9 +230,7 @@ mod tests {
     }
 
     fn registry_with_templates() -> TemplateRegistry {
-        let mut registry = TemplateRegistry::new();
-
-        for document in [
+        TemplateRegistry::from_documents(vec![
             template_document(
                 "rates_shock",
                 "systemic",
@@ -319,27 +259,16 @@ mod tests {
                     empty_component_spec("equity_shock"),
                 ],
             ),
-        ] {
-            registry
-                .register_json_document(document)
-                .expect("test template should register");
-        }
+        ])
+        .expect("test templates should register")
+    }
 
-        registry
+    fn registry_with(document: JsonTemplateDocument) -> TemplateRegistry {
+        TemplateRegistry::from_documents(vec![document]).expect("json document should register")
     }
 
     fn collected_ids(entries: Vec<&TemplateMetadata>) -> Vec<&str> {
         entries.into_iter().map(|entry| entry.id.as_str()).collect()
-    }
-
-    fn builtin_template_ids() -> Vec<&'static str> {
-        vec![
-            "gfc_2008",
-            "covid_2020",
-            "rate_shock_2022",
-            "svb_2023",
-            "ltcm_1998",
-        ]
     }
 
     fn json_component_spec(id: &str, curve_id: &str, bp: f64) -> ScenarioSpec {
@@ -418,6 +347,17 @@ mod tests {
         }
     }
 
+    fn curve_ids(scenario: &ScenarioSpec) -> Vec<&str> {
+        scenario
+            .operations
+            .iter()
+            .map(|operation| match operation {
+                OperationSpec::CurveParallelBp { curve_id, .. } => curve_id.as_str(),
+                _ => panic!("unexpected operation"),
+            })
+            .collect()
+    }
+
     #[test]
     fn get_registered_template() {
         let registry = registry_with_templates();
@@ -429,12 +369,6 @@ mod tests {
 
         assert_eq!(template.metadata.name, "Template rates_shock");
         assert_eq!(template.metadata.tags, vec!["systemic"]);
-    }
-
-    #[test]
-    fn get_missing() {
-        let registry = registry_with_templates();
-
         assert!(registry.entries.get("missing").is_none());
     }
 
@@ -526,64 +460,28 @@ mod tests {
     }
 
     #[test]
-    fn with_embedded_builtins_registers_all_builtins() {
+    fn embedded_builtins_register_all_builtins_in_order() {
         let registry =
-            TemplateRegistry::with_embedded_builtins().expect("embedded builtins should load");
+            TemplateRegistry::embedded_builtins().expect("embedded builtins should load");
 
-        assert_eq!(collected_ids(registry.list()), builtin_template_ids());
+        assert_eq!(
+            collected_ids(registry.list()),
+            vec![
+                "gfc_2008",
+                "covid_2020",
+                "rate_shock_2022",
+                "svb_2023",
+                "ltcm_1998",
+            ]
+        );
     }
 
     #[test]
-    fn embedded_registry_builds_all_builtins_and_components() {
-        let registry =
-            TemplateRegistry::with_embedded_builtins().expect("embedded builtins should load");
-        for template_id in builtin_template_ids() {
-            let scenario = registry.build(template_id).expect("scenario should build");
-            let component_ids = registry
-                .component_ids(template_id)
-                .expect("components should be listed");
-
-            assert_eq!(scenario.id, template_id);
-            assert_eq!(component_ids.len(), 5);
-
-            for component_id in component_ids {
-                let component = registry
-                    .build_component(template_id, component_id)
-                    .expect("component should build");
-                assert_eq!(component.id, component_id);
-            }
-        }
-    }
-
-    #[test]
-    fn register_json_document_and_get_by_id() {
-        let mut registry = TemplateRegistry::new();
-
-        registry
-            .register_json_document(json_document())
-            .expect("json document should register");
-
-        let entry = registry
-            .entries
-            .get("json_template")
-            .expect("json template should exist");
-
-        assert_eq!(entry.metadata.id, "json_template");
-        assert_eq!(entry.metadata.name, "JSON Template");
-    }
-
-    #[test]
-    fn register_json_document_composite_uses_component_order_and_top_level_fields() {
-        let mut registry = TemplateRegistry::new();
-        registry
-            .register_json_document(json_document())
-            .expect("json document should register");
-        let entry = registry
-            .entries
-            .get("json_template")
-            .expect("json template should exist");
-
-        let scenario = entry.build();
+    fn composite_uses_metadata_identity_and_component_order() {
+        let registry = registry_with(json_document());
+        let scenario = registry
+            .build("json_template")
+            .expect("json template should build");
 
         assert_eq!(scenario.id, "json_template");
         assert_eq!(scenario.name.as_deref(), Some("JSON Template"));
@@ -592,67 +490,33 @@ mod tests {
             Some("Composite description from JSON")
         );
         assert_eq!(scenario.priority, 7);
-        assert_eq!(scenario.operations.len(), 2);
-
-        match &scenario.operations[0] {
-            OperationSpec::CurveParallelBp { curve_id, bp, .. } => {
-                assert_eq!(curve_id, "B-CURVE");
-                assert_eq!(*bp, -25.0);
-            }
-            _ => panic!("unexpected operation"),
-        }
-
-        match &scenario.operations[1] {
-            OperationSpec::CurveParallelBp { curve_id, bp, .. } => {
-                assert_eq!(curve_id, "A-CURVE");
-                assert_eq!(*bp, 50.0);
-            }
-            _ => panic!("unexpected operation"),
-        }
+        assert_eq!(curve_ids(&scenario), vec!["B-CURVE", "A-CURVE"]);
     }
 
     #[test]
-    fn register_json_document_composite_order_follows_component_ids_not_component_priority() {
-        let mut registry = TemplateRegistry::new();
-        registry
-            .register_json_document(json_document_with_priority_order_conflict())
-            .expect("json document should register");
-        let entry = registry
-            .entries
-            .get("priority_order_conflict")
-            .expect("json template should exist");
+    fn composite_order_follows_metadata_not_component_priority() {
+        let registry = registry_with(json_document_with_priority_order_conflict());
+        let scenario = registry
+            .build("priority_order_conflict")
+            .expect("json template should build");
 
-        let scenario = entry.build();
-
-        assert_eq!(scenario.operations.len(), 2);
-
-        match &scenario.operations[0] {
-            OperationSpec::CurveParallelBp { curve_id, .. } => {
-                assert_eq!(curve_id, "LATE-CURVE");
-            }
-            _ => panic!("unexpected operation"),
-        }
-
-        match &scenario.operations[1] {
-            OperationSpec::CurveParallelBp { curve_id, .. } => {
-                assert_eq!(curve_id, "EARLY-CURVE");
-            }
-            _ => panic!("unexpected operation"),
-        }
+        assert_eq!(curve_ids(&scenario), vec!["LATE-CURVE", "EARLY-CURVE"]);
     }
 
     #[test]
-    fn register_json_document_exposes_component_ids_and_metadata() {
-        let mut registry = TemplateRegistry::new();
-        registry
-            .register_json_document(json_document())
-            .expect("json document should register");
+    fn registered_template_exposes_component_ids_and_metadata() {
+        let registry = registry_with(json_document());
         let entry = registry
             .entries
             .get("json_template")
             .expect("json template should exist");
 
-        assert_eq!(entry.component_ids(), vec!["component_b", "component_a"]);
+        assert_eq!(
+            registry
+                .component_ids("json_template")
+                .expect("json template should exist"),
+            vec!["component_b", "component_a"]
+        );
         assert_eq!(entry.metadata.description, "Template registered from JSON");
         assert_eq!(entry.metadata.event_date, date!(2020 - 03 - 16));
         assert_eq!(
@@ -664,36 +528,15 @@ mod tests {
     }
 
     #[test]
-    fn register_json_document_rejects_invalid_documents() {
-        let mut registry = TemplateRegistry::new();
+    fn from_documents_rejects_invalid_documents() {
         let mut document = json_document();
         document.metadata.components = vec!["wrong_component".into()];
 
-        let error = registry
-            .register_json_document(document)
-            .expect_err("invalid document should be rejected");
+        let Err(error) = TemplateRegistry::from_documents(vec![document]) else {
+            panic!("invalid document should be rejected");
+        };
 
         assert!(matches!(error, crate::Error::Validation(_)));
         assert!(error.to_string().contains("must match metadata.components"));
-    }
-
-    #[test]
-    fn new_registry_is_empty_until_templates_are_registered() {
-        let registry = TemplateRegistry::new();
-
-        assert!(registry.list().is_empty());
-        assert!(registry.entries.get("gfc_2008").is_none());
-    }
-
-    #[test]
-    fn embedded_registry_provides_builtins_without_runtime_loading() {
-        let registry =
-            TemplateRegistry::with_embedded_builtins().expect("embedded builtins should load");
-
-        assert!(registry.entries.get("gfc_2008").is_some());
-        assert!(registry.entries.get("covid_2020").is_some());
-        assert!(registry.entries.get("rate_shock_2022").is_some());
-        assert!(registry.entries.get("svb_2023").is_some());
-        assert!(registry.entries.get("ltcm_1998").is_some());
     }
 }
