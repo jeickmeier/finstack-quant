@@ -24,7 +24,6 @@ pub(crate) fn register_range_accrual_metrics(
                 // Rho: discount-curve-only central bump, repriced with the requested model.
                 (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_discount_only())),
                 (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
-                // Theta is now registered universally in crate::EXOTICS.metrics()
                 (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
                 (Delta, GenericFdDelta::<crate::exotics::range_accrual::RangeAccrual>::default()),
                 (Gamma, GenericFdGamma::<crate::exotics::range_accrual::RangeAccrual>::default()),

@@ -31,6 +31,8 @@ pub fn scalar_price_amount(
     }
 }
 
+/// Publish a Monte Carlo estimate's standard error, 95% confidence bounds and
+/// path counts as `mc_*` custom measures on `result`.
 pub fn attach_mc_diagnostics(
     result: &mut crate::results::ValuationResult,
     estimate: &finstack_quant_models::monte_carlo::results::MoneyEstimate,
@@ -460,12 +462,8 @@ pub fn merged_path_config(
     Ok(c)
 }
 
-/// Extract a unitless market scalar with a fallback default.
-///
 /// Read a required unitless market scalar, erroring when it is missing or typed.
 ///
-/// Production model-parameter resolvers should prefer this over the lenient
-/// fallback form so missing or mistyped model scalars are surfaced.
 /// The `model` argument is purely diagnostic and appears in the error
 /// message (e.g. `"Heston"`, `"rough Bergomi"`).
 pub fn get_unitless_scalar_strict(
@@ -486,57 +484,13 @@ pub fn get_unitless_scalar_strict(
     }
 }
 
-/// Compute requested metric measures for an already-priced instrument.
-///
-/// The caller owns the `ValuationResult` envelope and passes the final,
-/// scenario-adjusted base value. This helper only builds the metric context and
-/// returns deterministic measures, preventing metric attachment from replacing
-/// model details or metadata.
-///
-/// This function uses trait objects to avoid generic monomorphization across
-/// compilation units, which can cause coverage metadata mismatches.
-///
-/// # Arguments
-///
-/// * `instrument` - The instrument to price (wrapped in Arc for efficiency)
-/// * `curves` - Market data context (wrapped in Arc for efficiency)
-/// * `as_of` - Valuation date
-/// * `base_value` - Final scenario-adjusted base value (NPV)
-/// * `metrics` - List of metrics to compute. Every entry is forwarded to the
-///   metric registry unfiltered, so each one either lands in the returned map
-///   or aborts the call with an error; requested metrics are never silently
-///   dropped. Callers that legitimately tolerate partial support across
-///   heterogeneous instruments (composites) must narrow this list themselves.
-/// * `cfg` - Optional FinstackConfig for user-tunable metric defaults (e.g., bump sizes).
-///   When `None`, uses global defaults.
-/// * `market_history` - Optional market history for Historical VaR / Expected Shortfall metrics.
-///   When `None`, these metrics will not be available.
-///
-/// # Errors
-///
-/// Returns `Error::UnknownMetric` when a requested identifier is not
-/// registered, `Error::MetricNotApplicable` when it is registered but has no
-/// calculator for this instrument type, and `Error::MetricCalculationFailed`
-/// when a calculator runs and fails (for example on a missing market input).
-///
-/// # Performance
-///
-/// Accepts Arc-wrapped arguments to avoid cloning on every call. Callers should
-/// clone the instrument and market context once into Arc at the call boundary.
-///
-/// # Thread Safety
-///
-/// The `curves` parameter is wrapped in `Arc` for efficiency, not thread synchronization.
-/// Callers must ensure the market context is not mutated concurrently. For multi-threaded
-/// pricing with market data updates, create a new `MarketContext` snapshot for each
-/// pricing batch.
-///
-/// The `instrument` parameter is also `Arc`-wrapped. Instruments are generally immutable
-/// after construction, so this is safe for concurrent reads.
-/// Crate-private bundle at the registry → metric boundary.
+/// Pricing options, dispatch and pricer-published measures handed from the
+/// registry to [`compute_metrics_dyn`].
 #[derive(Default)]
 pub struct MetricBuildOptions {
+    /// Config, market history and recalibration provider for the metric context.
     pub pricing: PricingOptions,
+    /// Pricer dispatch metric calculators use when they reprice bumped markets.
     pub pricing_dispatch: PricingDispatch,
     /// Measures the model pricer already published for this valuation, taken
     /// verbatim from its `ValuationResult`. Standard identifiers among them
@@ -544,6 +498,34 @@ pub struct MetricBuildOptions {
     pub pricer_measures: IndexMap<MetricId, f64>,
 }
 
+/// Compute requested metric measures for an already-priced instrument.
+///
+/// The caller owns the `ValuationResult` envelope and passes the final,
+/// scenario-adjusted base value. This helper only builds the metric context and
+/// returns deterministic measures, preventing metric attachment from replacing
+/// model details or metadata.
+///
+/// # Arguments
+///
+/// * `instrument` - The priced instrument, shared with the metric context.
+/// * `curves` - Market data context the base value was priced against.
+/// * `as_of` - Valuation date.
+/// * `base_value` - Final scenario-adjusted base value (NPV).
+/// * `metrics` - Metrics to compute. Every entry is forwarded to the metric
+///   registry unfiltered, so each one either lands in the returned map or
+///   aborts the call with an error; requested metrics are never silently
+///   dropped. Callers that tolerate partial support across heterogeneous
+///   instruments (composites) must narrow this list themselves.
+/// * `options` - Pricing options (config, market history for historical
+///   VaR/ES, recalibration provider), the pricer dispatch used for bumped
+///   reprices, and the measures the model pricer already published.
+///
+/// # Errors
+///
+/// Returns `Error::UnknownMetric` when a requested identifier is not
+/// registered, `Error::MetricNotApplicable` when it is registered but has no
+/// calculator for this instrument type, and `Error::MetricCalculationFailed`
+/// when a calculator runs and fails (for example on a missing market input).
 pub fn compute_metrics_dyn(
     instrument: Arc<dyn crate::instruments::common_impl::traits::Instrument>,
     curves: Arc<MarketContext>,
@@ -1203,7 +1185,6 @@ pub fn apply_inflation_lag(date: Date, lag: InflationLag) -> finstack_quant_core
         InflationLag::None => Ok(date),
         InflationLag::Months(m) => date.add_months(-i32::from(m)),
         InflationLag::Days(d) => date.add_days(-i64::from(d)),
-        #[allow(unreachable_patterns)]
         _ => Err(finstack_quant_core::Error::Validation(
             "unsupported inflation lag convention".into(),
         )),

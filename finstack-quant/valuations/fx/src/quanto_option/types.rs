@@ -224,7 +224,6 @@ impl TryFrom<QuantoOptionUnchecked> for QuantoOption {
     }
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 impl QuantoOption {
     /// Create a canonical example quanto equity option (Nikkei in USD)
     /// expiring on the project-wide stable example epoch.

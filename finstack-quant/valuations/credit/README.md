@@ -31,11 +31,11 @@ assert!(!cds.id().is_empty());
 
 ## Public surface
 
-Import path: `finstack_quant_valuations_credit::<leaf>` (or
-`finstack_quant_valuations::instruments::credit_derivatives::<leaf>` through
-the umbrella). `CreditDefaultSwap`, `CdsIndex`, `CdsTranche`, `CdsOption`,
-`CdsOptionStrike` and `CdsOptionStrikeKind` are also re-exported at the crate
-root and flat at `finstack_quant_valuations::instruments`. The quadrature
+Import path: `finstack_quant_valuations_credit::<leaf>::<Type>` (or
+`finstack_quant_valuations::instruments::credit_derivatives::<leaf>::<Type>`
+through the umbrella); the crate root exports only the `CREDIT` family static.
+`CreditDefaultSwap`, `CdsIndex`, `CdsTranche` and `CdsOption` are also flat at
+`finstack_quant_valuations::instruments`. The quadrature
 helpers in `cds_option::{bloomberg_quadrature, pricer}` and the CDS pricing
 engine in `cds::pricing` are `#[doc(hidden)] pub`: the umbrella's Bloomberg
 CDSO golden test reaches them because its market bootstrap needs

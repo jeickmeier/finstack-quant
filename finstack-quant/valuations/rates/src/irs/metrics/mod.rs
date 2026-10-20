@@ -11,13 +11,9 @@
 //!
 //! # Module Organization
 //!
-//! Each metric is implemented in its own file for clarity:
-//! - [`par_rate`]: Par swap rate calculation
-//! - [`annuity`]: Fixed leg annuity
-//! - [`pv_fixed`]: Fixed leg PV
-//! - [`pv_float`]: Floating leg PV
-//!
-//! DV01 metrics use the unified calculator framework from `finstack_quant_valuations_core::metrics`.
+//! Par rate and the leg PVs are defined in this file; the annuity, DV01 and
+//! IR convexity calculators have their own files. DV01 uses the unified
+//! calculator framework from `finstack_quant_valuations_core::metrics`.
 //!
 //! # Examples
 //!
@@ -70,8 +66,6 @@ pub(crate) fn register_irs_metrics(
         metrics: [
             (Annuity, annuity::AnnuityCalculator),
             (ParRate, ParRateCalculator),
-
-            // Theta is now registered universally in crate::RATES.metrics()
 
             (Dv01, dv01::IrsDv01Calculator),
 
@@ -169,12 +163,9 @@ impl MetricCalculator for FixedLegPvCalculator {
 
 /// Present value calculator for the floating leg of an interest rate swap.
 ///
-/// Projects forward rates and discounts floating coupon payments. Automatically
-/// detects OIS swaps (overnight compounding) and uses the appropriate pricing method.
-/// For seasoned swaps with past resets, uses historical fixings if available.
-///
-/// Computes the present value of all future floating rate payments by
-/// projecting forward rates from the forward curve and discounting.
+/// Projects forward rates and discounts floating coupon payments, dispatching on
+/// the leg's compounding (see `pricer::compute_float_leg_pv`). Seasoned swaps
+/// read past resets from historical fixings.
 ///
 /// # Calculation
 ///
@@ -192,13 +183,9 @@ impl MetricCalculator for FixedLegPvCalculator {
 ///
 /// ## OIS/Overnight Swaps (RFR-style)
 ///
-/// For swaps with compounded-in-arrears floating legs, uses the
-/// discount-only identity:
-/// ```text
-/// PV_float = Notional × (DF(start) - DF(end)) + Spread_Annuity
-/// ```
-///
-/// This is exact when the forward curve matches the discount curve.
+/// Compounded-in-arrears legs project each coupon with the shared overnight
+/// compounding engine, splicing realized fixings into started periods and
+/// discounting with the fixed-leg discount curve.
 ///
 /// # References
 ///

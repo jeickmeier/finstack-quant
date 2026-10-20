@@ -34,7 +34,6 @@ pub(crate) fn register_swaption_metrics(
             (Vega, VegaCalculator),
             (HwSigmaVega, vega::HwSigmaVegaCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
-            // Theta is now registered universally in crate::RATES.metrics()
             // Rho bumps ONLY the discount/funding curve (holding the forward swap
             // rate fixed) — this is the correct option rho definition.  Using
             // `parallel_combined()` would also move the forward curve, conflating

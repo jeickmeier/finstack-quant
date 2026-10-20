@@ -1,5 +1,6 @@
-//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
-//!
+//! Tranche measures on `CdsTranchePricer` — model upfront, par spread, spread
+//! DV01, expected loss, correlation delta, jump-to-default — and their helpers.
+
 use super::config::{
     CdsTranchePricer, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION, NUMERICAL_TOLERANCE,
     PAR_SPREAD_TOLERANCE,

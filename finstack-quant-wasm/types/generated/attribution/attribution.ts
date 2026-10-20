@@ -13603,8 +13603,6 @@ export interface CdsOption {
  * Represents a spot equity position that can be priced using market data.
  * The price can come from direct market quotes or be computed from
  * underlying fundamentals.
- *
- * See unit tests and `examples/` for usage.
  */
 export interface Equity {
   /**

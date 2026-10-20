@@ -1,15 +1,4 @@
-//! Shared fixed-leg pricing and swap payment utilities.
-//!
-//! This module provides fixed coupon valuation, period data and payment-delay
-//! handling. Floating coupons use the canonical cashflow builder and overnight
-//! projection engines.
-//!
-//! # Capabilities
-//!
-//! - Numerically stable relative discount factors via
-//!   [`DiscountCurve::df_between_dates`](finstack_quant_core::market_data::term_structures::DiscountCurve::df_between_dates)
-//! - Neumaier compensated summation for long-dated swaps
-//! - Holiday-aware payment delay handling
+//! Swap payment utilities: the annuity floor and holiday-aware payment delays.
 
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{Date, DateExt};

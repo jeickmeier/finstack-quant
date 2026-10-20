@@ -43,14 +43,15 @@ assert!(!option.id().is_empty());
 
 ## Public surface
 
-Import path: `finstack_quant_valuations_equity::<leaf>` (or
-`finstack_quant_valuations::instruments::equity::<leaf>` through the
-umbrella). The headline types (`Equity`, `EquityOption`, `EquityFuture`,
+Import path: `finstack_quant_valuations_equity::<leaf>::<Type>` (or
+`finstack_quant_valuations::instruments::equity::<leaf>::<Type>` through the
+umbrella); the crate root exports only the `EQUITY` family static and
+`EquityPathModel`. The headline types (`Equity`, `EquityOption`, `EquityFuture`,
 `EquityFutureOption`, `EquityTotalReturnFuture`, `EquityTotalReturnSwap`,
 `VarianceSwap`, `EquityPriceSeriesPolicy`, `Autocallable`, `FinalPayoffType`,
 `CliquetOption`, `VolatilityIndexFuture`, `VolatilityIndexFutureOption`,
-`DiscountedCashFlow`, `TerminalValueSpec`, `PrivateMarketsFund`) are also
-re-exported at the crate root and flat at `finstack_quant_valuations::instruments`.
+`DiscountedCashFlow`, `TerminalValueSpec`, `PrivateMarketsFund`) are also flat at
+`finstack_quant_valuations::instruments`.
 
 ## Tests and benches
 

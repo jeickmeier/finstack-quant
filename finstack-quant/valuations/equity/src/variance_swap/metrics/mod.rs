@@ -1,7 +1,4 @@
-//! Variance swap metrics module.
-//!
-//! Split into focused calculators similar to other instruments. This `mod.rs`
-//! re-exports the calculators and provides a registry hookup.
+//! Variance swap metric registration; the vega calculator has its own file.
 
 mod vega;
 

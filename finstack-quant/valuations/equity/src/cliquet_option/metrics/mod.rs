@@ -21,21 +21,19 @@ pub(crate) fn register_cliquet_option_metrics(
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
 
-    {
-        finstack_quant_valuations_core::register_metrics! {
-            registry: registry,
-            instrument: InstrumentType::CliquetOption,
-            metrics: [
-                (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::cliquet_option::CliquetOption>::default()),
-                (Rho, RhoCalculator),
-                (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
-                (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-                (Delta, GenericFdDelta::<crate::cliquet_option::CliquetOption>::default()),
-                (Gamma, GenericFdGamma::<crate::cliquet_option::CliquetOption>::default()),
-                (Vanna, GenericFdVanna::<crate::cliquet_option::CliquetOption>::default()),
-                (Volga, GenericFdVolga::<crate::cliquet_option::CliquetOption>::default()),
-            ]
-        }
+    finstack_quant_valuations_core::register_metrics! {
+        registry: registry,
+        instrument: InstrumentType::CliquetOption,
+        metrics: [
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::cliquet_option::CliquetOption>::default()),
+            (Rho, RhoCalculator),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (Delta, GenericFdDelta::<crate::cliquet_option::CliquetOption>::default()),
+            (Gamma, GenericFdGamma::<crate::cliquet_option::CliquetOption>::default()),
+            (Vanna, GenericFdVanna::<crate::cliquet_option::CliquetOption>::default()),
+            (Volga, GenericFdVolga::<crate::cliquet_option::CliquetOption>::default()),
+        ]
     }
     Ok(())
 }

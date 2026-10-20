@@ -125,7 +125,6 @@ pub(crate) fn register_structured_credit_metrics(
             (CDR, pool::CdrCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-            // Theta is now registered universally in crate::STRUCTURED_CREDIT.metrics(),
             // Model-specific risk metrics (custom metrics)
             (Recovery01, risk::recovery01::Recovery01Calculator),
             (Prepayment01, risk::prepayment01::Prepayment01Calculator),

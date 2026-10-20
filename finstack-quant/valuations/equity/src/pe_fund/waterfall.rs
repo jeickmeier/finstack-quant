@@ -529,7 +529,6 @@ impl AllocationLedger {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 struct AllocationParams<'e> {
     total_amount: Money,
     initial_lp_unreturned: f64,

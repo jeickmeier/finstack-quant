@@ -1,5 +1,6 @@
-//! Configuration, integration, and metric helpers for CDS pricing.
-//!
+//! Premium schedules, coupon accruals, par spread, risky annuity and PV01, and
+//! full NPV on `CdsPricer`.
+
 use super::engine::{AodInputs, CdsPricer, CouponPeriod};
 use super::helpers::sp_cond_to;
 use crate::cds::CreditDefaultSwap;

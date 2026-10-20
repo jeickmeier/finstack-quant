@@ -12,7 +12,7 @@
 //!   ignored
 //! - **Rates credit**: Joint rates-credit rollback and OAS, including call,
 //!   put, and return-floor rights
-//! - **Merton MC**: Structural credit Monte Carlo for PIK bonds (feature-gated)
+//! - **Merton MC**: Structural credit Monte Carlo for PIK bonds
 //!
 //! # Utilities
 //!

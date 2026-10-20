@@ -57,19 +57,6 @@ use finstack_quant_core::market_data::fixings::fixing_series_id;
 /// observations they project (see [`TrsEngine::cashflows_financing_leg_with_fixings`]).
 pub type FinancingLegFlows = (Vec<(Date, Money)>, Vec<ProjectedFixing>);
 
-/// Project one financing-leg accrual period's floating rate, excluding spread.
-///
-/// `simple` legs use the discount-factor-implied simple forward over the period;
-/// compounded (OIS / RFR) legs daily-compound the overnight forward
-/// and return the equivalent simple rate `(∏(1+rᵢ·dᵢ)−1)/τ`, capturing the
-/// daily-compounding convexity the arithmetic average drops.
-///
-/// For compounded periods that have already started
-/// (`period_start <= as_of < period_end`), the function splices realized daily
-/// fixings (from `fixings`) with projected overnight forwards through the shared
-/// overnight coupon projector. Fully-future periods (`period_start > as_of`)
-/// use the same projector with entirely projected observations. Missing realized
-/// fixings for an in-progress period are errors.
 /// Projected TRS financing coupon for one accrual window.
 struct FinancingPeriodProjection {
     /// Index rate excluding spread.
@@ -110,6 +97,19 @@ impl FinancingPeriodProjection {
     }
 }
 
+/// Project one financing-leg accrual period's floating rate, excluding spread.
+///
+/// `simple` legs use the discount-factor-implied simple forward over the period;
+/// compounded (OIS / RFR) legs daily-compound the overnight forward
+/// and return the equivalent simple rate `(∏(1+rᵢ·dᵢ)−1)/τ`, capturing the
+/// daily-compounding convexity the arithmetic average drops.
+///
+/// For compounded periods that have already started
+/// (`period_start <= as_of < period_end`), the function splices realized daily
+/// fixings (from `fixings`) with projected overnight forwards through the shared
+/// overnight coupon projector. Fully-future periods (`period_start > as_of`)
+/// use the same projector with entirely projected observations. Missing realized
+/// fixings for an in-progress period are errors.
 #[allow(clippy::too_many_arguments)]
 fn financing_period_projection(
     financing: &FinancingLegSpec,

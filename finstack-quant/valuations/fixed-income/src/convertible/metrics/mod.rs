@@ -48,7 +48,6 @@ pub(crate) fn register_convertible_metrics(
             (Cs01, cs01::Cs01Calculator),
             (BucketedCs01, cs01::BucketedCs01Calculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
-            // Theta is now registered universally in crate::FIXED_INCOME.metrics()
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (Accrued, accrued_interest::AccruedInterestCalculator),
             (CleanPrice, accrued_interest::CleanPriceCalculator),

@@ -1,5 +1,5 @@
-//! Configuration, integration, and metric helpers for CDS pricing.
-//!
+//! Protection-leg integration over the ISDA Standard Model knot grid.
+
 use super::engine::CdsPricer;
 use super::helpers::{date_from_hazard_time, isda_standard_model_boundaries, settlement_date};
 use finstack_quant_core::dates::{Date, HolidayCalendar};

@@ -65,5 +65,3 @@ impl MetricCalculator for RhoCalculator {
         tree_greek(context, MetricId::Rho)
     }
 }
-
-// Theta calculator is implemented in `metrics/theta.rs` to share a generic implementation.

@@ -452,8 +452,6 @@ impl CdsTranche {
         let pricer = pricing::CdsTranchePricer::new();
         pricer.calculate_correlation_delta(self, market, as_of)
     }
-
-    // Builder now provided by derive
 }
 
 // Attributable is provided via blanket impl for all Instrument types

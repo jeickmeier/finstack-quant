@@ -268,7 +268,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsOption {
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 finstack_quant_valuations_core::impl_empty_cashflow_provider!(
     CmsOption,
     finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder

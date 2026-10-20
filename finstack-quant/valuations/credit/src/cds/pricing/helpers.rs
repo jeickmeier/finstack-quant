@@ -1,5 +1,6 @@
-//! Configuration, integration, and metric helpers for CDS pricing.
-//!
+//! Hazard-time conversion, settlement dates, ISDA integration boundaries and
+//! recovery-consistency checks shared by the CDS pricer.
+
 use finstack_quant_core::dates::{Date, DateExt, DayCount, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::{Error, Result};

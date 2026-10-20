@@ -59,5 +59,3 @@ pub(crate) mod pricing_helper;
 mod types;
 
 pub use types::FxSwap;
-
-// Builder provided by FinancialBuilder derive

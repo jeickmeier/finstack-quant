@@ -50,9 +50,11 @@ convention in `mbs_passthrough` and all four move.
 
 ## Public surface
 
-Import path: `finstack_quant_valuations_fixed_income::<leaf>` (or `finstack_quant_valuations::instruments::fixed_income::<leaf>` through the umbrella).
-Every leaf directory is `pub mod`. The headline types are additionally
-re-exported at the crate root and flat at `finstack_quant_valuations::instruments`:
+Import path: `finstack_quant_valuations_fixed_income::<leaf>::<Type>` (or
+`finstack_quant_valuations::instruments::fixed_income::<leaf>::<Type>` through the
+umbrella). Every leaf directory is `pub mod`; the crate root exports only the
+`FIXED_INCOME` family static. The headline types are also flat at
+`finstack_quant_valuations::instruments`:
 
 `Bond`, `BondSettlementConvention`, `BondFuture`, `BondFutureBuilder`,
 `BondFutureSpecs`, `DeliverableBond`, `AgencyCmo`, `CmoTranche`,

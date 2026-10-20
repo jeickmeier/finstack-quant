@@ -57,5 +57,3 @@ pub(crate) mod pricer;
 mod types;
 
 pub use types::VolatilityIndexFuture;
-
-// Builder provided by FinancialBuilder derive

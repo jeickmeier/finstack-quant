@@ -23,7 +23,6 @@ pub(crate) fn register_asian_option_metrics(
                 (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
                 (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
                 (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-                // Theta is now registered universally in crate::EXOTICS.metrics(),
                 (Delta, GenericFdDelta::<crate::exotics::asian_option::AsianOption>::default()),
                 (Gamma, GenericFdGamma::<crate::exotics::asian_option::AsianOption>::default()),
                 (Vanna, GenericFdVanna::<crate::exotics::asian_option::AsianOption>::default()),

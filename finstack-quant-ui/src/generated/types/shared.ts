@@ -40239,8 +40239,6 @@ export interface ScenarioPricingOverrides32 {
  * The price can come from direct market quotes or be computed from
  * underlying fundamentals.
  *
- * See unit tests and `examples/` for usage.
- *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "Equity".
  */

@@ -446,19 +446,13 @@ pub fn generate_three_factor_paths(
 // Use centralized constants from parent module
 use super::super::MIN_CIR_SPREAD;
 
-/// Build credit spread parameters from MC config.
-///
-/// # Feller Condition
-///
-/// For CIR processes, validates the Feller condition: 2κθ > σ². When violated,
-/// the process can reach zero. A warning is logged but the process proceeds
-/// since the QE discretization handles boundary behavior gracefully.
 /// Credit-spread process parameters for one facility.
 ///
 /// Market-anchored specs start at the hazard curve's instantaneous spread on
 /// `simulation_anchor` and revert to the conditional average spread over the
 /// remaining tenor; explicit CIR and constant specs are guarded for
-/// stability.
+/// stability. A CIR process that violates the Feller condition (2κθ > σ²) logs
+/// a warning and proceeds; the QE discretization clips spreads at zero.
 ///
 /// # Arguments
 ///

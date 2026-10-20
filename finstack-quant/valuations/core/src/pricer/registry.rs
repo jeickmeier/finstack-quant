@@ -516,21 +516,6 @@ impl PricerRegistry {
     }
 }
 
-/// Apply request-owned metadata while preserving model-owned audit fields.
-///
-/// Numeric mode and rounding come from the effective request config. Existing
-/// model timestamps and version stamps are retained, with request defaults used
-/// only when the model omitted them.
-///
-/// FX policy precedence (highest to lowest):
-/// 1. A policy already set on `result.meta.fx_policy_applied` by the pricer.
-/// 2. The `fx_policy` field on any curve the instrument depends on.
-/// 3. `None`.
-///
-/// Multi-curve aggregation: when more than one dependent curve carries a
-/// policy stamp, they are joined with ` | ` so the audit trail records every
-/// policy that fed into the valuation. Single-stamp results return the
-/// policy verbatim.
 /// Record how a result was produced: model, requested date, declared market
 /// dependencies, scenario adjustment and (for metric requests) bump sizes.
 fn valuation_provenance(
@@ -566,6 +551,21 @@ fn valuation_provenance(
     })
 }
 
+/// Apply request-owned metadata while preserving model-owned audit fields.
+///
+/// Numeric mode and rounding come from the effective request config. Existing
+/// model timestamps and version stamps are retained, with request defaults used
+/// only when the model omitted them.
+///
+/// FX policy precedence (highest to lowest):
+/// 1. A policy already set on `result.meta.fx_policy_applied` by the pricer.
+/// 2. The `fx_policy` field on any curve the instrument depends on.
+/// 3. `None`.
+///
+/// Multi-curve aggregation: when more than one dependent curve carries a
+/// policy stamp, they are joined with ` | ` so the audit trail records every
+/// policy that fed into the valuation. Single-stamp results return the
+/// policy verbatim.
 #[doc(hidden)]
 pub fn stamp_results_meta(
     cfg: &FinstackConfig,

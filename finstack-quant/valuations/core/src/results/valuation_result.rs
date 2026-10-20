@@ -739,8 +739,6 @@ impl ValuationResult {
         self
     }
 
-    // Note: FX policy stamping is handled at the core `ResultsMeta` level.
-
     /// Check if all covenants passed their compliance tests.
     ///
     /// Returns `true` if there are no covenants or if all covenants passed.
@@ -838,11 +836,6 @@ impl ValuationResult {
             .unwrap_or_default()
     }
 }
-
-// Note: a previous revision exposed `impl Index<MetricId>` / `impl Index<&MetricId>`
-// on `ValuationResult`, which silently panicked on missing keys. Callers must now
-// use `metric(id)` / `metric_str(id)` (option-returning), or index the backing `measures` map directly when a
-// missing key truly is a programming error at the call site.
 
 #[cfg(test)]
 mod tests {

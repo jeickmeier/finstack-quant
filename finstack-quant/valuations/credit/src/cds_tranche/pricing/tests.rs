@@ -1,5 +1,5 @@
-//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
-//!
+//! Unit tests for the CDS tranche pricing engine.
+
 use super::config::{DiscountAt, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION};
 use super::*;
 use crate::cds_tranche::parameters::CdsTrancheParams;

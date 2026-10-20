@@ -116,5 +116,3 @@ impl MetricCalculator for YtwCalculator {
         Ok(best_ytm)
     }
 }
-
-impl YtwCalculator {}

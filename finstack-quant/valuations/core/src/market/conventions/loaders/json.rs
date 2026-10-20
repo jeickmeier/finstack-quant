@@ -1,7 +1,7 @@
 //! Shared JSON registry loader helpers.
 
 use finstack_quant_core::Error;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::{HashMap, HashSet};
 
 const SUPPORTED_REGISTRY_SCHEMA_MAJOR: u32 = 2;
 
@@ -120,12 +120,12 @@ where
     file.validate_metadata(registry_name)?;
 
     let mut final_map = HashMap::default();
-    let mut seen_ids: HashMap<String, ()> = HashMap::default();
+    let mut seen_ids: HashSet<String> = HashSet::default();
     for entry in file.entries {
         let value = map_record(&entry.record)?;
         for id in entry.ids {
             let key = normalize_registry_id(&id);
-            if seen_ids.insert(key.clone(), ()).is_some() {
+            if !seen_ids.insert(key.clone()) {
                 return Err(Error::Validation(format!(
                     "Duplicate registry id after normalization: '{}' (from '{}')",
                     key, id

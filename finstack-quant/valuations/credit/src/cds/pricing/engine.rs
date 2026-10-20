@@ -1,5 +1,5 @@
-//! Configuration, integration, and metric helpers for CDS pricing.
-//!
+//! `CdsPricer`: premium and protection legs, NPV and the hazard-reprice cache.
+
 use super::config::CdsPricerConfig;
 use super::helpers::{
     date_from_hazard_time, haz_t, isda_standard_model_boundaries, settlement_date, sp_cond_to,

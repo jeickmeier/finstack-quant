@@ -1,5 +1,6 @@
-//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
-//!
+//! `CdsTranchePricer`, its numerical constants and the internal pool and
+//! expected-loss row types.
+
 use finstack_quant_cashflows::primitives::CashFlow;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;

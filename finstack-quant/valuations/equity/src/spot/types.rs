@@ -19,8 +19,6 @@ use finstack_quant_valuations_core::instruments::MarketDependencies;
 /// Represents a spot equity position that can be priced using market data.
 /// The price can come from direct market quotes or be computed from
 /// underlying fundamentals.
-///
-/// See unit tests and `examples/` for usage.
 #[derive(
     Clone,
     Debug,
@@ -31,8 +29,6 @@ use finstack_quant_valuations_core::instruments::MarketDependencies;
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-// Note: JsonSchema derive requires finstack-quant-core types to implement JsonSchema
-// #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Equity {
     /// Unique identifier for the equity
     pub id: InstrumentId,

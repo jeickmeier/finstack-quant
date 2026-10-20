@@ -22,12 +22,11 @@ use finstack_quant_valuations_core::pricer::{
 use finstack_quant_valuations_core::results::ValuationResult;
 use std::sync::Arc;
 
-// LSMC imports (gated by feature)
 use crate::swaption::pricing::hw_cashflows::{
     value_with_exercise_today, HwExerciseTerms, HwSwaptionCashflows,
 };
 use crate::swaption::pricing::monte_carlo_lsmc::SwaptionLsmcPricer;
-use crate::swaption::pricing::swap_rate_utils::HullWhiteBondPrice;
+use crate::swaption::pricing::swap_rate_utils::hw_bond_price;
 use crate::swaption::CashSettlementMethod;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::process::ou::{
@@ -618,9 +617,7 @@ impl BermudanSwaptionPricer {
                 t,
                 hw_params.kappa,
                 hw_params.sigma_at_time(t),
-                |maturity| {
-                    HullWhiteBondPrice::bond_price(&hw_params, short_rate, t, maturity, discount_fn)
-                },
+                |maturity| hw_bond_price(&hw_params, short_rate, t, maturity, discount_fn),
                 terms,
             ))
         };

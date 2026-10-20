@@ -943,7 +943,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
     }
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 #[cfg(test)]
 mod tests {
     use super::*;

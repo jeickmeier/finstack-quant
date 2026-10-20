@@ -117,8 +117,6 @@ pub(crate) fn register_term_loan_metrics(
         metrics: [
             (Ytw, YtwCalculator),
 
-            // Theta is now registered universally in crate::FIXED_INCOME.metrics()
-
             (Dv01, risk_view::TermLoanParallelDv01Calculator),
             (BucketedDv01, risk_view::TermLoanBucketedDv01Calculator),
             (Cs01, risk_view::TermLoanCs01Calculator),
@@ -174,7 +172,7 @@ pub(crate) fn register_term_loan_metrics(
 ///
 /// The fee-inclusive "all-in" borrower cost — the IFRS-9 effective interest
 /// rate that amortizes upfront fees and OID over the loan's life — is a
-/// separate metric, [`super::oid_eir::OidEirAmortizationCalculator`]
+/// separate metric, [`OidEirAmortizationCalculator`]
 /// (`"oid_eir_rate"`), which solves an XIRR over the full flow set (including
 /// the upfront fee when `OidEirSpec::include_fees`). Use that metric when the
 /// borrower's effective rate inclusive of origination economics is required.

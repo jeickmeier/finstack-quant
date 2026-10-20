@@ -1,5 +1,5 @@
-//! Configuration, integration, and metric helpers for CDS pricing.
-//!
+//! Unit tests for the CDS pricing engine.
+
 #![allow(clippy::expect_used, clippy::panic)]
 
 use super::helpers::{date_from_hazard_time, haz_t, settlement_date, sp_cond_to};
