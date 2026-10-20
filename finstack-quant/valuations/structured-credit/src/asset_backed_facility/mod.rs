@@ -2,7 +2,7 @@
 //! facility lending against a collateral pool under advance rates,
 //! concentration limits and a borrowing-base test.
 //!
-//! The facility reuses the structured-credit engine: [`AssetBackedFacility::synthesized_deal`]
+//! The facility reuses the structured-credit engine: [`AssetBackedFacility::synthesized_deal`](crate::asset_backed_facility::AssetBackedFacility::synthesized_deal)
 //! builds a two-class deal (facility note + residual) whose
 //! `CoverageTestType::BorrowingBase` test enforces the borrowing base every
 //! period, whose reinvestment period is the revolving period, and whose
@@ -12,7 +12,7 @@
 //! its payment date, `fees` reach the waterfall ahead of the facility's
 //! interest, `draws` and `readvance_to_borrowing_base` lift the
 //! facility balance after closing, and the commitment fee accrues only
-//! while the line revolves. [`AssetBackedFacility::project`] returns the
+//! while the line revolves. [`AssetBackedFacility::project`](crate::asset_backed_facility::AssetBackedFacility::project) returns the
 //! note's flows, the commitment fee, the draws and the residual; the
 //! `Instrument` impl prices the lender's flows on the discount curve.
 //!

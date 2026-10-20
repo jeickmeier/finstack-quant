@@ -1,6 +1,6 @@
 //! Pricing-engine components for fixed-income bonds.
 //!
-use super::super::super::super::types::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::types::CurveId;

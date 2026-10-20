@@ -8,7 +8,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_equity::Equity;
+use finstack_quant_valuations_equity::spot::Equity;
 
 fn build_flat_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
     let mut builder = DiscountCurve::builder(curve_id)

@@ -10,7 +10,7 @@
 //! ```
 
 use super::cs01::z_spread_bumped_pvs;
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 

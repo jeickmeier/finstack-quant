@@ -44,7 +44,9 @@ pub fn sample_swap(side: PayReceive) -> VarianceSwap {
         .observation_frequency(Tenor::daily())
         .observation_calendar_id("USNY".into())
         .realized_var_method(RealizedVarMethod::CloseToClose)
-        .price_series_policy(finstack_quant_valuations_equity::EquityPriceSeriesPolicy::Adjusted)
+        .price_series_policy(
+            finstack_quant_valuations_equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
+        )
         .side(side)
         .discount_curve_id(CurveId::new(DISC_ID))
         .day_count(DayCount::Act365F)

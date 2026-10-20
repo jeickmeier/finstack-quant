@@ -6,7 +6,7 @@
 //!
 //! # See Also
 //!
-//! - [`CallableRangeAccrual`] for instrument definition
+//! - [`CallableRangeAccrual`](crate::exotics::callable_range_accrual::CallableRangeAccrual) for instrument definition
 //! - [`crate::exotics::range_accrual::RangeAccrual`] for the underlying range accrual leg
 //! - [`finstack_quant_valuations_core::instruments::BermudanCallProvision`]
 

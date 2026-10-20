@@ -20,7 +20,7 @@ impl DfDateSelector {
     fn resolve(self, context: &MetricContext) -> finstack_quant_core::Result<Date> {
         match self {
             Self::Start => context
-                .instrument_as::<crate::Deposit>()?
+                .instrument_as::<crate::deposit::Deposit>()?
                 .effective_start_date(),
             Self::End => context.instrument.expiry().ok_or_else(|| {
                 finstack_quant_core::Error::Validation(format!(
@@ -74,7 +74,7 @@ impl MetricCalculator for DfCalculator {
 #[cfg(test)]
 mod tests {
     use super::DfCalculator;
-    use crate::Deposit;
+    use crate::deposit::Deposit;
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};

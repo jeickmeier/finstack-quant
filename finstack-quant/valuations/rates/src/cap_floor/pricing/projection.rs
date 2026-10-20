@@ -197,10 +197,10 @@ pub(crate) fn resolve_optioned_caplet_inputs(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cap_floor::RateOptionType;
     use crate::cap_floor::{
         CapFloorVolType, OvernightCouponConvention, OvernightSpreadCompounding,
     };
-    use crate::RateOptionType;
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, DayCountContext};

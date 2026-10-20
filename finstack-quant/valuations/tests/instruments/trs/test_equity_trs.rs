@@ -153,7 +153,7 @@ fn completed_period_remains_valued_until_lagged_payment_date() {
         .schedule(schedule)
         .side(PayReceive::Receive)
         .dividend_settlement(
-            finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
+            finstack_quant_valuations::instruments::equity::equity_trs::TrsDividendSettlement::OnDividendDate,
         )
         .initial_level(4_900.0)
         .build()

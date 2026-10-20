@@ -125,7 +125,7 @@ pub(crate) fn register_structured_credit_metrics(
             (CDR, pool::CdrCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-            // Theta is now registered universally in crate::structured_credit::STRUCTURED_CREDIT.metrics(),
+            // Theta is now registered universally in crate::STRUCTURED_CREDIT.metrics(),
             // Model-specific risk metrics (custom metrics)
             (Recovery01, risk::recovery01::Recovery01Calculator),
             (Prepayment01, risk::prepayment01::Prepayment01Calculator),
@@ -154,7 +154,7 @@ mod tests {
     /// `list_standard_metrics` surface them by id without extra wiring.
     #[test]
     fn data_complete_deal_metrics_are_registered_for_structured_credit() {
-        let registry = crate::structured_credit::STRUCTURED_CREDIT.metrics();
+        let registry = crate::STRUCTURED_CREDIT.metrics();
         for id in [
             MetricId::CloWas,
             MetricId::AbsChargeOff,

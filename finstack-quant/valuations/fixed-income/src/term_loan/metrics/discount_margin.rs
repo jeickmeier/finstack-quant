@@ -26,7 +26,7 @@
 
 use crate::loan_quotes::{pv_with_discount_margin, solve_discount_margin};
 use crate::term_loan::pricing::TermLoanDiscountingPricer;
-use crate::TermLoan;
+use crate::term_loan::TermLoan;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use rust_decimal::prelude::ToPrimitive;
 

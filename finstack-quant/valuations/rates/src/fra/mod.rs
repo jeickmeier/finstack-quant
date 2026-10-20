@@ -56,7 +56,7 @@
 //!
 //! # See Also
 //!
-//! - [`ForwardRateAgreement`] for instrument struct
+//! - [`ForwardRateAgreement`](crate::fra::ForwardRateAgreement) for instrument struct
 //! - Plan-driven calibration in `calibration::api` (Forward step) for curve construction
 
 pub(crate) mod metrics;

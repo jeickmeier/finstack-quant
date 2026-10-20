@@ -5,7 +5,7 @@ use crate::bond::pricing::quote_conversions::{
     clean_price_from_japanese_simple_yield, price_from_ytm, price_from_ytw, price_from_z_spread,
 };
 use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::bond::types::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{InputError, Result};

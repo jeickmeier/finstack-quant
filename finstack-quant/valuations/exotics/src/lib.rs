@@ -21,7 +21,7 @@
 //! Exotic options, structured rate notes and commodity derivatives.
 //!
 //! Two instrument families share this crate and one registration unit,
-//! [`exotics::EXOTICS`]:
+//! [`EXOTICS`]:
 //!
 //! - [`exotics`]: path-dependent options (Asian, barrier, lookback), range
 //!   accruals and the Hull-White structured notes (TARN, snowball, callable
@@ -38,8 +38,8 @@
 //!
 //! ```rust
 //! use finstack_quant_valuations_core::instruments::Instrument;
-//! use finstack_quant_valuations_exotics::commodity::CommodityForward;
-//! use finstack_quant_valuations_exotics::exotics::AsianOption;
+//! use finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;
+//! use finstack_quant_valuations_exotics::exotics::asian_option::AsianOption;
 //!
 //! let asian = AsianOption::example().unwrap();
 //! let forward = CommodityForward::example().unwrap();
@@ -51,15 +51,8 @@ pub mod commodity;
 /// Exotic and path-dependent options.
 pub mod exotics;
 
-pub use commodity::{
-    CommodityAsianOption, CommodityForward, CommodityFuture, CommodityFutureFixing,
-    CommodityFutureOption, CommoditySpotOption, CommoditySpotOptionExercise, CommoditySpreadOption,
-    CommoditySwap, CommoditySwaption,
-};
-pub use exotics::{
-    AsianOption, AveragingMethod, BarrierOption, CallableRangeAccrual, LookbackOption,
-    LookbackType, RangeAccrual, Snowball, SnowballVariant, Tarn, EXOTICS,
-};
+mod family;
+pub use family::EXOTICS;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

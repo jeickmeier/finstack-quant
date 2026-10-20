@@ -27,7 +27,7 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations_exotics::commodity::CommodityForward;
+//! use finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;
 //! use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -52,9 +52,9 @@
 //!
 //! # See Also
 //!
-//! - [`CommodityForward`] for forwards and futures
-//! - [`CommoditySwap`] for fixed-float swaps
-//! - [`CommoditySpotOption`] for commodity options
+//! - [`CommodityForward`](crate::commodity::commodity_forward::CommodityForward) for forwards and futures
+//! - [`CommoditySwap`](crate::commodity::commodity_swap::CommoditySwap) for fixed-float swaps
+//! - [`CommoditySpotOption`](crate::commodity::commodity_spot_option::CommoditySpotOption) for commodity options
 
 /// Shared business-day averaging helpers for floating legs.
 pub(crate) mod averaging;
@@ -75,12 +75,3 @@ pub mod commodity_swap;
 /// Commodity swaption module.
 pub mod commodity_swaption;
 pub(crate) mod forward_price;
-
-pub use commodity_asian_option::CommodityAsianOption;
-pub use commodity_forward::CommodityForward;
-pub use commodity_future::{CommodityFuture, CommodityFutureFixing};
-pub use commodity_future_option::CommodityFutureOption;
-pub use commodity_spot_option::{CommoditySpotOption, CommoditySpotOptionExercise};
-pub use commodity_spread_option::CommoditySpreadOption;
-pub use commodity_swap::CommoditySwap;
-pub use commodity_swaption::CommoditySwaption;

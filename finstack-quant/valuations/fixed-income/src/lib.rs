@@ -44,7 +44,7 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations_fixed_income::Bond;
+//! use finstack_quant_valuations_fixed_income::bond::Bond;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::types::Rate;
@@ -66,11 +66,11 @@
 //!
 //! # See Also
 //!
-//! - [`Bond`] for standard fixed/floating rate bonds
+//! - [`Bond`](crate::bond::Bond) for standard fixed/floating rate bonds
 //! - `StructuredCredit` for ABS, CLO, and securitized products (the
 //!   `finstack-quant-valuations-structured-credit` crate, re-exported by the
 //!   umbrella as `instruments::fixed_income::structured_credit`)
-//! - [`AgencyMbsPassthrough`] for mortgage pass-throughs
+//! - [`AgencyMbsPassthrough`](crate::mbs_passthrough::AgencyMbsPassthrough) for mortgage pass-throughs
 //! - [`finstack_quant_cashflows`] for cashflow generation
 
 /// Bond module - Fixed and floating rate bonds.
@@ -99,17 +99,6 @@ pub mod term_loan;
 
 mod family;
 pub use family::FIXED_INCOME;
-
-pub use bond::{Bond, BondSettlementConvention};
-pub use bond_future::{BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond};
-pub use convertible::ConvertibleBond;
-pub use dollar_roll::DollarRoll;
-pub use fi_trs::FiIndexTotalReturnSwap;
-pub use inflation_linked_bond::InflationLinkedBond;
-pub use mbs_passthrough::{AgencyMbsPassthrough, AgencyProgram, PoolType};
-pub use revolving_credit::RevolvingCredit;
-pub use tba::{AgencyTba, TbaTerm};
-pub use term_loan::TermLoan;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

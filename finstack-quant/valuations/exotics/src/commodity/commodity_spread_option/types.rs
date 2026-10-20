@@ -51,7 +51,7 @@ use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
 /// # Example
 ///
 /// ```
-/// use finstack_quant_valuations_exotics::commodity::CommoditySpreadOption;
+/// use finstack_quant_valuations_exotics::commodity::commodity_spread_option::CommoditySpreadOption;
 /// use finstack_quant_valuations_core::instruments::OptionType;
 /// use finstack_quant_core::types::{CurveId, InstrumentId};
 /// use time::macros::date;
@@ -237,7 +237,7 @@ impl CommoditySpreadOption {
 impl Instrument for CommoditySpreadOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommoditySpreadOption,
-        crate::exotics::EXOTICS
+        crate::EXOTICS
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {

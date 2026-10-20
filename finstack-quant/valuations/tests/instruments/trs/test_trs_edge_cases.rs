@@ -379,7 +379,7 @@ fn test_equity_trs_with_past_start_date() {
         ))
         .side(PayReceive::Receive)
         .dividend_settlement(
-            finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
+            finstack_quant_valuations::instruments::equity::equity_trs::TrsDividendSettlement::OnDividendDate,
         )
         .build()
         .unwrap();
@@ -420,7 +420,7 @@ fn test_equity_trs_with_very_short_tenor_1_day() {
         ))
         .side(PayReceive::Receive)
         .dividend_settlement(
-            finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
+            finstack_quant_valuations::instruments::equity::equity_trs::TrsDividendSettlement::OnDividendDate,
         )
         .build()
         .unwrap();

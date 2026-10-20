@@ -32,7 +32,7 @@
 //!
 //! # See Also
 //!
-//! - [`BarrierOption`] for instrument struct
+//! - [`BarrierOption`](crate::exotics::barrier_option::BarrierOption) for instrument struct
 //! - [`finstack_quant_core::types::BarrierType`] for up/down and in/out classification
 //! - [`models::closed_form::barrier`](finstack_quant_models::closed_form::barrier) for pricing
 

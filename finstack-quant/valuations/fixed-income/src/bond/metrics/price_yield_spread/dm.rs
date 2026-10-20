@@ -3,7 +3,7 @@
 use super::z_spread::{maturity_scaled_bracket, BondZSpreadPricingKernel};
 use crate::bond::pricing::quote_conversions::clear_price_driving_overrides;
 use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use std::cell::RefCell;
@@ -188,7 +188,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
 
         // Valid FRN that references the "USD-SOFR-3M" projection curve.
-        let bond = crate::Bond::floating(
+        let bond = crate::bond::Bond::floating(
             "DM-UNIT-MISSING-FWD",
             Money::from((1_000_000_i64, Currency::USD)),
             "USD-SOFR-3M",

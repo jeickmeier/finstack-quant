@@ -41,7 +41,7 @@
 //!
 //! # See Also
 //!
-//! - [`FxTouchOption`] for the instrument struct
+//! - [`FxTouchOption`](crate::fx_touch_option::FxTouchOption) for the instrument struct
 //! - `pricer::compute_pv` for pricing calculations
 
 /// FX touch option risk metrics

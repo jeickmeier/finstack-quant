@@ -24,7 +24,7 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations::instruments::fixed_income::Bond;
+//! use finstack_quant_valuations::instruments::Bond;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::types::Rate;
@@ -60,8 +60,7 @@
 
 pub use finstack_quant_valuations_fixed_income::*;
 pub use finstack_quant_valuations_structured_credit::{
-    asset_backed_facility, cmo, structured_credit, AgencyCmo, AssetBackedFacility, CmoTranche,
-    CmoTrancheType, CmoWaterfall, StructuredCredit,
+    asset_backed_facility, cmo, structured_credit, STRUCTURED_CREDIT,
 };
 
 mod bond_json;

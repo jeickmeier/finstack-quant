@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use super::{StochasticPricingResult, StructuredCredit};
+use crate::structured_credit::{StochasticPricingResult, StructuredCredit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{
@@ -37,7 +37,7 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
 }
 
 fn register_metrics(registry: &mut MetricRegistry) -> Result<(), MetricRegistryError> {
-    super::metrics::register_structured_credit_metrics(registry)?;
+    crate::structured_credit::metrics::register_structured_credit_metrics(registry)?;
     crate::cmo::metrics::register_cmo_metrics(registry)?;
     crate::asset_backed_facility::metrics::register_asset_backed_facility_metrics(registry)?;
     // `StructuredCreditStochasticPricer` publishes `expected_loss` and

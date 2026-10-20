@@ -11,7 +11,7 @@ use finstack_quant_margin::{
     OtcMarginSpec, ScheduleImCalculator, SimmCalculator, VmCalculator, VmParameters,
 };
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_rates::InterestRateSwap;
+use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use time::Month;
 
 fn test_date() -> Date {

@@ -23,7 +23,7 @@ no other instrument family. The multi-asset `Basket` is not here: its legs are
 | `tarn/`, `snowball/` | Target-redemption and snowball / inverse-floater notes | Hull-White 1F Monte Carlo (`finstack_quant_models::rates::hw1f`); term fixings through `instruments::pricing::term_fixings` |
 
 ```rust
-use finstack_quant_valuations_exotics::exotics::{AsianOption, AveragingMethod};
+use finstack_quant_valuations_exotics::exotics::asian_option::{AsianOption, AveragingMethod};
 
 let asian = AsianOption::example().unwrap();
 assert_eq!(asian.averaging_method, AveragingMethod::Arithmetic);

@@ -570,7 +570,7 @@ impl Bond {
     /// use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams};
-    /// use finstack_quant_valuations_fixed_income::Bond;
+    /// use finstack_quant_valuations_fixed_income::bond::Bond;
     /// use rust_decimal_macros::dec;
     /// use time::macros::date;
     ///

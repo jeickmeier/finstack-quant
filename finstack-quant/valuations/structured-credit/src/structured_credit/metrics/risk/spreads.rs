@@ -725,7 +725,7 @@ mod zspread_quote_tests {
             MetricId::SpreadDuration,
         ] {
             let mut context = context_without_quote();
-            let err = crate::structured_credit::STRUCTURED_CREDIT
+            let err = crate::STRUCTURED_CREDIT
                 .metrics()
                 .compute(std::slice::from_ref(&requested), &mut context)
                 .expect_err("quote-dependent spread metrics must require an external quote");
@@ -745,7 +745,7 @@ mod zspread_quote_tests {
     #[test]
     fn spread_duration_normalizes_by_quote_reproducing_target() {
         let mut context = context_with_quote(90.0);
-        crate::structured_credit::STRUCTURED_CREDIT
+        crate::STRUCTURED_CREDIT
             .metrics()
             .compute(&[MetricId::SpreadDuration], &mut context)
             .expect("quoted spread duration");

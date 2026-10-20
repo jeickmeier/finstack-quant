@@ -18,8 +18,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_fixed_income::bond::Bond;
 use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
-use finstack_quant_valuations_fixed_income::Bond;
 use time::macros::date;
 
 use finstack_quant_valuations_test_support::test_helpers::tolerances;

@@ -59,7 +59,7 @@
 //!
 //! # See Also
 //!
-//! - [`InterestRateFuture`] for instrument struct
+//! - [`InterestRateFuture`](crate::ir_future::InterestRateFuture) for instrument struct
 //! - [`crate::ir_future::FutureContractSpecs`] for contract specifications
 //! - Plan-driven calibration in `calibration::api` (Forward step)
 

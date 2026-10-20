@@ -125,7 +125,7 @@
 //!
 //! # Examples
 //!
-//! See [`CreditDefaultSwap`] for construction and usage examples.
+//! See [`CreditDefaultSwap`](crate::cds::CreditDefaultSwap) for construction and usage examples.
 //!
 //! # See Also
 //!

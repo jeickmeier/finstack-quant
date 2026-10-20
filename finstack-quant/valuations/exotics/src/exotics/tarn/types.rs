@@ -204,7 +204,7 @@ impl Tarn {
 impl finstack_quant_valuations_core::instruments::Instrument for Tarn {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Tarn,
-        crate::exotics::EXOTICS
+        crate::EXOTICS
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {

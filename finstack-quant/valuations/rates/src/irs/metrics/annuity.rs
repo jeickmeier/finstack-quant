@@ -46,7 +46,7 @@
 //! - Tuckman, B., & Serrat, A. (2011). *Fixed Income Securities*. Chapter 4. `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 //! - Kahan, W. (1965). "Further Remarks on Reducing Truncation Errors." `docs/REFERENCES.md#kahan-1965`
 
-use crate::InterestRateSwap;
+use crate::irs::InterestRateSwap;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Fixed-leg annuity calculator for interest rate swaps.

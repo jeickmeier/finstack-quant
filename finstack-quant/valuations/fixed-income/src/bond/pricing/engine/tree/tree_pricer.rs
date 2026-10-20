@@ -1,9 +1,9 @@
 //! Pricing-engine components for fixed-income bonds.
 //!
-use super::super::super::super::types::Bond;
 use super::bond_valuator::BondValuator;
 use super::config::{TreeModelChoice, TreePricerConfig};
 use super::lsmc::{price_bond_lsmc, BondLsmcConfig};
+use crate::bond::Bond;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{Error, Result};

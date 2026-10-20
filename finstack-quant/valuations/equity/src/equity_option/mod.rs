@@ -76,11 +76,11 @@
 //!
 //! # Examples
 //!
-//! See [`EquityOption`] for construction and usage examples.
+//! See [`EquityOption`](crate::equity_option::EquityOption) for construction and usage examples.
 //!
 //! # See Also
 //!
-//! - [`EquityOption`] for equity option struct
+//! - [`EquityOption`](crate::equity_option::EquityOption) for equity option struct
 //! - equity option metrics module for complete Greeks calculations
 //! - equity option pricer module for pricing implementations
 

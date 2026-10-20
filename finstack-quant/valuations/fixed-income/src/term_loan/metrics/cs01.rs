@@ -11,7 +11,7 @@
 //! [`ZSpreadBucketedCs01`]: finstack_quant_valuations_core::metrics::sensitivities::cs01_z_spread::ZSpreadBucketedCs01
 
 use crate::term_loan::pricing::TermLoanDiscountingPricer;
-use crate::TermLoan;
+use crate::term_loan::TermLoan;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01_z_spread::{

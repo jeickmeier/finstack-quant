@@ -181,44 +181,84 @@ pub mod rates {
 }
 
 pub use fixed_income::{
-    AgencyCmo, AgencyMbsPassthrough, AgencyProgram, AgencyTba, AssetBackedFacility, Bond,
-    BondFuture, BondFutureBuilder, BondFutureSpecs, BondSettlementConvention, CmoTranche,
-    CmoTrancheType, CmoWaterfall, ConvertibleBond, DeliverableBond, DollarRoll,
-    FiIndexTotalReturnSwap, InflationLinkedBond, PoolType, RevolvingCredit, StructuredCredit,
-    TbaTerm, TermLoan,
+    asset_backed_facility::AssetBackedFacility,
+    bond::{Bond, BondSettlementConvention},
+    bond_future::{BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond},
+    cmo::{AgencyCmo, CmoTranche, CmoTrancheType, CmoWaterfall},
+    convertible::ConvertibleBond,
+    dollar_roll::DollarRoll,
+    fi_trs::FiIndexTotalReturnSwap,
+    inflation_linked_bond::InflationLinkedBond,
+    mbs_passthrough::{AgencyMbsPassthrough, AgencyProgram, PoolType},
+    revolving_credit::RevolvingCredit,
+    structured_credit::StructuredCredit,
+    tba::{AgencyTba, TbaTerm},
+    term_loan::TermLoan,
 };
 
 pub use rates::{
-    BasisSwap, BermudanSwaption, CapFloor, CmsOption, CmsSpreadOption, CmsSwap, CollateralSpec,
-    CollateralType, Deposit, ForwardRateAgreement, InflationCapFloor, InflationSwap,
-    InterestRateFuture, InterestRateSwap, RateOptionType, Repo, RepoType, Swaption, XccySwap,
-    YoYInflationSwap,
+    basis_swap::BasisSwap,
+    cap_floor::{CapFloor, RateOptionType},
+    cms_option::CmsOption,
+    cms_spread_option::CmsSpreadOption,
+    cms_swap::CmsSwap,
+    deposit::Deposit,
+    fra::ForwardRateAgreement,
+    inflation_cap_floor::InflationCapFloor,
+    inflation_swap::{InflationSwap, YoYInflationSwap},
+    ir_future::InterestRateFuture,
+    irs::InterestRateSwap,
+    repo::{CollateralSpec, CollateralType, Repo, RepoType},
+    swaption::{BermudanSwaption, Swaption},
+    xccy_swap::XccySwap,
 };
 
-pub use credit_derivatives::{CdsIndex, CdsOption, CdsTranche, CreditDefaultSwap};
+pub use credit_derivatives::{
+    cds::CreditDefaultSwap, cds_index::CdsIndex, cds_option::CdsOption, cds_tranche::CdsTranche,
+};
 
 pub use equity::{
-    Autocallable, CliquetOption, DiscountedCashFlow, Equity, EquityFuture, EquityFutureOption,
-    EquityOption, EquityPriceSeriesPolicy, EquityTotalReturnFuture, EquityTotalReturnSwap,
-    FinalPayoffType, LeveredRealEstateEquity, PrivateMarketsFund, RealEstateAsset,
-    RealEstateFinancing, RealEstateValuationMethod, TerminalValueSpec, VarianceSwap,
-    VolatilityIndexFuture, VolatilityIndexFutureOption,
+    autocallable::{Autocallable, FinalPayoffType},
+    cliquet_option::CliquetOption,
+    dcf_equity::{DiscountedCashFlow, TerminalValueSpec},
+    equity_future::EquityFuture,
+    equity_future_option::EquityFutureOption,
+    equity_option::EquityOption,
+    equity_total_return_future::EquityTotalReturnFuture,
+    equity_trs::EquityTotalReturnSwap,
+    pe_fund::PrivateMarketsFund,
+    real_estate::{
+        LeveredRealEstateEquity, RealEstateAsset, RealEstateFinancing, RealEstateValuationMethod,
+    },
+    spot::Equity,
+    variance_swap::{EquityPriceSeriesPolicy, VarianceSwap},
+    vol_index_future::VolatilityIndexFuture,
+    vol_index_future_option::VolatilityIndexFutureOption,
 };
 
-pub use fx::FxVarianceSwap;
-pub use fx::{DigitalPayoutType, FxDigitalOption, FxTouchOption, TouchType};
+pub use fx::fx_variance_swap::FxVarianceSwap;
 pub use fx::{
-    FxBarrierOption, FxForward, FxFuture, FxFutureOption, FxOption, FxSpot, FxSwap, Ndf,
-    QuantoOption,
+    fx_barrier_option::FxBarrierOption, fx_forward::FxForward, fx_future::FxFuture,
+    fx_future_option::FxFutureOption, fx_option::FxOption, fx_spot::FxSpot, fx_swap::FxSwap,
+    ndf::Ndf, quanto_option::QuantoOption,
+};
+pub use fx::{
+    fx_digital_option::{DigitalPayoutType, FxDigitalOption},
+    fx_touch_option::{FxTouchOption, TouchType},
 };
 
 pub use commodity::{
-    CommodityAsianOption, CommodityForward, CommodityFuture, CommodityFutureFixing,
-    CommodityFutureOption, CommoditySpotOption, CommoditySpotOptionExercise, CommoditySpreadOption,
-    CommoditySwap, CommoditySwaption,
+    commodity_asian_option::CommodityAsianOption,
+    commodity_forward::CommodityForward,
+    commodity_future::{CommodityFuture, CommodityFutureFixing},
+    commodity_future_option::CommodityFutureOption,
+    commodity_spot_option::{CommoditySpotOption, CommoditySpotOptionExercise},
+    commodity_spread_option::CommoditySpreadOption,
+    commodity_swap::CommoditySwap,
+    commodity_swaption::CommoditySwaption,
 };
 
-pub use rates::InterestRateFutureOption;
+pub use rates::ir_future_option::InterestRateFutureOption;
 
 pub use composite::{
     CompositeExposureReport, CompositeHistoryRow, CompositeInstrument, CompositeLegSpec,
@@ -228,8 +268,14 @@ pub use composite::{
 };
 
 pub use exotics::{
-    AsianOption, AveragingMethod, BarrierOption, Basket, CallableRangeAccrual, LookbackOption,
-    LookbackType, RangeAccrual, Snowball, SnowballVariant, Tarn,
+    asian_option::{AsianOption, AveragingMethod},
+    barrier_option::BarrierOption,
+    basket::Basket,
+    callable_range_accrual::CallableRangeAccrual,
+    lookback_option::{LookbackOption, LookbackType},
+    range_accrual::RangeAccrual,
+    snowball::{Snowball, SnowballVariant},
+    tarn::Tarn,
 };
 
 pub mod json_loader;

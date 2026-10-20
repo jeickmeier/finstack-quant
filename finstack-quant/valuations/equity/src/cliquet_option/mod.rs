@@ -32,7 +32,7 @@
 //!
 //! # See Also
 //!
-//! - [`CliquetOption`] for instrument struct
+//! - [`CliquetOption`](crate::cliquet_option::CliquetOption) for instrument struct
 //! - Monte Carlo pricer for path-dependent pricing
 
 pub(crate) mod metrics;

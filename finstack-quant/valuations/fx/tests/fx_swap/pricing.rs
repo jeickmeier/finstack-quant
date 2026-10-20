@@ -10,7 +10,7 @@ use super::fixtures::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_fx::FxSwap;
+use finstack_quant_valuations_fx::fx_swap::FxSwap;
 
 #[test]
 fn test_basic_pv_at_inception() {

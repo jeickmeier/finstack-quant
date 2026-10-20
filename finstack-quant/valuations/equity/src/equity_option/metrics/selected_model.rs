@@ -18,7 +18,7 @@ pub(crate) fn selected_equity_greek(
     kind: OptionGreekKind,
     context: &mut MetricContext,
 ) -> Result<f64> {
-    use crate::EquityOption;
+    use crate::equity_option::EquityOption;
     use finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::{
         GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVega, GenericFdVolga,
     };
@@ -58,7 +58,7 @@ pub(crate) fn selected_equity_greek(
 
 fn selected_equity_theta(context: &MetricContext) -> Result<f64> {
     use std::sync::Arc;
-    let option: &crate::EquityOption = context.instrument_as()?;
+    let option: &crate::equity_option::EquityOption = context.instrument_as()?;
     if context.as_of >= option.expiry
         || option
             .exercise
@@ -110,7 +110,7 @@ fn selected_equity_theta(context: &MetricContext) -> Result<f64> {
 
 #[cfg(test)]
 mod tests {
-    use crate::EquityOption;
+    use crate::equity_option::EquityOption;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::{
         context::MarketContext, scalars::MarketScalar, surfaces::VolSurface,

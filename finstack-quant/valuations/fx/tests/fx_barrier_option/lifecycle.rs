@@ -5,7 +5,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_fx::FxBarrierOption;
+use finstack_quant_valuations_fx::fx_barrier_option::FxBarrierOption;
 use finstack_quant_valuations_test_support::date::date;
 use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
 use finstack_quant_valuations_test_support::volatility::flat_vol_surface;

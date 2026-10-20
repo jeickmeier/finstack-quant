@@ -15,8 +15,8 @@ use finstack_quant_core::dates::{adjust, Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 
-use super::super::types::Bond;
 use super::super::CashflowSpec;
+use crate::bond::Bond;
 
 /// Compute the settlement date from a trade/valuation date.
 ///

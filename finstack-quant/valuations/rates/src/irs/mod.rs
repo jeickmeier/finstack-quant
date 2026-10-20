@@ -82,11 +82,11 @@
 //!
 //! # Examples
 //!
-//! See [`InterestRateSwap`] for construction and usage examples.
+//! See [`InterestRateSwap`](crate::irs::InterestRateSwap) for construction and usage examples.
 //!
 //! # See Also
 //!
-//! - [`InterestRateSwap`] for the main swap struct
+//! - [`InterestRateSwap`](crate::irs::InterestRateSwap) for the main swap struct
 //! - `FixedLegSpec` for fixed leg specification
 //! - `FloatLegSpec` for floating leg specification
 //! - `PayReceive` for swap direction

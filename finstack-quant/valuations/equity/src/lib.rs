@@ -46,8 +46,8 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations_equity::{EquityOptionMarketData, EquityOptionParams};
-//! use finstack_quant_valuations_equity::EquityOption;
+//! use finstack_quant_valuations_equity::equity_option::{EquityOptionMarketData, EquityOptionParams};
+//! use finstack_quant_valuations_equity::equity_option::EquityOption;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::types::{CurveId, PriceId};
@@ -85,10 +85,10 @@
 //!
 //! # See Also
 //!
-//! - [`EquityOption`] for vanilla options
-//! - [`VarianceSwap`] for variance/volatility swaps
-//! - [`Autocallable`] for structured notes
-//! - [`PrivateMarketsFund`] for PE/credit fund valuation
+//! - [`EquityOption`](crate::equity_option::EquityOption) for vanilla options
+//! - [`VarianceSwap`](crate::variance_swap::VarianceSwap) for variance/volatility swaps
+//! - [`Autocallable`](crate::autocallable::Autocallable) for structured notes
+//! - [`PrivateMarketsFund`](crate::pe_fund::PrivateMarketsFund) for PE/credit fund valuation
 
 /// Explicit stochastic model policy for path-dependent equity structures.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -134,22 +134,6 @@ pub mod vol_index_future_option;
 
 mod family;
 pub use family::EQUITY;
-
-pub use autocallable::{Autocallable, FinalPayoffType};
-pub use cliquet_option::CliquetOption;
-pub use dcf_equity::{DiscountedCashFlow, TerminalValueSpec};
-pub use equity_future::EquityFuture;
-pub use equity_future_option::EquityFutureOption;
-pub use equity_option::{
-    EquityOption, EquityOptionExercise, EquityOptionMarketData, EquityOptionParams,
-};
-pub use equity_total_return_future::EquityTotalReturnFuture;
-pub use equity_trs::{EquityTotalReturnSwap, TrsDividendSettlement};
-pub use pe_fund::PrivateMarketsFund;
-pub use spot::Equity;
-pub use variance_swap::{EquityPriceSeriesPolicy, VarianceSwap};
-pub use vol_index_future::VolatilityIndexFuture;
-pub use vol_index_future_option::VolatilityIndexFutureOption;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

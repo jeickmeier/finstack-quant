@@ -37,7 +37,7 @@
 //!
 //! # See Also
 //!
-//! - [`CmsOption`] for instrument struct
+//! - [`CmsOption`](crate::cms_option::CmsOption) for instrument struct
 //! - CMS option metrics module for risk metrics
 
 pub(crate) mod metrics;

@@ -3,7 +3,7 @@
 //! by default, every running fee.
 
 use crate::loan_quotes::oid_eir_schedule_from_flows;
-use crate::RevolvingCredit;
+use crate::revolving_credit::RevolvingCredit;
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 

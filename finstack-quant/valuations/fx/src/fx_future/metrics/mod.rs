@@ -6,7 +6,7 @@ struct FuturesPrice;
 
 impl MetricCalculator for FuturesPrice {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let future: &crate::FxFuture = context.instrument_as()?;
+        let future: &crate::fx_future::FxFuture = context.instrument_as()?;
         future.mark_price(&context.curves, context.as_of)
     }
 }
@@ -15,7 +15,7 @@ struct Delta;
 
 impl MetricCalculator for Delta {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let future: &crate::FxFuture = context.instrument_as()?;
+        let future: &crate::fx_future::FxFuture = context.instrument_as()?;
         future.futures_price_delta()
     }
 }

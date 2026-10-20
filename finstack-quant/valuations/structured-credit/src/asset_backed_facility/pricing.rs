@@ -464,7 +464,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
 impl Instrument for AssetBackedFacility {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::AssetBackedFacility,
-        crate::structured_credit::STRUCTURED_CREDIT
+        crate::STRUCTURED_CREDIT
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {

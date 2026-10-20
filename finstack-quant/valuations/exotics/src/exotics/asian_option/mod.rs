@@ -25,8 +25,8 @@
 //!
 //! # See Also
 //!
-//! - [`AsianOption`] for instrument struct
-//! - [`AveragingMethod`] for geometric vs arithmetic
+//! - [`AsianOption`](crate::exotics::asian_option::AsianOption) for instrument struct
+//! - [`AveragingMethod`](crate::exotics::asian_option::AveragingMethod) for geometric vs arithmetic
 //! - [`models::closed_form::asian`](finstack_quant_models::closed_form::asian) for pricing formulas
 
 pub(crate) mod metrics;

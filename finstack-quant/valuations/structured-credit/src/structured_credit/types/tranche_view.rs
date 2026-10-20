@@ -98,7 +98,7 @@ impl Instrument for StructuredCreditTranche {
     }
 
     fn family(&self) -> &'static finstack_quant_valuations_core::pricer::Family {
-        &crate::structured_credit::STRUCTURED_CREDIT
+        &crate::STRUCTURED_CREDIT
     }
 
     /// The deal, not the view: the deal's metric calculators downcast the

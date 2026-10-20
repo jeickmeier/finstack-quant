@@ -102,11 +102,11 @@
 //!
 //! # Examples
 //!
-//! See [`Bond`] for construction examples.
+//! See [`Bond`](crate::bond::Bond) for construction examples.
 //!
 //! # See Also
 //!
-//! - [`Bond`] for the main bond struct and factory methods
+//! - [`Bond`](crate::bond::Bond) for the main bond struct and factory methods
 //! - `CallPutSchedule` for embedded option schedules
 //! - `CashflowSpec` for fixed/floating/amortizing specifications
 //! - `AmortizationSpec` for amortizing bonds

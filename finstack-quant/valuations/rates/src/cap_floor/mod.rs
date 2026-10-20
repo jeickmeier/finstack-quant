@@ -82,12 +82,12 @@
 //!
 //! # Examples
 //!
-//! See [`CapFloor`] for construction and usage examples.
+//! See [`CapFloor`](crate::cap_floor::CapFloor) for construction and usage examples.
 //!
 //! # See Also
 //!
-//! - [`CapFloor`] for cap/floor instrument struct
-//! - [`RateOptionType`] for cap vs floor distinction
+//! - [`CapFloor`](crate::cap_floor::CapFloor) for cap/floor instrument struct
+//! - [`RateOptionType`](crate::cap_floor::RateOptionType) for cap vs floor distinction
 //! - cap/floor metrics module for risk metrics (DV01, vega)
 
 pub(crate) mod hw_pricer;

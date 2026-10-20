@@ -27,7 +27,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
 use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
 use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
-use finstack_quant_valuations::instruments::equity::Equity;
+use finstack_quant_valuations::instruments::Equity;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::Position;
@@ -165,7 +165,7 @@ fn equity_trs(tenor_years: i32) -> EquityTotalReturnSwap {
         .schedule(schedule)
         .side(PayReceive::Receive)
         .dividend_settlement(
-            finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
+            finstack_quant_valuations::instruments::equity::equity_trs::TrsDividendSettlement::OnDividendDate,
         )
         .build()
         .unwrap()

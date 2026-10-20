@@ -53,7 +53,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
 impl Instrument for StructuredCredit {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::StructuredCredit,
-        crate::structured_credit::STRUCTURED_CREDIT
+        crate::STRUCTURED_CREDIT
     );
 
     fn market_dependencies(

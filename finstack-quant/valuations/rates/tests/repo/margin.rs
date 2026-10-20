@@ -10,7 +10,7 @@ use finstack_quant_margin::{
     CsaSpec, MarginCallTiming, MarginTenor, RepoMarginSpec, RepoMarginType, VmCalculator,
     VmParameters,
 };
-use finstack_quant_valuations_rates::{CollateralSpec, Repo};
+use finstack_quant_valuations_rates::repo::{CollateralSpec, Repo};
 use time::Month;
 
 fn test_date() -> Date {

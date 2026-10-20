@@ -13,7 +13,7 @@ use finstack_quant_core::Result;
 
 use finstack_quant_cashflows::builder::CashflowRepresentation;
 
-use super::types::Bond;
+use crate::bond::Bond;
 
 impl finstack_quant_cashflows::CashflowScheduleSource for Bond {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {

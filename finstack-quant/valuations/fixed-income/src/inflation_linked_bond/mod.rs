@@ -89,7 +89,7 @@
 //!
 //! # See Also
 //!
-//! - [`InflationLinkedBond`] for instrument struct
+//! - [`InflationLinkedBond`](crate::inflation_linked_bond::InflationLinkedBond) for instrument struct
 //! - [`crate::inflation_linked_bond::IndexationMethod`] for indexation type
 //! - [`crate::inflation_linked_bond::DeflationProtection`] for floor specifications
 //! - inflation-linked bond metrics module for inflation-specific risk metrics
