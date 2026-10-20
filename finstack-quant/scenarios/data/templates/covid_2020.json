@@ -27,8 +27,8 @@
       "covid_2020_fx"
     ]
   },
-  "components": {
-    "covid_2020_rates": {
+  "components": [
+    {
       "id": "covid_2020_rates",
       "name": "COVID 2020 - Rates",
       "operations": [
@@ -61,7 +61,7 @@
       ],
       "priority": 0
     },
-    "covid_2020_credit": {
+    {
       "id": "covid_2020_credit",
       "name": "COVID 2020 - Credit",
       "operations": [
@@ -80,7 +80,7 @@
       ],
       "priority": 1
     },
-    "covid_2020_equity": {
+    {
       "id": "covid_2020_equity",
       "name": "COVID 2020 - Equity",
       "operations": [
@@ -94,7 +94,7 @@
       ],
       "priority": 2
     },
-    "covid_2020_vol": {
+    {
       "id": "covid_2020_vol",
       "name": "COVID 2020 - Volatility",
       "operations": [
@@ -106,7 +106,7 @@
       ],
       "priority": 3
     },
-    "covid_2020_fx": {
+    {
       "id": "covid_2020_fx",
       "name": "COVID 2020 - FX",
       "operations": [
@@ -125,18 +125,9 @@
       ],
       "priority": 4
     }
-  },
+  ],
   "composite": {
-    "id": "covid_2020",
-    "name": "COVID 2020 Market Shock",
     "description": "Pandemic panic - emergency easing, spread widening, equity crash, vol spike",
-    "priority": 0,
-    "component_ids": [
-      "covid_2020_rates",
-      "covid_2020_credit",
-      "covid_2020_equity",
-      "covid_2020_vol",
-      "covid_2020_fx"
-    ]
+    "priority": 0
   }
 }

@@ -23,33 +23,22 @@ impl RegisteredTemplate {
 
         let JsonTemplateDocument {
             metadata,
-            mut components,
+            components,
             composite,
             ..
         } = document;
 
-        let ordered_component_specs = composite
-            .component_ids
+        let composite_operations = components
             .iter()
-            .map(|component_id| {
-                let spec = components.shift_remove(component_id).ok_or_else(|| {
-                    Error::internal(format!(
-                        "validated JSON template missing component '{component_id}'"
-                    ))
-                })?;
-                Ok((component_id.clone(), spec))
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        let components: IndexMap<String, ScenarioSpec> =
-            ordered_component_specs.iter().cloned().collect();
-        let composite_operations = ordered_component_specs
-            .iter()
-            .flat_map(|(_, spec)| spec.operations.iter().cloned())
+            .flat_map(|spec| spec.operations.iter().cloned())
             .collect::<Vec<_>>();
+        let components: IndexMap<String, ScenarioSpec> = components
+            .into_iter()
+            .map(|spec| (spec.id.clone(), spec))
+            .collect();
         let composite_spec = ScenarioSpec {
-            id: composite.id,
-            name: composite.name,
+            id: metadata.id.clone(),
+            name: Some(metadata.name.clone()),
             description: composite.description,
             operations: composite_operations,
             priority: composite.priority,
@@ -250,11 +239,12 @@ mod tests {
     #![allow(clippy::expect_used, clippy::panic)]
 
     use super::TemplateRegistry;
-    use crate::templates::json::{JsonCompositeTemplate, JsonTemplateDocument};
+    use crate::templates::json::{
+        JsonCompositeTemplate, JsonTemplateDocument, ScenarioTemplateSchema,
+    };
     use crate::{
         AssetClass, CurveKind, OperationSpec, ScenarioSpec, TemplateMetadata, TemplateSeverity,
     };
-    use indexmap::indexmap;
     use time::macros::date;
 
     fn template_document(
@@ -262,40 +252,26 @@ mod tests {
         tag: &str,
         asset_class: AssetClass,
         severity: TemplateSeverity,
-        component_specs: Vec<ScenarioSpec>,
+        components: Vec<ScenarioSpec>,
     ) -> JsonTemplateDocument {
-        let component_ids = component_specs
-            .iter()
-            .map(|spec| spec.id.clone())
-            .collect::<Vec<_>>();
-        let components = component_specs
-            .into_iter()
-            .map(|spec| (spec.id.clone(), spec))
-            .collect();
-        let name = format!("Template {id}");
         let description = format!("Description for {id}");
-        let composite = JsonCompositeTemplate::new(
-            id,
-            Some(&name),
-            Some(&description),
-            0,
-            component_ids.clone(),
-        );
-
         JsonTemplateDocument {
-            schema: crate::templates::json::ScenarioTemplateSchema::ScenarioTemplate,
+            schema: ScenarioTemplateSchema::ScenarioTemplate,
             metadata: TemplateMetadata {
                 id: id.into(),
-                name,
-                description,
+                name: format!("Template {id}"),
+                description: description.clone(),
                 event_date: date!(2008 - 09 - 15),
                 asset_classes: vec![asset_class],
                 tags: vec![tag.into()],
                 severity,
-                components: component_ids,
+                components: components.iter().map(|spec| spec.id.clone()).collect(),
             },
             components,
-            composite,
+            composite: JsonCompositeTemplate {
+                description: Some(description),
+                priority: 0,
+            },
         }
     }
 
@@ -396,7 +372,7 @@ mod tests {
 
     fn json_document() -> JsonTemplateDocument {
         JsonTemplateDocument {
-            schema: crate::templates::json::ScenarioTemplateSchema::ScenarioTemplate,
+            schema: ScenarioTemplateSchema::ScenarioTemplate,
             metadata: TemplateMetadata {
                 id: "json_template".into(),
                 name: "JSON Template".into(),
@@ -407,23 +383,20 @@ mod tests {
                 severity: TemplateSeverity::Severe,
                 components: vec!["component_b".into(), "component_a".into()],
             },
-            components: indexmap! {
-                "component_b".into() => json_component_spec("component_b", "B-CURVE", -25.0),
-                "component_a".into() => json_component_spec("component_a", "A-CURVE", 50.0),
+            components: vec![
+                json_component_spec("component_b", "B-CURVE", -25.0),
+                json_component_spec("component_a", "A-CURVE", 50.0),
+            ],
+            composite: JsonCompositeTemplate {
+                description: Some("Composite description from JSON".into()),
+                priority: 7,
             },
-            composite: JsonCompositeTemplate::new(
-                "json_template",
-                Some("Composite From JSON"),
-                Some("Composite description from JSON"),
-                7,
-                vec!["component_b".into(), "component_a".into()],
-            ),
         }
     }
 
     fn json_document_with_priority_order_conflict() -> JsonTemplateDocument {
         JsonTemplateDocument {
-            schema: crate::templates::json::ScenarioTemplateSchema::ScenarioTemplate,
+            schema: ScenarioTemplateSchema::ScenarioTemplate,
             metadata: TemplateMetadata {
                 id: "priority_order_conflict".into(),
                 name: "Priority Order Conflict".into(),
@@ -434,43 +407,14 @@ mod tests {
                 severity: TemplateSeverity::Moderate,
                 components: vec!["late_priority".into(), "early_priority".into()],
             },
-            components: indexmap! {
-                "late_priority".into() => json_component_spec_with_priority("late_priority", "LATE-CURVE", 10.0, 10),
-                "early_priority".into() => json_component_spec_with_priority("early_priority", "EARLY-CURVE", 20.0, -10),
+            components: vec![
+                json_component_spec_with_priority("late_priority", "LATE-CURVE", 10.0, 10),
+                json_component_spec_with_priority("early_priority", "EARLY-CURVE", 20.0, -10),
+            ],
+            composite: JsonCompositeTemplate {
+                description: Some("Composite order should follow metadata.components".into()),
+                priority: 3,
             },
-            composite: JsonCompositeTemplate::new(
-                "priority_order_conflict",
-                Some("Priority Order Conflict"),
-                Some("Composite order should follow component_ids"),
-                3,
-                vec!["late_priority".into(), "early_priority".into()],
-            ),
-        }
-    }
-
-    fn json_document_without_composite_name() -> JsonTemplateDocument {
-        JsonTemplateDocument {
-            schema: crate::templates::json::ScenarioTemplateSchema::ScenarioTemplate,
-            metadata: TemplateMetadata {
-                id: "no_composite_name".into(),
-                name: "No Composite Name".into(),
-                description: "Composite name omitted in JSON".into(),
-                event_date: date!(2020 - 03 - 16),
-                asset_classes: vec![AssetClass::Rates],
-                tags: vec!["json".into()],
-                severity: TemplateSeverity::Mild,
-                components: vec!["component_only".into()],
-            },
-            components: indexmap! {
-                "component_only".into() => json_component_spec("component_only", "ONLY-CURVE", 5.0),
-            },
-            composite: JsonCompositeTemplate::new(
-                "no_composite_name",
-                None,
-                Some("Composite description without a name"),
-                2,
-                vec!["component_only".into()],
-            ),
         }
     }
 
@@ -642,7 +586,7 @@ mod tests {
         let scenario = entry.build();
 
         assert_eq!(scenario.id, "json_template");
-        assert_eq!(scenario.name.as_deref(), Some("Composite From JSON"));
+        assert_eq!(scenario.name.as_deref(), Some("JSON Template"));
         assert_eq!(
             scenario.description.as_deref(),
             Some("Composite description from JSON")
@@ -698,28 +642,6 @@ mod tests {
     }
 
     #[test]
-    fn register_json_document_omitted_composite_name_stays_absent() {
-        let mut registry = TemplateRegistry::new();
-        registry
-            .register_json_document(json_document_without_composite_name())
-            .expect("json document should register");
-        let entry = registry
-            .entries
-            .get("no_composite_name")
-            .expect("json template should exist");
-
-        let scenario = entry.build();
-
-        assert_eq!(scenario.id, "no_composite_name");
-        assert_eq!(scenario.name, None);
-        assert_eq!(
-            scenario.description.as_deref(),
-            Some("Composite description without a name")
-        );
-        assert_eq!(scenario.priority, 2);
-    }
-
-    #[test]
     fn register_json_document_exposes_component_ids_and_metadata() {
         let mut registry = TemplateRegistry::new();
         registry
@@ -752,9 +674,7 @@ mod tests {
             .expect_err("invalid document should be rejected");
 
         assert!(matches!(error, crate::Error::Validation(_)));
-        assert!(error
-            .to_string()
-            .contains("metadata.components must match component IDs"));
+        assert!(error.to_string().contains("must match metadata.components"));
     }
 
     #[test]

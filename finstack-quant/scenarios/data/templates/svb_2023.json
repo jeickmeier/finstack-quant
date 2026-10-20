@@ -27,8 +27,8 @@
       "svb_2023_fx"
     ]
   },
-  "components": {
-    "svb_2023_rates": {
+  "components": [
+    {
       "id": "svb_2023_rates",
       "name": "SVB 2023 - Rates",
       "operations": [
@@ -57,7 +57,7 @@
       ],
       "priority": 0
     },
-    "svb_2023_credit": {
+    {
       "id": "svb_2023_credit",
       "name": "SVB 2023 - Credit",
       "operations": [
@@ -71,7 +71,7 @@
       ],
       "priority": 1
     },
-    "svb_2023_equity": {
+    {
       "id": "svb_2023_equity",
       "name": "SVB 2023 - Equity",
       "operations": [
@@ -92,7 +92,7 @@
       ],
       "priority": 2
     },
-    "svb_2023_vol": {
+    {
       "id": "svb_2023_vol",
       "name": "SVB 2023 - Volatility",
       "operations": [
@@ -104,7 +104,7 @@
       ],
       "priority": 3
     },
-    "svb_2023_fx": {
+    {
       "id": "svb_2023_fx",
       "name": "SVB 2023 - FX",
       "operations": [
@@ -117,18 +117,9 @@
       ],
       "priority": 4
     }
-  },
+  ],
   "composite": {
-    "id": "svb_2023",
-    "name": "SVB / Regional Banking Crisis 2023",
     "description": "Regional banking stress - front-end rally, bank spread widening, volatility jump",
-    "priority": 0,
-    "component_ids": [
-      "svb_2023_rates",
-      "svb_2023_credit",
-      "svb_2023_equity",
-      "svb_2023_vol",
-      "svb_2023_fx"
-    ]
+    "priority": 0
   }
 }
