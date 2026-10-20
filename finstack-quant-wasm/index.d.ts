@@ -31283,19 +31283,13 @@ export interface AttributionNamespace {
    */
   validateReturnContributionJson(specJson: JsonInput): string;
   /**
-   * Human-readable tree explanation of an attribution, non-zero factors only (twin of Python `PnlAttribution.explain`).
+   * Human-readable tree explanation of an attribution's factor breakdown (twin of Python `PnlAttribution.explain`).
    * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+   * @param showZeros - Optional boolean; `true` lists every factor including zero-valued ones, while omitted or `false` hides zero-valued factors.
    * @returns Multi-line tree text.
-   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`, and kind `invalid_type` if `showZeros` is not a boolean.
    */
-  pnlAttributionExplainText(pnl: PnlAttribution | string): string;
-  /**
-   * Verbose tree explanation of an attribution, including zero-valued factors (twin of Python `PnlAttribution.explain_verbose`).
-   * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
-   * @returns Multi-line tree text.
-   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
-   */
-  pnlAttributionExplainVerboseText(pnl: PnlAttribution | string): string;
+  pnlAttributionExplainText(pnl: PnlAttribution | string, showZeros?: boolean | null): string;
   /**
    * Share of total P&L, in percent, that an amount represents (twin of Python `PnlAttribution.pct_of_total`).
    * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).

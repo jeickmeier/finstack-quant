@@ -993,8 +993,12 @@ impl PnlAttribution {
     /// Generate a structured tree explanation of P&L attribution.
     ///
     /// Creates a human-readable tree showing the total P&L broken down by factor.
-    /// Zero-valued factors are omitted for a clean presentation. Use
-    /// [`Self::explain_verbose`] to include all factors regardless of value.
+    ///
+    /// # Arguments
+    ///
+    /// * `show_zeros` - `false` omits zero-valued factors for a clean
+    ///   presentation; `true` lists every factor, which helps verify that
+    ///   all factors were computed.
     ///
     /// # Returns
     ///
@@ -1013,20 +1017,7 @@ impl PnlAttribution {
     ///   ├─ Vol: $2,000 (1.6%)
     ///   └─ Residual: -$1,570 (-1.2%)
     /// ```
-    pub fn explain(&self) -> String {
-        self.explain_impl(false)
-    }
-
-    /// Generate a verbose tree explanation showing all factors including zeros.
-    ///
-    /// Unlike [`Self::explain`], this method shows every attribution factor
-    /// regardless of whether its value is zero. Useful for debugging and
-    /// verifying that all factors are being computed.
-    pub fn explain_verbose(&self) -> String {
-        self.explain_impl(true)
-    }
-
-    fn explain_impl(&self, show_zeros: bool) -> String {
+    pub fn explain(&self, show_zeros: bool) -> String {
         let rc = &self.meta.rounding;
 
         let fmt = |amount: &Money| -> String {
@@ -1430,7 +1421,7 @@ mod tests {
         );
 
         attribution.carry_detail = Some(detail);
-        let explanation = attribution.explain_verbose();
+        let explanation = attribution.explain(true);
         assert!(explanation.contains("Coupon Income"));
         assert!(explanation.contains("Pull-to-Par"));
         assert!(explanation.contains("Roll-Down"));
@@ -1480,10 +1471,8 @@ mod tests {
             format!("  └─ Residual: {} (10.0%)", usd(10)),
         ]
         .join("\n");
-        assert_eq!(attribution.explain(), expected);
-        assert!(attribution
-            .explain_verbose()
-            .contains("  ├─ Market Scalars: "));
+        assert_eq!(attribution.explain(false), expected);
+        assert!(attribution.explain(true).contains("  ├─ Market Scalars: "));
     }
 
     #[test]

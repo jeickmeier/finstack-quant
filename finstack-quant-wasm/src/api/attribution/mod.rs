@@ -332,34 +332,27 @@ fn parse_pnl(value: &JsValue) -> Result<finstack_quant_attribution::PnlAttributi
     crate::utils::input::from_js_json(value, "pnl")
 }
 
-/// Human-readable tree explanation of an attribution (non-zero factors only).
+/// Human-readable tree explanation of an attribution's factor breakdown.
 ///
 /// Free-function twin of Python `PnlAttribution.explain` (Rust
 /// `PnlAttribution::explain`).
 /// @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+/// @param showZeros - Optional boolean; `true` lists every factor including
+///   zero-valued ones, while omitted or `false` hides zero-valued factors.
 /// @returns Multi-line tree text.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+/// Throws with kind `validation` if `pnl` is not a `PnlAttribution`, and
+/// kind `invalid_type` if `showZeros` is not a boolean.
 #[wasm_bindgen(js_name = pnlAttributionExplainText)]
-pub fn pnl_attribution_explain(pnl: JsValue) -> Result<String, JsValue> {
-    Ok(parse_pnl(&pnl)?.explain())
-}
-
-/// Verbose tree explanation of an attribution, including zero-valued factors.
-///
-/// Free-function twin of Python `PnlAttribution.explain_verbose` (Rust
-/// `PnlAttribution::explain_verbose`).
-/// @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
-/// @returns Multi-line tree text.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
-#[wasm_bindgen(js_name = pnlAttributionExplainVerboseText)]
-pub fn pnl_attribution_explain_verbose(pnl: JsValue) -> Result<String, JsValue> {
-    Ok(parse_pnl(&pnl)?.explain_verbose())
+pub fn pnl_attribution_explain(
+    pnl: JsValue,
+    show_zeros: Option<JsValue>,
+) -> Result<String, JsValue> {
+    let show_zeros =
+        crate::utils::input::js_opt_bool(show_zeros.as_ref(), "showZeros")?.unwrap_or(false);
+    Ok(parse_pnl(&pnl)?.explain(show_zeros))
 }
 
 /// Share of total P&L, in percent, that an amount represents.

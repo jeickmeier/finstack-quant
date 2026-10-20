@@ -1120,29 +1120,20 @@ class PnlAttribution:
         """
         ...
 
-    def explain(self) -> str:
+    def explain(self, show_zeros: bool = False) -> str:
         """
-        Human-readable tree explanation (non-zero factors only).
+        Human-readable tree explanation of the factor breakdown.
+
+        Parameters
+        ----------
+        show_zeros : bool, default False
+            ``False`` omits zero-valued factors; ``True`` lists every
+            factor, which helps verify that all factors were computed.
 
         Returns
         -------
         str
-            Multi-line string with tree structure showing P&L breakdown.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def explain_verbose(self) -> str:
-        """
-        Verbose tree explanation including zero-valued factors.
-
-        Returns
-        -------
-        str
-            Multi-line string with tree structure showing all factors.
+            Multi-line string with tree structure showing the P&L breakdown.
 
         Notes
         -----

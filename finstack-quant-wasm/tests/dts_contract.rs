@@ -1818,7 +1818,7 @@ fn rust_computation_twins_are_declared() {
         "calibrationResultContentHash(resultJson: CalibrationResultEnvelope | string): string;",
         "attributePnlMany(inputs: AttributionInputs | string, instruments: JsonInput[] | string): PnlAttribution[];",
         "attributeReturnContribution(spec: JsonInput): ReturnContributionResult;",
-        "pnlAttributionExplainText(pnl: PnlAttribution | string): string;",
+        "pnlAttributionExplainText(pnl: PnlAttribution | string, showZeros?: boolean | null): string;",
         "financialModelContentHash(modelJson: JsonInput): string;",
         "nodeToDatedSchedule(modelJson: JsonInput, resultJson: StatementResult | string, nodeId: string, convention?: 'end' | 'start' | null): [string, number][];",
         "scenarioComparisonTable(scenarioResultsJson: ScenarioResults | string, metrics: string[]): TableEnvelope;",

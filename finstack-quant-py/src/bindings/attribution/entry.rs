@@ -294,9 +294,6 @@ pub(crate) fn attribute_pnl_many<'py>(
         .iter()
         .map(extract_instrument)
         .collect::<PyResult<Vec<_>>>()?;
-    if payloads.is_empty() {
-        return serde_rows_to_dataframe_with_schema::<serde_json::Value>(py, &[], &WIDE_COLUMNS);
-    }
     let inputs = build_inputs(
         py,
         market_t0,
@@ -406,15 +403,6 @@ pub(crate) fn pnl_bridge(
     Ok(PyMoney::from_inner(pnl))
 }
 
-/// Parse and execute one ``AttributionEnvelope`` with panic containment.
-fn run_attribute_pnl_envelope(
-    py: Python<'_>,
-    spec_json: &str,
-) -> PyResult<finstack_quant_attribution::AttributionResultEnvelope> {
-    let envelope = AttributionEnvelope::from_json(spec_json).map_err(core_to_py)?;
-    py.detach(|| envelope.execute()).map_err(core_to_py)
-}
-
 /// Run attribution from a full JSON ``AttributionEnvelope``.
 ///
 /// Returns the typed envelope; use its ``to_json()`` method for canonical JSON.
@@ -447,7 +435,9 @@ pub(crate) fn attribute_pnl_envelope(
     py: Python<'_>,
     spec_json: &str,
 ) -> PyResult<PyAttributionResultEnvelope> {
-    run_attribute_pnl_envelope(py, spec_json).map(|inner| PyAttributionResultEnvelope { inner })
+    let envelope = AttributionEnvelope::from_json(spec_json).map_err(core_to_py)?;
+    let inner = py.detach(|| envelope.execute()).map_err(core_to_py)?;
+    Ok(PyAttributionResultEnvelope { inner })
 }
 
 /// Compute single-period return contribution attribution.
