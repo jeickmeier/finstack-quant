@@ -33,7 +33,6 @@ export const calibration = {
   calibrationEnvelopeContentHash: wasm.calibrationEnvelopeContentHash,
   calibrationResultContentHash: wasm.calibrationResultContentHash,
   calibrationResultStepReport: wasm.calibrationResultStepReport,
-  calibrationResultStepReportJson: wasm.calibrationResultStepReportJson,
   calibrationResultResiduals: wasm.calibrationResultResiduals,
   rateQuoteDeposit: wasm.rateQuoteDeposit,
   rateQuoteFra: wasm.rateQuoteFra,

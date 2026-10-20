@@ -6,7 +6,6 @@
 
 use super::config::extract_config;
 use super::quotes::extract_market_datum;
-use super::report::PyCalibrationValidationReport;
 use crate::bindings::date_utils::extract_date_iso;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::py_to_json_value;
@@ -18,7 +17,6 @@ use finstack_quant_calibration::api::prior_market::PriorMarketObject;
 use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep,
 };
-use finstack_quant_calibration::api::validate as validate_api;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -1108,16 +1106,6 @@ impl PyCalibrationEnvelope {
     ///     If the request contains a non-finite number.
     fn content_hash(&self) -> PyResult<String> {
         self.inner.content_hash().map_err(core_to_py)
-    }
-
-    /// Solver-free static validation of this envelope.
-    ///
-    /// Returns
-    /// -------
-    /// CalibrationValidationReport
-    ///     Every static error plus the dependency graph.
-    fn dry_run(&self) -> PyCalibrationValidationReport {
-        PyCalibrationValidationReport::from_inner(validate_api::validate(&self.inner))
     }
 
     /// Serialize to compact JSON.

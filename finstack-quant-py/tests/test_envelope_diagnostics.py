@@ -259,6 +259,6 @@ def test_envelope_round_trip_retains_market_data_and_quote_sets() -> None:
 def test_envelope_rejects_duplicate_market_data_during_validation() -> None:
     envelope = _request()
     repeated = CalibrationEnvelope(envelope.plan, market_data=envelope.market_data * 2)
-    assert any(error["kind"] == "duplicate_market_datum_id" for error in repeated.dry_run().errors)
+    assert any(error["kind"] == "duplicate_market_datum_id" for error in dry_run(repeated).errors)
     with pytest.raises(CalibrationEnvelopeError, match="duplicate"):
         calibrate(repeated)

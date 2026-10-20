@@ -204,7 +204,6 @@
       "calibrationResultContentHash",
       "calibrationResultResiduals",
       "calibrationResultStepReport",
-      "calibrationResultStepReportJson",
       "calibrationStepBaseCorrelation",
       "calibrationStepCapFloorHullWhite",
       "calibrationStepDiscount",
@@ -262,9 +261,6 @@
     "kind": "function"
   },
   "calibration.calibrationResultStepReport": {
-    "kind": "function"
-  },
-  "calibration.calibrationResultStepReportJson": {
     "kind": "function"
   },
   "calibration.calibrationResultResiduals": {

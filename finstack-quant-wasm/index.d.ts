@@ -30238,20 +30238,6 @@ export interface CalibrationNamespace {
     stepId: string
   ): generated.calibration.CalibrationReport;
   /**
-   * Report of one calibration step as a compact JSON string.
-   *
-   * JSON wire twin of `calibrationResultStepReport` and free-function twin
-   * of Python `CalibrationResult.step_report_json`.
-   * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
-   * @param stepId - Identifier of the calibration step, as given in the plan.
-   * @returns Compact `CalibrationReport` JSON.
-   * @throws Error - Throws a `CalibrationEnvelopeError` if the result is malformed or exceeds the default load limits, and a `FinstackError` with `kind: "not_found"` if no step has the given `stepId` or with `kind: "validation"` if the report cannot be serialized.
-   */
-  calibrationResultStepReportJson(
-    resultJson: CalibrationResultEnvelope | string,
-    stepId: string
-  ): string;
-  /**
    * Per-quote residual rows of one calibration step.
    *
    * Free-function twin of Python `CalibrationResult.residuals`, which returns
