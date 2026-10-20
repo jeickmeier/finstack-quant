@@ -178,14 +178,14 @@ impl Portfolio {
     /// new row.
     pub fn add_position(&mut self, position: Position) -> Result<()> {
         if self.position_index.contains_key(&position.position_id) {
-            return Err(Error::validation(format!(
+            return Err(Error::invalid_input(format!(
                 "Duplicate position ID: {}",
                 position.position_id
             )));
         }
         if let Some(book_id) = &position.book_id {
             let book = self.books.get_mut(book_id).ok_or_else(|| {
-                Error::validation(format!(
+                Error::invalid_input(format!(
                     "Position '{}' references non-existent book '{}'",
                     position.position_id, book_id
                 ))
@@ -271,7 +271,7 @@ impl Portfolio {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::ValidationFailed`] when duplicate position IDs are found,
+    /// Returns [`Error::InvalidInput`] when duplicate position IDs are found,
     /// [`Error::UnknownEntity`] when a position references an entity
     /// that is not present in [`Portfolio::entities`], or when a cycle is detected
     /// in the book hierarchy.
@@ -294,12 +294,12 @@ impl Portfolio {
             }
         });
         if let Some(message) = first_issue {
-            return Err(Error::validation(message));
+            return Err(Error::invalid_input(message));
         }
         for position in &self.positions {
             let membership = memberships.get(&position.position_id).copied();
             if membership != position.book_id.as_ref() {
-                return Err(Error::validation(format!(
+                return Err(Error::invalid_input(format!(
                     "Position '{}' book_id {:?} disagrees with book membership {:?}",
                     position.position_id, position.book_id, membership
                 )));
@@ -388,14 +388,14 @@ fn check_position_ids_and_books<'a>(
     let mut seen_ids = finstack_quant_core::HashSet::default();
     for position in positions {
         if !seen_ids.insert(&position.position_id) {
-            return Err(Error::validation(format!(
+            return Err(Error::invalid_input(format!(
                 "Duplicate position ID: {}",
                 position.position_id
             )));
         }
         if let Some(book_id) = &position.book_id {
             if !books.contains_key(book_id) {
-                return Err(Error::validation(format!(
+                return Err(Error::invalid_input(format!(
                     "Position '{}' references non-existent book '{}'",
                     position.position_id, book_id
                 )));

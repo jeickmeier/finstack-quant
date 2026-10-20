@@ -74,6 +74,7 @@ def _result_json(metrics: dict[str, Any] | None = None) -> str:
             "position_values": {},
             "total_base_currency": {"amount": "12345.67", "currency": "USD"},
             "by_entity": {},
+            "fx_collapse_policy": "cashflow_date",
         },
         "metrics": {"aggregated": aggregated, "by_position": {}},
         "meta": {

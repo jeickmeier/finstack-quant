@@ -213,7 +213,7 @@ test('buildCreditVolReport matches Python', () => {
   const report = portfolio.buildCreditVolReport(inputs.credit_decomposition, model, true);
   assertClose(wire(report), expected.build_credit_vol_report);
   assert.equal(
-    portfolio.buildCreditVolReport(inputs.credit_decomposition, model, false).by_position_optional,
+    portfolio.buildCreditVolReport(inputs.credit_decomposition, model, false).by_position,
     null
   );
   assert.throws(

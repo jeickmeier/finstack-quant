@@ -169,7 +169,7 @@ fn scenario_pnl_reconciles_end_to_end() {
         hazard_bump_mode: Default::default(),
     };
 
-    let finstack_quant_portfolio::scenarios::ScenarioPnlView { pnl, report } =
+    let finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem { pnl, report, .. } =
         finstack_quant_portfolio::scenarios::scenario_pnl(&portfolio, &scenario, &market, &config)
             .unwrap();
 
@@ -249,9 +249,10 @@ fn scenario_pnl_no_op_scenario_is_flat() {
         hazard_bump_mode: Default::default(),
     };
 
-    let finstack_quant_portfolio::scenarios::ScenarioPnlView {
+    let finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem {
         pnl,
         report: _report,
+        ..
     } = finstack_quant_portfolio::scenarios::scenario_pnl(
         &portfolio,
         &scenario,
@@ -288,9 +289,8 @@ fn scenario_pnl_no_op_scenario_is_flat() {
         &config,
     )
     .expect("scenario batch");
-    let finstack_quant_portfolio::scenarios::ScenarioPnlView {
-        pnl: standalone,
-        report: _,
+    let finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem {
+        pnl: standalone, ..
     } = finstack_quant_portfolio::scenarios::scenario_pnl(&portfolio, &shock, &market, &config)
         .expect("standalone scenario");
 

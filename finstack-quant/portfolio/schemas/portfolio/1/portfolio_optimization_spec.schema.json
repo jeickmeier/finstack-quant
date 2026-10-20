@@ -45,12 +45,12 @@
         "child_book_ids": {
           "description": "Child book IDs (for hierarchical organization)",
           "items": {
-            "$ref": "#/$defs/BookId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
         "id": {
-          "$ref": "#/$defs/BookId",
+          "$ref": "#/$defs/Id",
           "description": "Unique identifier for this book"
         },
         "meta": {
@@ -68,7 +68,7 @@
         "parent_id": {
           "anyOf": [
             {
-              "$ref": "#/$defs/BookId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -79,7 +79,7 @@
         "position_ids": {
           "description": "Position IDs directly assigned to this book (non-recursive)",
           "items": {
-            "$ref": "#/$defs/PositionId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
@@ -98,10 +98,6 @@
       ],
       "type": "object"
     },
-    "BookId": {
-      "description": "Book identifier.",
-      "type": "string"
-    },
     "CandidatePosition": {
       "additionalProperties": false,
       "description": "A candidate instrument that could be added to the portfolio.\n\nThis represents an instrument not currently held but available for trading.\nThe optimizer can allocate weight to candidates (up to `max_weight`).",
@@ -113,10 +109,10 @@
           "type": "object"
         },
         "entity_id": {
-          "$ref": "#/$defs/EntityId"
+          "$ref": "#/$defs/Id"
         },
         "id": {
-          "$ref": "#/$defs/PositionId"
+          "$ref": "#/$defs/Id"
         },
         "instrument_spec": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json"
@@ -1131,7 +1127,7 @@
       "description": "An entity that can hold positions.\n\nEntities represent companies, funds, or other legal entities that\nown instruments. For standalone instruments (derivatives, FX), use\nthe dummy entity.",
       "properties": {
         "id": {
-          "$ref": "#/$defs/EntityId",
+          "$ref": "#/$defs/Id",
           "description": "Unique identifier for the entity"
         },
         "meta": {
@@ -1159,8 +1155,8 @@
       ],
       "type": "object"
     },
-    "EntityId": {
-      "description": "Entity identifier (company, fund, etc.)",
+    "Id": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
       "type": "string"
     },
     "Inequality": {
@@ -1465,7 +1461,7 @@
           "description": "Filter by entity ID.",
           "properties": {
             "by_entity_id": {
-              "$ref": "#/$defs/EntityId"
+              "$ref": "#/$defs/Id"
             }
           },
           "required": [
@@ -1492,7 +1488,7 @@
           "properties": {
             "by_position_ids": {
               "items": {
-                "$ref": "#/$defs/PositionId"
+                "$ref": "#/$defs/Id"
               },
               "type": "array"
             }
@@ -1549,10 +1545,6 @@
         }
       ]
     },
-    "PositionId": {
-      "description": "Position identifier.",
-      "type": "string"
-    },
     "PositionSpec": {
       "description": "Serializable position specification (without `Arc<dyn Instrument>`).\n\nThis struct allows positions to be serialized and deserialized by storing\nthe instrument definition as JSON rather than a trait object.",
       "properties": {
@@ -1566,7 +1558,7 @@
         "book_id": {
           "anyOf": [
             {
-              "$ref": "#/$defs/BookId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -1575,7 +1567,7 @@
           "description": "Optional book identifier"
         },
         "entity_id": {
-          "$ref": "#/$defs/EntityId",
+          "$ref": "#/$defs/Id",
           "description": "Entity identifier"
         },
         "instrument_id": {
@@ -1599,7 +1591,7 @@
           "type": "object"
         },
         "position_id": {
-          "$ref": "#/$defs/PositionId",
+          "$ref": "#/$defs/Id",
           "description": "Position identifier"
         },
         "quantity": {

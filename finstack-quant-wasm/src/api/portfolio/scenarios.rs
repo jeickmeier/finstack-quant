@@ -50,13 +50,15 @@ pub fn apply_scenario_and_revalue(
 /// `Portfolio` handle.
 ///
 /// Values the portfolio against the unshocked market and against the
-/// scenario-shocked market, and returns a JS object with structured `pnl`
-/// (base-currency `total` plus `by_position`) and `report` values. Positions
-/// added or removed by the scenario are zero-filled against the missing side,
-/// so the drill-down always sums to the total.
+/// scenario-shocked market, and returns the `ScenarioPnlBatchItem`
+/// (`scenario_id`, a structured `pnl` with base-currency `total` plus
+/// `by_position`, and `report`), the same item `scenarioPnlBatch` returns per
+/// scenario. Positions added or removed by the scenario are zero-filled
+/// against the missing side, so the drill-down always sums to the total.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param scenario_json - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
 /// @param market - Constructed `core.MarketContext` handle supplying the unshocked curves, quotes, and FX data used for the base leg.
+/// @returns The scenario's `ScenarioPnlBatchItem`.
 ///
 /// # Errors
 ///

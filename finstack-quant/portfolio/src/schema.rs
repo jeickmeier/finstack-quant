@@ -19,9 +19,8 @@ use crate::{
     grid_attribution::GridPosition, margin::PortfolioMarginResult,
     optimization::PortfolioOptimizationSpec, performance::DatedCashflow, performance::LinkedReturn,
     performance::TwrrPeriod, primitive::PortfolioPrimitiveExposureReport, replay::ReplayConfig,
-    replay::ReplayResult, scenarios::ScenarioPnlBatchItem, scenarios::ScenarioPnlView,
-    scenarios::ScenarioRevalueView, sensitivity::FactorPnlProfile,
-    sensitivity::SensitivityMatrixJson, PortfolioResult,
+    replay::ReplayResult, scenarios::ScenarioPnlBatchItem, scenarios::ScenarioRevalueView,
+    sensitivity::FactorPnlProfile, sensitivity::SensitivityMatrixJson, PortfolioResult,
 };
 use finstack_quant_core::schema::{
     externalize_schema_definitions, ExternalSchemaDefinition, SchemaArtifact, SchemaKind,
@@ -476,19 +475,10 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "portfolio",
         "scenario_pnl_batch_item",
         Output,
-        "One ordered result from `scenario_pnl_batch`."
+        "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`."
     )
     .with_packager(package_materialization_schema)
     .with_examples(examples::scenario_pnl_batch_item),
-    finstack_quant_core::schema_artifact!(
-        ScenarioPnlView,
-        "portfolio",
-        "scenario_pnl_view",
-        Output,
-        "Scenario-P&L view returned by binding surfaces."
-    )
-    .with_packager(package_materialization_schema)
-    .with_examples(examples::scenario_pnl_view_example),
     finstack_quant_core::schema_artifact!(
         ScenarioRevalueView,
         "portfolio",

@@ -378,7 +378,7 @@ fn raw_position_endpoint(input: &RawEvaluationInput<'_>, position: &Position) ->
         input.portfolio.base_currency,
     )?;
     if !amount.is_finite() {
-        return Err(Error::validation(format!(
+        return Err(Error::invalid_input(format!(
             "M-1: non-finite factor-stress PV for position '{}' ({amount})",
             position.position_id
         )));

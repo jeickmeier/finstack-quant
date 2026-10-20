@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::types::PositionId;
 use finstack_quant_factor::credit::hierarchy::{dimension_key, CreditFactorModel};
-use finstack_quant_factor::matching::CREDIT_GENERIC_FACTOR_ID;
+use finstack_quant_factor::matching::{parse_bucket_factor_id, CREDIT_GENERIC_FACTOR_ID};
 use finstack_quant_factor::risk::RiskDecomposition;
 use finstack_quant_factor::RiskMeasure;
 
@@ -22,8 +22,8 @@ pub struct CreditVolReport {
     pub by_level: Vec<LevelVolContribution>,
     /// Portfolio idiosyncratic contribution.
     pub idiosyncratic_total: f64,
-    /// Optional position-level breakdown.
-    pub by_position_optional: Option<Vec<PositionVolContribution>>,
+    /// Position-level breakdown; `None` unless requested.
+    pub by_position: Option<Vec<PositionVolContribution>>,
 }
 
 /// Aggregated risk contribution for one hierarchy level.
@@ -85,16 +85,7 @@ pub fn build_credit_vol_report(
             generic += contribution.absolute_risk;
             continue;
         }
-        let Some(rest) = id.strip_prefix("credit::level") else {
-            continue;
-        };
-        let mut parts = rest.splitn(3, "::");
-        let (Some(level), Some(_dimension), Some(bucket)) =
-            (parts.next(), parts.next(), parts.next())
-        else {
-            continue;
-        };
-        let Ok(level) = level.parse::<usize>() else {
+        let Some((level, bucket)) = parse_bucket_factor_id(&contribution.factor_id) else {
             continue;
         };
         let Some(output) = by_level.get_mut(level) else {
@@ -115,7 +106,7 @@ pub fn build_credit_vol_report(
         0.0
     };
 
-    let by_position_optional = by_position.then(|| {
+    let position_rows = by_position.then(|| {
         let mut factor_by_position: BTreeMap<String, f64> = BTreeMap::new();
         for contribution in &decomposition.position_factor_contributions {
             *factor_by_position
@@ -153,7 +144,7 @@ pub fn build_credit_vol_report(
         generic,
         by_level,
         idiosyncratic_total: decomposition.residual_risk,
-        by_position_optional,
+        by_position: position_rows,
     }
 }
 
@@ -173,7 +164,7 @@ mod tests {
                 by_bucket: BTreeMap::from([("IG".to_owned(), 0.2)]),
             }],
             idiosyncratic_total: 0.4,
-            by_position_optional: Some(vec![PositionVolContribution {
+            by_position: Some(vec![PositionVolContribution {
                 position_id: PositionId::new("POS1"),
                 factor_total: 0.3,
                 idiosyncratic: 0.0,
@@ -184,7 +175,7 @@ mod tests {
         let json = serde_json::to_value(&report).expect("serialize");
         assert_eq!(json["measure"], "variance");
         assert_eq!(json["by_level"][0]["by_bucket"]["IG"], 0.2);
-        assert_eq!(json["by_position_optional"][0]["position_id"], "POS1");
+        assert_eq!(json["by_position"][0]["position_id"], "POS1");
         let restored: CreditVolReport = serde_json::from_value(json).expect("deserialize");
         assert_eq!(restored, report);
     }

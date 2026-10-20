@@ -39,8 +39,7 @@ pub struct PositionValue {
     /// base currency's `Money` rounding).
     ///
     /// Absent when the native currency is the base currency (no FX lookup is
-    /// made), and on values deserialized from JSON written before this field
-    /// existed.
+    /// made).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fx_rate: Option<f64>,
 
@@ -129,7 +128,6 @@ pub struct PortfolioValuation {
     /// [`as_of`](Self::as_of) through the market FX matrix; this records the
     /// applied [`FxConversionPolicy`] so the result envelope satisfies the
     /// policy-visibility invariant (the FX strategy is stamped, not implied).
-    #[serde(default = "default_fx_collapse_policy")]
     pub fx_collapse_policy: FxConversionPolicy,
 
     /// Request-local compatibility stamp used only for safe selective reuse.
@@ -139,12 +137,6 @@ pub struct PortfolioValuation {
     /// portfolio state and therefore falls back to a full evaluation.
     #[serde(skip)]
     pub(crate) provenance: Option<crate::evaluation::EvaluationProvenance>,
-}
-
-/// Default FX policy stamped on a [`PortfolioValuation`]: the spot-equivalent
-/// `as_of` conversion used by the portfolio spot FX helper.
-fn default_fx_collapse_policy() -> FxConversionPolicy {
-    FxConversionPolicy::CashflowDate
 }
 
 impl PortfolioValuation {

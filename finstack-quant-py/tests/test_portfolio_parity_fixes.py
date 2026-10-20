@@ -174,8 +174,9 @@ class TestScenarioInputs:
         pf, mkt = _portfolio(), _market()
         _valuation, report = apply_scenario_and_revalue(pf, spec, mkt)
         assert report.operations_applied == 0
-        pnl, _ = scenario_pnl(pf, spec, mkt)
-        assert pnl.total == pytest.approx(0.0)
+        item = scenario_pnl(pf, spec, mkt)
+        assert item.scenario_id == "s"
+        assert item.pnl.total == pytest.approx(0.0)
         batch = scenario_pnl_batch(pf, [spec, spec.to_json()], mkt)
         assert [item.scenario_id for item in batch] == ["s", "s"]
         assert scenario_pnl_batch(pf, "[]", mkt) == []
@@ -204,7 +205,7 @@ class TestCashflows:
     @pytest.mark.parametrize("date", ["wrong-date", "2025-02-30"])
     def test_json_netting_rejects_invalid_payment_dates(self, date: str) -> None:
         payload = {date: {"USD": {"coupon": {"amount": "100", "currency": "USD"}}}}
-        with pytest.raises(PortfolioError, match="invalid cashflow date"):
+        with pytest.raises(PortfolioError, match="invalid cashflow by_date ladder"):
             net_in_currency_by_date(json.dumps(payload), "USD")
 
     @pytest.mark.parametrize(
@@ -229,7 +230,7 @@ class TestCashflows:
                 }
             }
         }
-        with pytest.raises(PortfolioError, match="cashflow money"):
+        with pytest.raises(PortfolioError, match=r"invalid cashflow by_date ladder|cashflow money at"):
             net_in_currency_by_date(json.dumps(payload), "USD")
 
     def test_json_netting_validates_currencies_outside_the_requested_output(self) -> None:
@@ -239,7 +240,7 @@ class TestCashflows:
                 "EUR": {"Principal": {"amount": "invalid", "currency": "EUR"}},
             }
         }
-        with pytest.raises(PortfolioError, match="EUR/Principal"):
+        with pytest.raises(PortfolioError, match='invalid value: string "invalid"'):
             net_in_currency_by_date(json.dumps(payload), "USD")
         payload["2025-01-15"]["EUR"]["Principal"]["amount"] = "200"
         assert net_in_currency_by_date(json.dumps(payload), "USD") == [("2025-01-15", 100.0)]

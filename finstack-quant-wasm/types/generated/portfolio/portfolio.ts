@@ -826,14 +826,6 @@ export type AttributionMethod =
       taylor: TaylorAttributionConfig;
     };
 /**
- * Book identifier.
- */
-export type BookId = string;
-/**
- * Position identifier.
- */
-export type PositionId = string;
-/**
  * Enumeration of cash-flow kinds for classification and ordering.
  *
  * Used to distinguish between different types of cashflows for
@@ -904,10 +896,6 @@ export type CFKind =
   | "collateral_substitution_in"
   | "collateral_substitution_out";
 /**
- * Entity identifier (company, fund, etc.)
- */
-export type EntityId = string;
-/**
  * Unit of position measurement.
  *
  * The unit describes how the `quantity` on a [`Position`] should be interpreted.
@@ -947,10 +935,6 @@ export type PositionUnit =
     }
   | "face_value"
   | "percentage";
-/**
- * Why a position did not contribute classified cashflows to a portfolio ladder.
- */
-export type CashflowExtractionIssueKind = "build_failed";
 /**
  * How [`PortfolioCashflows::collapse_to_base_by_date_kind`] converts
  * foreign-currency flows into the reporting currency.
@@ -1066,13 +1050,13 @@ export type MetricExpr =
 export type PositionFilter =
   | "all"
   | {
-      by_entity_id: EntityId;
+      by_entity_id: Id;
     }
   | {
       by_attribute: AttributeTest;
     }
   | {
-      by_position_ids: PositionId[];
+      by_position_ids: Id[];
     }
   | {
       not: PositionFilter;
@@ -1461,7 +1445,7 @@ export type PositionChange =
       /**
        * Position identifier to remove from the scenario.
        */
-      position_id: PositionId;
+      position_id: Id;
     }
   | {
       kind: "resize";
@@ -1472,7 +1456,7 @@ export type PositionChange =
       /**
        * Position identifier to resize.
        */
-      position_id: PositionId;
+      position_id: Id;
     };
 /**
  * Source of a per-position residual variance contribution.
@@ -2044,11 +2028,11 @@ export interface Book {
   /**
    * Child book IDs (for hierarchical organization)
    */
-  child_book_ids: BookId[];
+  child_book_ids: Id[];
   /**
    * Unique identifier for this book
    */
-  id: BookId;
+  id: Id;
   /**
    * Additional metadata
    */
@@ -2062,11 +2046,11 @@ export interface Book {
   /**
    * Parent book identifier (None for root books)
    */
-  parent_id?: BookId | null;
+  parent_id?: Id | null;
   /**
    * Position IDs directly assigned to this book (non-recursive)
    */
-  position_ids: PositionId[];
+  position_ids: Id[];
   /**
    * Book-level tags for grouping and filtering
    */
@@ -2146,8 +2130,8 @@ export interface CandidatePosition {
   attributes?: {
     [k: string]: AttributeValue;
   };
-  entity_id: EntityId;
-  id: PositionId;
+  entity_id: Id;
+  id: Id;
   instrument_spec: valuations.InstrumentJson;
   max_weight: number;
   min_weight: number;
@@ -2295,7 +2279,8 @@ export interface CashflowAggregationOptions {
   [k: string]: unknown;
 }
 /**
- * Structured issue captured while extracting full cashflow schedules.
+ * A position whose instrument could not build its contractual cashflow
+ * schedule, so it contributed no classified cashflows to the ladder.
  */
 export interface CashflowExtractionIssue {
   /**
@@ -2307,17 +2292,13 @@ export interface CashflowExtractionIssue {
    */
   instrument_type: InstrumentType;
   /**
-   * Failure category.
-   */
-  kind: CashflowExtractionIssueKind;
-  /**
    * Human-readable failure detail.
    */
   message: string;
   /**
    * Position whose cashflow extraction was attempted.
    */
-  position_id: PositionId;
+  position_id: Id;
   [k: string]: unknown;
 }
 /**
@@ -2618,9 +2599,9 @@ export interface CreditVolReport {
    */
   by_level: LevelVolContribution[];
   /**
-   * Optional position-level breakdown.
+   * Position-level breakdown; `None` unless requested.
    */
-  by_position_optional?: PositionVolContribution[] | null;
+  by_position?: PositionVolContribution[] | null;
   /**
    * Contribution from the generic credit factor.
    */
@@ -2676,7 +2657,7 @@ export interface PositionVolContribution {
   /**
    * Portfolio position identifier.
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Sum of systematic and idiosyncratic contributions.
    */
@@ -2821,7 +2802,7 @@ export interface Entity {
   /**
    * Unique identifier for the entity
    */
-  id: EntityId;
+  id: Id;
   /**
    * Additional metadata
    */
@@ -2962,7 +2943,7 @@ export interface PositionAssignment {
   /**
    * Portfolio position identifier.
    */
-  position_id: PositionId;
+  position_id: Id;
   [k: string]: unknown;
 }
 /**
@@ -2976,7 +2957,7 @@ export interface UnmatchedEntry {
   /**
    * Portfolio position identifier.
    */
-  position_id: PositionId;
+  position_id: Id;
   [k: string]: unknown;
 }
 /**
@@ -4688,7 +4669,7 @@ export interface PortfolioCashflowEvent {
   /**
    * Position contributing the event.
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Effective rate used to compute the event when available.
    */
@@ -4718,7 +4699,7 @@ export interface PortfolioCashflowPositionSummary {
   /**
    * Position identifier.
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Schedule representation carried by the instrument.
    */
@@ -4755,7 +4736,7 @@ export interface PortfolioCashflows {
    * Stamped so callers do not infer a spot-on-payment-date conversion from
    * [`finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate`].
    */
-  fx_collapse_policy?: CashflowFxPolicy;
+  fx_collapse_policy: CashflowFxPolicy;
   /**
    * Extraction issues for unsupported instruments and provider failures.
    */
@@ -4910,7 +4891,7 @@ export interface PortfolioMetrics {
    * [`SkippedMetric`] entry — that field only records non-finite values —
    * so this list is the only signal that the aggregate is partial.
    */
-  degraded_positions?: PositionId[];
+  degraded_positions?: Id[];
   /**
    * Positions whose non-finite metric values were excluded from aggregation.
    *
@@ -4959,7 +4940,7 @@ export interface SkippedMetric {
   /**
    * Position that produced the non-finite value.
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * The non-finite value that was encountered.
    */
@@ -5087,7 +5068,7 @@ export interface TradeSpec {
   /**
    * Position identifier in the optimized portfolio.
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Post‑trade quantity.
    */
@@ -5210,11 +5191,11 @@ export interface PositionSpec {
   /**
    * Optional book identifier
    */
-  book_id?: BookId | null;
+  book_id?: Id | null;
   /**
    * Entity identifier
    */
-  entity_id: EntityId;
+  entity_id: Id;
   /**
    * Instrument identifier (for reference/lookup)
    */
@@ -5235,7 +5216,7 @@ export interface PositionSpec {
   /**
    * Position identifier
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Signed quantity. For [`PositionUnit::Notional`], a lot multiplier.
    */
@@ -5367,7 +5348,7 @@ export interface PortfolioPrimitivePath {
   /**
    * Portfolio position containing the direct instrument or root composite.
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Signed primitive quantity after position and nested-leg scaling.
    */
@@ -5419,7 +5400,7 @@ export interface PortfolioValuation {
    * Positions whose valuation fell back to PV-only because requested risk
    * metrics could not be computed.
    */
-  degraded_positions?: PositionId[];
+  degraded_positions?: Id[];
   /**
    * FX policy applied when collapsing position values to the base currency.
    *
@@ -5428,7 +5409,7 @@ export interface PortfolioValuation {
    * applied [`FxConversionPolicy`] so the result envelope satisfies the
    * policy-visibility invariant (the FX strategy is stamped, not implied).
    */
-  fx_collapse_policy?: FxConversionPolicy;
+  fx_collapse_policy: FxConversionPolicy;
   /**
    * Values for each position
    */
@@ -5451,7 +5432,7 @@ export interface PositionValue {
   /**
    * Entity that owns this position
    */
-  entity_id: EntityId;
+  entity_id: Id;
   /**
    * Spot FX rate applied to collapse [`value_native`](Self::value_native)
    * into [`value_base`](Self::value_base): units of the portfolio base
@@ -5460,8 +5441,7 @@ export interface PositionValue {
    * base currency's `Money` rounding).
    *
    * Absent when the native currency is the base currency (no FX lookup is
-   * made), and on values deserialized from JSON written before this field
-   * existed.
+   * made).
    */
   fx_rate?: number | null;
   /**
@@ -5499,7 +5479,7 @@ export interface PositionValue {
   /**
    * Position identifier
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Original metrics failure message when the valuation fell back to PV-only.
    */
@@ -5852,7 +5832,7 @@ export interface ScenarioPnl {
   [k: string]: unknown;
 }
 /**
- * One ordered result from `scenario_pnl_batch`.
+ * One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`.
  */
 export interface ScenarioPnlBatchItem {
   /**
@@ -5867,20 +5847,6 @@ export interface ScenarioPnlBatchItem {
    * Identifier copied from the input scenario.
    */
   scenario_id: string;
-  [k: string]: unknown;
-}
-/**
- * Scenario-P&L view returned by binding surfaces.
- */
-export interface ScenarioPnlView {
-  /**
-   * Scenario-attributable profit and loss.
-   */
-  pnl: ScenarioPnl;
-  /**
-   * Scenario application report.
-   */
-  report: ApplicationReport;
   [k: string]: unknown;
 }
 /**

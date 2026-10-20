@@ -8,8 +8,7 @@ use thiserror::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Errors that can occur during portfolio operations.
-#[derive(Debug, Clone, PartialEq, Error, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
 pub enum Error {
     /// Position references an unknown entity
@@ -20,10 +19,6 @@ pub enum Error {
         /// Entity identifier that was not found.
         entity_id: EntityId,
     },
-
-    /// Portfolio validation failed
-    #[error("Portfolio validation failed: {0}")]
-    ValidationFailed(String),
 
     /// FX conversion failed
     #[error("FX conversion failed: {from} to {to}")]
@@ -58,7 +53,7 @@ pub enum Error {
     #[error(transparent)]
     Core(#[from] finstack_quant_core::Error),
 
-    /// Invalid input data
+    /// Invalid caller input or a failed portfolio validation check.
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
@@ -79,15 +74,6 @@ pub enum Error {
 }
 
 impl Error {
-    /// Create a validation error with context.
-    ///
-    /// # Arguments
-    ///
-    /// * `msg` - Human-readable description of the validation failure.
-    pub fn validation(msg: impl Into<String>) -> Self {
-        Self::ValidationFailed(msg.into())
-    }
-
     /// Create a valuation error with context.
     ///
     /// # Arguments
@@ -113,7 +99,7 @@ impl Error {
     /// | Kind | Variants |
     /// |------|----------|
     /// | [`ErrorKind::NotFound`] | `UnknownEntity`, `MissingMarketData`, `FxConversionFailed` (no rate for the pair) |
-    /// | [`ErrorKind::Validation`] | `ValidationFailed`, `ScenarioError`, `InvalidInput`, `ContractLimitExceeded`, `MaterializationFailed` |
+    /// | [`ErrorKind::Validation`] | `ScenarioError`, `InvalidInput`, `ContractLimitExceeded`, `MaterializationFailed` |
     ///
     /// `Core` keeps its own kind and `ValuationError` carries the kind of the
     /// failure it wraps.
@@ -129,8 +115,7 @@ impl Error {
             Error::UnknownEntity { .. }
             | Error::MissingMarketData(_)
             | Error::FxConversionFailed { .. } => ErrorKind::NotFound,
-            Error::ValidationFailed(_)
-            | Error::ScenarioError(_)
+            Error::ScenarioError(_)
             | Error::InvalidInput(_)
             | Error::ContractLimitExceeded { .. }
             | Error::MaterializationFailed(_) => ErrorKind::Validation,
@@ -150,11 +135,12 @@ impl Error {
         }
     }
 
-    /// Create an invalid input error.
+    /// Create an invalid-input error, the one validation category for bad
+    /// caller input and failed portfolio checks.
     ///
     /// # Arguments
     ///
-    /// * `msg` - Description of the bad caller input.
+    /// * `msg` - Description of the bad input or the violated invariant.
     pub fn invalid_input(msg: impl Into<String>) -> Self {
         Self::InvalidInput(msg.into())
     }
@@ -231,7 +217,6 @@ mod tests {
                 Error::valuation("P", ErrorKind::Computation, "solver"),
                 ErrorKind::Computation,
             ),
-            (Error::validation("bad"), ErrorKind::Validation),
             (Error::ScenarioError("bad".into()), ErrorKind::Validation),
             (Error::invalid_input("bad"), ErrorKind::Validation),
             (

@@ -177,7 +177,7 @@ fn build_netting_sets(portfolio: &Portfolio) -> Result<(NettingSets<'_>, Members
                             .iter()
                             .map(|p| p.position_id.as_str())
                             .collect();
-                        return Err(Error::validation(format!(
+                        return Err(Error::invalid_input(format!(
                             "Conflicting margin specifications for netting set '{}' at position '{}' (registered positions: {:?})",
                             netting_set.id, position.position_id, registered
                         )));
@@ -198,7 +198,7 @@ fn build_netting_sets(portfolio: &Portfolio) -> Result<(NettingSets<'_>, Members
                 csa_owners.insert(spec.csa.id.clone(), (ns.id.counterparty_id(), &spec.csa))
             {
                 if owner != ns.id.counterparty_id() || existing != &spec.csa {
-                    return Err(Error::validation(format!(
+                    return Err(Error::invalid_input(format!(
                         "CSA '{}' has conflicting terms or different counterparties",
                         spec.csa.id
                     )));
@@ -213,7 +213,7 @@ fn build_netting_sets(portfolio: &Portfolio) -> Result<(NettingSets<'_>, Members
 /// one by the square-root-of-time rule: `amount * sqrt(target / source)`.
 fn rescale_to_mpor(amount: f64, source_days: u32, target_days: u32) -> Result<f64> {
     if source_days == 0 {
-        return Err(Error::validation("IM source MPOR must be positive"));
+        return Err(Error::invalid_input("IM source MPOR must be positive"));
     }
     Ok(amount * (f64::from(target_days) / f64::from(source_days)).sqrt())
 }
@@ -244,7 +244,7 @@ impl MarginRun<'_> {
             let gross = result
                 .by_netting_set
                 .get(&ns.id)
-                .ok_or_else(|| Error::validation("Missing netting-set IM result"))?
+                .ok_or_else(|| Error::invalid_input("Missing netting-set IM result"))?
                 .initial_margin;
             let amount =
                 crate::fx::convert_to_base(gross, self.as_of, self.market, spec.csa.base_currency)?
@@ -256,7 +256,7 @@ impl MarginRun<'_> {
         }
         for id in current.keys() {
             if !gross_by_csa.contains_key(id) {
-                return Err(Error::validation(format!(
+                return Err(Error::invalid_input(format!(
                     "Unknown IM collateral CSA '{id}'"
                 )));
             }
@@ -265,7 +265,7 @@ impl MarginRun<'_> {
             let params = csa
                 .im_params
                 .as_ref()
-                .ok_or_else(|| Error::validation("Missing IM terms"))?;
+                .ok_or_else(|| Error::invalid_input("Missing IM terms"))?;
             let currency = csa.base_currency;
             let account = params.apply_collateral_terms(
                 Money::new(gross, currency)?,
@@ -443,7 +443,7 @@ impl MarginRun<'_> {
                 }
                 ImMethodology::Schedule => (self.calculate_schedule_im(netting_set, target_mpor)?, None),
                 ImMethodology::ClearingHouse => (self.calculate_clearing_im(netting_set, target_mpor, &mut degraded_positions)?, None),
-                other => return Err(Error::validation(format!(
+                other => return Err(Error::invalid_input(format!(
                     "Portfolio OTC margin does not support configured IM methodology {other:?}; supply its dedicated collateral/model engine"
                 ))),
             }
@@ -484,16 +484,16 @@ impl MarginRun<'_> {
             let instrument = &position.instrument;
             let marginable = instrument
                 .as_marginable()
-                .ok_or_else(|| Error::validation("Schedule position is not marginable"))?;
+                .ok_or_else(|| Error::invalid_input("Schedule position is not marginable"))?;
             let exposure = marginable
                 .im_exposure_base(self.market, self.as_of)?
                 .ok_or_else(|| {
-                    Error::validation(format!(
+                    Error::invalid_input(format!(
                         "Schedule position '{id}' requires regulatory notional"
                     ))
                 })?;
             let expiry = instrument.expiry().ok_or_else(|| {
-                Error::validation(format!(
+                Error::invalid_input(format!(
                     "Schedule position '{id}' requires contractual expiry"
                 ))
             })?;
@@ -508,7 +508,7 @@ impl MarginRun<'_> {
                 InstrumentType::Cds | InstrumentType::CdsIndex => ScheduleAssetClass::Credit,
                 InstrumentType::EquityTotalReturnSwap => ScheduleAssetClass::Equity,
                 other => {
-                    return Err(Error::validation(format!(
+                    return Err(Error::invalid_input(format!(
                         "No approved schedule classification for {other:?}"
                     )))
                 }
@@ -594,7 +594,7 @@ impl MarginRun<'_> {
         let current_collateral = Money::from((0_i64, spec.csa.base_currency));
         let vm_result = VmCalculator::new(spec.csa.clone())
             .calculate(gross_vm, current_collateral, self.as_of)
-            .map_err(|e| Error::validation(format!("M-13: CSA VM calculation failed: {e}")))?;
+            .map_err(|e| Error::invalid_input(format!("M-13: CSA VM calculation failed: {e}")))?;
         crate::fx::convert_to_base(
             vm_result.net_margin(),
             self.as_of,

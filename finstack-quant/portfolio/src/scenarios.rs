@@ -325,27 +325,8 @@ pub struct ScenarioPnl {
     pub by_position: IndexMap<PositionId, Money>,
 }
 
-/// Scenario-P&L view returned by binding surfaces.
-///
-/// Mirrors [`ScenarioRevalueView`] so callers keep scenario provenance
-/// (which operations were applied, which were skipped) alongside the P&L.
-///
-/// This pre-1.0 API intentionally has no alias under its former
-/// persistence-implying name:
-///
-/// ```compile_fail
-/// use finstack_quant_portfolio::scenarios::ScenarioPnlEnvelope;
-/// ```
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct ScenarioPnlView {
-    /// Scenario-attributable profit and loss.
-    pub pnl: ScenarioPnl,
-    /// Scenario application report.
-    pub report: ApplicationReport,
-}
-
-/// One ordered result from [`scenario_pnl_batch`].
+/// One scenario's P&L with its provenance: the result of [`scenario_pnl`] and
+/// each ordered entry of [`scenario_pnl_batch`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ScenarioPnlBatchItem {
@@ -439,8 +420,9 @@ fn diff_valuations(
 ///
 /// # Returns
 ///
-/// [`Result`] containing the [`ScenarioPnl`] ladder together with the scenario
-/// [`ApplicationReport`], so the P&L is never separated from its provenance.
+/// [`ScenarioPnlBatchItem`] holding the scenario `id`, the [`ScenarioPnl`]
+/// ladder and the scenario [`ApplicationReport`], so the P&L is never
+/// separated from its provenance.
 ///
 /// # Errors
 ///
@@ -461,7 +443,7 @@ fn diff_valuations(
 /// # let portfolio: finstack_quant_portfolio::Portfolio = unimplemented!("Provide a portfolio");
 /// # let market: MarketContext = unimplemented!("Provide market data");
 /// # let scenario: ScenarioSpec = unimplemented!("Provide a scenario");
-/// let finstack_quant_portfolio::scenarios::ScenarioPnlView { pnl, report } = scenario_pnl(&portfolio, &scenario, &market, &FinstackConfig::default())?;
+/// let finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem { pnl, report, .. } = scenario_pnl(&portfolio, &scenario, &market, &FinstackConfig::default())?;
 /// println!("Scenario P&L: {} over {} operations", pnl.total, report.operations_applied);
 /// # Ok(())
 /// # }
@@ -471,16 +453,10 @@ pub fn scenario_pnl(
     scenario: &ScenarioSpec,
     market: &MarketContext,
     config: &finstack_quant_core::config::FinstackConfig,
-) -> Result<ScenarioPnlView> {
-    let mut results =
-        scenario_pnl_batch(portfolio, std::slice::from_ref(scenario), market, config)?;
-    let result = results
+) -> Result<ScenarioPnlBatchItem> {
+    scenario_pnl_batch(portfolio, std::slice::from_ref(scenario), market, config)?
         .pop()
-        .ok_or_else(|| Error::ScenarioError("scenario batch returned no result".to_string()))?;
-    Ok(ScenarioPnlView {
-        pnl: result.pnl,
-        report: result.report,
-    })
+        .ok_or_else(|| Error::ScenarioError("scenario batch returned no result".to_string()))
 }
 
 /// Compute ordered P&L results for multiple scenarios while sharing one base valuation.
@@ -934,9 +910,10 @@ mod tests {
         let market = build_test_market();
         let config = FinstackConfig::default();
 
-        let crate::scenarios::ScenarioPnlView {
+        let crate::scenarios::ScenarioPnlBatchItem {
             pnl,
             report: _report,
+            ..
         } = scenario_pnl(&portfolio, &scenario_with(Vec::new()), &market, &config)
             .expect("test should succeed");
 
@@ -1014,7 +991,7 @@ mod tests {
             bp: 50.0,
         }]);
 
-        let crate::scenarios::ScenarioPnlView { pnl, report } =
+        let crate::scenarios::ScenarioPnlBatchItem { pnl, report, .. } =
             scenario_pnl(&portfolio, &scenario, &market, &config).expect("test should succeed");
 
         assert!(report.operations_applied > 0);

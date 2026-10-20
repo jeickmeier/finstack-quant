@@ -261,7 +261,6 @@ import type {
   PositionSpec,
   ReconciliationReport,
   ScenarioPnlBatchItem,
-  ScenarioPnlView,
   SensitivityMatrixJson,
   StressPnl,
   StressResult,
@@ -495,7 +494,6 @@ export type {
   PositionSpec,
   ReconciliationReport,
   ScenarioPnlBatchItem,
-  ScenarioPnlView,
   SensitivityMatrixJson,
   StressPnl,
   StressResult,
@@ -35068,21 +35066,22 @@ export interface PortfolioNamespace {
    * already-built `Portfolio` handle.
    *
    * Values the portfolio against the unshocked market and against the
-   * scenario-shocked market, and returns a JS object with structured `pnl`
-   * (base-currency `total` plus `by_position`) and `report` values. Positions
-   * added or removed by the scenario are zero-filled against the missing side,
-   * so the drill-down always sums to the total.
-   * @returns Scenario-attributable P&L ladder and application report.
+   * scenario-shocked market, and returns the `ScenarioPnlBatchItem`
+   * (`scenario_id`, a structured `pnl` with base-currency `total` plus
+   * `by_position`, and `report`), the same item `scenarioPnlBatch` returns per
+   * scenario. Positions added or removed by the scenario are zero-filled
+   * against the missing side, so the drill-down always sums to the total.
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param scenarioJson - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
    * @param market - Constructed `core.MarketContext` handle supplying the unshocked curves, quotes, and FX data used for the base leg.
+   * @returns The scenario's `ScenarioPnlBatchItem`.
    * @throws Error - Throws a JavaScript exception if the scenario JSON is malformed or invalid, scenario application or either valuation fails, valuation currencies are inconsistent, or the structured result cannot be converted to JavaScript.
    */
   scenarioPnl(
     portfolio: Portfolio,
     scenarioJson: JsonInput,
     market: MarketContext
-  ): ScenarioPnlView;
+  ): ScenarioPnlBatchItem;
   /**
    * Optimize portfolio weights using the LP-based optimizer.
    *
@@ -35209,10 +35208,10 @@ export interface PortfolioNamespace {
    * Rolls the decomposition's factor contributions up by credit-hierarchy
    * level. Returns the `CreditVolReport`: `total`, `measure`, the `generic`
    * credit-factor contribution, `by_level` rollups, `idiosyncratic_total` and,
-   * when requested, `by_position_optional` rows.
+   * when requested, `by_position` rows.
    * @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `models.factor.risk.decomposeFactors`.
    * @param model - `models.factor.credit.CreditFactorModel` handle whose hierarchy names the levels.
-   * @param byPosition - `true` to include the per-position breakdown; `false` leaves `by_position_optional` `null`.
+   * @param byPosition - `true` to include the per-position breakdown; `false` leaves `by_position` `null`.
    * @returns The `CreditVolReport`.
    * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `decomposition` is not a JSON string or plain object or `byPosition` is not a boolean, and a `FinstackError` (kind `validation`) if `decomposition` does not match the `RiskDecomposition` schema.
    */

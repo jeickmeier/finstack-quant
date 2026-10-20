@@ -526,13 +526,6 @@ fn scenario_pnl() -> Value {
     json!({"total": usd("-425.25"), "by_position": {"POS_001": usd("-425.25")}})
 }
 
-pub(super) fn scenario_pnl_view_example() -> Result<Vec<Value>> {
-    example_from_json::<crate::scenarios::ScenarioPnlView>(json!({
-        "pnl": scenario_pnl(),
-        "report": application_report()
-    }))
-}
-
 pub(super) fn scenario_pnl_batch_item() -> Result<Vec<Value>> {
     example_from_json::<crate::scenarios::ScenarioPnlBatchItem>(json!({
         "scenario_id": "usd_rates_stress",
@@ -640,7 +633,7 @@ pub(super) fn credit_vol_report() -> Result<Vec<Value>> {
             "by_bucket": {"Financials": 0.0055, "Industrials": 0.0035}
         }],
         "idiosyncratic_total": 0.0108,
-        "by_position_optional": null
+        "by_position": null
     }))
 }
 

@@ -8,7 +8,6 @@ use finstack_quant_portfolio::factor_model::{
 use crate::bindings::models::factor::credit::PyCreditFactorModel;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 
-use crate::bindings::json_bridge::serialize_json;
 use crate::bindings::models::factor::risk::PyRiskDecomposition;
 
 /// Aggregated risk contribution for a single hierarchy level.
@@ -152,20 +151,22 @@ impl PyCreditVolReport {
         self.inner.total
     }
 
-    /// Risk measure serialized as a JSON-compatible string (e.g. ``"variance"``).
+    /// Risk measure of the source decomposition, as its canonical Python
+    /// value: ``"variance"``, ``"volatility"``, ``{"var": {"confidence": c}}``
+    /// or ``{"expected_shortfall": {"confidence": c}}``.
     #[getter]
-    fn measure_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner.measure)
+    fn measure<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.measure)
     }
 
     /// Contribution from the generic (principal-component) ``credit::generic``
-    /// factor, in the units of :attr:`measure_json`.
+    /// factor, in the units of :attr:`measure`.
     #[getter]
     fn generic(&self) -> f64 {
         self.inner.generic
     }
 
-    /// Portfolio idiosyncratic risk in the units of :attr:`measure_json`.
+    /// Portfolio idiosyncratic risk in the units of :attr:`measure`.
     ///
     /// Returns
     /// -------
@@ -193,7 +194,7 @@ impl PyCreditVolReport {
     /// Optional per-position breakdown; ``None`` when not requested.
     #[getter]
     fn by_position(&self) -> Option<Vec<PyPositionVolContribution>> {
-        self.inner.by_position_optional.as_ref().map(|rows| {
+        self.inner.by_position.as_ref().map(|rows| {
             rows.iter()
                 .cloned()
                 .map(PyPositionVolContribution::from_inner)
@@ -216,7 +217,7 @@ impl PyCreditVolReport {
     /// on :attr:`LevelVolContribution.by_bucket`, which is already a plain dict.
     ///
     /// Columns: ``level_name``, ``total`` (level contribution in the units of
-    /// :attr:`measure_json`).
+    /// :attr:`measure`).
     fn to_level_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         // The columns are built explicitly: the frame leaves out `by_bucket`.
         let rows = &self.inner.by_level;
@@ -237,14 +238,11 @@ impl PyCreditVolReport {
     ///
     /// Columns: ``position_id``, ``factor_total`` (systematic),
     /// ``idiosyncratic`` (issuer-specific), ``total`` (their sum) — all in the
-    /// units of :attr:`measure_json`.
+    /// units of :attr:`measure`.
     fn to_position_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         // Built explicitly so the empty case keeps the full column schema.
-        let rows: &[PositionVolContribution] = self
-            .inner
-            .by_position_optional
-            .as_deref()
-            .unwrap_or_default();
+        let rows: &[PositionVolContribution] =
+            self.inner.by_position.as_deref().unwrap_or_default();
         let position_ids: Vec<&str> = rows.iter().map(|p| p.position_id.as_str()).collect();
         let factor_totals: Vec<f64> = rows.iter().map(|p| p.factor_total).collect();
         let idiosyncratic: Vec<f64> = rows.iter().map(|p| p.idiosyncratic).collect();

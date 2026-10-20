@@ -184,13 +184,14 @@ impl PyStressResult {
     ///     Portfolio-currency amount; a loss is **negative**.
     #[getter]
     fn total_pnl(&self) -> f64 {
-        self.inner.total_pnl
+        self.inner.pnl.total_pnl
     }
 
     /// Per-position ``(position_id, pnl)`` entries.
     #[getter]
     fn position_pnl(&self) -> Vec<(String, f64)> {
         self.inner
+            .pnl
             .position_pnl
             .iter()
             .map(|(id, pnl)| (id.as_str().to_owned(), *pnl))
@@ -212,7 +213,7 @@ impl PyStressResult {
     /// negative).
     #[pyo3(text_signature = "(self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = &self.inner.position_pnl;
+        let rows = &self.inner.pnl.position_pnl;
         let position_ids: Vec<&str> = rows.iter().map(|(id, _)| id.as_str()).collect();
         let pnl: Vec<f64> = rows.iter().map(|(_, pnl)| *pnl).collect();
         let data = PyDict::new(py);
@@ -224,8 +225,8 @@ impl PyStressResult {
     fn __repr__(&self) -> String {
         format!(
             "StressResult(total_pnl={}, positions={}, stressed_total_risk={})",
-            self.inner.total_pnl,
-            self.inner.position_pnl.len(),
+            self.inner.pnl.total_pnl,
+            self.inner.pnl.position_pnl.len(),
             self.inner.stressed_decomposition.total_risk,
         )
     }

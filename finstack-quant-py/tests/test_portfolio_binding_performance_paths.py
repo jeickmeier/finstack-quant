@@ -125,14 +125,7 @@ def test_scenario_pnl_batch_matches_standalone_and_accepts_json_or_typed_inputs(
     # Batch items and the standalone results are compared through their
     # canonical JSON.
     batch = [json.loads(item.to_json()) for item in scenario_pnl_batch(portfolio, scenarios_json, market)]
-    expected = []
-    for scenario in scenarios:
-        pnl, report = scenario_pnl(portfolio, json.dumps(scenario), market)
-        expected.append({
-            "scenario_id": scenario["id"],
-            "pnl": json.loads(pnl.to_json()),
-            "report": json.loads(report.to_json()),
-        })
+    expected = [json.loads(scenario_pnl(portfolio, json.dumps(scenario), market).to_json()) for scenario in scenarios]
 
     assert batch == expected
     assert [item["scenario_id"] for item in batch] == ["up_10bp", "down_15bp"]

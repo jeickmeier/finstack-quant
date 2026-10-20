@@ -56,10 +56,10 @@ pub struct StressPnl {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StressResult {
-    /// Total portfolio P&L under the stressed market.
-    pub total_pnl: f64,
-    /// Per-position P&L contributions.
-    pub position_pnl: Vec<(PositionId, f64)>,
+    /// Total and per-position P&L under the stressed market; its fields
+    /// (`total_pnl`, `position_pnl`) are flattened into this object on the wire.
+    #[serde(flatten)]
+    pub pnl: StressPnl,
     /// Risk decomposition recomputed under the stressed market.
     pub stressed_decomposition: RiskDecomposition,
 }
@@ -307,14 +307,14 @@ impl FactorModel {
         let mut position_pnl = Vec::with_capacity(portfolio.positions.len());
         for (position_index, position) in portfolio.positions.iter().enumerate() {
             let base_endpoint = base_valuation.endpoint(position_index).ok_or_else(|| {
-                Error::validation(format!(
+                Error::invalid_input(format!(
                     "Factor stress base endpoint is missing position '{}'",
                     position.position_id
                 ))
             })?;
             let stressed_endpoint =
                 stressed_valuation.endpoint(position_index).ok_or_else(|| {
-                    Error::validation(format!(
+                    Error::invalid_input(format!(
                         "Factor stress stressed endpoint is missing position '{}'",
                         position.position_id
                     ))
@@ -377,8 +377,7 @@ impl FactorModel {
         let stressed_decomposition = self.analyze(portfolio, &stressed_market, as_of)?;
 
         Ok(StressResult {
-            total_pnl: pnl.total_pnl,
-            position_pnl: pnl.position_pnl,
+            pnl,
             stressed_decomposition,
         })
     }
@@ -568,8 +567,8 @@ mod tests {
             return;
         };
 
-        assert_eq!(stress_result.position_pnl.len(), 1);
-        assert!(stress_result.total_pnl.is_finite());
+        assert_eq!(stress_result.pnl.position_pnl.len(), 1);
+        assert!(stress_result.pnl.total_pnl.is_finite());
     }
 
     #[test]
@@ -585,8 +584,8 @@ mod tests {
         let pnl = model
             .factor_stress_pnl(&portfolio, &market, as_of, &stresses)
             .expect("pnl-only factor stress");
-        assert_eq!(pnl.total_pnl, full.total_pnl);
-        assert_eq!(pnl.position_pnl, full.position_pnl);
+        assert_eq!(pnl.total_pnl, full.pnl.total_pnl);
+        assert_eq!(pnl.position_pnl, full.pnl.position_pnl);
     }
 
     #[test]
@@ -616,6 +615,7 @@ mod tests {
                     &[(FactorId::new("Rates"), 1.0)],
                 )
                 .expect("stress")
+                .pnl
                 .total_pnl
         };
 
@@ -674,7 +674,7 @@ mod tests {
         let expected = (stressed_raw - base_raw) * portfolio.positions[0].scale_factor();
 
         assert!(expected.abs() > 1e-12);
-        assert!((result.total_pnl - expected).abs() < 1e-12);
+        assert!((result.pnl.total_pnl - expected).abs() < 1e-12);
     }
 
     #[test]
@@ -724,7 +724,7 @@ mod tests {
         let expected = (stressed_raw - base_raw) * portfolio.positions[0].scale_factor();
 
         assert!(expected.abs() > 1e-12);
-        assert_eq!(result.total_pnl, expected);
+        assert_eq!(result.pnl.total_pnl, expected);
     }
 
     #[test]
@@ -929,8 +929,8 @@ mod tests {
             .value_raw(&manually_stressed, as_of)
             .expect("stressed value");
 
-        assert!((result.total_pnl - (stressed_value - base_value)).abs() < 1e-8);
-        assert!(result.total_pnl.abs() > 1e-8);
+        assert!((result.pnl.total_pnl - (stressed_value - base_value)).abs() < 1e-8);
+        assert!(result.pnl.total_pnl.abs() > 1e-8);
     }
 
     #[test]
@@ -984,6 +984,7 @@ mod tests {
 
         assert_eq!(
             result
+                .pnl
                 .position_pnl
                 .iter()
                 .map(|(position_id, _)| position_id.as_str())
@@ -992,7 +993,7 @@ mod tests {
         );
         assert_eq!(affected_calls.load(Ordering::SeqCst), 2);
         assert_eq!(unaffected_calls.load(Ordering::SeqCst), 1);
-        assert_eq!(result.position_pnl[1].1, 0.0);
+        assert_eq!(result.pnl.position_pnl[1].1, 0.0);
     }
 
     fn build_test_model() -> Option<(FactorModel, Portfolio, MarketContext)> {

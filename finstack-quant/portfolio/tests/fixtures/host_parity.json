@@ -938,7 +938,7 @@
         }
       ],
       "idiosyncratic_total": 0.4,
-      "by_position_optional": [
+      "by_position": [
         {
           "position_id": "POS1",
           "factor_total": 0.30000000000000004,

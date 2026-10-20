@@ -131,7 +131,7 @@ impl PyPortfolioCashflows {
     }
 
     /// Extraction issues as a list of JSON-shaped dicts (``position_id``,
-    /// ``instrument_id``, ``instrument_type``, ``kind``, ``message``).
+    /// ``instrument_id``, ``instrument_type``, ``message``).
     #[getter]
     fn issues<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.issues)
@@ -212,7 +212,7 @@ impl PyPortfolioCashflows {
     /// Export the extraction ``issues`` as a pandas ``DataFrame``.
     ///
     /// Columns: ``position_id``, ``instrument_id``, ``instrument_type``,
-    /// ``kind`` (issue category, e.g. ``"build_failed"``), ``message``.
+    /// ``message`` (why the schedule could not be built).
     #[pyo3(text_signature = "(self)")]
     fn to_issues_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let issues = &self.inner.issues;
@@ -222,21 +222,11 @@ impl PyPortfolioCashflows {
             .iter()
             .map(|i| i.instrument_type.to_string())
             .collect();
-        let kinds: Vec<String> = issues
-            .iter()
-            .map(|i| {
-                serde_json::to_value(i.kind)
-                    .ok()
-                    .and_then(|v| v.as_str().map(str::to_owned))
-                    .unwrap_or_default()
-            })
-            .collect();
         let messages: Vec<&str> = issues.iter().map(|i| i.message.as_str()).collect();
         let data = PyDict::new(py);
         data.set_item("position_id", position_ids)?;
         data.set_item("instrument_id", instrument_ids)?;
         data.set_item("instrument_type", instrument_types)?;
-        data.set_item("kind", kinds)?;
         data.set_item("message", messages)?;
         dict_to_dataframe(py, &data, None)
     }

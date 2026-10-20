@@ -112,7 +112,7 @@ pub struct AllocationDiagnostics {
 ///
 /// # Errors
 ///
-/// Returns [`Error::ValidationFailed`] when inputs violate scheme invariants or
+/// Returns [`Error::InvalidInput`] when inputs violate scheme invariants or
 /// capital cannot be represented at the requested rounding precision.
 ///
 /// # Arguments
@@ -137,7 +137,7 @@ pub fn allocate_weights(spec: &WeightAllocationSpec) -> Result<WeightAllocationR
         }
         AllocationScheme::RiskBudget => {
             let covariance = covariance.as_ref().ok_or_else(|| {
-                Error::validation("allocation covariance is required for risk_budget scheme")
+                Error::invalid_input("allocation covariance is required for risk_budget scheme")
             })?;
             risk_budget_weights(&spec.strategies, covariance)?
         }
@@ -189,36 +189,38 @@ impl WeightAllocationSpec {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::ValidationFailed`] when the text is not valid JSON or
+    /// Returns [`Error::InvalidInput`] when the text is not valid JSON or
     /// does not match the specification shape.
     pub fn from_json(spec_json: &str) -> Result<Self> {
         serde_json::from_str(spec_json)
-            .map_err(|err| Error::validation(format!("invalid allocation JSON: {err}")))
+            .map_err(|err| Error::invalid_input(format!("invalid allocation JSON: {err}")))
     }
 
     fn validate_common(&self) -> Result<()> {
         if !self.total_capital.is_finite() {
-            return Err(Error::validation("allocation total_capital must be finite"));
+            return Err(Error::invalid_input(
+                "allocation total_capital must be finite",
+            ));
         }
         if self.strategies.is_empty() {
-            return Err(Error::validation(
+            return Err(Error::invalid_input(
                 "allocation requires at least one strategy",
             ));
         }
         if self.money_decimal_places > 12 {
-            return Err(Error::validation(
+            return Err(Error::invalid_input(
                 "allocation money_decimal_places must be <= 12",
             ));
         }
         let mut ids = std::collections::BTreeSet::new();
         for strategy in &self.strategies {
             if strategy.id.trim().is_empty() {
-                return Err(Error::validation(
+                return Err(Error::invalid_input(
                     "allocation strategy id must not be empty",
                 ));
             }
             if !ids.insert(strategy.id.clone()) {
-                return Err(Error::validation(format!(
+                return Err(Error::invalid_input(format!(
                     "allocation strategy id '{}' is duplicated",
                     strategy.id
                 )));
@@ -229,7 +231,7 @@ impl WeightAllocationSpec {
 
     fn covariance_matrix(&self) -> Result<Vec<f64>> {
         let covariance = self.covariance.as_ref().ok_or_else(|| {
-            Error::validation("allocation covariance is required for risk_budget scheme")
+            Error::invalid_input("allocation covariance is required for risk_budget scheme")
         })?;
         flatten_and_validate_covariance(covariance, self.strategies.len())
     }
@@ -243,13 +245,13 @@ fn fixed_weights(strategies: &[StrategyAllocationInput]) -> Result<Vec<f64>> {
     let mut weights = Vec::with_capacity(strategies.len());
     for strategy in strategies {
         let weight = strategy.fixed_weight.ok_or_else(|| {
-            Error::validation(format!(
+            Error::invalid_input(format!(
                 "allocation strategy '{}' missing fixed_weight",
                 strategy.id
             ))
         })?;
         if !weight.is_finite() || weight < 0.0 {
-            return Err(Error::validation(format!(
+            return Err(Error::invalid_input(format!(
                 "allocation strategy '{}' fixed_weight must be finite and nonnegative",
                 strategy.id
             )));
@@ -272,7 +274,7 @@ fn inverse_volatility_weights(
     for strategy in strategies {
         let volatility = sample_volatility(strategy)?;
         if volatility <= WEIGHT_TOLERANCE {
-            return Err(Error::validation(format!(
+            return Err(Error::invalid_input(format!(
                 "allocation strategy '{}' has zero volatility",
                 strategy.id
             )));
@@ -283,7 +285,7 @@ fn inverse_volatility_weights(
 
     let denominator = neumaier_sum(inverse_vols.iter().copied());
     if denominator <= WEIGHT_TOLERANCE {
-        return Err(Error::validation(
+        return Err(Error::invalid_input(
             "allocation inverse volatility denominator is zero",
         ));
     }
@@ -307,13 +309,13 @@ fn sample_volatility(strategy: &StrategyAllocationInput) -> Result<f64> {
         .enumerate()
         .find(|(_, value)| !value.is_finite())
     {
-        return Err(Error::validation(format!(
+        return Err(Error::invalid_input(format!(
             "allocation strategy '{}' has non-finite return at index {index} ({value})",
             strategy.id
         )));
     }
     if strategy.returns.len() < 2 {
-        return Err(Error::validation(format!(
+        return Err(Error::invalid_input(format!(
             "allocation strategy '{}' requires at least two returns",
             strategy.id
         )));
@@ -386,7 +388,7 @@ fn risk_budget_weights(
                 // (or vanishing) risk contribution — typically strongly
                 // negative correlations — which this long-only fixed-point
                 // scheme cannot solve.
-                return Err(Error::validation(format!(
+                return Err(Error::invalid_input(format!(
                     "allocation risk contribution for strategy '{}' is nonpositive; the \
                      long-only risk_budget solver requires strictly positive risk \
                      contributions (check for strongly negative correlations)",
@@ -398,7 +400,7 @@ fn risk_budget_weights(
         normalize_weights(&mut weights)?;
     }
 
-    Err(Error::validation(
+    Err(Error::invalid_input(
         "allocation risk_budget solver failed to converge",
     ))
 }
@@ -407,13 +409,13 @@ fn risk_budgets(strategies: &[StrategyAllocationInput]) -> Result<Vec<f64>> {
     let mut budgets = Vec::with_capacity(strategies.len());
     for strategy in strategies {
         let budget = strategy.risk_budget.ok_or_else(|| {
-            Error::validation(format!(
+            Error::invalid_input(format!(
                 "allocation strategy '{}' missing risk_budget",
                 strategy.id
             ))
         })?;
         if !budget.is_finite() || budget < 0.0 {
-            return Err(Error::validation(format!(
+            return Err(Error::invalid_input(format!(
                 "allocation strategy '{}' risk_budget must be finite and nonnegative",
                 strategy.id
             )));
@@ -426,20 +428,20 @@ fn risk_budgets(strategies: &[StrategyAllocationInput]) -> Result<Vec<f64>> {
 
 fn flatten_and_validate_covariance(covariance: &[Vec<f64>], n: usize) -> Result<Vec<f64>> {
     if covariance.len() != n {
-        return Err(Error::validation(format!(
+        return Err(Error::invalid_input(format!(
             "allocation covariance must have {n} rows"
         )));
     }
     let mut flat = Vec::with_capacity(n * n);
     for row in covariance {
         if row.len() != n {
-            return Err(Error::validation(format!(
+            return Err(Error::invalid_input(format!(
                 "allocation covariance must be {n}x{n}"
             )));
         }
         for value in row {
             if !value.is_finite() {
-                return Err(Error::validation(
+                return Err(Error::invalid_input(
                     "allocation covariance entries must be finite",
                 ));
             }
@@ -451,12 +453,14 @@ fn flatten_and_validate_covariance(covariance: &[Vec<f64>], n: usize) -> Result<
             let left = flat[row * n + col];
             let right = flat[col * n + row];
             if (left - right).abs() > 1e-10 {
-                return Err(Error::validation("allocation covariance must be symmetric"));
+                return Err(Error::invalid_input(
+                    "allocation covariance must be symmetric",
+                ));
             }
         }
     }
     finstack_quant_core::math::linalg::cholesky_correlation(&flat, n).map_err(|err| {
-        Error::validation(format!(
+        Error::invalid_input(format!(
             "allocation covariance must be positive semidefinite: {err}"
         ))
     })?;
@@ -480,7 +484,7 @@ fn risk_contribution_fractions(weights: &[f64], covariance: &[f64]) -> Result<Ve
         .map(|(weight, marginal)| weight * marginal)
         .sum::<f64>();
     if variance <= WEIGHT_TOLERANCE {
-        return Err(Error::validation(
+        return Err(Error::invalid_input(
             "allocation portfolio variance must be positive",
         ));
     }
@@ -503,7 +507,7 @@ fn rounded_capitals(total_capital: f64, weights: &[f64], decimal_places: u32) ->
             .iter()
             .any(|weight| !weight.is_finite() || *weight < 0.0)
     {
-        return Err(Error::validation(
+        return Err(Error::invalid_input(
             "allocation capital rounding requires finite minor units and nonnegative weights",
         ));
     }
@@ -523,7 +527,7 @@ fn rounded_capitals(total_capital: f64, weights: &[f64], decimal_places: u32) ->
         .filter(|(_, fraction)| *fraction > 0.0)
         .count();
     if !residual.is_finite() || residual < 0.0 || residual > fractional_count as f64 {
-        return Err(Error::validation(
+        return Err(Error::invalid_input(
             "allocation capital is not representable at the requested rounding precision",
         ));
     }
@@ -539,7 +543,7 @@ fn rounded_capitals(total_capital: f64, weights: &[f64], decimal_places: u32) ->
         }
         let adjusted = units[idx] + 1.0;
         if adjusted <= units[idx] {
-            return Err(Error::validation(
+            return Err(Error::invalid_input(
                 "allocation capital is not representable at the requested rounding precision",
             ));
         }
@@ -550,7 +554,7 @@ fn rounded_capitals(total_capital: f64, weights: &[f64], decimal_places: u32) ->
         .map(|units| total_capital.signum() * units / scale)
         .collect();
     if capitals.iter().any(|capital| !capital.is_finite()) {
-        return Err(Error::validation(
+        return Err(Error::invalid_input(
             "allocation rounded capital must be finite",
         ));
     }
@@ -560,7 +564,7 @@ fn rounded_capitals(total_capital: f64, weights: &[f64], decimal_places: u32) ->
 fn validate_weights_sum_to_one(weights: &[f64], label: &str) -> Result<()> {
     let sum = neumaier_sum(weights.iter().copied());
     if (sum - 1.0).abs() > WEIGHT_TOLERANCE {
-        return Err(Error::validation(format!(
+        return Err(Error::invalid_input(format!(
             "allocation {label} must sum to 1.0 (got {sum})"
         )));
     }
@@ -570,7 +574,9 @@ fn validate_weights_sum_to_one(weights: &[f64], label: &str) -> Result<()> {
 fn normalize_weights(weights: &mut [f64]) -> Result<()> {
     let sum = neumaier_sum(weights.iter().copied());
     if sum <= WEIGHT_TOLERANCE {
-        return Err(Error::validation("allocation weights sum must be positive"));
+        return Err(Error::invalid_input(
+            "allocation weights sum must be positive",
+        ));
     }
     for weight in weights {
         *weight /= sum;

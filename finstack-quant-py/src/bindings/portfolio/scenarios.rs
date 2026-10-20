@@ -77,11 +77,11 @@ fn apply_scenario_and_revalue(
 ///
 /// Returns
 /// -------
-/// tuple[ScenarioPnl, ApplicationReport]
-///     The P&L ladder (``total`` plus ``by_position``, all base-currency
-///     floats; ``ScenarioPnl.currency`` names the currency) and the scenario
-///     application report. ``ScenarioPnl`` offers ``to_dataframe()`` and
-///     ``to_series()``; call ``.to_json()`` on either for its wire form.
+/// ScenarioPnlBatchItem
+///     The scenario's ``scenario_id``, its P&L ladder ``pnl``
+///     (:class:`ScenarioPnl`, base-currency ``total`` plus ``by_position``)
+///     and the scenario application ``report``; the same item type
+///     :func:`scenario_pnl_batch` returns per scenario.
 #[pyfunction]
 #[pyo3(text_signature = "(portfolio, scenario, market)")]
 fn scenario_pnl(
@@ -89,27 +89,23 @@ fn scenario_pnl(
     portfolio: &Bound<'_, PyAny>,
     scenario: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
-) -> PyResult<(PyScenarioPnl, PyApplicationReport)> {
+) -> PyResult<PyScenarioPnlBatchItem> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
     let scenario = extract_scenario_spec(py, scenario)?;
     let market = extract_market_ref(py, market)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
-    let finstack_quant_portfolio::scenarios::ScenarioPnlView { pnl, report } = py
-        .detach(|| {
-            finstack_quant_portfolio::scenarios::scenario_pnl(
-                portfolio_ref,
-                &scenario,
-                market_ref,
-                &config,
-            )
-        })
-        .map_err(portfolio_to_py)?;
-    Ok((
-        PyScenarioPnl { inner: pnl },
-        PyApplicationReport { inner: report },
-    ))
+    py.detach(|| {
+        finstack_quant_portfolio::scenarios::scenario_pnl(
+            portfolio_ref,
+            &scenario,
+            market_ref,
+            &config,
+        )
+    })
+    .map(|inner| PyScenarioPnlBatchItem { inner })
+    .map_err(portfolio_to_py)
 }
 
 /// Compute ordered portfolio P&L for a batch of scenarios.

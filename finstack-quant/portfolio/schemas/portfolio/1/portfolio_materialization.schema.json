@@ -21,12 +21,12 @@
         "child_book_ids": {
           "description": "Child book IDs (for hierarchical organization)",
           "items": {
-            "$ref": "#/$defs/BookId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
         "id": {
-          "$ref": "#/$defs/BookId",
+          "$ref": "#/$defs/Id",
           "description": "Unique identifier for this book"
         },
         "meta": {
@@ -44,7 +44,7 @@
         "parent_id": {
           "anyOf": [
             {
-              "$ref": "#/$defs/BookId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -55,7 +55,7 @@
         "position_ids": {
           "description": "Position IDs directly assigned to this book (non-recursive)",
           "items": {
-            "$ref": "#/$defs/PositionId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
@@ -73,10 +73,6 @@
         "child_book_ids"
       ],
       "type": "object"
-    },
-    "BookId": {
-      "description": "Book identifier.",
-      "type": "string"
     },
     "Currency": {
       "description": "ISO 4217 currency enumeration",
@@ -888,7 +884,7 @@
       "description": "An entity that can hold positions.\n\nEntities represent companies, funds, or other legal entities that\nown instruments. For standalone instruments (derivatives, FX), use\nthe dummy entity.",
       "properties": {
         "id": {
-          "$ref": "#/$defs/EntityId",
+          "$ref": "#/$defs/Id",
           "description": "Unique identifier for the entity"
         },
         "meta": {
@@ -915,10 +911,6 @@
         "id"
       ],
       "type": "object"
-    },
-    "EntityId": {
-      "description": "Entity identifier (company, fund, etc.)",
-      "type": "string"
     },
     "FxPair": {
       "additionalProperties": false,
@@ -1324,10 +1316,6 @@
     "PortfolioMaterializationSchema": {
       "const": "finstack_quant.portfolio_materialization/1",
       "description": "Sole supported portfolio-materialization contract marker.",
-      "type": "string"
-    },
-    "PositionId": {
-      "description": "Position identifier.",
       "type": "string"
     },
     "VolatilityDependency": {

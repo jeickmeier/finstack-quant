@@ -1090,16 +1090,16 @@ mod tests {
         let position = attribution
             .by_position
             .get("P-COMPOSITE")
-            .ok_or_else(|| Error::validation("missing composite attribution"))?;
+            .ok_or_else(|| Error::invalid_input("missing composite attribution"))?;
         assert_eq!(position.total_pnl.amount(), 10.0);
         // Endpoint values are the scaled sum of the primitive paths:
         // 2 × (100 − 90) at T0 and 2 × (110 − 95) at T1.
         let pv_t0 = position
             .pv_t0
-            .ok_or_else(|| Error::validation("missing composite pv_t0"))?;
+            .ok_or_else(|| Error::invalid_input("missing composite pv_t0"))?;
         let pv_t1 = position
             .pv_t1
-            .ok_or_else(|| Error::validation("missing composite pv_t1"))?;
+            .ok_or_else(|| Error::invalid_input("missing composite pv_t1"))?;
         assert!((pv_t0.amount() - 20.0).abs() < 1.0e-9);
         assert!((pv_t1.amount() - 30.0).abs() < 1.0e-9);
         assert!(position.waterfall_steps.is_empty() && position.sensitivity_steps.is_empty());
@@ -1188,7 +1188,7 @@ mod tests {
         let position = attribution
             .by_position
             .get("P-EUR")
-            .ok_or_else(|| Error::validation("missing composite attribution"))?;
+            .ok_or_else(|| Error::invalid_input("missing composite attribution"))?;
         // Per unit: 10 EUR × 1.2 + 100 EUR × (1.2 − 1.1) = 22 USD; two units held.
         assert_eq!(position.total_pnl.currency(), Currency::USD);
         assert!((position.total_pnl.amount() - 44.0).abs() < 1.0e-9);
@@ -1197,7 +1197,7 @@ mod tests {
             .meta
             .fx_policy
             .as_ref()
-            .ok_or_else(|| Error::validation("composite FX policy not stamped"))?;
+            .ok_or_else(|| Error::invalid_input("composite FX policy not stamped"))?;
         assert_eq!(fx_policy.target_currency, Some(Currency::USD));
         Ok(())
     }

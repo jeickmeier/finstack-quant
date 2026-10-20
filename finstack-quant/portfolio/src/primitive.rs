@@ -241,7 +241,7 @@ fn register_definition(
 ) -> Result<()> {
     let hash = InstrumentEnvelope::new(definition.clone()).content_hash()?;
     match definitions.get(instrument_id.as_str()) {
-        Some(existing) if existing != &hash => Err(Error::validation(format!(
+        Some(existing) if existing != &hash => Err(Error::invalid_input(format!(
             "primitive instrument id '{instrument_id}' has conflicting definitions across portfolio positions"
         ))),
         Some(_) => Ok(()),
@@ -335,7 +335,7 @@ mod tests {
             .aggregates
             .iter()
             .find(|aggregate| aggregate.instrument_id.as_str() == "COMPOSITE-LONG")
-            .ok_or_else(|| Error::validation("missing long primitive aggregate"))?;
+            .ok_or_else(|| Error::invalid_input("missing long primitive aggregate"))?;
         assert_eq!(long.net_quantity, 0.0);
         assert_eq!(long.gross_quantity, 4.0);
         assert_eq!(long.net_value.amount(), 0.0);

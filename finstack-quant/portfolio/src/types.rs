@@ -4,15 +4,21 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-define_string_id! {
-    /// Entity identifier (company, fund, etc.)
-    pub struct EntityId;
-}
+/// Marker type for portfolio entity identifiers.
+#[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct EntityTag;
 
-define_string_id! {
-    /// Position identifier.
-    pub struct PositionId;
-}
+/// Marker type for portfolio position identifiers.
+#[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct PositionTag;
+
+/// Entity identifier (company, fund, etc.); serialized as a bare string.
+pub type EntityId = finstack_quant_core::types::Id<EntityTag>;
+
+/// Position identifier; serialized as a bare string.
+pub type PositionId = finstack_quant_core::types::Id<PositionTag>;
 
 /// Constant for the dummy entity used for standalone instruments.
 ///

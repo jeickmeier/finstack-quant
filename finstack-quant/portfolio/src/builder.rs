@@ -243,12 +243,12 @@ impl PortfolioBuilder {
     /// Returns [`Error`] when the configuration is incomplete
     /// or validation fails.
     pub fn build(mut self) -> Result<Portfolio> {
-        let base_currency = self.base_currency.ok_or_else(|| {
-            crate::Error::ValidationFailed("Base currency must be set".to_string())
-        })?;
+        let base_currency = self
+            .base_currency
+            .ok_or_else(|| crate::Error::InvalidInput("Base currency must be set".to_string()))?;
 
         let as_of = self.as_of.ok_or_else(|| {
-            crate::Error::ValidationFailed("Valuation date (as_of) must be set".to_string())
+            crate::Error::InvalidInput("Valuation date (as_of) must be set".to_string())
         })?;
 
         let needs_dummy = self
@@ -270,7 +270,7 @@ impl PortfolioBuilder {
         for position in &self.positions {
             if let Some(book_id) = &position.book_id {
                 let book = self.books.get_mut(book_id).ok_or_else(|| {
-                    Error::validation(format!(
+                    Error::invalid_input(format!(
                         "Position '{}' references non-existent book '{}'",
                         position.position_id, book_id
                     ))

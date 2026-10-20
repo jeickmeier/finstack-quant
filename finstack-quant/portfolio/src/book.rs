@@ -172,10 +172,13 @@ pub(crate) fn validate_books<'a>(
     memberships
 }
 
-define_string_id! {
-    /// Book identifier.
-    pub struct BookId;
-}
+/// Marker type for portfolio book identifiers.
+#[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct BookTag;
+
+/// Book identifier; serialized as a bare string.
+pub type BookId = finstack_quant_core::types::Id<BookTag>;
 
 /// A book represents a folder-like organizational unit within a portfolio.
 ///

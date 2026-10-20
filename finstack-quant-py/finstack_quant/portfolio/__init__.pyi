@@ -1932,6 +1932,7 @@ class PortfolioValuation:
     ...     "position_values": {},
     ...     "total_base_currency": {"amount": "0", "currency": "USD"},
     ...     "by_entity": {},
+    ...     "fx_collapse_policy": "cashflow_date",
     ... }
     >>> PortfolioValuation.from_json(json.dumps(doc)).total_value
     0.0
@@ -1967,6 +1968,7 @@ class PortfolioValuation:
         ...     "position_values": {},
         ...     "total_base_currency": {"amount": "0", "currency": "USD"},
         ...     "by_entity": {},
+        ...     "fx_collapse_policy": "cashflow_date",
         ... }
         >>> valuation = PortfolioValuation.from_json(json.dumps(doc))
         >>> (valuation.total_value, valuation.base_currency)
@@ -2226,7 +2228,7 @@ class PortfolioCashflows:
     --------
     >>> from finstack_quant.portfolio import PortfolioCashflows
     >>> cashflows = PortfolioCashflows.from_json(
-    ...     '{"events":[],"by_position":{},"by_date":{},"position_summaries":{},"issues":[]}'
+    ...     '{"events":[],"by_position":{},"by_date":{},"position_summaries":{},"issues":[],"fx_collapse_policy":"cip_forward"}'
     ... )
     >>> (len(cashflows.by_position), len(cashflows.issues))
     (0, 0)
@@ -2257,7 +2259,7 @@ class PortfolioCashflows:
         --------
         >>> from finstack_quant.portfolio import PortfolioCashflows
         >>> cashflows = PortfolioCashflows.from_json(
-        ...     '{"events":[],"by_position":{},"by_date":{},"position_summaries":{},"issues":[]}'
+        ...     '{"events":[],"by_position":{},"by_date":{},"position_summaries":{},"issues":[],"fx_collapse_policy":"cip_forward"}'
         ... )
         >>> (len(cashflows.by_position), len(cashflows.issues))
         (0, 0)
@@ -2408,7 +2410,7 @@ class PortfolioCashflows:
         -------
         list[dict[str, Any]]
             Entries with ``position_id``, ``instrument_id``,
-            ``instrument_type``, ``kind`` and ``message``.
+            ``instrument_type`` and ``message``.
 
         Notes
         -----
@@ -2440,7 +2442,7 @@ class PortfolioCashflows:
         -------
         pd.DataFrame
             Columns ``position_id``, ``instrument_id``, ``instrument_type``,
-            ``kind``, ``message``; zero rows when there are no issues.
+            ``message``; zero rows when there are no issues.
 
         Raises
         ------
@@ -3260,6 +3262,7 @@ class PortfolioResult:
     ...     "position_values": {},
     ...     "total_base_currency": {"amount": "0", "currency": "USD"},
     ...     "by_entity": {},
+    ...     "fx_collapse_policy": "cashflow_date",
     ... }
     >>> rounding = {
     ...     "mode": "bankers",
@@ -3321,6 +3324,7 @@ class PortfolioResult:
         ...         "position_values": {},
         ...         "total_base_currency": {"amount": "0", "currency": "USD"},
         ...         "by_entity": {},
+        ...         "fx_collapse_policy": "cashflow_date",
         ...     })
         ... )
         >>> metrics = PortfolioMetrics.from_json('{"aggregated": {}, "by_position": {}}')
@@ -3413,6 +3417,7 @@ class PortfolioResult:
         ...     "position_values": {},
         ...     "total_base_currency": {"amount": "0", "currency": "USD"},
         ...     "by_entity": {},
+        ...     "fx_collapse_policy": "cashflow_date",
         ... }
         >>> rounding = {
         ...     "mode": "bankers",
@@ -3782,8 +3787,9 @@ class ScenarioPnl:
     """
     Scenario-attributable profit and loss, in the portfolio base currency.
 
-    Returned by :func:`scenario_pnl` alongside the scenario
-    :class:`~finstack_quant.scenarios.ApplicationReport`. Positions added or
+    Held as ``pnl`` by the :class:`ScenarioPnlBatchItem` that
+    :func:`scenario_pnl` and :func:`scenario_pnl_batch` return, beside the
+    scenario :class:`~finstack_quant.scenarios.ApplicationReport`. Positions added or
     removed by the scenario are zero-filled against the missing side, so
     :attr:`by_position` always sums to :attr:`total`.
 
@@ -4384,7 +4390,7 @@ def scenario_pnl(
     portfolio: Portfolio | str,
     scenario: ScenarioSpec | str,
     market: MarketContext | str,
-) -> tuple[ScenarioPnl, ApplicationReport]:
+) -> ScenarioPnlBatchItem:
     """
     Compute the profit and loss attributable to a scenario.
 
@@ -4409,11 +4415,13 @@ def scenario_pnl(
 
     Returns
     -------
-    tuple[ScenarioPnl, ApplicationReport]
-        The P&L ladder (base-currency ``total`` and ``by_position`` amounts)
-        and the scenario application report carrying which operations were
-        applied. :class:`ScenarioPnl` offers ``to_dataframe()`` and
-        ``to_series()``; call ``.to_json()`` on either for its wire form.
+    ScenarioPnlBatchItem
+        The scenario's ``scenario_id``, its P&L ladder ``pnl``
+        (:class:`ScenarioPnl`, base-currency ``total`` and ``by_position``
+        amounts) and the scenario application ``report`` carrying which
+        operations were applied; the same item type
+        :func:`scenario_pnl_batch` returns per scenario. ``to_json()`` gives
+        its wire form.
 
     Raises
     ------
@@ -4430,9 +4438,9 @@ def scenario_pnl(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, scenario_pnl
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> pnl, report = scenario_pnl(Portfolio.from_spec(spec), '{"id":"s","name":"S","operations":[]}', MarketContext())
-    >>> (pnl.total, pnl.currency, pnl.by_position)
-    (0.0, 'USD', {})
+    >>> item = scenario_pnl(Portfolio.from_spec(spec), '{"id":"s","name":"S","operations":[]}', MarketContext())
+    >>> (item.scenario_id, item.pnl.total, item.pnl.currency, item.pnl.by_position)
+    ('s', 0.0, 'USD', {})
     """
     ...
 
@@ -9254,7 +9262,7 @@ class CreditVolReport:
             JSON emitted by :meth:`to_json`, or the object the WASM
             ``buildCreditVolReport`` returns, serialized: ``total``,
             ``measure``, ``generic``, ``by_level``, ``idiosyncratic_total``
-            and ``by_position_optional``.
+            and ``by_position``.
 
         Returns
         -------
@@ -9271,7 +9279,7 @@ class CreditVolReport:
         >>> from finstack_quant.portfolio import CreditVolReport
         >>> report = CreditVolReport.from_json(
         ...     '{"total":1.0,"measure":"variance","generic":0.25,"by_level":[],'
-        ...     '"idiosyncratic_total":0.75,"by_position_optional":null}'
+        ...     '"idiosyncratic_total":0.75,"by_position":null}'
         ... )
         >>> (report.total, report.generic, report.by_position)
         (1.0, 0.25, None)
@@ -9286,7 +9294,7 @@ class CreditVolReport:
         -------
         str
             Compact JSON with ``total``, ``measure``, ``generic``,
-            ``by_level``, ``idiosyncratic_total`` and ``by_position_optional``;
+            ``by_level``, ``idiosyncratic_total`` and ``by_position``;
             the same shape the WASM ``buildCreditVolReport`` returns.
 
         Raises
@@ -9313,18 +9321,20 @@ class CreditVolReport:
         ...
 
     @property
-    def measure_json(self) -> str:
+    def measure(self) -> str | dict[str, Any]:
         """
-        Risk measure specification as JSON.
+        Risk measure of the source decomposition, as its canonical Python value.
 
         Returns
         -------
-        str
-            Risk measure specification as JSON.
+        str | dict[str, Any]
+            ``"variance"``, ``"volatility"``, ``{"var": {"confidence": c}}`` or
+            ``{"expected_shortfall": {"confidence": c}}`` — the same shape as
+            ``RiskDecomposition.measure``.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored or derived value.
+        This accessor does not raise; it returns the stored value.
         """
         ...
 
@@ -9419,7 +9429,7 @@ class CreditVolReport:
         on ``LevelVolContribution.by_bucket``, which is already a plain dict.
 
         Columns: ``level_name``, ``total`` (level contribution in the units of
-        :attr:`measure_json`).
+        :attr:`measure`).
 
         Returns
         -------
@@ -9444,7 +9454,7 @@ class CreditVolReport:
 
         Columns: ``position_id``, ``factor_total`` (systematic),
         ``idiosyncratic`` (issuer-specific), ``total`` (their sum) — all in
-        the units of :attr:`measure_json`.
+        the units of :attr:`measure`.
 
         Returns
         -------

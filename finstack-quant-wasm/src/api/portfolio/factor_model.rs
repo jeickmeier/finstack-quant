@@ -264,10 +264,10 @@ pub fn allocate_weights(spec: JsValue) -> Result<JsValue, JsValue> {
 /// Rolls the decomposition's factor contributions up by credit-hierarchy
 /// level. Returns the `CreditVolReport`: `total`, `measure`, the `generic`
 /// credit-factor contribution, `by_level` rollups, `idiosyncratic_total` and,
-/// when requested, `by_position_optional` rows.
+/// when requested, `by_position` rows.
 /// @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `models.factor.risk.decomposeFactors`.
 /// @param model - `models.factor.credit.CreditFactorModel` handle whose hierarchy names the levels.
-/// @param by_position - `true` to include the per-position breakdown; `false` leaves `by_position_optional` `null`.
+/// @param by_position - `true` to include the per-position breakdown; `false` leaves `by_position` `null`.
 /// @returns The `CreditVolReport`.
 ///
 /// # Errors
