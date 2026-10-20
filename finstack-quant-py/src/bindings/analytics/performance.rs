@@ -4,6 +4,7 @@ use super::types::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{int_values_to_series, values_to_series};
 use crate::errors::analytics_to_py;
 use finstack_quant_analytics::{
@@ -1314,31 +1315,6 @@ impl PyPerformance {
         envelope_to_pandas(py, &table)?.call_method1("set_index", ("ticker",))
     }
 
-    /// Serialize authoritative engine inputs (dates, returns, spans, benchmark,
-    /// frequency, active window) to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_to_json(&self.inner)
-    }
-
-    /// Rebuild an engine from :meth:`to_json` output.
-    ///
-    /// Revalidates dates, returns, spans, unique names, benchmark, and active
-    /// window, then rebuilds caches. Raises ``ValueError`` for invalid inputs
-    /// or unknown fields, including obsolete serialized caches.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: Performance = serde_json::from_str(json)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid Performance JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` (and therefore ``copy.deepcopy``, ``joblib``,
-    /// ``multiprocessing``) via the :meth:`to_json` / :meth:`from_json` pair.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        pickle_reduce_json::<Self>(py, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Returns a compact summary of the serialized fields, with collections
@@ -1349,6 +1325,8 @@ impl PyPerformance {
         crate::bindings::repr_support::repr_from_serde("Performance", &self.inner)
     }
 }
+
+wire_methods!(PyPerformance, Performance, "Performance");
 
 /// Sharpe ratio of one return series.
 ///

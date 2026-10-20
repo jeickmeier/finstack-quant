@@ -1,10 +1,10 @@
 //! Result structs and enums for the analytics domain.
 
 use crate::bindings::date_utils::date_to_py;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     dates_to_datetime_index, dict_to_dataframe, labeled_values_to_series,
 };
-use crate::errors::display_to_py;
 use finstack_quant_analytics::{
     BetaResult, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns, MultiFactorResult,
     PeriodStats, RollingGreeks,
@@ -12,28 +12,6 @@ use finstack_quant_analytics::{
 use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
-fn serde_from_json<T: DeserializeOwned>(json: &str) -> PyResult<T> {
-    serde_json::from_str(json).map_err(display_to_py)
-}
-
-pub(super) fn serde_to_json<T: Serialize>(value: &T) -> PyResult<String> {
-    serde_json::to_string(value).map_err(display_to_py)
-}
-
-pub(super) fn pickle_reduce_json<'py, T: pyo3::PyTypeInfo>(
-    py: Python<'py>,
-    json: String,
-) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-    let from_json = py.get_type::<T>().getattr("from_json")?;
-    crate::bindings::pickle_support::reduce_via_json(from_json, json)
-}
-
-fn dataframe_repr_html(frame: PyResult<Bound<'_, PyAny>>) -> Option<String> {
-    frame.ok()?.call_method0("_repr_html_").ok()?.extract().ok()
-}
 
 /// Aggregated statistics for grouped periodic returns.
 #[pyclass(name = "PeriodStats", module = "finstack_quant.analytics", frozen)]
@@ -43,29 +21,6 @@ pub struct PyPeriodStats {
 
 #[pymethods]
 impl PyPeriodStats {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        pickle_reduce_json::<Self>(py, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_from_json(json)?,
-        })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_to_json(&self.inner)
-    }
-
     /// Best period return.
     #[getter]
     fn best(&self) -> f64 {
@@ -177,12 +132,6 @@ impl PyPeriodStats {
             self.inner.win_rate, self.inner.avg_return
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks (delegates to
-    /// ``to_dataframe``; ``None`` falls back to ``__repr__``).
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        dataframe_repr_html(self.to_dataframe(py))
-    }
 }
 
 impl PyPeriodStats {
@@ -230,29 +179,6 @@ pub struct PyBetaResult {
 
 #[pymethods]
 impl PyBetaResult {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        pickle_reduce_json::<Self>(py, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_from_json(json)?,
-        })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_to_json(&self.inner)
-    }
-
     /// Beta coefficient.
     #[getter]
     fn beta(&self) -> f64 {
@@ -316,16 +242,6 @@ impl PyBetaResult {
             self.inner.beta, self.inner.std_err, self.inner.ci_lower, self.inner.ci_upper
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        dataframe_repr_html(self.to_dataframe(py))
-    }
 }
 
 /// Alpha, beta, and R-squared from a single-index regression.
@@ -336,29 +252,6 @@ pub struct PyGreeksResult {
 
 #[pymethods]
 impl PyGreeksResult {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        pickle_reduce_json::<Self>(py, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_from_json(json)?,
-        })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_to_json(&self.inner)
-    }
-
     /// Annualized Jensen alpha.
     #[getter]
     fn alpha(&self) -> f64 {
@@ -416,16 +309,6 @@ impl PyGreeksResult {
             self.inner.alpha, self.inner.beta, self.inner.r_squared, self.inner.adjusted_r_squared
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        dataframe_repr_html(self.to_dataframe(py))
-    }
 }
 
 /// Rolling alpha and beta time series.
@@ -436,29 +319,6 @@ pub struct PyRollingGreeks {
 
 #[pymethods]
 impl PyRollingGreeks {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        pickle_reduce_json::<Self>(py, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_from_json(json)?,
-        })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_to_json(&self.inner)
-    }
-
     /// Date labels for each rolling window.
     #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
@@ -492,16 +352,6 @@ impl PyRollingGreeks {
     fn __repr__(&self) -> String {
         format!("RollingGreeks(len={})", self.inner.dates.len())
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        dataframe_repr_html(self.to_dataframe(py))
-    }
 }
 
 /// Multi-factor regression result.
@@ -516,29 +366,6 @@ pub struct PyMultiFactorResult {
 
 #[pymethods]
 impl PyMultiFactorResult {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        pickle_reduce_json::<Self>(py, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_from_json(json)?,
-        })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_to_json(&self.inner)
-    }
-
     /// Annualized OLS intercept of the (possibly rf-adjusted) dependent series.
     #[getter]
     fn alpha(&self) -> f64 {
@@ -663,29 +490,6 @@ pub struct PyDrawdownEpisode {
 
 #[pymethods]
 impl PyDrawdownEpisode {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        pickle_reduce_json::<Self>(py, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_from_json(json)?,
-        })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_to_json(&self.inner)
-    }
-
     /// Start date of the drawdown.
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -767,12 +571,6 @@ impl PyDrawdownEpisode {
             self.inner.max_drawdown, self.inner.duration_days
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks (delegates to
-    /// ``to_dataframe``; ``None`` falls back to ``__repr__``).
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        dataframe_repr_html(self.to_dataframe(py))
-    }
 }
 
 /// Period-to-date returns for each ticker.
@@ -783,29 +581,6 @@ pub struct PyLookbackReturns {
 
 #[pymethods]
 impl PyLookbackReturns {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        pickle_reduce_json::<Self>(py, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_from_json(json)?,
-        })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_to_json(&self.inner)
-    }
-
     /// Ticker names aligned with the ``mtd`` / ``qtd`` / ``ytd`` / ``fytd``
     /// vectors.
     #[getter]
@@ -851,12 +626,6 @@ impl PyLookbackReturns {
         dict_to_dataframe(py, &data, Some(idx))
     }
 
-    /// Render as an HTML table in Jupyter notebooks (delegates to
-    /// ``to_dataframe``; ``None`` falls back to ``__repr__``).
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        dataframe_repr_html(self.to_dataframe(py))
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "LookbackReturns(mtd_len={}, fytd_len={})",
@@ -877,32 +646,6 @@ pub struct PyDatedSeries {
 
 #[pymethods]
 impl PyDatedSeries {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        pickle_reduce_json::<Self>(py, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    ///
-    /// Expects the Rust `DatedSeries` shape (`values` / `dates` /
-    /// `value_column`) emitted by [`to_json`](Self::to_json).
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_from_json(json)?,
-        })
-    }
-
-    /// Serialize to compact JSON (the Rust `DatedSeries` serde form).
-    fn to_json(&self) -> PyResult<String> {
-        serde_to_json(&self.inner)
-    }
-
     /// Numeric values, one per window.
     #[getter]
     fn values<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
@@ -943,17 +686,23 @@ impl PyDatedSeries {
             self.inner.values.len()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        dataframe_repr_html(self.to_dataframe(py))
-    }
 }
+
+wire_methods!(PyPeriodStats, PeriodStats, "PeriodStats");
+impl_repr_html_via_dataframe!(PyPeriodStats);
+wire_methods!(PyBetaResult, BetaResult, "BetaResult");
+impl_repr_html_via_dataframe!(PyBetaResult);
+wire_methods!(PyGreeksResult, GreeksResult, "GreeksResult");
+impl_repr_html_via_dataframe!(PyGreeksResult);
+wire_methods!(PyRollingGreeks, RollingGreeks, "RollingGreeks");
+impl_repr_html_via_dataframe!(PyRollingGreeks);
+wire_methods!(PyMultiFactorResult, MultiFactorResult, "MultiFactorResult");
+wire_methods!(PyDrawdownEpisode, DrawdownEpisode, "DrawdownEpisode");
+impl_repr_html_via_dataframe!(PyDrawdownEpisode);
+wire_methods!(PyLookbackReturns, LookbackReturns, "LookbackReturns");
+impl_repr_html_via_dataframe!(PyLookbackReturns);
+wire_methods!(PyDatedSeries, DatedSeries, "DatedSeries");
+impl_repr_html_via_dataframe!(PyDatedSeries);
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPeriodStats>()?;
