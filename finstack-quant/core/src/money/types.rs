@@ -23,7 +23,6 @@
 
 use crate::config::{FinstackConfig, RoundingMode};
 use crate::currency::Currency;
-use crate::dates::Date;
 use crate::decimal::f64_to_decimal;
 use crate::{Error, InputError};
 use core::fmt;
@@ -77,12 +76,13 @@ pub struct FormatOpts {
 }
 
 impl Default for FormatOpts {
-    /// Defaults: 2 decimals, currency code shown, `','` grouping, Bankers rounding.
+    /// Defaults, matching `Display`: currency minor-unit decimals, currency
+    /// code shown, no grouping, Bankers rounding.
     fn default() -> Self {
         Self {
-            decimals: Some(2),
+            decimals: None,
             show_currency: true,
-            group: Some(','),
+            group: None,
             rounding: RoundingMode::Bankers,
         }
     }
@@ -260,22 +260,14 @@ impl Money {
     ///
     /// # Errors
     ///
-    /// Returns `InputError::ConversionOverflow` when the Decimal cannot be
-    /// converted to the finite `f64` view used by [`Self::amount`].
+    /// Never fails: every `Decimal` has a finite `f64` view for
+    /// [`Self::amount`]. The `Result` matches the other `Money` constructors.
     ///
     /// # Arguments
     ///
     /// * `amount` - Finite monetary quantity in major currency units before rounding
     /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
     pub fn from_decimal(amount: rust_decimal::Decimal, currency: Currency) -> Result<Self, Error> {
-        // rust_decimal::Decimal models a fixed-precision number with no
-        // NaN/Infinity representation, so finiteness is structural. The
-        // remaining concern is converting back to f64 for downstream f64-only
-        // code paths — guard at construction time so we never hold a value
-        // that can't round-trip through Money::amount().
-        if rust_decimal::prelude::ToPrimitive::to_f64(&amount).is_none() {
-            return Err(Error::Input(InputError::ConversionOverflow));
-        }
         Ok(Self { amount, currency })
     }
 
@@ -624,14 +616,13 @@ impl Money {
     ///
     /// Returns a currency mismatch, division-by-zero, or conversion-overflow error.
     pub fn checked_div(self, rhs: Self) -> Result<f64, Error> {
-        use rust_decimal::prelude::ToPrimitive;
         ensure_same_currency(&self, &rhs)?;
         if rhs.amount.is_zero() {
             return Err(Error::Validation("division by zero".into()));
         }
         self.amount
             .checked_div(rhs.amount)
-            .and_then(|ratio| ratio.to_f64())
+            .map(|ratio| ratio.as_f64())
             .ok_or(Error::Input(InputError::ConversionOverflow))
     }
 
@@ -661,67 +652,6 @@ impl Money {
             amount: super::rounding::round_decimal(self.amount, dp, RoundingMode::Bankers),
             currency: self.currency,
         })
-    }
-
-    /// Convert this [`Money`] into another currency using an `FxProvider`.
-    ///
-    /// # Parameters
-    /// - `to`: target [`Currency`](crate::currency::Currency)
-    /// - `on`: valuation date used for the FX lookup
-    /// - `provider`: FX source implementing `FxProvider`
-    /// - `policy`: lookup policy hint passed to the provider
-    ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::money::fx::{FxConversionPolicy, FxProvider};
-    /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::dates::Date;
-    /// use time::Month;
-    ///
-    /// struct StaticFx;
-    /// impl FxProvider for StaticFx {
-    ///     fn rate(
-    ///         &self,
-    ///         _from: Currency,
-    ///         _to: Currency,
-    ///         _on: Date,
-    ///         _policy: FxConversionPolicy,
-    ///     ) -> finstack_quant_core::Result<f64> {
-    ///         Ok(1.2)
-    ///     }
-    /// }
-    ///
-    /// let eur = Money::from((100_i64, Currency::EUR));
-    /// let trade_date = Date::from_calendar_date(2024, Month::January, 2).expect("Valid date");
-    /// let usd = eur.convert(
-    ///     Currency::USD,
-    ///     trade_date,
-    ///     &StaticFx,
-    ///     FxConversionPolicy::CashflowDate,
-    /// ).expect("Currency conversion should succeed");
-    /// assert_eq!(usd.amount(), 120.0);
-    /// assert_eq!(usd.currency(), Currency::USD);
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Propagates a provider lookup failure. It also returns
-    /// `InputError::InvalidFxRate` for a non-finite or non-positive quote, and
-    /// `InputError::ConversionOverflow` when applying a valid quote exceeds
-    /// Decimal precision.
-    pub fn convert(
-        self,
-        to: Currency,
-        on: Date,
-        provider: &impl crate::money::fx::FxProvider,
-        policy: crate::money::fx::FxConversionPolicy,
-    ) -> crate::Result<Self> {
-        if self.currency == to {
-            return Ok(self);
-        }
-        let rate = provider.rate(self.currency, to, on, policy)?;
-        self.convert_at_rate(to, rate)
     }
 
     /// Convert this amount using an already-resolved FX rate.
@@ -760,12 +690,7 @@ impl fmt::Display for Money {
         // Route through the canonical formatter so `Display` always agrees with
         // `format(currency_decimals, true)` (a raw `{:.prec$}` on the Decimal
         // would truncate instead of round).
-        let dp = usize::from(self.currency.decimals());
-        f.write_str(&self.format_with(FormatOpts {
-            decimals: Some(dp),
-            group: None,
-            ..FormatOpts::default()
-        }))
+        f.write_str(&self.format_with(FormatOpts::default()))
     }
 }
 
@@ -842,7 +767,10 @@ mod tests {
     #[test]
     fn grouped_format_handles_negative_values() {
         let m = Money::new(-1234.56, Currency::USD).expect("valid money fixture");
-        let formatted = m.format_with(FormatOpts::default());
+        let formatted = m.format_with(FormatOpts {
+            group: Some(','),
+            ..FormatOpts::default()
+        });
         assert!(
             formatted.starts_with("USD -1,234.56"),
             "formatted output should keep sign on integer part only: {}",
@@ -920,31 +848,10 @@ mod tests {
         assert_eq!(object.get("currency"), Some(&serde_json::json!("USD")));
     }
 
-    struct NaNProvider;
-    impl crate::money::fx::FxProvider for NaNProvider {
-        fn rate(
-            &self,
-            _from: Currency,
-            _to: Currency,
-            _on: Date,
-            _policy: crate::money::fx::FxConversionPolicy,
-        ) -> crate::Result<f64> {
-            Ok(f64::NAN)
-        }
-    }
-
     #[test]
     fn convert_rejects_non_finite_rate() {
         let usd = Money::from((5_i64, Currency::USD));
-        let date =
-            Date::from_calendar_date(2024, time::Month::January, 1).expect("Valid test date");
-        let res = usd.convert(
-            Currency::EUR,
-            date,
-            &NaNProvider,
-            crate::money::fx::FxConversionPolicy::CashflowDate,
-        );
-        assert!(res.is_err());
+        assert!(usd.convert_at_rate(Currency::EUR, f64::NAN).is_err());
     }
 
     #[test]

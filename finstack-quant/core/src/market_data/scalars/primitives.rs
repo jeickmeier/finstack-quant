@@ -51,25 +51,18 @@ pub enum SeriesInterpolation {
 }
 
 impl std::fmt::Display for SeriesInterpolation {
+    /// Writes the serde label (`step` or `linear`).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Step => write!(f, "step"),
-            Self::Linear => write!(f, "linear"),
-        }
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
 impl std::str::FromStr for SeriesInterpolation {
     type Err = crate::Error;
 
+    /// Parses the serde label; the error names the accepted labels.
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "step" => Ok(Self::Step),
-            "linear" => Ok(Self::Linear),
-            other => Err(crate::Error::Validation(format!(
-                "unknown series interpolation {other:?}; expected \"step\" or \"linear\""
-            ))),
-        }
+        crate::wire::serde_parse(s)
     }
 }
 

@@ -314,9 +314,8 @@ pub fn net_in_currency_by_date_json(
 
     let mut out = Vec::new();
     for (date, per_currency) in by_date_obj {
-        let parsed_date: finstack_quant_core::wire::DateWire =
-            serde_json::from_value(serde_json::Value::String(date.clone()))
-                .map_err(|e| Error::InvalidInput(format!("invalid cashflow date '{date}': {e}")))?;
+        let parsed_date: Date = serde_json::from_value(serde_json::Value::String(date.clone()))
+            .map_err(|e| Error::InvalidInput(format!("invalid cashflow date '{date}': {e}")))?;
         let currencies = per_currency.as_object().ok_or_else(|| {
             Error::InvalidInput(format!(
                 "cashflow date '{date}' must contain a currency object"
@@ -353,7 +352,7 @@ pub fn net_in_currency_by_date_json(
                 )));
             }
             if bucket_currency == currency && !kinds.is_empty() {
-                out.push((parsed_date.0, total));
+                out.push((parsed_date, total));
             }
         }
     }

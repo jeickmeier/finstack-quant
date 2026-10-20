@@ -93,20 +93,8 @@ impl MarketContext {
             rolled_curves.insert(id.clone(), rolled_storage);
         }
 
-        let mut new_ctx = Self {
-            curves: Arc::new(rolled_curves),
-            fx: self.fx.clone(),
-            surfaces: Arc::clone(&self.surfaces),
-            prices: Arc::clone(&self.prices),
-            series: Arc::clone(&self.series),
-            inflation_indices: Arc::clone(&self.inflation_indices),
-            credit_indices: Arc::clone(&self.credit_indices),
-            dividends: Arc::clone(&self.dividends),
-            fx_delta_vol_surfaces: Arc::clone(&self.fx_delta_vol_surfaces),
-            vol_cubes: Arc::clone(&self.vol_cubes),
-            collateral: Arc::clone(&self.collateral),
-            hierarchy: self.hierarchy.clone(),
-        };
+        let mut new_ctx = self.clone();
+        new_ctx.curves = Arc::new(rolled_curves);
 
         let _invalidated = new_ctx.rebind_all_credit_indices();
 

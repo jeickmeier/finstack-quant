@@ -310,7 +310,6 @@ pub trait KindlessError: std::fmt::Display {}
 
 impl KindlessError for serde_json::Error {}
 impl KindlessError for String {}
-impl KindlessError for finstack_quant_core::currency::TryFromCurrencyError {}
 impl KindlessError for time::error::ComponentRange {}
 
 /// Convert a kind-less parse/serde error into a Python `ValueError`.

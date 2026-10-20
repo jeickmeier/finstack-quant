@@ -101,23 +101,15 @@ impl TryFrom<FxDeltaVolSurfaceWire> for FxDeltaVolSurface {
     type Error = crate::Error;
 
     fn try_from(raw: FxDeltaVolSurfaceWire) -> crate::Result<Self> {
-        FxDeltaVolSurface::validate(
-            &raw.expiries,
-            &raw.atm_vols,
-            &raw.rr_25d,
-            &raw.bf_25d,
-            raw.rr_10d.as_deref(),
-            raw.bf_10d.as_deref(),
-        )?;
-        Ok(Self {
-            id: raw.id,
-            expiries: raw.expiries,
-            atm_vols: raw.atm_vols,
-            rr_25d: raw.rr_25d,
-            bf_25d: raw.bf_25d,
-            rr_10d: raw.rr_10d,
-            bf_10d: raw.bf_10d,
-        })
+        Self::new(
+            raw.id,
+            raw.expiries,
+            raw.atm_vols,
+            raw.rr_25d,
+            raw.bf_25d,
+            raw.rr_10d,
+            raw.bf_10d,
+        )
     }
 }
 

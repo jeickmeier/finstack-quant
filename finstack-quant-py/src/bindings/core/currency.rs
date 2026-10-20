@@ -48,7 +48,7 @@ impl PyCurrency {
     fn from_numeric(_cls: &Bound<'_, PyType>, code: u16) -> PyResult<Self> {
         Currency::try_from(code)
             .map(Self::from_inner)
-            .map_err(display_to_py)
+            .map_err(crate::errors::core_to_py)
     }
 
     /// Three-letter ISO-4217 code (uppercase).

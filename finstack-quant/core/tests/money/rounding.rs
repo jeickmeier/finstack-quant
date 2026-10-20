@@ -69,10 +69,7 @@ fn money_display_matches_format_bankers_rounding() {
         let usd = Money::new(amount, Currency::USD).expect("valid money fixture");
         assert_eq!(
             format!("{usd}"),
-            usd.format_with(FormatOpts {
-                group: None,
-                ..FormatOpts::default()
-            }),
+            usd.format_with(FormatOpts::default()),
             "Display and format() must agree for USD {amount}"
         );
     }
@@ -100,14 +97,7 @@ fn money_display_matches_format_bankers_rounding() {
     // 0-decimal currency: 99.9 JPY must banker's-round up to 100, not truncate to 99.
     let jpy = Money::new(99.9, Currency::JPY).expect("valid money fixture");
     assert_eq!(format!("{jpy}"), "JPY 100");
-    assert_eq!(
-        format!("{jpy}"),
-        jpy.format_with(FormatOpts {
-            decimals: None,
-            group: None,
-            ..FormatOpts::default()
-        })
-    );
+    assert_eq!(format!("{jpy}"), jpy.format_with(FormatOpts::default()));
 }
 
 #[test]

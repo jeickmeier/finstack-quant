@@ -87,8 +87,7 @@
 //! assert_eq!(currency, Currency::USD);
 //!
 //! // To numeric code
-//! let code: u16 = Currency::EUR.into();
-//! assert_eq!(code, 978);
+//! assert_eq!(Currency::EUR.numeric(), 978);
 //!
 //! // Display formatting
 //! assert_eq!(format!("{}", Currency::GBP), "GBP");
@@ -129,38 +128,12 @@ fn unknown_currency_code(code: &str) -> crate::Error {
 }
 
 impl Currency {
-    /// ISO-4217 decimal precision for this currency (e.g. USD → 2).
-    /// Falls back to 2 decimal places for unknown currency codes.
-    #[inline]
-    pub fn decimals(self) -> u8 {
-        MINOR_UNITS.get(&self.numeric()).copied().unwrap_or(2)
-    }
-
     /// ISO 4217 numeric code as `u16`.
     #[inline]
     pub const fn numeric(self) -> u16 {
         self as u16
     }
 }
-
-impl From<Currency> for u16 {
-    #[inline]
-    fn from(c: Currency) -> u16 {
-        c as u16
-    }
-}
-
-/// Error type for failed currency conversion from numeric code.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TryFromCurrencyError(pub u16);
-
-impl core::fmt::Display for TryFromCurrencyError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "invalid ISO 4217 currency code: {}", self.0)
-    }
-}
-
-impl core::error::Error for TryFromCurrencyError {}
 
 #[cfg(test)]
 mod tests {
@@ -342,8 +315,6 @@ mod tests {
         for &code in &codes {
             let currency =
                 Currency::try_from(code).expect("Currency conversion should succeed in test");
-            let back: u16 = currency.into();
-            assert_eq!(code, back);
             assert_eq!(currency.numeric(), code);
         }
 

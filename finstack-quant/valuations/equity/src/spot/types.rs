@@ -223,39 +223,7 @@ impl Equity {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
-        if price.currency() == self.currency {
-            return Ok(price);
-        }
-
-        let matrix = market.fx_required()?;
-
-        struct MatrixProvider<'a> {
-            m: &'a finstack_quant_core::money::fx::FxMatrix,
-        }
-        impl finstack_quant_core::money::fx::FxProvider for MatrixProvider<'_> {
-            fn rate(
-                &self,
-                from: finstack_quant_core::currency::Currency,
-                to: finstack_quant_core::currency::Currency,
-                on: finstack_quant_core::dates::Date,
-                policy: finstack_quant_core::money::fx::FxConversionPolicy,
-            ) -> finstack_quant_core::Result<f64> {
-                let r = self
-                    .m
-                    .rate(finstack_quant_core::money::fx::FxQuery::with_policy(
-                        from, to, on, policy,
-                    ))?;
-                Ok(r.rate)
-            }
-        }
-
-        let provider = MatrixProvider { m: matrix.as_ref() };
-        price.convert(
-            self.currency,
-            as_of,
-            &provider,
-            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
-        )
+        Ok(market.convert_money(price, self.currency, as_of)?.amount)
     }
 
     /// Get the effective number of shares held (defaults to 1).

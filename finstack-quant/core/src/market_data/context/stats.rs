@@ -19,6 +19,27 @@ use crate::market_data::{
     surfaces::{FxDeltaVolSurface, VolCube, VolSurface},
 };
 
+/// Id-keyed store of a [`MarketContext`], viewed for counting and lookup.
+trait KeyedMap {
+    /// Number of stored entries.
+    fn count(&self) -> usize;
+    /// Whether an entry is stored under `id`.
+    fn has(&self, id: &str) -> bool;
+}
+
+impl<K, V> KeyedMap for FxHashMap<K, V>
+where
+    K: std::borrow::Borrow<str> + std::hash::Hash + Eq,
+{
+    fn count(&self) -> usize {
+        self.len()
+    }
+
+    fn has(&self, id: &str) -> bool {
+        self.contains_key(id)
+    }
+}
+
 impl MarketContext {
     // Introspection and statistics
 
@@ -77,16 +98,7 @@ impl MarketContext {
     /// Check whether any data (curve, surface, price, series, index, dividend, or collateral mapping) is registered under the given id.
     pub fn contains(&self, id: impl AsRef<str>) -> bool {
         let id = id.as_ref();
-        self.curves.contains_key(id)
-            || self.surfaces.contains_key(id)
-            || self.vol_cubes.contains_key(id)
-            || self.prices.contains_key(id)
-            || self.series.contains_key(id)
-            || self.inflation_indices.contains_key(id)
-            || self.credit_indices.contains_key(id)
-            || self.dividends.contains_key(id)
-            || self.fx_delta_vol_surfaces.contains_key(id)
-            || self.collateral.contains_key(id)
+        self.keyed_maps().iter().any(|map| map.has(id))
     }
 
     /// Number of stored market-data objects.
@@ -106,17 +118,29 @@ impl MarketContext {
     /// assert_eq!(MarketContext::new().len(), 0);
     /// ```
     pub fn len(&self) -> usize {
-        self.curves.len()
-            + usize::from(self.fx.is_some())
-            + self.surfaces.len()
-            + self.vol_cubes.len()
-            + self.prices.len()
-            + self.series.len()
-            + self.inflation_indices.len()
-            + self.credit_indices.len()
-            + self.dividends.len()
-            + self.fx_delta_vol_surfaces.len()
-            + self.collateral.len()
+        usize::from(self.fx.is_some())
+            + self
+                .keyed_maps()
+                .iter()
+                .map(|map| map.count())
+                .sum::<usize>()
+    }
+
+    /// Every id-keyed store, in one list shared by [`Self::len`] and
+    /// [`Self::contains`].
+    fn keyed_maps(&self) -> [&dyn KeyedMap; 10] {
+        [
+            &*self.curves,
+            &*self.surfaces,
+            &*self.vol_cubes,
+            &*self.prices,
+            &*self.series,
+            &*self.inflation_indices,
+            &*self.credit_indices,
+            &*self.dividends,
+            &*self.fx_delta_vol_surfaces,
+            &*self.collateral,
+        ]
     }
 
     /// Return `true` when no market data has been inserted (`len() == 0`).

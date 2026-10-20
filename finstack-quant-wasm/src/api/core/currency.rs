@@ -65,7 +65,7 @@ impl JsCurrency {
         let code: u16 = crate::utils::input::js_uint(&code, "code")?;
         RustCurrency::try_from(code)
             .map(|inner| JsCurrency { inner })
-            .map_err(|error| to_js_err(error.to_string()))
+            .map_err(to_js_err)
     }
 
     /// Three-letter ISO-4217 alphabetic code.

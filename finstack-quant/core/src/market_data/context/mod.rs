@@ -187,17 +187,7 @@ pub struct MarketContext {
 impl std::fmt::Debug for MarketContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MarketContext")
-            .field("curves", &self.curves.len())
-            .field("fx", &self.fx.as_ref().map(|_| ".."))
-            .field("surfaces", &self.surfaces.len())
-            .field("prices", &self.prices.len())
-            .field("series", &self.series.len())
-            .field("inflation_indices", &self.inflation_indices.len())
-            .field("credit_indices", &self.credit_indices.len())
-            .field("dividends", &self.dividends.len())
-            .field("fx_delta_vol_surfaces", &self.fx_delta_vol_surfaces.len())
-            .field("vol_cubes", &self.vol_cubes.len())
-            .field("collateral", &self.collateral.len())
+            .field("stats", &self.stats())
             .field("hierarchy", &self.hierarchy.is_some())
             .finish()
     }

@@ -327,171 +327,176 @@ pub enum Currency {
     ZWL = 932,
 }
 
-/// Number of decimal places (minor units) for each ISO 4217 currency, keyed by numeric code.
-pub static MINOR_UNITS: phf::Map<u16, u8> = phf::phf_map! {
-    784u16 => 2,
-    971u16 => 2,
-    8u16 => 2,
-    51u16 => 2,
-    532u16 => 2,
-    973u16 => 2,
-    32u16 => 2,
-    36u16 => 2,
-    533u16 => 2,
-    944u16 => 2,
-    977u16 => 2,
-    52u16 => 2,
-    50u16 => 2,
-    975u16 => 2,
-    48u16 => 3,
-    108u16 => 0,
-    60u16 => 2,
-    96u16 => 2,
-    68u16 => 2,
-    986u16 => 2,
-    44u16 => 2,
-    64u16 => 2,
-    72u16 => 2,
-    933u16 => 2,
-    84u16 => 2,
-    124u16 => 2,
-    976u16 => 2,
-    756u16 => 2,
-    990u16 => 4,
-    152u16 => 0,
-    156u16 => 2,
-    170u16 => 2,
-    188u16 => 2,
-    931u16 => 2,
-    192u16 => 2,
-    132u16 => 2,
-    203u16 => 2,
-    262u16 => 0,
-    208u16 => 2,
-    214u16 => 2,
-    12u16 => 2,
-    818u16 => 2,
-    232u16 => 2,
-    230u16 => 2,
-    978u16 => 2,
-    242u16 => 2,
-    238u16 => 2,
-    826u16 => 2,
-    981u16 => 2,
-    936u16 => 2,
-    292u16 => 2,
-    270u16 => 2,
-    324u16 => 0,
-    320u16 => 2,
-    328u16 => 2,
-    344u16 => 2,
-    340u16 => 2,
-    191u16 => 2,
-    332u16 => 2,
-    348u16 => 2,
-    360u16 => 2,
-    376u16 => 2,
-    356u16 => 2,
-    368u16 => 3,
-    364u16 => 2,
-    352u16 => 0,
-    388u16 => 2,
-    400u16 => 3,
-    392u16 => 0,
-    404u16 => 2,
-    417u16 => 2,
-    116u16 => 2,
-    174u16 => 0,
-    408u16 => 2,
-    410u16 => 0,
-    414u16 => 3,
-    136u16 => 2,
-    398u16 => 2,
-    418u16 => 2,
-    422u16 => 2,
-    144u16 => 2,
-    430u16 => 2,
-    426u16 => 2,
-    434u16 => 3,
-    504u16 => 2,
-    498u16 => 2,
-    969u16 => 2,
-    807u16 => 2,
-    104u16 => 2,
-    496u16 => 2,
-    446u16 => 2,
-    929u16 => 2,
-    480u16 => 2,
-    462u16 => 2,
-    454u16 => 2,
-    484u16 => 2,
-    458u16 => 2,
-    943u16 => 2,
-    516u16 => 2,
-    566u16 => 2,
-    558u16 => 2,
-    578u16 => 2,
-    524u16 => 2,
-    554u16 => 2,
-    512u16 => 3,
-    590u16 => 2,
-    604u16 => 2,
-    598u16 => 2,
-    608u16 => 2,
-    586u16 => 2,
-    985u16 => 2,
-    600u16 => 0,
-    634u16 => 2,
-    946u16 => 2,
-    941u16 => 2,
-    643u16 => 2,
-    646u16 => 0,
-    682u16 => 2,
-    90u16 => 2,
-    690u16 => 2,
-    938u16 => 2,
-    752u16 => 2,
-    702u16 => 2,
-    654u16 => 2,
-    925u16 => 2,
-    694u16 => 2,
-    706u16 => 2,
-    968u16 => 2,
-    728u16 => 2,
-    930u16 => 2,
-    760u16 => 2,
-    748u16 => 2,
-    764u16 => 2,
-    972u16 => 2,
-    934u16 => 2,
-    788u16 => 3,
-    776u16 => 2,
-    949u16 => 2,
-    780u16 => 2,
-    901u16 => 2,
-    834u16 => 2,
-    980u16 => 2,
-    800u16 => 0,
-    840u16 => 2,
-    858u16 => 2,
-    860u16 => 2,
-    926u16 => 2,
-    928u16 => 2,
-    704u16 => 0,
-    548u16 => 0,
-    882u16 => 2,
-    950u16 => 0,
-    951u16 => 2,
-    952u16 => 0,
-    953u16 => 0,
-    886u16 => 2,
-    710u16 => 2,
-    967u16 => 2,
-    932u16 => 2,
-};
+impl Currency {
+    /// ISO-4217 decimal precision (minor units) for this currency (e.g. USD → 2).
+    #[inline]
+    pub const fn decimals(self) -> u8 {
+        match self {
+            Currency::BIF
+            | Currency::CLP
+            | Currency::DJF
+            | Currency::GNF
+            | Currency::ISK
+            | Currency::JPY
+            | Currency::KMF
+            | Currency::KRW
+            | Currency::PYG
+            | Currency::RWF
+            | Currency::UGX
+            | Currency::VND
+            | Currency::VUV
+            | Currency::XAF
+            | Currency::XOF
+            | Currency::XPF => 0,
+            Currency::AED
+            | Currency::AFN
+            | Currency::ALL
+            | Currency::AMD
+            | Currency::ANG
+            | Currency::AOA
+            | Currency::ARS
+            | Currency::AUD
+            | Currency::AWG
+            | Currency::AZN
+            | Currency::BAM
+            | Currency::BBD
+            | Currency::BDT
+            | Currency::BGN
+            | Currency::BMD
+            | Currency::BND
+            | Currency::BOB
+            | Currency::BRL
+            | Currency::BSD
+            | Currency::BTN
+            | Currency::BWP
+            | Currency::BYN
+            | Currency::BZD
+            | Currency::CAD
+            | Currency::CDF
+            | Currency::CHF
+            | Currency::CNY
+            | Currency::COP
+            | Currency::CRC
+            | Currency::CUC
+            | Currency::CUP
+            | Currency::CVE
+            | Currency::CZK
+            | Currency::DKK
+            | Currency::DOP
+            | Currency::DZD
+            | Currency::EGP
+            | Currency::ERN
+            | Currency::ETB
+            | Currency::EUR
+            | Currency::FJD
+            | Currency::FKP
+            | Currency::GBP
+            | Currency::GEL
+            | Currency::GHS
+            | Currency::GIP
+            | Currency::GMD
+            | Currency::GTQ
+            | Currency::GYD
+            | Currency::HKD
+            | Currency::HNL
+            | Currency::HRK
+            | Currency::HTG
+            | Currency::HUF
+            | Currency::IDR
+            | Currency::ILS
+            | Currency::INR
+            | Currency::IRR
+            | Currency::JMD
+            | Currency::KES
+            | Currency::KGS
+            | Currency::KHR
+            | Currency::KPW
+            | Currency::KYD
+            | Currency::KZT
+            | Currency::LAK
+            | Currency::LBP
+            | Currency::LKR
+            | Currency::LRD
+            | Currency::LSL
+            | Currency::MAD
+            | Currency::MDL
+            | Currency::MGA
+            | Currency::MKD
+            | Currency::MMK
+            | Currency::MNT
+            | Currency::MOP
+            | Currency::MRU
+            | Currency::MUR
+            | Currency::MVR
+            | Currency::MWK
+            | Currency::MXN
+            | Currency::MYR
+            | Currency::MZN
+            | Currency::NAD
+            | Currency::NGN
+            | Currency::NIO
+            | Currency::NOK
+            | Currency::NPR
+            | Currency::NZD
+            | Currency::PAB
+            | Currency::PEN
+            | Currency::PGK
+            | Currency::PHP
+            | Currency::PKR
+            | Currency::PLN
+            | Currency::QAR
+            | Currency::RON
+            | Currency::RSD
+            | Currency::RUB
+            | Currency::SAR
+            | Currency::SBD
+            | Currency::SCR
+            | Currency::SDG
+            | Currency::SEK
+            | Currency::SGD
+            | Currency::SHP
+            | Currency::SLE
+            | Currency::SLL
+            | Currency::SOS
+            | Currency::SRD
+            | Currency::SSP
+            | Currency::STN
+            | Currency::SYP
+            | Currency::SZL
+            | Currency::THB
+            | Currency::TJS
+            | Currency::TMT
+            | Currency::TOP
+            | Currency::TRY
+            | Currency::TTD
+            | Currency::TWD
+            | Currency::TZS
+            | Currency::UAH
+            | Currency::USD
+            | Currency::UYU
+            | Currency::UZS
+            | Currency::VED
+            | Currency::VES
+            | Currency::WST
+            | Currency::XCD
+            | Currency::YER
+            | Currency::ZAR
+            | Currency::ZMW
+            | Currency::ZWL => 2,
+            Currency::BHD
+            | Currency::IQD
+            | Currency::JOD
+            | Currency::KWD
+            | Currency::LYD
+            | Currency::OMR
+            | Currency::TND => 3,
+            Currency::CLF => 4,
+        }
+    }
+}
 
 impl TryFrom<u16> for Currency {
-    type Error = TryFromCurrencyError;
+    type Error = crate::Error;
 
     fn try_from(code: u16) -> Result<Self, Self::Error> {
         match code {
@@ -654,7 +659,7 @@ impl TryFrom<u16> for Currency {
             710 => Ok(Currency::ZAR),
             967 => Ok(Currency::ZMW),
             932 => Ok(Currency::ZWL),
-            _ => Err(TryFromCurrencyError(code)),
+            _ => Err(crate::Error::Validation(format!("invalid ISO 4217 currency code: {code}"))),
         }
     }
 }

@@ -437,17 +437,13 @@ impl FxMatrix {
             return Ok(cached);
         }
 
-        // The provider remains direction-sensitive; only cache storage is canonical.
-        let revision = self.observation_revision();
-        match self.provider.rate(from, to, on, policy) {
-            Ok(rate) => {
-                let rate = validate_fx_rate(from, to, rate)?;
-                let rate = self.insert_observed_quote(query, rate, false, revision)?;
-                Ok(FxRateResult {
-                    rate,
-                    triangulated: false,
-                })
-            }
+        // Every error of the fetch tail after the provider call is
+        // `InvalidFxRate`, so it bypasses triangulation exactly as before.
+        match self.fetch_from_provider(query) {
+            Ok(rate) => Ok(FxRateResult {
+                rate,
+                triangulated: false,
+            }),
             Err(error @ crate::Error::Input(crate::InputError::InvalidFxRate { .. })) => Err(error),
             Err(_) if self.config.enable_triangulation => {
                 // Try simple triangulation via pivot
@@ -1039,16 +1035,19 @@ impl FxMatrix {
         if let Some(cached) = self.read_cached_rate(from, to, on, policy)? {
             return Ok(cached.rate);
         }
-        // Fetch from the provider
+        self.fetch_from_provider(FxQuery::with_policy(from, to, on, policy))
+    }
+
+    /// Fetch `query` from the provider, validate the rate and record it as an
+    /// observed quote. The provider remains direction-sensitive; only cache
+    /// storage is canonical.
+    fn fetch_from_provider(&self, query: FxQuery) -> crate::Result<f64> {
         let revision = self.observation_revision();
-        let r = self.provider.rate(from, to, on, policy)?;
-        let r = validate_fx_rate(from, to, r)?;
-        self.insert_observed_quote(
-            FxQuery::with_policy(from, to, on, policy),
-            r,
-            false,
-            revision,
-        )
+        let rate = self
+            .provider
+            .rate(query.from, query.to, query.on, query.policy)?;
+        let rate = validate_fx_rate(query.from, query.to, rate)?;
+        self.insert_observed_quote(query, rate, false, revision)
     }
 
     /// Resolve cache source priority before pair orientation for every lookup path.

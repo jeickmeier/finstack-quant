@@ -56,11 +56,7 @@ impl SimpleFxProvider {
     /// let provider = SimpleFxProvider::new();
     /// ```
     pub fn new() -> Self {
-        Self {
-            quotes: RwLock::new(FxHashMap::default()),
-            pinned_quotes: RwLock::new(FxHashMap::default()),
-            revision: AtomicU64::new(0),
-        }
+        Self::default()
     }
 
     /// Insert or update a single FX quote.
@@ -91,10 +87,7 @@ impl SimpleFxProvider {
     /// provider.set_quote(Currency::GBP, Currency::USD, 1.25);
     /// ```
     pub fn set_quote(&self, from: Currency, to: Currency, rate: f64) -> crate::Result<()> {
-        let rate = super::validate_fx_rate(from, to, rate)?;
-        recover(self.quotes.write()).insert((from, to), rate);
-        self.advance_revision();
-        Ok(())
+        self.set_quotes(&[(from, to, rate)])
     }
 
     /// Bulk insert or update FX quotes.
