@@ -638,7 +638,7 @@ impl Bond {
         // We compute the mode (most frequent) interval across all consecutive
         // coupon dates, ignoring potential stubs at the front or back. This is
         // more robust than using just the first interval, which may be a stub.
-        use finstack_quant_cashflows::primitives::CFKind;
+        use finstack_quant_core::cashflow::CFKind;
         use finstack_quant_core::dates::Tenor;
         use std::collections::BTreeMap;
 

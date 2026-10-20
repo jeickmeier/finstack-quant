@@ -346,7 +346,7 @@ fn test_accrued_interest_amortizing_schedule_driven() {
     let schedule = bond
         .cashflow_schedule(&curves, issue)
         .expect("Full schedule retrieval should succeed in test");
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     let mut coupon_dates: Vec<(Date, f64)> = Vec::new();
     for cf in schedule.get_flows() {
         if matches!(cf.kind, CFKind::Fixed | CFKind::Stub) {
@@ -375,7 +375,7 @@ fn test_accrued_interest_amortizing_schedule_driven() {
     // Mirror that convention here so the expected value tracks the impl.
     type CouponInfo = (Date, f64, Option<f64>, Option<(Date, Date)>);
     let coupon_info: Vec<CouponInfo> = {
-        use finstack_quant_cashflows::primitives::CFKind;
+        use finstack_quant_core::cashflow::CFKind;
         let mut out: Vec<CouponInfo> = Vec::new();
         for cf in schedule.get_flows() {
             if !matches!(cf.kind, CFKind::Fixed | CFKind::Stub) {

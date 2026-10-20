@@ -5,7 +5,7 @@ use super::config::{
     PAR_SPREAD_TOLERANCE,
 };
 use crate::cds_tranche::CdsTranche;
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
 use finstack_quant_core::math::binomial_pmf_all_into;

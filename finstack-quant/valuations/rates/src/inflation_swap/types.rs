@@ -1,8 +1,8 @@
 //! Zero-coupon Inflation Swap types and pricing implementation.
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };

@@ -1,7 +1,7 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
-use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

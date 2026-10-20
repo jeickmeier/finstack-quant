@@ -13,7 +13,7 @@
 //!   projector. Historical fixings are required once the fixing date is past.
 
 use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule, Notional};
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -668,11 +668,11 @@ impl XccySwap {
             )?;
             let all_in = projected.all_in_rate(spread);
             let amount = leg.side.sign() * projected.unsigned_coupon(leg.notional.amount(), spread);
-            flows.push(finstack_quant_cashflows::primitives::CashFlow::new(
+            flows.push(finstack_quant_core::cashflow::CashFlow::new(
                 period.payment_date,
                 projected.fixing_date.or(period.reset_date),
                 Money::new(amount, leg.notional.currency())?,
-                finstack_quant_cashflows::primitives::CFKind::FloatReset,
+                finstack_quant_core::cashflow::CFKind::FloatReset,
                 projected.year_fraction,
                 Some(all_in),
             ));

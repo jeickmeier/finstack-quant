@@ -4,8 +4,8 @@
 //! deriving schedule metadata. Downstream pricing/risk code consumes this shape.
 
 use crate::builder::Notional;
-use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Period};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -19,7 +19,7 @@ use super::compiler::{FixedSchedule, FloatSchedule};
 /// All known `CFKind` variants are explicitly ranked so that same-date ordering
 /// is fully deterministic. The wildcard arm covers future `#[non_exhaustive]`
 /// additions and sorts them after all known variants.
-pub(crate) fn kind_rank(kind: CFKind) -> u8 {
+fn kind_rank(kind: CFKind) -> u8 {
     match kind {
         CFKind::Fixed | CFKind::Stub | CFKind::FloatReset | CFKind::InflationCoupon => 0,
         CFKind::Fee
@@ -69,7 +69,7 @@ pub(crate) fn kind_rank(kind: CFKind) -> u8 {
 /// A stable sort is used deliberately: `merge_cashflow_schedules` concatenates
 /// already-sorted schedules, and the stable sort's run detection handles those
 /// pre-sorted runs in near-linear time (an unstable sort re-partitions them).
-pub(crate) fn sort_flows(flows: &mut [CashFlow]) {
+fn sort_flows(flows: &mut [CashFlow]) {
     flows.sort_by(compare_flows);
 }
 
@@ -649,7 +649,7 @@ impl CashFlowSchedule {
     /// a composite that has principal movements in multiple currencies.
     /// Single-currency principal paths retain full repayment reconciliation;
     /// a foreign coupon or fee does not exempt that path from validation.
-    pub(crate) fn validate_native_cash(&self) -> finstack_quant_core::Result<()> {
+    fn validate_native_cash(&self) -> finstack_quant_core::Result<()> {
         self.validate_structure()?;
         let mut principal_currency = None;
         let mut multiple_principal_currencies = false;
@@ -804,7 +804,7 @@ impl CashFlowSchedule {
     ///
     /// ```rust
     /// use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    /// use finstack_quant_cashflows::primitives::{CashFlow, CFKind};
+    /// use finstack_quant_core::cashflow::{CashFlow, CFKind};
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::{Date, DayCount};
     /// use finstack_quant_core::money::Money;
@@ -944,7 +944,7 @@ impl CashFlowSchedule {
     ///
     /// ```rust
     /// use finstack_quant_cashflows::{schedule_from_dated_flows, ScheduleBuildOpts};
-    /// use finstack_quant_cashflows::primitives::CFKind;
+    /// use finstack_quant_core::cashflow::CFKind;
     /// use finstack_quant_core::{currency::Currency, dates::{Date, DayCount}, money::Money};
     /// use time::Month;
     ///
@@ -1018,7 +1018,7 @@ impl CashFlowSchedule {
         Ok(balances)
     }
 
-    pub(crate) fn replay_balances(
+    fn replay_balances(
         &self,
         funding_anchor: Date,
     ) -> finstack_quant_core::Result<Vec<(usize, Money, Money)>> {
@@ -1217,7 +1217,7 @@ where
 ///
 /// Uses a relative tolerance of 1e-12 scaled by magnitude, with a minimum
 /// absolute tolerance of 1e-12 (from the `.max(1.0)` floor).
-pub(super) fn amounts_approx_equal(a: f64, b: f64) -> bool {
+fn amounts_approx_equal(a: f64, b: f64) -> bool {
     let max_abs = a.abs().max(b.abs()).max(1.0);
     (a - b).abs() < max_abs * 1e-12
 }
@@ -1626,7 +1626,7 @@ mod tests {
         let maturity = issue.add_months(6).expect("date shift");
         for (amort, remaining) in [
             (
-                super::super::AmortizationSpec::CustomPrincipal {
+                crate::builder::AmortizationSpec::CustomPrincipal {
                     items: vec![
                         (first, Money::from((40_i64, Currency::USD))),
                         (maturity, Money::from((60_i64, Currency::USD))),
@@ -1635,7 +1635,7 @@ mod tests {
                 60_i64,
             ),
             (
-                super::super::AmortizationSpec::StepRemaining {
+                crate::builder::AmortizationSpec::StepRemaining {
                     schedule: vec![
                         (first, Money::from((60_i64, Currency::USD))),
                         (second, Money::from((30_i64, Currency::USD))),
@@ -1659,7 +1659,7 @@ mod tests {
             );
             assert!(matches!(
                 normalized.notional.amort,
-                super::super::AmortizationSpec::None
+                crate::builder::AmortizationSpec::None
             ));
             assert_eq!(
                 normalized.dated_flows().expect("remaining principal"),

@@ -270,7 +270,7 @@ impl TermLoanValuator {
         tree_steps: usize,
         recovery_rate: Option<f64>,
     ) -> Result<Self> {
-        use finstack_quant_cashflows::primitives::CFKind;
+        use finstack_quant_core::cashflow::CFKind;
         let dt = time_to_maturity / tree_steps as f64;
         let time_steps: Vec<f64> = (0..=tree_steps).map(|i| i as f64 * dt).collect();
         let num_steps = tree_steps + 1;

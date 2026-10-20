@@ -13,7 +13,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 
 use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule, Notional};
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
 
 /// FX Swap instrument definition

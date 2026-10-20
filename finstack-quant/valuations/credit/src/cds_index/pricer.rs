@@ -18,10 +18,10 @@ use crate::cds_index::{
 };
 use finstack_quant_cashflows::builder::merge_cashflow_schedules;
 use finstack_quant_cashflows::builder::{CashFlowSchedule, Notional};
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_cashflows::{
     schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
 };
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
@@ -945,7 +945,7 @@ mod tests {
     use crate::cds_index::CdsIndexConstituent;
     use date_support::date;
     use discount_forward_curve_support::flat_discount_with_tenor;
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::HazardCurve;
     use finstack_quant_valuations_core::instruments::common_impl::parameters::CreditParams;

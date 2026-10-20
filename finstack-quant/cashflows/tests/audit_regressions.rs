@@ -3,8 +3,8 @@ use cf::builder::{
     CashFlowSchedule, FloatingLegCompounding, OvernightObservationSchedule,
     OvernightRateConstraints,
 };
-use cf::primitives::CFKind;
 use finstack_quant_cashflows as cf;
+use finstack_quant_core::cashflow::CFKind;
 use serde_json::{json, Value};
 
 fn spec(issue: &str, maturity: &str) -> Value {

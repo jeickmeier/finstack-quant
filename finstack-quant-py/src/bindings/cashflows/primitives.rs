@@ -1,6 +1,6 @@
 //! Python bindings for `finstack_quant_cashflows::primitives`.
 
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow, CashFlowAccrual};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};

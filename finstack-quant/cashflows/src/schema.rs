@@ -7,7 +7,7 @@ use serde_json::Value;
 
 /// Stable base URI for cashflow component schemas.
 #[cfg(feature = "jsonschema-validate")]
-pub const CASHFLOW_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/cashflow/1/";
+const CASHFLOW_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/cashflow/1/";
 
 /// Typed cashflow definitions eligible for assertion-checked externalization.
 pub const CASHFLOW_SCHEMA_DEFINITIONS: &[finstack_quant_core::schema::ExternalSchemaDefinition] = &[
@@ -46,8 +46,7 @@ pub const CASHFLOW_SCHEMA_DEFINITIONS: &[finstack_quant_core::schema::ExternalSc
 /// # Arguments
 ///
 /// * `schema` - Complete schema generated from a cashflow serde type.
-#[doc(hidden)]
-pub fn package_cashflow_schema(schema: &mut Value) -> Result<()> {
+fn package_cashflow_schema(schema: &mut Value) -> Result<()> {
     finstack_quant_core::schema::externalize_schema_definitions(
         schema,
         finstack_quant_core::schema::COMMON_SCHEMA_DEFINITIONS,

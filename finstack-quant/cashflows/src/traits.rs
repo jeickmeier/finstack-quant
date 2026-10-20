@@ -7,8 +7,8 @@
 //! ad-hoc flow lists using [`ScheduleBuildOpts`].
 
 use crate::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-use crate::primitives::{CFKind, CashFlow};
 use crate::DatedFlows;
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -50,7 +50,7 @@ pub trait CashflowScheduleSource: Send + Sync {
     /// use finstack_quant_core::market_data::context::MarketContext;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_cashflows::builder::CashFlowSchedule;
-    /// use finstack_quant_cashflows::primitives::CFKind;
+    /// use finstack_quant_core::cashflow::CFKind;
     /// use finstack_quant_cashflows::{CashflowScheduleSource, schedule_from_dated_flows, ScheduleBuildOpts};
     ///
     /// struct MyInstrument {
@@ -194,7 +194,7 @@ fn resolve_schedule_notional(
 /// ];
 /// let schedule = schedule_from_dated_flows(
 ///     flows,
-///     finstack_quant_cashflows::primitives::CFKind::Fixed,
+///     finstack_quant_core::cashflow::CFKind::Fixed,
 ///     DayCount::Thirty360,
 ///     ScheduleBuildOpts::default(),
 /// );
@@ -245,7 +245,7 @@ pub fn schedule_from_dated_flows(
 ///
 /// ```rust
 /// use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
-/// use finstack_quant_cashflows::primitives::{CashFlow, CFKind};
+/// use finstack_quant_core::cashflow::{CashFlow, CFKind};
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::{Date, DayCount};
 /// use finstack_quant_core::money::Money;

@@ -7,10 +7,8 @@ use crate::bond::pricing::quote_conversions::{
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::CashflowSpec;
 use crate::Bond;
-use finstack_quant_cashflows::{
-    builder::{CashFlowSchedule, ScheduleParams},
-    primitives::CFKind,
-};
+use finstack_quant_cashflows::builder::{CashFlowSchedule, ScheduleParams};
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{
     calendar_by_id_strict, BusinessDayConvention, Date, DayCount, HolidayCalendar, ScheduleBuilder,
     StubKind, Tenor,

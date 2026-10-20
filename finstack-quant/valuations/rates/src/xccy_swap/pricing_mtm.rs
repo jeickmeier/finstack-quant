@@ -134,10 +134,10 @@ fn project_mtm_cashflows(
     context: &finstack_quant_core::market_data::context::MarketContext,
     as_of: Date,
 ) -> Result<(
-    Vec<finstack_quant_cashflows::primitives::CashFlow>,
+    Vec<finstack_quant_core::cashflow::CashFlow>,
     finstack_quant_cashflows::builder::CashFlowMeta,
 )> {
-    use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+    use finstack_quant_core::cashflow::{CFKind, CashFlow};
     use finstack_quant_core::money::fx::FxQuery;
     use finstack_quant_core::money::Money;
 

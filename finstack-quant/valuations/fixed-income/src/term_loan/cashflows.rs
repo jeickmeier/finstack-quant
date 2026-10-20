@@ -10,7 +10,7 @@ use finstack_quant_cashflows::builder::{CashFlowBuilder, ScheduleParams};
 use finstack_quant_cashflows::builder::{
     CouponType, FeeBase, FeeSpec, FloatingCouponSpec, FloatingRateSpec, StepUpCouponSpec,
 };
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;

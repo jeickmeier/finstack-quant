@@ -5,8 +5,7 @@
 //! layer that supplies those tuples.
 
 use crate::builder::FloatingLegCompounding;
-use crate::primitives::{CFKind, CashFlow};
-use finstack_quant_core::cashflow::CashFlowAccrual;
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::fixings::{fixing_series_id, require_fixing_value_exact};
@@ -18,16 +17,59 @@ use rust_decimal::Decimal;
 use tracing::{info, warn};
 
 use crate::builder::overnight::{OvernightObservationSchedule, OvernightRateConstraints};
-use crate::builder::rate_helpers::calculate_floating_rate;
+use crate::builder::rate_helpers::{
+    calculate_floating_rate, project_index_rate, FloatingRateParams,
+};
 use crate::builder::{
     CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod, FloatingRateFallback,
     FloatingRateObservation, SchedulePeriod,
 };
 use rust_decimal::prelude::ToPrimitive;
 
-use super::super::compiler::{FixedSchedule, FloatSchedule};
-use super::f64_to_decimal;
-use super::helpers::{add_pik_flow_if_nonzero, compute_reset_date};
+use crate::builder::compiler::{FixedSchedule, FloatSchedule};
+use crate::builder::periods::compute_reset_date;
+use finstack_quant_core::decimal::f64_to_decimal;
+
+/// Add a PIK cashflow if the amount is strictly positive.
+///
+/// Returns the PIK amount for outstanding balance tracking (`0.0` when no
+/// flow was added).
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `pik_amt` is negative. A negative PIK
+/// coupon (negative all-in rate on a PIK/split leg) would have to *reduce*
+/// the outstanding balance; that de-capitalization policy is not modeled, so
+/// it fails loudly instead of being silently dropped. Configure an
+/// `all_in_floor_bp` of zero (or pay cash) for negative-rate PIK structures.
+fn add_pik_flow_if_nonzero(
+    flows: &mut Vec<CashFlow>,
+    date: Date,
+    pik_amt: f64,
+    ccy: Currency,
+    rate: Option<f64>,
+    accrual_factor: f64,
+) -> finstack_quant_core::Result<f64> {
+    if pik_amt < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "negative PIK coupon amount {pik_amt} on {date}: de-capitalizing PIK is not \
+             supported; floor the all-in rate at zero or use a cash coupon"
+        )));
+    }
+    if pik_amt > 0.0 {
+        flows.push(CashFlow::new(
+            date,
+            None,
+            Money::new(pik_amt, ccy)?,
+            CFKind::Pik,
+            accrual_factor,
+            rate,
+        ));
+        Ok(pik_amt)
+    } else {
+        Ok(0.0)
+    }
+}
 
 /// Append pre-computed inflation-linked coupon cashflows.
 ///
@@ -475,7 +517,7 @@ fn project_segment_indices(
             let index_rate = if *reset_date < as_of || same_day_fixing_exists {
                 require_fixing_value_exact(fixings, forward_curve_id, *reset_date, as_of)?
             } else {
-                super::super::rate_helpers::project_index_rate(
+                project_index_rate(
                     *reset_date,
                     curve,
                     period.accrual_start,
@@ -754,7 +796,7 @@ pub(crate) fn emit_float_coupons_on(
                     )?;
                     let constrained_index = calculate_floating_rate(
                         index_rate,
-                        &crate::builder::rate_helpers::FloatingRateParams {
+                        &FloatingRateParams {
                             index_floor_bp: params.index_floor_bp,
                             index_cap_bp: params.index_cap_bp,
                             ..Default::default()

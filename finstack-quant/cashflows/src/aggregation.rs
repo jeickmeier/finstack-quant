@@ -239,7 +239,7 @@ fn sum_by_period<T: HasDate>(
 /// Returns [`finstack_quant_core::Error::Validation`] if periods are not sorted by
 /// start date, overlap (a period starts before the previous period ends), or
 /// share a `PeriodId`.
-pub(crate) fn validate_periods(periods: &[Period]) -> finstack_quant_core::Result<()> {
+fn validate_periods(periods: &[Period]) -> finstack_quant_core::Result<()> {
     for p in periods {
         if p.start >= p.end {
             return Err(finstack_quant_core::Error::Validation(format!(

@@ -204,7 +204,7 @@ impl DefaultModelSpec {
             )));
         }
 
-        use super::super::credit_rates::cdr_to_mdr;
+        use crate::builder::credit_rates::cdr_to_mdr;
         cdr_to_mdr(cdr)
     }
 

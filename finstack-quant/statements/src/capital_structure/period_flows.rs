@@ -19,8 +19,8 @@ use crate::capital_structure::cashflows::CashflowBreakdown;
 use crate::error::Result;
 use crate::evaluator::{CapitalStructureWarning, EvalWarning};
 use finstack_quant_cashflows::builder::{CashFlowSchedule, CashflowRepresentation};
-use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_cashflows::{accrued_interest_amount, AccrualConfig};
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::{Date, Period};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -547,7 +547,7 @@ pub fn calculate_period_flows(
 mod tests {
     use super::*;
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::cashflow::CashFlow;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, PeriodId};

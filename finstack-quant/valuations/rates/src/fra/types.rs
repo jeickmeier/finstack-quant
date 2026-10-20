@@ -467,7 +467,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
 
         let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            finstack_quant_cashflows::primitives::CFKind::Fixed,
+            finstack_quant_core::cashflow::CFKind::Fixed,
             self.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: self.notional()?,

@@ -7,7 +7,7 @@
 use super::schedule::{finalize_flows, CashFlowSchedule};
 use crate::builder::{AmortizationSpec, Notional, PrincipalExchange};
 use crate::json::PrincipalEventSpec;
-use crate::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::decimal::f64_to_decimal;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
@@ -508,7 +508,7 @@ pub(super) struct CompiledCashFlowPlan {
     pub(super) fixed_schedules: Vec<FixedSchedule>,
     pub(super) float_schedules: Vec<FloatSchedule>,
     pub(super) periodic_fees: Vec<PeriodicFee>,
-    pub(super) fixed_fees: Vec<(Date, Money)>,
+    pub(super) fixed_fees: crate::DatedFlows,
     pub(super) principal_events: Vec<PrincipalEventSpec>,
     pub(super) dates: Vec<Date>,
     pub(super) amort_setup: AmortizationSetup,

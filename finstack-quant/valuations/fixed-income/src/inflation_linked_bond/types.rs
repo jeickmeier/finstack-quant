@@ -423,7 +423,7 @@ impl InflationLinkedBond {
     fn real_cashflow_schedule(
         &self,
     ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        use finstack_quant_cashflows::primitives::{CFKind, CashFlow, CashFlowAccrual};
+        use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 
         let coupon_rate = self.real_coupon_rate()?;
         let currency = self.notional.currency();
@@ -890,11 +890,11 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
                 as_of,
                 self.deflation_protection != DeflationProtection::None,
             )?;
-            detailed_flows.push(finstack_quant_cashflows::primitives::CashFlow::new(
+            detailed_flows.push(finstack_quant_core::cashflow::CashFlow::new(
                 principal_date,
                 None,
                 self.notional.checked_mul_f64(principal_ratio)?,
-                finstack_quant_cashflows::primitives::CFKind::Notional,
+                finstack_quant_core::cashflow::CFKind::Notional,
                 0.0,
                 None,
             ));

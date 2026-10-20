@@ -244,7 +244,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for PrivateMarketsFund {
         let flows = self.lp_cashflows()?;
         let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            finstack_quant_cashflows::primitives::CFKind::Fixed,
+            finstack_quant_core::cashflow::CFKind::Fixed,
             finstack_quant_core::dates::DayCount::Act365F,
             finstack_quant_cashflows::ScheduleBuildOpts::default(),
         );

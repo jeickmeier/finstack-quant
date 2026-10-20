@@ -13,7 +13,7 @@ use crate::builder::orchestrator::{
     apply_principal_event, BuildState, CompiledCashFlowPlan, PreparedAmortization,
 };
 use crate::builder::PrincipalExchange;
-use crate::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 
 impl CompiledCashFlowPlan {
     /// Emit fixed and floating coupons, returning total PIK amount to capitalize.

@@ -5,8 +5,8 @@
 //! rules are inferred from `CFKind`-tagged flows and the schedule outstanding
 //! path, not from instrument specs.
 
-use crate::builder::schedule::CashFlowSchedule;
-use crate::primitives::CFKind;
+use crate::builder::CashFlowSchedule;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{
     calendar_by_id_strict, Date, DateExt, DayCount, DayCountContext, Tenor,
 };

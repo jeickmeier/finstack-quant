@@ -41,21 +41,21 @@
 //! # }
 //! ```
 
-pub(crate) mod calendar;
-pub(crate) mod compiler;
+mod calendar;
+mod compiler;
 mod coupon_api;
-pub(crate) mod credit_rates;
-pub(crate) mod date_generation;
-pub(crate) mod emission;
+mod credit_rates;
+mod date_generation;
+mod emission;
 mod floating_replay;
 mod orchestrator;
-pub(crate) mod overnight;
+mod overnight;
 pub(crate) mod periods;
-pub(crate) mod pipeline;
+mod pipeline;
 mod principal;
-pub(crate) mod rate_helpers;
+mod rate_helpers;
 pub(crate) mod schedule;
-pub(crate) mod specs;
+mod specs;
 
 pub use calendar::WEEKENDS_ONLY_ID;
 pub use credit_rates::{

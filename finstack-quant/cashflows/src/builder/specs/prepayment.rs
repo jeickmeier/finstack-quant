@@ -102,7 +102,7 @@ impl PrepaymentModelSpec {
                         "PSA speed_multiplier ({speed_multiplier}) must be finite and non-negative"
                     )));
                 }
-                super::super::credit_rates::psa_cpr(*speed_multiplier, seasoning_months)
+                crate::builder::credit_rates::psa_cpr(*speed_multiplier, seasoning_months)
             }
             PrepaymentModelSpec::CmbsLockout {
                 lockout_months,
@@ -116,7 +116,7 @@ impl PrepaymentModelSpec {
                 }
             }
             PrepaymentModelSpec::Abs { speed } => {
-                return super::super::credit_rates::abs_to_smm(*speed, seasoning_months);
+                return crate::builder::credit_rates::abs_to_smm(*speed, seasoning_months);
             }
             PrepaymentModelSpec::Vector { monthly_cpr } => {
                 vector_at(monthly_cpr, seasoning_months, "monthly_cpr")?
@@ -130,7 +130,7 @@ impl PrepaymentModelSpec {
             )));
         }
 
-        use super::super::credit_rates::cpr_to_smm;
+        use crate::builder::credit_rates::cpr_to_smm;
         cpr_to_smm(cpr)
     }
 
@@ -149,7 +149,7 @@ impl PrepaymentModelSpec {
             ..
         } = self
         {
-            super::super::credit_rates::cpr_to_smm(*cpr)?;
+            crate::builder::credit_rates::cpr_to_smm(*cpr)?;
         }
         if let PrepaymentModelSpec::Vector { monthly_cpr } = self {
             for (index, cpr) in monthly_cpr.iter().enumerate() {
