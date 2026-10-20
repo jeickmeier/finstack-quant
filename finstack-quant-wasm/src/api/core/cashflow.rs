@@ -1,4 +1,4 @@
-//! Cashflow primitives: `CFKind` and `CashFlow` computations over wire values.
+//! `finstack_quant_core::cashflow`: `CFKind` and `CashFlow` computations over wire values.
 //!
 //! `CFKind` crosses the boundary as its snake_case wire string (`"fixed"`,
 //! `"pre_payment"`) and `CashFlow` as a plain object; the Rust methods are

@@ -356,20 +356,20 @@ const cases = {
     };
     return {
       parse: ['fixed', 'pre_payment', 'collateral_substitution_out'].map((name) =>
-        cashflows.cfKindParse(name)
+        core.cfKindParse(name)
       ),
       interest_like: ['fixed', 'float_reset', 'fee', 'notional'].map((kind) =>
-        cashflows.cfKindIsInterestLike(kind)
+        core.cfKindIsInterestLike(kind)
       ),
       principal_like: ['fixed', 'pik', 'amortization', 'recovery'].map((kind) =>
-        cashflows.cfKindIsPrincipalLike(kind)
+        core.cfKindIsPrincipalLike(kind)
       ),
       cash_settlement: ['fixed', 'pik', 'defaulted_notional', 'notional'].map((kind) =>
-        cashflows.cfKindIsCashSettlement(kind)
+        core.cfKindIsCashSettlement(kind)
       ),
       balance_date: [
-        cashflows.cashFlowGetBalanceDate(flow),
-        cashflows.cashFlowGetBalanceDate({ ...flow, principal_date: '2025-07-11' }),
+        core.cashFlowGetBalanceDate(flow),
+        core.cashFlowGetBalanceDate({ ...flow, principal_date: '2025-07-11' }),
       ],
       with_accrual: { ...flow, accrual },
       with_principal_delta: { ...flow, principal_delta: usd('-1000') },
@@ -597,8 +597,8 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     cashflows.notionalValidate(JSON.stringify(cashflows.notionalPar(100, 'USD'))),
     undefined
   );
-  assert.equal(cashflows.cfKindIsInterestLike('"fixed"'), true);
-  assert.equal(cashflows.cfKindIsInterestLike('fixed'), true);
+  assert.equal(core.cfKindIsInterestLike('"fixed"'), true);
+  assert.equal(core.cfKindIsInterestLike('fixed'), true);
   assert.equal(cashflows.scheduleParamsValidate(cashflows.scheduleParamsUsdSofrSwap()), undefined);
   assert.throws(
     () =>
@@ -651,7 +651,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     kind('validation', /rate/)
   );
   assert.equal(
-    cashflows.cashFlowValidate({
+    core.cashFlowValidate({
       date: '2025-07-15',
       reset_date: null,
       amount: usd('1'),
@@ -663,7 +663,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
   );
   assert.throws(
     () =>
-      cashflows.cashFlowValidate({
+      core.cashFlowValidate({
         date: '2025-07-15',
         reset_date: '2025-08-01',
         amount: usd('1'),
@@ -673,13 +673,10 @@ test('spec functions validate through Rust and reject wrong host types', () => {
       }),
     kind('validation', /reset_date must not be after payment date/)
   );
+  assert.throws(() => core.cfKindParse('coupon-ish'), kind('validation', /unknown cashflow kind/));
+  assert.throws(() => core.cfKindParse(3), kind('invalid_type', /^name: /));
   assert.throws(
-    () => cashflows.cfKindParse('coupon-ish'),
-    kind('validation', /unknown cashflow kind/)
-  );
-  assert.throws(() => cashflows.cfKindParse(3), kind('invalid_type', /^name: /));
-  assert.throws(
-    () => cashflows.cfKindIsInterestLike('coupon-ish'),
+    () => core.cfKindIsInterestLike('coupon-ish'),
     kind('validation', /kind: unknown variant `coupon-ish`/)
   );
   assert.throws(

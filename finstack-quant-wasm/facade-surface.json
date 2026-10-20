@@ -404,13 +404,7 @@
       "buildCashflowSchedule",
       "buildCashflowScheduleJson",
       "calendarYearLadder",
-      "cashFlowGetBalanceDate",
-      "cashFlowValidate",
       "cdrToMdr",
-      "cfKindIsCashSettlement",
-      "cfKindIsInterestLike",
-      "cfKindIsPrincipalLike",
-      "cfKindParse",
       "cprToSmm",
       "datedFlows",
       "datedFlowsJson",
@@ -530,25 +524,7 @@
   "cashflows.calendarYearLadder": {
     "kind": "function"
   },
-  "cashflows.cashFlowGetBalanceDate": {
-    "kind": "function"
-  },
-  "cashflows.cashFlowValidate": {
-    "kind": "function"
-  },
   "cashflows.cdrToMdr": {
-    "kind": "function"
-  },
-  "cashflows.cfKindIsCashSettlement": {
-    "kind": "function"
-  },
-  "cashflows.cfKindIsInterestLike": {
-    "kind": "function"
-  },
-  "cashflows.cfKindIsPrincipalLike": {
-    "kind": "function"
-  },
-  "cashflows.cfKindParse": {
     "kind": "function"
   },
   "cashflows.cprToSmm": {
@@ -748,6 +724,12 @@
       "availableCalendars",
       "buildFiscalPeriods",
       "buildPeriods",
+      "cashFlowGetBalanceDate",
+      "cashFlowValidate",
+      "cfKindIsCashSettlement",
+      "cfKindIsInterestLike",
+      "cfKindIsPrincipalLike",
+      "cfKindParse",
       "choleskyDecomposition",
       "choleskySolve",
       "correlation",
@@ -1753,6 +1735,24 @@
     "kind": "function"
   },
   "core.longestPositiveRun": {
+    "kind": "function"
+  },
+  "core.cashFlowGetBalanceDate": {
+    "kind": "function"
+  },
+  "core.cashFlowValidate": {
+    "kind": "function"
+  },
+  "core.cfKindIsCashSettlement": {
+    "kind": "function"
+  },
+  "core.cfKindIsInterestLike": {
+    "kind": "function"
+  },
+  "core.cfKindIsPrincipalLike": {
+    "kind": "function"
+  },
+  "core.cfKindParse": {
     "kind": "function"
   },
   "core.schema": {

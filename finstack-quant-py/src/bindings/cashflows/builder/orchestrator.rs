@@ -3,7 +3,7 @@
 use finstack_quant_cashflows::builder::CashFlowBuilder;
 use pyo3::prelude::*;
 
-use crate::bindings::cashflows::primitives::extract_cf_kind;
+use crate::bindings::core::cashflow::extract_cf_kind;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
 use crate::errors::core_to_py;

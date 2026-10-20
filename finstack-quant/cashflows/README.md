@@ -24,7 +24,6 @@ umbrella crate as `finstack_quant::cashflows`.
 | [`accrual`](src/accrual.rs) | `accrued_interest_amount`, `AccrualIndex`, `AccrualConfig`, `AccrualMethod`, `ExCouponRule` |
 | [`aggregation`](src/aggregation.rs) | Period bucketing, currency-checked totals, credit-adjusted PV, calendar-year ladders |
 | [`fixings`](src/fixings.rs) | `ProjectedFixing` raw index observations retained for realized-forward scenario rolls |
-| [`primitives`](src/lib.rs) | `CashFlow`, `CFKind`, and `CashFlowAccrual` re-exported from core |
 | [`schema`](src/schema.rs) | Published JSON Schema artifacts and `jsonschema` resources |
 
 Crate-root exports also include `CashflowScheduleSource`, `CashflowProvider`,
@@ -210,10 +209,11 @@ stability rules.
 ## Bindings
 
 - **Python** — typed submodules under `finstack_quant.cashflows`:
-  `primitives`, `builder`, `accrual`, `aggregation`, `schema`, plus the JSON
+  `builder`, `accrual`, `aggregation`, `fixings`, `schema`, plus the JSON
   bridge (`build_cashflow_schedule_json`, `validate_cashflow_schedule_json`,
   `dated_flows_json`) on the package root; the rate conversions live on
-  `builder`.
+  `builder`. The `CashFlow`, `CFKind` and `CashFlowAccrual` row types are
+  `finstack_quant.core.cashflow`.
 - **WASM** — JSON-only surface in
   [`exports/cashflows.js`](../../finstack-quant-wasm/exports/cashflows.js):
   `buildCashflowScheduleJson`, `validateCashflowScheduleJson`,

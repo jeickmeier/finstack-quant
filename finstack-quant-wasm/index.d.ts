@@ -8799,6 +8799,68 @@ export interface CoreNamespace {
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `df` is non-finite or not strictly positive.
    */
   studentTInvCdf(p: number, df: number): number;
+
+  /**
+   * Parse a cashflow kind label into its `CFKind` wire string.
+   *
+   * Parsed by Rust `CFKind::from_str`: the snake_case wire string, ASCII case
+   * ignored, plus the aliases `"coupon"` and `"principal"`.
+   *
+   * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
+   * @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
+   * @throws If `name` is not a string (kind `invalid_type`) or names no cashflow kind (kind `validation`).
+   */
+  cfKindParse(name: string): generated.cashflows.CFKind;
+
+  /**
+   * Whether a cashflow kind is interest-like (fixed, floating, inflation or stub coupon).
+   *
+   * @param kind - `CFKind` wire string.
+   * @returns `true` for coupon-type kinds; fees, principal and margin kinds are `false`.
+   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
+   */
+  cfKindIsInterestLike(kind: generated.cashflows.CFKind): boolean;
+
+  /**
+   * Whether a cashflow kind changes or returns principal.
+   *
+   * @param kind - `CFKind` wire string.
+   * @returns `true` for notional, PIK, amortization, prepayment, revolving draw/repayment and defaulted-notional kinds.
+   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
+   */
+  cfKindIsPrincipalLike(kind: generated.cashflows.CFKind): boolean;
+
+  /**
+   * Whether a cashflow kind settles in cash.
+   *
+   * Non-cash state rows (`pik`, `defaulted_notional`) are excluded from
+   * settlement sums such as `datedFlows`.
+   *
+   * @param kind - `CFKind` wire string.
+   * @returns `true` when flows of this kind are paid or received in cash.
+   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
+   */
+  cfKindIsCashSettlement(kind: generated.cashflows.CFKind): boolean;
+
+  /**
+   * Date on which a cashflow changes the outstanding balance.
+   *
+   * Mirrors Rust `CashFlow::get_balance_date`: the flow's `principal_date`
+   * when set, otherwise its payment `date`.
+   *
+   * @param flow - `CashFlow` wire object.
+   * @returns ISO-8601 balance date.
+   * @throws If `flow` is not a `CashFlow` (kind `validation`).
+   */
+  cashFlowGetBalanceDate(flow: generated.cashflows.CashFlow): generated.core.DateWire;
+
+  /**
+   * Check a cashflow's invariants.
+   *
+   * @param flow - `CashFlow` wire object.
+   * @throws If `flow` is not a `CashFlow`, its amount, accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
+   */
+  cashFlowValidate(flow: generated.cashflows.CashFlow): void;
 }
 
 /**
@@ -14448,68 +14510,6 @@ export interface CashflowsNamespace {
     oldDate: string,
     newDate: string
   ): MarketContext;
-
-  /**
-   * Parse a cashflow kind label into its `CFKind` wire string.
-   *
-   * Parsed by Rust `CFKind::from_str`: the snake_case wire string, ASCII case
-   * ignored, plus the aliases `"coupon"` and `"principal"`.
-   *
-   * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
-   * @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
-   * @throws If `name` is not a string (kind `invalid_type`) or names no cashflow kind (kind `validation`).
-   */
-  cfKindParse(name: string): generated.cashflows.CFKind;
-
-  /**
-   * Whether a cashflow kind is interest-like (fixed, floating, inflation or stub coupon).
-   *
-   * @param kind - `CFKind` wire string.
-   * @returns `true` for coupon-type kinds; fees, principal and margin kinds are `false`.
-   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
-   */
-  cfKindIsInterestLike(kind: generated.cashflows.CFKind): boolean;
-
-  /**
-   * Whether a cashflow kind changes or returns principal.
-   *
-   * @param kind - `CFKind` wire string.
-   * @returns `true` for notional, PIK, amortization, prepayment, revolving draw/repayment and defaulted-notional kinds.
-   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
-   */
-  cfKindIsPrincipalLike(kind: generated.cashflows.CFKind): boolean;
-
-  /**
-   * Whether a cashflow kind settles in cash.
-   *
-   * Non-cash state rows (`pik`, `defaulted_notional`) are excluded from
-   * settlement sums such as `datedFlows`.
-   *
-   * @param kind - `CFKind` wire string.
-   * @returns `true` when flows of this kind are paid or received in cash.
-   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
-   */
-  cfKindIsCashSettlement(kind: generated.cashflows.CFKind): boolean;
-
-  /**
-   * Date on which a cashflow changes the outstanding balance.
-   *
-   * Mirrors Rust `CashFlow::get_balance_date`: the flow's `principal_date`
-   * when set, otherwise its payment `date`.
-   *
-   * @param flow - `CashFlow` wire object.
-   * @returns ISO-8601 balance date.
-   * @throws If `flow` is not a `CashFlow` (kind `validation`).
-   */
-  cashFlowGetBalanceDate(flow: generated.cashflows.CashFlow): generated.core.DateWire;
-
-  /**
-   * Check a cashflow's invariants.
-   *
-   * @param flow - `CashFlow` wire object.
-   * @throws If `flow` is not a `CashFlow`, its amount, accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
-   */
-  cashFlowValidate(flow: generated.cashflows.CashFlow): void;
 
   /**
    * Recurring fee quoted in basis points of a drawn or undrawn balance.

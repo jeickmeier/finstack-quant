@@ -4,12 +4,11 @@
 //! schedule-JSON analytics) and the prepayment/default rate conversions. The
 //! typed surface lives in the submodules: the `CashFlowSchedule` /
 //! `CashFlowBuilder` / `AccrualIndex` handles, and free functions over
-//! wire-shaped spec, primitive and aggregation values.
+//! wire-shaped spec and aggregation values.
 
 pub mod accrual;
 pub mod aggregation;
 pub mod fixings;
-pub mod primitives;
 pub mod schedule;
 pub mod specs;
 

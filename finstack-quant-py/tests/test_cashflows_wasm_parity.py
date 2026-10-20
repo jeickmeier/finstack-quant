@@ -50,7 +50,7 @@ from finstack_quant.cashflows.builder import (
     merge_cashflow_schedules,
 )
 from finstack_quant.cashflows.fixings import materialize_fixings
-from finstack_quant.cashflows.primitives import CashFlow, CashFlowAccrual, CFKind
+from finstack_quant.core.cashflow import CashFlow, CashFlowAccrual, CFKind
 from finstack_quant.core.dates import DayCount, Tenor, build_periods
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money

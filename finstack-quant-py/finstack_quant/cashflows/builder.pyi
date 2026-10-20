@@ -31,7 +31,7 @@ import pandas as pd
 
 from finstack_quant.cashflows.aggregation import PeriodAggregation
 from finstack_quant.cashflows.fixings import ProjectedFixing
-from finstack_quant.cashflows.primitives import CashFlow, CFKind
+from finstack_quant.core.cashflow import CashFlow, CFKind
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import BusinessDayConvention, DayCount, Period, StubKind, Tenor
 from finstack_quant.core.market_data import MarketContext
@@ -549,7 +549,7 @@ class CashFlowBuilder:
         ...     PrincipalExchange,
         ...     ScheduleParams,
         ... )
-        >>> from finstack_quant.cashflows.primitives import CFKind
+        >>> from finstack_quant.core.cashflow import CFKind
         >>> from finstack_quant.core.money import Money
         >>> schedule = (
         ...     CashFlowSchedule
@@ -1705,7 +1705,7 @@ class CashFlowSchedule:
         --------
         >>> import datetime
         >>> from finstack_quant.cashflows.builder import CashFlowSchedule, Notional
-        >>> from finstack_quant.cashflows.primitives import CashFlow, CFKind
+        >>> from finstack_quant.core.cashflow import CashFlow, CFKind
         >>> from finstack_quant.core.dates import DayCount
         >>> from finstack_quant.core.money import Money
         >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED, 0.0)

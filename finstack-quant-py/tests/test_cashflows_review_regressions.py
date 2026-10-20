@@ -10,7 +10,7 @@ from finstack_quant.cashflows import dated_flows, dated_flows_json
 from finstack_quant.cashflows.accrual import AccrualConfig, accrued_interest_amount
 from finstack_quant.cashflows.aggregation import PeriodAggregation
 from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
-from finstack_quant.cashflows.primitives import CashFlow, CashFlowAccrual
+from finstack_quant.core.cashflow import CashFlow, CashFlowAccrual
 from finstack_quant.core.dates import DayCount
 from finstack_quant.core.money import Money
 

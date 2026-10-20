@@ -1,6 +1,7 @@
 //! WASM bindings for the `finstack-quant-core` crate.
 
 pub mod calendar;
+pub mod cashflow;
 pub mod config;
 pub mod currency;
 pub mod currency_statics;

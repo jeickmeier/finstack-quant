@@ -11,7 +11,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::bindings::cashflows::aggregation::PyPeriodAggregation;
-use crate::bindings::cashflows::primitives::{extract_cf_kind, PyCashFlow};
+use crate::bindings::core::cashflow::{extract_cf_kind, PyCashFlow};
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::periods::PyPeriod;
@@ -343,7 +343,7 @@ impl PyCashFlowSchedule {
     /// --------
     /// >>> import datetime
     /// >>> from finstack_quant.cashflows.builder import CashFlowSchedule, Notional
-    /// >>> from finstack_quant.cashflows.primitives import CashFlow, CFKind
+    /// >>> from finstack_quant.core.cashflow import CashFlow, CFKind
     /// >>> from finstack_quant.core.dates import DayCount
     /// >>> from finstack_quant.core.money import Money
     /// >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED, 0.0)
