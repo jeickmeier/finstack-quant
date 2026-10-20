@@ -220,7 +220,7 @@ impl PyForecastMethod {
 )]
 #[derive(Clone, PartialEq)]
 pub struct PyForecastSpec {
-    pub(super) inner: finstack_quant_statements::types::ForecastSpec,
+    pub(crate) inner: finstack_quant_statements::types::ForecastSpec,
 }
 
 impl PyForecastSpec {

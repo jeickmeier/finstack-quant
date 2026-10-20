@@ -9,9 +9,13 @@
 //!
 //! ## Where To Start
 //!
-//! - Use [`crate::evaluator::Evaluator::evaluate`] for standard model evaluation.
-//! - Use [`crate::evaluator::Evaluator::evaluate_with_market`] when the model
-//!   references capital structure (`cs.*`) and you need instrument pricing.
+//! - Use [`crate::evaluator::Evaluator::evaluate`] for standard model evaluation,
+//!   including fixed-rate capital structure.
+//! - Use [`crate::evaluator::Evaluator::evaluate_with_market`] when
+//!   capital-structure instruments need market data or explicit values need an
+//!   as-of cutoff.
+//! - Use [`crate::evaluator::StatementResult::rollup`] to roll results up to a
+//!   coarser frequency (quarterly to annual).
 //! - Use [`crate::evaluator::StatementResult`] as the canonical output envelope for downstream
 //!   analysis, reporting, and exports; call its `to_table_*` methods when you
 //!   need a serializable tabular representation.
@@ -42,6 +46,7 @@ pub(crate) mod monte_carlo;
 mod period_history;
 mod precedence;
 mod results;
+mod rollup;
 
 pub use cashflow_export::{node_to_dated_schedule, PeriodDateConvention};
 pub use context::EvaluationContext;
@@ -53,3 +58,4 @@ pub use results::{
     CapitalStructureClaimCategory, CapitalStructureWarning, CellSource, EvalStats, EvalWarning,
     NumericMode, StatementResult,
 };
+pub use rollup::{RollupMethod, RollupSpec};

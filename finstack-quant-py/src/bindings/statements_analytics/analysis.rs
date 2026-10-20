@@ -239,6 +239,11 @@ fn run_variance(
 
 /// Evaluate all scenarios in a scenario set.
 ///
+/// Like ``Evaluator.evaluate``, a capital structure is evaluated from an
+/// empty market, which serves fixed-rate instruments; use
+/// ``evaluate_scenario_set_with_market`` for instruments that need market
+/// data.
+///
 /// Parameters
 /// ----------
 /// model : FinancialModelSpec | str
@@ -255,9 +260,13 @@ fn run_variance(
 /// ------
 /// ValueError
 ///     If the set is empty, a parent chain cycles, an override is
-///     incompatible with its node, or evaluation fails.
+///     incompatible with its node, a forecast override has invalid
+///     parameters, or evaluation fails.
 /// KeyError
-///     If an override names a node missing from the model.
+///     If an override names a node missing from the model, or a
+///     capital-structure instrument needs market data.
+/// RuntimeError
+///     If capital-structure cashflow generation or the waterfall fails.
 ///
 /// Examples
 /// --------
@@ -281,6 +290,78 @@ fn evaluate_scenario_set(
             .map_err(statements_to_py)?;
         Ok(PyScenarioResults { inner })
     })
+}
+
+/// Evaluate all scenarios in a scenario set against a market as of a date.
+///
+/// Each scenario is evaluated like ``Evaluator.evaluate_with_market``: the
+/// capital structure's instruments are priced from ``market`` as of
+/// ``as_of`` (floating coupons, swaps, caps), so every result carries
+/// ``cs_cashflows``, and explicit actuals not yet available at ``as_of`` are
+/// hidden. The market is shared unchanged by every scenario.
+///
+/// Parameters
+/// ----------
+/// model : FinancialModelSpec | str
+///     A ``FinancialModelSpec`` object or a JSON string.
+/// scenario_set : ScenarioSet | str
+///     A typed scenario set or its JSON serialization.
+/// market : MarketContext | str
+///     Curves, fixings and FX the instruments are priced from, typed or its
+///     canonical JSON.
+/// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
+///     Valuation date for the instruments' cashflows and the cutoff for
+///     explicit-value visibility; ISO ``YYYY-MM-DD`` strings are accepted.
+///
+/// Returns
+/// -------
+/// ScenarioResults
+///     Typed mapping of scenario names to statement results.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If ``as_of`` is not date-like, the set is empty, a parent chain
+///     cycles, an override is incompatible with its node, a forecast override
+///     has invalid parameters, or evaluation fails.
+/// KeyError
+///     If an override names a node missing from the model, or an instrument
+///     needs market data ``market`` lacks.
+/// RuntimeError
+///     If capital-structure cashflow generation or the waterfall fails.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.core.market_data import MarketContext
+/// >>> from finstack_quant.statements import ModelBuilder
+/// >>> from finstack_quant.statements_analytics import ScenarioSet, evaluate_scenario_set_with_market
+/// >>> b = ModelBuilder("m")
+/// >>> _ = b.periods("2025Q1..Q2", None)
+/// >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+/// >>> results = evaluate_scenario_set_with_market(
+/// ...     b.build(), ScenarioSet({"base": {}, "down": {"revenue": 90.0}}), MarketContext(), "2025-01-01"
+/// ... )
+/// >>> results.names
+/// ['base', 'down']
+#[pyfunction]
+#[pyo3(text_signature = "(model, scenario_set, market, as_of)")]
+fn evaluate_scenario_set_with_market(
+    py: Python<'_>,
+    model: &Bound<'_, PyAny>,
+    scenario_set: &Bound<'_, PyAny>,
+    market: &Bound<'_, PyAny>,
+    as_of: &Bound<'_, PyAny>,
+) -> PyResult<PyScenarioResults> {
+    let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
+    let model = extract_model_ref(model)?;
+    let market = crate::bindings::extract::extract_market_ref(py, market)?;
+    let scenario_set = extract_scenario_set(scenario_set)?;
+    let model_inner: &finstack_quant_statements::FinancialModelSpec = &model;
+    let market_inner: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let inner = py
+        .detach(|| scenario_set.evaluate_all_with_market(model_inner, market_inner, as_of))
+        .map_err(statements_to_py)?;
+    Ok(PyScenarioResults { inner })
 }
 
 /// Compare two evaluated scenarios metric-by-metric.
@@ -1339,6 +1420,10 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(generate_tornado_entries, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(run_variance, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(evaluate_scenario_set, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(
+        evaluate_scenario_set_with_market,
+        m
+    )?)?;
     m.add_function(pyo3::wrap_pyfunction!(scenario_diff, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(variance_bridge, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(backtest_forecast, m)?)?;
