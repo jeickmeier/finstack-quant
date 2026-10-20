@@ -414,7 +414,7 @@ full list.
 | `mise run all-fmt` | Format Rust, Python, and WASM; auto-fix Python and WASM (mutating) |
 | `mise run rust-fix` | Apply clippy --fix across the Rust workspace (mutating) |
 | `mise run all-test` | Run Rust, Python, and WASM tests |
-| `mise run all-ci` | Regenerate derived artifacts, then reproduce the nightly CI checks locally |
+| `mise run all-ci` | Regenerate derived artifacts, then reproduce the nightly CI checks locally (`--release` adds the release gates) |
 | `mise run rust-build` | Build the Rust workspace excluding the binding crates |
 | `mise run rust-test` | Run native Rust tests via `cargo nextest`; `--doctest` runs only the doctests |
 | `mise run rust-lint` | `cargo fmt --check` plus clippy with `-D warnings` across the workspace |
