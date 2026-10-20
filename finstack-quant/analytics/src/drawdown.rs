@@ -9,8 +9,8 @@
 //! - [`mean_episode_drawdown`]: scalar average of the worst N episode minima.
 //! - [`mean_drawdown`]: arithmetic mean of a drawdown path.
 
-use crate::dates::Date;
 use crate::risk_metrics::ratio_or_sign_infinity;
+use finstack_quant_core::dates::Date;
 
 /// Drawdown episode with start, valley, optional recovery, and max drawdown.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -354,14 +354,13 @@ pub(crate) fn pain_index(drawdown: &[f64]) -> f64 {
     sum / drawdown.len() as f64
 }
 
-/// Maximum drawdown depth from a pre-computed drawdown series.
+/// Deepest point of a pre-computed drawdown series: its maximum drawdown.
 ///
-/// Returns the most negative value in `drawdown`, or `0.0` for an empty slice.
-///
-/// To compute directly from a returns series, compose with
-/// [`to_drawdown_series`]: `max_drawdown(&to_drawdown_series(&returns))`.
+/// Returns the most negative value in `drawdown`, `0.0` for an empty slice,
+/// or `NaN` if any value is non-finite. The public [`crate::max_drawdown`]
+/// applies this to [`to_drawdown_series`] of a returns series.
 #[must_use]
-pub(crate) fn max_drawdown(drawdown: &[f64]) -> f64 {
+pub(crate) fn deepest(drawdown: &[f64]) -> f64 {
     if drawdown.iter().any(|value| !value.is_finite()) {
         return f64::NAN;
     }
@@ -558,7 +557,7 @@ pub(crate) fn pain_ratio(cagr_val: f64, pain: f64, risk_free_rate: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::{Duration, Month};
+    use finstack_quant_core::dates::{Duration, Month};
 
     fn make_dates(n: usize) -> Vec<Date> {
         (0..n)

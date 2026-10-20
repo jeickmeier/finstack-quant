@@ -3,15 +3,16 @@
 
 use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 
-use super::Performance;
-use crate::dates::HolidayCalendar;
+use super::{invalid_return_series, Performance};
 use crate::drawdown::{
-    calmar, martin_ratio, max_drawdown, max_drawdown_duration as dd_max_duration, mean_drawdown,
-    pain_index, pain_ratio, recovery_factor, sterling_ratio, ulcer_index,
+    burke_ratio, calmar, deepest, martin_ratio, max_drawdown_duration, mean_drawdown,
+    mean_episode_drawdown, pain_index, pain_ratio, recovery_factor, sterling_ratio, ulcer_index,
+    worst_episode_depths,
 };
 use crate::returns::comp_total;
 use crate::risk_metrics;
 use crate::risk_metrics::CagrDayCount;
+use finstack_quant_core::dates::HolidayCalendar;
 
 impl Performance {
     /// Compound annual growth rate for each ticker.
@@ -66,18 +67,18 @@ impl Performance {
         &self,
         day_count: CagrDayCount,
         calendar: Option<&dyn HolidayCalendar>,
-    ) -> crate::Result<Vec<f64>> {
+    ) -> finstack_quant_core::Result<Vec<f64>> {
         (0..self.ticker_names.len())
             .map(|i| {
                 let Some((start, end)) = self.active_holding_period_for_ticker(i) else {
-                    return Err(crate::error::InputError::InvalidReturnSeries {
-                        ticker: self.ticker_names[i].clone(),
-                        index: self.start_idx,
-                        reason: format!(
+                    return Err(invalid_return_series(
+                        self.ticker_names[i].as_str(),
+                        self.start_idx,
+                        format!(
                             "active range [{}..{}] has no positive holding period for ticker {}",
                             self.start_idx, self.end_idx, self.ticker_names[i]
                         ),
-                    }
+                    )
                     .into());
                 };
                 risk_metrics::cagr(self.active_returns(i), start, end, day_count, calendar)
@@ -180,9 +181,9 @@ impl Performance {
     ///
     /// Propagates errors from [`Self::cagr`] when the active range cannot be
     /// annualized.
-    pub fn calmar(&self) -> crate::Result<Vec<f64>> {
+    pub fn calmar(&self) -> finstack_quant_core::Result<Vec<f64>> {
         let cagrs = self.cagr(CagrDayCount::default(), None)?;
-        Ok(self.map_tickers(|i| calmar(cagrs[i], max_drawdown(self.active_drawdown_values(i)))))
+        Ok(self.map_tickers(|i| calmar(cagrs[i], deepest(self.active_drawdown_values(i)))))
     }
 
     /// Maximum drawdown for each ticker.
@@ -211,7 +212,7 @@ impl Performance {
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn max_drawdown(&self) -> Vec<f64> {
-        self.map_tickers(|i| max_drawdown(self.active_drawdown_values(i)))
+        self.map_tickers(|i| deepest(self.active_drawdown_values(i)))
     }
 
     /// Mean drawdown (arithmetic mean of the drawdown path) for each ticker.
@@ -235,9 +236,9 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
-    pub fn value_at_risk(&self, confidence: f64) -> crate::Result<Vec<f64>> {
+    pub fn value_at_risk(&self, confidence: f64) -> finstack_quant_core::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;
         Ok(self.map_tickers(|i| risk_metrics::value_at_risk(self.active_returns(i), confidence)))
     }
@@ -257,9 +258,9 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
-    pub fn expected_shortfall(&self, confidence: f64) -> crate::Result<Vec<f64>> {
+    pub fn expected_shortfall(&self, confidence: f64) -> finstack_quant_core::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;
         Ok(self
             .map_tickers(|i| risk_metrics::expected_shortfall(self.active_returns(i), confidence)))
@@ -277,9 +278,9 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
-    pub fn tail_ratio(&self, confidence: f64) -> crate::Result<Vec<f64>> {
+    pub fn tail_ratio(&self, confidence: f64) -> finstack_quant_core::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;
         Ok(self.map_tickers(|i| risk_metrics::tail_ratio(self.active_returns(i), confidence)))
     }
@@ -354,7 +355,7 @@ impl Performance {
     pub fn max_drawdown_duration(&self) -> Vec<i64> {
         self.map_tickers(|i| {
             let (path, dates) = self.active_drawdown_path(i);
-            dd_max_duration(&path, dates)
+            max_drawdown_duration(&path, dates)
         })
     }
 
@@ -392,7 +393,7 @@ impl Performance {
     ///
     /// Propagates errors from [`Self::cagr`] when the active range cannot be
     /// annualized.
-    pub fn martin_ratio(&self) -> crate::Result<Vec<f64>> {
+    pub fn martin_ratio(&self) -> finstack_quant_core::Result<Vec<f64>> {
         let cagrs = self.cagr(CagrDayCount::default(), None)?;
         Ok(self
             .map_tickers(|i| martin_ratio(cagrs[i], ulcer_index(self.active_drawdown_values(i)))))
@@ -418,13 +419,13 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
     pub fn parametric_var(
         &self,
         confidence: f64,
         horizon_periods: Option<f64>,
-    ) -> crate::Result<Vec<f64>> {
+    ) -> finstack_quant_core::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;
         Ok(self.map_tickers(|i| {
             risk_metrics::parametric_var(self.active_returns(i), confidence, horizon_periods)
@@ -448,13 +449,13 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
     pub fn cornish_fisher_var(
         &self,
         confidence: f64,
         horizon_periods: Option<f64>,
-    ) -> crate::Result<Vec<f64>> {
+    ) -> finstack_quant_core::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;
         Ok(self.map_tickers(|i| {
             risk_metrics::cornish_fisher_var(self.active_returns(i), confidence, horizon_periods)
@@ -470,7 +471,7 @@ impl Performance {
     pub fn recovery_factor(&self) -> Vec<f64> {
         self.map_tickers(|i| {
             let total_ret = comp_total(self.active_returns(i));
-            let max_dd = max_drawdown(self.active_drawdown_values(i));
+            let max_dd = deepest(self.active_drawdown_values(i));
             recovery_factor(total_ret, max_dd)
         })
     }
@@ -491,10 +492,14 @@ impl Performance {
     ///
     /// Propagates errors from [`Self::cagr`] when the active range cannot be
     /// annualized.
-    pub fn sterling_ratio(&self, risk_free_rate: f64, n: usize) -> crate::Result<Vec<f64>> {
+    pub fn sterling_ratio(
+        &self,
+        risk_free_rate: f64,
+        n: usize,
+    ) -> finstack_quant_core::Result<Vec<f64>> {
         let cagrs = self.cagr(CagrDayCount::default(), None)?;
         Ok(self.map_tickers(|i| {
-            let avg = crate::drawdown::mean_episode_drawdown(self.active_drawdown_values(i), n);
+            let avg = mean_episode_drawdown(self.active_drawdown_values(i), n);
             sterling_ratio(cagrs[i], avg, risk_free_rate)
         }))
     }
@@ -515,11 +520,15 @@ impl Performance {
     ///
     /// Propagates errors from [`Self::cagr`] when the active range cannot be
     /// annualized.
-    pub fn burke_ratio(&self, risk_free_rate: f64, n: usize) -> crate::Result<Vec<f64>> {
+    pub fn burke_ratio(
+        &self,
+        risk_free_rate: f64,
+        n: usize,
+    ) -> finstack_quant_core::Result<Vec<f64>> {
         let cagrs = self.cagr(CagrDayCount::default(), None)?;
         Ok(self.map_tickers(|i| {
-            let dd_vals = crate::drawdown::worst_episode_depths(self.active_drawdown_values(i), n);
-            crate::drawdown::burke_ratio(cagrs[i], &dd_vals, risk_free_rate)
+            let dd_vals = worst_episode_depths(self.active_drawdown_values(i), n);
+            burke_ratio(cagrs[i], &dd_vals, risk_free_rate)
         }))
     }
 
@@ -547,7 +556,7 @@ impl Performance {
     ///
     /// Propagates errors from [`Self::cagr`] when the active range cannot be
     /// annualized.
-    pub fn pain_ratio(&self, risk_free_rate: f64) -> crate::Result<Vec<f64>> {
+    pub fn pain_ratio(&self, risk_free_rate: f64) -> finstack_quant_core::Result<Vec<f64>> {
         let cagrs = self.cagr(CagrDayCount::default(), None)?;
         Ok(self.map_tickers(|i| {
             let pain = pain_index(self.active_drawdown_values(i));
@@ -570,9 +579,9 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
-    pub fn cdar(&self, confidence: f64) -> crate::Result<Vec<f64>> {
+    pub fn cdar(&self, confidence: f64) -> finstack_quant_core::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;
         Ok(self.map_tickers(|i| {
             let dd = self.active_drawdown_values(i);
@@ -606,9 +615,13 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] when `confidence` is not
+    /// Returns [`finstack_quant_core::Error::Validation`] when `confidence` is not
     /// strictly inside `(0, 1)`.
-    pub fn modified_sharpe(&self, risk_free_rate: f64, confidence: f64) -> crate::Result<Vec<f64>> {
+    pub fn modified_sharpe(
+        &self,
+        risk_free_rate: f64,
+        confidence: f64,
+    ) -> finstack_quant_core::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;
         Ok(self.map_tickers(|i| {
             risk_metrics::modified_sharpe(
@@ -646,7 +659,11 @@ impl Performance {
     /// Rejects a `confidence` outside `(0, 1)` and propagates [`Self::cagr`]
     /// and [`Self::calmar`] failures (for example a panel too short to
     /// annualize).
-    pub fn summary(&self, risk_free_rate: f64, confidence: f64) -> crate::Result<TableEnvelope> {
+    pub fn summary(
+        &self,
+        risk_free_rate: f64,
+        confidence: f64,
+    ) -> finstack_quant_core::Result<TableEnvelope> {
         Self::ensure_confidence(confidence)?;
         let (var, es): (Vec<f64>, Vec<f64>) = self
             .map_tickers(|i| risk_metrics::value_at_risk_and_es(self.active_returns(i), confidence))
@@ -710,9 +727,9 @@ impl Performance {
 #[cfg(test)]
 mod from_returns_cagr_tests {
 
-    use crate::dates::{Date, Month, PeriodKind};
     use crate::risk_metrics::{self, cagr, CagrDayCount};
     use crate::Performance;
+    use finstack_quant_core::dates::{Date, Month, PeriodKind};
 
     fn d(year: i32, month: Month, day: u8) -> Date {
         Date::from_calendar_date(year, month, day).expect("valid date")
@@ -827,7 +844,10 @@ mod from_returns_cagr_tests {
         )
         .expect("daily panel");
         let err = perf
-            .cagr(CagrDayCount::DayCount(crate::dates::DayCount::Bus252), None)
+            .cagr(
+                CagrDayCount::DayCount(finstack_quant_core::dates::DayCount::Bus252),
+                None,
+            )
             .expect_err("Bus252 requires a calendar");
         let msg = err.to_string();
         assert!(

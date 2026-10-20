@@ -4,7 +4,7 @@
 //!
 //! Crate-internal: callers use these through [`crate::Performance`].
 
-use crate::math::summation::NeumaierAccumulator;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 /// Pairwise simple (percentage-change) returns from a price series.
 ///

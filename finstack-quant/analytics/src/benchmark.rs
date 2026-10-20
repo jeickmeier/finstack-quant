@@ -7,10 +7,10 @@
 //! Delegates to `math::stats` for core statistics (correlation, covariance,
 //! variance, OnlineCovariance).
 
-use crate::dates::Date;
-use crate::math::stats::{OnlineCovariance, OnlineStats};
 use crate::regression::normalized_svd_least_squares;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::special_functions::student_t_inv_cdf;
+use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats};
 use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
 use finstack_quant_core::wire::NonFiniteFields;
 use nalgebra::DMatrix;
@@ -874,17 +874,20 @@ impl ReturnKind {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::Validation`] for an unknown label, or
+    /// Returns [`finstack_quant_core::Error::Validation`] for an unknown label, or
     /// for a non-zero `risk_free_rate` with [`ReturnKind::Excess`].
-    pub fn from_label(label: Option<&str>, risk_free_rate: f64) -> crate::Result<Self> {
+    pub fn from_label(
+        label: Option<&str>,
+        risk_free_rate: f64,
+    ) -> finstack_quant_core::Result<Self> {
         match label {
             None | Some("excess") if risk_free_rate == 0.0 => Ok(Self::Excess),
-            None | Some("excess") => Err(crate::error::Error::Validation(format!(
+            None | Some("excess") => Err(finstack_quant_core::Error::Validation(format!(
                 "risk_free_rate {risk_free_rate} has no effect on excess returns; \
                  pass return_kind \"total\" or leave risk_free_rate at 0.0"
             ))),
             Some("total") => Ok(Self::Total { risk_free_rate }),
-            Some(other) => Err(crate::error::Error::Validation(format!(
+            Some(other) => Err(finstack_quant_core::Error::Validation(format!(
                 "unknown return_kind {other:?}; expected \"excess\" or \"total\""
             ))),
         }
@@ -1044,7 +1047,7 @@ pub(crate) fn multi_factor_greeks(
     factors: &[&[f64]],
     ann_factor: f64,
     return_kind: ReturnKind,
-) -> crate::Result<MultiFactorResult> {
+) -> finstack_quant_core::Result<MultiFactorResult> {
     if !ann_factor.is_finite() || ann_factor <= 0.0 {
         tracing::debug!(
             ann_factor,
@@ -1119,7 +1122,7 @@ pub(crate) fn multi_factor_greeks(
             reason = "factor_length_mismatch",
             "multi-factor greeks rejected input"
         );
-        return Err(crate::error::InputError::DimensionMismatch.into());
+        return Err(finstack_quant_core::error::InputError::DimensionMismatch.into());
     }
     let design = DMatrix::from_fn(
         n,
@@ -1395,7 +1398,7 @@ mod tests {
 
     use super::*;
 
-    use crate::dates::{Duration, Month};
+    use finstack_quant_core::dates::{Duration, Month};
 
     fn jan(day: u8) -> Date {
         Date::from_calendar_date(2025, Month::January, day).expect("valid date")
@@ -2116,8 +2119,8 @@ mod tests {
 
     #[test]
     fn performance_multi_factor_greeks_errors_on_invalid_factor_input() {
-        use crate::dates::{Month, PeriodKind};
         use crate::performance::Performance;
+        use finstack_quant_core::dates::{Month, PeriodKind};
 
         let jan =
             |day: u8| Date::from_calendar_date(2024, Month::January, day).expect("valid date");

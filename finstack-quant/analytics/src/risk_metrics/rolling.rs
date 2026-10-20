@@ -7,7 +7,7 @@
 //! rebuild interval `k`, scheduled rebuilds cost `O(n + n * window / k)`;
 //! numerical recovery can trigger additional rebuilds.
 
-use crate::dates::Date;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::neumaier_sum;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 
@@ -441,8 +441,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::{Duration, Month};
     use crate::risk_metrics::return_based::{sortino, volatility};
+    use finstack_quant_core::dates::{Duration, Month};
     fn jan1(year: i32) -> Date {
         Date::from_calendar_date(year, Month::January, 1).expect("valid date")
     }

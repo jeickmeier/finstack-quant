@@ -4,9 +4,9 @@
 //! `&[f64]` return slices. Annualization uses the caller-supplied factor
 //! (typically from `PeriodKind::annualization_factor()`).
 
-use crate::dates::{Date, DayCount, DayCountContext, HolidayCalendar};
-use crate::math::stats::{mean, mean_var, variance};
-use crate::math::summation::kahan_sum;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext, HolidayCalendar};
+use finstack_quant_core::math::stats::{mean, mean_var, variance};
+use finstack_quant_core::math::summation::kahan_sum;
 
 use super::tail_risk::cornish_fisher_var;
 
@@ -36,7 +36,7 @@ pub enum CagrDayCount {
 }
 
 impl std::str::FromStr for CagrDayCount {
-    type Err = crate::error::Error;
+    type Err = finstack_quant_core::Error;
 
     /// Parse a CAGR day-count label.
     ///
@@ -91,7 +91,7 @@ impl std::fmt::Display for CagrDayCount {
 ///
 /// Returns [`Error::Validation`](finstack_quant_core::Error::Validation) when `returns` is empty or the
 /// date range has a non-positive span. Propagates
-/// [`crate::error::InputError::MissingCalendarForBus252`] when Bus/252 is
+/// [`finstack_quant_core::error::InputError::MissingCalendarForBus252`] when Bus/252 is
 /// requested without a calendar.
 pub(crate) fn cagr(
     returns: &[f64],
@@ -99,7 +99,7 @@ pub(crate) fn cagr(
     end: Date,
     day_count: CagrDayCount,
     calendar: Option<&dyn HolidayCalendar>,
-) -> crate::Result<f64> {
+) -> finstack_quant_core::Result<f64> {
     if returns.is_empty() {
         tracing::debug!(reason = "empty_returns", "invalid CAGR input");
         return Err(finstack_quant_core::Error::Validation(
@@ -132,7 +132,7 @@ fn annualized_years(
     end: Date,
     day_count: CagrDayCount,
     calendar: Option<&dyn HolidayCalendar>,
-) -> crate::Result<f64> {
+) -> finstack_quant_core::Result<f64> {
     match day_count {
         CagrDayCount::Act365_25 => {
             let days = (end - start).whole_days() as f64;
@@ -319,7 +319,7 @@ pub fn sharpe(returns: &[f64], risk_free_rate: f64, periods_per_year: f64) -> f6
 /// return or reconstructed drawdown path contains a non-finite value.
 #[must_use]
 pub fn max_drawdown(returns: &[f64]) -> f64 {
-    crate::drawdown::max_drawdown(&crate::drawdown::to_drawdown_series(returns))
+    crate::drawdown::deepest(&crate::drawdown::to_drawdown_series(returns))
 }
 
 /// Downside deviation: semi-standard deviation below a minimum acceptable return.
@@ -601,11 +601,12 @@ pub(crate) fn modified_sharpe(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::Month;
-    use crate::math::stats::{mean, variance};
+    use finstack_quant_core::dates::Month;
+    use finstack_quant_core::math::stats::{mean, variance};
 
-    fn jan1(year: i32) -> crate::dates::Date {
-        crate::dates::Date::from_calendar_date(year, Month::January, 1).expect("valid date")
+    fn jan1(year: i32) -> finstack_quant_core::dates::Date {
+        finstack_quant_core::dates::Date::from_calendar_date(year, Month::January, 1)
+            .expect("valid date")
     }
 
     #[test]
@@ -687,15 +688,18 @@ mod tests {
     #[test]
     fn free_functions_agree_with_daily_panel() {
         let returns = [0.01, -0.02, 0.015, 0.003, -0.01, 0.02];
-        let dates: Vec<crate::dates::Date> = (1..=6)
-            .map(|d| crate::dates::Date::from_calendar_date(2025, Month::January, d).unwrap())
+        let dates: Vec<finstack_quant_core::dates::Date> = (1..=6)
+            .map(|d| {
+                finstack_quant_core::dates::Date::from_calendar_date(2025, Month::January, d)
+                    .unwrap()
+            })
             .collect();
         let perf = crate::Performance::from_returns(
             dates,
             vec![returns.to_vec()],
             vec!["A".into()],
             None,
-            crate::dates::PeriodKind::Daily,
+            finstack_quant_core::dates::PeriodKind::Daily,
         )
         .unwrap();
         assert!((sharpe(&returns, 0.02, 252.0) - perf.sharpe(0.02)[0]).abs() < 1e-12);
@@ -944,7 +948,8 @@ mod tests {
 
         let annual_skew = crate::risk_metrics::skewness(&returns) / ann_factor.sqrt();
         let annual_kurt = crate::risk_metrics::kurtosis(&returns) / ann_factor;
-        let z = crate::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
+        let z =
+            finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
         let z2 = z * z;
         let z3 = z2 * z;
         let annual_z_cf = z + (z2 - 1.0) * annual_skew / 6.0 + (z3 - 3.0 * z) * annual_kurt / 24.0
@@ -1005,14 +1010,14 @@ mod tests {
         let ann_factor = 12.0;
         let m = mean(&returns);
         let vol = variance(&returns).sqrt();
-        let z = crate::math::special_functions::standard_normal_inv_cdf(0.05);
+        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05);
         let expected = m * ann_factor + z * vol * ann_factor.sqrt();
         let actual = crate::risk_metrics::parametric_var(&returns, 0.95, Some(ann_factor));
         assert!((actual - expected).abs() < 1e-14, "{actual} vs {expected}");
     }
 
     /// Test-only CAGR from a fixed annualisation factor (no calendar dates).
-    fn cagr_from_factor(returns: &[f64], ann_factor: f64) -> crate::Result<f64> {
+    fn cagr_from_factor(returns: &[f64], ann_factor: f64) -> finstack_quant_core::Result<f64> {
         if returns.is_empty() {
             tracing::debug!(reason = "empty_returns", "invalid CAGR input");
             return Err(finstack_quant_core::Error::Validation(
@@ -1051,8 +1056,8 @@ mod tests {
     mod fixture_tests {
         use super::{cagr_from_factor, sharpe, sortino};
         use crate::benchmark::{multi_factor_greeks, rolling_greeks, ReturnKind};
-        use crate::dates::Date;
         use crate::risk_metrics::{expected_shortfall, value_at_risk};
+        use finstack_quant_core::dates::Date;
         use serde::Deserialize;
 
         const API_INVARIANTS_FIXTURE: &str =
