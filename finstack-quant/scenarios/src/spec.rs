@@ -7,7 +7,7 @@
 //!
 //! Start with [`ScenarioSpec`] and [`OperationSpec`]. Use [`RateBindingSpec`]
 //! when statement nodes should follow curve-driven rates, and use
-//! [`HierarchyTarget`] together with [`ResolutionMode`](finstack_quant_core::market_data::hierarchy::ResolutionMode)
+//! [`HierarchyTarget`](finstack_quant_core::market_data::hierarchy::HierarchyTarget) together with [`ResolutionMode`](finstack_quant_core::market_data::hierarchy::ResolutionMode)
 //! for hierarchy-expanded shocks.
 //!
 //! # Conventions
@@ -26,20 +26,14 @@
 //!   match.
 
 use finstack_quant_core::dates::DayCount;
+use finstack_quant_core::market_data::hierarchy::HierarchyTarget;
 use finstack_quant_core::market_data::hierarchy::ResolutionMode;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_statements::types::NodeId;
+use finstack_quant_valuations::pricer::InstrumentType;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-
-/// Re-export [`HierarchyTarget`] for hierarchy-targeted operations.
-pub use finstack_quant_core::market_data::hierarchy::HierarchyTarget;
-
-/// Re-export [`InstrumentType`] for
-/// type-safe instrument shock operations.
-pub use finstack_quant_valuations::pricer::InstrumentType;
-
-/// Re-export [`NodeId`] for statement node identification.
-pub use finstack_quant_statements::types::NodeId;
 
 /// A complete scenario specification with metadata and ordered operations.
 ///
@@ -647,7 +641,7 @@ pub enum OperationSpec {
     /// # Example
     /// ```rust
     /// use finstack_quant_scenarios::{OperationSpec, RateBindingSpec};
-    /// use finstack_quant_scenarios::spec::Compounding;
+    /// use finstack_quant_core::math::Compounding;
     ///
     /// let op = OperationSpec::RateBinding {
     ///     binding: RateBindingSpec {
@@ -702,7 +696,8 @@ pub enum OperationSpec {
     ///
     /// # Example
     /// ```rust
-    /// use finstack_quant_scenarios::{OperationSpec, InstrumentType};
+    /// use finstack_quant_scenarios::OperationSpec;
+    /// use finstack_quant_valuations::pricer::InstrumentType;
     ///
     /// let op = OperationSpec::InstrumentPricePctByType {
     ///     instrument_types: vec![InstrumentType::Bond, InstrumentType::TermLoan],
@@ -720,7 +715,8 @@ pub enum OperationSpec {
     ///
     /// # Example
     /// ```rust
-    /// use finstack_quant_scenarios::{OperationSpec, InstrumentType};
+    /// use finstack_quant_scenarios::OperationSpec;
+    /// use finstack_quant_valuations::pricer::InstrumentType;
     ///
     /// let op = OperationSpec::InstrumentSpreadBpByType {
     ///     instrument_types: vec![InstrumentType::Cds],
@@ -1162,7 +1158,7 @@ pub enum TimeRollMode {
 /// # Examples
 /// ```rust
 /// use finstack_quant_scenarios::spec::RateBindingSpec;
-/// use finstack_quant_scenarios::spec::Compounding;
+/// use finstack_quant_core::math::Compounding;
 ///
 /// let binding = RateBindingSpec {
 ///     node_id: "InterestRate".into(),
@@ -1222,11 +1218,6 @@ impl RateBindingSpec {
         Ok(())
     }
 }
-
-/// Compounding convention for rate conversions: the canonical core
-/// [`finstack_quant_core::math::Compounding`] (wire `continuous`, `simple`,
-/// `annual`, or `{"periodic": n}`), re-exported for scenario authoring.
-pub use finstack_quant_core::math::Compounding;
 
 impl ScenarioSpec {
     /// Parse a scenario specification from JSON and validate it.

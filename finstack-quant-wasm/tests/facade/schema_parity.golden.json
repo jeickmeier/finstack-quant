@@ -2028,7 +2028,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json",
             "type_name": "ScenarioEnvelope",
             "kind": "input",
-            "bytes": 103053
+            "bytes": 103119
           },
           {
             "path": "schemas/scenarios/1/template_metadata.schema.json",
@@ -4514,7 +4514,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json",
             "type_name": "ScenarioEnvelope",
             "kind": "input",
-            "bytes": 103053
+            "bytes": 103119
           },
           {
             "domain": "scenarios",

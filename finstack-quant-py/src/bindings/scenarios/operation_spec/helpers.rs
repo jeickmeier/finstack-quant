@@ -8,7 +8,8 @@ use std::str::FromStr;
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::hierarchy::HierarchyTarget;
-use finstack_quant_scenarios::spec::{Compounding, CurveKind, TenorMatchMode, TimeRollMode};
+use finstack_quant_core::math::Compounding;
+use finstack_quant_scenarios::spec::{CurveKind, TenorMatchMode, TimeRollMode};
 use finstack_quant_valuations::pricer::InstrumentType;
 use indexmap::IndexMap;
 use pyo3::prelude::*;

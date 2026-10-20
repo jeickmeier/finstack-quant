@@ -75,10 +75,7 @@ use finstack_quant_valuations::recalibration::RecalibrationProvider;
 
 use crate::engine::ApplicationReport;
 use crate::{ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec};
-
-/// Re-export attribution types appearing in horizon-analysis public APIs so
-/// direct scenarios consumers do not need a separate attribution dependency.
-pub use finstack_quant_attribution::{AttributionFactor, AttributionMethod, PnlAttribution};
+use finstack_quant_attribution::{AttributionFactor, AttributionMethod, PnlAttribution};
 
 /// Parse an [`AttributionMethod`] from its binding string form.
 ///
