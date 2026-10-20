@@ -73,25 +73,6 @@ impl HedgeSwap {
         }
     }
 
-    /// Track the balance of the note `tranche_id` (balance-guaranteed swap).
-    ///
-    /// # Arguments
-    ///
-    /// * `tranche_id` - Id of a note in the deal's capital structure whose
-    ///   period-start balance rescales the swap's flows.
-    #[must_use]
-    pub fn on_tranche_par(mut self, tranche_id: impl Into<String>) -> Self {
-        self.notional = SwapNotional::TranchePar(tranche_id.into());
-        self
-    }
-
-    /// Track the performing collateral balance.
-    #[must_use]
-    pub fn on_pool_par(mut self) -> Self {
-        self.notional = SwapNotional::PoolPar;
-        self
-    }
-
     /// Rank the net payments after the notes, ahead of the residual.
     #[must_use]
     pub fn junior(mut self) -> Self {

@@ -123,12 +123,12 @@ fn clo(
         ),
     ])
     .expect("structure");
-    let mut deal =
-        StructuredCredit::new_clo("CLO-REINVEST", pool, tranches, close, maturity, "USD-OIS")
+    let mut deal = StructuredCredit {
+        coverage_triggers: tests,
+        ..StructuredCredit::new_clo("CLO-REINVEST", pool, tranches, close, maturity, "USD-OIS")
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
-            .with_coverage_triggers(tests)
-            .expect("coverage tests");
+    };
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 0);
@@ -344,7 +344,10 @@ fn reinvest_action_routes_the_cure_into_the_window_budget() {
     let reinvest = simulate(
         Some(window(&[], None)),
         0.05,
-        vec![CoverageTestSpec::oc("D", 1.10).with_action(CoverageTestAction::Reinvest)],
+        vec![CoverageTestSpec {
+            action: CoverageTestAction::Reinvest,
+            ..CoverageTestSpec::oc("D", 1.10)
+        }],
     );
     assert!(
         principal_through(&pay_down, "A", window_end()) > 0.0,

@@ -163,11 +163,14 @@ mod tests {
     }
 
     fn sample_fx() -> FxSpot {
-        FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_notional(Money::from((5_000_000_i64, Currency::EUR)))
-            .expect("should succeed")
-            .with_quoted_spot(1.24)
-            .expect("should succeed")
+        FxSpot::builder()
+            .id(InstrumentId::new("EURUSD"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .notional(Money::from((5_000_000_i64, Currency::EUR)))
+            .quoted_spot(1.24)
+            .build()
+            .expect("valid FX spot")
     }
 
     fn context_for(inst: FxSpot, as_of: Date) -> MetricContext {
@@ -236,11 +239,14 @@ mod base_amount_tests {
     }
 
     fn sample_fx() -> FxSpot {
-        FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_notional(Money::from((1_250_000_i64, Currency::EUR)))
-            .expect("should succeed")
-            .with_quoted_spot(1.18)
-            .expect("should succeed")
+        FxSpot::builder()
+            .id(InstrumentId::new("EURUSD"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .notional(Money::from((1_250_000_i64, Currency::EUR)))
+            .quoted_spot(1.18)
+            .build()
+            .expect("valid FX spot")
     }
 
     #[test]

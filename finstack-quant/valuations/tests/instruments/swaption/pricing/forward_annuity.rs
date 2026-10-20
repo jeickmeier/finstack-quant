@@ -168,10 +168,9 @@ fn test_annuity_dispatch_matches_selected_settlement_method() {
         "physical settlement annuity",
     );
 
-    let collateralized = base
-        .clone()
-        .with_settlement(SettlementType::Cash)
-        .with_cash_settlement_method(CashSettlementMethod::CollateralizedCashPrice);
+    let mut collateralized = base.clone();
+    collateralized.settlement = SettlementType::Cash;
+    collateralized.cash_settlement_method = CashSettlementMethod::CollateralizedCashPrice;
     let collateralized_annuity = collateralized
         .annuity(disc.as_ref(), as_of, forward)
         .unwrap();
@@ -182,10 +181,9 @@ fn test_annuity_dispatch_matches_selected_settlement_method() {
         "collateralized cash-price annuity",
     );
 
-    let par_yield = base
-        .clone()
-        .with_settlement(SettlementType::Cash)
-        .with_cash_settlement_method(CashSettlementMethod::ParYield);
+    let mut par_yield = base.clone();
+    par_yield.settlement = SettlementType::Cash;
+    par_yield.cash_settlement_method = CashSettlementMethod::ParYield;
     let par_yield_annuity = par_yield.annuity(disc.as_ref(), as_of, forward).unwrap();
     // ParYield is the settlement-date cash annuity discounted from the swap
     // effective date (the cash settlement date) to as_of.
@@ -200,16 +198,15 @@ fn test_annuity_dispatch_matches_selected_settlement_method() {
         "par-yield cash annuity",
     );
 
-    let isda = base
-        .clone()
-        .with_settlement(SettlementType::Cash)
-        .with_cash_settlement_method(CashSettlementMethod::IsdaParPar);
+    let mut isda = base.clone();
+    isda.settlement = SettlementType::Cash;
+    isda.cash_settlement_method = CashSettlementMethod::IsdaParPar;
     let isda_annuity = isda.annuity(disc.as_ref(), as_of, forward).unwrap();
     assert_approx_eq(isda_annuity, expected_physical, 1e-12, "isda cash annuity");
 
-    let zero_coupon = base
-        .with_settlement(SettlementType::Cash)
-        .with_cash_settlement_method(CashSettlementMethod::ZeroCoupon);
+    let mut zero_coupon = base;
+    zero_coupon.settlement = SettlementType::Cash;
+    zero_coupon.cash_settlement_method = CashSettlementMethod::ZeroCoupon;
     let zero_coupon_annuity = zero_coupon.annuity(disc.as_ref(), as_of, forward).unwrap();
     let expected_zero_coupon = zero_coupon
         .cash_annuity_zero_coupon(disc.as_ref(), as_of)
@@ -227,9 +224,9 @@ fn test_par_yield_annuity_discounted_from_expiry() {
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let market = create_flat_market(as_of, 0.05, 0.30);
     let disc = market.get_discount("USD_OIS").unwrap();
-    let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05)
-        .with_settlement(SettlementType::Cash)
-        .with_cash_settlement_method(CashSettlementMethod::ParYield);
+    let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
+    swaption.settlement = SettlementType::Cash;
+    swaption.cash_settlement_method = CashSettlementMethod::ParYield;
     let forward = swaption.forward_swap_rate(&market, as_of).unwrap();
 
     let annuity = swaption.annuity(disc.as_ref(), as_of, forward).unwrap();
@@ -257,9 +254,9 @@ fn test_zero_coupon_cash_annuity_matches_tenor_times_maturity_df() {
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let market = create_flat_market(as_of, 0.05, 0.30);
     let disc = market.get_discount("USD_OIS").unwrap();
-    let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05)
-        .with_settlement(SettlementType::Cash)
-        .with_cash_settlement_method(CashSettlementMethod::ZeroCoupon);
+    let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
+    swaption.settlement = SettlementType::Cash;
+    swaption.cash_settlement_method = CashSettlementMethod::ZeroCoupon;
 
     let tenor = swaption
         .get_fixed_day_count()
@@ -328,9 +325,9 @@ fn test_single_curve_forward_honors_explicit_fixed_leg_payment_cashflows() {
 #[test]
 fn test_par_yield_cash_annuity_counts_schedule_periods() {
     let (_, expiry, swap_start, swap_end) = standard_dates();
-    let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.04)
-        .with_settlement(SettlementType::Cash)
-        .with_cash_settlement_method(CashSettlementMethod::ParYield);
+    let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.04);
+    swaption.settlement = SettlementType::Cash;
+    swaption.cash_settlement_method = CashSettlementMethod::ParYield;
     swaption.underlying_fixed_leg.frequency = Tenor::annual();
     swaption.underlying_fixed_leg.day_count = DayCount::Act360;
     let swap_rate = 0.04_f64;

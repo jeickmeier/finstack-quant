@@ -69,26 +69,44 @@ pub fn test_date() -> Date {
 
 /// Create a simple EURUSD FX spot
 pub fn sample_eurusd() -> FxSpot {
-    FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
+    FxSpot::builder()
+        .id(InstrumentId::new("EURUSD"))
+        .base_currency(Currency::EUR)
+        .quote_currency(Currency::USD)
+        .notional(Money::from((1_i64, Currency::EUR)))
+        .build()
+        .expect("valid FX spot")
 }
 
 /// Create EURUSD with explicit notional and rate
 pub fn eurusd_with_notional(notional: f64, rate: f64) -> FxSpot {
-    sample_eurusd()
-        .with_notional(Money::new(notional, Currency::EUR).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(rate)
-        .unwrap()
+    FxSpot {
+        notional: Money::new(notional, Currency::EUR).expect("valid money fixture"),
+        quoted_spot: Some(rate),
+        ..sample_eurusd()
+    }
 }
 
 /// Create GBPUSD FX spot
 pub fn sample_gbpusd() -> FxSpot {
-    FxSpot::new(InstrumentId::new("GBPUSD"), Currency::GBP, Currency::USD)
+    FxSpot::builder()
+        .id(InstrumentId::new("GBPUSD"))
+        .base_currency(Currency::GBP)
+        .quote_currency(Currency::USD)
+        .notional(Money::from((1_i64, Currency::GBP)))
+        .build()
+        .expect("valid FX spot")
 }
 
 /// Create USDJPY FX spot
 pub fn sample_usdjpy() -> FxSpot {
-    FxSpot::new(InstrumentId::new("USDJPY"), Currency::USD, Currency::JPY)
+    FxSpot::builder()
+        .id(InstrumentId::new("USDJPY"))
+        .base_currency(Currency::USD)
+        .quote_currency(Currency::JPY)
+        .notional(Money::from((1_i64, Currency::USD)))
+        .build()
+        .expect("valid FX spot")
 }
 
 /// Create a market context with FX matrix

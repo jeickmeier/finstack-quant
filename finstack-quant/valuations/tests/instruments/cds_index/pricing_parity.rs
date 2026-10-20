@@ -204,11 +204,7 @@ fn test_mode_switching_preserves_basics() {
     assert_eq!(idx.pricing, IndexPricing::SingleCurve);
 
     // Switch to constituents
-    let credits = equal_weight_constituents(5)
-        .into_iter()
-        .map(|c| c.credit)
-        .collect::<Vec<_>>();
-    idx = idx.with_constituents_equal_weight(credits);
+    idx = idx.with_constituents(equal_weight_constituents(5));
 
     // Verify basics preserved
     assert_eq!(idx.id(), "CDX-SWITCH");

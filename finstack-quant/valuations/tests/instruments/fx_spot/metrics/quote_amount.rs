@@ -5,6 +5,7 @@
 
 use super::super::common::*;
 use finstack_quant_core::{currency::Currency, market_data::context::MarketContext, money::Money};
+use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
 use finstack_quant_valuations::instruments::Instrument;
 
 #[test]
@@ -45,7 +46,10 @@ fn test_quote_amount_equals_npv() {
 
 #[test]
 fn test_quote_amount_default_notional() {
-    let fx = sample_eurusd().with_quoted_spot(1.18).expect("test rate");
+    let fx = FxSpot {
+        quoted_spot: Some(1.18),
+        ..sample_eurusd()
+    };
     let market = MarketContext::new();
     let result = fx
         .price_with_metrics(
@@ -94,11 +98,11 @@ fn test_quote_amount_various_currencies() {
     let market = MarketContext::new();
 
     // GBPUSD
-    let gbp_fx = sample_gbpusd()
-        .with_notional(Money::new(500_000.0, Currency::GBP).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(1.40)
-        .expect("test rate");
+    let gbp_fx = FxSpot {
+        notional: Money::new(500_000.0, Currency::GBP).expect("valid money fixture"),
+        quoted_spot: Some(1.40),
+        ..sample_gbpusd()
+    };
     let gbp_result = gbp_fx
         .price_with_metrics(
             &market,
@@ -115,11 +119,11 @@ fn test_quote_amount_various_currencies() {
     );
 
     // USDJPY
-    let jpy_fx = sample_usdjpy()
-        .with_notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(110.0)
-        .expect("test rate");
+    let jpy_fx = FxSpot {
+        notional: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        quoted_spot: Some(110.0),
+        ..sample_usdjpy()
+    };
     let jpy_result = jpy_fx
         .price_with_metrics(
             &market,
@@ -138,11 +142,11 @@ fn test_quote_amount_various_currencies() {
 
 #[test]
 fn test_quote_amount_zero_notional() {
-    let fx = sample_eurusd()
-        .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(1.20)
-        .expect("test rate");
+    let fx = FxSpot {
+        notional: Money::new(0.0, Currency::EUR).expect("valid money fixture"),
+        quoted_spot: Some(1.20),
+        ..sample_eurusd()
+    };
     let market = MarketContext::new();
     let result = fx
         .price_with_metrics(

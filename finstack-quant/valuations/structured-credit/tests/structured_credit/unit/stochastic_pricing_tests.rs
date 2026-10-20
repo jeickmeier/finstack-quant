@@ -164,13 +164,17 @@ fn monte_carlo_rejects_fewer_than_two_independent_estimators() {
 }
 
 #[test]
-fn cleanup_call_builder_rejects_invalid_thresholds() {
+fn cleanup_call_validation_rejects_invalid_thresholds() {
     let sc = build_sc("ABS-CLEANUP", 1_000_000.0);
+    let with_cleanup = |threshold: f64| StructuredCredit {
+        cleanup_call_decimal: Some(threshold),
+        ..sc.clone()
+    };
 
-    assert!(sc.clone().with_cleanup_call_decimal(0.10).is_ok());
-    assert!(sc.clone().with_cleanup_call_decimal(0.0).is_err());
-    assert!(sc.clone().with_cleanup_call_decimal(1.0).is_err());
-    assert!(sc.with_cleanup_call_decimal(f64::NAN).is_err());
+    assert!(with_cleanup(0.10).validate_invariants().is_ok());
+    assert!(with_cleanup(0.0).validate_invariants().is_err());
+    assert!(with_cleanup(1.0).validate_invariants().is_err());
+    assert!(with_cleanup(f64::NAN).validate_invariants().is_err());
 }
 
 #[test]
@@ -442,7 +446,8 @@ fn hedge_pricing_validates_nested_swap_before_market_access() {
         .expect("example hedge swap");
     swap.fixed_leg.end = swap.fixed_leg.start;
     swap.float_leg.end = swap.float_leg.start;
-    let sc = build_sc("ABS-INVALID-HEDGE", 1_000_000.0).with_hedge_swap(HedgeSwap::new(swap));
+    let mut sc = build_sc("ABS-INVALID-HEDGE", 1_000_000.0);
+    sc.hedge_swaps.push(HedgeSwap::new(swap));
 
     let err = sc
         .price_with_metrics(
@@ -458,17 +463,6 @@ fn hedge_pricing_validates_nested_swap_before_market_access() {
         "unexpected nested hedge validation error: {message}"
     );
     assert!(!message.contains("Curve not found"));
-}
-
-#[test]
-fn with_hedge_swap_attaches_a_waterfall_settled_swap() {
-    let swap = finstack_quant_valuations_rates::irs::InterestRateSwap::example()
-        .expect("example hedge swap");
-    let sc = build_sc("ABS-HEDGED", 1_000_000.0);
-    assert!(sc.hedge_swaps.is_empty());
-    let hedged = sc.with_hedge_swap(HedgeSwap::new(swap.clone()).on_pool_par().junior());
-    assert_eq!(hedged.hedge_swaps.len(), 1);
-    assert_eq!(hedged.hedge_swaps[0].swap.id, swap.id);
 }
 
 /// Regression: the `pv_std_error` of a large-PV deal stays accurate when using
@@ -869,15 +863,15 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
         sc.first_payment_date = Date::from_calendar_date(2025, Month::February, 1).expect("date");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.18);
         if case.stochastic {
-            sc.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(
+            sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::factor_correlated(
                 PrepaymentModelSpec::constant_cpr(0.15),
                 0.25,
                 0.15,
             ));
-            sc.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.03, 0.20));
-            sc.with_correlation(
-                CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("valid correlation"),
-            );
+            sc.credit_model.stochastic_default_spec =
+                Some(StochasticDefaultSpec::gaussian_copula(0.03, 0.20));
+            sc.credit_model.correlation_structure =
+                Some(CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("valid correlation"));
         } else if case.label == "factor_correlated_mc" {
             use finstack_quant_cashflows::builder::DefaultModelSpec;
             sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
@@ -1041,13 +1035,15 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
 /// the estimator count changes the computed estimate.
 fn stochastic_estimator_count_deal() -> StructuredCredit {
     let mut sc = build_sc("ABS-MC-ESTIMATOR-PIN", 1_000_000.0);
-    sc.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(
+    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::factor_correlated(
         PrepaymentModelSpec::constant_cpr(0.15),
         0.25,
         0.15,
     ));
-    sc.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.03, 0.20));
-    sc.with_correlation(CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("correlation"));
+    sc.credit_model.stochastic_default_spec =
+        Some(StochasticDefaultSpec::gaussian_copula(0.03, 0.20));
+    sc.credit_model.correlation_structure =
+        Some(CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("correlation"));
     sc
 }
 

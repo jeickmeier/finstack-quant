@@ -374,18 +374,6 @@ impl PoolAsset {
         self
     }
 
-    /// Set industry classification
-    pub fn with_industry(mut self, industry: impl Into<String>) -> Self {
-        self.industry = Some(industry.into());
-        self
-    }
-
-    /// Set obligor identifier
-    pub fn with_obligor_id(mut self, obligor_id: impl Into<String>) -> Self {
-        self.obligor_id = Some(obligor_id.into());
-        self
-    }
-
     /// Get spread component in basis points
     ///
     /// Returns the explicit spread if available, otherwise derives from rate.
@@ -408,18 +396,6 @@ impl PoolAsset {
             self.maturity,
             finstack_quant_core::dates::DayCountContext::default(),
         )
-    }
-
-    /// Record a default and its outstanding recovery claim, payable after the deal recovery lag.
-    /// Repeating this operation replaces the current claim; it does not add another claim.
-    ///
-    /// # Arguments
-    /// * `recovery_amount` - Unreceived recovery cash in the asset currency, from zero to defaulted par.
-    /// * `default_date` - Economic default date used to schedule the recovery payment.
-    pub fn default_with_recovery(&mut self, recovery_amount: Money, default_date: Date) {
-        self.defaulted = true;
-        self.recovery_amount = Some(recovery_amount);
-        self.default_date = Some(default_date);
     }
 }
 

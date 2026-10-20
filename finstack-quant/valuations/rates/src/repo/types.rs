@@ -496,22 +496,6 @@ impl Repo {
         self.cash_amount.checked_div_f64(factor)
     }
 
-    /// Check if the repo is adequately collateralized.
-    pub fn is_adequately_collateralized(&self, market: &MarketContext) -> Result<bool> {
-        let collateral_value = self.collateral.market_value(market)?;
-        let required_value = self.required_collateral_value()?;
-
-        // Ensure same currency for comparison
-        if collateral_value.currency() != required_value.currency() {
-            return Err(Error::CurrencyMismatch {
-                expected: required_value.currency(),
-                actual: collateral_value.currency(),
-            });
-        }
-
-        Ok(collateral_value.amount() >= required_value.amount())
-    }
-
     /// Compute present value of the repo using curves in the market context.
     ///
     /// Returns the PV of future cashflows.

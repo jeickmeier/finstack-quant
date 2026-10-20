@@ -1247,16 +1247,19 @@ mod tests {
 
     #[test]
     fn test_fx_spot_roundtrip() {
-        let fx_spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_notional(Money::from((1_000_000_i64, Currency::EUR)))
-            .expect("FxSpot notional should be valid")
-            .with_quoted_spot(1.10)
-            .expect("FxSpot rate should be valid")
-            .with_settlement_date(
+        let fx_spot = FxSpot::builder()
+            .id(InstrumentId::new("EURUSD"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
+            .quoted_spot(1.10)
+            .settlement_date(
                 Date::from_calendar_date(2024, Month::January, 15).expect("Valid test date"),
             )
-            .with_base_calendar_id("TARGET")
-            .with_quote_calendar_id("USNY");
+            .base_calendar_id("TARGET".into())
+            .quote_calendar_id("USNY".into())
+            .build()
+            .expect("valid FX spot");
 
         let json = InstrumentJson::FxSpot(fx_spot.clone());
         let serialized =
@@ -1504,11 +1507,13 @@ mod tests {
     fn test_fx_spot_default_business_day_convention_when_omitted() {
         use finstack_quant_core::dates::BusinessDayConvention;
 
-        let spot = FxSpot::new(
-            InstrumentId::new("EURUSD-DEFAULTS"),
-            Currency::EUR,
-            Currency::USD,
-        );
+        let spot = FxSpot::builder()
+            .id(InstrumentId::new("EURUSD-DEFAULTS"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .notional(Money::from((1_i64, Currency::EUR)))
+            .build()
+            .expect("valid FX spot");
         let mut json = serde_json::to_value(InstrumentJson::FxSpot(spot))
             .expect("FxSpot JSON serialization should succeed");
         remove_spec_key(&mut json, "business_day_convention");

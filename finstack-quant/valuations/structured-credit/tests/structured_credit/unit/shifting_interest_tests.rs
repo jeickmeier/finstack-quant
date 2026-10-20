@@ -86,8 +86,10 @@ fn rmbs(step: f64, mode: ShiftMode, triggers: Vec<StepDownTrigger>) -> Structure
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 0);
     deal.waterfall_rules = Some(WaterfallRules {
-        shifting_interest: Some(
-            ShiftingInterestSpec::new(
+        shifting_interest: Some(ShiftingInterestSpec {
+            mode,
+            triggers,
+            ..ShiftingInterestSpec::new(
                 "A",
                 vec![
                     ShiftingInterestStep {
@@ -100,9 +102,7 @@ fn rmbs(step: f64, mode: ShiftMode, triggers: Vec<StepDownTrigger>) -> Structure
                     },
                 ],
             )
-            .with_mode(mode)
-            .with_triggers(triggers),
-        ),
+        }),
         ..Default::default()
     });
     deal

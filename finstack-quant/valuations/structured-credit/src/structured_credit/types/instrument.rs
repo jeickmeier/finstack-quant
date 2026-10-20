@@ -91,6 +91,11 @@ impl Instrument for StructuredCredit {
             }
         }
         self.validate_custom_waterfall()?;
+        // A custom waterfall validates the deal-level triggers together with
+        // its own test tiers; the template path validates them here.
+        if self.waterfall.is_none() {
+            self.validate_coverage_tests(self.coverage_triggers.iter())?;
+        }
         self.pool.validate_original_balance()?;
         let currency = self.pool.get_currency();
         for hedge in &self.hedge_swaps {

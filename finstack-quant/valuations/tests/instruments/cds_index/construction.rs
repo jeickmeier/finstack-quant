@@ -85,30 +85,6 @@ fn test_construction_with_constituents() {
 }
 
 #[test]
-fn test_builder_with_constituents_equal_weight() {
-    // Test: Builder method creates equal-weighted constituents
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-
-    let mut idx = standard_single_curve_index("CDX-BUILD", start, end, 10_000_000.0);
-    assert_eq!(idx.pricing, IndexPricing::SingleCurve);
-
-    // Add constituents via builder
-    let credits = (0..3)
-        .map(|i| CreditParams::corporate_standard(format!("NAME{}", i), format!("HZ{}", i)))
-        .collect::<Vec<_>>();
-
-    idx = idx.with_constituents_equal_weight(credits);
-
-    assert_eq!(idx.pricing, IndexPricing::Constituents);
-    assert_eq!(idx.constituents.len(), 3);
-
-    for constituent in &idx.constituents {
-        assert!((constituent.weight - 1.0 / 3.0).abs() < 1e-10);
-    }
-}
-
-#[test]
 fn test_builder_with_explicit_weights() {
     // Test: Builder accepts explicit weights
     let start = date!(2025 - 01 - 01);

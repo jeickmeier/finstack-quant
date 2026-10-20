@@ -21,24 +21,6 @@ fn test_standard_construction() {
 }
 
 #[test]
-fn test_with_contract_specs() {
-    let (_, start, end) = standard_dates();
-    let custom_specs = FutureContractSpecs {
-        face_value: 2_000_000.0,
-        tick_size: 0.01,
-        delivery_months: 6,
-        convexity_adjustment: Some(0.0001),
-    };
-
-    let future = create_standard_future(start, end).with_contract_specs(custom_specs);
-
-    assert_eq!(future.contract_specs.face_value, 2_000_000.0);
-    assert_eq!(future.contract_specs.tick_size, 0.01);
-    assert_eq!(future.contract_specs.delivery_months, 6);
-    assert_eq!(future.contract_specs.convexity_adjustment, Some(0.0001));
-}
-
-#[test]
 fn test_default_contract_specs() {
     let specs = FutureContractSpecs::default();
 
@@ -190,23 +172,6 @@ fn test_implied_rate_various_prices() {
             implied
         );
     }
-}
-
-#[test]
-fn test_derived_tick_value() {
-    let (_, start, end) = standard_dates();
-    let future = create_standard_future(start, end);
-
-    let tick_value = future.derived_tick_value().unwrap();
-
-    // For a 3-month contract (approx 0.25 year), tick value should be reasonable
-    // Actual calculation varies with exact dates (Act/360 day count)
-    assert!(tick_value > 0.0, "Tick value should be positive");
-    assert!(
-        tick_value < 2000.0,
-        "Tick value should be reasonable, got {}",
-        tick_value
-    );
 }
 
 #[test]

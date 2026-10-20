@@ -201,10 +201,14 @@ impl Pricer for RichBondPricer {
                 fx_triangulated: Some(true),
             },
         ))
-        .with_covenant("rich-result", covenant)
         .with_explanation(finstack_quant_core::explain::ExplanationTrace::new(
             "rich-pricer",
         ));
+        result.covenants = Some(
+            [("rich-result".to_string(), covenant)]
+                .into_iter()
+                .collect(),
+        );
         result.meta.fx_policy_applied = Some("pricer-fx-policy".to_string());
         result.meta.timestamp = Some(time::OffsetDateTime::UNIX_EPOCH);
         result.meta.version = Some("model-version".to_string());

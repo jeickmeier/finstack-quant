@@ -301,9 +301,10 @@ fn loss_allocation_policy_changes_the_senior_note_flows() {
 fn failing_coverage_test_does_not_trap_the_coupon_it_protects() {
     let market = fixed_market();
     let untested = structured_credit();
-    let tested = structured_credit()
-        .with_coverage_triggers(vec![CoverageTestSpec::oc("SR", 2.0)])
-        .expect("coverage test");
+    let tested = StructuredCredit {
+        coverage_triggers: vec![CoverageTestSpec::oc("SR", 2.0)],
+        ..structured_credit()
+    };
 
     let without = deterministic(&untested, &market);
     let with = deterministic(&tested, &market);

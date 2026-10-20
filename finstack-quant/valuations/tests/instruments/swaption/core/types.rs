@@ -80,16 +80,15 @@ fn test_bermudan_schedule_sort_and_lockout() {
     let d1 = date!(2026 - 06 - 01);
     let d2 = date!(2026 - 01 - 01);
     let d3 = date!(2026 - 12 - 01);
-    let schedule = BermudanSchedule::new(vec![d1, d2, d3])
-        .with_lockout(date!(2026 - 03 - 01))
-        .with_notice_days(2);
+    let mut schedule = BermudanSchedule::new(vec![d1, d2, d3]);
+    schedule.lockout_end = Some(date!(2026 - 03 - 01));
+    schedule.notice_days = 2;
 
     assert_eq!(schedule.exercise_dates, vec![d2, d1, d3]);
     assert_eq!(schedule.notice_days, 2);
 
     let effective = schedule.effective_dates();
     assert_eq!(effective, vec![d1, d3]);
-    assert_eq!(schedule.num_exercises(), 2);
 }
 
 #[test]
@@ -147,7 +146,7 @@ fn test_resolve_volatility_priority_and_greek_inputs_expired() {
     assert_approx_eq(override_vol, 0.35, 1e-12, "override vol");
 
     let sabr_params = SabrParameters::rates_standard(0.2, 0.5, -0.25).unwrap();
-    swaption = swaption.with_sabr_params(sabr_params);
+    swaption.sabr_params = Some(sabr_params);
     let sabr_vol = swaption.resolve_volatility(&market, forward, t).unwrap();
     assert!(sabr_vol.is_finite(), "sabr vol should be finite");
     assert!(
@@ -184,29 +183,13 @@ fn test_sabr_parameter_constructors_and_internal_conversion() {
 }
 
 #[test]
-fn test_swaption_example_and_builder_helpers() {
+fn test_swaption_example_defaults() {
     let example = Swaption::example().expect("example");
     assert_eq!(example.settlement, SettlementType::Cash);
     assert_eq!(
         example.cash_settlement_method,
         CashSettlementMethod::CollateralizedCashPrice
     );
-
-    let updated = example
-        .with_settlement(SettlementType::Cash)
-        .with_option_type(finstack_quant_valuations::instruments::OptionType::Put)
-        .with_cash_settlement_method(CashSettlementMethod::ZeroCoupon)
-        .with_calendar("nyse");
-    assert_eq!(updated.settlement, SettlementType::Cash);
-    assert_eq!(
-        updated.option_type,
-        finstack_quant_valuations::instruments::OptionType::Put
-    );
-    assert_eq!(
-        updated.cash_settlement_method,
-        CashSettlementMethod::ZeroCoupon
-    );
-    assert_eq!(updated.get_calendar_id(), Some("nyse"));
 }
 
 #[test]

@@ -131,8 +131,10 @@ mod cases {
             .expect("equity"),
         ])
         .expect("structure");
-        deal.tranches.tranches[0].oc_trigger =
-            Some(CoverageTrigger::new(1.30, consequence).with_cure_level(1.40));
+        deal.tranches.tranches[0].oc_trigger = Some(CoverageTrigger {
+            cure_level: Some(1.40),
+            ..CoverageTrigger::new(1.30, consequence)
+        });
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         deal
@@ -466,10 +468,10 @@ mod cases {
     #[test]
     fn production_waterfall_predefaulted_par_is_not_performing_collateral() {
         let mut deal = StructuredCredit::example().expect("example");
-        deal.pool.assets[0].default_with_recovery(
-            Money::new(70_000_000.0, Currency::USD).expect("recovery"),
-            deal.closing_date,
-        );
+        deal.pool.assets[0].defaulted = true;
+        deal.pool.assets[0].recovery_amount =
+            Some(Money::new(70_000_000.0, Currency::USD).expect("recovery"));
+        deal.pool.assets[0].default_date = Some(deal.closing_date);
         let state = SimulationState::new(
             &deal.pool,
             &deal.tranches,
@@ -1016,18 +1018,19 @@ mod cases {
             maturity,
         )
         .expect("tranche");
-        let mut instrument = StructuredCredit::new_abs(
-            "ABS-CLEANUP",
-            pool,
-            TrancheStructure::new(vec![tranche]).expect("structure"),
-            cleanup_test_date(),
-            maturity,
-            "USD-OIS",
-        )
-        .expect("valid structured-credit dates")
-        .with_calendar_id("nyse")
-        .with_cleanup_call_decimal(0.10)
-        .expect("cleanup call");
+        let mut instrument = StructuredCredit {
+            cleanup_call_decimal: Some(0.10),
+            ..StructuredCredit::new_abs(
+                "ABS-CLEANUP",
+                pool,
+                TrancheStructure::new(vec![tranche]).expect("structure"),
+                cleanup_test_date(),
+                maturity,
+                "USD-OIS",
+            )
+            .expect("valid structured-credit dates")
+            .with_calendar_id("nyse")
+        };
         // 60% CPR: the pool factor crosses below 10% within ~4 years, well
         // before maturity, so a cleanup call genuinely fires mid-life.
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.60);
@@ -2444,8 +2447,12 @@ mod cases {
     fn coverage_trigger_for_unknown_tranche_is_rejected() {
         use crate::structured_credit::types::CoverageTestSpec;
 
-        let err = oc_trigger_deal(vec![])
-            .with_coverage_triggers(vec![CoverageTestSpec::oc("NOT_A_TRANCHE", 1.2)])
+        use finstack_quant_valuations_core::instruments::Instrument;
+
+        let mut deal = oc_trigger_deal(vec![]);
+        deal.coverage_triggers = vec![CoverageTestSpec::oc("NOT_A_TRANCHE", 1.2)];
+        let err = deal
+            .validate_invariants()
             .expect_err("a trigger naming an unknown tranche must be rejected");
         let msg = err.to_string();
         assert!(
@@ -2600,18 +2607,19 @@ mod cases {
             maturity,
         )
         .expect("equity tranche");
-        let mut instrument = StructuredCredit::new_abs(
-            "ABS-BIG-RECOVERY-QUEUE",
-            pool,
-            TrancheStructure::new(vec![senior, equity]).expect("structure"),
-            start,
-            maturity,
-            "USD-OIS",
-        )
-        .expect("valid structured-credit dates")
-        .with_calendar_id("nyse")
-        .with_cleanup_call_decimal(0.10)
-        .expect("cleanup call");
+        let mut instrument = StructuredCredit {
+            cleanup_call_decimal: Some(0.10),
+            ..StructuredCredit::new_abs(
+                "ABS-BIG-RECOVERY-QUEUE",
+                pool,
+                TrancheStructure::new(vec![senior, equity]).expect("structure"),
+                start,
+                maturity,
+                "USD-OIS",
+            )
+            .expect("valid structured-credit dates")
+            .with_calendar_id("nyse")
+        };
         // No fees/coupons: principal funding is independently conserved as
         // performing par plus recoveries, less allocated net credit losses.
         instrument.fees = None;

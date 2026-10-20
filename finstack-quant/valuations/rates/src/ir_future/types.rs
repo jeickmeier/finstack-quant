@@ -380,12 +380,6 @@ impl InterestRateFuture {
             .build()
     }
 
-    /// Set contract specifications.
-    pub fn with_contract_specs(mut self, specs: FutureContractSpecs) -> Self {
-        self.contract_specs = specs;
-        self
-    }
-
     /// Get the rate implied by the entry price `terms.entry_price`.
     ///
     /// Interest rate futures quote as 100 minus the rate, i.e., a price of 97.50
@@ -738,14 +732,6 @@ impl InterestRateFuture {
             .npv_from_model_price(self.id.as_str(), as_of, || self.fair_price(market, as_of))
     }
 
-    /// Derive contract tick value for the instrument accrual.
-    ///
-    /// Tick value is the quote-point multiplier times the tick size in price points.
-    pub fn derived_tick_value(&self) -> finstack_quant_core::Result<f64> {
-        self.validate()?;
-        Ok(self.terms.multiplier * self.contract_specs.tick_size)
-    }
-
     /// Calculate convexity adjusted rate using volatility surface.
     ///
     /// Uses the Hull-White 1-factor model approximation in the zero-mean-reversion
@@ -1095,14 +1081,6 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn quoted_tick_reconciles_with_one_contract_pnl() {
-        let mut future = InterestRateFuture::example().expect("future");
-        future.terms.multiplier = 2500.0;
-        future.contract_specs.tick_size = 0.0025;
-        assert_eq!(future.derived_tick_value().expect("tick"), 6.25);
     }
 
     #[test]

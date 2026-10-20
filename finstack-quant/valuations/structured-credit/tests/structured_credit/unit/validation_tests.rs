@@ -61,8 +61,10 @@ fn test_empty_tier_is_invalid_except_residual() {
 
 #[test]
 fn test_negative_recipient_weight_is_invalid() {
-    let tier = WaterfallTier::new("tier-a", 1, PaymentType::Fee)
-        .add_recipient(fixed_fee_recipient("r1").with_weight(-0.25));
+    let tier = WaterfallTier::new("tier-a", 1, PaymentType::Fee).add_recipient(Recipient {
+        weight: Some(-0.25),
+        ..fixed_fee_recipient("r1")
+    });
 
     let errors = validate_tiers(&[tier]);
     assert_eq!(errors.len(), 1);
@@ -73,8 +75,14 @@ fn test_negative_recipient_weight_is_invalid() {
 fn test_pro_rata_requires_positive_total_weight() {
     let tier = WaterfallTier::new("tier-a", 1, PaymentType::Interest)
         .allocation_mode(AllocationMode::ProRata)
-        .add_recipient(fixed_fee_recipient("r1").with_weight(0.0))
-        .add_recipient(fixed_fee_recipient("r2").with_weight(0.0));
+        .add_recipient(Recipient {
+            weight: Some(0.0),
+            ..fixed_fee_recipient("r1")
+        })
+        .add_recipient(Recipient {
+            weight: Some(0.0),
+            ..fixed_fee_recipient("r2")
+        });
 
     let errors = validate_tiers(&[tier]);
     assert_eq!(errors.len(), 1);

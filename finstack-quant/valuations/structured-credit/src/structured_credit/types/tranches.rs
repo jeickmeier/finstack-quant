@@ -51,15 +51,6 @@ impl CoverageTrigger {
         }
     }
 
-    /// Set a separate cure threshold and return the updated trigger.
-    ///
-    /// # Arguments
-    /// * `cure_level` - Coverage ratio required to exit breach, at least the breach threshold.
-    pub fn with_cure_level(mut self, cure_level: f64) -> Self {
-        self.cure_level = Some(cure_level);
-        self
-    }
-
     /// Determine breach status, retaining an existing breach until its cure level.
     ///
     /// # Arguments
@@ -335,20 +326,6 @@ impl Tranche {
     #[must_use]
     pub fn with_rating(mut self, rating: CreditRating) -> Self {
         self.rating = Some(rating);
-        self
-    }
-
-    /// Add overcollateralization coverage trigger
-    #[must_use]
-    pub fn with_oc_trigger(mut self, trigger: CoverageTrigger) -> Self {
-        self.oc_trigger = Some(trigger);
-        self
-    }
-
-    /// Add interest coverage trigger
-    #[must_use]
-    pub fn with_ic_trigger(mut self, trigger: CoverageTrigger) -> Self {
-        self.ic_trigger = Some(trigger);
         self
     }
 }
@@ -1096,8 +1073,10 @@ mod tests {
 
     #[test]
     fn test_coverage_trigger() {
-        let trigger =
-            CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow).with_cure_level(1.25);
+        let trigger = CoverageTrigger {
+            cure_level: Some(1.25),
+            ..CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
+        };
 
         // Breach scenario
         assert!(trigger.is_breached(1.15));
@@ -1110,8 +1089,10 @@ mod tests {
 
     #[test]
     fn production_waterfall_breached_trigger_requires_cure_threshold() {
-        let mut trigger =
-            CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow).with_cure_level(1.25);
+        let mut trigger = CoverageTrigger {
+            cure_level: Some(1.25),
+            ..CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
+        };
         trigger.breach_date = Some(test_date());
         assert!(
             trigger.is_breached(1.22),

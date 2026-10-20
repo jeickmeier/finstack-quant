@@ -289,13 +289,6 @@ impl CoverageTestSpec {
         Self::new(tranche_id, CoverageTestType::BorrowingBase, trigger_level)
     }
 
-    /// Set what a failure does with the diverted interest.
-    #[must_use]
-    pub fn with_action(mut self, action: CoverageTestAction) -> Self {
-        self.action = action;
-        self
-    }
-
     /// Place the template test tier after `tranche_id`'s interest tier.
     ///
     /// # Arguments
@@ -313,18 +306,6 @@ impl CoverageTestSpec {
     #[must_use]
     pub fn after_junior_fees(mut self) -> Self {
         self.placement = Some(CoveragePlacement::AfterJuniorFees);
-        self
-    }
-
-    /// Cap what a failure diverts at `pct` percent of the interest remaining
-    /// at the test tier.
-    ///
-    /// # Arguments
-    ///
-    /// * `pct` - Percent of the remaining interest in `(0, 100]`.
-    #[must_use]
-    pub fn with_divert_pct(mut self, pct: f64) -> Self {
-        self.divert_pct = Some(pct);
         self
     }
 

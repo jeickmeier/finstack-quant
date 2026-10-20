@@ -85,9 +85,9 @@ impl StructuredCredit {
         Self {
             id: id.into(),
             deal_type,
-            // Senior fees are opt-in via `with_fees` / `with_standard_fees`.
+            // Senior fees are opt-in via `fees` / `with_standard_fees`.
             fees: None,
-            // OC/IC triggers are opt-in via `with_coverage_triggers`.
+            // OC/IC triggers are opt-in via `coverage_triggers`.
             coverage_triggers: Vec::new(),
             pool: params.pool,
             tranches: params.tranches,
@@ -132,7 +132,7 @@ impl StructuredCredit {
             liquidation_price_pct: None,
             // No declarative waterfall rules by default.
             waterfall_rules: None,
-            // Template waterfall by default; custom via `with_waterfall`.
+            // Template waterfall by default; custom via `waterfall`.
             waterfall: None,
         }
     }

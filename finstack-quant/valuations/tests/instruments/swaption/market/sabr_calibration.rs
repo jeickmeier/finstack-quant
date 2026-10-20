@@ -18,8 +18,8 @@ fn test_sabr_parameters_validation() {
         shift: None,
     };
 
-    let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05)
-        .with_sabr_params(valid_params);
+    let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
+    swaption.sabr_params = Some(valid_params);
 
     let pv = swaption.value(&market, as_of).unwrap().amount();
     assert!(
@@ -46,8 +46,8 @@ fn test_sabr_beta_range() {
             shift: None,
         };
 
-        let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05)
-            .with_sabr_params(params);
+        let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
+        swaption.sabr_params = Some(params);
         if beta == 0.0 {
             swaption.vol_model = finstack_quant_valuations::instruments::VolatilityModel::Normal;
         }
@@ -84,10 +84,10 @@ fn test_sabr_rho_effect() {
         shift: None,
     };
 
-    let swaption_neg = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.07)
-        .with_sabr_params(params_neg);
-    let swaption_pos = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.07)
-        .with_sabr_params(params_pos);
+    let mut swaption_neg = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.07);
+    swaption_neg.sabr_params = Some(params_neg);
+    let mut swaption_pos = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.07);
+    swaption_pos.sabr_params = Some(params_pos);
 
     let pv_neg = swaption_neg.value(&market, as_of).unwrap().amount();
     let pv_pos = swaption_pos.value(&market, as_of).unwrap().amount();
@@ -123,10 +123,10 @@ fn test_sabr_nu_volatility_of_volatility() {
         shift: None,
     };
 
-    let swaption_low = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05)
-        .with_sabr_params(params_low);
-    let swaption_high = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05)
-        .with_sabr_params(params_high);
+    let mut swaption_low = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
+    swaption_low.sabr_params = Some(params_low);
+    let mut swaption_high = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
+    swaption_high.sabr_params = Some(params_high);
 
     let pv_low = swaption_low.value(&market, as_of).unwrap().amount();
     let pv_high = swaption_high.value(&market, as_of).unwrap().amount();

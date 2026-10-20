@@ -336,9 +336,10 @@ fn test_bermudan_schedule_with_lockout() {
     let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("Valid date");
     let lockout_end = Date::from_calendar_date(2027, Month::January, 1).expect("Valid date");
 
-    let schedule = BermudanSchedule::co_terminal(first_exercise, swap_end, Tenor::semi_annual())
-        .expect("valid Bermudan schedule")
-        .with_lockout(lockout_end);
+    let mut schedule =
+        BermudanSchedule::co_terminal(first_exercise, swap_end, Tenor::semi_annual())
+            .expect("valid Bermudan schedule");
+    schedule.lockout_end = Some(lockout_end);
 
     let effective_dates = schedule.effective_dates();
 

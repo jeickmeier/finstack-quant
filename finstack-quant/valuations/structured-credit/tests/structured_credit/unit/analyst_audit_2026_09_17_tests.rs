@@ -452,13 +452,14 @@ fn p6_clo_standard_rules_carry_performing_collateral_at_par() {
             ),
         ])
         .expect("structure");
-        let mut deal = quiet(
-            StructuredCredit::new_clo("P6", pool, tranches, close, legal, "USD-OIS")
-                .expect("valid structured-credit dates"),
-            0.0,
-        )
-        .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.10)])
-        .expect("triggers");
+        let mut deal = StructuredCredit {
+            coverage_triggers: vec![CoverageTestSpec::oc("A", 1.10)],
+            ..quiet(
+                StructuredCredit::new_clo("P6", pool, tranches, close, legal, "USD-OIS")
+                    .expect("valid structured-credit dates"),
+                0.0,
+            )
+        };
         deal.coverage_rules = Some(CoverageRules::clo_standard());
         let run = run_simulation_with_diagnostics(&deal, &market(close), close).expect("run");
         run.diagnostics.periods[0].coverage_tests[0].ratio
@@ -963,13 +964,14 @@ fn rating_haircuts_key_by_rating_bucket() {
             ),
         ])
         .expect("structure");
-        let mut deal = quiet(
-            StructuredCredit::new_clo("HC", pool, tranches, close, legal, "USD-OIS")
-                .expect("valid structured-credit dates"),
-            0.0,
-        )
-        .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.10)])
-        .expect("triggers");
+        let mut deal = StructuredCredit {
+            coverage_triggers: vec![CoverageTestSpec::oc("A", 1.10)],
+            ..quiet(
+                StructuredCredit::new_clo("HC", pool, tranches, close, legal, "USD-OIS")
+                    .expect("valid structured-credit dates"),
+                0.0,
+            )
+        };
         deal.coverage_rules = Some(CoverageRules {
             rating_haircuts: map.into_iter().collect(),
             ..CoverageRules::default()

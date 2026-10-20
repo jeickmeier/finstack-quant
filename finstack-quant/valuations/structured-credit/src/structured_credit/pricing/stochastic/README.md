@@ -33,13 +33,15 @@ let mut clo = StructuredCredit::example().expect("example");
 clo.enable_stochastic().expect("valid built-in stochastic defaults");
 
 // Or supply explicit models-owned specifications.
-clo.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(
+clo.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::factor_correlated(
     PrepaymentModelSpec::constant_cpr(0.15),
     0.40,
     0.25,
-))
-.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.03, 0.20))
-.with_correlation(CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("valid correlation"));
+));
+clo.credit_model.stochastic_default_spec =
+    Some(StochasticDefaultSpec::gaussian_copula(0.03, 0.20));
+clo.credit_model.correlation_structure =
+    Some(CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("valid correlation"));
 ```
 
 `StochasticPrepaySpec`, `StochasticDefaultSpec`, `CorrelationStructure`, and

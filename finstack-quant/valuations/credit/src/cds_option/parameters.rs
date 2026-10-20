@@ -232,16 +232,6 @@ impl CdsOptionParams {
         self.coupon_bp = Some(coupon_bp);
         self
     }
-
-    /// Set the accrual-start convention for the synthetic underlying CDS.
-    #[must_use]
-    pub fn with_protection_start_convention(
-        mut self,
-        convention: ProtectionStartConvention,
-    ) -> Self {
-        self.protection_start_convention = convention;
-        self
-    }
 }
 
 #[cfg(test)]

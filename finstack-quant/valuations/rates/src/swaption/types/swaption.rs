@@ -322,37 +322,6 @@ impl Swaption {
         })
     }
 
-    /// Attach SABR parameters to enable SABR-implied volatility pricing.
-    pub fn with_sabr_params(mut self, params: SabrParameters) -> Self {
-        self.sabr_params = Some(params);
-        self
-    }
-
-    /// Override the settlement type (default: Physical).
-    pub fn with_settlement(mut self, settlement: SettlementType) -> Self {
-        self.settlement = settlement;
-        self
-    }
-
-    /// Override the option type (Call = payer, Put = receiver).
-    pub fn with_option_type(mut self, option_type: OptionType) -> Self {
-        self.option_type = option_type;
-        self
-    }
-
-    /// Set the holiday calendar for schedule generation.
-    ///
-    /// # Arguments
-    /// * `calendar_id` - Calendar ID registered in `calendar_by_id`
-    ///   (e.g., `"nyse"` for USD, `"target"` for EUR)
-    pub fn with_calendar(mut self, calendar_id: impl Into<CalendarId>) -> Self {
-        let calendar_id = calendar_id.into().to_string();
-        self.underlying_fixed_leg.calendar_id = Some(calendar_id.clone().into());
-        self.underlying_float_leg.calendar_id = Some(calendar_id.clone().into());
-        self.underlying_float_leg.fixing_calendar_id = Some(calendar_id.into());
-        self
-    }
-
     fn underlying_fixed_leg_with_rate(&self, rate: Decimal) -> FixedLegSpec {
         let mut fixed = self.underlying_fixed_leg.clone();
         fixed.rate = rate;
@@ -387,24 +356,6 @@ impl Swaption {
             self.get_underlying_start_date(),
             self.get_underlying_maturity(),
         )
-    }
-
-    /// Set the cash settlement annuity method.
-    ///
-    /// Only affects pricing when `settlement` is `SettlementType::Cash`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use finstack_quant_valuations_rates::swaption::{Swaption, CashSettlementMethod};
-    ///
-    /// // Create a cash-settled swaption with ISDA Par-Par settlement
-    /// let swaption = Swaption::example().expect("example")
-    ///     .with_cash_settlement_method(CashSettlementMethod::IsdaParPar);
-    /// ```
-    pub fn with_cash_settlement_method(mut self, method: CashSettlementMethod) -> Self {
-        self.cash_settlement_method = method;
-        self
     }
 
     // Pricing Methods (moved from engine for direct access)

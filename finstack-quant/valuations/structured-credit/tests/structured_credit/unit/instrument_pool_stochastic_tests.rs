@@ -216,7 +216,8 @@ fn spread_sensitivity_raises_draws_and_losses_on_stress_paths() {
             senior: 45_900_000.0,
             equity: 5_100_000.0,
         });
-        deal.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.02, 0.3));
+        deal.credit_model.stochastic_default_spec =
+            Some(StochasticDefaultSpec::gaussian_copula(0.02, 0.3));
         deal
     };
     let market = market_with_curves(CLOSING).insert(widening_hazard_curve());
@@ -271,7 +272,8 @@ fn same_seed_is_bit_identical_across_thread_counts() {
         senior: 45_900_000.0,
         equity: 5_100_000.0,
     });
-    deal.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.02, 0.3));
+    deal.credit_model.stochastic_default_spec =
+        Some(StochasticDefaultSpec::gaussian_copula(0.02, 0.3));
     let market = market_with_curves(CLOSING)
         .insert(HazardCurve::flat(HAZARD_ID, CLOSING, 0.05, 0.4).expect("hazard curve"));
 

@@ -214,12 +214,6 @@ impl BasisSwap {
         Ok(swap)
     }
 
-    /// Allow (or disallow) calendar-day fallback when the calendar cannot be resolved.
-    pub fn with_allow_calendar_fallback(mut self, allow: bool) -> Self {
-        self.allow_calendar_fallback = allow;
-        self
-    }
-
     /// Validate structural invariants independently of the constructor.
     ///
     /// This is required for Serde-backed Rust/Python/WASM construction, which
