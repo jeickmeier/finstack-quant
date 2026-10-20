@@ -276,11 +276,6 @@ impl DollarRoll {
         self.front_price - self.back_price
     }
 
-    /// Get the drop in 32nds (common market convention).
-    pub fn drop_32nds(&self) -> f64 {
-        self.drop() * 32.0
-    }
-
     /// Effective settlement class (explicit or inferred from agency + term).
     pub fn effective_settlement_class(&self) -> SifmaSettlementClass {
         self.settlement_class.unwrap_or_else(|| {
@@ -483,10 +478,6 @@ mod tests {
 
         // Front price 98.5 - back price 98.0 = 0.5
         assert!((drop - 0.5).abs() < 1e-10);
-
-        // 0.5 points = 16/32nds
-        let drop_32 = roll.drop_32nds();
-        assert!((drop_32 - 16.0).abs() < 1e-10);
     }
 
     #[test]

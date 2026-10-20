@@ -76,14 +76,6 @@ pub struct RevolvingCreditPricer {
     model: ModelKey,
 }
 
-impl Default for RevolvingCreditPricer {
-    fn default() -> Self {
-        Self {
-            model: ModelKey::Discounting,
-        }
-    }
-}
-
 impl RevolvingCreditPricer {
     /// A positive `leq` (or LC `leq`) is contingent exposure at default: with
     /// no default model it is silently inert, so a standalone valuation

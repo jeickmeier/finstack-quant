@@ -222,14 +222,7 @@ fn mc_step_schedule(
             DayCountContext::default(),
         )?);
         let period_end = accrual_end - time::Duration::days(1);
-        let seasoning = mbs.seasoning_months(period_end);
-        let base_smm = mbs.prepayment_spec.smm(seasoning)?;
-        if !base_smm.is_finite() || !(0.0..=1.0).contains(&base_smm) {
-            return Err(Error::Validation(format!(
-                "MBS prepayment model returned invalid SMM={base_smm} at seasoning {seasoning} months on MC path; expected finite value in [0.0, 1.0]"
-            )));
-        }
-        base_smms.push(base_smm);
+        base_smms.push(mbs.smm(period_end)?);
     }
     Ok(McStepSchedule {
         payment_extras,

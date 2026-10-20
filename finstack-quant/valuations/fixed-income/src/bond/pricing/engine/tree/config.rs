@@ -14,9 +14,7 @@ use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
 /// `HoLee` model is a simple parallel-shift tree appropriate for quick estimates.
 /// For production callable bond OAS, use `HullWhite` with parameters fitted
 /// before pricing.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+#[derive(Debug, Clone)]
 pub enum TreeModelChoice {
     /// Ho-Lee model with normal short-rate volatility.
     HoLee {

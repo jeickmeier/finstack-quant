@@ -946,20 +946,6 @@ impl RevolvingCredit {
         }
     }
 
-    /// Get the current undrawn amount.
-    pub fn undrawn_amount(&self) -> finstack_quant_core::Result<Money> {
-        self.commitment.checked_sub(self.drawn)
-    }
-
-    /// Get the current utilization rate (drawn / committed).
-    pub fn utilization_rate(&self) -> f64 {
-        if self.commitment.amount() == 0.0 {
-            0.0
-        } else {
-            self.drawn.amount() / self.commitment.amount()
-        }
-    }
-
     /// Drawn balance on `date` of a deterministic draw/repay schedule.
     ///
     /// Starts from `drawn`, the balance at `anchor`, and replays in
@@ -1219,14 +1205,6 @@ impl RevolvingCredit {
     /// Check if the facility uses stochastic utilization.
     pub fn is_stochastic(&self) -> bool {
         matches!(self.draw_repay_spec, DrawRepaySpec::Stochastic(_))
-    }
-
-    /// Check if the facility has a credit curve configured for CS01 calculations.
-    ///
-    /// Returns `true` if `credit_curve_id` is set, indicating that credit risk
-    /// sensitivity (CS01) calculations are meaningful for this facility.
-    pub fn has_credit_curve(&self) -> bool {
-        self.credit_curve_id.is_some()
     }
 }
 

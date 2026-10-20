@@ -84,10 +84,8 @@ fn solve_ytm_timed_with(
         ));
     }
 
-    // Most one-cashflow conventions have a closed-form inverse.
-    // TreasuryActual can combine a simple fractional period with periodic
-    // compounding, so it must use the shared root solve below.
-    if cashflows.len() == 1 && !matches!(spec.compounding, YieldCompounding::TreasuryActual) {
+    // One-cashflow yields have a closed-form inverse.
+    if cashflows.len() == 1 {
         let (_, years, face_value) = cashflows[0];
         let fv = face_value.amount();
         if years > 0.0 && fv > 0.0 && target > 0.0 {
@@ -101,12 +99,6 @@ fn solve_ytm_timed_with(
                 YieldCompounding::Street => {
                     let m = super::quote_conversions::periods_per_year(spec.frequency)?.max(1.0);
                     m * (ratio.powf(1.0 / (m * years)) - 1.0)
-                }
-                YieldCompounding::TreasuryActual => {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "TreasuryActual one-cashflow yield requires numerical inversion"
-                            .to_string(),
-                    ));
                 }
                 YieldCompounding::Rate(Compounding::Periodic(periods)) => {
                     let m = f64::from(periods.get()).max(1.0);

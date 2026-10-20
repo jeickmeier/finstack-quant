@@ -3,7 +3,6 @@
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::constants::numerical::ZERO_TOLERANCE;
 use finstack_quant_valuations_core::instruments::BondRiskBasis;
@@ -107,116 +106,25 @@ impl MetricCalculator for ConvexityCalculator {
             return Ok(0.0);
         }
 
-        // Calculate convexity using quote_date as time origin
+        // Calculate convexity using quote_date as time origin. Street
+        // compounding: DF = (1 + y/m)^(-c) with c = m·t, so
+        // d²DF/dy² = c·(c + 1) / (m + y)² · DF.
+        let m = crate::bond::pricing::quote_conversions::periods_per_year(frequency)?.max(1.0);
         let mut d2_price = finstack_quant_core::math::summation::NeumaierAccumulator::new();
         for &(_, t, amount) in &timed {
             if t <= 0.0 {
                 continue;
             }
-            let df_second = df_second_derivative(yield_rate, t, comp, frequency)?;
-            d2_price.add(amount.amount() * df_second);
+            let df = crate::bond::pricing::quote_conversions::df_from_yield(
+                yield_rate, t, comp, frequency,
+            )?;
+            let c = m * t;
+            let denom = m + yield_rate;
+            d2_price.add(amount.amount() * c * (c + 1.0) / (denom * denom) * df);
         }
 
         Ok(d2_price.total() / price / 100.0)
     }
-}
-
-fn df_second_derivative(
-    ytm: f64,
-    t: f64,
-    comp: crate::bond::pricing::quote_conversions::YieldCompounding,
-    frequency: finstack_quant_core::dates::Tenor,
-) -> finstack_quant_core::Result<f64> {
-    use crate::bond::pricing::quote_conversions::{
-        df_from_yield, periods_per_year, YieldCompounding,
-    };
-
-    if t <= 0.0 {
-        return Ok(0.0);
-    }
-
-    let df = df_from_yield(ytm, t, comp, frequency)?;
-    Ok(match comp {
-        YieldCompounding::Rate(Compounding::Simple) => {
-            let denom = 1.0 + ytm * t;
-            2.0 * t * t / (denom * denom * denom)
-        }
-        YieldCompounding::Rate(Compounding::Annual) => {
-            let denom = 1.0 + ytm;
-            t * (t + 1.0) / (denom * denom) * df
-        }
-        YieldCompounding::Rate(Compounding::Periodic(m)) => {
-            let m = f64::from(m.get());
-            let c = m * t;
-            let denom = m + ytm;
-            c * (c + 1.0) / (denom * denom) * df
-        }
-        YieldCompounding::Rate(Compounding::Continuous) => t * t * df,
-        YieldCompounding::Street => {
-            let m = periods_per_year(frequency)?.max(1.0);
-            let c = m * t;
-            let denom = m + ytm;
-            c * (c + 1.0) / (denom * denom) * df
-        }
-        YieldCompounding::Moosmuller => {
-            let m = periods_per_year(frequency)?.max(1.0);
-            let n_full = (t * m).floor();
-            let mut w = t - n_full / m;
-            if w <= 1e-12 {
-                w = 1.0 / m;
-            }
-            if t <= w + 1e-12 {
-                let denom = 1.0 + ytm * w;
-                2.0 * w * w / (denom * denom * denom)
-            } else {
-                let k_minus_1 = ((t - w) * m).round().max(0.0);
-                let df_stub = 1.0 / (1.0 + ytm * w);
-                let df_periodic = (1.0 + ytm / m).powf(-k_minus_1);
-                let df_stub_prime = -w / (1.0 + ytm * w).powi(2);
-                let df_stub_second = 2.0 * w * w / (1.0 + ytm * w).powi(3);
-                let denom = m + ytm;
-                let df_periodic_prime = -(k_minus_1 / denom) * df_periodic;
-                let df_periodic_second =
-                    k_minus_1 * (k_minus_1 + 1.0) / (denom * denom) * df_periodic;
-                df_stub_second * df_periodic
-                    + 2.0 * df_stub_prime * df_periodic_prime
-                    + df_stub * df_periodic_second
-            }
-        }
-        YieldCompounding::TreasuryActual => {
-            let m = periods_per_year(frequency)?.max(1.0);
-            let period_length = 1.0 / m;
-
-            if t <= period_length {
-                let denom = 1.0 + ytm * t;
-                2.0 * t * t / (denom * denom * denom)
-            } else {
-                let n_full = (t * m).floor();
-                let stub_time = t - n_full / m;
-                if stub_time <= 1e-10 {
-                    let c = m * t;
-                    let denom = m + ytm;
-                    c * (c + 1.0) / (denom * denom) * df
-                } else {
-                    let df_stub = 1.0 / (1.0 + ytm * stub_time);
-                    let df_periodic = (1.0 + ytm / m).powf(-n_full);
-
-                    let df_stub_prime = -stub_time / (1.0 + ytm * stub_time).powi(2);
-                    let df_stub_second =
-                        2.0 * stub_time * stub_time / (1.0 + ytm * stub_time).powi(3);
-
-                    let denom = m + ytm;
-                    let df_periodic_prime = -(n_full / denom) * df_periodic;
-                    let df_periodic_second =
-                        n_full * (n_full + 1.0) / (denom * denom) * df_periodic;
-
-                    df_stub_second * df_periodic
-                        + 2.0 * df_stub_prime * df_periodic_prime
-                        + df_stub * df_periodic_second
-                }
-            }
-        }
-    })
 }
 
 #[cfg(test)]

@@ -25,7 +25,7 @@ use rust_decimal::prelude::ToPrimitive;
 /// * `ytm` - Yield to maturity as decimal (e.g., 0.05 for 5%)
 /// * `t` - Time in years from valuation date to cashflow date
 /// * `comp` - Compounding convention (see [`YieldCompounding`])
-/// * `bond_frequency` - Bond's coupon frequency (used for `Street` and `TreasuryActual`)
+/// * `bond_frequency` - Bond's coupon frequency (used for `Street` and `Moosmuller`)
 ///
 /// # Compounding Formulas
 ///
@@ -36,7 +36,6 @@ use rust_decimal::prelude::ToPrimitive;
 /// | Periodic(m) | `(1 + y/m)^(-m*t)` |
 /// | Continuous | `exp(-y*t)` |
 /// | Street | `(1 + y/f)^(-f*t)` where f = frequency |
-/// | TreasuryActual | Simple for t < 1/f, then periodic |
 /// | Moosmuller | `1/(1 + y*w) * (1 + y/f)^(-(k-1))` (schedule-aware in pricing) |
 ///
 /// # Errors
@@ -117,74 +116,6 @@ pub fn df_from_yield(
             }
             base.powf(-m * t)
         }
-        YieldCompounding::TreasuryActual => {
-            // ISDA/Treasury actual convention:
-            // - Use simple interest for the first (potentially irregular) period
-            // - Use periodic compounding for subsequent full periods
-            //
-            // LIMITATION: Stub period detection is TIME-BASED, not SCHEDULE-AWARE.
-            // We identify the first period as t < 1/frequency (i.e., less than
-            // one full coupon period). This is a reasonable approximation that
-            // captures the essence of the convention for standard bonds.
-            //
-            // For bonds with irregular first coupons that don't align with the
-            // standard frequency (e.g., a long-first stub spanning 8 months on
-            // a semi-annual bond), this heuristic may misclassify the stub.
-            // For exact ISDA compliance with non-standard structures, consider
-            // passing actual stub information from the cashflow schedule.
-            let m = periods_per_year(bond_frequency)?.max(1.0);
-            let period_length = 1.0 / m;
-
-            // Validate periodic compounding base for extreme negative yields
-            let periodic_base = 1.0 + ytm / m;
-            if periodic_base <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "TreasuryActual periodic base (1 + y/m) = {} is non-positive for ytm={}, m={}",
-                    periodic_base, ytm, m
-                )));
-            }
-
-            if t <= period_length {
-                // First (potentially stub) period: simple interest
-                let denom = 1.0 + ytm * t;
-                if denom <= 0.0 {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "TreasuryActual simple interest denom (1 + y*t) = {} is non-positive for ytm={}, t={}",
-                        denom, ytm, t
-                    )));
-                }
-                1.0 / denom
-            } else {
-                // For subsequent periods, we need to compound:
-                // - Simple interest for the first period portion
-                // - Periodic compounding for the remaining full periods
-                //
-                // Total time t = stub_time + n_full_periods / m
-                // where stub_time <= period_length
-                //
-                // DF = DF_stub * DF_periodic
-                //    = 1/(1 + y*stub) * (1 + y/m)^(-n_full_periods)
-                let n_full_periods = (t * m).floor();
-                let stub_time = t - n_full_periods / m;
-
-                if stub_time > 1e-10 {
-                    // Has a stub period
-                    let stub_denom = 1.0 + ytm * stub_time;
-                    if stub_denom <= 0.0 {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "TreasuryActual stub denom (1 + y*stub) = {} is non-positive for ytm={}, stub_time={}",
-                            stub_denom, ytm, stub_time
-                        )));
-                    }
-                    let df_stub = 1.0 / stub_denom;
-                    let df_periodic = periodic_base.powf(-n_full_periods);
-                    df_stub * df_periodic
-                } else {
-                    // No stub, pure periodic
-                    periodic_base.powf(-m * t)
-                }
-            }
-        }
         YieldCompounding::Moosmuller => {
             // Time-based Moosmüller: the fractional period at the start is `w`
             // and the remaining whole coupon periods are `k-1`. On a period
@@ -199,70 +130,6 @@ pub fn df_from_yield(
             df_moosmuller_with_first_period(ytm, t, m, w)?
         }
     })
-}
-
-/// Schedule-aware U.S. Treasury actual discount factor.
-///
-/// Treasury Appendix B decomposes the first payment horizon into an initial
-/// fractional quasi-coupon and zero or more full coupon periods:
-///
-/// ```text
-/// DF(t) = 1 / (1 + y * w) * (1 + y / m)^(-k)
-/// ```
-///
-/// where `w < 1/m` is the initial fractional period and `k` is the number of
-/// full periods through `t`. This distinction is material for a long first
-/// coupon: the full regular part compounds periodically rather than being
-/// folded into the simple-interest fraction.
-///
-/// Source: 31 CFR Part 356, Appendix B, section II.
-pub(super) fn df_treasury_actual_with_first_period(
-    ytm: f64,
-    t: f64,
-    m: f64,
-    first_period_len: f64,
-) -> finstack_quant_core::Result<f64> {
-    if !m.is_finite() || m <= 0.0 || !first_period_len.is_finite() || first_period_len <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "TreasuryActual requires positive finite frequency and first-period length; \
-             got m={m}, first_period_len={first_period_len}"
-        )));
-    }
-
-    // Split a long first period into its initial fractional quasi-coupon and
-    // complete regular periods. The epsilon keeps an exact regular boundary
-    // from becoming a nearly-full simple period under floating-point noise.
-    let complete_first_periods = (first_period_len * m + 1e-12).floor().max(0.0);
-    let mut fractional_period = first_period_len - complete_first_periods / m;
-    if fractional_period.abs() < 1e-12 {
-        fractional_period = 0.0;
-    }
-    if fractional_period < 0.0 || fractional_period >= 1.0 / m + 1e-12 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "TreasuryActual could not decompose first-period length {first_period_len} \
-             at frequency {m}"
-        )));
-    }
-
-    let simple_denom = 1.0 + ytm * fractional_period.min(t);
-    if simple_denom <= 0.0 || !simple_denom.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "TreasuryActual simple-interest denominator is invalid: {simple_denom}"
-        )));
-    }
-    let df_simple = 1.0 / simple_denom;
-
-    let periodic_periods = (m * (t - fractional_period).max(0.0)).round();
-    if periodic_periods == 0.0 {
-        return Ok(df_simple);
-    }
-    let periodic_base = 1.0 + ytm / m;
-    if periodic_base <= 0.0 || !periodic_base.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "TreasuryActual periodic base (1 + y/m) is invalid: {periodic_base}"
-        )));
-    }
-    Ok(df_simple * periodic_base.powf(-periodic_periods))
 }
 
 /// Moosmüller discount factor with a schedule-flagged first-period length `w`.
@@ -435,12 +302,9 @@ pub(crate) fn act365l_flow_times(
 
 /// Price from yield using explicit day count and frequency (no `Bond` borrow required).
 ///
-/// For the [`YieldCompounding::TreasuryActual`] convention the first (potentially
+/// For the [`YieldCompounding::Moosmuller`] convention the first (potentially
 /// irregular) coupon period is flagged from the **cashflow schedule** — the
 /// year-fraction to the first post-`as_of` flow — rather than inferred from time.
-/// This keeps the YTM↔price conversion correct for new issues with long first
-/// coupons, where the time-based `t <= 1/m` heuristic in [`df_from_yield`] would
-/// misapply simple interest to the wrong horizon.
 ///
 /// For ACT/ACT (ICMA) day counts, a reference coupon period inferred from the
 /// cashflow schedule (via the internal `icma_reference_period` helper) is supplied to the
@@ -479,7 +343,7 @@ pub fn price_from_ytm_compounded_params(
 /// # Arguments
 ///
 /// * `flows` - Payment dates, elapsed year fractions, and signed currency amounts.
-/// * `frequency` - Contractual coupon tenor used by Street, Treasury, and Moosmüller yields.
+/// * `frequency` - Contractual coupon tenor used by Street and Moosmüller yields.
 /// * `ytm` - Annual yield expressed as a decimal under `comp`.
 /// * `comp` - Convention converting elapsed time and yield into discount factors.
 pub(crate) fn price_from_ytm_timed(
@@ -488,12 +352,9 @@ pub(crate) fn price_from_ytm_timed(
     ytm: f64,
     comp: YieldCompounding,
 ) -> finstack_quant_core::Result<f64> {
-    // Schedule-aware first-period length for TreasuryActual / Moosmüller:
-    // the year-fraction from `as_of` to the first cashflow strictly after `as_of`.
-    let schedule_first_period = if matches!(
-        comp,
-        YieldCompounding::TreasuryActual | YieldCompounding::Moosmuller
-    ) {
+    // Schedule-aware first-period length for Moosmüller: the year-fraction
+    // from `as_of` to the first cashflow strictly after `as_of`.
+    let schedule_first_period = if matches!(comp, YieldCompounding::Moosmuller) {
         flows.iter().map(|&(_, yf, _)| yf).find(|&yf| yf > 0.0)
     } else {
         None
@@ -505,10 +366,6 @@ pub(crate) fn price_from_ytm_timed(
     for &(date, t, amount) in flows {
         if t > 0.0 {
             let df = match (comp, schedule_first_period) {
-                (YieldCompounding::TreasuryActual, Some(first_period_len)) => {
-                    let m = periods_per_year(frequency)?.max(1.0);
-                    df_treasury_actual_with_first_period(ytm, t, m, first_period_len)?
-                }
                 (YieldCompounding::Moosmuller, Some(w)) => {
                     // Coupon + redemption on the same payment date share `k`.
                     if moosmuller_date != Some(date) {

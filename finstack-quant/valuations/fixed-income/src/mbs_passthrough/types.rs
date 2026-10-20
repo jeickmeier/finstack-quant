@@ -494,10 +494,26 @@ impl AgencyMbsPassthrough {
         }
     }
 
-    /// Get SMM (single monthly mortality) for given date.
-    pub fn smm(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
-        let seasoning = self.seasoning_months(as_of);
-        self.prepayment_spec.smm(seasoning)
+    /// SMM (single monthly mortality) at the pool age on `date`.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Date whose pool age (months since issue, WALA) drives the
+    ///   PSA/CDR seasoning ramp.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the prepayment model yields an SMM that
+    /// is not finite or lies outside `[0, 1]`.
+    pub fn smm(&self, date: Date) -> finstack_quant_core::Result<f64> {
+        let seasoning = self.seasoning_months(date);
+        let smm = self.prepayment_spec.smm(seasoning)?;
+        if !smm.is_finite() || !(0.0..=1.0).contains(&smm) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "MBS prepayment model returned invalid SMM={smm} at seasoning {seasoning} months; expected finite value in [0.0, 1.0]"
+            )));
+        }
+        Ok(smm)
     }
 
     /// Pool factor: `current_face / original_face`.

@@ -113,14 +113,7 @@ pub fn generate_cashflows(
 
         // PSA/CDR seasoning ramps key off pool age (WALA), measured from the
         // issue date.
-        let seasoning = mbs.seasoning_months(period_end);
-        let raw_smm = mbs.prepayment_spec.smm(seasoning)?;
-        if !raw_smm.is_finite() || !(0.0..=1.0).contains(&raw_smm) {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "MBS prepayment model returned invalid SMM={raw_smm} at seasoning {seasoning} months; expected finite value in [0.0, 1.0]"
-            )));
-        }
-        let smm = raw_smm;
+        let smm = mbs.smm(period_end)?;
 
         // `wam_months` is the *remaining* WAM at the valuation date, so the level-pay
         // amortization horizon shrinks by one per projected period — not by
