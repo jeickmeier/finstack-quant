@@ -4,6 +4,7 @@
 //! and common `PnlAttribution` assembly. Currency conversion itself lives on
 //! [`MarketContext::convert_money`] — call sites here use it directly.
 
+use crate::factors::MarketRestoreFlags;
 use crate::AttributionRequest;
 use crate::{
     AttributionFactor, AttributionMethod, CarryDetail, ExecutionPolicy, MoveUnit, PnlAttribution,
@@ -36,70 +37,62 @@ use std::sync::Arc;
 /// stay snapshot-gated. A failed dependency lookup fails open (treat every
 /// family as used) so a missing declaration cannot drop a live factor.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct InstrumentFactorUse {
-    pub rates: bool,
-    pub credit: bool,
-    pub inflation: bool,
-    pub fx: bool,
-    pub volatility: bool,
-    pub scalars: bool,
-}
+pub(crate) struct InstrumentFactorUse(MarketRestoreFlags);
 
 impl InstrumentFactorUse {
-    const fn all() -> Self {
-        Self {
-            rates: true,
-            credit: true,
-            inflation: true,
-            fx: true,
-            volatility: true,
-            scalars: true,
-        }
-    }
-
     pub(crate) fn of(instrument: &dyn Instrument) -> Self {
         match instrument.market_dependencies() {
             Ok(deps) => Self::from_deps(&deps, instrument),
-            Err(_) => Self::all(),
+            Err(_) => Self(MarketRestoreFlags::all()),
         }
     }
 
     fn from_deps(deps: &MarketDependencies, instrument: &dyn Instrument) -> Self {
-        let rates =
-            !deps.curves.discount_curves.is_empty() || !deps.curves.forward_curves.is_empty();
-        let credit = !deps.curves.credit_curves.is_empty();
-        let inflation = !deps.curves.inflation_curves.is_empty();
-        let fx = !deps.fx_pairs.is_empty() || instrument.fx_exposure().is_some();
-        let volatility = !deps.volatility_dependencies.is_empty();
-        let scalars = !deps.market_scalar_ids.is_empty();
+        let families = [
+            (
+                !deps.curves.discount_curves.is_empty() || !deps.curves.forward_curves.is_empty(),
+                MarketRestoreFlags::RATES,
+            ),
+            (
+                !deps.curves.credit_curves.is_empty(),
+                MarketRestoreFlags::HAZARD,
+            ),
+            (
+                !deps.curves.inflation_curves.is_empty(),
+                MarketRestoreFlags::INFLATION,
+            ),
+            (
+                !deps.fx_pairs.is_empty() || instrument.fx_exposure().is_some(),
+                MarketRestoreFlags::FX,
+            ),
+            (
+                !deps.volatility_dependencies.is_empty(),
+                MarketRestoreFlags::VOL,
+            ),
+            (
+                !deps.market_scalar_ids.is_empty(),
+                MarketRestoreFlags::SCALARS,
+            ),
+        ];
         // An empty dependency set is "undeclared", not "uses nothing". Test
         // stubs and some custom instruments omit the declaration; fail open
         // so a live FX/scalar/credit factor is not dropped into residual.
-        if !rates && !credit && !inflation && !fx && !volatility && !scalars {
-            return Self::all();
+        if families.iter().all(|(used, _)| !used) {
+            return Self(MarketRestoreFlags::all());
         }
-        Self {
-            rates,
-            credit,
-            inflation,
-            fx,
-            volatility,
-            scalars,
-        }
+        // Correlations are not declared as dependencies, so they always count.
+        Self(
+            families
+                .into_iter()
+                .filter(|(used, _)| *used)
+                .fold(MarketRestoreFlags::CORRELATION, |all, (_, family)| {
+                    all | family
+                }),
+        )
     }
 
     pub(crate) fn uses_attribution_factor(self, factor: &AttributionFactor) -> bool {
-        match factor {
-            AttributionFactor::Carry
-            | AttributionFactor::ModelParameters
-            | AttributionFactor::Correlations => true,
-            AttributionFactor::RatesCurves => self.rates,
-            AttributionFactor::CreditCurves => self.credit,
-            AttributionFactor::InflationCurves => self.inflation,
-            AttributionFactor::Fx => self.fx,
-            AttributionFactor::Volatility => self.volatility,
-            AttributionFactor::MarketScalars => self.scalars,
-        }
+        MarketRestoreFlags::for_factor(factor).is_none_or(|family| self.0.contains(family))
     }
 }
 
@@ -1151,22 +1144,29 @@ mod tests {
         )
         .expect("bond");
         let factor_use = InstrumentFactorUse::of(&bond);
-        assert!(factor_use.rates);
-        assert!(!factor_use.credit);
-        assert!(!factor_use.inflation);
-        assert!(!factor_use.fx);
-        assert!(!factor_use.volatility);
-        assert!(!factor_use.scalars);
         assert!(factor_use.uses_attribution_factor(&AttributionFactor::RatesCurves));
-        assert!(!factor_use.uses_attribution_factor(&AttributionFactor::CreditCurves));
+        for unused in [
+            AttributionFactor::CreditCurves,
+            AttributionFactor::InflationCurves,
+            AttributionFactor::Fx,
+            AttributionFactor::Volatility,
+            AttributionFactor::MarketScalars,
+        ] {
+            assert!(!factor_use.uses_attribution_factor(&unused), "{unused:?}");
+        }
         assert!(factor_use.uses_attribution_factor(&AttributionFactor::Correlations));
         assert!(factor_use.uses_attribution_factor(&AttributionFactor::Carry));
+        assert!(factor_use.uses_attribution_factor(&AttributionFactor::ModelParameters));
 
         // Empty declarations are undeclared, not "uses nothing".
         let undeclared = InstrumentFactorUse::from_deps(&MarketDependencies::new(), &bond);
-        assert!(undeclared.fx);
-        assert!(undeclared.credit);
-        assert!(undeclared.scalars);
+        for factor in [
+            AttributionFactor::Fx,
+            AttributionFactor::CreditCurves,
+            AttributionFactor::MarketScalars,
+        ] {
+            assert!(undeclared.uses_attribution_factor(&factor), "{factor:?}");
+        }
     }
 
     /// Flat-YTM window curve must invert Street compounding at the bond's

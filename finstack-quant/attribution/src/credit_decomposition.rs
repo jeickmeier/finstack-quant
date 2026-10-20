@@ -50,22 +50,10 @@ impl AttributionInputs {
     ) -> Result<Option<super::CreditFactorAttribution>> {
         use finstack_quant_core::money::Money;
 
-        let Some((issuer_id, issuer_row)) = resolve_issuer(model, instrument.as_ref()) else {
+        let Some(cascade) = plan_credit_cascade(model, instrument, market_t0, market_t1, notes)?
+        else {
             return Ok(None);
         };
-        if issuer_row.is_none() {
-            notes.push(format!(
-                "credit_factor_detail unavailable: issuer {} not present in \
-                 CreditFactorModel.issuer_betas",
-                issuer_id
-            ));
-            return Ok(None);
-        }
-
-        let Some(cascade) = plan_credit_cascade(model, instrument, market_t0, market_t1)? else {
-            return Ok(None);
-        };
-        notes.extend(cascade.warnings.iter().cloned());
 
         let credit_snapshot = MarketSnapshot::extract(market_t0, MarketRestoreFlags::HAZARD);
         let cs01_base_market =

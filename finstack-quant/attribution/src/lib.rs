@@ -297,6 +297,7 @@ pub fn attribute_pnl(
     method: &AttributionMethod,
     request: &AttributionRequest<'_>,
 ) -> finstack_quant_core::Result<PnlAttribution> {
+    helpers::validate_attribution_period(request.as_of_t0, request.as_of_t1)?;
     match method {
         AttributionMethod::Parallel => parallel::attribute_pnl_parallel(request),
         AttributionMethod::Waterfall(order) => {

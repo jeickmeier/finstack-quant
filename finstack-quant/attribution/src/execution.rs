@@ -232,15 +232,7 @@ impl AttributionInputs {
                         attribution.credit_factor_detail = Some(detail);
                         attribution.meta.num_repricings += 2;
                     }
-                    Ok(None) => {
-                        if detail_notes.is_empty() {
-                            attribution.meta.notes.push(
-                                "credit_factor_model supplied but no resolvable issuer/CS01 \
-                                 on instrument; credit_factor_detail omitted"
-                                    .into(),
-                            );
-                        }
-                    }
+                    Ok(None) => {}
                     Err(e) => {
                         attribution
                             .meta

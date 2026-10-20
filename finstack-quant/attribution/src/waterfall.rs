@@ -32,9 +32,7 @@
 //! - Residual is minimal by construction (should be within numeric precision)
 //! - Recommended for risk reporting where sum must equal total
 
-use crate::credit_cascade::{
-    build_credit_factor_attribution, note_unplanned_cascade, plan_credit_cascade, CreditCascade,
-};
+use crate::credit_cascade::{build_credit_factor_attribution, plan_credit_cascade, CreditCascade};
 use crate::factors::*;
 use crate::helpers::*;
 use crate::AttributionRequest;
@@ -229,7 +227,6 @@ pub(crate) fn attribute_pnl_waterfall(
             }
         }
     }
-    validate_attribution_period(as_of_t0, as_of_t1)?;
 
     let (instrument_t0, val_t0, val_t1) = endpoint_values(request)?;
     let mut attribution = seed_attribution(
@@ -253,12 +250,15 @@ pub(crate) fn attribute_pnl_waterfall(
     // CreditCurves step when planning yields None (no issuer tag, no hazard
     // dependencies, etc.).
     let cascade: Option<CreditCascade> = match credit_factor_model {
-        Some(model) => plan_credit_cascade(model, instrument, market_t0, market_t1)?,
+        Some(model) => plan_credit_cascade(
+            model,
+            instrument,
+            market_t0,
+            market_t1,
+            &mut attribution.meta.notes,
+        )?,
         None => None,
     };
-    if credit_factor_model.is_some() && cascade.is_none() {
-        note_unplanned_cascade(&mut attribution, instrument.id(), "waterfall");
-    }
     let mut credit_step_pnls: Vec<finstack_quant_core::money::Money> = Vec::new();
 
     // Build hybrid market: start with all T₀, progressively apply T₁

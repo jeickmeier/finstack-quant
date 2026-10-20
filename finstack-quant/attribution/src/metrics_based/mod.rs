@@ -329,7 +329,6 @@ pub(crate) fn attribute_request(
         model_params_t0,
         ..
     } = *request;
-    validate_attribution_period(as_of_t0, as_of_t1)?;
     let instrument_t0 = instrument_at_t0(instrument, model_params_t0)?;
     let mut metrics_instrument = instrument_t0.clone_box();
     // A zero-day window has no carry (the metrics-based carry step zeroes it),

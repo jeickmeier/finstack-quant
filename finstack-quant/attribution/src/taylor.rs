@@ -256,7 +256,6 @@ fn compute_taylor_result(
         model_params_t0,
         ..
     } = *request;
-    validate_attribution_period(as_of_t0, as_of_t1)?;
     let (instrument_t0, pv_t0, pv_t1) = endpoint_values(request)?;
     // Decimal-exact difference: subtracting two large `.amount()` f64s loses
     // precision at high notionals, and `checked_sub` also rejects a currency
