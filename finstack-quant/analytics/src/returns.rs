@@ -1,6 +1,6 @@
-//! Return computation utilities: simple returns, excess returns, price conversion,
-//! compounded returns. Delegates to `math::stats::log_returns` for log variants
-//! and `math::summation` for numerically stable accumulation.
+//! Return computation utilities: simple returns from prices, excess returns,
+//! and compounded returns, accumulated with `math::summation` for numerical
+//! stability.
 //!
 //! Crate-internal: callers use these through [`crate::Performance`].
 

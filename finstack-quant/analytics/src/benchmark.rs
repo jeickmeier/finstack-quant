@@ -2,8 +2,7 @@
 //!
 //! [`beta`] and the result types ([`BetaResult`], [`GreeksResult`],
 //! [`RollingGreeks`], [`MultiFactorResult`]) are re-exported at the crate
-//! root. Everything else is crate-internal; `///` doc examples target crate
-//! developers and are marked `ignore`.
+//! root. Everything else is crate-internal.
 //!
 //! Delegates to `math::stats` for core statistics (correlation, covariance,
 //! variance, OnlineCovariance).
