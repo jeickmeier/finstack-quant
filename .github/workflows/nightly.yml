@@ -109,6 +109,16 @@ jobs:
           cache: true
           cache_save: false
 
+      # rust-cache hashes `rustc -vV` of every toolchain `rustup toolchain list`
+      # shows into its restore key. mise installs into the image's rustup
+      # (RUSTUP_HOME=~/.rustup), so the image's preinstalled `stable` is listed
+      # too, and it differs between ubuntu-latest images (1.99.0 vs 1.99.1): the
+      # key flips and the restore misses. Nothing builds with it: mise exports
+      # RUSTUP_TOOLCHAIN and rust-toolchain.toml pins the same version. Every
+      # rust-cache step needs this step before it.
+      - name: Remove the runner image's Rust toolchain
+        run: rustup toolchain uninstall stable
+
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
@@ -184,6 +194,10 @@ jobs:
           cache: true
           cache_save: false
 
+      # Keeps the image's Rust out of the rust-cache key (see Lint).
+      - name: Remove the runner image's Rust toolchain
+        run: rustup toolchain uninstall stable
+
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
@@ -230,6 +244,10 @@ jobs:
         with:
           cache: true
           cache_save: false
+
+      # Keeps the image's Rust out of the rust-cache key (see Lint).
+      - name: Remove the runner image's Rust toolchain
+        run: rustup toolchain uninstall stable
 
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
@@ -291,6 +309,10 @@ jobs:
         with:
           cache: true
           cache_save: false
+
+      # Keeps the image's Rust out of the rust-cache key (see Lint).
+      - name: Remove the runner image's Rust toolchain
+        run: rustup toolchain uninstall stable
 
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
