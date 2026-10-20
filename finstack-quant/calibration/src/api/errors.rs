@@ -48,28 +48,21 @@ pub struct StrictLoadDiagnostic {
     pub actual_version: Option<u32>,
 }
 
+/// The serde wire tag of a unit enum (`LoadPhase::Build` -> `"build"`).
+fn wire_tag<T: serde::Serialize>(value: &T) -> String {
+    serde_json::to_value(value)
+        .ok()
+        .and_then(|tag| tag.as_str().map(str::to_owned))
+        .unwrap_or_default()
+}
+
 impl StrictLoadDiagnostic {
     /// Project a core contract diagnostic onto the host-facing record.
     fn from_contract(diagnostic: &finstack_quant_core::contract::Diagnostic) -> Self {
-        use finstack_quant_core::contract::{LoadPhase, Severity};
-        let phase = match diagnostic.phase {
-            LoadPhase::Parse => "parse",
-            LoadPhase::Version => "version",
-            LoadPhase::Structure => "structure",
-            LoadPhase::Semantic => "semantic",
-            #[allow(unreachable_patterns)]
-            _ => "unknown",
-        };
-        let severity = match diagnostic.severity {
-            Severity::Error => "error",
-            Severity::Warning => "warning",
-            #[allow(unreachable_patterns)]
-            _ => "unknown",
-        };
         Self {
             code: diagnostic.code.clone(),
-            phase: phase.to_string(),
-            severity: severity.to_string(),
+            phase: wire_tag(&diagnostic.phase),
+            severity: wire_tag(&diagnostic.severity),
             pointer: diagnostic.pointer.clone(),
             message: diagnostic.message.clone(),
             contract: diagnostic.contract.clone(),
@@ -297,5 +290,24 @@ impl From<EnvelopeError> for finstack_quant_core::Error {
             message: err.to_string(),
             category,
         }
+    }
+}
+
+#[cfg(test)]
+mod wire_tag_tests {
+    use super::*;
+    use finstack_quant_core::contract::{Diagnostic, LoadPhase, Severity};
+
+    #[test]
+    fn build_phase_diagnostics_keep_their_phase() {
+        let diagnostic = Diagnostic::new(
+            "calibration/final-market",
+            LoadPhase::Build,
+            Severity::Error,
+            "bad",
+        );
+        let record = StrictLoadDiagnostic::from_contract(&diagnostic);
+        assert_eq!(record.phase, "build");
+        assert_eq!(record.severity, "error");
     }
 }
