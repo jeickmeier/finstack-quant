@@ -414,7 +414,6 @@
       "cprToSmm",
       "datedFlows",
       "datedFlowsJson",
-      "defaultModelSpecCdr2pct",
       "defaultModelSpecCumulativeDefaultFraction",
       "defaultModelSpecMdr",
       "defaultModelSpecMdrWithSurvival",
@@ -559,9 +558,6 @@
     "kind": "function"
   },
   "cashflows.datedFlowsJson": {
-    "kind": "function"
-  },
-  "cashflows.defaultModelSpecCdr2pct": {
     "kind": "function"
   },
   "cashflows.defaultModelSpecCumulativeDefaultFraction": {

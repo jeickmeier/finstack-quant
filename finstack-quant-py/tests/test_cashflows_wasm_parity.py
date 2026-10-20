@@ -380,7 +380,7 @@ def _default_models() -> Any:
     models = [
         DefaultModelSpec.constant_cdr(0.03),
         DefaultModelSpec.sda(1.5),
-        DefaultModelSpec.cdr_2pct(),
+        DefaultModelSpec.constant_cdr(0.02),
         DefaultModelSpec.vector([0.01, 0.02, 0.04]),
         DefaultModelSpec.cumulative_loss([0.5, 1.5, 2.0], 0.4),
         DefaultModelSpec.timing(0.1, [15, 30, 30, 15, 10]),

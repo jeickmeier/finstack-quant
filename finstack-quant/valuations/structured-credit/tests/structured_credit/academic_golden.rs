@@ -15,7 +15,7 @@
 //! - Moody's Investors Service. "WARF®: Measuring Portfolio Credit Risk in CLOs."
 
 use finstack_quant_cashflows::builder::{
-    clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr, psa_to_cpr,
+    clamped_cdr_to_mdr, clamped_cpr_to_smm, mdr_to_cdr, psa_cpr,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -51,31 +51,31 @@ fn test_psa_golden_100_percent() {
 
     // Month 1: 0.2% CPR
     assert!(
-        (psa_to_cpr(1.0, 1) - 0.002).abs() < RATE_TOLERANCE,
+        (psa_cpr(1.0, 1) - 0.002).abs() < RATE_TOLERANCE,
         "100% PSA month 1 should be exactly 0.2% CPR"
     );
 
     // Month 15: 3.0% CPR (halfway through ramp)
     assert!(
-        (psa_to_cpr(1.0, 15) - 0.03).abs() < RATE_TOLERANCE,
+        (psa_cpr(1.0, 15) - 0.03).abs() < RATE_TOLERANCE,
         "100% PSA month 15 should be exactly 3.0% CPR"
     );
 
     // Month 30: 6.0% CPR (terminal rate)
     assert!(
-        (psa_to_cpr(1.0, 30) - 0.06).abs() < RATE_TOLERANCE,
+        (psa_cpr(1.0, 30) - 0.06).abs() < RATE_TOLERANCE,
         "100% PSA month 30 should be exactly 6.0% CPR"
     );
 
     // Month 60: 6.0% CPR (flat after ramp)
     assert!(
-        (psa_to_cpr(1.0, 60) - 0.06).abs() < RATE_TOLERANCE,
+        (psa_cpr(1.0, 60) - 0.06).abs() < RATE_TOLERANCE,
         "100% PSA month 60 should remain at 6.0% CPR"
     );
 
     // Month 120: 6.0% CPR (flat after ramp)
     assert!(
-        (psa_to_cpr(1.0, 120) - 0.06).abs() < RATE_TOLERANCE,
+        (psa_cpr(1.0, 120) - 0.06).abs() < RATE_TOLERANCE,
         "100% PSA month 120 should remain at 6.0% CPR"
     );
 }
@@ -90,7 +90,7 @@ fn test_psa_golden_multiples() {
 
     for speed in speeds {
         let expected_cpr = speed * 0.06; // speed × 6% terminal CPR
-        let actual_cpr = psa_to_cpr(speed, month);
+        let actual_cpr = psa_cpr(speed, month);
 
         assert!(
             (actual_cpr - expected_cpr).abs() < RATE_TOLERANCE,
@@ -156,7 +156,7 @@ fn test_cdr_mdr_golden_conversion() {
         );
 
         // Verify roundtrip
-        let cdr_back = clamped_mdr_to_cdr(actual_mdr);
+        let cdr_back = mdr_to_cdr(actual_mdr).expect("valid MDR");
         assert!(
             (cdr_back - cdr).abs() < RATE_TOLERANCE,
             "{}: roundtrip failed: {} -> {} -> {}",

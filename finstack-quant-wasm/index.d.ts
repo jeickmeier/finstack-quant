@@ -14627,14 +14627,6 @@ export interface CashflowsNamespace {
   notionalValidate(notional: generated.cashflows.Notional): void;
 
   /**
-   * Constant 2% CDR baseline.
-   *
-   * @returns `DefaultModelSpec` wire object `{ curve: "constant", cdr: 0.02 }`.
-   * @throws If the model cannot be serialized.
-   */
-  defaultModelSpecCdr2pct(): generated.cashflows.DefaultModelSpec;
-
-  /**
    * Check a default model's curve parameters.
    *
    * @param spec - `DefaultModelSpec` wire object.

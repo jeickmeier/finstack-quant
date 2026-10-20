@@ -67,12 +67,16 @@ pub const PSA_RAMP_MONTHS: u32 = 30;
 /// Terminal annual CPR of the 100% PSA benchmark (6%).
 pub const PSA_TERMINAL_CPR: f64 = 0.06;
 
+/// Peak annual CDR of the 100% SDA benchmark (0.60%), reached at month 30.
+///
+/// [`DefaultModelSpec::Sda`](crate::builder::DefaultModelSpec::Sda) scales
+/// this curve by its `speed_multiplier`.
+pub const SDA_PEAK_CDR: f64 = 0.006;
+
 /// Annual CPR of the PSA benchmark curve at a loan age, scaled by speed.
 ///
 /// 100% PSA ramps linearly from 0.2% CPR at month 1 to 6% at month 30 and
-/// stays flat afterwards: `CPR = speed × 6% × min(age, 30) / 30`. This is
-/// the single PSA implementation of the workspace; mortgage, structured
-/// credit and stochastic-prepayment code call it.
+/// stays flat afterwards: `CPR = speed × 6% × min(age, 30) / 30`.
 ///
 /// # Arguments
 ///
@@ -149,7 +153,9 @@ fn monthly_to_annual(name: &str, monthly: f64) -> finstack_quant_core::Result<f6
     if monthly == 0.0 {
         return Ok(0.0);
     }
-    Ok(1.0 - (1.0 - monthly).powi(12))
+    // `1 - (1 - m)^12` through `expm1`/`ln_1p`, which keeps precision for
+    // small mortality rates exactly like the annual-to-monthly direction.
+    Ok(-(12.0 * (-monthly).ln_1p()).exp_m1())
 }
 
 /// Reject non-finite or out-of-range mortality rates with a self-describing
@@ -363,17 +369,6 @@ pub fn clamped_cpr_to_smm(cpr: f64) -> f64 {
     convert_clamped(cpr, cpr_to_smm)
 }
 
-/// Monthly SMM to annual CPR with the input clamped into `[0, 1]`.
-///
-/// # Arguments
-///
-/// * `smm` - Single monthly mortality as a decimal; clamped into `[0, 1]`.
-#[inline]
-#[must_use]
-pub fn clamped_smm_to_cpr(smm: f64) -> f64 {
-    convert_clamped(smm, smm_to_cpr)
-}
-
 /// Annual CDR to monthly MDR with the input clamped into `[0, 1]`.
 ///
 /// # Arguments
@@ -385,29 +380,6 @@ pub fn clamped_cdr_to_mdr(cdr: f64) -> f64 {
     convert_clamped(cdr, cdr_to_mdr)
 }
 
-/// Monthly MDR to annual CDR with the input clamped into `[0, 1]`.
-///
-/// # Arguments
-///
-/// * `mdr` - Monthly default rate as a decimal; clamped into `[0, 1]`.
-#[inline]
-#[must_use]
-pub fn clamped_mdr_to_cdr(mdr: f64) -> f64 {
-    convert_clamped(mdr, mdr_to_cdr)
-}
-
-/// Standard PSA curve CPR with a non-negative speed and the result capped at one.
-///
-/// # Arguments
-///
-/// * `speed_multiplier` - PSA speed as a multiple of the standard curve (`1.5` is 150 % PSA); negative values count as zero.
-/// * `month` - Seasoning in months since origination.
-#[inline]
-#[must_use]
-pub fn psa_to_cpr(speed_multiplier: f64, month: u32) -> f64 {
-    psa_cpr(speed_multiplier.max(0.0), month).min(1.0)
-}
-
 #[cfg(test)]
 mod clamped_tests {
     use super::*;
@@ -417,14 +389,6 @@ mod clamped_tests {
         assert_eq!(clamped_cpr_to_smm(0.0), 0.0);
         assert!((clamped_cpr_to_smm(1.5) - 1.0).abs() < 1e-12);
         assert!(clamped_cpr_to_smm(-0.2) == 0.0);
-        assert!((clamped_smm_to_cpr(clamped_cpr_to_smm(0.06)) - 0.06).abs() < 1e-12);
-        assert!((clamped_mdr_to_cdr(clamped_cdr_to_mdr(0.02)) - 0.02).abs() < 1e-12);
-    }
-
-    #[test]
-    fn psa_to_cpr_clamps_speed_and_result() {
-        assert_eq!(psa_to_cpr(-1.0, 30), 0.0);
-        assert_eq!(psa_to_cpr(50.0, 30), 1.0);
-        assert!((psa_to_cpr(1.0, 30) - psa_cpr(1.0, 30)).abs() < 1e-15);
+        assert!((clamped_cdr_to_mdr(0.02) - cdr_to_mdr(0.02).expect("valid CDR")).abs() < 1e-15);
     }
 }

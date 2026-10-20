@@ -70,7 +70,7 @@ fn default_correlation() -> f64 {
 
 impl Default for StochasticDefaultSpec {
     fn default() -> Self {
-        StochasticDefaultSpec::Deterministic(DefaultModelSpec::cdr_2pct())
+        StochasticDefaultSpec::Deterministic(DefaultModelSpec::constant_cdr(0.02))
     }
 }
 

@@ -94,7 +94,6 @@ const EXPORTED_KEYS = [
   'cprToSmm',
   'datedFlows',
   'datedFlowsJson',
-  'defaultModelSpecCdr2pct',
   'defaultModelSpecCumulativeDefaultFraction',
   'defaultModelSpecMdr',
   'defaultModelSpecMdrWithSurvival',

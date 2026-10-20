@@ -1834,12 +1834,12 @@ class DefaultModelSpec:
     Default rate model used to project defaults across a pool or portfolio.
 
     Constructed via named factories (:meth:`constant_cdr`, :meth:`sda`,
-    :meth:`cdr_2pct`) mirroring the Rust curve presets.
+    :meth:`vector`, ...) mirroring the Rust curve presets.
 
     Examples
     --------
     >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-    >>> DefaultModelSpec.cdr_2pct().curve["cdr"]
+    >>> DefaultModelSpec.constant_cdr(0.02).curve["cdr"]
     0.02
     """
 
@@ -1914,7 +1914,7 @@ class DefaultModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> DefaultModelSpec.cdr_2pct().curve["cdr"]
+        >>> DefaultModelSpec.constant_cdr(0.02).curve["cdr"]
         0.02
         """
         ...
@@ -2118,7 +2118,7 @@ class DefaultModelSpec:
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
         >>> round(DefaultModelSpec.timing(0.10, [50.0, 50.0]).cumulative_default_fraction(12), 12)
         0.05
-        >>> DefaultModelSpec.cdr_2pct().cumulative_default_fraction(12) is None
+        >>> DefaultModelSpec.constant_cdr(0.02).cumulative_default_fraction(12) is None
         True
         """
         ...
@@ -2156,7 +2156,7 @@ class DefaultModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> isinstance(DefaultModelSpec.cdr_2pct().to_json(), str)
+        >>> isinstance(DefaultModelSpec.constant_cdr(0.02).to_json(), str)
         True
         """
         ...
@@ -2184,7 +2184,7 @@ class DefaultModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> value = DefaultModelSpec.cdr_2pct()
+        >>> value = DefaultModelSpec.constant_cdr(0.02)
         >>> DefaultModelSpec.from_json(value.to_json()).to_json() == value.to_json()
         True
         """

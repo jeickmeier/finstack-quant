@@ -14,6 +14,8 @@
 //! - `default`: Default models (CDR/SDA) and events
 //! - `recovery`: Recovery specifications
 //! - `rate`: Loan coupon specification (fixed all-in rate or floating index plus spread)
+//! - `amortization`: Notional and amortization specifications
+//! - `principal`: Principal exchange policy and explicit principal events
 //!
 //! ## Responsibilities
 //!
@@ -40,7 +42,7 @@ mod schedule;
 /// # Errors
 ///
 /// Returns `Error::Validation` when the vector is empty or the entry is not
-/// a finite decimal in `[0, 1]` (rates) — the caller names the field.
+/// finite and non-negative; the caller names the field.
 pub(super) fn vector_at(
     values: &[f64],
     seasoning_months: u32,
@@ -59,6 +61,22 @@ pub(super) fn vector_at(
         )));
     }
     Ok(value)
+}
+
+/// Reject any per-month vector entry that is not a finite decimal in `[0, 1]`.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` naming `name[index]` for the first offending entry.
+pub(super) fn check_unit_vector(values: &[f64], name: &str) -> finstack_quant_core::Result<()> {
+    for (index, value) in values.iter().enumerate() {
+        if !value.is_finite() || !(0.0..=1.0).contains(value) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{name}[{index}] ({value}) must be a decimal in [0, 1]"
+            )));
+        }
+    }
+    Ok(())
 }
 
 pub use amortization::{AmortizationSpec, Notional};

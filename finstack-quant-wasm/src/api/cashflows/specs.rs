@@ -145,15 +145,6 @@ pub fn notional_validate(notional: JsValue) -> Result<(), JsValue> {
 
 // --- DefaultModelSpec ------------------------------------------------------------
 
-/// Constant 2% CDR baseline.
-///
-/// @returns `DefaultModelSpec` wire object `{ curve: "constant", cdr: 0.02 }`.
-/// @throws If the model cannot be serialized.
-#[wasm_bindgen(js_name = defaultModelSpecCdr2pct)]
-pub fn default_model_spec_cdr_2pct() -> Result<JsValue, JsValue> {
-    to_js_value(&DefaultModelSpec::cdr_2pct())
-}
-
 /// Check a default model's curve parameters.
 ///
 /// @param spec - `DefaultModelSpec` wire object.

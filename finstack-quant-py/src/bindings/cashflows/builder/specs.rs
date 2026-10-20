@@ -2019,7 +2019,7 @@ impl PyPrepaymentModelSpec {
 /// Examples
 /// --------
 /// >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-/// >>> DefaultModelSpec.cdr_2pct().curve["cdr"]
+/// >>> DefaultModelSpec.constant_cdr(0.02).curve["cdr"]
 /// 0.02
 #[pyclass(
     name = "DefaultModelSpec",
@@ -2052,15 +2052,6 @@ impl PyDefaultModelSpec {
     fn sda(speed_multiplier: f64) -> Self {
         Self {
             inner: DefaultModelSpec::sda(speed_multiplier),
-        }
-    }
-
-    /// 2% CDR baseline.
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn cdr_2pct() -> Self {
-        Self {
-            inner: DefaultModelSpec::cdr_2pct(),
         }
     }
 

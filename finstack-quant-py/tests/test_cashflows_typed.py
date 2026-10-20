@@ -99,11 +99,11 @@ class TestBuilderSpecs:
         timing = DefaultModelSpec.timing(0.10, [50.0, 50.0])
         assert timing.cumulative_default_fraction(12) == pytest.approx(0.05, abs=1e-12)
         assert timing.cumulative_default_fraction(0) == 0.0
-        assert DefaultModelSpec.cdr_2pct().cumulative_default_fraction(12) is None
+        assert DefaultModelSpec.constant_cdr(0.02).cumulative_default_fraction(12) is None
         # Timing curve: 50% of a 10% lifetime default in year 1, spread monthly.
         assert timing.mdr_with_survival(6, 1.0) == pytest.approx(0.05 / 12, abs=1e-15)
         assert timing.mdr_with_survival(6, 0.5) == pytest.approx(2 * timing.mdr_with_survival(6, 1.0), abs=1e-15)
-        constant = DefaultModelSpec.cdr_2pct()
+        constant = DefaultModelSpec.constant_cdr(0.02)
         assert constant.mdr_with_survival(6, 0.5) == constant.mdr(6)
         with pytest.raises(ValueError, match="surviving_balance_fraction"):
             timing.mdr_with_survival(6, -1.0)
@@ -598,7 +598,7 @@ class TestBuilderSpecs:
         assert PrepaymentModelSpec.constant_cpr(0.06).curve["cpr"] == pytest.approx(0.06)
         sda = DefaultModelSpec.sda(1.0)
         assert sda.mdr(30) > sda.mdr(1)
-        assert DefaultModelSpec.cdr_2pct().curve["cdr"] == pytest.approx(0.02)
+        assert DefaultModelSpec.constant_cdr(0.02).curve["cdr"] == pytest.approx(0.02)
         rec = RecoveryModelSpec(rate=0.40, recovery_lag=12)
         rec.validate()
         assert rec.recovery_lag == 12

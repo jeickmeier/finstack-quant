@@ -46,7 +46,6 @@ export const cashflows = {
   cprToSmm: wasm.cprToSmm,
   datedFlows: wasm.datedFlows,
   datedFlowsJson: wasm.datedFlowsJson,
-  defaultModelSpecCdr2pct: wasm.defaultModelSpecCdr2pct,
   defaultModelSpecCumulativeDefaultFraction: wasm.defaultModelSpecCumulativeDefaultFraction,
   defaultModelSpecMdr: wasm.defaultModelSpecMdr,
   defaultModelSpecMdrWithSurvival: wasm.defaultModelSpecMdrWithSurvival,

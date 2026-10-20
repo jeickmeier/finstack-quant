@@ -419,7 +419,7 @@ const cases = {
     const models = [
       { curve: 'constant', cdr: 0.03 },
       { curve: 'sda', speed_multiplier: 1.5 },
-      cashflows.defaultModelSpecCdr2pct(),
+      { curve: 'constant', cdr: 0.02 },
       { curve: 'vector', monthly_cdr: [0.01, 0.02, 0.04] },
       { curve: 'cumulative_loss', cumulative_net_loss_pct: [0.5, 1.5, 2.0], severity: 0.4 },
       { curve: 'timing', cumulative_default_rate: 0.1, annual_pct: [15, 30, 30, 15, 10] },
@@ -683,7 +683,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     kind('validation', /kind: unknown variant `coupon-ish`/)
   );
   assert.throws(
-    () => cashflows.defaultModelSpecMdr(cashflows.defaultModelSpecCdr2pct(), 1.5),
+    () => cashflows.defaultModelSpecMdr({ curve: 'constant', cdr: 0.02 }, 1.5),
     kind('invalid_type', /^seasoningMonths: /)
   );
   assert.throws(
@@ -769,7 +769,7 @@ test('CFCC-010: compounding presets and default-model survival helpers come from
     Math.abs(cashflows.defaultModelSpecCumulativeDefaultFraction(timing, 12) - 0.05) < 1e-12
   );
   assert.equal(
-    cashflows.defaultModelSpecCumulativeDefaultFraction(cashflows.defaultModelSpecCdr2pct(), 12),
+    cashflows.defaultModelSpecCumulativeDefaultFraction({ curve: 'constant', cdr: 0.02 }, 12),
     undefined
   );
   assert.ok(

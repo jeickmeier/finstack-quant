@@ -34,12 +34,10 @@
 
 use super::super::expected_shocked_smm;
 use super::traits::StochasticPrepayment;
-use finstack_quant_cashflows::builder::clamped_cpr_to_smm;
+use finstack_quant_cashflows::builder::{clamped_cpr_to_smm, PSA_RAMP_MONTHS};
 
 /// Refinancing slope parameter (lambda) of the arctangent incentive response.
 const REFI_SLOPE: f64 = 20.0;
-/// Seasoning ramp length in months (PSA-like ramp).
-const RAMP_MONTHS: u32 = 30;
 
 /// Richard-Roll prepayment model for RMBS.
 ///
@@ -104,10 +102,10 @@ impl RichardRollPrepay {
 
     /// Calculate the seasoning ramp multiplier.
     fn seasoning_multiplier(&self, seasoning: u32) -> f64 {
-        if seasoning >= RAMP_MONTHS {
+        if seasoning >= PSA_RAMP_MONTHS {
             1.0
         } else {
-            seasoning as f64 / RAMP_MONTHS as f64
+            seasoning as f64 / PSA_RAMP_MONTHS as f64
         }
     }
 }

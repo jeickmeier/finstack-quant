@@ -57,9 +57,8 @@ pub(crate) mod schedule;
 mod specs;
 
 pub use credit_rates::{
-    abs_to_smm, cdr_to_mdr, clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr,
-    clamped_smm_to_cpr, cpr_to_smm, mdr_to_cdr, psa_cpr, psa_to_cpr, smm_to_cpr, PSA_RAMP_MONTHS,
-    PSA_TERMINAL_CPR,
+    abs_to_smm, cdr_to_mdr, clamped_cdr_to_mdr, clamped_cpr_to_smm, cpr_to_smm, mdr_to_cdr,
+    psa_cpr, smm_to_cpr, PSA_RAMP_MONTHS, PSA_TERMINAL_CPR, SDA_PEAK_CDR,
 };
 pub use emission::emit_inflation_coupons;
 pub use floating_replay::{
