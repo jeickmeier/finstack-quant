@@ -82,6 +82,27 @@ fn attach_validation_result(
     }
 }
 
+/// Gate a solved curve with its curve validator and wrap it as a step outcome.
+fn validated_curve_outcome<C>(
+    curve: C,
+    report: CalibrationReport,
+    global_config: &CalibrationConfig,
+) -> StepOutcome
+where
+    C: CurveValidator + Into<CurveStorage>,
+{
+    let report = attach_validation_result(
+        report,
+        curve.validate(&global_config.validation),
+        global_config,
+    );
+    StepOutcome {
+        output: StepOutput::Curve(curve.into()),
+        credit_index_update: None,
+        report,
+    }
+}
+
 /// Hull-White quote structs carry a normal/Black flag but no displacement.
 /// Reject shifted coordinates before a quote can be reinterpreted as Black.
 fn hw_quote_is_normal(quote_type: VolQuoteType) -> Result<bool> {
@@ -312,7 +333,7 @@ pub(crate) fn apply_output(
 }
 
 /// Execute calibration logic for the provided [`StepParams`].
-pub(crate) fn execute_params(
+fn execute_params(
     params: &StepParams,
     quotes: &[MarketQuote],
     context: &MarketContext,
@@ -324,59 +345,19 @@ pub(crate) fn execute_params(
     match params {
         StepParams::Discount(p) => {
             let (curve, report) = DiscountCurveTarget::solve(p, quotes, context, global_config)?;
-            let report = attach_validation_result(
-                report,
-                curve.validate(&global_config.validation),
-                global_config,
-            );
-            let output = StepOutput::Curve(curve.into());
-            Ok(StepOutcome {
-                output,
-                credit_index_update: None,
-                report,
-            })
+            Ok(validated_curve_outcome(curve, report, global_config))
         }
         StepParams::Forward(p) => {
             let (curve, report) = ForwardCurveTarget::solve(p, quotes, context, global_config)?;
-            let report = attach_validation_result(
-                report,
-                curve.validate(&global_config.validation),
-                global_config,
-            );
-            let output = StepOutput::Curve(curve.into());
-            Ok(StepOutcome {
-                output,
-                credit_index_update: None,
-                report,
-            })
+            Ok(validated_curve_outcome(curve, report, global_config))
         }
         StepParams::Hazard(p) => {
             let (curve, report) = HazardCurveTarget::solve(p, quotes, context, global_config)?;
-            let report = attach_validation_result(
-                report,
-                curve.validate(&global_config.validation),
-                global_config,
-            );
-            let output = StepOutput::Curve(curve.into());
-            Ok(StepOutcome {
-                output,
-                credit_index_update: None,
-                report,
-            })
+            Ok(validated_curve_outcome(curve, report, global_config))
         }
         StepParams::Inflation(p) => {
             let (curve, report) = InflationCurveTarget::solve(p, quotes, context, global_config)?;
-            let report = attach_validation_result(
-                report,
-                curve.validate(&global_config.validation),
-                global_config,
-            );
-            let output = StepOutput::Curve(curve.into());
-            Ok(StepOutcome {
-                output,
-                credit_index_update: None,
-                report,
-            })
+            Ok(validated_curve_outcome(curve, report, global_config))
         }
         StepParams::BaseCorrelation(p) => {
             let (curve, index_update, report) =
