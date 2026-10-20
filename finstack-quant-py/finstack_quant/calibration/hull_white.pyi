@@ -636,7 +636,7 @@ def calibrate_hull_white_to_swaptions(
     discount: DiscountCurve,
     quotes: list[SwaptionQuote],
     fit_tolerance: float,
-    frequency: str = "semi_annual",
+    frequency: str | None = None,
     initial_guess: HullWhiteCalibrationParams | None = None,
 ) -> tuple[HullWhiteCalibrationParams, CalibrationReport]:
     """Fit scalar Hull-White parameters to at-the-money swaption quotes.
@@ -653,9 +653,9 @@ def calibrate_hull_white_to_swaptions(
         quotes use decimal rate volatility (0.0001 is one basis point); Black
         quotes use relative volatility. A poor fit returns a report with
         ``success=False``; callers must inspect it before using the parameters.
-    frequency : str, default "semi_annual"
+    frequency : str | None, default None
         Fixed-leg payment frequency: ``"annual"``, ``"semi_annual"`` or
-        ``"quarterly"``.
+        ``"quarterly"``; None uses the Rust default (``"semi_annual"``).
     initial_guess : HullWhiteCalibrationParams | None, default None
         Solver starting point; Rust defaults when None.
 

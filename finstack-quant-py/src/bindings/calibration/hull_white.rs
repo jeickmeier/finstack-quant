@@ -544,8 +544,9 @@ fn curve_of(curve: &Bound<'_, PyAny>, label: &str) -> PyResult<Arc<DiscountCurve
 /// fit_tolerance : float
 ///     Required positive maximum reconstructed quote error: decimal rate volatility
 ///     for normal quotes, relative volatility for Black quotes. Independent of solver tolerance.
-/// frequency : str, default "semi_annual"
-///     Fixed-leg payment frequency: ``"annual"``, ``"semi_annual"`` or ``"quarterly"``.
+/// frequency : str | None, default None
+///     Fixed-leg payment frequency: ``"annual"``, ``"semi_annual"`` or ``"quarterly"``;
+///     ``None`` uses the Rust default (``"semi_annual"``).
 /// initial_guess : HullWhiteCalibrationParams | None, default None
 ///     Starting point for the solver; Rust defaults when ``None``.
 ///
@@ -562,21 +563,23 @@ fn curve_of(curve: &Bound<'_, PyAny>, label: &str) -> PyResult<Arc<DiscountCurve
 /// RuntimeError
 ///     If the solver fails to converge.
 #[pyfunction]
-#[pyo3(signature = (discount, quotes, fit_tolerance, frequency = "semi_annual", initial_guess = None))]
-#[pyo3(
-    text_signature = "(discount, quotes, fit_tolerance, frequency='semi_annual', initial_guess=None)"
-)]
+#[pyo3(signature = (discount, quotes, fit_tolerance, frequency = None, initial_guess = None))]
+#[pyo3(text_signature = "(discount, quotes, fit_tolerance, frequency=None, initial_guess=None)")]
 fn calibrate_hull_white_to_swaptions(
     py: Python<'_>,
     discount: &Bound<'_, PyAny>,
     quotes: Vec<PyRef<'_, PySwaptionQuote>>,
     fit_tolerance: f64,
-    frequency: &str,
+    frequency: Option<&str>,
     initial_guess: Option<PyRef<'_, PyHullWhiteCalibrationParams>>,
 ) -> PyResult<(PyHullWhiteCalibrationParams, PyCalibrationReport)> {
     let curve = curve_of(discount, "discount")?;
     let quotes: Vec<SwaptionQuote> = quotes.into_iter().map(|q| q.inner).collect();
-    let frequency = frequency.parse().map_err(core_to_py)?;
+    let frequency = frequency
+        .map(str::parse::<rust_hw::SwapFrequency>)
+        .transpose()
+        .map_err(core_to_py)?
+        .unwrap_or_default();
     let initial_guess = initial_guess.map(|p| p.inner);
     let (params, report) = py
         .detach(move || {
