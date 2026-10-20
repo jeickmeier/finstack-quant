@@ -496,8 +496,7 @@ mod tests {
         let quote = RateQuote::Futures {
             id: QuoteId::new("TEST-SR3-M6"),
             contract: IrFutureContractId::new("CME:SR3"),
-            expiry: Date::from_calendar_date(2026, finstack_quant_core::dates::Month::June, 17)
-                .expect("valid date"),
+            expiry: Date::from_calendar_date(2026, time::Month::June, 17).expect("valid date"),
             price: 96.00,
             convexity_adjustment: 0.0,
         };

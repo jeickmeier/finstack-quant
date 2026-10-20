@@ -16,7 +16,7 @@ use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::{
 use finstack_quant_valuations_fixed_income::bond::{Bond, CashflowSpec};
 use time::macros::date;
 
-fn flat_jpy_market(as_of: time::Date) -> MarketContext {
+fn flat_jpy_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
     let curve = DiscountCurve::builder("JPY-JGB")
         .base_date(as_of)
         .knots([(0.0, 1.0), (5.0, 0.90)])
@@ -41,7 +41,11 @@ fn two_year_jgb_style_bond() -> Bond {
         .expect("JGB-style bullet")
 }
 
-fn japanese_simple_yield(bond: &Bond, market: &MarketContext, as_of: time::Date) -> f64 {
+fn japanese_simple_yield(
+    bond: &Bond,
+    market: &MarketContext,
+    as_of: finstack_quant_core::dates::Date,
+) -> f64 {
     *bond
         .price_with_metrics(
             market,

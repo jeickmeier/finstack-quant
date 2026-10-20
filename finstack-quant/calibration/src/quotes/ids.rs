@@ -1,9 +1,9 @@
 //! Quote identifiers and pillar types.
 
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::Tenor;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use time::Date;
 
 /// A stable identifier for a market quote (e.g., "USD-OIS-SWAP-5Y").
 ///

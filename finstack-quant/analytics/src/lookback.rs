@@ -4,8 +4,9 @@
 //! [`select_range`] returns a `Range<usize>` into the sorted dates/returns
 //! arrays for a `[period_start, ref_date]` window.
 
-use crate::dates::{Date, DateExt, FiscalConfig, Month};
+use crate::dates::{Date, DateExt, FiscalConfig};
 use core::ops::Range;
+use time::Month;
 
 /// Index range `[period_start, ref_date]` inclusive in a sorted date slice.
 pub(crate) fn select_range(dates: &[Date], period_start: Date, ref_date: Date) -> Range<usize> {
@@ -48,7 +49,7 @@ pub(crate) fn fytd_start_date(ref_date: Date, fiscal_config: FiscalConfig) -> Da
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::Duration;
+    use time::Duration;
     fn d(y: i32, m: u8, day: u8) -> Date {
         crate::dates::create_date(y, Month::try_from(m).expect("valid month"), day)
             .expect("valid date")

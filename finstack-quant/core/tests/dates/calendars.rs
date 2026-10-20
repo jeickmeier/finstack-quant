@@ -3,9 +3,10 @@
 use super::common::{by_id, make_date};
 use finstack_quant_core::dates::{
     adjust, available_calendars, calendar_by_id_strict, BusinessDayConvention, Date, DateExt,
-    HolidayCalendar, Month,
+    HolidayCalendar,
 };
 use std::collections::HashSet;
+use time::Month;
 use time::Weekday;
 
 fn holiday_set(cal: &dyn HolidayCalendar, year: i32) -> HashSet<Date> {

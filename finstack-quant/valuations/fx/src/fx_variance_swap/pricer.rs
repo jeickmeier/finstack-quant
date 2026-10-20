@@ -589,7 +589,7 @@ mod tests {
                 swap.strike_variance = 0.0;
                 let dates = observation_dates(&swap).expect("dates");
                 let final_date = *dates.last().expect("last");
-                let as_of = final_date - finstack_quant_core::dates::Duration::days(1);
+                let as_of = final_date - time::Duration::days(1);
                 let market = zero_rate_market(as_of, 0.00001);
                 // Exactly two known returns, +1% then -1%; all remaining
                 // historical closes and the final close are 1.0.

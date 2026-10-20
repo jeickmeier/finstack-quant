@@ -463,8 +463,10 @@ impl PyPeriodPlan {
             .iter()
             .map(|p| p.id.to_string())
             .collect();
-        let starts: Vec<time::Date> = self.inner.periods.iter().map(|p| p.start).collect();
-        let ends: Vec<time::Date> = self.inner.periods.iter().map(|p| p.end).collect();
+        let starts: Vec<finstack_quant_core::dates::Date> =
+            self.inner.periods.iter().map(|p| p.start).collect();
+        let ends: Vec<finstack_quant_core::dates::Date> =
+            self.inner.periods.iter().map(|p| p.end).collect();
         let actual: Vec<bool> = self.inner.periods.iter().map(|p| p.is_actual).collect();
         let columns = PyDict::new(py);
         columns.set_item("id", ids)?;

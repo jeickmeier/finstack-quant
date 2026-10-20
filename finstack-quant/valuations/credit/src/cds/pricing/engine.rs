@@ -169,10 +169,8 @@ impl CdsPricer {
         // covered); Bloomberg CDSW/CDSO conventions integrate from the
         // valuation date ("protection starts immediately"). See
         // `CdsValuationConvention::protection_step_in_days`.
-        let step_in = as_of
-            + finstack_quant_core::dates::Duration::days(
-                cds.valuation_convention.protection_step_in_days(),
-            );
+        let step_in =
+            as_of + time::Duration::days(cds.valuation_convention.protection_step_in_days());
         let protection_start = step_in.max(cds.protection_start());
         let protection_end = cds.premium_leg.end;
 

@@ -48,7 +48,7 @@ pub(super) enum TimePoint {
     /// Year fraction from the curve base date.
     Years(f64),
     /// Calendar date, converted with the curve day count by Rust.
-    Date(time::Date),
+    Date(finstack_quant_core::dates::Date),
 }
 
 /// Extract a [`TimePoint`] from a `float`/`int` (year fraction), a

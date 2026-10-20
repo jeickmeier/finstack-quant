@@ -441,8 +441,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::{Duration, Month};
     use crate::risk_metrics::return_based::{sortino, volatility};
+    use time::{Duration, Month};
     fn jan1(year: i32) -> Date {
         Date::from_calendar_date(year, Month::January, 1).expect("valid date")
     }

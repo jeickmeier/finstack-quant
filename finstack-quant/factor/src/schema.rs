@@ -19,12 +19,12 @@ fn example_credit_inputs(
     use std::collections::BTreeMap;
 
     let months = [
-        finstack_quant_core::dates::Month::January,
-        finstack_quant_core::dates::Month::February,
-        finstack_quant_core::dates::Month::March,
-        finstack_quant_core::dates::Month::April,
-        finstack_quant_core::dates::Month::May,
-        finstack_quant_core::dates::Month::June,
+        time::Month::January,
+        time::Month::February,
+        time::Month::March,
+        time::Month::April,
+        time::Month::May,
+        time::Month::June,
     ];
     let dates = months
         .into_iter()

@@ -157,7 +157,7 @@ fn test_fixed_amount_oid_prorated_across_draws() {
 
     // Draw dates fall mid-quarter, so the only flows on those dates are the
     // funding legs. Pro-rata OID: 300k × 6/10 = 180k, 300k × 4/10 = 120k.
-    let funding_at = |date: time::Date| -> f64 {
+    let funding_at = |date: finstack_quant_core::dates::Date| -> f64 {
         flows
             .iter()
             .filter(|(d, _)| *d == date)
@@ -675,9 +675,9 @@ mod margin_stepup_period_semantics {
     use rust_decimal::Decimal;
 
     /// Off-cycle step date in the middle of the second quarterly period.
-    const STEP_DATE: time::Date = date!(2025 - 05 - 15);
+    const STEP_DATE: finstack_quant_core::dates::Date = date!(2025 - 05 - 15);
     /// First period start on/after the step date (LSTA effective boundary).
-    const NEXT_PERIOD_START: time::Date = date!(2025 - 07 - 01);
+    const NEXT_PERIOD_START: finstack_quant_core::dates::Date = date!(2025 - 07 - 01);
 
     fn stepup_covenants() -> TermLoanCovenantEvents {
         TermLoanCovenantEvents {
@@ -765,11 +765,20 @@ mod margin_stepup_period_semantics {
     }
 
     /// `(accrual_start, accrual_end)` for every interest-like flow, in date order.
-    fn accrual_periods(loan: &TermLoan, market: &MarketContext) -> Vec<(time::Date, time::Date)> {
+    fn accrual_periods(
+        loan: &TermLoan,
+        market: &MarketContext,
+    ) -> Vec<(
+        finstack_quant_core::dates::Date,
+        finstack_quant_core::dates::Date,
+    )> {
         let schedule = loan
             .cashflow_schedule(market, date!(2025 - 01 - 01))
             .expect("cashflow schedule should succeed");
-        let mut periods: Vec<(time::Date, time::Date)> = schedule
+        let mut periods: Vec<(
+            finstack_quant_core::dates::Date,
+            finstack_quant_core::dates::Date,
+        )> = schedule
             .get_flows()
             .iter()
             .filter(|cf| cf.kind.is_interest_like())
@@ -813,11 +822,11 @@ mod margin_stepup_period_semantics {
         // The new margin first applies to the period starting at the next
         // period boundary (2025-07-01): earlier coupons match the no-step-up
         // loan, later coupons exceed it by the 100 bp step.
-        let coupon_amounts = |loan: &TermLoan| -> Vec<(time::Date, f64)> {
+        let coupon_amounts = |loan: &TermLoan| -> Vec<(finstack_quant_core::dates::Date, f64)> {
             let schedule = loan
                 .cashflow_schedule(&market, date!(2025 - 01 - 01))
                 .unwrap();
-            let mut flows: Vec<(time::Date, f64)> = schedule
+            let mut flows: Vec<(finstack_quant_core::dates::Date, f64)> = schedule
                 .get_flows()
                 .iter()
                 .filter(|cf| cf.kind.is_interest_like())
@@ -864,7 +873,7 @@ mod margin_stepup_period_semantics {
             let schedule = loan
                 .cashflow_schedule(&market, date!(2025 - 01 - 01))
                 .unwrap();
-            let mut flows: Vec<(time::Date, f64)> = schedule
+            let mut flows: Vec<(finstack_quant_core::dates::Date, f64)> = schedule
                 .get_flows()
                 .iter()
                 .filter(|cf| cf.kind.is_interest_like())
@@ -991,7 +1000,7 @@ fn commitment_fees_are_paid_once_per_period_on_the_payment_date() {
     let schedule = loan
         .cashflow_schedule(&build_market_context(), issue)
         .expect("schedule");
-    let fees: Vec<(time::Date, f64)> = schedule
+    let fees: Vec<(finstack_quant_core::dates::Date, f64)> = schedule
         .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::CommitmentFee)

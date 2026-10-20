@@ -920,12 +920,9 @@ mod tests {
 
     #[test]
     fn missing_or_non_finite_futures_convexity_is_envelope_error() {
-        let expiry = finstack_quant_core::dates::Date::from_calendar_date(
-            2026,
-            finstack_quant_core::dates::Month::March,
-            17,
-        )
-        .expect("valid expiry");
+        let expiry =
+            finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::March, 17)
+                .expect("valid expiry");
         let mut env = empty_envelope("bad-convexity");
         env.plan
             .quote_sets

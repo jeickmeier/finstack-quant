@@ -1214,8 +1214,9 @@ impl JsForwardCurve {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::{DayCount, Month};
+    use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
+    use time::Month;
 
     #[test]
     fn parse_iso_date_components_and_roundtrip() {

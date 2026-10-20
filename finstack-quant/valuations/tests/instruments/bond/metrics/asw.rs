@@ -14,7 +14,7 @@ use finstack_quant_valuations::metrics::{standard_registry, MetricContext, Metri
 use std::sync::Arc;
 use time::macros::date;
 
-fn simple_discount_curve(id: &str, as_of: time::Date) -> DiscountCurve {
+fn simple_discount_curve(id: &str, as_of: finstack_quant_core::dates::Date) -> DiscountCurve {
     DiscountCurve::builder(id)
         .base_date(as_of)
         .knots([(0.0, 1.0), (5.0, 0.9)])
@@ -23,7 +23,7 @@ fn simple_discount_curve(id: &str, as_of: time::Date) -> DiscountCurve {
         .unwrap()
 }
 
-fn simple_fixed_bond(as_of: time::Date) -> Bond {
+fn simple_fixed_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
     Bond::fixed(
         "ASW-TEST",
         Money::new(100.0, Currency::USD).expect("valid money fixture"),
@@ -36,7 +36,7 @@ fn simple_fixed_bond(as_of: time::Date) -> Bond {
     .expect("Test bond creation should succeed")
 }
 
-fn simple_forward_curve(id: &str, as_of: time::Date) -> ForwardCurve {
+fn simple_forward_curve(id: &str, as_of: finstack_quant_core::dates::Date) -> ForwardCurve {
     ForwardCurve::builder(id, 0.25)
         .base_date(as_of)
         .knots(vec![(0.5, 0.04), (5.0, 0.045), (10.0, 0.05)])
@@ -221,7 +221,8 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
     if let Ok(cal) = finstack_quant_core::dates::calendar_by_id_strict(&spec.schedule.calendar_id) {
         builder = builder.adjust_with(spec.schedule.business_day_convention, cal);
     }
-    let sched: Vec<time::Date> = builder.build().expect("schedule").into_iter().collect();
+    let sched: Vec<finstack_quant_core::dates::Date> =
+        builder.build().expect("schedule").into_iter().collect();
 
     let (par_rate, fixed_ann) = par_rate_and_annuity_from_discount(
         &disc,

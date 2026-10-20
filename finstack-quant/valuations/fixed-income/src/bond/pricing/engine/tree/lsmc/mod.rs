@@ -22,7 +22,7 @@ use finstack_quant_cashflows::builder::{
 use finstack_quant_cashflows::builder::{CouponType, FloatingCouponSpec, FloatingRateFallback};
 use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::dates::calendar_by_id_strict;
-use finstack_quant_core::dates::{adjust, Date, DateExt, DayCount, DayCountContext, Duration};
+use finstack_quant_core::dates::{adjust, Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::{fixing_series_id, require_fixing_value_exact};
 use finstack_quant_core::market_data::traits::Discounting;
@@ -42,6 +42,7 @@ use finstack_quant_valuations_core::instruments::common_impl::pricing::rates_cre
 use rust_decimal::prelude::ToPrimitive;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, BTreeSet};
+use time::Duration;
 
 mod build;
 mod policy;

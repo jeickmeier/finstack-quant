@@ -394,9 +394,10 @@ fn finalize_correlation_matrix(matrix: Vec<Vec<f64>>) -> crate::Result<(Vec<Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::{Month, PeriodKind};
+    use crate::dates::PeriodKind;
     use crate::math::linalg::validate_correlation_matrix;
     use crate::Performance;
+    use time::Month;
 
     fn jan(day: u8) -> Date {
         Date::from_calendar_date(2024, Month::January, day).expect("valid date")

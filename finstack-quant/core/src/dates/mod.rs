@@ -1,12 +1,12 @@
 //! Date utilities: business-day adjustments, day-counts, schedules, IMM helpers.
 //!
 //! This module wraps the [`time`](https://docs.rs/time) crate and exposes
-//! domain-specific helpers commonly needed by pricing engines. Everything is
-//! available through `finstack_quant_core::dates`, keeping downstream dependencies
-//! small and version-stable.
+//! domain-specific helpers commonly needed by pricing engines through
+//! `finstack_quant_core::dates`. `Date` is re-exported here; `Month`, `Duration`,
+//! `Weekday` and the other `time` types are imported from `time` directly.
 //!
 //! # Highlights
-//! - ergonomic re-exports of `time` primitives (`Date`, `OffsetDateTime`, …)
+//! - re-export of `time::Date` (import every other `time` type from `time` itself)
 //! - holiday calendars and business-day conventions (`adjust`, `HolidayCalendar`)
 //! - schedule generation utilities (`ScheduleBuilder`)
 //! - IMM/third-Wednesday helpers for derivatives roll dates
@@ -117,7 +117,7 @@
 /// and credit derivative markets.
 pub const CALENDAR_DAYS_PER_YEAR: f64 = 365.0;
 
-pub use time::{Date, Duration, Month, OffsetDateTime, PrimitiveDateTime};
+pub use time::Date;
 
 mod date_extensions;
 

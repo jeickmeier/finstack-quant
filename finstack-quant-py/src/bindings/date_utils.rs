@@ -1,6 +1,6 @@
 //! Date conversion helpers shared by the Python bindings.
 //!
-//! Every Python↔`time::Date` conversion lives here: date-like objects
+//! Every Python↔`finstack_quant_core::dates::Date` conversion lives here: date-like objects
 //! (`py_to_date` / `date_to_py`), ISO-8601 strings (`py_to_date` /
 //! `extract_date_iso`), and calendar parts (`month_from_u8` / `date_from_ymd`).
 
@@ -9,7 +9,7 @@ use pyo3::types::PyModule;
 
 use crate::errors::{display_to_py, value_error};
 
-/// Convert a Python date-like object or ISO-8601 string to a Rust [`time::Date`].
+/// Convert a Python date-like object or ISO-8601 string to a Rust [`finstack_quant_core::dates::Date`].
 ///
 /// Accepts any object exposing integer `year`/`month`/`day` attributes
 /// (`datetime.date`, `datetime.datetime`, `pandas.Timestamp`, …) as well as an
@@ -20,7 +20,7 @@ use crate::errors::{display_to_py, value_error};
 ///
 /// Returns `TypeError` when `obj` is neither a string nor date-like, and
 /// `ValueError` when a string is not valid ISO 8601.
-pub(crate) fn py_to_date(obj: &Bound<'_, PyAny>) -> PyResult<time::Date> {
+pub(crate) fn py_to_date(obj: &Bound<'_, PyAny>) -> PyResult<finstack_quant_core::dates::Date> {
     if let Ok(s) = obj.extract::<std::borrow::Cow<'_, str>>() {
         return finstack_quant_core::dates::parse_iso_date(&s).map_err(crate::errors::core_to_py);
     }
@@ -35,11 +35,15 @@ pub(crate) fn py_to_date(obj: &Bound<'_, PyAny>) -> PyResult<time::Date> {
     let year: i32 = obj.getattr("year")?.extract()?;
     let month: u8 = obj.getattr("month")?.extract()?;
     let day: u8 = obj.getattr("day")?.extract()?;
-    time::Date::from_calendar_date(year, month_from_u8(month)?, day).map_err(display_to_py)
+    finstack_quant_core::dates::Date::from_calendar_date(year, month_from_u8(month)?, day)
+        .map_err(display_to_py)
 }
 
-/// Convert a Rust [`time::Date`] to a Python `datetime.date`.
-pub(crate) fn date_to_py<'py>(py: Python<'py>, date: time::Date) -> PyResult<Bound<'py, PyAny>> {
+/// Convert a Rust [`finstack_quant_core::dates::Date`] to a Python `datetime.date`.
+pub(crate) fn date_to_py<'py>(
+    py: Python<'py>,
+    date: finstack_quant_core::dates::Date,
+) -> PyResult<Bound<'py, PyAny>> {
     let datetime = PyModule::import(py, "datetime")?;
     let date_class = datetime.getattr("date")?;
     date_class.call1((date.year(), date.month() as u8, date.day()))
@@ -50,8 +54,12 @@ pub(crate) fn month_from_u8(value: u8) -> PyResult<time::Month> {
     time::Month::try_from(value).map_err(|_| value_error(format!("invalid month: {value}")))
 }
 
-/// Build a [`time::Date`] from calendar parts, mapping both failures to `ValueError`.
-pub(crate) fn date_from_ymd(year: i32, month: u8, day: u8) -> PyResult<time::Date> {
+/// Build a [`finstack_quant_core::dates::Date`] from calendar parts, mapping both failures to `ValueError`.
+pub(crate) fn date_from_ymd(
+    year: i32,
+    month: u8,
+    day: u8,
+) -> PyResult<finstack_quant_core::dates::Date> {
     finstack_quant_core::dates::create_date(year, month_from_u8(month)?, day)
         .map_err(crate::errors::core_to_py)
 }

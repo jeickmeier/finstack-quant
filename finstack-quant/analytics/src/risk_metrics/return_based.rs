@@ -601,8 +601,8 @@ pub(crate) fn modified_sharpe(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::Month;
     use crate::math::stats::{mean, variance};
+    use time::Month;
 
     fn jan1(year: i32) -> crate::dates::Date {
         crate::dates::Date::from_calendar_date(year, Month::January, 1).expect("valid date")

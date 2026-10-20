@@ -478,7 +478,8 @@ fn validate_issuer_weights(
 #[cfg(test)]
 mod production_credit_audit {
     use super::*;
-    use crate::dates::{Date, Month};
+    use crate::dates::Date;
+    use time::Month;
 
     #[test]
     fn issuer_curves_cover_every_constituent() {

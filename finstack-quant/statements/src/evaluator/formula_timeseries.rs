@@ -13,10 +13,11 @@ use crate::evaluator::formula::{
     evaluate_non_negative_integer_arg, require_args,
 };
 use crate::evaluator::results::EvalWarning;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::{DayCount, DayCountContext, PeriodId, PeriodKind};
 use finstack_quant_core::expr::{Expr, ExprNode};
 use finstack_quant_core::math::ZERO_TOLERANCE;
-use time::{Date, Duration, Weekday};
+use time::{Duration, Weekday};
 
 /// Offset exactly in calendar periods, independent of the number of stored observations.
 /// Out-of-range dates have no observation and return `None` without a linear walk.

@@ -3,7 +3,7 @@
 use super::super::super::super::types::Bond;
 use super::TreePricer;
 use finstack_quant_core::dates::DateExt;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Duration};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::Result;
@@ -11,6 +11,7 @@ use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
 use finstack_quant_models::{NodeState, TreeDiscounting, TreeValuator};
 use finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::continuous_frp_weight;
+use time::Duration;
 
 /// Bond valuator for tree-based pricing of callable/putable bonds.
 ///

@@ -35,7 +35,9 @@ fn minimal_config_json() -> String {
 fn minimal_inputs_json() -> String {
     // 24 regular month-end dates ending 2024-03-31.
     let dates: Vec<String> = {
-        let end = time::Date::from_calendar_date(2024, time::Month::March, 31).unwrap();
+        let end =
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::March, 31)
+                .unwrap();
         let mut d = end;
         let mut v = Vec::with_capacity(24);
         v.push(d.to_string());

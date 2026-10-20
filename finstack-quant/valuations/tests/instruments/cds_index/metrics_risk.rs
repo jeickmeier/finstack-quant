@@ -661,7 +661,7 @@ fn test_recovery01_scales_with_notional() {
 fn metric(
     idx: &finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex,
     ctx: &MarketContext,
-    as_of: time::Date,
+    as_of: finstack_quant_core::dates::Date,
     id: MetricId,
     options: finstack_quant_valuations::instruments::PricingOptions,
 ) -> f64 {

@@ -19,9 +19,9 @@
 //! represent exactly: non-finite numbers, array holes, functions, symbols and
 //! non-plain objects such as `Map`, `Date` or wasm-bindgen handles.
 
+use finstack_quant_core::dates::Date;
 use js_sys::{Array, Object};
 use serde::de::DeserializeOwned;
-use time::Date;
 use wasm_bindgen::{JsCast, JsValue};
 
 /// Largest integer a JavaScript `number` represents exactly (`2^53 - 1`).

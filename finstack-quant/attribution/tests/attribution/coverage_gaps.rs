@@ -21,7 +21,7 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 use time::macros::date;
 
-fn flat_discount(id: &str, as_of: time::Date, rate: f64) -> DiscountCurve {
+fn flat_discount(id: &str, as_of: finstack_quant_core::dates::Date, rate: f64) -> DiscountCurve {
     let tenors = [0.0, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0];
     let knots: Vec<(f64, f64)> = tenors.iter().map(|&t| (t, (-rate * t).exp())).collect();
     let builder = DiscountCurve::builder(id)
@@ -197,7 +197,7 @@ fn metrics_based_attributes_forward_curve_basis_move() {
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
 
-    let fwd = |as_of: time::Date, rate: f64| {
+    let fwd = |as_of: finstack_quant_core::dates::Date, rate: f64| {
         ForwardCurve::builder("USD-SOFR-3M", 0.25)
             .base_date(as_of)
             .knots([(0.0, rate), (1.0, rate), (5.0, rate), (10.0, rate)])

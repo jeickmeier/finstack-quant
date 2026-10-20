@@ -243,7 +243,7 @@ pub struct PyVmCalculator {
 fn extract_dated_exposures(
     obj: &Bound<'_, PyAny>,
     currency: Currency,
-) -> PyResult<Vec<(time::Date, Money)>> {
+) -> PyResult<Vec<(finstack_quant_core::dates::Date, Money)>> {
     let items: Vec<(Bound<'_, PyAny>, f64)> = if obj.hasattr("items")? && obj.hasattr("index")? {
         obj.call_method0("items")?
             .try_iter()?

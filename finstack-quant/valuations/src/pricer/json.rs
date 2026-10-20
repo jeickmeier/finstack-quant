@@ -889,8 +889,10 @@ mod tests {
             "TEST-BOND",
             Money::from((1_000_000_i64, Currency::USD)),
             finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
-            time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2034, time::Month::January, 1)
+                .expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,
             "USD-OIS",
         )
@@ -899,7 +901,9 @@ mod tests {
     }
 
     fn market_context() -> MarketContext {
-        let base = time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date");
+        let base =
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("date");
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(base)
             .knots([(0.5, 0.99), (1.0, 0.98), (5.0, 0.90), (10.0, 0.80)])
@@ -947,8 +951,10 @@ mod tests {
             "TEST-BOND",
             Money::from((1_000_000_i64, Currency::USD)),
             finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
-            time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2034, time::Month::January, 1)
+                .expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,
             "USD-OIS",
         )
@@ -1313,8 +1319,10 @@ mod tests {
             "ENVELOPE-BOND",
             Money::from((1_000_000_i64, Currency::USD)),
             finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
-            time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2034, time::Month::January, 1)
+                .expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,
             "USD-OIS",
         )
@@ -1676,11 +1684,17 @@ mod tests {
     #[test]
     fn price_instrument_from_json_accepts_market_history_for_hvar() {
         let history = crate::metrics::risk::MarketHistory::new(
-            time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("date"),
             2,
             vec![
                 crate::metrics::risk::MarketScenario::new(
-                    time::Date::from_calendar_date(2023, time::Month::December, 29).expect("date"),
+                    finstack_quant_core::dates::Date::from_calendar_date(
+                        2023,
+                        time::Month::December,
+                        29,
+                    )
+                    .expect("date"),
                     vec![crate::metrics::risk::RiskFactorShift {
                         factor: crate::metrics::risk::RiskFactorType::DiscountRate {
                             curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
@@ -1690,7 +1704,12 @@ mod tests {
                     }],
                 ),
                 crate::metrics::risk::MarketScenario::new(
-                    time::Date::from_calendar_date(2023, time::Month::December, 28).expect("date"),
+                    finstack_quant_core::dates::Date::from_calendar_date(
+                        2023,
+                        time::Month::December,
+                        28,
+                    )
+                    .expect("date"),
                     vec![crate::metrics::risk::RiskFactorShift {
                         factor: crate::metrics::risk::RiskFactorType::DiscountRate {
                             curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),

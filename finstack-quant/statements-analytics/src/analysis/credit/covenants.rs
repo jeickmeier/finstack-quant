@@ -199,11 +199,12 @@ pub fn to_table(forecast: &CovenantForecast) -> Result<TableEnvelope> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::{Date, Month, Tenor};
+    use finstack_quant_core::dates::{Date, Tenor};
     use finstack_quant_covenants::CovenantType;
     use finstack_quant_covenants::{Covenant, CovenantEngine, CovenantMetricId, CovenantSpec};
     use finstack_quant_statements::evaluator::StatementResult;
     use indexmap::IndexMap;
+    use time::Month;
 
     #[test]
     fn fiscal_horizon_uses_model_boundaries() {

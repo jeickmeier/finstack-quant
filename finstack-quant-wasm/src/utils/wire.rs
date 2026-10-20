@@ -7,9 +7,9 @@
 //! same document as JSON text, and always parses through `serde_json`, so the
 //! Rust type's `deny_unknown_fields` and validating `Deserialize` apply.
 
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::wire::DecimalWire;
 use serde::de::DeserializeOwned;
-use time::Date;
 use wasm_bindgen::JsValue;
 
 use super::input::{from_js_json, js_string};

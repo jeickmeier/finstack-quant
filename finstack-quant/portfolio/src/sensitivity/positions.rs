@@ -93,8 +93,10 @@ mod tests {
             "TEST-BOND",
             Money::from((1_000_000_i64, Currency::USD)),
             finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
-            time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2034, time::Month::January, 1)
+                .expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,
             "USD-OIS",
         )
@@ -121,8 +123,10 @@ mod tests {
             "TEST-BOND",
             Money::from((1_000_000_i64, Currency::USD)),
             finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
-            time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2034, time::Month::January, 1)
+                .expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,
             "USD-OIS",
         )
@@ -149,8 +153,10 @@ mod tests {
             "TEST-BOND",
             Money::from((1_000_000_i64, Currency::USD)),
             finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
-            time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2034, time::Month::January, 1)
+                .expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,
             "USD-OIS",
         )

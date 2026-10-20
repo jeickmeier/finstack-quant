@@ -67,7 +67,7 @@ pub struct TemplateMetadata {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub event_date: time::Date,
+    pub event_date: finstack_quant_core::dates::Date,
     /// Asset classes materially affected by the scenario.
     pub asset_classes: Vec<AssetClass>,
     /// Freeform tags used for filtering and discovery.

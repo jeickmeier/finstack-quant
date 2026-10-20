@@ -127,7 +127,7 @@ mod replay_tests {
             .unwrap()
     }
 
-    fn market_at_rate(as_of: time::Date, rate_bp: f64) -> MarketContext {
+    fn market_at_rate(as_of: finstack_quant_core::dates::Date, rate_bp: f64) -> MarketContext {
         let rate = rate_bp / 10_000.0;
         let curve = DiscountCurve::builder("USD")
             .base_date(as_of)

@@ -2,7 +2,7 @@
 
 use finstack_quant_cashflows::builder::AmortizationSpec;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, Month, Tenor};
+use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_portfolio::{
@@ -16,6 +16,7 @@ use finstack_quant_valuations::instruments::{
 };
 use indexmap::IndexMap;
 use time::macros::date;
+use time::Month;
 
 /// Number of artifacts in the unique-instrument acceptance fixture.
 pub const FIXTURE_A_ARTIFACTS: usize = 5_000;

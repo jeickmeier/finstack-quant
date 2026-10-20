@@ -1396,7 +1396,7 @@ mod tests {
 
     use super::*;
 
-    use crate::dates::{Duration, Month};
+    use time::{Duration, Month};
 
     fn jan(day: u8) -> Date {
         Date::from_calendar_date(2025, Month::January, day).expect("valid date")
@@ -2117,8 +2117,9 @@ mod tests {
 
     #[test]
     fn performance_multi_factor_greeks_errors_on_invalid_factor_input() {
-        use crate::dates::{Month, PeriodKind};
+        use crate::dates::PeriodKind;
         use crate::performance::Performance;
+        use time::Month;
 
         let jan =
             |day: u8| Date::from_calendar_date(2024, Month::January, day).expect("valid date");

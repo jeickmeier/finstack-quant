@@ -30,7 +30,8 @@ instance.
 
 ```rust
 use finstack_quant_analytics::Performance;
-use finstack_quant_core::dates::{Date, Month, PeriodKind};
+use finstack_quant_core::dates::{Date, PeriodKind};
+use time::Month;
 
 let dates: Vec<Date> = (1..=10)
     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())

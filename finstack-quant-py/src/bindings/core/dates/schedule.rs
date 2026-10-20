@@ -355,7 +355,7 @@ impl PySchedule {
         let starts = &self.inner.dates[..n];
         let ends = self.inner.dates.get(1..).unwrap_or_default();
         let to_datetime = py.import("pandas")?.getattr("to_datetime")?;
-        let column = |dates: &[time::Date]| -> PyResult<Bound<'py, PyAny>> {
+        let column = |dates: &[finstack_quant_core::dates::Date]| -> PyResult<Bound<'py, PyAny>> {
             to_datetime.call1((crate::bindings::pandas_utils::dates_to_pylist(py, dates)?,))
         };
         let columns = PyDict::new(py);

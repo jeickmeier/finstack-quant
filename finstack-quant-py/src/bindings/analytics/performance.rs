@@ -77,7 +77,7 @@ fn extract_f64_vec(obj: &Bound<'_, PyAny>, label: &str) -> PyResult<Vec<f64>> {
 /// Decomposed DataFrame: dates, column-major numeric values, and ticker names.
 struct DataFramePanel {
     /// Chronological observation dates.
-    dates: Vec<time::Date>,
+    dates: Vec<finstack_quant_core::dates::Date>,
     /// `columns[ticker_idx][date_idx]`.
     columns: Vec<Vec<f64>>,
     /// Column names from the DataFrame.
@@ -174,7 +174,7 @@ fn series_to_frame<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>
 }
 
 type PerformanceBuilder = fn(
-    Vec<time::Date>,
+    Vec<finstack_quant_core::dates::Date>,
     Vec<Vec<f64>>,
     Vec<String>,
     Option<&str>,
@@ -184,7 +184,7 @@ type PerformanceBuilder = fn(
 /// Build a `Performance` from pre-extracted panel arrays using the given Rust constructor.
 fn build_performance_with(
     py: Python<'_>,
-    dates: Vec<time::Date>,
+    dates: Vec<finstack_quant_core::dates::Date>,
     columns: Vec<Vec<f64>>,
     ticker_names: Vec<String>,
     benchmark_ticker: Option<&str>,

@@ -301,7 +301,10 @@ pub(crate) fn dated_money_from_py(
     obj: &Bound<'_, PyAny>,
     currency: Option<&str>,
     what: &str,
-) -> PyResult<(time::Date, finstack_quant_core::money::Money)> {
+) -> PyResult<(
+    finstack_quant_core::dates::Date,
+    finstack_quant_core::money::Money,
+)> {
     let type_name = obj.get_type().name()?.to_string();
     let (date_obj, money_obj): (Bound<'_, PyAny>, Bound<'_, PyAny>) =
         obj.extract().map_err(|_| {
@@ -319,7 +322,7 @@ pub(crate) fn dated_money_from_py(
 /// # Arguments
 ///
 /// * `date` - Calendar date to render.
-pub(crate) fn date_repr(date: time::Date) -> String {
+pub(crate) fn date_repr(date: finstack_quant_core::dates::Date) -> String {
     format!(
         "datetime.date({}, {}, {})",
         date.year(),

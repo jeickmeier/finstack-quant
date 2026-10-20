@@ -558,7 +558,7 @@ pub(crate) fn pain_ratio(cagr_val: f64, pain: f64, risk_free_rate: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::{Duration, Month};
+    use time::{Duration, Month};
 
     fn make_dates(n: usize) -> Vec<Date> {
         (0..n)

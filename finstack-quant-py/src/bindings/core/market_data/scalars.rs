@@ -18,9 +18,10 @@ use crate::errors::core_to_py;
 
 fn observations_to_dataframe<'py>(
     py: Python<'py>,
-    observations: Vec<(time::Date, f64)>,
+    observations: Vec<(finstack_quant_core::dates::Date, f64)>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let dates: Vec<time::Date> = observations.iter().map(|(date, _)| *date).collect();
+    let dates: Vec<finstack_quant_core::dates::Date> =
+        observations.iter().map(|(date, _)| *date).collect();
     let values: Vec<f64> = observations.iter().map(|(_, value)| *value).collect();
     let data = PyDict::new(py);
     data.set_item("value", values)?;

@@ -17,8 +17,9 @@
 //! - Bus/252 - calendar-dependent
 
 use super::common::{by_id, DAYCOUNT_TOLERANCE};
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Duration, Tenor, TenorUnit};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor, TenorUnit};
 use proptest::prelude::*;
+use time::Duration;
 use time::Month;
 
 fn make_date(y: i32, m: u8, d: u8) -> Date {

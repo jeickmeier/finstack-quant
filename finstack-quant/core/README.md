@@ -49,7 +49,7 @@ Full item documentation is in the rustdoc (`cargo doc -p finstack-quant-core
 
 | Path | What it is |
 |------|------------|
-| `dates::{Date, Duration, Month, OffsetDateTime, PrimitiveDateTime}` | Re-exports of the `time` crate types used throughout. |
+| `dates::Date` | Re-export of `time::Date`; import `Month`, `Duration` and other `time` types from `time`. |
 | `dates::{create_date, parse_iso_date}` | Fallible constructors (no `unwrap` on `from_calendar_date`). |
 | `dates::DayCount` | Day-count conventions, plus `DayCountContext` for conventions (Act/Act ICMA, Bus/252) that need a coupon period or calendar. |
 | `dates::{adjust, BusinessDayConvention, HolidayCalendar, CalendarMetadata}` | Business-day rolling. |

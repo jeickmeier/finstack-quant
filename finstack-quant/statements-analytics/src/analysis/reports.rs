@@ -301,13 +301,16 @@ pub(crate) fn trailing_sum_at(
         PeriodKind::Weekly => return None,
         PeriodKind::Daily if at.is_fiscal() => return None,
         PeriodKind::Daily => {
-            let end = time::Date::from_ordinal_date(at.year(), at.index())
+            let end = finstack_quant_core::dates::Date::from_ordinal_date(at.year(), at.index())
                 .ok()?
                 .checked_add(time::Duration::days(1))?;
             let year = end.year().checked_sub(1)?;
-            let start = time::Date::from_calendar_date(year, end.month(), end.day())
-                .or_else(|_| time::Date::from_calendar_date(year, end.month(), 28))
-                .ok()?;
+            let start =
+                finstack_quant_core::dates::Date::from_calendar_date(year, end.month(), end.day())
+                    .or_else(|_| {
+                        finstack_quant_core::dates::Date::from_calendar_date(year, end.month(), 28)
+                    })
+                    .ok()?;
             usize::try_from((end - start).whole_days()).ok()?
         }
         _ => usize::from(at.kind().periods_per_year()),
@@ -815,7 +818,8 @@ mod tests {
 
     #[test]
     fn daily_rolling_year_handles_february_boundaries() {
-        use time::{Date, Month};
+        use finstack_quant_core::dates::Date;
+        use time::Month;
         for (start, end, expected) in [
             (
                 (2023, Month::February, 28),
