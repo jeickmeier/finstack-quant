@@ -90,12 +90,13 @@ mod credit;
 mod cross_factor;
 mod equity;
 mod fx;
+mod inflation;
 mod rates;
 pub(crate) mod shifts;
 mod volatility;
 
 use crate::helpers::*;
-use crate::{AttributionMethod, PnlAttribution};
+use crate::{AttributionMethod, MoveUnit, PnlAttribution};
 use context::MetricsContext;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -288,7 +289,7 @@ pub fn attribute_pnl_metrics_based(
     volatility::apply(&inputs, &mut attribution, &mut non_finite_detected);
     equity::apply_spot(&inputs, &mut attribution, &mut non_finite_detected);
     cross_factor::apply(&inputs, &mut attribution, &mut non_finite_detected);
-    equity::apply_inflation(&inputs, &mut attribution, &mut non_finite_detected);
+    inflation::apply(&inputs, &mut attribution, &mut non_finite_detected);
 
     if non_finite_detected {
         attribution.result_invalid = true;
@@ -393,6 +394,60 @@ pub(crate) fn attribute_request(
         attribution.meta.num_repricings += 1;
     }
     Ok(attribution)
+}
+
+fn note_warning(
+    attribution: &mut PnlAttribution,
+    message: impl Into<String>,
+    instrument_id: &str,
+    factor: &str,
+) {
+    let message = message.into();
+    tracing::warn!(
+        instrument_id = %instrument_id,
+        factor,
+        detail = %message,
+        "Attribution soft warning"
+    );
+    attribution.meta.notes.push(message);
+}
+
+/// Append a second-order-only row: `gamma_pnl` from a convexity/gamma metric
+/// applied to `market_move` (in `unit`); the first-order amount is zero.
+fn push_second_order_step(
+    attribution: &mut PnlAttribution,
+    factor: &str,
+    unit: MoveUnit,
+    market_move: f64,
+    gamma_pnl: f64,
+) {
+    let currency = attribution.total_pnl.currency();
+    let step = sensitivity_step(
+        factor,
+        FactorWorking::SecondOrder { unit, market_move },
+        Money::from((0_i64, currency)),
+        Some(money_or_zero(gamma_pnl, currency)),
+        &mut attribution.meta.notes,
+    );
+    attribution.sensitivity_steps.push(step);
+}
+
+/// Append a first-order row for `factor` whose P&L is `explained_pnl`.
+fn push_first_order_step(
+    attribution: &mut PnlAttribution,
+    factor: &str,
+    working: FactorWorking,
+    explained_pnl: f64,
+) {
+    let currency = attribution.total_pnl.currency();
+    let step = sensitivity_step(
+        factor,
+        working,
+        money_or_zero(explained_pnl, currency),
+        None,
+        &mut attribution.meta.notes,
+    );
+    attribution.sensitivity_steps.push(step);
 }
 
 #[cfg(test)]

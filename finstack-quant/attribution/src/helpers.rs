@@ -103,6 +103,40 @@ impl InstrumentFactorUse {
     }
 }
 
+/// Map `items` with the infallible `f`; see [`try_map_policy`].
+pub(crate) fn map_policy<T, R, F>(policy: ExecutionPolicy, items: &[T], f: F) -> Vec<R>
+where
+    T: Sync,
+    R: Send,
+    F: Fn(&T) -> R + Sync + Send,
+{
+    let Ok(mapped) = try_map_policy(policy, items, |item| {
+        Ok::<R, std::convert::Infallible>(f(item))
+    });
+    mapped
+}
+
+/// Fallible map of `items` with `f`, using Rayon only on native `Parallel`.
+///
+/// Both policies report the error of the lowest-index failing item, so a
+/// parallel run names the same failure as a serial (or wasm32) run.
+pub(crate) fn try_map_policy<T, R, E, F>(
+    policy: ExecutionPolicy,
+    items: &[T],
+    f: F,
+) -> std::result::Result<Vec<R>, E>
+where
+    T: Sync,
+    R: Send,
+    E: Send,
+    F: Fn(&T) -> std::result::Result<R, E> + Sync + Send,
+{
+    match policy {
+        ExecutionPolicy::Parallel => finstack_quant_core::parallel::try_map_ordered(items, f),
+        ExecutionPolicy::Serial => items.iter().map(f).collect(),
+    }
+}
+
 /// Keep a curve-movement measurement, treating a curve absent from either
 /// market as unmeasured.
 ///
@@ -645,22 +679,6 @@ pub(crate) fn stamp_fx_policy(
     });
 }
 
-pub(crate) fn note_warning(
-    attribution: &mut PnlAttribution,
-    message: impl Into<String>,
-    instrument_id: &str,
-    factor: &str,
-) {
-    let message = message.into();
-    tracing::warn!(
-        instrument_id = %instrument_id,
-        factor,
-        detail = %message,
-        "Attribution soft warning"
-    );
-    attribution.meta.notes.push(message);
-}
-
 pub(crate) fn finalize_attribution(
     attribution: &mut PnlAttribution,
     instrument_id: &str,
@@ -813,44 +831,6 @@ pub(crate) fn sensitivity_step(
         FactorWorking::Repriced { pv } => step.repriced_pv = Some(pv),
     }
     step
-}
-
-/// Append a second-order-only row: `gamma_pnl` from a convexity/gamma metric
-/// applied to `market_move` (in `unit`); the first-order amount is zero.
-pub(crate) fn push_second_order_step(
-    attribution: &mut PnlAttribution,
-    factor: &str,
-    unit: MoveUnit,
-    market_move: f64,
-    gamma_pnl: f64,
-) {
-    let currency = attribution.total_pnl.currency();
-    let step = sensitivity_step(
-        factor,
-        FactorWorking::SecondOrder { unit, market_move },
-        Money::from((0_i64, currency)),
-        Some(money_or_zero(gamma_pnl, currency)),
-        &mut attribution.meta.notes,
-    );
-    attribution.sensitivity_steps.push(step);
-}
-
-/// Append a first-order row for `factor` whose P&L is `explained_pnl`.
-pub(crate) fn push_first_order_step(
-    attribution: &mut PnlAttribution,
-    factor: &str,
-    working: FactorWorking,
-    explained_pnl: f64,
-) {
-    let currency = attribution.total_pnl.currency();
-    let step = sensitivity_step(
-        factor,
-        working,
-        money_or_zero(explained_pnl, currency),
-        None,
-        &mut attribution.meta.notes,
-    );
-    attribution.sensitivity_steps.push(step);
 }
 
 /// `Money` for a row component whose non-finite case is already flagged
@@ -1451,5 +1431,19 @@ mod tests {
             panic!("mismatched model parameter snapshot should fail")
         };
         assert!(error.to_string().contains("StructuredCredit"));
+    }
+
+    #[test]
+    fn parallel_policy_reports_the_serial_first_error() {
+        let items: Vec<usize> = (0..256).collect();
+        let fails = |i: &usize| if i % 9 == 4 { Err(*i) } else { Ok(*i) };
+        let serial = try_map_policy(ExecutionPolicy::Serial, &items, fails);
+        assert_eq!(serial, Err(4));
+        for _ in 0..30 {
+            assert_eq!(
+                try_map_policy(ExecutionPolicy::Parallel, &items, fails),
+                serial
+            );
+        }
     }
 }

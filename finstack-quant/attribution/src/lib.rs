@@ -128,7 +128,6 @@
 
 pub(crate) mod credit_cascade;
 pub(crate) mod credit_decomposition;
-pub(crate) mod credit_factor;
 mod detail;
 pub(crate) mod execution;
 pub(crate) mod factors;
@@ -136,7 +135,6 @@ pub(crate) mod helpers;
 pub mod long_rows;
 pub(crate) mod metrics_based;
 pub(crate) mod parallel;
-pub(crate) mod policy_map;
 mod result;
 pub(crate) mod return_contribution;
 #[cfg(feature = "json-schema")]
@@ -146,7 +144,7 @@ pub(crate) mod target_currency;
 pub(crate) mod taylor;
 pub(crate) mod waterfall;
 
-pub use credit_factor::CreditFactorDetailOptions;
+pub use credit_cascade::CreditFactorDetailOptions;
 pub use detail::{
     CarryDetail, CorrelationsAttribution, CreditCarryByLevel, CreditCarryDecomposition,
     CreditCurvesAttribution, CreditFactorAttribution, CrossFactorDetail, FxAttribution,

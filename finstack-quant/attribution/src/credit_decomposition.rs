@@ -173,7 +173,7 @@ impl AttributionInputs {
         market_t0: &MarketContext,
         attribution: &mut PnlAttribution,
     ) -> Result<()> {
-        use super::credit_factor::credit_factor_model_id;
+        use crate::credit_cascade::credit_factor_model_id;
         use crate::{CreditCarryByLevel, CreditCarryDecomposition, LevelCarry, SourceLine};
         use finstack_quant_core::math::Compounding;
         use finstack_quant_core::money::Money;
