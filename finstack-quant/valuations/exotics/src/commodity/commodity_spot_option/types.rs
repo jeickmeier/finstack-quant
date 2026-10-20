@@ -40,7 +40,6 @@ pub struct CommodityMcParams {
 #[serde(deny_unknown_fields)]
 pub struct CommoditySpotOptionExercise {
     /// Exercise date, or expiry observation date for an unexercised option.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -49,7 +48,6 @@ pub struct CommoditySpotOptionExercise {
     /// Positive observed commodity spot price in strike units.
     pub spot: f64,
     /// Actual cash-payment or physical-delivery date, on or after exercise.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -125,14 +123,12 @@ pub struct CommoditySpotOption {
     ///
     /// Required when `exercise_style == ExerciseStyle::Bermudan`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<Vec<finstack_quant_core::wire::DateWire>>")
     )]
     pub exercise_dates: Option<Vec<Date>>,
     /// Option expiry date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

@@ -154,7 +154,6 @@ struct RawInflationCurve {
     /// Base CPI level at t=0
     pub base_cpi: f64,
     /// Base date
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub base_date: Date,
     /// Day count convention

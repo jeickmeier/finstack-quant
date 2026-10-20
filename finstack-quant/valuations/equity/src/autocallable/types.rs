@@ -63,7 +63,6 @@ pub struct Autocallable {
     ///
     /// Barriers are monitored **discretely** at these exact dates only.
     /// The Monte Carlo time grid is constructed to include these dates precisely.
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
@@ -72,14 +71,12 @@ pub struct Autocallable {
     /// Contractual payment dates for coupons and early redemption.
     ///
     /// Each entry corresponds to `observation_dates` at the same index.
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     pub payment_dates: Vec<Date>,
     /// Explicit terminal expiry date for the structure.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -152,7 +149,6 @@ pub struct Autocallable {
     /// remaining future observation dates are simulated.
     #[builder(default)]
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -200,21 +196,18 @@ struct AutocallableUnchecked {
     ///
     /// Barriers are monitored **discretely** at these exact dates only.
     /// The Monte Carlo time grid is constructed to include these dates precisely.
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     observation_dates: Vec<Date>,
     /// Contractual payment dates corresponding to observation dates.
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     payment_dates: Vec<Date>,
     /// Explicit terminal expiry date for the structure.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -276,7 +269,6 @@ struct AutocallableUnchecked {
     /// missed memory coupons, discrete knock-in monitoring) and only the
     /// remaining future observation dates are simulated.
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")

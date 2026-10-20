@@ -46,7 +46,6 @@ pub struct PoolAsset {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_floor_bp: Option<f64>,
     /// Contractual maturity date of the asset.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -65,7 +64,7 @@ pub struct PoolAsset {
     /// Realized or modeled recovery amount when the asset is defaulted.
     pub recovery_amount: Option<Money>,
     /// Economic default date for the outstanding recovery claim; required for defaulted assets.
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -74,7 +73,7 @@ pub struct PoolAsset {
     /// Acquisition price in the asset currency, used for trading gain/loss.
     pub purchase_price: Option<Money>,
     /// Date on which the pool acquired the asset, if known.
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -84,7 +83,7 @@ pub struct PoolAsset {
     /// the seasoning-dependent prepayment/default curves (PSA, SDA, ABS,
     /// vector) and the amortization schedule. Falls back to
     /// `acquisition_date`, then to the deal closing date (new collateral).
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -435,7 +434,6 @@ impl PoolAsset {
 #[serde(deny_unknown_fields)]
 pub struct ReinvestmentPeriod {
     /// Inclusive end date of the reinvestment period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -650,7 +648,6 @@ pub struct RepLine {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_floor_bp: Option<f64>,
     /// Weighted average maturity date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

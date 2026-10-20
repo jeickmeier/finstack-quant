@@ -196,21 +196,18 @@ pub struct StructuredCredit {
 
     /// Key dates.
     /// Deal closing date (issuance).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub closing_date: Date,
     /// First payment date to tranches.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub first_payment_date: Date,
     /// Legal final maturity date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -221,11 +218,7 @@ pub struct StructuredCredit {
     /// `None` uses the valuation date. Cashflows payable on or before settlement
     /// belong to the seller; model PV remains measured on the valuation date.
     #[builder(default)]
-    #[serde(
-        default,
-        with = "finstack_quant_core::wire::optional_date",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

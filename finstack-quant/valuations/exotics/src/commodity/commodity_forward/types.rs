@@ -123,7 +123,6 @@ pub struct CommodityForward {
     #[builder(default = 1.0)]
     pub multiplier: f64,
     /// Settlement/delivery date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

@@ -23,7 +23,7 @@ use wasm_bindgen::prelude::*;
 
 /// `[date, value]` pairs with ISO dates, as the coupon programs carry them.
 #[derive(serde::Deserialize)]
-struct DatedPair<T>(#[serde(with = "finstack_quant_core::wire::date")] Date, T);
+struct DatedPair<T>(Date, T);
 
 /// Dated amounts as `{ date, amount }` objects.
 fn dated_flows_wire(flows: Vec<(Date, Money)>) -> Result<JsValue, JsValue> {

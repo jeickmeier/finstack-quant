@@ -134,7 +134,6 @@ pub struct AgencyTba {
     /// [`AgencyTba::effective_settlement_date`]. Dollar rolls use this to keep leg
     /// pricing consistent with explicit roll settlement dates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -146,7 +145,6 @@ pub struct AgencyTba {
     pub trade_price: f64,
     /// Trade date.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

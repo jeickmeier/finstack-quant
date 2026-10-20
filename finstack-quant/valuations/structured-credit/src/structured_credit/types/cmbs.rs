@@ -116,7 +116,6 @@ impl BalloonSpec {
 #[serde(deny_unknown_fields)]
 pub struct PenaltyStep {
     /// Last date this step applies.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -140,7 +139,7 @@ pub enum PrepaymentPenalty {
     /// the loan inside the lockout.
     Lockout {
         /// Last date of the lockout; `None` locks out to maturity.
-        #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+        #[serde(default)]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -152,7 +151,7 @@ pub enum PrepaymentPenalty {
         /// Premium in percent of the prepaid balance (`3.0` = 3%).
         pct: f64,
         /// Last date the penalty applies; `None` applies it to maturity.
-        #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+        #[serde(default)]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -187,7 +186,7 @@ pub enum PrepaymentPenalty {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         floor_pct: Option<f64>,
         /// Last date the penalty applies; `None` applies it to maturity.
-        #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+        #[serde(default)]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -456,14 +455,14 @@ impl<'de> Deserialize<'de> for PrepaymentPenalty {
         #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
         enum Wire {
             Lockout {
-                #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+                #[serde(default)]
                 through: Option<Date>,
             },
 
             Fixed {
                 pct: f64,
 
-                #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+                #[serde(default)]
                 through: Option<Date>,
             },
 
@@ -481,7 +480,7 @@ impl<'de> Deserialize<'de> for PrepaymentPenalty {
                 #[serde(default, skip_serializing_if = "Option::is_none")]
                 floor_pct: Option<f64>,
 
-                #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+                #[serde(default)]
                 through: Option<Date>,
             },
         }

@@ -810,7 +810,6 @@ pub struct DiscountCurveParams {
     /// Currency of the curve.
     pub currency: Currency,
     /// Base date for the curve.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -851,7 +850,6 @@ pub struct ForwardCurveParams {
     /// Currency of the curve.
     pub currency: Currency,
     /// Base date for the curve.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -895,7 +893,6 @@ pub struct HazardCurveParams {
     /// Currency of the curve.
     pub currency: Currency,
     /// Base date for the curve.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -946,7 +943,6 @@ pub struct InflationCurveParams {
     pub currency: Currency,
     /// Valuation and calibration-instrument start date. The output curve's
     /// zero-time reference CPI date is this date minus `observation_lag`.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -992,7 +988,6 @@ pub struct VolSurfaceParams {
     /// Identifier for the volatility surface being built.
     pub vol_surface_id: String,
     /// Base date for the surface.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1041,7 +1036,6 @@ pub struct SwaptionVolParams {
     /// Identifier for the volatility surface.
     pub vol_surface_id: String,
     /// Base date for the calibration.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1137,7 +1131,6 @@ pub struct BaseCorrelationParams {
     /// Quotes must resolve to the same CDS convention maturity as this tenor.
     pub maturity_years: f64,
     /// Base date for the calibration.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1249,7 +1242,6 @@ pub struct HullWhiteStepParams {
     /// Currency for conventions.
     pub currency: Currency,
     /// Base date for the calibration.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1292,7 +1284,6 @@ pub struct CapFloorHullWhiteStepParams {
     /// Currency for conventions.
     pub currency: Currency,
     /// Base date for the calibration.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1327,7 +1318,6 @@ pub struct SviSurfaceParams {
     /// Identifier for the volatility surface being built.
     pub vol_surface_id: String,
     /// Base date for the surface.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1435,7 +1425,6 @@ pub struct XccyBasisParams {
     /// Foreign currency being calibrated.
     pub currency: Currency,
     /// Base date for the curve.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1485,7 +1474,6 @@ pub struct ParametricCurveParams {
     /// instruments use this curve for discounting and implied projection.
     pub curve_id: CurveId,
     /// Base date for the curve.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

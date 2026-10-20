@@ -658,7 +658,6 @@ struct InflationIndexWire {
     /// Currency
     pub currency: Currency,
     /// Observations as (date, value) pairs
-    #[serde(with = "crate::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(crate::wire::DateWire, f64)>")
@@ -680,11 +679,9 @@ struct InflationIndexWire {
 #[serde(deny_unknown_fields)]
 struct InflationPublicationWire {
     /// First calendar day of the reference month.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     reference_month: Date,
     /// Inclusive date on which the observation must be available.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     publication_date: Date,
 }

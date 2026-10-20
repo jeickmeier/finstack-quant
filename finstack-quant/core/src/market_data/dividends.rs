@@ -89,7 +89,6 @@ pub enum DividendKind {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DividendEvent {
     /// Ex-dividend date.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub date: Date,
     /// Event kind.

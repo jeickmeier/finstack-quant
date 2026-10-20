@@ -446,7 +446,6 @@ pub enum CapitalStructureWarning {
         /// Canonical cashflow classification that was excluded.
         cashflow_kind: CFKind,
         /// Original contractual payment date.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")

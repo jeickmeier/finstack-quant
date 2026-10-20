@@ -101,14 +101,12 @@ pub struct InflationCapFloor {
     )]
     pub strike: Decimal,
     /// Start date of the first inflation period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start_date: Date,
     /// End date of the final inflation period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

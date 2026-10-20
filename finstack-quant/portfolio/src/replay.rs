@@ -81,7 +81,6 @@ pub struct ReplayConfig {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct JsonSnapshot {
-    #[serde(with = "finstack_quant_core::wire::date")]
     date: Date,
     market: MarketContext,
 }

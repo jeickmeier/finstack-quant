@@ -59,14 +59,12 @@ pub struct Deposit {
     /// Principal amount of the deposit.
     pub notional: Money,
     /// Start date of the deposit period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start_date: Date,
     /// Maturity date of the deposit period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

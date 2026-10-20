@@ -59,7 +59,6 @@ pub struct CdsTrancheQuote {
     /// Detachment point (decimal, e.g. 0.07).
     pub detachment: f64,
     /// Maturity date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

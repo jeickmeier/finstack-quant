@@ -115,7 +115,6 @@ pub struct EquityTotalReturnSwap {
     /// unavailable.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -155,7 +154,6 @@ pub struct EquityTotalReturnSwap {
     /// not add continuous-yield dividend return to avoid double counting.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -221,7 +219,6 @@ struct EquityTotalReturnSwapUnchecked {
     /// the valuation date; the first period may use `initial_level` instead.
     /// Pricing errors when the current period's start level is unavailable.
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -256,7 +253,6 @@ struct EquityTotalReturnSwapUnchecked {
     /// When non-empty, pricing uses explicit period dividend pass-through and does
     /// not add continuous-yield dividend return to avoid double counting.
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")

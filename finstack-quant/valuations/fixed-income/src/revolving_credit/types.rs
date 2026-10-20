@@ -100,7 +100,6 @@ pub struct RevolvingCredit {
     pub drawn: Money,
 
     /// Date when the facility becomes available.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -108,7 +107,6 @@ pub struct RevolvingCredit {
     pub issue_date: Date,
 
     /// Date when the facility expires.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -561,7 +559,6 @@ pub enum DrawRepaySpec {
 #[serde(deny_unknown_fields)]
 pub struct DrawRepayEvent {
     /// Date of the draw or repayment.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

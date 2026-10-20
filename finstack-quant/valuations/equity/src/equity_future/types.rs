@@ -43,7 +43,6 @@ pub struct EquityFuture {
     /// Optional discrete dividends `(ex_date, amount)` in index points.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")

@@ -99,14 +99,12 @@ pub struct FixedLegSpec {
     #[serde(default = "crate::serde_defaults::stub_short_front")]
     pub stub: StubKind,
     /// Start date of the fixed leg
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start: Date,
     /// End date of the fixed leg
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -229,14 +227,12 @@ pub struct FloatLegSpec {
     #[serde(default)]
     pub fixing_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Start date of the floating leg
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start: Date,
     /// End date of the floating leg
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -323,14 +319,12 @@ pub struct PremiumLegSpec {
     /// `frequency` and `stub`. The equity-futures `imm` grid is rejected.
     pub roll_rule: finstack_quant_cashflows::builder::RollRule,
     /// Start date of protection
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start: Date,
     /// End date of protection
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

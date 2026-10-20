@@ -15,7 +15,6 @@ pub enum Monitoring {
     /// Monitor only at the stated contractual observation dates.
     Discrete {
         /// Strictly increasing dates on which the barrier level is observed.
-        #[serde(with = "finstack_quant_core::wire::dates")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "Vec<finstack_quant_core::wire::DateWire>")

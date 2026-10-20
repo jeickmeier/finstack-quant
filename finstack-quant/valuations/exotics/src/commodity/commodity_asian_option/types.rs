@@ -82,7 +82,6 @@ pub struct CommodityAsianOption {
     /// Dates on which the commodity price is observed for averaging.
     ///
     /// **Note**: These dates should be pre-adjusted for business day conventions.
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
@@ -91,7 +90,6 @@ pub struct CommodityAsianOption {
     /// Already observed fixings for seasoned options (ex-date, price pairs).
     #[builder(default)]
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -108,7 +106,6 @@ pub struct CommodityAsianOption {
     )]
     pub quantity: f64,
     /// Option expiry/settlement date for the payoff.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

@@ -91,7 +91,6 @@ pub enum RateQuote {
         /// this date. For in-arrears IMM contracts such as `CME:SR3`, pass the
         /// business day before the ending IMM Wednesday, not the named contract
         /// month's starting IMM date.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")

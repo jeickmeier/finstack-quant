@@ -155,7 +155,6 @@ pub struct CoverageTestDiagnostic {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PeriodDiagnostics {
     /// Payment date of the period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -231,7 +230,7 @@ pub struct SimulationDiagnostics {
     pub reserve_replenished: Money,
     /// Payment date on which an early-amortization event (or a coverage-test
     /// acceleration) ended the revolving period, when one fired.
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

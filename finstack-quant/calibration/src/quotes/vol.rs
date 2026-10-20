@@ -70,7 +70,6 @@ pub enum VolQuote {
         /// Underlying identifier
         underlying: UnderlyingId,
         /// Option expiry
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -88,14 +87,12 @@ pub enum VolQuote {
         /// Unique identifier for the quote.
         id: QuoteId,
         /// Option expiry
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
         )]
         expiry: Date,
         /// Underlying swap maturity date
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -119,7 +116,6 @@ pub enum VolQuote {
         /// Unique identifier for the quote.
         id: QuoteId,
         /// Cap/floor maturity or caplet expiry.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")

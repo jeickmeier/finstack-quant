@@ -212,7 +212,6 @@ struct RawDiscountCurve {
     /// Curve identifier
     pub id: String,
     /// Base date
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub base: Date,
     /// Day count convention for discount time basis

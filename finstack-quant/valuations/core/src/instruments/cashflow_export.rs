@@ -65,7 +65,6 @@ pub struct InstrumentCashflowEnvelope {
     /// Model key used (`"discounting"` or `"hazard_rate"`).
     pub model: String,
     /// Valuation date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -99,7 +98,6 @@ pub struct InstrumentCashflowEnvelope {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CashflowRow {
     /// Payment date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -116,7 +114,6 @@ pub struct CashflowRow {
     /// Contractual accrual-period start behind `accrual_factor`. Absent for
     /// flows that carry no accrual metadata (principal, fees, exchanges).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -124,7 +121,6 @@ pub struct CashflowRow {
     pub accrual_start: Option<Date>,
     /// Contractual accrual-period end behind `accrual_factor`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -155,7 +151,7 @@ pub struct CashflowRow {
     pub rate: Option<f64>,
     /// Reset date when the flow is a floating-rate fixing.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

@@ -75,7 +75,6 @@ pub struct FxForward {
     /// Quote currency (domestic currency, denominator of the pair, PV currency).
     pub quote_currency: Currency,
     /// Maturity/settlement date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -140,7 +139,6 @@ struct FxForwardUnchecked {
     /// Quote currency (domestic currency, denominator of the pair, PV currency).
     quote_currency: Currency,
     /// Maturity/settlement date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

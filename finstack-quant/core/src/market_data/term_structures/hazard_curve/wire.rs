@@ -10,7 +10,6 @@ pub(super) struct RawHazardCurve {
     /// Curve identifier
     pub id: String,
     /// Base date
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub base: Date,
     /// Time/value pairs used to construct the curve

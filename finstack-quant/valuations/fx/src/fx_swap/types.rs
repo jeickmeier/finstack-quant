@@ -35,14 +35,12 @@ pub struct FxSwap {
     /// Quote currency (domestic)
     pub quote_currency: Currency,
     /// Near leg settlement date (spot leg)
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub near_date: Date,
     /// Far leg settlement date (forward leg)
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -107,14 +105,12 @@ struct FxSwapUnchecked {
     /// Quote currency (domestic).
     quote_currency: Currency,
     /// Near leg settlement date (spot leg).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     near_date: Date,
     /// Far leg settlement date (forward leg).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

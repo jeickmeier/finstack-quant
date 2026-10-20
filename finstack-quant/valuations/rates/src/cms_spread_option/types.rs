@@ -60,14 +60,12 @@ pub struct CmsSpreadOption {
     /// Notional amount.
     pub notional: Money,
     /// Option expiry date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub expiry: Date,
     /// Payment date (may differ from expiry).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

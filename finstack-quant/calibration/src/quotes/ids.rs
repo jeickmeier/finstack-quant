@@ -152,7 +152,6 @@ pub enum Pillar {
     /// The maturity is fixed to a specific date, regardless of the valuation date. This is
     /// typically used for futures contracts or bespoke instruments with fixed maturities.
     Date(
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")

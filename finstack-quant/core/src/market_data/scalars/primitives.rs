@@ -547,7 +547,6 @@ struct ScalarTimeSeriesWire {
     /// Optional currency
     pub currency: Option<Currency>,
     /// Observations as (date, value) pairs
-    #[serde(with = "crate::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(crate::wire::DateWire, f64)>")

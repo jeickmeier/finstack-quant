@@ -86,7 +86,6 @@ use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instr
 #[serde(deny_unknown_fields)]
 pub struct EquityOptionExercise {
     /// Exercise date, or the expiry observation date for an unexercised option.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -95,7 +94,6 @@ pub struct EquityOptionExercise {
     /// Observed underlying level used to determine the fixed cash payoff.
     pub spot: f64,
     /// Contractual cash-payment or physical-delivery date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -150,7 +148,6 @@ pub struct EquityOption {
     #[builder(default)]
     pub exercise_style: ExerciseStyle,
     /// Option expiry date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -223,7 +220,6 @@ pub struct EquityOption {
     ///   discrete dividend problem"
     #[builder(default)]
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -235,7 +231,6 @@ pub struct EquityOption {
     /// at which early exercise is permitted. Dates before as_of or after expiry
     /// are filtered out automatically.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<Vec<finstack_quant_core::wire::DateWire>>")

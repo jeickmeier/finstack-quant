@@ -79,7 +79,7 @@ pub struct DayCountContextState {
     ///
     /// Required for exact ICMA accrual on round-trip. `None` selects the
     /// frequency-only ICMA calculation path; ACT/365L requires these dates.
-    #[serde(default, with = "crate::wire::optional_date_pair")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<(crate::wire::DateWire, crate::wire::DateWire)>")

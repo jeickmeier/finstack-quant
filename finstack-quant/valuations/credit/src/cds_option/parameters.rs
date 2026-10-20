@@ -74,14 +74,12 @@ pub struct CdsOptionParams {
     /// Typed option strike: forward spread or clean price.
     pub strike: CdsOptionStrike,
     /// Option expiry date. Must precede `underlying_maturity`.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub expiry: Date,
     /// Underlying CDS maturity date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

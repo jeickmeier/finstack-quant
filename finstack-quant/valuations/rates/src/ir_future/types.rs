@@ -88,7 +88,6 @@ pub struct InterestRateFuture {
     ///
     /// Defaults to `terms.last_trading_date` when omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -98,7 +97,6 @@ pub struct InterestRateFuture {
     ///
     /// Defaults to 2 calendar days after fixing date when omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -108,7 +106,6 @@ pub struct InterestRateFuture {
     ///
     /// Defaults to `period_start + contract_specs.delivery_months` months when omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

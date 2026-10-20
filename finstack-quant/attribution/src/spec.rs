@@ -114,14 +114,12 @@ pub struct AttributionInputs {
     /// Market context at T₁
     pub market_t1: MarketContextState,
     /// Valuation date at T₀
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub as_of_t0: Date,
     /// Valuation date at T₁
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

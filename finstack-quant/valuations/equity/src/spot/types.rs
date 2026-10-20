@@ -55,7 +55,6 @@ pub struct Equity {
     /// Optional discrete cash dividends `(ex_date, amount)` for single-name forwards.
     #[serde(default)]
     #[builder(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")

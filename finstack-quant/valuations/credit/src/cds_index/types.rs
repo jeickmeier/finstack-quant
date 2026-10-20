@@ -173,7 +173,6 @@ pub struct CdsIndex {
     /// discounted from its payment date and dropped once that date is before
     /// the valuation date.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_dated_money")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<(finstack_quant_core::wire::DateWire, Money)>")

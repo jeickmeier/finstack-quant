@@ -56,7 +56,6 @@ pub struct ThreeFactorPathData {
     /// accrual boundaries plus every term-index reset date inside the facility
     /// life, sorted ascending. The name predates the separation of accrual,
     /// reset and adjusted payment dates.
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")

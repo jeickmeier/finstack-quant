@@ -51,14 +51,12 @@ pub struct InflationSwap {
     /// Notional in quote currency
     pub notional: Money,
     /// Start date of indexation
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start_date: Date,
     /// Maturity date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -616,14 +614,12 @@ pub struct YoYInflationSwap {
     /// Notional in quote currency
     pub notional: Money,
     /// Start date of the first accrual period
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start_date: Date,
     /// Maturity date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

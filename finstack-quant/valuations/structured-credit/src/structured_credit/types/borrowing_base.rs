@@ -38,7 +38,7 @@ pub struct EligibilityRule {
     #[serde(default = "default_true")]
     pub exclude_defaulted: bool,
     /// Collateral maturing after this date is ineligible.
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

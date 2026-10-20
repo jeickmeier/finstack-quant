@@ -12,7 +12,6 @@ pub struct HazardCalibrationInput {
     /// Exact serialized typed CDS quote.
     pub quote: serde_json::Value,
     /// Contractual pillar date resolved from the quote and CDS conventions.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub pillar_date: Date,
     /// Frozen year-fraction pillar time used by the original solve.

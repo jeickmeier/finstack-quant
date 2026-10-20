@@ -109,7 +109,7 @@ pub struct FxSpot {
     pub quote_currency: Currency,
     /// Optional explicit settlement (value) date. When set it is only
     /// business-day adjusted and `settlement_days` is ignored.
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -188,7 +188,7 @@ struct FxSpotUnchecked {
     /// Quote currency (the currency used for pricing)
     quote_currency: Currency,
     /// Optional explicit settlement (value) date
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

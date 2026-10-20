@@ -132,14 +132,12 @@ pub fn dimension_key(dim: &HierarchyDimension) -> &str {
 #[serde(deny_unknown_fields)]
 pub struct DateRange {
     /// First date of the window (inclusive).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start: Date,
     /// Last date of the window (inclusive).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -731,7 +729,6 @@ pub struct VolState {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FactorHistories {
     /// Ordered sequence of observation dates (aligned with value vectors).
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
@@ -854,7 +851,6 @@ pub struct CreditFactorModel {
     /// Exact namespaced v1 schema marker.
     pub schema: CreditFactorModelSchema,
     /// Calibration anchor date (`as_of`).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

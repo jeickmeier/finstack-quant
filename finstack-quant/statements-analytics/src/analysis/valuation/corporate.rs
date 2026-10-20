@@ -123,7 +123,6 @@ pub struct DcfPeriodRow {
     /// Statement period the flow was read from.
     pub period_id: PeriodId,
     /// Date the flow is discounted from: the last day of the period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

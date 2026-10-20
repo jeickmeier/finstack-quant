@@ -173,8 +173,8 @@ Discount curves use their own date basis for relative discounting.
 `CashflowScheduleBuildSpec` is the serde-first construction path used by the
 bindings: `notional`, `issue`, `maturity`, plus optional `coupon_program`,
 `payment_program`, `fees`, `principal_events`, and `principal_exchange`. It is
-`#[serde(deny_unknown_fields)]`, and dates go through
-`finstack_quant_core::wire::date` (ISO `YYYY-MM-DD`).
+`#[serde(deny_unknown_fields)]`, and dates are ISO `YYYY-MM-DD` strings
+(`time::Date` serde; schema type `finstack_quant_core::wire::DateWire`).
 
 ```rust
 use finstack_quant_cashflows::{build_cashflow_schedule_json, dated_flows_json};

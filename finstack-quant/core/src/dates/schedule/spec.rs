@@ -12,11 +12,9 @@ use super::*;
 /// from configuration files and converted to a runtime [`ScheduleBuilder`].
 pub struct ScheduleSpec {
     /// Start date of the schedule.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub start: Date,
     /// End date (maturity) of the schedule.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub end: Date,
     /// Payment frequency (e.g., quarterly, monthly).
@@ -48,10 +46,8 @@ pub struct ScheduleSpec {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct ScheduleSpecWire {
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     start: Date,
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     end: Date,
     frequency: Tenor,

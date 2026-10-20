@@ -163,7 +163,6 @@ pub enum TraceEntry {
     #[serde(rename = "cashflow_pv")]
     CashflowPV {
         /// Cashflow payment date (ISO8601)
-        #[serde(with = "crate::wire::date")]
         #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
         date: Date,
         /// Cashflow amount (stored as f64 for JSON simplicity)

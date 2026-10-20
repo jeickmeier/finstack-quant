@@ -23,14 +23,12 @@ pub struct CashflowScheduleBuildSpec {
     /// Principal amount and amortization behavior.
     pub notional: Notional,
     /// Contract issue date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub issue_date: Date,
     /// Contract maturity date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -81,14 +79,12 @@ pub enum CouponLegSpec {
     },
     /// Fixed coupon over an explicit half-open date window.
     FixedWindow {
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
         )]
         /// Inclusive window start.
         start: Date,
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -100,14 +96,12 @@ pub enum CouponLegSpec {
     },
     /// Floating coupon over an explicit half-open date window.
     FloatingWindow {
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
         )]
         /// Inclusive window start.
         start: Date,
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -119,7 +113,6 @@ pub enum CouponLegSpec {
     },
     /// Fixed coupons followed by floating coupons at `switch`.
     FixedToFloat {
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -149,7 +142,6 @@ pub enum CouponLegSpec {
 pub struct MarginStepSpec {
     /// Effective-from date: the new spread applies to coupon periods from
     /// this date until the next step.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -172,14 +164,12 @@ pub struct MarginStepSpec {
 pub enum PaymentProgramSpec {
     /// Apply a split over one explicit half-open date window.
     Window {
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
         )]
         /// Inclusive window start.
         start: Date,
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -202,7 +192,6 @@ pub enum PaymentProgramSpec {
 #[serde(deny_unknown_fields)]
 pub struct PaymentStepSpec {
     /// Boundary date for the payment split.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -218,14 +207,12 @@ pub struct PaymentStepSpec {
 #[serde(deny_unknown_fields)]
 pub struct PrincipalEventSpec {
     /// Event date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub date: Date,
     /// Cash settlement date, independently adjusted from the economic event date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -262,7 +249,6 @@ impl PrincipalEventSpec {
 #[serde(deny_unknown_fields)]
 pub struct DatedFlowJson {
     /// Flow date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

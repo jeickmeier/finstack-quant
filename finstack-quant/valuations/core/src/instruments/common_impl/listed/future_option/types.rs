@@ -55,7 +55,6 @@ pub enum FutureOptionSettlement {
     Cash {
         /// Date on which the fixed exercise payoff is paid, including after
         /// early exercise; this date is not relative to the exercise date.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -65,14 +64,12 @@ pub enum FutureOptionSettlement {
     /// Delivery of a futures position entered at the option strike.
     Future {
         /// Last trading date of the delivered underlying future.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
         )]
         underlying_last_trading_date: Date,
         /// Final settlement date of the delivered underlying future.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -102,7 +99,6 @@ impl FutureOptionSettlement {
 #[serde(deny_unknown_fields)]
 pub struct FutureOptionExercise {
     /// Exercise date. European options require this to equal contractual expiry.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -180,7 +176,6 @@ pub struct FutureOptionTerms {
     /// European or American exercise convention.
     pub exercise_style: ExerciseStyle,
     /// Contractual option expiry.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

@@ -357,21 +357,20 @@ pub struct Schedule {
     /// These dates are never business-day adjusted. Payment-date adjustment,
     /// payment lag, and fixing lag live on [`Self::payment_dates`] and
     /// [`Self::fixing_dates`].
-    #[serde(with = "crate::wire::dates")]
     #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
     pub dates: Vec<Date>,
     /// Payment date for each accrual period (one per period end).
     ///
     /// Length is `dates.len().saturating_sub(1)`. Duplicate payment dates are
     /// retained so the series stays 1:1 with period ends.
-    #[serde(default, with = "crate::wire::dates")]
+    #[serde(default)]
     #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
     pub payment_dates: Vec<Date>,
     /// Fixing dates for each accrual period.
     ///
     /// Empty when no fixing lag is configured; otherwise the same length as
     /// [`Self::payment_dates`].
-    #[serde(default, with = "crate::wire::dates")]
+    #[serde(default)]
     #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
     pub fixing_dates: Vec<Date>,
     /// Warnings generated during schedule construction.
