@@ -24,11 +24,11 @@ pub(crate) fn register_lookback_option_metrics(
                 (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_discount_only())),
                 (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
                 (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-                // Theta is now registered universally in crate::exotics::EXOTICS.metrics(),
-                (Delta, GenericFdDelta::<crate::LookbackOption>::default()),
-                (Gamma, GenericFdGamma::<crate::LookbackOption>::default()),
-                (Vanna, GenericFdVanna::<crate::LookbackOption>::default()),
-                (Volga, GenericFdVolga::<crate::LookbackOption>::default()),
+                // Theta is now registered universally in crate::EXOTICS.metrics(),
+                (Delta, GenericFdDelta::<crate::exotics::lookback_option::LookbackOption>::default()),
+                (Gamma, GenericFdGamma::<crate::exotics::lookback_option::LookbackOption>::default()),
+                (Vanna, GenericFdVanna::<crate::exotics::lookback_option::LookbackOption>::default()),
+                (Volga, GenericFdVolga::<crate::exotics::lookback_option::LookbackOption>::default()),
             ]
         }
     }

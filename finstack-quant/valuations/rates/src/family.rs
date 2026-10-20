@@ -10,15 +10,23 @@ use finstack_quant_valuations_core::register_generic;
 pub static RATES: Family = Family::new("rates", register_pricers, register_metrics);
 
 fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
-    register_generic!(registry, InstrumentType::Irs, crate::InterestRateSwap);
-    register_generic!(registry, InstrumentType::Fra, crate::ForwardRateAgreement);
+    register_generic!(registry, InstrumentType::Irs, crate::irs::InterestRateSwap);
+    register_generic!(
+        registry,
+        InstrumentType::Fra,
+        crate::fra::ForwardRateAgreement
+    );
     register_generic!(
         registry,
         InstrumentType::BasisSwap,
         crate::basis_swap::BasisSwap
     );
-    register_generic!(registry, InstrumentType::Deposit, crate::Deposit);
-    register_generic!(registry, InstrumentType::XccySwap, crate::XccySwap);
+    register_generic!(registry, InstrumentType::Deposit, crate::deposit::Deposit);
+    register_generic!(
+        registry,
+        InstrumentType::XccySwap,
+        crate::xccy_swap::XccySwap
+    );
     register_generic!(registry, InstrumentType::Repo, crate::repo::Repo);
     register_generic!(
         registry,
@@ -28,7 +36,7 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     register_generic!(
         registry,
         InstrumentType::InterestRateFutureOption,
-        crate::InterestRateFutureOption
+        crate::ir_future_option::InterestRateFutureOption
     );
 
     // Caps/floors and European swaptions.
@@ -54,7 +62,7 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     register_generic!(
         registry,
         InstrumentType::InflationSwap,
-        crate::InflationSwap
+        crate::inflation_swap::InflationSwap
     );
     register_generic!(
         registry,

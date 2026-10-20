@@ -120,7 +120,7 @@
 //!
 //! # See Also
 //!
-//! - [`Basket`] for main instrument struct
+//! - [`Basket`](crate::instruments::Basket) for main instrument struct
 //! - `BasketConstituent` for constituent specification
 //! - `ConstituentReference` for market data vs instrument references
 //! - `BasketAssetType` for constituent asset classification

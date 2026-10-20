@@ -26,7 +26,7 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations::instruments::equity::{EquityOptionMarketData, EquityOptionParams};
+//! use finstack_quant_valuations::instruments::equity::equity_option::{EquityOptionMarketData, EquityOptionParams};
 //! use finstack_quant_valuations::instruments::EquityOption;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
@@ -80,6 +80,3 @@ pub use finstack_quant_valuations_equity::*;
 
 /// Real estate assets and levered real-estate equity.
 pub mod real_estate;
-pub use real_estate::{
-    LeveredRealEstateEquity, RealEstateAsset, RealEstateFinancing, RealEstateValuationMethod,
-};

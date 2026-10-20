@@ -15,7 +15,7 @@
 //!
 //! where `shock` is the parallel rate bump in decimal (e.g., 0.0025 for 25 bp).
 
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;

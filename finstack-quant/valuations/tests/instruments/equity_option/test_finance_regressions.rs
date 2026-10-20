@@ -198,7 +198,9 @@ fn positive_volatility_pde_approaches_the_deterministic_limit() {
 
 #[test]
 fn pending_cash_exercise_keeps_rate_risk_and_accretion() {
-    use finstack_quant_valuations::instruments::{equity::EquityOptionExercise, SettlementType};
+    use finstack_quant_valuations::instruments::{
+        equity::equity_option::EquityOptionExercise, SettlementType,
+    };
     let as_of = date!(2025 - 01 - 06);
     let pay = date!(2025 - 02 - 06);
     let mut option = create_call(as_of - Duration::days(365), as_of, 90.0);

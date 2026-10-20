@@ -1,6 +1,6 @@
 //! Weighted average cost metric for revolving credit facilities.
 
-use crate::RevolvingCredit;
+use crate::revolving_credit::RevolvingCredit;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};

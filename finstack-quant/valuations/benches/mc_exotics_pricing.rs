@@ -18,11 +18,12 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PayoutTiming;
 use finstack_quant_core::types::{BarrierType, CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::equity::autocallable::{Autocallable, FinalPayoffType};
-use finstack_quant_valuations::instruments::equity::{CliquetOption, EquityPathModel};
+use finstack_quant_valuations::instruments::equity::EquityPathModel;
 use finstack_quant_valuations::instruments::exotics::lookback_option::{
     LookbackOption, LookbackType,
 };
 use finstack_quant_valuations::instruments::Attributes;
+use finstack_quant_valuations::instruments::CliquetOption;
 use finstack_quant_valuations::instruments::{
     AsianOption, AveragingMethod, BarrierOption, Instrument, InstrumentPricingOverrides,
     Monitoring, OptionType,

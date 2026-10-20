@@ -44,7 +44,7 @@
 //! # Quick Example
 //!
 //! ```
-//! use finstack_quant_valuations_rates::InterestRateSwap;
+//! use finstack_quant_valuations_rates::irs::InterestRateSwap;
 //! use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};
 //! use finstack_quant_valuations_core::instruments::PayReceive;
 //! use finstack_quant_cashflows::builder::FloatingLegCompounding;
@@ -113,9 +113,9 @@
 //!
 //! # See Also
 //!
-//! - [`InterestRateSwap`] for vanilla IRS
-//! - [`Swaption`] for European swaptions
-//! - [`CapFloor`] for caps and floors
+//! - [`InterestRateSwap`](crate::irs::InterestRateSwap) for vanilla IRS
+//! - [`Swaption`](crate::swaption::Swaption) for European swaptions
+//! - [`CapFloor`](crate::cap_floor::CapFloor) for caps and floors
 //! - the calibration crate for curve construction
 
 /// Basis swap module - Floating vs floating swaps.
@@ -157,22 +157,6 @@ pub mod xccy_swap;
 
 mod family;
 pub use family::RATES;
-
-pub use basis_swap::BasisSwap;
-pub use cap_floor::{CapFloor, RateOptionType};
-pub use cms_option::CmsOption;
-pub use cms_spread_option::CmsSpreadOption;
-pub use cms_swap::CmsSwap;
-pub use deposit::Deposit;
-pub use fra::ForwardRateAgreement;
-pub use inflation_cap_floor::InflationCapFloor;
-pub use inflation_swap::{InflationSwap, YoYInflationSwap};
-pub use ir_future::{FutureContractSpecs, InterestRateFuture};
-pub use ir_future_option::InterestRateFutureOption;
-pub use irs::InterestRateSwap;
-pub use repo::{CollateralSpec, CollateralType, Repo, RepoType};
-pub use swaption::{BermudanSwaption, Swaption};
-pub use xccy_swap::XccySwap;
 
 // `irs::marginable`'s unit tests `include!` the integration-test helper
 // `tests/support/rates.rs`, which names this crate from outside.

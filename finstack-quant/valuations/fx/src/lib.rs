@@ -51,7 +51,7 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations_fx::FxOption;
+//! use finstack_quant_valuations_fx::fx_option::FxOption;
 //!
 //! // Use the example FX option (EUR/USD call)
 //! let _option = FxOption::example().unwrap();
@@ -74,10 +74,10 @@
 //!
 //! # See Also
 //!
-//! - [`FxOption`] for vanilla FX options
-//! - [`FxForward`] for outright forwards
-//! - [`FxBarrierOption`] for barrier options
-//! - [`Ndf`] for non-deliverable forwards
+//! - [`FxOption`](crate::fx_option::FxOption) for vanilla FX options
+//! - [`FxForward`](crate::fx_forward::FxForward) for outright forwards
+//! - [`FxBarrierOption`](crate::fx_barrier_option::FxBarrierOption) for barrier options
+//! - [`Ndf`](crate::ndf::Ndf) for non-deliverable forwards
 
 /// FX barrier option module.
 pub mod fx_barrier_option;
@@ -107,19 +107,6 @@ pub(crate) mod shared;
 
 mod family;
 pub use family::FX;
-
-pub use fx_barrier_option::FxBarrierOption;
-pub use fx_digital_option::{DigitalPayoutType, FxDigitalOption};
-pub use fx_forward::FxForward;
-pub use fx_future::FxFuture;
-pub use fx_future_option::FxFutureOption;
-pub use fx_option::FxOption;
-pub use fx_spot::FxSpot;
-pub use fx_swap::FxSwap;
-pub use fx_touch_option::{FxTouchOption, TouchType};
-pub use fx_variance_swap::FxVarianceSwap;
-pub use ndf::Ndf;
-pub use quanto_option::QuantoOption;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

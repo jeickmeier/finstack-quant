@@ -823,9 +823,9 @@ mod tests {
     use crate::instruments::fixed_income::revolving_credit::RevolvingCredit;
     use crate::instruments::fixed_income::structured_credit::StructuredCredit;
     use crate::instruments::fixed_income::term_loan::TermLoan;
-    use crate::instruments::fx::FxOption;
     use crate::instruments::rates::ir_future::InterestRateFuture;
     use crate::instruments::rates::swaption::Swaption;
+    use crate::instruments::FxOption;
     use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry};
     use crate::pricer::{
         expect_inst, InstrumentType, Pricer, PricerKey, PricerRegistry, PricingError,

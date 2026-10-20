@@ -11,8 +11,8 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_rates::cap_floor::RateOptionType;
 use finstack_quant_valuations_rates::inflation_cap_floor::InflationCapFloor;
-use finstack_quant_valuations_rates::RateOptionType;
 use finstack_quant_valuations_test_support::inflation::{
     flat_discount, flat_inflation_curve, simple_index,
 };
@@ -24,7 +24,7 @@ use time::{Duration, Month};
 fn cap_floor_parity_matches_same_forward_swap_across_quote_volatilities() {
     use finstack_quant_core::market_data::scalars::InflationIndex;
     use finstack_quant_core::market_data::surfaces::VolQuoteType;
-    use finstack_quant_valuations_rates::YoYInflationSwap;
+    use finstack_quant_valuations_rates::inflation_swap::YoYInflationSwap;
     use time::macros::date;
 
     let as_of = date!(2025 - 01 - 02);
@@ -163,7 +163,7 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
     use finstack_quant_core::market_data::term_structures::InflationCurve;
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_rates::inflation_cap_floor::InflationVolatilityExpiry;
-    use finstack_quant_valuations_rates::{InflationSwap, YoYInflationSwap};
+    use finstack_quant_valuations_rates::inflation_swap::{InflationSwap, YoYInflationSwap};
     use time::macros::date;
 
     let as_of = date!(2026 - 01 - 20);

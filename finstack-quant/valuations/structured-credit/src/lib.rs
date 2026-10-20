@@ -25,7 +25,7 @@
 //! the fixed-income family (bond cashflow specs, loan terms, the revolving
 //! credit Monte Carlo engine, the agency pass-through pool model) and on the
 //! rates family (the deal-level interest-rate swap hedge), and share one
-//! registration unit, [`structured_credit::STRUCTURED_CREDIT`]:
+//! registration unit, [`STRUCTURED_CREDIT`]:
 //!
 //! - [`structured_credit`]: ABS, RMBS, CMBS and CLO deals as one instrument —
 //!   collateral pool, tranche capital structure, payment waterfall with
@@ -44,7 +44,8 @@
 //!
 //! ```rust
 //! use finstack_quant_valuations_core::instruments::Instrument;
-//! use finstack_quant_valuations_structured_credit::{AgencyCmo, StructuredCredit};
+//! use finstack_quant_valuations_structured_credit::cmo::AgencyCmo;
+//! use finstack_quant_valuations_structured_credit::structured_credit::StructuredCredit;
 //!
 //! let deal = StructuredCredit::example().unwrap();
 //! let cmo = AgencyCmo::example().unwrap();
@@ -58,9 +59,8 @@ pub mod cmo;
 /// Structured credit module - ABS, RMBS, CMBS, CLO.
 pub mod structured_credit;
 
-pub use asset_backed_facility::AssetBackedFacility;
-pub use cmo::{AgencyCmo, CmoTranche, CmoTrancheType, CmoWaterfall};
-pub use structured_credit::{StructuredCredit, STRUCTURED_CREDIT};
+mod family;
+pub use family::STRUCTURED_CREDIT;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

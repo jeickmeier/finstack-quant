@@ -302,9 +302,9 @@ fn test_registry_price_with_unknown_pricer() {
 
 #[test]
 fn removed_option_discounting_aliases_return_unknown_pricer() {
-    use finstack_quant_valuations::instruments::commodity::CommoditySpotOption;
     use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
     use finstack_quant_valuations::instruments::rates::swaption::Swaption;
+    use finstack_quant_valuations::instruments::CommoditySpotOption;
 
     let equity_option = EquityOption::example().expect("equity option example");
     let swaption = Swaption::example().expect("example");

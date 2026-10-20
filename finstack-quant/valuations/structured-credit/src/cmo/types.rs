@@ -724,7 +724,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AgencyCmo {
 impl finstack_quant_valuations_core::instruments::Instrument for AgencyCmo {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::AgencyCmo,
-        crate::structured_credit::STRUCTURED_CREDIT
+        crate::STRUCTURED_CREDIT
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {

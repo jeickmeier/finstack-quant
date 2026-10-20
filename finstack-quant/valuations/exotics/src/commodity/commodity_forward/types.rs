@@ -419,7 +419,7 @@ impl CommodityForward {
 impl finstack_quant_valuations_core::instruments::Instrument for CommodityForward {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommodityForward,
-        crate::exotics::EXOTICS
+        crate::EXOTICS
     );
 
     fn validate_invariants(&self) -> Result<()> {

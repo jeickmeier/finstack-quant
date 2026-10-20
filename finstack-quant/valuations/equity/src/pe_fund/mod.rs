@@ -36,7 +36,7 @@
 //!
 //! # See Also
 //!
-//! - [`PrivateMarketsFund`] for fund struct
+//! - [`PrivateMarketsFund`](crate::pe_fund::PrivateMarketsFund) for fund struct
 //! - private markets waterfall module for distribution waterfall logic
 //! - private markets metrics module for private markets metrics
 

@@ -45,7 +45,7 @@ impl Pricer for CdsHazardPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
-        let cds = expect_inst::<crate::CreditDefaultSwap>(instrument, InstrumentType::Cds)?;
+        let cds = expect_inst::<crate::cds::CreditDefaultSwap>(instrument, InstrumentType::Cds)?;
         let value = cds.base_value(market, as_of).map_err(|e| {
             PricingError::from_core(
                 e,
@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn cds_index_adapter_reports_missing_hazard_curve_as_missing_market_data() {
-        let index = crate::CdsIndex::example().expect("example index");
+        let index = crate::cds_index::CdsIndex::example().expect("example index");
         let result = price_without_hazard(
             &index,
             PricerKey::new(InstrumentType::CdsIndex, ModelKey::HazardRate),
@@ -129,7 +129,7 @@ mod tests {
 
     #[test]
     fn cds_option_adapter_reports_missing_hazard_curve_as_missing_market_data() {
-        let mut option = crate::CdsOption::example().expect("example option");
+        let mut option = crate::cds_option::CdsOption::example().expect("example option");
         // Quote σ directly so the vol surface is not needed and the hazard
         // curve is the missing input.
         option
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn cds_tranche_adapter_reports_missing_hazard_curve_as_missing_market_data() {
-        let tranche = crate::CdsTranche::example().expect("example tranche");
+        let tranche = crate::cds_tranche::CdsTranche::example().expect("example tranche");
         let result = price_without_hazard(
             &tranche,
             PricerKey::new(InstrumentType::CdsTranche, ModelKey::HazardRate),

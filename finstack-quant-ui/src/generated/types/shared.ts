@@ -44993,7 +44993,7 @@ export interface ScenarioPricingOverrides48 {
 }
 /**
  * Option on spot commodity. Options on a specified futures contract use
- * [`crate::CommodityFutureOption`], including futures delivery.
+ * [`crate::commodity::commodity_future_option::CommodityFutureOption`], including futures delivery.
  *
  * # Pricing
  *
@@ -46073,7 +46073,7 @@ export interface Tenor21 {
  * # Example
  *
  * ```
- * use finstack_quant_valuations_exotics::commodity::CommoditySpreadOption;
+ * use finstack_quant_valuations_exotics::commodity::commodity_spread_option::CommoditySpreadOption;
  * use finstack_quant_valuations_core::instruments::OptionType;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
  * use time::macros::date;

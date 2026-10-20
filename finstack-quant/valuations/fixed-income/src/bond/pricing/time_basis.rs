@@ -5,7 +5,7 @@
 //! Coupon ACT/365L remains a contractual accrual convention. Discount factors
 //! use the discount curve's own base date and day count at actual payment dates.
 
-use crate::bond::types::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

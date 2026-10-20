@@ -20,15 +20,15 @@ pub(crate) fn register_autocallable_metrics(
             registry: registry,
             instrument: InstrumentType::Autocallable,
             metrics: [
-                (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::Autocallable>::default()),
+                (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::autocallable::Autocallable>::default()),
                 (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
                 (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
                 (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
                 // Theta is now registered universally in crate::EQUITY.metrics(),
-                (Delta, GenericFdDelta::<crate::Autocallable>::default()),
-                (Gamma, GenericFdGamma::<crate::Autocallable>::default()),
-                (Vanna, GenericFdVanna::<crate::Autocallable>::default()),
-                (Volga, GenericFdVolga::<crate::Autocallable>::default()),
+                (Delta, GenericFdDelta::<crate::autocallable::Autocallable>::default()),
+                (Gamma, GenericFdGamma::<crate::autocallable::Autocallable>::default()),
+                (Vanna, GenericFdVanna::<crate::autocallable::Autocallable>::default()),
+                (Volga, GenericFdVolga::<crate::autocallable::Autocallable>::default()),
             ]
         }
     }

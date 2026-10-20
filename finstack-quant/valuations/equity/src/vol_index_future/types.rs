@@ -29,7 +29,7 @@
 //! rises above its entry price (matching [`EquityFuture`]). The MTM is
 //! undiscounted because the position is daily margined.
 //!
-//! [`EquityFuture`]: crate::EquityFuture
+//! [`EquityFuture`]: crate::equity_future::EquityFuture
 //!
 //! No convexity adjustment is applied. This is exact only when the vol index
 //! curve is built directly from quoted futures/forward vol levels (the curve

@@ -1,7 +1,7 @@
 //! Pricing-engine components for fixed-income bonds.
 //!
-use super::super::super::super::types::Bond;
 use super::TreePricer;
+use crate::bond::Bond;
 use finstack_quant_core::dates::DateExt;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Duration};
 use finstack_quant_core::market_data::context::MarketContext;

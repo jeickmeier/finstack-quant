@@ -398,7 +398,7 @@ impl CreditDefaultSwap {
     /// use finstack_quant_cashflows::builder::RollRule;
     /// use finstack_quant_valuations_core::constants::isda::STANDARD_RECOVERY_SENIOR;
     /// use finstack_quant_valuations_core::market::conventions::CdsConvention;
-    /// use finstack_quant_valuations_credit::CreditDefaultSwap;
+    /// use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
     /// use finstack_quant_valuations_core::instruments::{Attributes, InstrumentPricingOverrides, PayReceive, PremiumLegSpec, ProtectionLegSpec};
     /// use rust_decimal::Decimal;
     /// use time::macros::date;

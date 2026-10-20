@@ -60,7 +60,7 @@ pub struct CommoditySpotOptionExercise {
 }
 
 /// Option on spot commodity. Options on a specified futures contract use
-/// [`crate::CommodityFutureOption`], including futures delivery.
+/// [`crate::commodity::commodity_future_option::CommodityFutureOption`], including futures delivery.
 ///
 /// # Pricing
 ///
@@ -709,7 +709,7 @@ fn black76_unit_price(
 impl Instrument for CommoditySpotOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommoditySpotOption,
-        crate::exotics::EXOTICS
+        crate::EXOTICS
     );
 
     fn default_model(&self) -> finstack_quant_valuations_core::pricer::ModelKey {
@@ -1400,7 +1400,7 @@ mod tests {
                     .build()
                     .expect("vol surface"),
             );
-        let registry = crate::exotics::EXOTICS.pricers();
+        let registry = crate::EXOTICS.pricers();
 
         let default = option
             .price_with_metrics(

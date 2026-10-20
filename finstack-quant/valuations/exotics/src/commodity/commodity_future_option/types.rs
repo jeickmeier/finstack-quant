@@ -83,5 +83,5 @@ impl CommodityFutureOption {
 finstack_quant_valuations_core::impl_future_option_instrument!(
     CommodityFutureOption,
     finstack_quant_valuations_core::pricer::InstrumentType::CommodityFutureOption,
-    crate::exotics::EXOTICS
+    crate::EXOTICS
 );

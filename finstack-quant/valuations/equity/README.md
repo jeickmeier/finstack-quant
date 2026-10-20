@@ -35,7 +35,7 @@ and `LeveredRealEstateEquity` stay in the umbrella at
 
 ```rust
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_equity::EquityOption;
+use finstack_quant_valuations_equity::equity_option::EquityOption;
 
 let option = EquityOption::example().unwrap();
 assert!(!option.id().is_empty());

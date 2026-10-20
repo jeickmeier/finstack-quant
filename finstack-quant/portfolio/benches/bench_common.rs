@@ -38,7 +38,6 @@ use finstack_quant_valuations::instruments::equity::equity_option::{
     EquityOption, EquityOptionParams,
 };
 use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
-use finstack_quant_valuations::instruments::equity::Equity;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
 use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
@@ -57,6 +56,7 @@ use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, Collat
 use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CreditParams;
+use finstack_quant_valuations::instruments::Equity;
 use finstack_quant_valuations::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations::instruments::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
@@ -863,7 +863,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     for i in 0..positions_per_derivative.min(2) {
         let cds_option_id = format!("CDSOPTION_{}", i);
         let option_params = CdsOptionParams::call(
-            finstack_quant_valuations::instruments::credit_derivatives::CdsOptionStrike::Spread(
+            finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike::Spread(
                 rust_decimal::Decimal::new(1, 2),
             ),
             base + time::Duration::days(365),

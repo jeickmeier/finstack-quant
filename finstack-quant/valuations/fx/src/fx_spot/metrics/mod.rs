@@ -147,7 +147,7 @@ impl MetricCalculator for SpotRateCalculator {
 #[cfg(test)]
 mod tests {
     use super::BaseAmountCalculator;
-    use crate::FxSpot;
+    use crate::fx_spot::FxSpot;
     use finstack_quant_core::{
         currency::Currency, dates::Date, market_data::context::MarketContext, money::Money,
         types::InstrumentId,

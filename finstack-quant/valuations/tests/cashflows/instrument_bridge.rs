@@ -4,20 +4,18 @@ use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
 use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
-use finstack_quant_valuations::instruments::credit_derivatives::{CdsIndex, CdsTranche};
 use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuture;
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
 use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
-use finstack_quant_valuations::instruments::fixed_income::{
-    AgencyCmo, AgencyMbsPassthrough, AgencyTba,
-};
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
 use finstack_quant_valuations::instruments::fx::fx_swap::FxSwap;
 use finstack_quant_valuations::instruments::fx::ndf::Ndf;
 use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::Position;
+use finstack_quant_valuations::instruments::{AgencyCmo, AgencyMbsPassthrough, AgencyTba};
+use finstack_quant_valuations::instruments::{CdsIndex, CdsTranche};
 fn assert_provider<T: CashflowProvider>(_instrument: &T) {}
 use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
 use finstack_quant_valuations::instruments::rates::cms_swap::CmsSwap;

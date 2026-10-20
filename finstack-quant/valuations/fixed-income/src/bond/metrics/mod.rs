@@ -118,7 +118,7 @@ pub(crate) fn context_workout_path(
         return Ok(cached.0.clone());
     }
     let path = {
-        let bond: &crate::Bond = context.instrument_as()?;
+        let bond: &crate::bond::Bond = context.instrument_as()?;
         let may_have_workout = (bond.return_floor.is_some()
             || bond.call_put.as_ref().is_some_and(|cp| cp.has_options()))
             && bond
@@ -147,7 +147,7 @@ pub(crate) fn context_workout_path(
 struct WorkoutPathCache(Option<QuotedWorkoutPath>);
 
 pub(crate) fn quoted_workout_path(
-    bond: &crate::Bond,
+    bond: &crate::bond::Bond,
     curves: &finstack_quant_core::market_data::context::MarketContext,
     as_of: Date,
     flows: &[(Date, Money)],

@@ -9,7 +9,7 @@
 use finstack_quant_valuations::instruments::equity::pe_fund::{
     ClawbackSettle, ClawbackSpec, PeFundWaterfallSpec,
 };
-use finstack_quant_valuations::instruments::equity::{
+use finstack_quant_valuations::instruments::{
     LeveredRealEstateEquity, PrivateMarketsFund, RealEstateAsset,
 };
 use serde::de::DeserializeOwned;

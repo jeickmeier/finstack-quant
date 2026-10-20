@@ -42,7 +42,7 @@
 //!
 //! # See Also
 //!
-//! - [`ConvertibleBond`] for instrument struct
+//! - [`ConvertibleBond`](crate::convertible::ConvertibleBond) for instrument struct
 //! - `ConversionSpec` for conversion terms
 //! - `AntiDilutionPolicy` for adjustment policies
 

@@ -46,7 +46,7 @@
 //!
 //! # See Also
 //!
-//! - [`BasisSwap`] for instrument struct
+//! - [`BasisSwap`](crate::basis_swap::BasisSwap) for instrument struct
 //! - `FloatLegSpec` for leg specification
 //! - Multi-curve construction in the calibration crate
 

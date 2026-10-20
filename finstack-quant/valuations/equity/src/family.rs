@@ -11,22 +11,26 @@ use finstack_quant_valuations_core::register_generic;
 pub static EQUITY: Family = Family::new("equity", register_pricers, register_metrics);
 
 fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
-    register_generic!(registry, InstrumentType::Equity, crate::Equity);
-    register_generic!(registry, InstrumentType::EquityFuture, crate::EquityFuture);
+    register_generic!(registry, InstrumentType::Equity, crate::spot::Equity);
+    register_generic!(
+        registry,
+        InstrumentType::EquityFuture,
+        crate::equity_future::EquityFuture
+    );
     register_generic!(
         registry,
         InstrumentType::EquityTotalReturnFuture,
-        crate::EquityTotalReturnFuture
+        crate::equity_total_return_future::EquityTotalReturnFuture
     );
     register_generic!(
         registry,
         InstrumentType::EquityFutureOption,
-        crate::EquityFutureOption
+        crate::equity_future_option::EquityFutureOption
     );
     register_generic!(
         registry,
         InstrumentType::VolatilityIndexFutureOption,
-        crate::VolatilityIndexFutureOption
+        crate::vol_index_future_option::VolatilityIndexFutureOption
     );
     register_generic!(
         registry,

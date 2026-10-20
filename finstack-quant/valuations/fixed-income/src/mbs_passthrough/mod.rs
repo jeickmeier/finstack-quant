@@ -1,6 +1,6 @@
 //! Agency MBS passthrough instrument module.
 //!
-//! This module provides the [`AgencyMbsPassthrough`] instrument for modeling
+//! This module provides the [`AgencyMbsPassthrough`](crate::mbs_passthrough::AgencyMbsPassthrough) instrument for modeling
 //! agency mortgage-backed securities (FNMA, FHLMC, GNMA) with prepayment
 //! modeling, servicing fees, and payment delay conventions.
 //!

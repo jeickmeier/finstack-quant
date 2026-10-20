@@ -6,7 +6,7 @@
 //! settlement-date base PV. Uses the same IRR engine and day-count as the loan
 //! for consistency.
 
-use crate::TermLoan;
+use crate::term_loan::TermLoan;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
