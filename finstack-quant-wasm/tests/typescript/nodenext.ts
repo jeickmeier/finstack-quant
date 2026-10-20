@@ -27,6 +27,7 @@ const documented: CalibrationEnvelope = {
 const freshness: calibration.MarketFreshnessPolicy = {
   snapshot_timestamp: '2026-01-02T00:00:00Z',
   max_age_seconds: 3600,
+  as_of_timestamp: '2026-01-02T00:30:00Z',
   quote_side: 'mid',
 };
 // @ts-expect-error JSON envelopes carry numbers, never bigint.
