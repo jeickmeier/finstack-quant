@@ -696,7 +696,10 @@ mod tests {
             );
         }
         let total = neumaier_sum(result.allocations.iter().map(|a| a.capital));
-        assert!((total - 10_000_000.0).abs() <= 1e-8, "capitals sum to {total}");
+        assert!(
+            (total - 10_000_000.0).abs() <= 1e-8,
+            "capitals sum to {total}"
+        );
     }
 
     #[test]
