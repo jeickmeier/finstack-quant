@@ -326,19 +326,6 @@ impl PyCashFlowBuilder {
 
     /// Python-style summary of what has been configured so far.
     fn __repr__(&self) -> String {
-        let principal = self.inner.get_initial_principal().map_or_else(
-            || "None".to_string(),
-            |n| format!("{} {}", n.amount(), n.currency()),
-        );
-        let horizon = match (self.inner.get_issue_date(), self.inner.get_maturity_date()) {
-            (Some(issue), Some(maturity)) => format!("'{issue}'..'{maturity}'"),
-            _ => "None".to_string(),
-        };
-        format!(
-            "CashFlowBuilder(principal={principal}, horizon={horizon}, coupon_legs={}, fees={}, principal_events={})",
-            self.inner.get_coupon_leg_count(),
-            self.inner.get_fee_count(),
-            self.inner.get_principal_event_count(),
-        )
+        self.inner.to_string()
     }
 }

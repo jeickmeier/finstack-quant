@@ -17,5 +17,3 @@ pub(crate) use coupons::{
 pub(super) use amortization::emit_amortization_on;
 
 pub(super) use fees::emit_fees_on;
-
-pub use coupons::emit_inflation_coupons;

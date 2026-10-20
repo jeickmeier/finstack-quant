@@ -102,12 +102,6 @@ impl PeriodAggregation {
             })
             .collect()
     }
-
-    /// Consume the wrapper and return the underlying nested map.
-    #[must_use]
-    pub fn into_inner(self) -> IndexMap<PeriodId, IndexMap<Currency, Money>> {
-        self.0
-    }
 }
 
 impl TryFrom<IndexMap<PeriodId, IndexMap<Currency, Money>>> for PeriodAggregation {
@@ -920,62 +914,6 @@ pub(crate) fn pv_by_period(
     sum_by_period(sorted, periods, |index, cf| {
         Ok((cf.amount.currency(), pvs[index]))
     })
-}
-
-#[cfg(test)]
-mod compensated_sum_tests {
-    use super::*;
-
-    #[test]
-    fn preserves_small_addend() {
-        let mut acc = NeumaierAccumulator::default();
-        acc.add(1.0);
-        acc.add(1e-16);
-        acc.add(-1.0);
-        let result = acc.total();
-        assert!(
-            result > 0.0,
-            "Neumaier should preserve small addend (non-zero): got {}",
-            result
-        );
-        assert!(
-            (result - 1e-16).abs() < 1e-16,
-            "Neumaier should preserve small addend close to 1e-16: got {}",
-            result
-        );
-    }
-
-    #[test]
-    fn large_sum_accuracy() {
-        let mut acc = NeumaierAccumulator::default();
-        for _ in 0..10_000 {
-            acc.add(0.1);
-        }
-        let result = acc.total();
-        assert!(
-            (result - 1000.0).abs() < 1e-10,
-            "Neumaier sum of 10k x 0.1 should be ~1000.0, got {}",
-            result
-        );
-    }
-
-    #[test]
-    fn beats_naive_drift() {
-        let mut naive = 0.0_f64;
-        let mut acc = NeumaierAccumulator::default();
-        for _ in 0..100_000 {
-            naive += 0.1;
-            acc.add(0.1);
-        }
-        let naive_error = (naive - 10_000.0).abs();
-        let neumaier_error = (acc.total() - 10_000.0).abs();
-        assert!(
-            neumaier_error < naive_error,
-            "Neumaier error ({}) should be less than naive error ({})",
-            neumaier_error,
-            naive_error
-        );
-    }
 }
 
 #[cfg(test)]

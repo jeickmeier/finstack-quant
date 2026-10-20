@@ -19,7 +19,7 @@ schemars = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 time = { workspace = true }
-tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+tracing = { version = "0.1", default-features = false }
 
 [features]
 default = ["json-schema", "jsonschema-validate"]

@@ -93,6 +93,7 @@ fn test_z_spread_reports_bond_compounding_spread() {
     let target_dirty = bond
         .cashflow_schedule(&market, as_of)
         .unwrap()
+        .into_flows()
         .into_iter()
         .filter(|flow| flow.date > as_of)
         .map(|flow| {

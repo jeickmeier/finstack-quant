@@ -373,7 +373,8 @@ pub fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedul
                 ..Default::default()
             },
         },
-    )?
+    )
+    .expect("valid schedule")
 }
 
 pub fn five_year_fixed_json() -> &'static str {

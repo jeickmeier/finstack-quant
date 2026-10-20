@@ -1,8 +1,4 @@
 //! Coupon cashflow emission (fixed and floating).
-//!
-//! `emit_inflation_coupons` maps pre-indexed inflation coupon tuples into
-//! `CashFlow` values. Index projection and ratio logic belong in the instrument
-//! layer that supplies those tuples.
 
 use crate::builder::FloatingLegCompounding;
 use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
@@ -70,39 +66,6 @@ fn add_pik_flow_if_nonzero(
     } else {
         Ok(0.0)
     }
-}
-
-/// Append pre-computed inflation-linked coupon cashflows.
-///
-/// This function does not project CPI/RPI/HICP fixings or calculate index
-/// ratios. It preserves caller-computed indexed coupon amounts and tags them as
-/// [`CFKind::InflationCoupon`] for downstream valuation/reporting.
-///
-/// Each tuple is `(payment_date, indexed_coupon_amount, accrual_factor, real_coupon_rate)`.
-///
-/// # Arguments
-///
-/// * `ccy` - Currency assigned to every emitted inflation-coupon cashflow.
-/// * `coupons` - Precomputed payment tuples of date, indexed amount, accrual
-///   factor in years, and annual real coupon rate as a decimal.
-/// * `out_flows` - Mutable schedule flow list to which one inflation-coupon
-///   row is appended for each supplied tuple.
-pub fn emit_inflation_coupons(
-    ccy: Currency,
-    coupons: &[(Date, f64, f64, f64)],
-    out_flows: &mut Vec<CashFlow>,
-) -> finstack_quant_core::Result<()> {
-    for &(date, amount, accrual_factor, real_coupon_rate) in coupons {
-        out_flows.push(CashFlow::new(
-            date,
-            None,
-            Money::new(amount, ccy)?,
-            CFKind::InflationCoupon,
-            accrual_factor,
-            Some(real_coupon_rate),
-        ));
-    }
-    Ok(())
 }
 
 /// Error for an overnight observation date strictly before the curve base
@@ -831,34 +794,6 @@ mod tests {
     use crate::builder::FloatingLegCompounding;
     use finstack_quant_core::dates::{calendar_by_id_strict, DayCount};
     use time::Month;
-
-    #[test]
-    fn emit_inflation_coupons_preserves_non_positive_amounts() {
-        let mut flows = Vec::new();
-        emit_inflation_coupons(
-            Currency::USD,
-            &[
-                (
-                    Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
-                    0.0,
-                    0.5,
-                    0.02,
-                ),
-                (
-                    Date::from_calendar_date(2025, Month::July, 1).expect("valid date"),
-                    -12.5,
-                    0.5,
-                    0.02,
-                ),
-            ],
-            &mut flows,
-        )
-        .expect("valid inflation coupons fixture");
-
-        assert_eq!(flows.len(), 2);
-        assert_eq!(flows[0].kind, CFKind::InflationCoupon);
-        assert_eq!(flows[1].amount.amount(), -12.5);
-    }
 
     #[test]
     fn overnight_projection_converts_curve_basis_but_preserves_observed_fixings() {

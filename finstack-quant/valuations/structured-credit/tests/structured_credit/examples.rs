@@ -179,7 +179,7 @@ mod tests {
         let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
         // Simulated principal cashflow schedule (Date, Amount)
-        let cashflows = vec![
+        let cashflows = [
             (
                 Date::from_calendar_date(2026, Month::January, 1).unwrap(),
                 Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -198,10 +198,12 @@ mod tests {
             ), // 4 years
         ];
 
-        let pool = AssetPool::new("DEMO_POOL", DealType::Clo, Currency::USD);
-
         // Calculate WAL using market-standard cashflow-based method
-        let wal = pool.wal_from_cashflows(&cashflows, as_of).expect("WAL");
+        let wal = finstack_quant_cashflows::builder::weighted_average_life_from_principal(
+            cashflows.iter().copied(),
+            as_of,
+        )
+        .expect("WAL");
 
         // Expected WAL:
         // (20M×1 + 30M×2 + 30M×3 + 20M×4) / 100M
@@ -312,10 +314,8 @@ mod tests {
 
         let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-        let pool = AssetPool::new("DEMO", DealType::Rmbs, Currency::USD);
-
         // Asset with 5-year maturity but principal amortizes over time
-        let amortizing_cashflows = vec![
+        let amortizing_cashflows = [
             (
                 Date::from_calendar_date(2026, Month::January, 1).unwrap(),
                 Money::new(25_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -339,9 +339,11 @@ mod tests {
         ];
 
         // Calculate true WAL from cashflows
-        let wal = pool
-            .wal_from_cashflows(&amortizing_cashflows, as_of)
-            .expect("WAL");
+        let wal = finstack_quant_cashflows::builder::weighted_average_life_from_principal(
+            amortizing_cashflows.iter().copied(),
+            as_of,
+        )
+        .expect("WAL");
 
         // Expected WAL:
         // (25M×1 + 30M×2 + 25M×3 + 15M×4 + 5M×5) / 100M

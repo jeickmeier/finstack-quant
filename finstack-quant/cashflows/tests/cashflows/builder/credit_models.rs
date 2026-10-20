@@ -547,7 +547,8 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
         .build()
         .unwrap();
 
-    let pv = schedule.npv(&curve, base).unwrap();
+    let pv =
+        finstack_quant_core::cashflow::npv(&curve, base, &schedule.dated_flows().unwrap()).unwrap();
     assert!(
         (pv.amount() - 200.0).abs() < 1e-10,
         "plain npv should include realized recovery but exclude default write-down markers, got {}",

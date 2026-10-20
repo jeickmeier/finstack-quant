@@ -27,7 +27,7 @@ use super::specs::FeeSpec;
 use tracing::debug;
 
 /// Internal state accumulated during schedule building.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(super) struct BuildState {
     pub(super) flows: Vec<CashFlow>,
     pub(super) projected_fixings: Vec<crate::fixings::ProjectedFixing>,
@@ -44,7 +44,7 @@ pub(super) struct BuildState {
     pub(super) linear_between_installment: Option<Decimal>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(super) struct AmortizationSetup {
     pub(super) amort_dates: finstack_quant_core::HashSet<Date>,
     pub(super) final_amortization_date: Option<Date>,
@@ -53,7 +53,7 @@ pub(super) struct AmortizationSetup {
 }
 
 /// Exactly one prepared rule is active for a compiled instrument.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(super) enum PreparedAmortization {
     None,
     LinearTo {
@@ -413,7 +413,6 @@ fn collect_all_dates(inputs: &DateCollectionInputs<'_>) -> finstack_quant_core::
     if let AmortizationSpec::LinearBetween { start, .. } = &inputs.notional.amort {
         dates.push(*start);
     }
-    dates.push(inputs.redemption_date);
     dates.sort_unstable();
     dates.dedup();
     if dates.len() < 2 {
@@ -442,45 +441,29 @@ pub struct CashFlowBuilder {
     pub(super) pending_error: Option<finstack_quant_core::Error>,
 }
 
-impl CashFlowBuilder {
-    /// Initial principal amount and currency, or `None` before [`Self::principal`].
-    #[must_use]
-    pub fn get_initial_principal(&self) -> Option<Money> {
-        self.initial_principal
-    }
-
-    /// Issue date set through [`Self::principal`], if any.
-    #[must_use]
-    pub fn get_issue_date(&self) -> Option<Date> {
-        self.issue
-    }
-
-    /// Maturity date set through [`Self::principal`], if any.
-    #[must_use]
-    pub fn get_maturity_date(&self) -> Option<Date> {
-        self.maturity
-    }
-
-    /// Number of coupon-program pieces (full-horizon legs and windows) added so far.
-    #[must_use]
-    pub fn get_coupon_leg_count(&self) -> usize {
-        self.coupon_program.len()
-    }
-
-    /// Number of fee specifications added so far.
-    #[must_use]
-    pub fn get_fee_count(&self) -> usize {
-        self.fees.len()
-    }
-
-    /// Number of explicit principal events added so far.
-    #[must_use]
-    pub fn get_principal_event_count(&self) -> usize {
-        self.principal_events.len()
+/// One-line summary of what has been configured so far, for host `repr`s.
+impl std::fmt::Display for CashFlowBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("CashFlowBuilder(principal=")?;
+        match self.initial_principal {
+            Some(principal) => write!(f, "{} {}", principal.amount(), principal.currency())?,
+            None => f.write_str("None")?,
+        }
+        f.write_str(", horizon=")?;
+        match (self.issue, self.maturity) {
+            (Some(issue), Some(maturity)) => write!(f, "'{issue}'..'{maturity}'")?,
+            _ => f.write_str("None")?,
+        }
+        write!(
+            f,
+            ", coupon_legs={}, fees={}, principal_events={})",
+            self.coupon_program.len(),
+            self.fees.len(),
+            self.principal_events.len()
+        )
     }
 }
 
-#[derive(Clone)]
 pub(super) struct CompiledCashFlowPlan {
     pub(super) notional: Notional,
     pub(super) issue: Date,

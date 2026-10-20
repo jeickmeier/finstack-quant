@@ -403,7 +403,12 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
         .build()
         .unwrap();
 
-    let pv = schedule.npv(&curve, curve.base_date()).unwrap();
+    let pv = finstack_quant_core::cashflow::npv(
+        &curve,
+        curve.base_date(),
+        &schedule.dated_flows().unwrap(),
+    )
+    .unwrap();
 
     let expected = schedule
         .get_flows()
@@ -1207,9 +1212,24 @@ fn npv_decreases_with_higher_discount_rate() {
     let curve_5pct = build_curve(0.05);
     let curve_7pct = build_curve(0.07);
 
-    let npv_3pct = schedule.npv(&curve_3pct, curve_3pct.base_date()).unwrap();
-    let npv_5pct = schedule.npv(&curve_5pct, curve_5pct.base_date()).unwrap();
-    let npv_7pct = schedule.npv(&curve_7pct, curve_7pct.base_date()).unwrap();
+    let npv_3pct = finstack_quant_core::cashflow::npv(
+        &curve_3pct,
+        curve_3pct.base_date(),
+        &schedule.dated_flows().unwrap(),
+    )
+    .unwrap();
+    let npv_5pct = finstack_quant_core::cashflow::npv(
+        &curve_5pct,
+        curve_5pct.base_date(),
+        &schedule.dated_flows().unwrap(),
+    )
+    .unwrap();
+    let npv_7pct = finstack_quant_core::cashflow::npv(
+        &curve_7pct,
+        curve_7pct.base_date(),
+        &schedule.dated_flows().unwrap(),
+    )
+    .unwrap();
 
     // Monotonicity: higher discount rate = lower NPV
     assert!(

@@ -192,7 +192,8 @@ fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedule {
                 ..Default::default()
             },
         },
-    )?
+    )
+    .expect("valid schedule")
 }
 
 // Benchmark: pv_by_period (plain, no credit)
@@ -388,10 +389,14 @@ fn bench_npv(c: &mut Criterion) {
         group.throughput(Throughput::Elements(schedule.get_flows().len() as u64));
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
             b.iter(|| {
-                black_box(&schedule)
-                    .npv(black_box(disc.as_ref()), black_box(base))
-                    .unwrap()
-                    .amount()
+                let flows = black_box(&schedule).dated_flows().unwrap();
+                finstack_quant_core::cashflow::npv(
+                    black_box(disc.as_ref()),
+                    black_box(base),
+                    &flows,
+                )
+                .unwrap()
+                .amount()
             });
         });
     }

@@ -521,7 +521,7 @@ pub struct PoolStats {
     /// Weighted average maturity (WAM) in years.
     ///
     /// For weighted average life use
-    /// [`AssetPool::wal_from_cashflows`].
+    /// [`finstack_quant_cashflows::builder::weighted_average_life_from_principal`].
     pub weighted_avg_maturity: f64,
     /// Diversity score (Moody's methodology)
     pub diversity_score: f64,
@@ -1202,29 +1202,6 @@ impl AssetPool {
             weighted_sum += term * line.balance.amount();
         }
         Ok(weighted_sum / total_balance)
-    }
-
-    /// Calculate true weighted average life from cashflow schedule
-    ///
-    /// This is the market-standard calculation that should be used when
-    /// full cashflow schedules are available.
-    ///
-    /// # Arguments
-    ///
-    /// * `cashflows` - Principal payment dates and amounts used as the WAL
-    ///   weights. Interest-only rows should be omitted; the helper treats
-    ///   each amount as principal.
-    /// * `as_of` - Origin date for the year-fraction clock. Payments on or
-    ///   before this date do not contribute to WAL.
-    pub fn wal_from_cashflows(
-        &self,
-        cashflows: &[(Date, Money)],
-        as_of: Date,
-    ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_cashflows::builder::weighted_average_life_from_principal(
-            cashflows.iter().copied(),
-            as_of,
-        )
     }
 
     /// Calculate diversity score (simplified Moody's approach)
