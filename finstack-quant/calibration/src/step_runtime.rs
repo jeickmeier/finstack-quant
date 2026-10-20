@@ -69,7 +69,8 @@ fn attach_validation_result(
     global_config: &CalibrationConfig,
 ) -> CalibrationReport {
     match validation {
-        Ok(()) => report.with_validation_result(true, None),
+        // A passing gate keeps any failure the target already recorded.
+        Ok(()) => report,
         Err(err) => match global_config.validation_mode {
             ValidationMode::Error => report.with_validation_result(false, Some(err.to_string())),
             ValidationMode::Warn => {
@@ -399,19 +400,21 @@ pub(crate) fn execute_params(
         StepParams::VolSurface(p) => {
             let (surface, report) = VolSurfaceTarget::solve(p, quotes, context, global_config)?;
             let mut new_report = report;
-            new_report
-                .explanation
-                .get_or_insert_with(|| {
-                    finstack_quant_core::explain::ExplanationTrace::new("vol_surface")
-                })
-                .push(
-                    TraceEntry::ComputationStep {
-                        name: "surface_built".to_string(),
-                        description: "Vol surface constructed".to_string(),
-                        metadata: None,
-                    },
-                    global_config.explain.max_entries,
-                );
+            if global_config.explain.enabled {
+                new_report
+                    .explanation
+                    .get_or_insert_with(|| {
+                        finstack_quant_core::explain::ExplanationTrace::new("vol_surface")
+                    })
+                    .push(
+                        TraceEntry::ComputationStep {
+                            name: "surface_built".to_string(),
+                            description: "Vol surface constructed".to_string(),
+                            metadata: None,
+                        },
+                        global_config.explain.max_entries,
+                    );
+            }
             let new_report = attach_validation_result(
                 new_report,
                 validate_surface(&surface, &global_config.validation),
@@ -1471,6 +1474,24 @@ mod tests {
         assert!(
             atm_vol > 0.0 && atm_vol < 1.0,
             "ATM SVI vol should be in a realistic range, got {atm_vol}"
+        );
+    }
+
+    #[test]
+    fn passing_runtime_gate_keeps_a_target_validation_failure() {
+        let failed = CalibrationReport::for_type_with_tolerance(
+            "vol_surface",
+            std::collections::BTreeMap::new(),
+            0,
+            1e-6,
+        )
+        .with_validation_result(false, Some("SABR butterfly-spread arbitrage".to_string()));
+        let report = attach_validation_result(failed, Ok(()), &CalibrationConfig::default());
+        assert!(!report.validation_passed);
+        assert!(!report.success);
+        assert_eq!(
+            report.validation_error.as_deref(),
+            Some("SABR butterfly-spread arbitrage")
         );
     }
 }
