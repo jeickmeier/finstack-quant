@@ -914,7 +914,7 @@ mod tests {
         {
             assert_eq!(step_id, "discount");
             assert_eq!(quote_id, "USD-DEP-1M");
-            assert!(reason.contains("rate must be finite"));
+            assert!(reason.contains("Invalid rate: must be finite"));
         }
     }
 
@@ -956,7 +956,7 @@ mod tests {
         {
             assert_eq!(step_id, "discount");
             assert_eq!(quote_id, "USD-FUT");
-            assert!(reason.contains("convexity_adjustment must be finite"));
+            assert!(reason.contains("Invalid convexity_adjustment: must be finite"));
         }
 
         env.market_data.clear();

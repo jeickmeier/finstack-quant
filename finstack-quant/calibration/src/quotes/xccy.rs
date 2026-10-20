@@ -1,7 +1,7 @@
 //! Cross-currency swap market quote schema.
 
 use super::ids::{Pillar, QuoteId};
-use super::validate;
+use finstack_quant_core::validation::{validate_f64_finite, validate_f64_positive};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::market::conventions::ids::XccyConventionId;
 use serde::{Deserialize, Serialize};
@@ -41,9 +41,9 @@ impl XccyQuote {
 
     /// Validate that the basis spread is finite and any spot FX is positive.
     pub fn validate(&self) -> Result<()> {
-        validate::finite(self.basis_spread_bp, "basis_spread_bp")?;
+        validate_f64_finite(self.basis_spread_bp, "basis_spread_bp")?;
         if let Some(value) = self.spot_fx {
-            validate::positive(value, "spot_fx")?;
+            validate_f64_positive(value, "spot_fx")?;
         }
         Ok(())
     }
