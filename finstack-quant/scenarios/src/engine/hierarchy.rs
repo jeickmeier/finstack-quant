@@ -1,5 +1,6 @@
 //! Hierarchy-target expansion and resolution.
 
+use super::ScenarioMarketTarget;
 use crate::error::Result;
 use crate::spec::{CurveKind, OperationSpec};
 use crate::warning::Warning;
@@ -12,24 +13,8 @@ use finstack_quant_core::{HashMap, HashSet};
 struct HierarchyExpansion {
     matched_depth: usize,
     operation: OperationSpec,
-    key: HierarchyExpansionKey,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum HierarchyExpansionKey {
-    Curve {
-        curve_kind: CurveKind,
-        curve_id: CurveId,
-    },
-    VolSurface {
-        vol_surface_id: CurveId,
-    },
-    EquityPrice {
-        spot_id: PriceId,
-    },
-    BaseCorrelation {
-        surface_id: CurveId,
-    },
+    /// Concrete market target the expanded operation shocks.
+    key: ScenarioMarketTarget,
 }
 
 fn resolve_hierarchy_matches(
@@ -79,7 +64,7 @@ fn expand_target(
     op_kind: &str,
     warnings: &mut Vec<Warning>,
     exists: impl Fn(&CurveId) -> bool,
-    mut make: impl FnMut(CurveId) -> (HierarchyExpansionKey, OperationSpec),
+    mut make: impl FnMut(CurveId) -> (ScenarioMarketTarget, OperationSpec),
 ) -> Vec<HierarchyExpansion> {
     let matches = resolve_hierarchy_matches(hierarchy, target);
     if matches.is_empty() {
@@ -171,7 +156,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
                 |id| curve_kind_target_exists(market, *curve_kind, id),
                 |curve_id| {
                     (
-                        HierarchyExpansionKey::Curve {
+                        ScenarioMarketTarget::Curve {
                             curve_kind: *curve_kind,
                             curve_id: curve_id.clone(),
                         },
@@ -192,7 +177,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
                 |id| market.get_surface(id.as_str()).is_ok(),
                 |curve_id| {
                     (
-                        HierarchyExpansionKey::VolSurface {
+                        ScenarioMarketTarget::VolSurface {
                             vol_surface_id: curve_id.clone(),
                         },
                         OperationSpec::VolSurfaceParallelPct {
@@ -210,7 +195,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
                 |id| market.get_price(id.as_str()).is_ok(),
                 |curve_id| {
                     (
-                        HierarchyExpansionKey::EquityPrice {
+                        ScenarioMarketTarget::EquityPrice {
                             spot_id: PriceId::new(curve_id.as_str()),
                         },
                         OperationSpec::EquityPricePct {
@@ -228,7 +213,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
                 |id| market.get_base_correlation(id.as_str()).is_ok(),
                 |curve_id| {
                     (
-                        HierarchyExpansionKey::BaseCorrelation {
+                        ScenarioMarketTarget::BaseCorrelation {
                             surface_id: curve_id.clone(),
                         },
                         OperationSpec::BaseCorrParallelPts {
@@ -246,9 +231,9 @@ pub(super) fn expand_hierarchy_operations<'a>(
         slots.push(Slot::Expanded(expansions));
     }
 
-    let max_depth: HashMap<HierarchyExpansionKey, usize> =
+    let max_depth: HashMap<ScenarioMarketTarget, usize> =
         if matches!(mode, ResolutionMode::MostSpecificWins) {
-            let mut md: HashMap<HierarchyExpansionKey, usize> = HashMap::default();
+            let mut md: HashMap<ScenarioMarketTarget, usize> = HashMap::default();
             for slot in &slots {
                 if let Slot::Expanded(exps) = slot {
                     for exp in exps {
