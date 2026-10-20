@@ -199,11 +199,11 @@ test('ModelBuilder.fromSpec resumes a model and periodsExplicit takes Period obj
 });
 
 test('ModelBuilder reports misuse without discarding the model', () => {
+  // Nodes may be added before `periods`; only `build` needs the timeline.
+  const noTimeline = new statements.ModelBuilder('no-timeline');
+  noTimeline.valueScalar('revenue', { [Q1]: 1.0 });
+  assert.throws(() => noTimeline.build());
   const builder = new statements.ModelBuilder('guard');
-  assert.throws(
-    () => builder.compute('x', 'y'),
-    (e) => e.kind === 'validation' && /periods\(\)/.test(e.message)
-  );
   assert.throws(
     () => builder.periods('not a range'),
     (e) => e.kind === 'validation'

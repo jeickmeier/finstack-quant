@@ -31598,7 +31598,7 @@ export interface ModelBuilder extends WasmOwned {
    * Reusing a node identifier replaces its former definition.
    * @param nodeId - Node identifier, unique within the model.
    * @param values - Object mapping period id (e.g. `"2025Q1"`) to a number or a `Money` wire object (`{amount, currency}`).
-   * @throws Error with kind `validation` if `values` is malformed, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
    */
   value(nodeId: string, values: Record<string, generated.statements.AmountOrScalar> | string): void;
   /**
@@ -31608,7 +31608,7 @@ export interface ModelBuilder extends WasmOwned {
    * `ModelBuilder::value_scalar`).
    * @param nodeId - Node identifier, unique within the model.
    * @param values - Object mapping period id (e.g. `"2025Q1"`) to a number.
-   * @throws Error with kind `validation` if `values` is malformed, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
    */
   valueScalar(nodeId: string, values: Record<string, number> | string): void;
   /**
@@ -31618,7 +31618,7 @@ export interface ModelBuilder extends WasmOwned {
    * `ModelBuilder::value_money`).
    * @param nodeId - Node identifier, unique within the model.
    * @param values - Object mapping period id (e.g. `"2025Q1"`) to a `Money` wire object (`{amount, currency}`); all amounts share one currency.
-   * @throws Error with kind `validation` if `values` is malformed, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
    */
   valueMoney(nodeId: string, values: Record<string, generated.statements.Money> | string): void;
   /**
@@ -31629,7 +31629,7 @@ export interface ModelBuilder extends WasmOwned {
    * builder usable.
    * @param nodeId - Existing node whose values the dates describe.
    * @param availabilityDates - Object mapping period id (e.g. `"2025Q1"`) to the ISO 8601 date its value was published.
-   * @throws Error with kind `validation` if `availabilityDates` is malformed, the node does not exist, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if `availabilityDates` is malformed, the node does not exist or the builder was consumed.
    */
   availabilityDates(nodeId: string, availabilityDates: Record<string, string> | string): void;
   /**
@@ -31639,7 +31639,7 @@ export interface ModelBuilder extends WasmOwned {
    * A failed call leaves the builder usable.
    * @param nodeId - Node identifier, unique within the model.
    * @param formula - Statements DSL expression, e.g. `"revenue - cogs"`.
-   * @throws Error with kind `validation` if the identifier is reserved, the formula is blank or does not parse and compile, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if the identifier is reserved, the formula is blank or does not parse and compile or the builder was consumed.
    */
   compute(nodeId: string, formula: string): void;
   /**
@@ -31659,7 +31659,7 @@ export interface ModelBuilder extends WasmOwned {
    * continue with.
    * @param nodeId - Node identifier, unique within the model.
    * @returns A `MixedNodeBuilder` for the node.
-   * @throws Error with kind `validation` if periods were not set or the builder was consumed.
+   * @throws Error with kind `validation` if the builder was consumed.
    */
   mixed(nodeId: string): MixedNodeBuilder;
   /**
@@ -31668,7 +31668,7 @@ export interface ModelBuilder extends WasmOwned {
    * Twin of Python `ModelBuilder.forecast` (Rust `ModelBuilder::forecast`).
    * @param nodeId - Node whose forecast periods the spec fills.
    * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
-   * @throws Error with kind `validation` if `forecastSpec` is malformed, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
    */
   forecast(nodeId: string, forecastSpec: generated.statements.ForecastSpec | string): void;
   /**
@@ -31677,7 +31677,7 @@ export interface ModelBuilder extends WasmOwned {
    * Twin of Python `ModelBuilder.where_clause` (Rust
    * `ModelBuilder::where_clause`).
    * @param whereClause - Boolean DSL expression; the node evaluates only in periods where it is true.
-   * @throws Error with kind `validation` if periods were not set or the builder was consumed.
+   * @throws Error with kind `validation` if the builder was consumed.
    */
   whereClause(whereClause: string): void;
   /**
@@ -31686,7 +31686,7 @@ export interface ModelBuilder extends WasmOwned {
    * Twin of Python `ModelBuilder.with_meta` (Rust `ModelBuilder::with_meta`).
    * @param key - Metadata key; `"currency"` is read by the evaluator and the DCF to infer the reporting currency.
    * @param value - Any JSON value (string, number, boolean, array, plain object or `null`), stored as given: a string is not parsed as JSON. For `key = "currency"` pass a three-letter code such as `"USD"`.
-   * @throws Error with kind `invalid_type` if `value` is not JSON-representable, and kind `validation` if a number is not finite, periods were not set, or the builder was consumed.
+   * @throws Error with kind `invalid_type` if `value` is not JSON-representable, and kind `validation` if a number is not finite or the builder was consumed.
    */
   withMeta(key: string, value: unknown): void;
   /**
@@ -31695,7 +31695,7 @@ export interface ModelBuilder extends WasmOwned {
    * Twin of Python `ModelBuilder.with_builtin_metrics` (Rust
    * `ModelBuilder::try_with_builtin_metrics`). A failed call leaves the
    * builder usable.
-   * @throws Error with kind `validation` if the built-in catalog cannot be loaded, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if the built-in catalog cannot be loaded or the builder was consumed.
    */
   withBuiltinMetrics(): void;
   /**
@@ -31706,7 +31706,7 @@ export interface ModelBuilder extends WasmOwned {
    * builder usable.
    * @param qualifiedId - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
    * @param registry - `Registry` holding the metric and its dependencies.
-   * @throws Error with kind `not_found` if the metric or a dependency is not in `registry`, and kind `validation` if the identifier is not `namespace.metric` shaped, periods were not set, or the builder was consumed.
+   * @throws Error with kind `not_found` if the metric or a dependency is not in `registry`, and kind `validation` if the identifier is not `namespace.metric` shaped or the builder was consumed.
    */
   addMetricFromRegistry(qualifiedId: string, registry: Registry): void;
   /**
@@ -31855,7 +31855,7 @@ export interface ModelBuilder extends WasmOwned {
    * Twin of Python `ModelBuilder.build` (Rust `ModelBuilder::build`). The
    * builder is consumed.
    * @returns The completed `FinancialModelSpec` plain object, accepted by every model-taking function.
-   * @throws Error with kind `validation` if the model fails semantic validation, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if the model fails semantic validation or the builder was consumed.
    */
   build(): generated.statements.FinancialModelSpec;
 }

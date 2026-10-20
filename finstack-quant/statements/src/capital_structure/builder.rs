@@ -176,7 +176,7 @@ fn build_swap_internal(
         .build()?)
 }
 
-impl<State> ModelBuilder<State> {
+impl ModelBuilder {
     /// Add a bond instrument to the capital structure specification.
     ///
     /// Uses `Bond::fixed()` with default conventions (semi-annual, 30/360).

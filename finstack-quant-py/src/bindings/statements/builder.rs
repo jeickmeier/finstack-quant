@@ -1,8 +1,6 @@
-//! Python wrapper for the type-state ModelBuilder.
+//! Python wrapper for `ModelBuilder`.
 //!
-//! Since Python cannot model Rust type-state at the type level, we collapse
-//! the two states into a single class and track readiness at runtime. Every
-//! fallible configuration step goes through the crate's non-consuming
+//! Every fallible configuration step goes through the crate's non-consuming
 //! `try_*` twins, so a typo in a formula, period range, or metric id raises
 //! without discarding the model accumulated so far.
 
@@ -24,7 +22,7 @@ use finstack_quant_statements::capital_structure::{
 use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
 use pyo3::prelude::*;
 
-/// Builder for financial models (type-state collapsed for Python).
+/// Builder for financial models.
 ///
 /// Every configuration method returns the builder, so calls chain::
 ///
@@ -50,12 +48,7 @@ use pyo3::prelude::*;
 /// leaves the builder usable.
 #[pyclass(name = "ModelBuilder", module = "finstack_quant.statements")]
 pub struct PyModelBuilder {
-    inner: Option<BuilderState>,
-}
-
-enum BuilderState {
-    NeedPeriods(ModelBuilder<finstack_quant_statements::builder::NeedPeriods>),
-    Ready(ModelBuilder<finstack_quant_statements::builder::Ready>),
+    inner: Option<ModelBuilder>,
 }
 
 /// Fluent builder for a mixed statement node.
@@ -170,9 +163,7 @@ impl PyMixedNodeBuilder {
     fn build(&mut self) -> PyResult<PyModelBuilder> {
         let builder = self.take()?;
         let ready = builder.build().map_err(statements_to_py)?;
-        Ok(PyModelBuilder {
-            inner: Some(BuilderState::Ready(ready)),
-        })
+        Ok(PyModelBuilder { inner: Some(ready) })
     }
 
     /// Return ``MixedNodeBuilder(node_id='revenue')`` (or ``consumed``).
@@ -205,7 +196,7 @@ impl PyModelBuilder {
     #[pyo3(text_signature = "(id)")]
     fn new(id: &str) -> Self {
         Self {
-            inner: Some(BuilderState::NeedPeriods(ModelBuilder::new(id))),
+            inner: Some(ModelBuilder::new(id)),
         }
     }
 
@@ -230,7 +221,7 @@ impl PyModelBuilder {
     fn from_spec(spec: &PyFinancialModelSpec) -> PyResult<Self> {
         let builder = ModelBuilder::from_spec(spec.inner.clone()).map_err(statements_to_py)?;
         Ok(Self {
-            inner: Some(BuilderState::Ready(builder)),
+            inner: Some(builder),
         })
     }
 
@@ -265,25 +256,14 @@ impl PyModelBuilder {
         range: &str,
         actuals_until: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let state = slf.take_any()?;
-        match state {
-            BuilderState::NeedPeriods(b) => match b.try_periods(range, actuals_until) {
-                Ok(ready) => {
-                    slf.inner = Some(BuilderState::Ready(ready));
-                    Ok(slf)
-                }
-                Err((b, error)) => {
-                    slf.inner = Some(BuilderState::NeedPeriods(*b));
-                    Err(value_error(format!(
-                        "invalid period range {range:?}: {error}; {PERIOD_GRAMMAR}"
-                    )))
-                }
-            },
-            BuilderState::Ready(b) => {
-                slf.inner = Some(BuilderState::Ready(b));
-                Err(value_error("Periods already set"))
-            }
-        }
+        slf.builder_mut()?
+            .try_periods(range, actuals_until)
+            .map_err(|error| {
+                value_error(format!(
+                    "invalid period range {range:?}: {error}; {PERIOD_GRAMMAR}"
+                ))
+            })?;
+        Ok(slf)
     }
 
     /// Define the timeline from explicit ``Period`` objects.
@@ -319,18 +299,16 @@ impl PyModelBuilder {
         if periods.is_empty() {
             return Err(value_error("Period list must contain at least one period"));
         }
-        let state = slf.take_any()?;
-        match state {
-            BuilderState::NeedPeriods(b) => {
-                let ready = b.periods_explicit(periods).map_err(statements_to_py)?;
-                slf.inner = Some(BuilderState::Ready(ready));
-                Ok(slf)
-            }
-            BuilderState::Ready(b) => {
-                slf.inner = Some(BuilderState::Ready(b));
-                Err(value_error("Periods already set"))
-            }
+        if !slf.builder_mut()?.periods_slice().is_empty() {
+            return Err(value_error("Periods already set"));
         }
+        let builder = slf.take()?;
+        slf.inner = Some(
+            builder
+                .periods_explicit(periods)
+                .map_err(statements_to_py)?,
+        );
+        Ok(slf)
     }
 
     /// Add a value node with explicit period values.
@@ -352,7 +330,7 @@ impl PyModelBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If a period id does not parse, periods were not set, or the
+    ///     If a period id does not parse or the
     ///     builder was consumed.
     #[pyo3(text_signature = "($self, node_id, values)")]
     fn value<'py>(
@@ -363,9 +341,9 @@ impl PyModelBuilder {
         // Parse arguments BEFORE `take_ready()` so a bad period string does not
         // permanently consume the in-progress builder.
         let parsed = extract_value_series(values)?;
-        let state = slf.take_ready()?;
+        let state = slf.take()?;
         let ready = state.value(node_id, &parsed);
-        slf.inner = Some(BuilderState::Ready(ready));
+        slf.inner = Some(ready);
         Ok(slf)
     }
 
@@ -390,9 +368,9 @@ impl PyModelBuilder {
         values: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let parsed = extract_scalar_series(values)?;
-        let state = slf.take_ready()?;
+        let state = slf.take()?;
         let ready = state.value_scalar(node_id, &parsed);
-        slf.inner = Some(BuilderState::Ready(ready));
+        slf.inner = Some(ready);
         Ok(slf)
     }
 
@@ -416,9 +394,9 @@ impl PyModelBuilder {
         values: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let parsed = extract_money_series(values)?;
-        let state = slf.take_ready()?;
+        let state = slf.take()?;
         let ready = state.value_money(node_id, &parsed);
-        slf.inner = Some(BuilderState::Ready(ready));
+        slf.inner = Some(ready);
         Ok(slf)
     }
 
@@ -470,16 +448,10 @@ impl PyModelBuilder {
             .try_iter()?
             .map(|column| super::parse_period_id(&column?.str()?.to_string()))
             .collect::<PyResult<Vec<_>>>()?;
-        let periods = match slf.inner.as_ref() {
-            Some(BuilderState::NeedPeriods(builder)) => {
-                builder.resolve_period_columns(&columns, actuals_until)
-            }
-            Some(BuilderState::Ready(builder)) => {
-                builder.resolve_period_columns(&columns, actuals_until)
-            }
-            None => return Err(Self::consumed_error()),
-        }
-        .map_err(statements_to_py)?;
+        let periods = slf
+            .builder_mut()?
+            .resolve_period_columns(&columns, actuals_until)
+            .map_err(statements_to_py)?;
 
         let mut rows: Vec<(String, Vec<(PeriodId, AmountOrScalar)>)> = Vec::new();
         for row in frame.call_method0("iterrows")?.try_iter()? {
@@ -507,16 +479,16 @@ impl PyModelBuilder {
             rows.push((node_id, pairs));
         }
 
-        let mut ready = match slf.take_any()? {
-            BuilderState::NeedPeriods(builder) => builder
+        let mut builder = slf.take()?;
+        if builder.periods_slice().is_empty() {
+            builder = builder
                 .periods_explicit(periods)
-                .map_err(statements_to_py)?,
-            BuilderState::Ready(builder) => builder,
-        };
-        for (node_id, pairs) in rows {
-            ready = ready.value(node_id, &pairs);
+                .map_err(statements_to_py)?;
         }
-        slf.inner = Some(BuilderState::Ready(ready));
+        for (node_id, pairs) in rows {
+            builder = builder.value(node_id, &pairs);
+        }
+        slf.inner = Some(builder);
         Ok(slf)
     }
 
@@ -552,7 +524,7 @@ impl PyModelBuilder {
             .into_iter()
             .map(|(period, date)| Ok((super::parse_period_id(&period)?, py_to_date(&date)?)))
             .collect::<PyResult<Vec<_>>>()?;
-        slf.ready_mut()?
+        slf.builder_mut()?
             .try_availability_dates(node_id, &parsed)
             .map_err(statements_to_py)?;
         Ok(slf)
@@ -579,14 +551,14 @@ impl PyModelBuilder {
     /// ------
     /// ValueError
     ///     If the node id is reserved, the formula is blank or does not
-    ///     compile, periods were not set, or the builder was consumed.
+    ///     compile or the builder was consumed.
     #[pyo3(text_signature = "($self, node_id, formula)")]
     fn compute<'py>(
         mut slf: PyRefMut<'py, Self>,
         node_id: &str,
         formula: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        slf.ready_mut()?
+        slf.builder_mut()?
             .try_compute(node_id, formula)
             .map_err(statements_to_py)?;
         Ok(slf)
@@ -615,22 +587,14 @@ impl PyModelBuilder {
         node: PyRef<'_, PyNodeSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec = node.inner.clone();
-        match slf.inner.as_mut() {
-            Some(BuilderState::NeedPeriods(b)) => {
-                b.insert_node(spec);
-            }
-            Some(BuilderState::Ready(b)) => {
-                b.insert_node(spec);
-            }
-            None => return Err(Self::consumed_error()),
-        }
+        slf.builder_mut()?.insert_node(spec);
         Ok(slf)
     }
 
     /// Start configuring a mixed node.
     #[pyo3(text_signature = "($self, node_id)")]
     fn mixed(&mut self, node_id: &str) -> PyResult<PyMixedNodeBuilder> {
-        let state = self.take_ready()?;
+        let state = self.take()?;
         Ok(PyMixedNodeBuilder {
             inner: Some(state.mixed(node_id)),
         })
@@ -648,9 +612,9 @@ impl PyModelBuilder {
         node_id: &str,
         forecast_spec: PyRef<'_, PyForecastSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let state = slf.take_ready()?;
+        let state = slf.take()?;
         let ready = state.forecast(node_id, forecast_spec.inner.clone());
-        slf.inner = Some(BuilderState::Ready(ready));
+        slf.inner = Some(ready);
         Ok(slf)
     }
 
@@ -665,9 +629,9 @@ impl PyModelBuilder {
         mut slf: PyRefMut<'py, Self>,
         where_clause: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let state = slf.take_ready()?;
+        let state = slf.take()?;
         let ready = state.where_clause(where_clause);
-        slf.inner = Some(BuilderState::Ready(ready));
+        slf.inner = Some(ready);
         Ok(slf)
     }
 
@@ -694,7 +658,7 @@ impl PyModelBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``value`` is not JSON-serializable, periods were not set, or
+    ///     If ``value`` is not JSON-serializable or
     ///     the builder was consumed.
     #[pyo3(text_signature = "($self, key, value)")]
     fn with_meta<'py>(
@@ -704,9 +668,9 @@ impl PyModelBuilder {
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let value = crate::bindings::module_utils::py_to_json_value(py, value, "meta value")?;
-        let state = slf.take_ready()?;
+        let state = slf.take()?;
         let ready = state.with_meta(key, value);
-        slf.inner = Some(BuilderState::Ready(ready));
+        slf.inner = Some(ready);
         Ok(slf)
     }
 
@@ -720,11 +684,11 @@ impl PyModelBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the built-in catalog cannot be loaded, periods were not set, or
+    ///     If the built-in catalog cannot be loaded or
     ///     the builder was consumed.
     #[pyo3(text_signature = "($self)")]
     fn with_builtin_metrics(mut slf: PyRefMut<'_, Self>) -> PyResult<PyRefMut<'_, Self>> {
-        slf.ready_mut()?
+        slf.builder_mut()?
             .try_with_builtin_metrics()
             .map_err(statements_to_py)?;
         Ok(slf)
@@ -743,15 +707,15 @@ impl PyModelBuilder {
     ///     If ``qualified_id`` or one of its dependencies is not in
     ///     ``registry``. The builder stays usable.
     /// ValueError
-    ///     If the id is not ``namespace.metric`` shaped, periods were not
-    ///     set, or the builder was consumed.
+    ///     If the id is not ``namespace.metric`` shaped or the builder was
+    ///     consumed.
     #[pyo3(text_signature = "($self, qualified_id, registry)")]
     fn add_metric_from_registry<'py>(
         mut slf: PyRefMut<'py, Self>,
         qualified_id: &str,
         registry: PyRef<'_, PyRegistry>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        slf.ready_mut()?
+        slf.builder_mut()?
             .try_add_metric_from_registry(qualified_id, &registry.inner)
             .map_err(statements_to_py)?;
         Ok(slf)
@@ -788,26 +752,16 @@ impl PyModelBuilder {
         let notional = notional.inner;
         let issue = py_to_date(issue_date)?;
         let maturity = py_to_date(maturity_date)?;
-        match slf.inner.as_mut() {
-            Some(BuilderState::NeedPeriods(b)) => b.try_add_bond(
+        slf.builder_mut()?
+            .try_add_bond(
                 id,
                 notional,
                 coupon_rate,
                 issue,
                 maturity,
                 discount_curve_id,
-            ),
-            Some(BuilderState::Ready(b)) => b.try_add_bond(
-                id,
-                notional,
-                coupon_rate,
-                issue,
-                maturity,
-                discount_curve_id,
-            ),
-            None => return Err(Self::consumed_error()),
-        }
-        .map_err(statements_to_py)?;
+            )
+            .map_err(statements_to_py)?;
         Ok(slf)
     }
 
@@ -853,12 +807,9 @@ impl PyModelBuilder {
             discount_curve_id: discount_curve_id.to_string(),
             forward_curve_id: forward_curve_id.to_string(),
         };
-        match slf.inner.as_mut() {
-            Some(BuilderState::NeedPeriods(b)) => b.try_add_swap(params),
-            Some(BuilderState::Ready(b)) => b.try_add_swap(params),
-            None => return Err(Self::consumed_error()),
-        }
-        .map_err(statements_to_py)?;
+        slf.builder_mut()?
+            .try_add_swap(params)
+            .map_err(statements_to_py)?;
         Ok(slf)
     }
 
@@ -922,12 +873,9 @@ impl PyModelBuilder {
             convention,
             discount_curve_id: discount_curve_id.to_string(),
         };
-        match slf.inner.as_mut() {
-            Some(BuilderState::NeedPeriods(b)) => b.try_add_bond_with_convention(params),
-            Some(BuilderState::Ready(b)) => b.try_add_bond_with_convention(params),
-            None => return Err(Self::consumed_error()),
-        }
-        .map_err(statements_to_py)?;
+        slf.builder_mut()?
+            .try_add_bond_with_convention(params)
+            .map_err(statements_to_py)?;
         Ok(slf)
     }
 
@@ -1010,14 +958,9 @@ impl PyModelBuilder {
             float_day_count,
             business_day_convention: resolved_business_day_convention,
         };
-        match slf.inner.as_mut() {
-            Some(BuilderState::NeedPeriods(b)) => {
-                b.try_add_swap_with_conventions(params, conventions)
-            }
-            Some(BuilderState::Ready(b)) => b.try_add_swap_with_conventions(params, conventions),
-            None => return Err(Self::consumed_error()),
-        }
-        .map_err(statements_to_py)?;
+        slf.builder_mut()?
+            .try_add_swap_with_conventions(params, conventions)
+            .map_err(statements_to_py)?;
         Ok(slf)
     }
 
@@ -1056,12 +999,8 @@ impl PyModelBuilder {
             .into_instrument_json()
             .map_err(core_to_py)?;
         let spec = FinancialStatementInstrument::try_from(spec).map_err(statements_to_py)?;
-        let state = slf.take_any()?;
-        let next = match state {
-            BuilderState::NeedPeriods(b) => BuilderState::NeedPeriods(b.add_debt(id, spec)),
-            BuilderState::Ready(b) => BuilderState::Ready(b.add_debt(id, spec)),
-        };
-        slf.inner = Some(next);
+        let builder = slf.take()?;
+        slf.inner = Some(builder.add_debt(id, spec));
         Ok(slf)
     }
 
@@ -1077,12 +1016,8 @@ impl PyModelBuilder {
         currency: PyRef<'_, PyCurrency>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let ccy = currency.inner;
-        let state = slf.take_any()?;
-        let next = match state {
-            BuilderState::NeedPeriods(b) => BuilderState::NeedPeriods(b.reporting_currency(ccy)),
-            BuilderState::Ready(b) => BuilderState::Ready(b.reporting_currency(ccy)),
-        };
-        slf.inner = Some(next);
+        let builder = slf.take()?;
+        slf.inner = Some(builder.reporting_currency(ccy));
         Ok(slf)
     }
 
@@ -1105,12 +1040,8 @@ impl PyModelBuilder {
                     "invalid fx_policy {policy:?}: {e}; expected one of cashflow_date, period_end, period_average"
                 ))
             })?;
-        let state = slf.take_any()?;
-        let next = match state {
-            BuilderState::NeedPeriods(b) => BuilderState::NeedPeriods(b.fx_policy(parsed)),
-            BuilderState::Ready(b) => BuilderState::Ready(b.fx_policy(parsed)),
-        };
-        slf.inner = Some(next);
+        let builder = slf.take()?;
+        slf.inner = Some(builder.fx_policy(parsed));
         Ok(slf)
     }
 
@@ -1139,12 +1070,8 @@ impl PyModelBuilder {
         waterfall_spec: PyRef<'_, PyWaterfallSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec = waterfall_spec.inner.clone();
-        let state = slf.take_any()?;
-        let next = match state {
-            BuilderState::NeedPeriods(b) => BuilderState::NeedPeriods(b.waterfall(spec)),
-            BuilderState::Ready(b) => BuilderState::Ready(b.waterfall(spec)),
-        };
-        slf.inner = Some(next);
+        let builder = slf.take()?;
+        slf.inner = Some(builder.waterfall(spec));
         Ok(slf)
     }
 
@@ -1162,11 +1089,11 @@ impl PyModelBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the builder is not ready, was consumed, or its model violates a
+    ///     If the builder was consumed or its model (including its timeline) violates a
     ///     semantic invariant. This terminal method consumes the ready builder.
     #[pyo3(text_signature = "($self)")]
     fn build(&mut self) -> PyResult<PyFinancialModelSpec> {
-        let state = self.take_ready()?;
+        let state = self.take()?;
         let spec = state.build().map_err(statements_to_py)?;
         Ok(PyFinancialModelSpec { inner: spec })
     }
@@ -1177,14 +1104,14 @@ impl PyModelBuilder {
     /// afterwards, and ``'consumed'`` once ``build()`` / ``mixed()`` ran.
     fn __repr__(&self) -> String {
         match &self.inner {
-            Some(BuilderState::NeedPeriods(b)) => format!(
-                "ModelBuilder(id={:?}, state='need_periods', periods=0, nodes={})",
+            Some(b) => format!(
+                "ModelBuilder(id={:?}, state='{}', periods={}, nodes={})",
                 b.id(),
-                b.nodes().len()
-            ),
-            Some(BuilderState::Ready(b)) => format!(
-                "ModelBuilder(id={:?}, state='ready', periods={}, nodes={})",
-                b.id(),
+                if b.periods_slice().is_empty() {
+                    "need_periods"
+                } else {
+                    "ready"
+                },
                 b.periods_slice().len(),
                 b.nodes().len()
             ),
@@ -1201,33 +1128,14 @@ impl PyModelBuilder {
         )
     }
 
-    fn take_any(&mut self) -> PyResult<BuilderState> {
+    fn take(&mut self) -> PyResult<ModelBuilder> {
         self.inner.take().ok_or_else(Self::consumed_error)
     }
 
-    fn take_ready(&mut self) -> PyResult<ModelBuilder<finstack_quant_statements::builder::Ready>> {
-        let state = self.take_any()?;
-        match state {
-            BuilderState::Ready(b) => Ok(b),
-            BuilderState::NeedPeriods(b) => {
-                self.inner = Some(BuilderState::NeedPeriods(b));
-                Err(value_error("Must call periods() before adding nodes"))
-            }
-        }
-    }
-
-    /// Mutable access to the ready builder without taking ownership, so a
+    /// Mutable access to the builder without taking ownership, so a
     /// fallible Rust call cannot leave the wrapper empty.
-    fn ready_mut(
-        &mut self,
-    ) -> PyResult<&mut ModelBuilder<finstack_quant_statements::builder::Ready>> {
-        match self.inner.as_mut() {
-            Some(BuilderState::Ready(b)) => Ok(b),
-            Some(BuilderState::NeedPeriods(_)) => {
-                Err(value_error("Must call periods() before adding nodes"))
-            }
-            None => Err(Self::consumed_error()),
-        }
+    fn builder_mut(&mut self) -> PyResult<&mut ModelBuilder> {
+        self.inner.as_mut().ok_or_else(Self::consumed_error)
     }
 }
 

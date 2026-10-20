@@ -2879,7 +2879,7 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If the builder is not ready, was already consumed, or the model violates its semantic invariants.
+            If the builder was already consumed or the model (including its timeline) violates its semantic invariants.
 
         """
         ...

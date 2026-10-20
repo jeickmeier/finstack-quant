@@ -49,7 +49,7 @@ exclusive end date.
 
 | Module | What you reach for |
 |--------|--------------------|
-| `builder` | `ModelBuilder` (type-state: `NeedPeriods` → `Ready`), `MixedNodeBuilder`, `validate_node_id` |
+| `builder` | `ModelBuilder`, `MixedNodeBuilder`, `validate_node_id` |
 | `types` | `FinancialModelSpec`, `NodeSpec`, `NodeId`, `NodeType`, `NodeValueType`, `AmountOrScalar`, `ForecastSpec`, `ForecastMethod`, `CapitalStructureSpec` |
 | `evaluator` | `Evaluator`, `StatementResult`, `PreparedEvaluation`, `EvaluationContext`, `DependencyGraph`, `MonteCarloConfig`/`MonteCarloResults`, `node_to_dated_schedule` |
 | `dsl` | `parse_formula`, `compile`, `parse_and_compile`, `extract_all_identifiers`, `StmtExpr`, `BinOp`, `UnaryOp` |

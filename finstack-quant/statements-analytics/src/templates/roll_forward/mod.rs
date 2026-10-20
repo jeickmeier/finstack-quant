@@ -20,12 +20,12 @@ use finstack_quant_statements::types::{NodeSpec, NodeType};
 ///
 /// Builder with the generated nodes inserted. Existing nodes with the same
 /// identifiers are overwritten; final `build()` validates formulas and references.
-pub fn add_roll_forward<State>(
-    builder: ModelBuilder<State>,
+pub fn add_roll_forward(
+    builder: ModelBuilder,
     name: &str,
     increases: &[&str],
     decreases: &[&str],
-) -> ModelBuilder<State> {
+) -> ModelBuilder {
     add_roll_forward_with_opening(builder, name, increases, decreases, 0.0)
 }
 
@@ -49,13 +49,13 @@ pub fn add_roll_forward<State>(
 ///
 /// Builder with the generated nodes inserted. Existing nodes with the same
 /// identifiers are overwritten; final `build()` validates formulas and references.
-pub fn add_roll_forward_with_opening<State>(
-    mut builder: ModelBuilder<State>,
+pub fn add_roll_forward_with_opening(
+    mut builder: ModelBuilder,
     name: &str,
     increases: &[&str],
     decreases: &[&str],
     opening: f64,
-) -> ModelBuilder<State> {
+) -> ModelBuilder {
     let beg_node_id = format!("{}_beg", name);
     let end_node_id = format!("{}_end", name);
 

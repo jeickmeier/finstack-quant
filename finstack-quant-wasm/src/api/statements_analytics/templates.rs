@@ -5,17 +5,17 @@ use crate::utils::input::{
     from_js_json, js_f64, js_f64_seq, js_opt_string_seq, js_string, js_string_seq, json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_statements::builder::{ModelBuilder, Ready};
+use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::FinancialModelSpec;
 use finstack_quant_statements_analytics::templates::{real_estate, roll_forward, vintage};
 use wasm_bindgen::prelude::*;
 
-fn builder(model: &JsValue) -> Result<ModelBuilder<Ready>, JsValue> {
+fn builder(model: &JsValue) -> Result<ModelBuilder, JsValue> {
     let model = FinancialModelSpec::from_json(&json_text(model, "model")?).map_err(to_js_err)?;
     ModelBuilder::from_spec(model).map_err(to_js_err)
 }
 
-fn finish(builder: ModelBuilder<Ready>) -> Result<JsValue, JsValue> {
+fn finish(builder: ModelBuilder) -> Result<JsValue, JsValue> {
     to_js_value(&builder.build().map_err(to_js_err)?)
 }
 

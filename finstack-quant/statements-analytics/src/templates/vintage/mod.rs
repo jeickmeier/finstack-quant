@@ -1,7 +1,7 @@
 //! Vintage/Cohort pattern implementation.
 
 use finstack_quant_core::math::ZERO_TOLERANCE;
-use finstack_quant_statements::builder::{ModelBuilder, Ready};
+use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::types::{NodeSpec, NodeType};
 
 /// Add a vintage buildup (cohort analysis) structure.
@@ -26,11 +26,11 @@ use finstack_quant_statements::types::{NodeSpec, NodeType};
 /// Builder with the generated nodes inserted. Existing nodes with the same
 /// identifiers are overwritten; final `build()` validates formulas and references.
 pub fn add_vintage_buildup(
-    mut builder: ModelBuilder<Ready>,
+    mut builder: ModelBuilder,
     name: &str,
     new_volume_node: &str,
     decay_curve: &[f64],
-) -> ModelBuilder<Ready> {
+) -> ModelBuilder {
     let mut terms = Vec::new();
 
     for (lag, &rate) in decay_curve.iter().enumerate() {
