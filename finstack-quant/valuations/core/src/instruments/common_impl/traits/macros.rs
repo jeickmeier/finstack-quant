@@ -1,5 +1,5 @@
-//! Macros implementation used by the traits subsystem.
-//!
+//! `impl_instrument_base!` and the other exported macros that write the
+//! `Instrument` boilerplate for a family type.
 /// Implements the standard boilerplate methods for the [`Instrument`](super::Instrument) trait.
 ///
 /// Most instruments store their ID as `self.id` (an `InstrumentId`), attributes as

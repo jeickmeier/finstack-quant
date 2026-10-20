@@ -153,7 +153,6 @@ pub struct Basket {
 }
 
 impl Basket {
-    // Builder provided by derive
     /// Create a canonical example basket with two market data constituents.
     pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
@@ -355,7 +354,6 @@ impl Instrument for Basket {
     crate::impl_focused_pricing_overrides!();
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 crate::impl_empty_cashflow_provider!(
     Basket,
     finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder

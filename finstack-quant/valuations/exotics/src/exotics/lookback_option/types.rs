@@ -194,7 +194,6 @@ pub struct LookbackOption {
     pub attributes: Attributes,
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 impl LookbackOption {
     /// Create a canonical example lookback option (fixed strike call).
     pub fn example() -> finstack_quant_core::Result<Self> {

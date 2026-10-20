@@ -6,7 +6,7 @@ use crate::market::conventions::{CdsConvention, CdsConventionSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::Error;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::{HashMap, HashSet};
 use std::str::FromStr;
 
 /// Parsed CDS convention tables used to build [`ConventionRegistry`].
@@ -85,13 +85,13 @@ fn load_registry_from_str(json: &str) -> Result<CdsRegistryTables, Error> {
     let mut entries: HashMap<CdsConventionKey, CdsConventionSpec> = HashMap::default();
     let mut any: HashMap<CdsConvention, CdsConventionSpec> = HashMap::default();
     let mut primary_family: HashMap<Currency, CdsConvention> = HashMap::default();
-    let mut seen_ids: HashMap<String, ()> = HashMap::default();
+    let mut seen_ids: HashSet<String> = HashSet::default();
 
     for entry in file.entries {
         let spec = entry.record.clone().into_spec()?;
         for id in entry.ids {
             let key_str = normalize_registry_id(&id);
-            if seen_ids.insert(key_str.clone(), ()).is_some() {
+            if !seen_ids.insert(key_str.clone()) {
                 return Err(Error::Validation(format!(
                     "Duplicate registry id after normalization: '{}' (from '{}')",
                     key_str, id

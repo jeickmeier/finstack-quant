@@ -9124,7 +9124,7 @@
     },
     "Equity": {
       "additionalProperties": false,
-      "description": "Simple equity (spot) instrument.\n\nRepresents a spot equity position that can be priced using market data.\nThe price can come from direct market quotes or be computed from\nunderlying fundamentals.\n\nSee unit tests and `examples/` for usage.",
+      "description": "Simple equity (spot) instrument.\n\nRepresents a spot equity position that can be priced using market data.\nThe price can come from direct market quotes or be computed from\nunderlying fundamentals.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",

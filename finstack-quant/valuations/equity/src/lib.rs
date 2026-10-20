@@ -105,7 +105,7 @@ pub enum EquityPathModel {
 pub mod autocallable;
 /// Cliquet option module - Cliquet/ratchet options.
 pub mod cliquet_option;
-/// DCF equity module - Discounted cash flow for equity (renamed from dcf).
+/// DCF equity module - Discounted cash flow for equity.
 pub mod dcf_equity;
 pub(crate) mod dividend01;
 /// Exchange-listed equity, equity-index, and fixed-currency quanto futures.
@@ -118,7 +118,7 @@ pub mod equity_option;
 pub mod equity_total_return_future;
 /// Equity TRS module - Equity total return swaps.
 pub mod equity_trs;
-/// PE fund module - Private equity/markets funds (renamed from private_markets_fund).
+/// PE fund module - Private equity/markets funds.
 pub mod pe_fund;
 /// Shared piecewise-constant GBM process and forward-vol/rate bootstrap for the
 /// equity path-dependent MC pricers (cliquet, autocallable).

@@ -53,7 +53,6 @@ pub(crate) fn register_basis_swap_metrics(
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_per_curve())),
             (BasisParSpread, ParSpreadCalculator),
             (IncrementalParSpread, IncrementalParSpreadCalculator),
-            // Theta is now registered universally in crate::RATES.metrics()
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }

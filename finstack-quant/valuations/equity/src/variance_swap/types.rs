@@ -579,7 +579,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for VarianceSwap {
     }
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 impl finstack_quant_cashflows::CashflowScheduleSource for VarianceSwap {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
         Ok(Some(self.notional))

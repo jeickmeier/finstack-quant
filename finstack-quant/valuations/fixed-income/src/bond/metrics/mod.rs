@@ -29,22 +29,10 @@
 //! - **Discount Margin**: Spread measure for floating-rate notes
 //! - **Asset Swap Spreads**: Par and market asset swap spreads
 //!
-//! # Examples
-//!
-//! ```text
-//! use finstack_quant_valuations_fixed_income::bond::Bond;
-//! use finstack_quant_valuations_fixed_income::bond::metrics::register_bond_metrics;
-//! use finstack_quant_valuations_core::metrics::{MetricRegistry, MetricId};
-//!
-//! let mut registry = MetricRegistry::new();
-//! register_bond_metrics(&mut registry);
-//!
-//! // Use registry to compute metrics for bonds
-//! ```
-//!
 //! # See Also
 //!
-//! - [`register_bond_metrics`] for registering all bond metrics
+//! - `register_bond_metrics` for registering all bond metrics with the
+//!   `FIXED_INCOME` family
 //! - [`finstack_quant_valuations_core::metrics`] for the metrics framework
 
 use finstack_quant_core::dates::Date;
@@ -197,16 +185,6 @@ pub(crate) fn quoted_workout_path(
 /// # Arguments
 ///
 /// * `registry` - The metric registry to register bond metrics into
-///
-/// # Examples
-///
-/// ```text
-/// use finstack_quant_valuations_fixed_income::bond::metrics::register_bond_metrics;
-/// use finstack_quant_valuations_core::metrics::MetricRegistry;
-///
-/// let mut registry = MetricRegistry::new();
-/// register_bond_metrics(&mut registry)?;
-/// ```
 pub(crate) fn register_bond_metrics(
     registry: &mut finstack_quant_valuations_core::metrics::MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
@@ -243,8 +221,6 @@ pub(crate) fn register_bond_metrics(
 
             (WAL, BondWalCalculator),
             (CarryTotal, finstack_quant_valuations_core::metrics::sensitivities::carry_decomposition::CarryDecompositionCalculator::with_clock(carry::BondYieldClock)),
-
-            // Theta is now registered universally in crate::FIXED_INCOME.metrics()
 
             (Dv01, BondDv01Calculator),
             (BucketedDv01, BondBucketedDv01Calculator),

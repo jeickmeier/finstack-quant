@@ -269,7 +269,6 @@ pub struct EquityOption {
     pub attributes: Attributes,
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 impl EquityOption {
     /// Create a vanilla equity option from a parameter bundle and explicit
     /// market-data identifiers.

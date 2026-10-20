@@ -1182,7 +1182,7 @@ export default [
   {
     "path": "#/$defs/d_a39cc24b914a22260377",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json#/$defs/Equity",
-    "description": "Simple equity (spot) instrument.\n\nRepresents a spot equity position that can be priced using market data.\nThe price can come from direct market quotes or be computed from\nunderlying fundamentals.\n\nSee unit tests and `examples/` for usage."
+    "description": "Simple equity (spot) instrument.\n\nRepresents a spot equity position that can be priced using market data.\nThe price can come from direct market quotes or be computed from\nunderlying fundamentals."
   },
   {
     "path": "#/$defs/d_a39cc24b914a22260377/properties/attributes",

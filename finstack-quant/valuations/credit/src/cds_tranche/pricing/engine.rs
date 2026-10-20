@@ -1,5 +1,6 @@
-//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
-//!
+//! Copula selection, projected premium and protection schedules, discounting and
+//! settlement for `CdsTranchePricer`.
+
 use super::config::{
     CdsTranchePricer, DiscountAt, EffectiveStructure, ProjectedDiscountedRow, ProjectionInputs,
     BESPOKE_SETTLEMENT_DAYS, INDEX_SETTLEMENT_DAYS, PROBABILITY_CLIP,

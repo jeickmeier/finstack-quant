@@ -593,7 +593,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
     }
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 /// Year-on-year (YoY) Inflation Swap instrument.
 ///
 /// Pays periodic inflation rates (CPI ratios over each period) versus a fixed rate.

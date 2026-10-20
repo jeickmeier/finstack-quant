@@ -63,7 +63,6 @@ pub(crate) fn register_cds_tranche_metrics(
             (ExpectedLoss, ExpectedLossCalculator),
             (JumpToDefault, JumpToDefaultCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
-            // Theta is now registered universally in crate::CREDIT.metrics()
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }

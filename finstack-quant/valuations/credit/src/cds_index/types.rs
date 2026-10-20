@@ -617,7 +617,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CdsIndex {
     }
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 // In Constituents mode, include per-constituent credit curves so that DV01/BucketedDV01
 // correctly bump all credit curves, not just the index-level one.
 

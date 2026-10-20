@@ -250,7 +250,6 @@ impl TryFrom<CliquetOptionUnchecked> for CliquetOption {
     }
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 impl CliquetOption {
     /// Validate structural invariants required by the pricing engine.
     ///

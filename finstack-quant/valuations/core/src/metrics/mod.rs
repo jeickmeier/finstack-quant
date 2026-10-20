@@ -69,7 +69,6 @@ pub use core::registry::{MetricRegistry, MetricRegistryError};
 pub use core::traits::{MetricCalculator, MetricContext};
 #[doc(hidden)]
 pub use core::universal::{register_universal_metrics, PricerPublishedMetric};
-/// Format a standard risk bucket (years) as a human-readable label.
 pub use sensitivities::config::{
     format_bucket_label, format_key_rate_label, parse_key_rate_label, STANDARD_BUCKETS_YEARS,
     STANDARD_BUCKET_LABELS,
@@ -92,9 +91,14 @@ pub use core::finite_difference::{
 
 // Error helper functions
 
-/// Create a NotFound error for missing metrics.
+/// Create a typed NotFound error for a missing metric.
 ///
 /// Use this when a metric dependency or required metric is not available.
+///
+/// # Arguments
+///
+/// * `metric` - Required metric identifier that was absent from a valuation
+///   result or dependency set; it is embedded in the returned `metric:` ID.
 ///
 /// # Examples
 ///
@@ -107,12 +111,6 @@ pub use core::finite_difference::{
 ///     results.get(&id).copied().ok_or_else(|| metric_not_found(id))
 /// }
 /// ```
-/// Create a typed NotFound error for a missing metric.
-///
-/// # Arguments
-///
-/// * `metric` - Required metric identifier that was absent from a valuation
-///   result or dependency set; it is embedded in the returned `metric:` ID.
 #[inline]
 pub fn metric_not_found(metric: MetricId) -> finstack_quant_core::Error {
     finstack_quant_core::InputError::NotFound {

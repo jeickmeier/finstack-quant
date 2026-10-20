@@ -54,9 +54,11 @@ from pricing overrides or calibrated market scalars is
 
 ## Public surface
 
-Import path: `finstack_quant_valuations_rates::<leaf>` (or `finstack_quant_valuations::instruments::rates::<leaf>` through the umbrella). All
-fifteen directories are `pub mod`. The headline types are also
-re-exported at the crate root and flat at `finstack_quant_valuations::instruments`:
+Import path: `finstack_quant_valuations_rates::<leaf>::<Type>` (or
+`finstack_quant_valuations::instruments::rates::<leaf>::<Type>` through the
+umbrella). All fifteen directories are `pub mod`; the crate root exports only the
+`RATES` family static. The headline types are also flat at
+`finstack_quant_valuations::instruments`:
 
 `InterestRateSwap`, `BasisSwap`, `XccySwap`, `CapFloor`, `RateOptionType`,
 `Swaption`, `BermudanSwaption`, `CmsSwap`, `CmsOption`, `CmsSpreadOption`,
@@ -69,12 +71,12 @@ actually reach for: the builders (`CapFloorBuilder`,
 `SwaptionBuilder`, `RepoBuilder`, `InflationSwapBuilder`,
 `YoYInflationSwapBuilder`, `InflationCapFloorBuilder`), `CapFloorVolType`,
 `OvernightCouponConvention`, `OvernightSpreadCompounding`,
-`swaption::{SABRParameters, BermudanSchedule, BermudanType,
-CashSettlementMethod, BermudanPricingMethod, BermudanSwaptionPricer,
-BermudanSwaptionTreeValuator, SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer}`,
-`xccy_swap::{NotionalExchange, ResettingSide,
-XccySwapLeg}`, `cms_swap::{FundingLeg, FundingLegSpec}`,
-`ir_future::FutureContractSpecs`, and `forward_swap_rate`.
+`swaption::{BermudanSchedule, BermudanType, CashSettlementMethod,
+BermudanPricingMethod, BermudanSwaptionPricer, BermudanSwaptionTreeValuator,
+SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer}`, `xccy_swap::XccySwapLeg`,
+`cms_swap::{FundingLeg, FundingLegSpec}` and `ir_future::FutureContractSpecs`.
+`NotionalExchange` and `ResettingSide` are valuations-core types at
+`finstack_quant_valuations::instruments`.
 Reusable `HullWhiteParams` and Hull-White equations live at
 `finstack_quant_models::rates::hull_white`; the HW1F Monte Carlo and LSMC
 engines at `finstack_quant_models::rates::hw1f`.
@@ -88,9 +90,9 @@ Swaptions use the shared `ExerciseStyle`, `SettlementType` and
 `finstack_quant_valuations::instruments`.
 
 Inside a leaf, `metrics/`, `types.rs`/`types/`, `pricer.rs`/`pricing/` and the
-model-specific pricers (`hw_pricer.rs`, `lmm_pricer.rs`, `bermudan/`) are `pub(crate)` or private; supported
+model-specific pricers (`hw_pricer.rs`, `bermudan/`) are `pub(crate)` or private; supported
 items surface through each leaf's `pub use`. Genuinely public submodules are
-`cms_option::pricer` and `cms_option::replication_pricer`; `cms_common`,
+`swaption::lmm_pricer`, `cms_option::pricer` and `cms_option::replication_pricer`; `cms_common`,
 `cms_fixings`, `cms_swap::pricer` and `forward_swap_rate` are `pub(crate)`.
 
 ## Family conventions

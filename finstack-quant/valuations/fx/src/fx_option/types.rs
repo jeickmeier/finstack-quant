@@ -222,7 +222,6 @@ pub struct FxOption {
     pub attributes: Attributes,
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 // FxOption uses both domestic and foreign curves for Garman-Kohlhagen pricing
 impl FxOption {
     /// Validate FX option currency invariants.

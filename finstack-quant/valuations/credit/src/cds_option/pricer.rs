@@ -4,8 +4,8 @@
 //! flow through the [`bloomberg_quadrature`](super::bloomberg_quadrature)
 //! numerical-quadrature engine. Greek metrics (delta, gamma, vega) live
 //! alongside their `MetricCalculator` definitions in the metrics module;
-//! the `CdsOption::{delta, gamma, vega}` methods are thin pass-throughs
-//! to those canonical implementations.
+//! the `CdsOption::{delta, gamma, vega}` methods validate the option and
+//! then call those canonical implementations.
 //!
 //! # References
 //!

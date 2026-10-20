@@ -135,7 +135,6 @@ pub struct FxBarrierOption {
     pub attributes: Attributes,
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 // FxBarrierOption uses both domestic and foreign curves for FX carry calculation
 impl FxBarrierOption {
     /// Rebate per unit of base notional (quote currency per base unit), the

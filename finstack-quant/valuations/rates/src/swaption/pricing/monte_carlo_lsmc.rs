@@ -9,19 +9,6 @@
 //! - Longstaff-Schwartz backward induction with optimal exercise decisions
 //! - Variance reduction via antithetic variates
 //! - Polynomial and Laguerre basis functions for regression
-//!
-//! # Usage
-//!
-//! ```text
-//! use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
-//! use finstack_quant_valuations_rates::swaption::pricing::monte_carlo_lsmc::SwaptionLsmcPricer;
-//! use finstack_quant_models::monte_carlo::process::ou::{HullWhite1FProcess, HullWhite1FParams};
-//!
-//! let hw_params = HullWhite1FParams::new(0.03, 0.01, 0.03).expect("valid parameters");
-//! let hw_process = HullWhite1FProcess::new(hw_params);
-//!
-//! let pricer = SwaptionLsmcPricer::with_config(Hw1fMcConfig::default(), hw_process);
-//! ```
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;

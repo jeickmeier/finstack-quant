@@ -34,13 +34,11 @@ fn b11_quote_set_propagates_applicable_metric_failure() {
             .expect("curve"),
     );
     let mut metrics = crate::FIXED_INCOME.metrics().clone();
-    metrics
-        .replace_metric(
-            MetricId::Ytm,
-            Arc::new(FailedYield),
-            &[InstrumentType::Bond],
-        )
-        .expect("replace metric");
+    metrics.replace_metric(
+        MetricId::Ytm,
+        Arc::new(FailedYield),
+        &[InstrumentType::Bond],
+    );
     let err = compute_quotes(
         &bond,
         &market,
@@ -505,13 +503,11 @@ fn compute_quotes_preserves_custom_tree_and_metric_registries_for_oas_roundtrip(
         .expect("unique custom Tree pricer");
 
     let mut metrics = crate::FIXED_INCOME.metrics().clone();
-    metrics
-        .replace_metric(
-            MetricId::Ytm,
-            Arc::new(FixedYtmCalculator),
-            &[InstrumentType::Bond],
-        )
-        .expect("replace YTM for this test");
+    metrics.replace_metric(
+        MetricId::Ytm,
+        Arc::new(FixedYtmCalculator),
+        &[InstrumentType::Bond],
+    );
 
     let target_oas = 0.002;
     let quotes = compute_quotes(

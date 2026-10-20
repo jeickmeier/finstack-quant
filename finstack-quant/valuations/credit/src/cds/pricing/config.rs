@@ -1,5 +1,5 @@
-//! Configuration, integration, and metric helpers for CDS pricing.
-//!
+//! `CdsPricerConfig`: integration grid, settlement and accrual-on-default settings.
+
 use finstack_quant_valuations_core::constants::time as time_constants;
 
 /// Configuration for CDS pricing.

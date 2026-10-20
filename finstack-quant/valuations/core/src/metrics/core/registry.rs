@@ -117,7 +117,8 @@ impl MetricRegistry {
                 instrument,
             });
         }
-        self.replace_metric(id, calculator, applicable_to)
+        self.replace_metric(id, calculator, applicable_to);
+        Ok(())
     }
 
     /// Deliberately replace metric registrations for tests or controlled overrides.
@@ -133,7 +134,7 @@ impl MetricRegistry {
         id: MetricId,
         calculator: Arc<dyn MetricCalculator>,
         applicable_to: &[InstrumentType],
-    ) -> std::result::Result<(), MetricRegistryError> {
+    ) {
         let entry = self.entries.entry(id).or_default();
         if applicable_to.is_empty() {
             entry.default = Some(calculator);
@@ -144,7 +145,6 @@ impl MetricRegistry {
                     .insert(*instrument_type, Arc::clone(&calculator));
             }
         }
-        Ok(())
     }
 
     /// Checks if a metric is registered.
@@ -784,9 +784,7 @@ mod tests {
             1.0
         );
 
-        registry
-            .replace_metric(MetricId::Dv01, calculator(2.0), &[])
-            .expect("explicit metric replacement");
+        registry.replace_metric(MetricId::Dv01, calculator(2.0), &[]);
         let mut context = create_test_context();
         assert_eq!(
             registry.compute(&[MetricId::Dv01], &mut context).unwrap()["dv01"],

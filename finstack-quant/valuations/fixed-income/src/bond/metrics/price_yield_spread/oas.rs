@@ -41,7 +41,6 @@ pub(crate) fn oas_decimal_from_quote_overrides(
         context.curves.as_ref(),
         context.as_of,
     )?;
-    let dirty_target_at_quote = dirty_at_quote;
     let mut trial_template = bond.clone();
     crate::bond::pricing::quote_conversions::clear_price_driving_overrides(&mut trial_template);
     // A precision target belongs to the final estimate. Enforcing it on every
@@ -109,7 +108,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
             }
         };
         match priced {
-            Ok(value) => value - dirty_target_at_quote,
+            Ok(value) => value - dirty_at_quote,
             Err(error) => {
                 let mut slot = pricing_error.borrow_mut();
                 if slot.is_none() {

@@ -1,5 +1,6 @@
-//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
-//!
+//! Expected tranche loss and the expected loss/write-down curve, with the
+//! equity-tranche capped expectations they are built from.
+
 use super::config::{CdsTranchePricer, ElWdPoint, PoolExposure, INTEGRATION_TOLERANCE};
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::dates::Date;

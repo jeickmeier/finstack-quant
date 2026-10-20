@@ -48,7 +48,7 @@ use finstack_quant_models::monte_carlo::TimeGrid;
 
 use super::lmm_bermudan::{build_exercise_aligned_grid, price_bermudan_lmm};
 use super::monte_carlo_lsmc::SwaptionLsmcPricer;
-use super::swap_rate_utils::HullWhiteBondPrice;
+use super::swap_rate_utils::hw_bond_price;
 use finstack_quant_models::rates::hw1f::mc::build_event_aligned_grid;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 
@@ -362,12 +362,10 @@ fn hw1f_intrinsic(
     for (j, &payment_date) in schedule.payment_dates.iter().enumerate() {
         if payment_date > t {
             annuity += schedule.accrual_fractions[j]
-                * HullWhiteBondPrice::bond_price(params, r_t, t, payment_date, discount_fn);
+                * hw_bond_price(params, r_t, t, payment_date, discount_fn);
         }
     }
-    let swap_rate = (1.0
-        - HullWhiteBondPrice::bond_price(params, r_t, t, schedule.end_date, discount_fn))
-        / annuity;
+    let swap_rate = (1.0 - hw_bond_price(params, r_t, t, schedule.end_date, discount_fn)) / annuity;
     (
         (swap_rate - strike).max(0.0) * annuity * notional,
         swap_rate,
@@ -629,13 +627,7 @@ fn lsmc_european_uses_pathwise_money_market_numeraire() {
                         .zip(&schedule.accrual_fractions)
                         .filter(|(pay, _)| **pay > t)
                         .map(|(pay, tau)| {
-                            tau * HullWhiteBondPrice::bond_price(
-                                hw.params(),
-                                rate,
-                                t,
-                                *pay,
-                                discount_fn,
-                            )
+                            tau * hw_bond_price(hw.params(), rate, t, *pay, discount_fn)
                         })
                         .sum();
                     Ok((swap_rate, annuity, intrinsic))
@@ -724,15 +716,7 @@ fn lsmc_bermudan_matches_pathwise_numeraire_reference() {
                     .iter()
                     .zip(&schedule.accrual_fractions)
                     .filter(|(pay, _)| **pay > t)
-                    .map(|(pay, tau)| {
-                        tau * HullWhiteBondPrice::bond_price(
-                            hw.params(),
-                            rate,
-                            t,
-                            *pay,
-                            discount_fn,
-                        )
-                    })
+                    .map(|(pay, tau)| tau * hw_bond_price(hw.params(), rate, t, *pay, discount_fn))
                     .sum();
                 Ok((swap_rate, annuity, intrinsic))
             },

@@ -494,17 +494,7 @@ pub(crate) fn price_from_ytm_timed(
         comp,
         YieldCompounding::TreasuryActual | YieldCompounding::Moosmuller
     ) {
-        let mut first: Option<f64> = None;
-        for &(_, yf, _) in flows {
-            if yf <= 0.0 {
-                continue;
-            }
-            if yf > 0.0 {
-                first = Some(yf);
-                break;
-            }
-        }
-        first
+        flows.iter().map(|&(_, yf, _)| yf).find(|&yf| yf > 0.0)
     } else {
         None
     };

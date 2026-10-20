@@ -24,7 +24,6 @@ pub(crate) fn register_barrier_option_metrics(
                 (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
                 (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
                 (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-                // Theta is now registered universally in crate::EXOTICS.metrics(),
                 (Delta, GenericFdDelta::<crate::exotics::barrier_option::BarrierOption>::default()),
                 (Gamma, GenericFdGamma::<crate::exotics::barrier_option::BarrierOption>::default()),
                 (Vanna, GenericFdVanna::<crate::exotics::barrier_option::BarrierOption>::default()),

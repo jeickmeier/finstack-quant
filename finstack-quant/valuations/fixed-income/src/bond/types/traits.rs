@@ -195,7 +195,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
     }
 }
 
-// Declare canonical market dependencies for DV01/CS01 calculators.
 impl Bond {
     /// Reject embedded bondholder or issuer rights that the Merton MC payoff
     /// kernel does not model.

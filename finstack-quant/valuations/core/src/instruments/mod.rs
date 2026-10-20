@@ -22,19 +22,6 @@
 //!   book-level effects belong in higher-level APIs unless the instrument exposes
 //!   them directly.
 //!
-//! # Organization
-//!
-//! Instruments are organized by asset class:
-//!
-//! - `fixed_income`: Bonds, loans, MBS, CMOs, structured credit
-//! - `rates`: Swaps, caps/floors, swaptions, deposits, repos
-//! - `credit_derivatives`: CDS, indices, tranches, options
-//! - `equity`: Options, variance swaps, TRS, DCF, private markets
-//! - `fx`: Spots, forwards, swaps, options, barriers, quantos
-//! - `commodity`: Forwards, swaps, options
-//! - `exotics`: Asian, barrier, lookback, basket options
-//! - `composite`: Cross-asset baskets, spreads, and synthetics with frozen quantities
-//!
 //! # Core Trait
 //!
 //! All instruments implement `Instrument`, providing:
@@ -45,7 +32,7 @@
 //! - `cashflow_schedule()`: Canonical future-dated waterfall schedule
 //! - `dated_cashflows()`: Derived flattened `(Date, Money)` convenience view
 //!
-//! Cashflow policy is now universal across instruments. Deterministic products
+//! Cashflow policy is universal across instruments. Deterministic products
 //! emit contractual or projected schedules, while contingent or exhausted
 //! products still return an explicit empty schedule tagged with metadata that
 //! distinguishes `Placeholder` from `NoResidual`.
@@ -58,59 +45,17 @@
 //!
 //! # API Layers
 //!
-//! - **Public**: `finstack_quant_valuations_core::instruments::*` — shared traits
-//!   (`Instrument`, ...), parameter types, and the `pricing`
-//!   submodule for shared pricing infrastructure used by this crate and by
-//!   `finstack-quant-calibration` (`swap_legs`, overnight conventions, time helpers).
-//! - **Family-facing**: `common_impl` is public but hidden from the rendered docs; the
-//!   instrument families reach their shared kernels through it. A few of its modules are
-//!   re-exported through `pricing` and the instrument root.
+//! - **Public**: `finstack_quant_valuations_core::instruments::*` — the contract
+//!   types (`Instrument`, `Attributes`, `PricingOptions`, market dependencies,
+//!   parameter specs, listed-contract terms, pricing overrides) and the
+//!   [`pricing`](crate::instruments::pricing) module of shared pricing kernels
+//!   used by the families and by `finstack-quant-calibration`.
+//! - **Family-facing**: `common_impl` is public but hidden from the rendered docs;
+//!   it holds the helpers, volatility resolution and margin glue the instrument
+//!   families share.
 //!
-//! # Supported Instrument Types
-//!
-//! ## Fixed Income
-//! | Type | Description |
-//! |------|-------------|
-//! | `Bond` | Fixed/floating-rate bonds with embedded options |
-//! | `InflationLinkedBond` | TIPS, index-linked gilts |
-//! | `ConvertibleBond` | Bonds with equity conversion |
-//! | `TermLoan` | Bilateral term loans |
-//! | `RevolvingCredit` | Revolving credit facilities |
-//! | `AssetBackedFacility` | Warehouse lines against collateral pools |
-//! | `StructuredCredit` | ABS, CLO, RMBS, CMBS |
-//! | `AgencyMbsPassthrough` | Agency MBS pass-throughs |
-//! | `AgencyCmo` | Collateralized mortgage obligations |
-//!
-//! ## Interest Rates
-//! | Type | Description |
-//! |------|-------------|
-//! | `InterestRateSwap` | Plain vanilla IRS |
-//! | `BasisSwap` | Floating-for-floating swaps |
-//! | `Swaption` | Options on swaps |
-//! | `CapFloor` | Caps, floors, collars |
-//! | `Deposit` | Money market deposits |
-//! | `Repo` | Repurchase agreements |
-//!
-//! ## Credit Derivatives
-//! | Type | Description |
-//! |------|-------------|
-//! | `CreditDefaultSwap` | Single-name CDS |
-//! | `CdsIndex` | Credit indices (CDX, iTraxx) |
-//! | `CdsTranche` | Synthetic CDO tranches |
-//! | `CdsOption` | Options on CDS spreads |
-//!
-//! ## Equity & FX
-//! | Type | Description |
-//! |------|-------------|
-//! | `EquityOption` | Vanilla equity options |
-//! | `FxOption` | FX options (Garman-Kohlhagen) |
-//! | `VarianceSwap` | Variance/volatility swaps |
-//! | `FxSwap` | FX forwards and swaps |
-//!
-//! ## Composite
-//! | Type | Description |
-//! |------|-------------|
-//! | `CompositeInstrument` | Cross-asset basket or synthetic with frozen quantities |
+//! The concrete instrument types live in the family crates and are assembled into
+//! one namespace by the umbrella crate's `instruments` module.
 //!
 //! # See Also
 //!

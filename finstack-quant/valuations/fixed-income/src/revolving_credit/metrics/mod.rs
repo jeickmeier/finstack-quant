@@ -59,7 +59,6 @@ pub(crate) fn register_revolving_credit_metrics(
             (BucketedCs01, finstack_quant_valuations_core::metrics::sensitivities::cs01_z_spread::ZSpreadBucketedCs01::<
                 crate::revolving_credit::RevolvingCredit,
             >::hazard_when_credit_curve()),
-            // Theta is now registered universally in crate::FIXED_INCOME.metrics()
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             // Quote metrics on the settlement schedule (LSTA convention: a
             // quote applies to the drawn balance plus accrued).

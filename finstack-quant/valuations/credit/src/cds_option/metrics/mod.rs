@@ -9,7 +9,7 @@
 //! - CS01 (quoted CDS spread sensitivity)
 //! - DV01 (swap-curve quote sensitivity; canonical IR sensitivity)
 //! - ParSpread (Bloomberg CDSO ATM forward spread in bp)
-//! - Implied Volatility (placeholder)
+//! - Implied Volatility
 
 pub(crate) mod delta;
 mod dv01;

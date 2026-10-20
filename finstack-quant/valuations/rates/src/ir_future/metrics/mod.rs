@@ -28,7 +28,6 @@ pub(crate) fn register_ir_future_metrics(
             (ImpliedForward, pricing::ImpliedForwardCalculator),
             (ConvexityAdjustment, pricing::ConvexityAdjustmentCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
-            // Theta is now registered universally in crate::RATES.metrics()
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }

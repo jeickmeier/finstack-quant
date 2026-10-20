@@ -1266,7 +1266,7 @@
     },
     "d_a39cc24b914a22260377": {
       "additionalProperties": false,
-      "description": "Simple equity (spot) instrument.\n\nRepresents a spot equity position that can be priced using market data.\nThe price can come from direct market quotes or be computed from\nunderlying fundamentals.\n\nSee unit tests and `examples/` for usage.",
+      "description": "Simple equity (spot) instrument.\n\nRepresents a spot equity position that can be priced using market data.\nThe price can come from direct market quotes or be computed from\nunderlying fundamentals.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
