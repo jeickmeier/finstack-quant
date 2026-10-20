@@ -1,6 +1,7 @@
 {
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/sector_period.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Per-sector portfolio and benchmark weights and returns for a single attribution period.",
   "examples": [
     {

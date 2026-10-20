@@ -1649,14 +1649,14 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/carino_linked_attribution.schema.json",
             "type_name": "CarinoLinkedAttribution",
             "kind": "output",
-            "bytes": 6838
+            "bytes": 6912
           },
           {
             "path": "schemas/portfolio/1/cashflow_aggregation_options.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/cashflow_aggregation_options.schema.json",
             "type_name": "CashflowAggregationOptions",
             "kind": "input",
-            "bytes": 681
+            "bytes": 714
           },
           {
             "path": "schemas/portfolio/1/cell_config.schema.json",
@@ -1677,7 +1677,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/dated_cashflow.schema.json",
             "type_name": "DatedCashflow",
             "kind": "input",
-            "bytes": 982
+            "bytes": 1015
           },
           {
             "path": "schemas/portfolio/1/duration_cell_table.schema.json",
@@ -1810,7 +1810,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
             "type_name": "PortfolioOptimizationSpec",
             "kind": "input",
-            "bytes": 58054
+            "bytes": 58161
           },
           {
             "path": "schemas/portfolio/1/portfolio_primitive_exposure_report.schema.json",
@@ -1852,7 +1852,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_config.schema.json",
             "type_name": "ReplayConfig",
             "kind": "input",
-            "bytes": 13066
+            "bytes": 13103
           },
           {
             "path": "schemas/portfolio/1/replay_result.schema.json",
@@ -1880,7 +1880,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/sector_period.schema.json",
             "type_name": "SectorPeriod",
             "kind": "input",
-            "bytes": 1553
+            "bytes": 1586
           },
           {
             "path": "schemas/portfolio/1/sensitivity_matrix_json.schema.json",
@@ -4117,7 +4117,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/carino_linked_attribution.schema.json",
             "type_name": "CarinoLinkedAttribution",
             "kind": "output",
-            "bytes": 6838
+            "bytes": 6912
           },
           {
             "domain": "portfolio",
@@ -4125,7 +4125,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/cashflow_aggregation_options.schema.json",
             "type_name": "CashflowAggregationOptions",
             "kind": "input",
-            "bytes": 681
+            "bytes": 714
           },
           {
             "domain": "portfolio",
@@ -4149,7 +4149,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/dated_cashflow.schema.json",
             "type_name": "DatedCashflow",
             "kind": "input",
-            "bytes": 982
+            "bytes": 1015
           },
           {
             "domain": "portfolio",
@@ -4301,7 +4301,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
             "type_name": "PortfolioOptimizationSpec",
             "kind": "input",
-            "bytes": 58054
+            "bytes": 58161
           },
           {
             "domain": "portfolio",
@@ -4349,7 +4349,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_config.schema.json",
             "type_name": "ReplayConfig",
             "kind": "input",
-            "bytes": 13066
+            "bytes": 13103
           },
           {
             "domain": "portfolio",
@@ -4381,7 +4381,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/sector_period.schema.json",
             "type_name": "SectorPeriod",
             "kind": "input",
-            "bytes": 1553
+            "bytes": 1586
           },
           {
             "domain": "portfolio",

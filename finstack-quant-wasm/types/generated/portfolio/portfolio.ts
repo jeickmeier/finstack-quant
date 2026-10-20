@@ -2091,7 +2091,6 @@ export interface BrinsonPeriodResult {
    * Sum of selection effects across sectors.
    */
   total_selection: number;
-  [k: string]: unknown;
 }
 /**
  * Per-sector attribution effects (Brinson-Fachler three-way split).
@@ -2118,7 +2117,6 @@ export interface SectorEffect {
    * active return.
    */
   total: number;
-  [k: string]: unknown;
 }
 /**
  * A candidate instrument that could be added to the portfolio.
@@ -2276,7 +2274,6 @@ export interface CashflowAggregationOptions {
    * contribute to the ladder and issues are returned on the result.
    */
   allow_partial: boolean;
-  [k: string]: unknown;
 }
 /**
  * A position whose instrument could not build its contractual cashflow
@@ -2694,7 +2691,6 @@ export interface DatedCashflow {
    * Cashflow date.
    */
   date: DateWire;
-  [k: string]: unknown;
 }
 export interface DegradedPosition {
   message: string;
@@ -5119,7 +5115,6 @@ export interface PortfolioOptimizationSpec {
    * How weights are defined.
    */
   weighting?: WeightingScheme;
-  [k: string]: unknown;
 }
 /**
  * Serializable portfolio specification.
@@ -5173,7 +5168,6 @@ export interface PortfolioSpec {
   tags?: {
     [k: string]: string;
   };
-  [k: string]: unknown;
 }
 /**
  * Serializable position specification (without `Arc<dyn Instrument>`).
@@ -5225,7 +5219,6 @@ export interface PositionSpec {
    * Unit of measurement
    */
   unit: PositionUnit;
-  [k: string]: unknown;
 }
 /**
  * Defines which instruments the optimizer can trade.
@@ -5537,7 +5530,6 @@ export interface PortfolioValuationOptions {
    * reported on [`PositionValue::inapplicable_metrics`].
    */
   strict_risk?: boolean;
-  [k: string]: unknown;
 }
 /**
  * Contribution of a single position to a specific factor bucket.
@@ -5891,7 +5883,6 @@ export interface SectorPeriod {
    * Sector identifier (industry / country / any grouping).
    */
   sector: string;
-  [k: string]: unknown;
 }
 /**
  * Canonical wire form of a factor-sensitivity matrix, shared by both hosts.

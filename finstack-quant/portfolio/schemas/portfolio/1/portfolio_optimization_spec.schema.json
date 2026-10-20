@@ -1384,6 +1384,7 @@
       ]
     },
     "PortfolioSpec": {
+      "additionalProperties": false,
       "description": "Serializable portfolio specification.\n\nThis struct allows portfolios to be serialized and deserialized by storing\npositions as `PositionSpec` rather than `Position` (which contains non-serializable\n`Arc<dyn Instrument>`).",
       "properties": {
         "as_of": {
@@ -1546,6 +1547,7 @@
       ]
     },
     "PositionSpec": {
+      "additionalProperties": false,
       "description": "Serializable position specification (without `Arc<dyn Instrument>`).\n\nThis struct allows positions to be serialized and deserialized by storing\nthe instrument definition as JSON rather than a trait object.",
       "properties": {
         "attributes": {
@@ -1713,6 +1715,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "JSON-serializable specification for a portfolio optimization problem.",
   "examples": [
     {

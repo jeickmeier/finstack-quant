@@ -271,7 +271,7 @@ impl RequestedMetrics {
 /// `false` only when a PV-preserving best-effort fallback is intentional.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct PortfolioValuationOptions {
     /// When `true` (default), any failure to compute the risk metrics
     /// requested of a position causes the entire portfolio valuation to fail.

@@ -36,6 +36,7 @@ use std::str::FromStr;
 /// ladder with those issues recorded on [`PortfolioCashflows::issues`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CashflowAggregationOptions {
     /// When `false` (default), a non-empty [`PortfolioCashflows::issues`]
     /// list fails the call. When `true`, remaining positions still

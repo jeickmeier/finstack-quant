@@ -162,6 +162,7 @@ pub struct Position {
 /// the instrument definition as JSON rather than a trait object.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PositionSpec {
     /// Position identifier
     pub position_id: PositionId,

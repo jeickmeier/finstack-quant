@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 /// [`PortfolioSpec`], and then run the optimizer.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PortfolioOptimizationSpec {
     /// Portfolio specification (same format as `value_portfolio`).
     pub portfolio: PortfolioSpec,

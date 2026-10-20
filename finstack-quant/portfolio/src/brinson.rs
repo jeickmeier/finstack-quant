@@ -87,6 +87,7 @@ use serde::{Deserialize, Serialize};
 /// for each sector (e.g. `0.015` = +1.5 %).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct SectorPeriod {
     /// Sector identifier (industry / country / any grouping).
     pub sector: String,
@@ -107,6 +108,7 @@ pub struct SectorPeriod {
 /// Per-sector attribution effects (Brinson-Fachler three-way split).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct SectorEffect {
     /// Sector identifier (mirrors [`SectorPeriod::sector`]).
     pub sector: String,
@@ -124,6 +126,7 @@ pub struct SectorEffect {
 /// Single-period Brinson-Fachler result.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct BrinsonPeriodResult {
     /// Per-sector effects, in the order supplied.
     pub sectors: Vec<SectorEffect>,

@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/carino_linked_attribution.schema.json",
-      "bytes": 6838,
+      "bytes": 6912,
       "kind": "output",
       "path": "schemas/portfolio/1/carino_linked_attribution.schema.json",
       "summary": "Compounded portfolio vs.",
@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/cashflow_aggregation_options.schema.json",
-      "bytes": 681,
+      "bytes": 714,
       "kind": "input",
       "path": "schemas/portfolio/1/cashflow_aggregation_options.schema.json",
       "summary": "Options for `aggregate_full_cashflows`.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/dated_cashflow.schema.json",
-      "bytes": 982,
+      "bytes": 1015,
       "kind": "input",
       "path": "schemas/portfolio/1/dated_cashflow.schema.json",
       "summary": "A dated cashflow amount for money-weighted return calculations.",
@@ -209,7 +209,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
-      "bytes": 58054,
+      "bytes": 58161,
       "kind": "input",
       "path": "schemas/portfolio/1/portfolio_optimization_spec.schema.json",
       "summary": "JSON-serializable specification for a portfolio optimization problem.",
@@ -263,7 +263,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_config.schema.json",
-      "bytes": 13066,
+      "bytes": 13103,
       "kind": "input",
       "path": "schemas/portfolio/1/replay_config.schema.json",
       "summary": "Configuration for a replay run.",
@@ -299,7 +299,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/sector_period.schema.json",
-      "bytes": 1553,
+      "bytes": 1586,
       "kind": "input",
       "path": "schemas/portfolio/1/sector_period.schema.json",
       "summary": "Per-sector portfolio and benchmark weights and returns for a single attribution period.",

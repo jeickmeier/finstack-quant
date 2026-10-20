@@ -90,6 +90,7 @@ pub struct Portfolio {
 /// `Arc<dyn Instrument>`).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PortfolioSpec {
     /// Portfolio identifier
     pub id: String,
