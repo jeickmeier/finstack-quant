@@ -29,7 +29,7 @@ mod tests {
 
     #[test]
     fn test_unified_pricer_key() {
-        let pricer = RevolvingCreditPricer::default();
+        let pricer = RevolvingCreditPricer::new(ModelKey::Discounting);
         assert_eq!(
             pricer.key(),
             PricerKey::new(InstrumentType::RevolvingCredit, ModelKey::Discounting)

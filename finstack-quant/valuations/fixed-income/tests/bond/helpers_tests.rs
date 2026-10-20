@@ -160,27 +160,6 @@ fn test_df_from_yield_street() {
 }
 
 #[test]
-fn test_df_from_yield_treasury_actual_short_and_long_paths() {
-    let frequency = Tenor::semi_annual();
-
-    let short_df = df_from_yield(0.06, 0.25, YieldCompounding::TreasuryActual, frequency).unwrap();
-    let short_expected = 1.0 / (1.0 + 0.06 * 0.25);
-    assert!((short_df - short_expected).abs() < 1e-12);
-
-    let stub_df = df_from_yield(0.06, 1.3, YieldCompounding::TreasuryActual, frequency).unwrap();
-    let m = 2.0_f64;
-    let n_full_periods = (1.3_f64 * m).floor();
-    let stub_time = 1.3 - n_full_periods / m;
-    let stub_expected = (1.0_f64 / (1.0_f64 + 0.06_f64 * stub_time))
-        * (1.0_f64 + 0.06_f64 / m).powf(-n_full_periods);
-    assert!((stub_df - stub_expected).abs() < 1e-12);
-
-    let no_stub_df = df_from_yield(0.06, 1.5, YieldCompounding::TreasuryActual, frequency).unwrap();
-    let no_stub_expected = (1.0_f64 + 0.06_f64 / m).powf(-m * 1.5_f64);
-    assert!((no_stub_df - no_stub_expected).abs() < 1e-12);
-}
-
-#[test]
 fn test_df_from_yield_validation_errors_cover_multiple_compounding_modes() {
     assert!(df_from_yield(
         -2.0,
@@ -197,13 +176,6 @@ fn test_df_from_yield_validation_errors_cover_multiple_compounding_modes() {
     )
     .is_err());
     assert!(df_from_yield(-5.0, 1.0, YieldCompounding::Street, Tenor::semi_annual()).is_err());
-    assert!(df_from_yield(
-        -5.0,
-        0.75,
-        YieldCompounding::TreasuryActual,
-        Tenor::semi_annual()
-    )
-    .is_err());
 }
 
 #[test]

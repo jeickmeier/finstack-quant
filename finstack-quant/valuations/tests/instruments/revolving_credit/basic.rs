@@ -456,12 +456,9 @@ fn test_revolving_credit_helpers() {
         .unwrap();
 
     // Test helper methods
-    assert_eq!(facility.utilization_rate(), 0.75);
+    assert_eq!(facility.utilization_at(facility.issue_date), 0.75);
     assert!(facility.is_deterministic());
     assert!(!facility.is_stochastic());
-
-    let undrawn = facility.undrawn_amount().unwrap();
-    assert_eq!(undrawn.amount(), 2_500_000.0);
 }
 
 #[test]

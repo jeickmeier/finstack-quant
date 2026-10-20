@@ -112,48 +112,13 @@ proptest! {
             .build()
             .unwrap();
 
-        let util_rate = facility.utilization_rate();
+        let util_rate = facility.utilization_at(facility.issue_date);
 
         prop_assert!((0.0..=1.0).contains(&util_rate),
             "Utilization rate {} should be in [0, 1]", util_rate);
         // Allow for floating point precision errors
         prop_assert!((util_rate - utilization_pct).abs() < 1e-6,
             "Utilization rate {} should approximately match target {}", util_rate, utilization_pct);
-    }
-
-    /// Property: Undrawn amount should equal commitment - drawn
-    #[test]
-    fn prop_undrawn_amount_arithmetic(
-        commitment in 1_000_000.0f64..100_000_000.0,
-        utilization_pct in 0.0f64..1.0,
-    ) {
-        let drawn = commitment * utilization_pct;
-
-        let facility = RevolvingCredit::builder()
-            .id("TEST".into())
-            .commitment(Money::new(commitment, Currency::USD).expect("valid money fixture"))
-            .drawn(Money::new(drawn, Currency::USD).expect("valid money fixture"))
-            .issue_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
-            .maturity(Date::from_calendar_date(2026, Month::January, 1).unwrap())
-            .rate(RateSpec::Fixed { rate: 0.05 })
-            .day_count(DayCount::Act360)
-            .frequency(Tenor::quarterly())
-            .fees(RevolvingCreditFees::default())
-            .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
-            .discount_curve_id("USD-OIS".into())
-            .recovery_rate(0.0)
-            .build()
-            .unwrap();
-
-        let undrawn = facility.undrawn_amount().unwrap();
-        let expected_undrawn = commitment - drawn;
-
-        // Allow for floating point precision errors
-        prop_assert!((undrawn.amount() - expected_undrawn).abs() < 0.01,
-            "Undrawn {} should approximately equal commitment - drawn {}",
-            undrawn.amount(), expected_undrawn);
-        prop_assert!(undrawn.amount() >= -1e-6,
-            "Undrawn amount should be non-negative (allowing for rounding)");
     }
 
     /// Property: Draw events should increase drawn balance, repay events should decrease it
@@ -351,7 +316,6 @@ mod deterministic_tests {
             .build()
             .unwrap();
 
-        assert!((facility.utilization_rate() - 1.0).abs() < 1e-10);
-        assert_eq!(facility.undrawn_amount().unwrap().amount(), 0.0);
+        assert!((facility.utilization_at(facility.issue_date) - 1.0).abs() < 1e-10);
     }
 }
