@@ -643,7 +643,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
             crate::equity_trs::pricer::net_cashflows(self, context, as_of)?;
         Ok(finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            finstack_quant_cashflows::primitives::CFKind::Fixed,
+            finstack_quant_core::cashflow::CFKind::Fixed,
             self.financing_leg.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),

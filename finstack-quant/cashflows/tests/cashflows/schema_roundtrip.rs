@@ -212,10 +212,10 @@ fn test_json_bridge_build_validate_flows_and_accrual() {
         serde_json::from_str(&schedule_json).expect("schedule JSON should deserialize");
     assert!(schedule.get_flows().iter().any(|flow| matches!(
         flow.kind,
-        finstack_quant_cashflows::primitives::CFKind::Fixed
-            | finstack_quant_cashflows::primitives::CFKind::FloatReset
-            | finstack_quant_cashflows::primitives::CFKind::Stub
-            | finstack_quant_cashflows::primitives::CFKind::InflationCoupon
+        finstack_quant_core::cashflow::CFKind::Fixed
+            | finstack_quant_core::cashflow::CFKind::FloatReset
+            | finstack_quant_core::cashflow::CFKind::Stub
+            | finstack_quant_core::cashflow::CFKind::InflationCoupon
     )));
     assert_eq!(
         schedule.get_meta().issue_date,
@@ -335,7 +335,7 @@ fn test_json_bridge_amortizing_schedule_build() {
         serde_json::from_str(&schedule_json).expect("schedule JSON should deserialize");
     assert!(schedule.get_flows().iter().any(|flow| matches!(
         flow.kind,
-        finstack_quant_cashflows::primitives::CFKind::Amortization
+        finstack_quant_core::cashflow::CFKind::Amortization
     )));
 }
 
@@ -689,12 +689,7 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
     let first_coupon = schedule
         .get_flows()
         .iter()
-        .find(|flow| {
-            matches!(
-                flow.kind,
-                finstack_quant_cashflows::primitives::CFKind::FloatReset
-            )
-        })
+        .find(|flow| matches!(flow.kind, finstack_quant_core::cashflow::CFKind::FloatReset))
         .expect("schedule has a floating coupon");
 
     // First coupon (accrues 2025-01-15 -> 2025-04-15): 4.0% fixing + 100 bp
@@ -796,7 +791,7 @@ fn canonical_coupon_and_payment_programs_build_nontrivial_schedule() {
     assert!(schedule
         .get_flows()
         .iter()
-        .any(|flow| flow.kind == finstack_quant_cashflows::primitives::CFKind::Pik));
+        .any(|flow| flow.kind == finstack_quant_core::cashflow::CFKind::Pik));
 }
 
 #[test]

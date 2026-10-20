@@ -31,7 +31,7 @@
 //! perform FX conversion. Coupon rates are decimals (`0.05` means 5%); fields
 //! ending in `_bp` are basis points. Schedule dates follow the day-count,
 //! calendar, business-day, stub, roll, and payment-lag rules in
-//! [`builder::ScheduleParams`]. [`primitives::CFKind`] is non-exhaustive, so
+//! [`builder::ScheduleParams`]. [`CFKind`](finstack_quant_core::cashflow::CFKind) is non-exhaustive, so
 //! downstream matches require a catch-all arm.
 //!
 //! # Errors
@@ -75,11 +75,6 @@
 //!
 //! - Day-count and schedule conventions: `docs/REFERENCES.md#isda-2006-definitions`
 //! - Bond-market accrued-interest conventions: `docs/REFERENCES.md#icma-rule-book`
-
-/// Cash-flow primitives (`CashFlow`, `CFKind`, `CashFlowAccrual`).
-pub mod primitives {
-    pub use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
-}
 
 /// Currency-preserving aggregation utilities for cashflows.
 pub mod aggregation;

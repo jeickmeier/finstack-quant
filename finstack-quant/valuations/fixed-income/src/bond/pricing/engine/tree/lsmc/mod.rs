@@ -20,7 +20,7 @@ use finstack_quant_cashflows::builder::{
     OvernightRateConstraints,
 };
 use finstack_quant_cashflows::builder::{CouponType, FloatingCouponSpec, FloatingRateFallback};
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{adjust, Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;

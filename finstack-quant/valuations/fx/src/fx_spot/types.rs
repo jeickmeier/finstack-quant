@@ -646,7 +646,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
 
         let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            finstack_quant_cashflows::primitives::CFKind::Notional,
+            finstack_quant_core::cashflow::CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F, // Standard for FX spot
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: self.notional()?,

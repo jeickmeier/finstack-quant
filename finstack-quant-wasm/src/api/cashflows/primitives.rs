@@ -7,7 +7,7 @@
 use crate::utils::input::js_string;
 use crate::utils::wire::js_wire;
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use wasm_bindgen::prelude::*;
 
 /// Parse a cashflow kind label into its `CFKind` wire string.

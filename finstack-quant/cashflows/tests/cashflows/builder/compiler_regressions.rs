@@ -1,8 +1,7 @@
 //! Economic regressions for compiled coupon and principal programs.
 
-use finstack_quant_cashflows::{
-    builder::CashFlowSchedule, primitives::CFKind, CashflowScheduleBuildSpec,
-};
+use finstack_quant_cashflows::{builder::CashFlowSchedule, CashflowScheduleBuildSpec};
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::{
     dates::{parse_iso_date, DayCount},
     market_data::{context::MarketContext, term_structures::ForwardCurve},

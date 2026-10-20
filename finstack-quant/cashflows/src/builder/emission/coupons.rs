@@ -5,8 +5,8 @@
 //! layer that supplies those tuples.
 
 use crate::builder::FloatingLegCompounding;
-use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::fixings::{fixing_series_id, require_fixing_value_exact};

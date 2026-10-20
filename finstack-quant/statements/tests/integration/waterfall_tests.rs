@@ -170,7 +170,7 @@ fn test_ecf_sweep_basic() {
 
 mod period_flow_waterfall_integration {
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::cashflow::CashFlow;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Period, PeriodId};

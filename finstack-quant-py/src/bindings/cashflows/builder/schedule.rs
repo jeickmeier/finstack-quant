@@ -3,7 +3,7 @@
 use finstack_quant_cashflows::builder::{
     merge_cashflow_schedules, CashFlowMeta, CashFlowSchedule, CashflowRepresentation,
 };
-use finstack_quant_cashflows::primitives::CashFlow;
+use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use pyo3::prelude::*;

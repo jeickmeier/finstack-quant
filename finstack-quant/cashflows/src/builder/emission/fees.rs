@@ -1,7 +1,7 @@
 //! Fee cashflow emission (periodic and fixed fees on the builder pipeline).
 
-use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;

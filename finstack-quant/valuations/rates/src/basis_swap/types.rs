@@ -1668,7 +1668,7 @@ mod tests {
         let first = schedule
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::FloatReset)
+            .find(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
             .expect("overnight coupon");
         let calendar = calendar_by_id_strict("usny").expect("usny");
         let periods = finstack_quant_cashflows::builder::build_periods(
@@ -1787,7 +1787,7 @@ mod tests {
         let first = schedule
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::FloatReset)
+            .find(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
             .expect("overnight coupon");
         let calendar = calendar_by_id_strict("weekends_only").expect("fixing calendar");
         let periods = finstack_quant_cashflows::builder::build_periods(

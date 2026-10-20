@@ -27,7 +27,7 @@ use super::pricing_options::PricingOptions;
 ///
 /// ```rust
 /// use finstack_quant_cashflows::builder::CashFlowSchedule;
-/// use finstack_quant_cashflows::primitives::CFKind;
+/// use finstack_quant_core::cashflow::CFKind;
 /// use finstack_quant_cashflows::{schedule_from_dated_flows, CashflowScheduleSource, ScheduleBuildOpts};
 /// use finstack_quant_core::dates::{Date, DayCount};
 /// use finstack_quant_core::market_data::context::MarketContext;

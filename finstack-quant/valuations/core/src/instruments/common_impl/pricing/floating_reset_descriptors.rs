@@ -25,7 +25,7 @@
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_cashflows::builder::FloatingRateParams;
 use finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::{Error, Result};

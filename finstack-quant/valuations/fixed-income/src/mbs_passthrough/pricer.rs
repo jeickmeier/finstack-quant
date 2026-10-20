@@ -5,7 +5,7 @@
 
 use super::AgencyMbsPassthrough;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -509,7 +509,7 @@ pub(crate) fn price_with_spread(
 mod tests {
     use super::*;
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;

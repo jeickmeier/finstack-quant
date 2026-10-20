@@ -383,7 +383,7 @@ fn build_step_up_bond_schedule(
 
 #[test]
 fn step_up_no_steps_equals_fixed_rate() {
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
@@ -454,7 +454,7 @@ fn step_up_no_steps_equals_fixed_rate() {
 
 #[test]
 fn step_up_one_step_changes_rate() {
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
@@ -520,7 +520,7 @@ fn step_up_one_step_changes_rate() {
 
 #[test]
 fn step_up_multiple_steps() {
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2028, Month::January, 1).expect("Valid test date");

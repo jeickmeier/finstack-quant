@@ -15,8 +15,8 @@
 
 use crate::cms_common::CmsReferenceSwap;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;

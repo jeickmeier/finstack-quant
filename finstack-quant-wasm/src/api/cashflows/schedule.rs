@@ -13,8 +13,8 @@ use finstack_quant_cashflows::builder::{
     merge_cashflow_schedules, CashFlowBuilder, CashFlowMeta, CashFlowSchedule,
     CashflowRepresentation, CouponType, FixedCouponSpec, FloatingCouponSpec, Notional,
 };
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_cashflows::{CashflowScheduleBuildSpec, DatedFlowJson, ScheduleBuildOpts};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DayCount, Period};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;

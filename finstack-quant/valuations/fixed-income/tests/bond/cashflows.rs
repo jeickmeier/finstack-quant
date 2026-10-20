@@ -294,7 +294,7 @@ fn test_pik_cashflows() {
         schedule
             .get_flows()
             .iter()
-            .any(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::Pik),
+            .any(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Pik),
         "canonical schedules must retain PIK for accrued interest and balance replay"
     );
     let settlements = bond.dated_cashflows(&curves, issue).unwrap();
@@ -616,8 +616,8 @@ fn test_actact_isma_daycount_context() {
         .filter(|cf| {
             matches!(
                 cf.kind,
-                finstack_quant_cashflows::primitives::CFKind::Fixed
-                    | finstack_quant_cashflows::primitives::CFKind::Stub
+                finstack_quant_core::cashflow::CFKind::Fixed
+                    | finstack_quant_core::cashflow::CFKind::Stub
             )
         })
         .collect();
@@ -705,8 +705,8 @@ fn test_bus252_daycount_with_calendar() {
         .filter(|cf| {
             matches!(
                 cf.kind,
-                finstack_quant_cashflows::primitives::CFKind::Fixed
-                    | finstack_quant_cashflows::primitives::CFKind::Stub
+                finstack_quant_core::cashflow::CFKind::Fixed
+                    | finstack_quant_core::cashflow::CFKind::Stub
             )
         })
         .collect();

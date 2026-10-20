@@ -4,7 +4,7 @@ use super::config::{DiscountAt, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORREL
 use super::*;
 use crate::cds_tranche::parameters::CdsTrancheParams;
 use crate::cds_tranche::CdsTranche;
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;

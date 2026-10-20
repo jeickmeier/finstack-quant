@@ -805,7 +805,7 @@ mod tests {
                         Money::from((100_i64, Currency::USD)),
                     ),
                 ],
-                finstack_quant_cashflows::primitives::CFKind::Fixed,
+                finstack_quant_core::cashflow::CFKind::Fixed,
                 DayCount::Act365F,
                 ScheduleBuildOpts {
                     notional_hint: self.notional().expect("valid notional"),

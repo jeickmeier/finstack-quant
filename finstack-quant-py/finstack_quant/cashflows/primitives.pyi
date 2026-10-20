@@ -1,7 +1,7 @@
 """
 Cashflow primitives: CashFlow, CFKind, settlement classification.
 
-Typed bindings for ``finstack_quant_cashflows::primitives``, mirroring the
+Typed bindings for ``finstack_quant_core::cashflow``, mirroring the
 Rust-canonical ``CFKind`` classification enum and the ``CashFlow`` dated
 payment record used throughout schedule construction and accrual.
 

@@ -1,6 +1,6 @@
 //! Helper functions for cashflow emission.
 
-use crate::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{adjust, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::money::Money;

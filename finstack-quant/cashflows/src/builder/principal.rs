@@ -6,7 +6,7 @@ use finstack_quant_core::money::Money;
 use crate::builder::orchestrator::CashFlowBuilder;
 use crate::builder::{AmortizationSpec, PrincipalExchange};
 use crate::json::PrincipalEventSpec;
-use crate::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 
 impl CashFlowBuilder {
     /// Sets principal details and instrument horizon.

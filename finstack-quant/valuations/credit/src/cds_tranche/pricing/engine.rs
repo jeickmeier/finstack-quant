@@ -6,7 +6,7 @@ use super::config::{
 };
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{calendar_by_id_strict, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;

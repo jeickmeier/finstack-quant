@@ -4,8 +4,8 @@
 //! deriving schedule metadata. Downstream pricing/risk code consumes this shape.
 
 use crate::builder::Notional;
-use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Period};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -804,7 +804,7 @@ impl CashFlowSchedule {
     ///
     /// ```rust
     /// use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    /// use finstack_quant_cashflows::primitives::{CashFlow, CFKind};
+    /// use finstack_quant_core::cashflow::{CashFlow, CFKind};
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::{Date, DayCount};
     /// use finstack_quant_core::money::Money;
@@ -944,7 +944,7 @@ impl CashFlowSchedule {
     ///
     /// ```rust
     /// use finstack_quant_cashflows::{schedule_from_dated_flows, ScheduleBuildOpts};
-    /// use finstack_quant_cashflows::primitives::CFKind;
+    /// use finstack_quant_core::cashflow::CFKind;
     /// use finstack_quant_core::{currency::Currency, dates::{Date, DayCount}, money::Money};
     /// use time::Month;
     ///
