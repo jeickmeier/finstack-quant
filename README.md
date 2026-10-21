@@ -364,7 +364,7 @@ mise run python-examples
 [mise](https://mise.jdx.dev/) pins the toolchain in [`mise.toml`](mise.toml): an
 exact stable Rust with `clippy`, `rustfmt`, and the `wasm32-unknown-unknown`
 target, plus nightly (needed only for the rustdoc JSON that `cargo-public-api`
-consumes), Node, Python 3.12, uv, `wasm-pack`, `wasm-bindgen`, binaryen
+consumes), Node, Python 3.14, uv, `wasm-pack`, `wasm-bindgen`, binaryen
 (`wasm-opt`), Playwright with its headless Chromium, `cargo-nextest`,
 `cargo-llvm-cov`, `cargo-deny`, `cargo-public-api`, `maturin`, and
 `osv-scanner`. `cargo-flamegraph` is not installed by default; it has no release
@@ -374,7 +374,7 @@ library crate.
 Everything installs into your user profile, so no admin rights are needed. The
 `[env]` table in `mise.toml` sets `CARGO_HOME` and `RUSTUP_HOME` to `.cargo` and
 `.rustup` under `$HOME` (`%USERPROFILE%` on Windows) and points `PYO3_PYTHON`
-at the mise-installed Python. uv gets `UV_PYTHON=3.12.15`,
+at the mise-installed Python. uv gets `UV_PYTHON=3.14.8`,
 `UV_PYTHON_PREFERENCE=only-system` and `UV_PYTHON_DOWNLOADS=never`, so it takes
 mise's interpreter from `PATH` and still installs into an active virtualenv.
 Any of these that you already export takes precedence.
