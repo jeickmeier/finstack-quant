@@ -536,7 +536,7 @@ mod tests {
         let mc_price = sum_payoff / num_paths as f64;
 
         // Analytic reference: Black-Scholes ATM call at σ = √ξ₀, r = q = 0.
-        let bs_price = crate::closed_form::bs_price(
+        let bs_price = crate::closed_form::vanilla::bs_price(
             s0,
             strike,
             0.0,

@@ -18,13 +18,13 @@
 //! simulated cashflows with this pathwise factor — not the deterministic
 //! time-0 curve DF, which would drop the payoff/numeraire correlation.
 
-use crate::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
+use crate::monte_carlo::discretization::ExactHullWhite1F;
 use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
 use crate::monte_carlo::results::MoneyEstimate;
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::{Discretization, PathState, Payoff, RandomStream, StateKey};
-use crate::rates::hw1f::bank_account::bank_step_factor;
-use crate::rates::hw1f::config::{Hw1fMcConfig, SampleSplit};
+use crate::rates::hw1f::bank_step_factor;
+use crate::rates::hw1f::{Hw1fMcConfig, SampleSplit};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::math::time_grid::TimeGrid;

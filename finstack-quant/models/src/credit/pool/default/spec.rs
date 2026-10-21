@@ -6,7 +6,7 @@
 use super::{
     CopulaBasedDefault, FactorCorrelatedDefault, IntensityProcessDefault, StochasticDefault,
 };
-use crate::correlation::copula::CopulaSpec;
+use crate::correlation::CopulaSpec;
 use finstack_quant_cashflows::builder::clamped_cdr_to_mdr;
 use finstack_quant_cashflows::builder::DefaultModelSpec;
 

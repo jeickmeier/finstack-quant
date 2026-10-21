@@ -6,9 +6,9 @@
 
 use crate::utils::input::js_f64;
 use crate::utils::{to_js_err, to_js_value};
+use finstack_quant_models::credit::scoring::ohlson::OhlsonOScoreInput;
 use finstack_quant_models::credit::scoring::{
-    self, AltmanZDoublePrimeInput, AltmanZPrimeInput, AltmanZScoreInput, OhlsonOScoreInput,
-    ZmijewskiInput,
+    self, AltmanZDoublePrimeInput, AltmanZPrimeInput, AltmanZScoreInput, ZmijewskiInput,
 };
 use wasm_bindgen::prelude::*;
 
@@ -218,7 +218,7 @@ pub fn ohlson_o_score(
         )?,
         net_income_change: js_f64(&net_income_change, "netIncomeChange")?,
     };
-    to_js_value(&scoring::ohlson_o_score(&input).map_err(to_js_err)?)
+    to_js_value(&scoring::ohlson::ohlson_o_score(&input).map_err(to_js_err)?)
 }
 
 /// Zmijewski (1984) probit financial-distress model.

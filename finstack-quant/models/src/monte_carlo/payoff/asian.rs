@@ -577,7 +577,7 @@ mod tests {
     #[test]
     fn test_geometric_asian_closed_form() {
         let price =
-            crate::closed_form::geometric_asian_call(100.0, 100.0, 1.0, 0.05, 0.02, 0.2, 12);
+            crate::closed_form::asian::geometric_asian_call(100.0, 100.0, 1.0, 0.05, 0.02, 0.2, 12);
 
         assert!(price > 0.0);
         assert!(price < 10.0);

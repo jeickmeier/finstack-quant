@@ -92,8 +92,8 @@
 //! ## Black-Scholes Greeks
 //!
 //! ```rust
-//! use finstack_quant_models::OptionType;
-//! use finstack_quant_models::closed_form::bs_greeks;
+//! use finstack_quant_models::types::OptionType;
+//! use finstack_quant_models::closed_form::vanilla::bs_greeks;
 //!
 //! let spot = 100.0;
 //! let strike = 100.0;
@@ -137,27 +137,23 @@
 //! - [`vanilla`] for Black-Scholes pricing and Greeks (delta, gamma, vega, theta, rho)
 //! - [`asian`] for Asian option pricing
 //! - [`barrier`] for barrier option pricing
-//! - [`lookback`] for lookback option pricing
-//! - [`quanto`] for quanto option pricing
+//! - `lookback` for lookback option pricing
+//! - `quanto` for quanto option pricing
 //! - [`heston`] for stochastic volatility pricing
-//! - [`forward`] for checked Black-76 / Bachelier / shifted-Black prices and forward Greeks
-//! - [`dispatch`] for the string-selected exotic closed forms
+//! - `forward` for checked Black-76 / Bachelier / shifted-Black prices and forward Greeks
+//! - `dispatch` for the string-selected exotic closed forms
 
 pub mod asian;
 pub mod barrier;
-pub mod dispatch;
-pub mod forward;
+pub(crate) mod dispatch;
+pub(crate) mod forward;
 pub mod heston;
-pub mod implied_vol;
-pub mod lookback;
-pub mod quanto;
+pub(crate) mod implied_vol;
+pub(crate) mod lookback;
+pub(crate) mod quanto;
 pub mod vanilla;
-pub mod volatility;
+pub(crate) mod volatility;
 
-pub use asian::{
-    arithmetic_asian_call_tw, arithmetic_asian_put_tw, geometric_asian_call, geometric_asian_put,
-};
-pub use barrier::{barrier_price, barrier_rebate};
 pub use dispatch::{
     asian_option_price, barrier_call, barrier_put, lookback_option_price, quanto_option_price,
     DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE,
@@ -166,17 +162,12 @@ pub use forward::{
     bachelier_greeks, bachelier_price, black76_greeks, black76_price, black_shifted_price,
     black_shifted_vega, ForwardGreeks,
 };
-pub use heston::{heston_call_price_fourier, heston_price, HestonPricingParams};
 pub use implied_vol::{black76_implied_vol, bs_implied_vol};
 pub use lookback::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
     floating_strike_lookback_put,
 };
 pub use quanto::{quanto_call, quanto_put};
-pub use vanilla::{
-    bs_greeks, bs_price, checked_closed_form_value, vanilla_expiry_payoff, BsGreeks,
-    DEFAULT_THETA_DAYS_PER_YEAR, ONE_PERCENT,
-};
 pub use volatility::{
     bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma,
     bachelier_price_with_annuity, bachelier_put, bachelier_vega, black_call, black_delta_call,

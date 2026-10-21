@@ -214,11 +214,9 @@ forward-based call prices; carry is already in the smile's forward.
 ## Example
 
 ```rust
-use finstack_quant_models::OptionType;
-use finstack_quant_models::volatility::{
-    bachelier_price_with_annuity, d1_d2, d1_d2_black76, norm_cdf,
-    SABRCalibrator, SABRModel, SABRParameters, SABRSmile, VolatilityConvention,
-};
+use finstack_quant_models::types::OptionType;
+use finstack_quant_models::volatility::{d1_d2, d1_d2_black76, norm_cdf, SABRCalibrator, SABRModel, SABRParameters, SABRSmile, VolatilityConvention};
+use finstack_quant_models::closed_form::bachelier_price_with_annuity;
 
 // Black-Scholes delta: note the (spot, strike, r, sigma, t, q) order.
 let (d1, _d2) = d1_d2(100.0, 105.0, 0.05, 0.20, 0.5, 0.02);

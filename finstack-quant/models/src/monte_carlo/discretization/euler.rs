@@ -40,7 +40,7 @@ use super::super::traits::{Discretization, StochasticProcess};
 /// **biased research scheme**: the process applies partial truncation
 /// (`v = max(v, 0)` in drift and diffusion) and the engine applies
 /// Cholesky to the declared factor correlation. Production Heston
-/// Europeans use [`crate::monte_carlo::discretization::QeHeston`] via
+/// Europeans use [`crate::monte_carlo::discretization::qe_heston::QeHeston`] via
 /// [`crate::monte_carlo::pricer::heston::price_heston`].
 #[derive(Debug, Clone, Default)]
 pub struct EulerMaruyama;
@@ -83,7 +83,7 @@ impl<P: StochasticProcess> Discretization<P> for EulerMaruyama {
 /// ```
 ///
 /// This ensures positivity for processes with proportional diffusion. For plain
-/// GBM, prefer [`crate::monte_carlo::discretization::exact::ExactGbm`], which uses the
+/// GBM, prefer [`crate::monte_carlo::discretization::ExactGbm`], which uses the
 /// analytical transition and has no time-discretization error.
 #[derive(Debug, Clone, Default)]
 pub struct LogEuler;

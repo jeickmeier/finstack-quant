@@ -102,4 +102,4 @@ pub const TRADING_DAYS_PER_YEAR: f64 = time::BUSINESS_DAYS_PER_YEAR_US;
 /// `bs_greeks` (ACT/365; pass [`TRADING_DAYS_PER_YEAR`] (252) instead for
 /// business-day-scaled theta). Both host bindings' `theta_days_per_year`
 /// parameters default to that one constant.
-pub use finstack_quant_models::closed_form::DEFAULT_THETA_DAYS_PER_YEAR;
+pub use finstack_quant_models::closed_form::vanilla::DEFAULT_THETA_DAYS_PER_YEAR;

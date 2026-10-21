@@ -13,7 +13,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, HazardCurve};
 use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::correlation::copula::CopulaSpec;
+use finstack_quant_models::correlation::CopulaSpec;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use std::sync::Arc;
 use time::Month;

@@ -8,7 +8,8 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::{NodeState, ShortRateTree, ShortRateTreeConfig, TreeValuator};
+use finstack_quant_models::trees::short_rate_tree::{ShortRateTree, ShortRateTreeConfig};
+use finstack_quant_models::trees::tree_framework::{NodeState, TreeValuator};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_fixed_income::bond::Bond;
 use time::macros::date;
@@ -316,8 +317,8 @@ fn test_putable_bond_tree_pricing_reasonable() {
 
 #[test]
 fn test_mean_reversion_reduces_rate_dispersion() {
-    use finstack_quant_models::HullWhiteTree;
-    use finstack_quant_models::HullWhiteTreeConfig;
+    use finstack_quant_models::trees::HullWhiteTree;
+    use finstack_quant_models::trees::HullWhiteTreeConfig;
 
     let as_of = date!(2020 - 01 - 01);
     let rate = 0.05;

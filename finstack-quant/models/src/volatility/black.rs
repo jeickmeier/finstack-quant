@@ -57,7 +57,7 @@
 ///
 /// # Example
 /// ```
-/// use finstack_quant_models::volatility::black::d1_d2;
+/// use finstack_quant_models::volatility::d1_d2;
 ///
 /// let (d1, d2) = d1_d2(100.0, 100.0, 0.05, 0.20, 1.0, 0.02);
 /// assert!(d1 > d2);
@@ -107,7 +107,7 @@ fn moneyness_limit(difference: f64) -> f64 {
 ///
 /// # Example
 /// ```
-/// use finstack_quant_models::volatility::black::d1_d2_black76;
+/// use finstack_quant_models::volatility::d1_d2_black76;
 ///
 /// let (d1, d2) = d1_d2_black76(0.05, 0.05, 0.20, 1.0);
 /// assert!(d1 > d2);

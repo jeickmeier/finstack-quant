@@ -24,7 +24,7 @@
 //! - Gatheral, J. (2006). *The Volatility Surface*. Wiley. `docs/REFERENCES.md#gatheral-volatility-surface`
 
 use super::classify_severity;
-use crate::volatility::arbitrage::types::{ArbitrageType, ArbitrageViolation, ViolationLocation};
+use crate::volatility::arbitrage::{ArbitrageType, ArbitrageViolation, ViolationLocation};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 
 /// Checks that implied probability density is non-negative via Durrleman's

@@ -4,15 +4,14 @@
 //! serializable specifications. Deal construction, calibration presets,
 //! waterfalls, and tranche pricing remain in `finstack-quant-valuations`.
 
-pub mod correlation;
-pub mod default;
+pub(crate) mod correlation;
+pub(crate) mod default;
 pub mod prepayment;
 
 pub use correlation::CorrelationStructure;
 pub use default::{
     PerNameCopulaDefault, PoolGranularity, StochasticDefault, StochasticDefaultSpec,
 };
-pub use prepayment::{StochasticPrepaySpec, StochasticPrepayment};
 
 use finstack_quant_cashflows::builder::clamped_cpr_to_smm;
 

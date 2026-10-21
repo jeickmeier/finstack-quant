@@ -14,7 +14,7 @@ use crate::CalibrationReport;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
 use finstack_quant_core::Result;
-use finstack_quant_models::{SabrCalibrator, SabrParameters, SabrShift};
+use finstack_quant_models::volatility::sabr::{SabrCalibrator, SabrParameters, SabrShift};
 use std::collections::BTreeMap;
 
 use crate::constants::OrderedF64;
@@ -348,7 +348,7 @@ mod tests {
     use finstack_quant_core::dates::{Date, DateExt};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_models::SabrParameters;
+    use finstack_quant_models::volatility::sabr::SabrParameters;
     use finstack_quant_valuations_core::instruments::OptionType;
     use time::Month;
 

@@ -22,7 +22,7 @@ pub struct Hw1fMcConfig {
     /// observation/coupon dates. Ensures accurate short-rate dynamics.
     pub min_steps_between_events: usize,
     /// Polynomial basis degree for LSMC regression (only used by
-    /// [`crate::rates::hw1f::lsmc`]; see [`crate::rates::hw1f::ShortRateBasis`]).
+    /// `crate::rates::hw1f::lsmc`; see [`crate::rates::hw1f::ShortRateBasis`]).
     pub basis_degree: usize,
     /// Split-sample (out-of-sample) LSMC pricing.
     ///

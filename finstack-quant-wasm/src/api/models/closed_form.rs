@@ -18,22 +18,27 @@ use crate::utils::input::{
     js_bool, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_string, js_uint,
 };
 use crate::utils::to_js_err;
-use finstack_quant_models::closed_form::implied_vol::{
-    black76_implied_vol as black76_implied_vol_core, bs_implied_vol as bs_implied_vol_core,
+use finstack_quant_models::closed_form::heston::{
+    heston_price as heston_price_core, HestonPricingParams,
+};
+use finstack_quant_models::closed_form::vanilla::{
+    bs_greeks as bs_greeks_core, bs_price as bs_price_core,
+    vanilla_expiry_payoff as vanilla_expiry_payoff_core, DEFAULT_THETA_DAYS_PER_YEAR,
 };
 use finstack_quant_models::closed_form::{
     asian_option_price as asian_option_price_core, bachelier_greeks as bachelier_greeks_core,
     bachelier_price as bachelier_price_core, barrier_call as barrier_call_core,
     barrier_put as barrier_put_core, black76_greeks as black76_greeks_core,
     black76_price as black76_price_core, black_shifted_price as black_shifted_price_core,
-    black_shifted_vega as black_shifted_vega_core, bs_greeks as bs_greeks_core,
-    bs_price as bs_price_core, heston_price as heston_price_core,
+    black_shifted_vega as black_shifted_vega_core,
     lookback_option_price as lookback_option_price_core,
-    quanto_option_price as quanto_option_price_core,
-    vanilla_expiry_payoff as vanilla_expiry_payoff_core, HestonPricingParams,
-    DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
+    quanto_option_price as quanto_option_price_core, DEFAULT_ASIAN_AVERAGING,
+    DEFAULT_LOOKBACK_STRIKE_TYPE,
 };
-use finstack_quant_models::OptionType;
+use finstack_quant_models::closed_form::{
+    black76_implied_vol as black76_implied_vol_core, bs_implied_vol as bs_implied_vol_core,
+};
+use finstack_quant_models::types::OptionType;
 use wasm_bindgen::prelude::*;
 
 /// Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
@@ -839,7 +844,7 @@ pub fn heston_price(
 /// and a `validation` error if it is malformed.
 #[wasm_bindgen(js_name = bsGreeksIsValid)]
 pub fn bs_greeks_is_valid(greeks: JsValue) -> Result<bool, JsValue> {
-    let greeks: finstack_quant_models::closed_form::BsGreeks =
+    let greeks: finstack_quant_models::closed_form::vanilla::BsGreeks =
         crate::utils::input::from_js_json(&greeks, "greeks")?;
     Ok(greeks.is_valid())
 }

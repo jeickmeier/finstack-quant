@@ -62,7 +62,7 @@ fn bachelier_state(forward: f64, strike: f64, sigma_n: f64, t: f64) -> Option<Ba
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_models::closed_form::volatility::{bachelier_call, bachelier_put};
+/// use finstack_quant_models::closed_form::{bachelier_call, bachelier_put};
 ///
 /// let call = bachelier_call(0.03, 0.025, 0.005, 2.0);
 /// let put = bachelier_put(0.03, 0.025, 0.005, 2.0);

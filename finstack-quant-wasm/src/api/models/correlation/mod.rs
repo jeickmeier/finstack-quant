@@ -334,7 +334,8 @@ impl JsRecoveryModel {
 pub fn correlation_bounds(p1: JsValue, p2: JsValue) -> Result<Box<[f64]>, JsValue> {
     let p1 = js_f64(&p1, "p1")?;
     let p2 = js_f64(&p2, "p2")?;
-    let (lo, hi) = corr::correlation_bounds(p1, p2).map_err(to_js_err)?;
+    let (lo, hi) =
+        finstack_quant_core::math::probability::correlation_bounds(p1, p2).map_err(to_js_err)?;
     Ok(Box::new([lo, hi]))
 }
 
@@ -358,7 +359,9 @@ pub fn joint_probabilities(
     let p1 = js_f64(&p1, "p1")?;
     let p2 = js_f64(&p2, "p2")?;
     let correlation = js_f64(&correlation, "correlation")?;
-    let (p11, p10, p01, p00) = corr::joint_probabilities(p1, p2, correlation).map_err(to_js_err)?;
+    let (p11, p10, p01, p00) =
+        finstack_quant_core::math::probability::joint_probabilities(p1, p2, correlation)
+            .map_err(to_js_err)?;
     Ok(Box::new([p11, p10, p01, p00]))
 }
 
@@ -388,7 +391,7 @@ pub fn joint_probabilities(
 pub fn validate_correlation_matrix(matrix: JsValue, n: JsValue) -> Result<(), JsValue> {
     let matrix: &[f64] = &js_f64_seq(&matrix, "matrix")?;
     let n: usize = js_uint(&n, "n")?;
-    corr::validate_correlation_matrix(matrix, n).map_err(to_js_err)
+    finstack_quant_core::math::linalg::validate_correlation_matrix(matrix, n).map_err(to_js_err)
 }
 
 /// Nearest correlation matrix (Higham 2002).
@@ -429,12 +432,12 @@ pub fn nearest_correlation(
     let max_iter: Option<usize> = js_opt_uint(max_iter.as_ref(), "maxIter")?;
     // Single source of truth for the defaults: the Rust
     // `NearestCorrelationOpts::default()` (max_iter = 200, tol = 1e-10).
-    let defaults = corr::NearestCorrelationOpts::default();
-    let opts = corr::NearestCorrelationOpts {
+    let defaults = finstack_quant_core::math::linalg::NearestCorrelationOpts::default();
+    let opts = finstack_quant_core::math::linalg::NearestCorrelationOpts {
         max_iter: max_iter.unwrap_or(defaults.max_iter),
         tol: tol.unwrap_or(defaults.tol),
     };
-    corr::nearest_correlation(&matrix, n, opts)
+    finstack_quant_core::math::linalg::nearest_correlation(&matrix, n, opts)
         .map(Vec::into_boxed_slice)
         .map_err(to_js_err)
 }

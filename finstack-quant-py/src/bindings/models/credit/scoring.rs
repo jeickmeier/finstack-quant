@@ -1,12 +1,14 @@
 //! Python bindings for `finstack_quant_models::credit::scoring`.
 
 use crate::bindings::macros::wire_methods;
+use finstack_quant_models::credit::scoring::ohlson::{
+    ohlson_o_score as core_ohlson_o_score, OhlsonOScoreInput,
+};
 use finstack_quant_models::credit::scoring::{
     altman_em_score as core_altman_em_score, altman_z_double_prime as core_altman_z_double_prime,
     altman_z_prime as core_altman_z_prime, altman_z_score as core_altman_z_score,
-    ohlson_o_score as core_ohlson_o_score, zmijewski_score as core_zmijewski_score,
-    AltmanZDoublePrimeInput, AltmanZPrimeInput, AltmanZScoreInput, OhlsonOScoreInput,
-    ScoringResult, ZmijewskiInput,
+    zmijewski_score as core_zmijewski_score, AltmanZDoublePrimeInput, AltmanZPrimeInput,
+    AltmanZScoreInput, ScoringResult, ZmijewskiInput,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};

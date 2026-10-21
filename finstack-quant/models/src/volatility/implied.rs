@@ -33,7 +33,7 @@
 
 use finstack_quant_core::InputError;
 
-use crate::closed_form::volatility::{
+use crate::closed_form::{
     bachelier_call, bachelier_put, bachelier_vega, black_call, black_put, black_vega,
 };
 
@@ -111,7 +111,7 @@ const BISECTION_STEPS: usize = 20;
 /// # Example
 ///
 /// ```rust
-/// use finstack_quant_models::closed_form::volatility::black_call;
+/// use finstack_quant_models::closed_form::black_call;
 /// use finstack_quant_models::volatility::implied_vol_black;
 /// # fn main() -> finstack_quant_core::Result<()> {
 ///
@@ -269,7 +269,7 @@ pub fn implied_vol_black(
 /// # Example
 ///
 /// ```rust
-/// use finstack_quant_models::closed_form::volatility::bachelier_call;
+/// use finstack_quant_models::closed_form::bachelier_call;
 /// use finstack_quant_models::volatility::implied_vol_bachelier;
 /// # fn main() -> finstack_quant_core::Result<()> {
 ///

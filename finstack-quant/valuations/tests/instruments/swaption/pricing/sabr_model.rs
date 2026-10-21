@@ -1,7 +1,7 @@
 //! SABR model pricing tests
 
 use crate::instruments::swaption::common::*;
-use finstack_quant_models::volatility::SabrParameters;
+use finstack_quant_models::volatility::sabr::SabrParameters;
 use finstack_quant_valuations::instruments::Instrument;
 
 #[test]

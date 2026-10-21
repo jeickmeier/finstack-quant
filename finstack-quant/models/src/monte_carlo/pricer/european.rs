@@ -2,13 +2,13 @@
 //!
 //! This module wraps [`crate::monte_carlo::engine::McEngine`] for the common case of pricing
 //! a European payoff under [`crate::monte_carlo::process::gbm::GbmProcess`] with
-//! [`crate::monte_carlo::discretization::exact::ExactGbm`]. Use it when you want a compact
+//! [`crate::monte_carlo::discretization::ExactGbm`]. Use it when you want a compact
 //! API and do not need custom process / discretization combinations.
 
 use super::super::engine::{McEngine, McEngineConfig};
 use super::super::results::MoneyEstimate;
 use super::super::traits::Payoff;
-use crate::monte_carlo::discretization::exact::ExactGbm;
+use crate::monte_carlo::discretization::ExactGbm;
 use crate::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::rng::philox::PhiloxRng;
@@ -410,7 +410,7 @@ mod tests {
                     Currency::USD,
                 )
                 .expect("pricing should succeed");
-            let expected = crate::closed_form::bs_price(
+            let expected = crate::closed_form::vanilla::bs_price(
                 case.spot,
                 case.strike,
                 case.rate,

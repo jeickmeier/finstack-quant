@@ -968,8 +968,8 @@ fn test_price_rejects_zero_chunk_size() {
 fn captured_rough_heston_paths_reset_history_and_match_streaming_prices() {
     use crate::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
-    use crate::monte_carlo::process::metadata::ProcessMetadata;
     use crate::monte_carlo::process::rough_heston::{RoughHestonParams, RoughHestonProcess};
+    use crate::monte_carlo::process::ProcessMetadata;
     use crate::monte_carlo::rng::philox::PhiloxRng;
     use finstack_quant_core::math::fractional::HurstExponent;
 
@@ -1411,7 +1411,7 @@ fn test_estimate_serde_requires_canonical_path_counts() {
 #[test]
 fn test_engine_antithetic_records_simulated_path_count() {
     use crate::monte_carlo::discretization::ExactGbm;
-    use crate::monte_carlo::payoff::EuropeanCall;
+    use crate::monte_carlo::payoff::vanilla::EuropeanCall;
     use crate::monte_carlo::process::gbm::GbmProcess;
     use crate::monte_carlo::rng::philox::PhiloxRng;
 
@@ -1472,8 +1472,9 @@ fn test_engine_antithetic_records_simulated_path_count() {
 /// (see [`crate::monte_carlo::traits::Discretization::applies_correlation_internally`]).
 mod correlation_regression {
     use super::*;
-    use crate::monte_carlo::discretization::{EulerMaruyama, QeHeston};
-    use crate::monte_carlo::payoff::EuropeanCall;
+    use crate::monte_carlo::discretization::euler::EulerMaruyama;
+    use crate::monte_carlo::discretization::qe_heston::QeHeston;
+    use crate::monte_carlo::payoff::vanilla::EuropeanCall;
     use crate::monte_carlo::process::gbm::{GbmParams, MultiGbmProcess};
     use crate::monte_carlo::process::heston::HestonProcess;
     use crate::monte_carlo::rng::philox::PhiloxRng;
@@ -1689,7 +1690,7 @@ mod correlation_regression {
 
         // Sanity check that the EulerMaruyama (engine Cholesky) result
         // agrees with ExactMultiGbm (also using engine Cholesky).
-        let disc_exact = crate::monte_carlo::discretization::exact::ExactMultiGbm::new();
+        let disc_exact = crate::monte_carlo::discretization::ExactMultiGbm::new();
         let v_exact_low = engine
             .price(
                 &rng,

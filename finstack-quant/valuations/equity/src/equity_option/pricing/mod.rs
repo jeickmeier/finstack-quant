@@ -614,11 +614,10 @@ mod tests {
             t,
         );
         params.dividend_yield = q;
-        let tree_european =
-            finstack_quant_models::trees::binomial_tree::BinomialTree::leisen_reimer(51)
-                .price_european(&params)
-                .expect("European lattice")
-                * european.quantity;
+        let tree_european = finstack_quant_models::trees::BinomialTree::leisen_reimer(51)
+            .price_european(&params)
+            .expect("European lattice")
+            * european.quantity;
         assert!(american_pv.amount() >= tree_european);
         assert!((tree_european - european_pv.amount()).abs() < 0.01 * european.quantity);
     }

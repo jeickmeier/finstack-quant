@@ -1,9 +1,9 @@
 //! Merton Monte Carlo engine for PIK bonds with structural credit risk.
 //!
 //! Orchestrates [`finstack_quant_models::credit::MertonModel`],
-//! [`finstack_quant_models::credit::EndogenousHazardSpec`],
-//! [`finstack_quant_models::credit::DynamicRecoverySpec`], and
-//! [`finstack_quant_models::credit::ToggleExerciseModel`] into a
+//! [`finstack_quant_models::credit::endogenous_hazard::EndogenousHazardSpec`],
+//! [`finstack_quant_models::credit::dynamic_recovery::DynamicRecoverySpec`], and
+//! [`finstack_quant_models::credit::toggle_exercise::ToggleExerciseModel`] into a
 //! unified Monte Carlo simulation for pricing bonds with PIK (payment-in-kind)
 //! features.
 //!

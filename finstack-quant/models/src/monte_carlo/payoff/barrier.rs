@@ -20,7 +20,7 @@
 use super::super::barriers::bridge::check_barrier_hit;
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::Payoff;
-pub use crate::types::OptionType;
+use crate::types::OptionType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;

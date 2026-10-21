@@ -61,34 +61,36 @@
 use crate::closed_form::heston::HestonPricingParams;
 use crate::monte_carlo::discretization::cheyette_rough::CheyetteRoughEuler;
 use crate::monte_carlo::discretization::euler::{EulerMaruyama, LogEuler};
-use crate::monte_carlo::discretization::exact::{ExactGbm, ExactMultiGbm};
 use crate::monte_carlo::discretization::exact_gbm_dividends::ExactGbmWithDividends;
 use crate::monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
 use crate::monte_carlo::discretization::milstein::Milstein;
+use crate::monte_carlo::discretization::qe_heston::QeHeston;
 use crate::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler;
 use crate::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
-use crate::monte_carlo::discretization::{ExactHullWhite1F, ExactSchwartzSmith, QeCir, QeHeston};
+use crate::monte_carlo::discretization::{ExactGbm, ExactMultiGbm};
+use crate::monte_carlo::discretization::{ExactHullWhite1F, ExactSchwartzSmith, QeCir};
 use crate::monte_carlo::engine::{
     build_correlation_factor, fill_shocks, McEngine, NoiseHook, MAX_CAPTURED_PATHS,
 };
+use crate::monte_carlo::process::brownian::BrownianParams;
 use crate::monte_carlo::process::brownian::{BrownianProcess, MultiBrownianProcess};
 use crate::monte_carlo::process::cheyette_rough::{
     CheyetteRoughVolParams, CheyetteRoughVolProcess,
 };
 use crate::monte_carlo::process::cir::{CirParams, CirPlusPlusProcess, CirProcess};
 use crate::monte_carlo::process::gbm::MultiGbmProcess;
+use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
 use crate::monte_carlo::process::gbm_dividends::{Dividend, GbmWithDividends};
 use crate::monte_carlo::process::heston::HestonProcess;
 use crate::monte_carlo::process::lmm::{LmmParams, LmmProcess};
 use crate::monte_carlo::process::local_vol::{LocalVolParams, LocalVolProcess};
+use crate::monte_carlo::process::multi_ou::MultiOuParams;
 use crate::monte_carlo::process::multi_ou::MultiOuProcess;
 use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
 use crate::monte_carlo::process::rough_bergomi::{RoughBergomiParams, RoughBergomiProcess};
 use crate::monte_carlo::process::rough_heston::{RoughHestonParams, RoughHestonProcess};
 use crate::monte_carlo::process::schwartz_smith::{SchwartzSmithParams, SchwartzSmithProcess};
-use crate::monte_carlo::process::{
-    BrownianParams, GbmParams, GbmProcess, MultiOuParams, ProcessMetadata,
-};
+use crate::monte_carlo::process::ProcessMetadata;
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
 use finstack_quant_core::math::time_grid::TimeGrid;

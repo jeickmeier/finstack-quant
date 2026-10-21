@@ -2,9 +2,9 @@
 //!
 //! This module provides utilities for working with probabilities of default:
 //!
-//! - [`calibration`]: PiT/TtC conversion using the Merton-Vasicek single-factor
+//! - `calibration`: PiT/TtC conversion using the Merton-Vasicek single-factor
 //!   model and central tendency estimation from historical default rates.
-//! - [`master_scale`]: Map continuous PDs to discrete rating grades with
+//! - `master_scale`: Map continuous PDs to discrete rating grades with
 //!   configurable boundaries. Includes versioned library assumptions using
 //!   S&P-style and Moody's-style labels; these are not agency calibrations.
 //!
@@ -23,9 +23,9 @@
 //! assert!(pd_pit > 0.02);
 //! ```
 
-pub mod calibration;
-pub mod error;
-pub mod master_scale;
+pub(crate) mod calibration;
+pub(crate) mod error;
+pub(crate) mod master_scale;
 #[cfg(test)]
 mod tests;
 

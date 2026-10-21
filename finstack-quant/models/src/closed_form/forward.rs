@@ -26,7 +26,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use finstack_quant_models::OptionType;
+//! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_models::closed_form::{black76_greeks, black76_price};
 //!
 //! let price = black76_price(100.0, 100.0, 0.95, 0.2, 1.0, OptionType::Call)?;
@@ -58,7 +58,7 @@ use crate::types::OptionType;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_models::OptionType;
+/// use finstack_quant_models::types::OptionType;
 /// use finstack_quant_models::closed_form::bachelier_greeks;
 ///
 /// let g = bachelier_greeks(0.03, 0.03, 0.0075, 1.0, OptionType::Call)?;
@@ -423,7 +423,7 @@ mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used)]
 
     use super::*;
-    use crate::closed_form::implied_vol::black76_implied_vol;
+    use crate::closed_form::black76_implied_vol;
 
     #[test]
     fn black76_price_matches_discounted_leaf_formula() {
@@ -489,7 +489,7 @@ mod tests {
     #[test]
     fn bachelier_price_is_unit_annuity_twin_and_checks_domain() {
         let unit = bachelier_price(0.03, 0.025, 0.005, 2.0, OptionType::Put).unwrap();
-        let annuity = crate::closed_form::volatility::bachelier_price_with_annuity(
+        let annuity = crate::closed_form::bachelier_price_with_annuity(
             OptionType::Put,
             0.03,
             0.025,

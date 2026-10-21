@@ -22,9 +22,8 @@ stochastic/
 
 ```rust
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
-use finstack_quant_models::credit::pool::{
-    CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
-};
+use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
+use finstack_quant_models::credit::pool::prepayment::StochasticPrepaySpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
 
 let mut clo = StructuredCredit::example().expect("example");

@@ -10,7 +10,7 @@
 //! off-ATM. Use `bs_cos_price` for all Black-Scholes Fourier pricing.
 
 use crate::errors::core_to_py;
-use finstack_quant_models::fourier::cos::{
+use finstack_quant_models::fourier::{
     bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
     vg_cos_price as rust_vg_cos_price, CosMarketParams,
 };

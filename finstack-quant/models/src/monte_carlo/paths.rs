@@ -348,7 +348,7 @@ impl std::fmt::Display for PathSamplingMethod {
 /// Metadata describing the process behind a captured dataset.
 ///
 /// This structure is typically populated by
-/// [`crate::monte_carlo::process::metadata::ProcessMetadata`] implementations and stored in a
+/// [`crate::monte_carlo::process::ProcessMetadata`] implementations and stored in a
 /// [`PathDataset`]. It describes how to interpret captured state vectors rather
 /// than how to price the instrument.
 #[derive(Debug, Clone, Serialize, Deserialize)]

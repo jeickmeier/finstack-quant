@@ -2,7 +2,7 @@
 //!
 use finstack_quant_core::market_data::surfaces::SabrParameterData;
 use finstack_quant_core::market_data::surfaces::{VolCube, VolInterpolationMode};
-use finstack_quant_models::volatility::SabrParameters;
+use finstack_quant_models::volatility::sabr::SabrParameters;
 
 #[test]
 fn test_vol_cube_from_grid_axes() {
@@ -510,7 +510,7 @@ fn test_market_context_stats_includes_vol_cubes() {
 // Normal (Bachelier) vol quoting tests
 
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
-use finstack_quant_models::closed_form::volatility::black_call;
+use finstack_quant_models::closed_form::black_call;
 use finstack_quant_models::volatility::implied_vol_bachelier;
 
 /// Positive-rates consistency: the Hagan normal vol from the cube must agree

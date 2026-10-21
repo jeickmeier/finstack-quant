@@ -24,7 +24,7 @@
 //! - Roper, M. (2010). *Arbitrage Free Implied Volatility Surfaces*.
 
 use super::classify_severity;
-use crate::volatility::arbitrage::types::{ArbitrageType, ArbitrageViolation, ViolationLocation};
+use crate::volatility::arbitrage::{ArbitrageType, ArbitrageViolation, ViolationLocation};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 
 /// Checks that total variance is non-decreasing in expiry at each

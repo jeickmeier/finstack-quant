@@ -2,7 +2,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::{Error, Result};
 
-use crate::trees::hull_white_tree::HullWhiteTree;
+use crate::trees::HullWhiteTree;
 
 use super::{ShortRateTree, TreeCalibrationResult, TreeDiscounting};
 

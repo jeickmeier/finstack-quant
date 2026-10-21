@@ -1,7 +1,7 @@
 //! Fourier pricing engines.
 
 pub mod characteristic_function;
-pub mod cos;
+pub(crate) mod cos;
 
 pub use cos::{
     bs_cos_price, merton_jump_cos_price, vg_cos_price, CosConfig, CosMarketParams, CosPricer,

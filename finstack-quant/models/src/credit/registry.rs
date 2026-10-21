@@ -1,6 +1,6 @@
 //! Registry for external credit assumptions that are expected to change over time.
 
-use crate::credit::lgd::seniority::{BetaRecovery, SeniorityCalibration, SeniorityClass};
+use crate::credit::lgd::{BetaRecovery, SeniorityCalibration, SeniorityClass};
 use crate::credit::pd::MasterScaleGrade;
 use finstack_quant_core::embedded_registry::EmbeddedJsonRegistry;
 use finstack_quant_core::types::CreditRating;

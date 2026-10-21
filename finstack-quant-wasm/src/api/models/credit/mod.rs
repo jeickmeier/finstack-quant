@@ -20,10 +20,14 @@ use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_core::wire::serde_tag;
+use finstack_quant_models::credit::dynamic_recovery::DynamicRecoverySpec;
+use finstack_quant_models::credit::endogenous_hazard::EndogenousHazardSpec;
+use finstack_quant_models::credit::toggle_exercise::{
+    CreditState, CreditStateVariable, ThresholdDirection, ToggleExerciseModel,
+};
 use finstack_quant_models::credit::{
-    self as credit, AssetDynamics, CreditState, CreditStateVariable, DynamicRecoverySpec,
-    EndogenousHazardSpec, MertonBarrierType, MertonModel, RatingFactorTable, SimulatedPaths,
-    ThresholdDirection, ToggleExerciseModel,
+    self as credit, AssetDynamics, MertonBarrierType, MertonModel, RatingFactorTable,
+    SimulatedPaths,
 };
 use wasm_bindgen::prelude::*;
 

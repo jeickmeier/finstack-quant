@@ -48,7 +48,7 @@ fn black_state(forward: f64, strike: f64, sigma: f64, t: f64) -> Option<BlackSta
     }
 
     let st = sigma * t.sqrt();
-    let (d1, d2) = crate::volatility::black::d1_d2_black76(forward, strike, sigma, t);
+    let (d1, d2) = crate::volatility::d1_d2_black76(forward, strike, sigma, t);
     Some(BlackState { st, d1, d2 })
 }
 
@@ -71,7 +71,7 @@ fn black_state(forward: f64, strike: f64, sigma: f64, t: f64) -> Option<BlackSta
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_models::closed_form::volatility::{black_call, black_put};
+/// use finstack_quant_models::closed_form::{black_call, black_put};
 ///
 /// let call = black_call(0.05, 0.04, 0.20, 1.5);
 /// let put = black_put(0.05, 0.04, 0.20, 1.5);

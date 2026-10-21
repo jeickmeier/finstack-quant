@@ -5,19 +5,19 @@
 //!
 //! # Module Organization
 //!
-//! - [`seniority`]: Beta-distributed recovery
+//! - `seniority`: Beta-distributed recovery
 //!   by debt seniority class.
-//! - [`workout`]: Collateral-first recovery
+//! - `workout`: Collateral-first recovery
 //!   waterfall with costs and time-to-resolution discounting.
-//! - [`downturn`]: Frye-Jacobs and
+//! - `downturn`: Frye-Jacobs and
 //!   regulatory-floor downturn LGD adjustments.
-//! - [`ead`]: Exposure at default with Credit
+//! - `ead`: Exposure at default with Credit
 //!   Conversion Factors.
 
-pub mod downturn;
-pub mod ead;
-pub mod seniority;
-pub mod workout;
+pub(crate) mod downturn;
+pub(crate) mod ead;
+pub(crate) mod seniority;
+pub(crate) mod workout;
 
 pub use downturn::{DownturnLgd, DownturnMethod};
 pub use ead::{CreditConversionFactor, EadCalculator};

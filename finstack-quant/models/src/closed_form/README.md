@@ -320,13 +320,10 @@ Decimal/f64 split.
 
 ```rust
 use finstack_quant_core::types::BarrierType;
-use finstack_quant_models::OptionType;
-use finstack_quant_models::closed_form::{
-    barrier::{barrier_price, BarrierParams},
-    bs_greeks, bs_price,
-    heston::{heston_call_price_fourier, HestonPricingParams},
-    implied_vol::bs_implied_vol,
-};
+use finstack_quant_models::types::OptionType;
+use finstack_quant_models::closed_form::{barrier::{barrier_price, BarrierParams}, heston::{heston_call_price_fourier, HestonPricingParams}};
+use finstack_quant_models::closed_form::vanilla::{bs_greeks, bs_price};
+use finstack_quant_models::closed_form::bs_implied_vol;
 
 let (spot, strike, r, q, vol, t) = (100.0, 100.0, 0.05, 0.02, 0.20, 1.0);
 

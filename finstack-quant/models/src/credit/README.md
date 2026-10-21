@@ -328,12 +328,10 @@ schedule on the config takes precedence.
 ## Example
 
 ```rust
-use finstack_quant_models::credit::{
-    market_anchored::conditional_average_hazard,
-    toggle_exercise::{CreditStateVariable, ThresholdDirection},
-    AssetDynamics, MertonBarrierType, DynamicRecoverySpec,
-    EndogenousHazardSpec, MertonModel, ToggleExerciseModel,
-};
+use finstack_quant_models::credit::{market_anchored::conditional_average_hazard, toggle_exercise::{CreditStateVariable, ThresholdDirection}, AssetDynamics, MertonBarrierType, MertonModel};
+use finstack_quant_models::credit::dynamic_recovery::DynamicRecoverySpec;
+use finstack_quant_models::credit::endogenous_hazard::EndogenousHazardSpec;
+use finstack_quant_models::credit::toggle_exercise::ToggleExerciseModel;
 
 // Direct construction.
 let model = MertonModel::new(100.0, 0.20, 80.0, 0.05)?;

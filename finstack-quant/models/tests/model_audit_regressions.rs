@@ -1,8 +1,9 @@
 //! Financial invariants and invalid-input regressions from the models audit.
 
 use finstack_quant_core::{currency::Currency, market_data::surfaces::VolSurface};
+use finstack_quant_models::closed_form::vanilla::bs_price;
 use finstack_quant_models::correlation::PortfolioLossResult;
-use finstack_quant_models::fourier::cos::{bs_cos_price, CosMarketParams};
+use finstack_quant_models::fourier::{bs_cos_price, CosMarketParams};
 use finstack_quant_models::monte_carlo::{
     pricer::{
         basis::PolynomialBasis,
@@ -11,10 +12,10 @@ use finstack_quant_models::monte_carlo::{
     process::gbm::GbmProcess,
 };
 use finstack_quant_models::pde::{BlackScholesPde, Grid1D, PdeProblem1D, Solver1D};
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::arbitrage::{
     check_local_vol_density_grid, check_surface, check_surface_grid, ArbitrageCheckConfig,
 };
-use finstack_quant_models::{bs_price, OptionType};
 
 #[test]
 fn checked_black_scholes_rejects_invalid_inputs_without_masking_nan() {

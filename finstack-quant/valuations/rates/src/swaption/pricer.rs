@@ -161,7 +161,7 @@ mod tests {
     use super::*;
     use date_support::date;
     use discount_forward_curve_support::flat_discount_with_tenor;
-    use finstack_quant_models::SabrParameters;
+    use finstack_quant_models::volatility::sabr::SabrParameters;
     use finstack_quant_valuations_core::instruments::{
         Instrument, InstrumentPricingOverrides, PricingOptions, ScenarioPricingOverrides,
     };
