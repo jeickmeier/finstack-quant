@@ -24,12 +24,13 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
 use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     run_simulation, AdvanceRate, AdvancingPolicy, AssetPool, BorrowingBaseRules, CoverageRules,
     CoverageTestSpec, CoverageTrigger, DealFees, DealType, DelinquencyModel, EligibilityRule,
     HedgeSwap, IncentiveFeeSpec, LossAllocationPolicy, LossRecognition, ModificationSpec,
     PoolAsset, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit,
-    Tranche, TrancheSeniority, TrancheStructure, TriggerConsequence,
+    Tranche, TrancheStructure, TriggerConsequence,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
     AfcSpec, AssetType, BalloonSpec, CallAssumption, CardPortfolioSpec, EarlyAmortizationSpec,

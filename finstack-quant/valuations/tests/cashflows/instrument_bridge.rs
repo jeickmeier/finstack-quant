@@ -7,13 +7,12 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefau
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuture;
+use finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo;
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
 use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
-use finstack_quant_valuations::instruments::fixed_income::{
-    AgencyCmo, AgencyMbsPassthrough, AgencyTba,
-};
+use finstack_quant_valuations::instruments::fixed_income::{AgencyMbsPassthrough, AgencyTba};
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
 use finstack_quant_valuations::instruments::fx::fx_swap::FxSwap;
 use finstack_quant_valuations::instruments::fx::ndf::Ndf;

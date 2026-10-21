@@ -1419,8 +1419,7 @@ mod tests {
     use super::*;
     use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
     use crate::structured_credit::{
-        AssetPool, DealType, PoolAsset, Tranche, TrancheCashflows, TrancheSeniority,
-        TrancheStructure,
+        AssetPool, DealType, PoolAsset, Tranche, TrancheCashflows, TrancheStructure,
     };
     use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{DefaultModelSpec, RecoveryModelSpec};
@@ -1429,6 +1428,7 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use time::Month;
 
     fn test_date() -> Date {
@@ -1979,9 +1979,7 @@ mod per_name_copula_tests {
 
     use super::*;
     use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
-    use crate::structured_credit::{
-        AssetPool, DealType, PoolAsset, Tranche, TrancheSeniority, TrancheStructure,
-    };
+    use crate::structured_credit::{AssetPool, DealType, PoolAsset, Tranche, TrancheStructure};
     use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{DefaultModelSpec, RecoveryModelSpec};
     use finstack_quant_core::currency::Currency;
@@ -1990,6 +1988,7 @@ mod per_name_copula_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_models::credit::pool::PoolGranularity;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use time::Month;
 
     fn close() -> Date {

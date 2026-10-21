@@ -29,7 +29,8 @@ calibrations) are the embedded registry
 
 ```rust
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_structured_credit::{AssetBackedFacility, StructuredCredit};
+use finstack_quant_valuations_structured_credit::asset_backed_facility::AssetBackedFacility;
+use finstack_quant_valuations_structured_credit::structured_credit::StructuredCredit;
 
 let deal = StructuredCredit::example().unwrap();
 let facility = AssetBackedFacility::example().unwrap();

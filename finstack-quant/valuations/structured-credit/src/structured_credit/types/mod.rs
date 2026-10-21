@@ -45,7 +45,7 @@ pub use cmbs::{BalloonSpec, PenaltyStep, PrepaymentPenalty, SpecialServicingSpec
 pub use delinquency::{AdvancingPolicy, DelinquencyModel, ModificationSpec};
 pub use draws::{TrancheDraw, TrancheReadvance};
 pub use enums::{AssetType, DealType, LossAllocationPolicy, LossRecognition, TriggerConsequence};
-pub use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
+pub(crate) use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 pub use hedges::{HedgeSwap, SwapNotional, SwapPriority};
 pub use npl::LiquidationSpec;
 

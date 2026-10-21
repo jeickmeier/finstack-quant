@@ -6,9 +6,10 @@ use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, R
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     calculate_tranche_oas, run_simulation_with_diagnostics, AssetPool, DealType, OasConfig,
-    PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
+    PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 

@@ -13,12 +13,12 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     execute_waterfall, run_simulation_with_diagnostics, AssetPool, CoverageTestDiagnostic,
     CoverageTestSpec, DealType, HedgeSwap, PaymentCalculation, PaymentType, PeriodDiagnostics,
     PoolAsset, Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod,
-    StructuredCredit, Tranche, TrancheSeniority, TrancheStructure, Waterfall, WaterfallContext,
-    WaterfallTier,
+    StructuredCredit, Tranche, TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
 };
 use time::macros::date;
 

@@ -27,9 +27,11 @@ use finstack_quant_core::money::Money;
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, PoolGranularity, StochasticDefaultSpec, StochasticPrepaySpec,
 };
+use finstack_quant_valuations_core::results::structured_credit::{
+    StochasticPricingResult, StructuredCreditPricingMode, TrancheSeniority,
+};
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    AssetPool, DealType, PoolAsset, StochasticPricingResult, StructuredCredit,
-    StructuredCreditPricingMode, Tranche, TrancheSeniority, TrancheStructure,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 

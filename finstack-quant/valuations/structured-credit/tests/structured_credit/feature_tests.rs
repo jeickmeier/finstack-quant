@@ -14,9 +14,10 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     run_simulation, AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche,
-    TrancheSeniority, TrancheStructure,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -386,9 +387,10 @@ mod afc_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        AfcSpec, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority,
-        TrancheStructure, WaterfallRules,
+        AfcSpec, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+        WaterfallRules,
     };
     use time::Month;
 
@@ -601,9 +603,10 @@ mod excess_spread_tests {
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
         run_simulation, AssetPool, DealType, ExcessSpreadSpec, PoolAsset, StructuredCredit,
-        Tranche, TrancheSeniority, TrancheStructure, WaterfallRules,
+        Tranche, TrancheStructure, WaterfallRules,
     };
     use time::Month;
 
@@ -887,9 +890,10 @@ mod step_down_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
         run_simulation, AssetPool, DealType, PoolAsset, StepDownSpec, StepDownTrigger,
-        StructuredCredit, Tranche, TrancheSeniority, TrancheStructure, WaterfallRules,
+        StructuredCredit, Tranche, TrancheStructure, WaterfallRules,
     };
     use time::Month;
 
@@ -1140,10 +1144,10 @@ mod shifting_interest_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::InstrumentId;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
         run_simulation, AssetPool, AssetType, DealType, PoolAsset, ShiftingInterestSpec,
-        ShiftingInterestStep, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
-        WaterfallRules,
+        ShiftingInterestStep, StructuredCredit, Tranche, TrancheStructure, WaterfallRules,
     };
     use time::Month;
 
@@ -1502,10 +1506,11 @@ mod early_amortization_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
         run_simulation, AssetPool, DealType, EarlyAmortizationSpec, PoolAsset,
-        ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche, TrancheSeniority,
-        TrancheStructure, WaterfallRules,
+        ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche, TrancheStructure,
+        WaterfallRules,
     };
     use time::Month;
 
@@ -1639,9 +1644,10 @@ mod controlled_accumulation_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
         run_simulation, AssetPool, ControlledAccumulationSpec, DealType, PoolAsset,
-        StructuredCredit, Tranche, TrancheSeniority, TrancheStructure, WaterfallRules,
+        StructuredCredit, Tranche, TrancheStructure, WaterfallRules,
     };
     use time::Month;
 

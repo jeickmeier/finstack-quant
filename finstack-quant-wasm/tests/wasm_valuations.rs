@@ -66,12 +66,12 @@ fn structured_credit_instrument_json() -> String {
     use finstack_quant_core::money::Money;
     use finstack_quant_models::credit::pool::{StochasticDefaultSpec, StochasticPrepaySpec};
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority,
-        TrancheStructure,
+        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
     };
     use finstack_quant_valuations::instruments::{
         InstrumentEnvelope, InstrumentJson, InstrumentPricingOverrides,
     };
+    use finstack_quant_valuations::results::structured_credit::TrancheSeniority;
     use time::Month;
 
     let closing = Date::from_calendar_date(2024, Month::January, 1).unwrap();

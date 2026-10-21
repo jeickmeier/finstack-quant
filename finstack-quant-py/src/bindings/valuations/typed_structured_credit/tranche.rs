@@ -12,8 +12,9 @@ use crate::errors::core_to_py;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    CoverageTrigger, Tranche, TrancheSeniority,
+    CoverageTrigger, Tranche,
 };
+use finstack_quant_valuations::results::structured_credit::TrancheSeniority;
 
 use super::super::instruments::enum_from_str;
 use super::super::typed_macros::builder_set;

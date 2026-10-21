@@ -15,7 +15,7 @@ use crate::structured_credit::{
     run_simulation_with_diagnostics, CallAssumption, CoverageRules, CoverageTestSpec,
     EarlyAmortizationSpec, LossAllocationPolicy, MarketConditions, Metadata, ReinvestmentCriteria,
     ReinvestmentPeriod, SimulationDiagnostics, StructuredCredit, Tranche, TrancheCashflows,
-    TrancheSeniority, TrancheStructure, WaterfallRules,
+    TrancheStructure, WaterfallRules,
 };
 use crate::structured_credit::{TrancheDraw, TrancheReadvance};
 use finstack_quant_cashflows::builder::RateSpec;
@@ -24,6 +24,7 @@ use finstack_quant_cashflows::{
 };
 use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 
 /// Identifier of the synthetic facility note.
 pub const FACILITY_TRANCHE_ID: &str = "FACILITY";

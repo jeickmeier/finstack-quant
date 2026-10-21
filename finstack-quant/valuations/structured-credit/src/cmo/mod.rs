@@ -102,7 +102,7 @@
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;
-pub mod tranches;
+mod tranches;
 mod types;
 pub mod waterfall;
 
