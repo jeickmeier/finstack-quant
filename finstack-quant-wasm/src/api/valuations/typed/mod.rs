@@ -243,6 +243,33 @@ pub(super) fn metric_value(
     .map_err(to_js_err)
 }
 
+/// Every standard option Greek that applies to a typed instrument, as a JS
+/// object whose keys keep the Rust `STANDARD_OPTION_GREEKS` order.
+///
+/// Shared by the `greeks` methods of the option classes; non-finite Greeks are
+/// rejected by Rust rather than serialized.
+pub(super) fn option_greeks(
+    instrument: Box<dyn Instrument>,
+    market_json: &str,
+    as_of: &str,
+    model: Option<&str>,
+) -> Js {
+    let instrument =
+        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)
+            .map_err(to_js_err)?;
+    let market: MarketContext = serde_json::from_str(market_json).map_err(to_js_err)?;
+    let pairs = finstack_quant_valuations::pricer::present_standard_option_greeks(
+        &instrument,
+        &market,
+        as_of,
+        model.unwrap_or("default"),
+        finstack_quant_calibration::recalibration::pricing_options(),
+    )
+    .map_err(to_js_err)?;
+    let ordered: indexmap::IndexMap<&'static str, f64> = pairs.into_iter().collect();
+    to_js_value(&ordered)
+}
+
 /// Shared, consumable state of a fluent builder.
 ///
 /// Every setter returns a new JavaScript handle on the same staged Rust

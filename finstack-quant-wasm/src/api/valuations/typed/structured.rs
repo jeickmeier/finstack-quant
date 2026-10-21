@@ -325,17 +325,11 @@ instrument_class!(
     finstack_quant_valuations::instruments::StructuredCredit
 );
 
-instrument_builder_entry!(
+instrument_surface!(
     JsStructuredCredit,
     "StructuredCredit",
     JsStructuredCreditBuilder
 );
-
-instrument_to_dict!(JsStructuredCredit, "StructuredCredit");
-
-instrument_market_dependencies!(JsStructuredCredit, "StructuredCredit");
-
-instrument_pricing!(JsStructuredCredit, "StructuredCredit");
 
 factories!(JsStructuredCredit, "StructuredCredit", finstack_quant_valuations::instruments::StructuredCredit, {
         /// Canonical example deal (mirrors Rust `StructuredCredit::example`): a USD 100,000,000 CLO with one 7% fixed-rate collateral bond and one 6% senior note, closing 2024-01-01, legal final 2034-01-01, discounted on `USD-OIS` with the `nyse` calendar.
@@ -447,15 +441,6 @@ getters!(JsStructuredCredit, "StructuredCredit", |i| {
         /// Custom priority of payments.
         /// @returns `null` when the deal-type template applies.
         waterfall as waterfall => json(i.waterfall),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
         /// Free-form attributes (tags and metadata).
         /// @returns The attribute bag.
         attributes as attributes => json(i.attributes),
@@ -487,6 +472,8 @@ getters!(JsStructuredCredit, "StructuredCredit", |i| {
         /// @returns `null` for non-card deals.
         card as card => json(i.credit_model.card),
 });
+
+common_getters!(JsStructuredCredit, "StructuredCredit", overrides);
 
 builder_class!(
     /// Fluent builder for `StructuredCredit`; one setter per Rust `FinancialBuilder` setter.
@@ -686,27 +673,18 @@ setters!(JsStructuredCreditBuilder, "StructuredCreditBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         deal_metadata as dealMetadata => json,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
         /// Set free-form attributes (tags and metadata) on the deal.
         /// @param value - Attribute bag; a plain object populates `meta` (an optional `"tags"` list populates `tags`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         attributes as attributes => json,
 });
+
+common_setters!(
+    JsStructuredCreditBuilder,
+    "StructuredCreditBuilder",
+    overrides
+);
 
 handle_setters!(JsStructuredCreditBuilder, "StructuredCreditBuilder", {
         /// Set the payment frequency for the structure.
@@ -985,27 +963,17 @@ impl JsStructuredCredit {
     }
 }
 
-/// Fluent builder for a `Tranche`; one setter per Rust `TrancheBuilder` setter.
-///
-/// Every setter returns the builder, so calls chain; `build()` validates and
-/// consumes it. Create one with `valuations.instruments.trancheBuilder()`.
-#[wasm_bindgen(js_name = TrancheBuilder)]
-pub struct JsTrancheBuilder {
-    inner: super::Staged<
-        finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheBuilder,
-    >,
-}
-
-impl JsTrancheBuilder {
-    /// An empty builder.
-    pub(crate) fn new() -> Self {
-        Self {
-            inner: super::Staged::new(
-                finstack_quant_valuations::instruments::fixed_income::structured_credit::Tranche::builder(),
-            ),
-        }
-    }
-}
+builder_class!(
+    @staged
+    /// Fluent builder for a `Tranche`; one setter per Rust `TrancheBuilder` setter.
+    ///
+    /// Every setter returns the builder, so calls chain; `build()` validates and
+    /// consumes it. Create one with `valuations.instruments.trancheBuilder()`.
+    JsTrancheBuilder,
+    "TrancheBuilder",
+    finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheBuilder,
+    finstack_quant_valuations::instruments::fixed_income::structured_credit::Tranche::builder()
+);
 
 #[wasm_bindgen(js_class = TrancheBuilder)]
 impl JsTrancheBuilder {

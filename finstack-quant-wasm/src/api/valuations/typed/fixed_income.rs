@@ -21,7 +21,6 @@ use crate::utils::input::{js_f64, js_string, json_text};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
 use wasm_bindgen::prelude::*;
 
 instrument_class!(
@@ -271,49 +270,6 @@ impl JsBond {
         Ok(JsBond { inner })
     }
 
-    /// Canonical example bond (mirrors Rust `Bond::example`): a 10-year US
-    /// Treasury, USD 1,000,000 at 4.25%, issued 2024-01-15.
-    /// @returns The example bond.
-    /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
-    pub fn example() -> Result<JsBond, JsValue> {
-        finstack_quant_valuations::instruments::Bond::example()
-            .map(|inner| JsBond { inner })
-            .map_err(to_js_err)
-    }
-
-    /// Canonical example floating-rate note (mirrors Rust `Bond::example_floating`):
-    /// USD SOFR 3M + 150bp with a 0% index floor.
-    /// @returns The example floating-rate note.
-    /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
-    #[wasm_bindgen(js_name = exampleFloating)]
-    pub fn example_floating() -> Result<JsBond, JsValue> {
-        finstack_quant_valuations::instruments::Bond::example_floating()
-            .map(|inner| JsBond { inner })
-            .map_err(to_js_err)
-    }
-
-    /// Canonical example callable bond (mirrors Rust `Bond::example_callable`):
-    /// a 5% semi-annual bond with a declining call schedule.
-    /// @returns The example callable bond.
-    /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
-    #[wasm_bindgen(js_name = exampleCallable)]
-    pub fn example_callable() -> Result<JsBond, JsValue> {
-        finstack_quant_valuations::instruments::Bond::example_callable()
-            .map(|inner| JsBond { inner })
-            .map_err(to_js_err)
-    }
-
-    /// Canonical example amortizing bond (mirrors Rust `Bond::example_amortizing`):
-    /// a 4% semi-annual bond with a scheduled principal amortization.
-    /// @returns The example amortizing bond.
-    /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
-    #[wasm_bindgen(js_name = exampleAmortizing)]
-    pub fn example_amortizing() -> Result<JsBond, JsValue> {
-        finstack_quant_valuations::instruments::Bond::example_amortizing()
-            .map(|inner| JsBond { inner })
-            .map_err(to_js_err)
-    }
-
     /// Return a copy of this bond with a minimum-MOIC return floor.
     ///
     /// Mirrors Rust `Bond::min_moic`; the receiver is not modified.
@@ -341,46 +297,52 @@ impl JsBond {
     }
 }
 
+factories!(JsBond, "Bond", finstack_quant_valuations::instruments::Bond, {
+        /// Canonical example bond (mirrors Rust `Bond::example`): a 10-year US
+        /// Treasury, USD 1,000,000 at 4.25%, issued 2024-01-15.
+        /// @returns The example bond.
+        /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+        example as example,
+        /// Canonical example floating-rate note (mirrors Rust `Bond::example_floating`):
+        /// USD SOFR 3M + 150bp with a 0% index floor.
+        /// @returns The example floating-rate note.
+        /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+        example_floating as exampleFloating,
+        /// Canonical example callable bond (mirrors Rust `Bond::example_callable`):
+        /// a 5% semi-annual bond with a declining call schedule.
+        /// @returns The example callable bond.
+        /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+        example_callable as exampleCallable,
+        /// Canonical example amortizing bond (mirrors Rust `Bond::example_amortizing`):
+        /// a 4% semi-annual bond with a scheduled principal amortization.
+        /// @returns The example amortizing bond.
+        /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+        example_amortizing as exampleAmortizing,
+});
+
 instrument_class!(
     /// Typed wrapper for the canonical Rust TermLoan instrument.
     JsTermLoan, "TermLoan", finstack_quant_valuations::instruments::TermLoan
 );
 
-#[wasm_bindgen(js_class = TermLoan)]
-impl JsTermLoan {
-    /// Canonical example term loan (mirrors Rust `TermLoan::example`).
-    ///
-    /// Returns a 5-year USD fixed-rate loan (6%, quarterly, Act/360, 2.5%
-    /// per-period amortization) useful as a starting point and in tests.
-    /// @returns The example loan.
-    /// @throws If construction fails (should not occur).
-    pub fn example() -> Result<JsTermLoan, JsValue> {
-        finstack_quant_valuations::instruments::TermLoan::example()
-            .map(|inner| JsTermLoan { inner })
-            .map_err(to_js_err)
-    }
-
-    /// Canonical example floating-rate term loan with a delayed-draw tranche
-    /// (mirrors Rust `TermLoan::example_floating_with_ddtl`).
-    /// @returns The example loan.
-    /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
-    #[wasm_bindgen(js_name = exampleFloatingWithDdtl)]
-    pub fn example_floating_with_ddtl() -> Result<JsTermLoan, JsValue> {
-        finstack_quant_valuations::instruments::TermLoan::example_floating_with_ddtl()
-            .map(|inner| JsTermLoan { inner })
-            .map_err(to_js_err)
-    }
-
-    /// Canonical example callable term loan (mirrors Rust `TermLoan::example_callable`).
-    /// @returns The example loan.
-    /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
-    #[wasm_bindgen(js_name = exampleCallable)]
-    pub fn example_callable() -> Result<JsTermLoan, JsValue> {
-        finstack_quant_valuations::instruments::TermLoan::example_callable()
-            .map(|inner| JsTermLoan { inner })
-            .map_err(to_js_err)
-    }
-}
+factories!(JsTermLoan, "TermLoan", finstack_quant_valuations::instruments::TermLoan, {
+        /// Canonical example term loan (mirrors Rust `TermLoan::example`).
+        ///
+        /// Returns a 5-year USD fixed-rate loan (6%, quarterly, Act/360, 2.5%
+        /// per-period amortization) useful as a starting point and in tests.
+        /// @returns The example loan.
+        /// @throws If construction fails (should not occur).
+        example as example,
+        /// Canonical example floating-rate term loan with a delayed-draw tranche
+        /// (mirrors Rust `TermLoan::example_floating_with_ddtl`).
+        /// @returns The example loan.
+        /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+        example_floating_with_ddtl as exampleFloatingWithDdtl,
+        /// Canonical example callable term loan (mirrors Rust `TermLoan::example_callable`).
+        /// @returns The example loan.
+        /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+        example_callable as exampleCallable,
+});
 
 instrument_class!(
     /// Typed wrapper for the canonical Rust AssetBackedFacility instrument.
@@ -389,16 +351,6 @@ instrument_class!(
 
 #[wasm_bindgen(js_class = AssetBackedFacility)]
 impl JsAssetBackedFacility {
-    /// The canonical example facility: the example CLO pool financed by a
-    /// USD 80M commitment drawn USD 70M.
-    /// @returns The example facility.
-    /// @throws If construction fails (should not occur).
-    pub fn example() -> Result<JsAssetBackedFacility, JsValue> {
-        finstack_quant_valuations::instruments::AssetBackedFacility::example()
-            .map(|inner| JsAssetBackedFacility { inner })
-            .map_err(to_js_err)
-    }
-
     /// Undrawn commitment at closing: `commitment - drawn`.
     /// @returns Undrawn amount in the commitment currency.
     /// @throws Error - Throws with kind `validation` if commitment and drawn amounts differ in currency.
@@ -433,22 +385,6 @@ impl JsAssetBackedFacility {
         to_js_value(&self.inner.project(&market, as_of).map_err(to_js_err)?)
     }
 
-    /// Lender IRR: XIRR of `-drawn` on `asOf` against every projected interest,
-    /// principal and fee receipt (mirrors Rust `AssetBackedFacility::facility_irr`).
-    /// @param marketJson - Serialized `MarketContext` with the curves and fixings for the projection.
-    /// @param asOf - Valuation date as an ISO-8601 string; the investment is dated here.
-    /// @returns Annual IRR as a decimal (`0.08` = 8%).
-    /// @throws Error - Throws with kind `validation` if an input is malformed, kind `not_found` if market data is missing, and kind `computation` if the XIRR does not converge.
-    #[wasm_bindgen(js_name = facilityIrr)]
-    pub fn facility_irr(&self, market_json: JsValue, as_of: JsValue) -> Result<f64, JsValue> {
-        let market = crate::api::valuations::pricing::parse_market_json(&json_text(
-            &market_json,
-            "marketJson",
-        )?)?;
-        let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
-        self.inner.facility_irr(&market, as_of).map_err(to_js_err)
-    }
-
     /// The two-class structured-credit deal the engine runs for this facility
     /// (mirrors Rust `AssetBackedFacility::synthesized_deal`): facility note
     /// plus residual, borrowing-base test, reinvestment window,
@@ -457,11 +393,7 @@ impl JsAssetBackedFacility {
     /// @throws Error - Throws with kind `validation` if the facility or the synthetic deal fails validation.
     #[wasm_bindgen(js_name = synthesizedDealJson)]
     pub fn synthesized_deal_json(&self) -> Result<String, JsValue> {
-        let deal = self.inner.synthesized_deal().map_err(to_js_err)?;
-        serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::StructuredCredit(
-            Box::new(deal),
-        )))
-        .map_err(to_js_err)
+        super::envelope_json(self.inner.synthesized_deal().map_err(to_js_err)?)
     }
 
     /// Borrowing base on the closing collateral: eligible collateral,
@@ -475,6 +407,24 @@ impl JsAssetBackedFacility {
     }
 }
 
+factories!(JsAssetBackedFacility, "AssetBackedFacility", finstack_quant_valuations::instruments::AssetBackedFacility, {
+        /// The canonical example facility: the example CLO pool financed by a
+        /// USD 80M commitment drawn USD 70M.
+        /// @returns The example facility.
+        /// @throws If construction fails (should not occur).
+        example as example,
+});
+
+market_metrics!(JsAssetBackedFacility, "AssetBackedFacility", {
+        /// Lender IRR: XIRR of `-drawn` on `asOf` against every projected interest,
+        /// principal and fee receipt (mirrors Rust `AssetBackedFacility::facility_irr`).
+        /// @param marketJson - Serialized `MarketContext` with the curves and fixings for the projection.
+        /// @param asOf - Valuation date as an ISO-8601 string; the investment is dated here.
+        /// @returns Annual IRR as a decimal (`0.08` = 8%).
+        /// @throws Error - Throws with kind `validation` if an input is malformed, kind `not_found` if market data is missing, and kind `computation` if the XIRR does not converge.
+        facility_irr as facilityIrr,
+});
+
 instrument_class!(
     /// Typed wrapper for the canonical Rust RevolvingCredit instrument.
     JsRevolvingCredit, "RevolvingCredit", finstack_quant_valuations::instruments::RevolvingCredit
@@ -482,18 +432,6 @@ instrument_class!(
 
 #[wasm_bindgen(js_class = RevolvingCredit)]
 impl JsRevolvingCredit {
-    /// Canonical example facility (mirrors Rust `RevolvingCredit::example`).
-    ///
-    /// Returns a three-year USD 50M SOFR + 250bp facility with USD 10M drawn
-    /// and a scheduled draw and repayment, useful as a starting point and in tests.
-    /// @returns The example facility.
-    /// @throws If construction fails (should not occur).
-    pub fn example() -> Result<JsRevolvingCredit, JsValue> {
-        finstack_quant_valuations::instruments::RevolvingCredit::example()
-            .map(|inner| JsRevolvingCredit { inner })
-            .map_err(to_js_err)
-    }
-
     /// Whether the draw/repay schedule is stochastic (Monte Carlo) rather than
     /// deterministic (mirrors Rust `RevolvingCredit::is_stochastic`).
     #[wasm_bindgen(getter, js_name = isStochastic)]
@@ -562,13 +500,17 @@ impl JsRevolvingCredit {
     }
 }
 
-instrument_builder_entry!(JsBond, "Bond", JsBondBuilder);
+factories!(JsRevolvingCredit, "RevolvingCredit", finstack_quant_valuations::instruments::RevolvingCredit, {
+        /// Canonical example facility (mirrors Rust `RevolvingCredit::example`).
+        ///
+        /// Returns a three-year USD 50M SOFR + 250bp facility with USD 10M drawn
+        /// and a scheduled draw and repayment, useful as a starting point and in tests.
+        /// @returns The example facility.
+        /// @throws If construction fails (should not occur).
+        example as example,
+});
 
-instrument_to_dict!(JsBond, "Bond");
-
-instrument_market_dependencies!(JsBond, "Bond");
-
-instrument_pricing!(JsBond, "Bond");
+instrument_surface!(JsBond, "Bond", JsBondBuilder);
 
 getters!(JsBond, "Bond", |i| {
         /// Principal amount of the bond.
@@ -619,22 +561,12 @@ getters!(JsBond, "Bond", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"discounting"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Expiry date exposed by the Rust `Instrument` trait.
         /// @returns The expiry/maturity date, or `null` when the instrument type reports none.
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
+
+common_getters!(JsBond, "Bond");
 
 builder_class!(
     /// Fluent builder for `Bond`; one setter per Rust `FinancialBuilder` setter.
@@ -709,27 +641,9 @@ setters!(JsBondBuilder, "BondBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         settlement_convention as settlementConvention => json,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsBondBuilder, "BondBuilder");
 
 handle_setters!(JsBondBuilder, "BondBuilder", {
         /// Set the principal amount.
@@ -739,13 +653,7 @@ handle_setters!(JsBondBuilder, "BondBuilder", {
         notional as notional => JsMoney,
 });
 
-instrument_builder_entry!(JsTermLoan, "TermLoan", JsTermLoanBuilder);
-
-instrument_to_dict!(JsTermLoan, "TermLoan");
-
-instrument_market_dependencies!(JsTermLoan, "TermLoan");
-
-instrument_pricing!(JsTermLoan, "TermLoan");
+instrument_surface!(JsTermLoan, "TermLoan", JsTermLoanBuilder);
 
 getters!(JsTermLoan, "TermLoan", |i| {
         /// Currency the loan is denominated in.
@@ -811,22 +719,12 @@ getters!(JsTermLoan, "TermLoan", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"discounting"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Expiry date exposed by the Rust `Instrument` trait.
         /// @returns The expiry/maturity date, or `null` when the instrument type reports none.
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
+
+common_getters!(JsTermLoan, "TermLoan");
 
 builder_class!(
     /// Fluent builder for `TermLoan`; one setter per Rust `FinancialBuilder` setter.
@@ -931,27 +829,9 @@ setters!(JsTermLoanBuilder, "TermLoanBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         settlement_days as settlementDays => uint,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsTermLoanBuilder, "TermLoanBuilder");
 
 handle_setters!(JsTermLoanBuilder, "TermLoanBuilder", {
         /// Set the committed notional (facility limit).
@@ -971,17 +851,11 @@ handle_setters!(JsTermLoanBuilder, "TermLoanBuilder", {
         day_count as dayCount => JsDayCount,
 });
 
-instrument_builder_entry!(
+instrument_surface!(
     JsRevolvingCredit,
     "RevolvingCredit",
     JsRevolvingCreditBuilder
 );
-
-instrument_to_dict!(JsRevolvingCredit, "RevolvingCredit");
-
-instrument_market_dependencies!(JsRevolvingCredit, "RevolvingCredit");
-
-instrument_pricing!(JsRevolvingCredit, "RevolvingCredit");
 
 getters!(JsRevolvingCredit, "RevolvingCredit", |i| {
         /// Total committed amount.
@@ -1053,15 +927,6 @@ getters!(JsRevolvingCredit, "RevolvingCredit", |i| {
         /// Business days from the valuation date to the settlement date used by quote metrics.
         /// @returns The settlement lag; `0` settles on the valuation date.
         settlement_days as settlementDays => json(i.settlement_days),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
         /// Scenario-selection attributes.
         /// @returns The attribute map.
         attributes as attributes => json(i.attributes),
@@ -1072,6 +937,8 @@ getters!(JsRevolvingCredit, "RevolvingCredit", |i| {
         /// @returns The expiry date.
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
+
+common_getters!(JsRevolvingCredit, "RevolvingCredit", overrides);
 
 builder_class!(
     /// Fluent builder for `RevolvingCredit`; one setter per Rust `FinancialBuilder` setter.
@@ -1186,27 +1053,18 @@ setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         settlement_days as settlementDays => uint,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
         /// Set scenario-selection attributes.
         /// @param value - Attribute map; `null` clears it.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         attributes as attributes => json,
 });
+
+common_setters!(
+    JsRevolvingCreditBuilder,
+    "RevolvingCreditBuilder",
+    overrides
+);
 
 handle_setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
         /// Set the total commitment.
@@ -1231,17 +1089,11 @@ handle_setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
         frequency as frequency => JsTenor,
 });
 
-instrument_builder_entry!(
+instrument_surface!(
     JsAssetBackedFacility,
     "AssetBackedFacility",
     JsAssetBackedFacilityBuilder
 );
-
-instrument_to_dict!(JsAssetBackedFacility, "AssetBackedFacility");
-
-instrument_market_dependencies!(JsAssetBackedFacility, "AssetBackedFacility");
-
-instrument_pricing!(JsAssetBackedFacility, "AssetBackedFacility");
 
 getters!(JsAssetBackedFacility, "AssetBackedFacility", |i| {
         /// Collateral pool the facility lends against.
@@ -1318,15 +1170,6 @@ getters!(JsAssetBackedFacility, "AssetBackedFacility", |i| {
         /// Recovery model of the collateral.
         /// @returns The typed spec.
         recovery_spec as recoverySpec => json(i.credit_model.recovery_spec),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
         /// Scenario-selection attributes.
         /// @returns The attribute map.
         attributes as attributes => json(i.attributes),
@@ -1334,6 +1177,8 @@ getters!(JsAssetBackedFacility, "AssetBackedFacility", |i| {
         /// @returns The model key.
         default_model as defaultModel => text(Instrument::default_model(i)),
 });
+
+common_getters!(JsAssetBackedFacility, "AssetBackedFacility", overrides);
 
 builder_class!(
     /// Fluent builder for `AssetBackedFacility`; one setter per Rust `FinancialBuilder` setter.
@@ -1448,27 +1293,18 @@ setters!(JsAssetBackedFacilityBuilder, "AssetBackedFacilityBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         recovery_spec as recoverySpec => json,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
         /// Set scenario-selection attributes.
         /// @param value - Attribute map; `null` clears it.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         attributes as attributes => json,
 });
+
+common_setters!(
+    JsAssetBackedFacilityBuilder,
+    "AssetBackedFacilityBuilder",
+    overrides
+);
 
 handle_setters!(JsAssetBackedFacilityBuilder, "AssetBackedFacilityBuilder", {
         /// Set the total commitment.

@@ -12,21 +12,12 @@ instrument_class!(
     finstack_quant_valuations::instruments::CdsOption
 );
 
-instrument_builder_entry!(JsCdsOption, "CdsOption", JsCdsOptionBuilder);
-
-instrument_to_dict!(JsCdsOption, "CdsOption");
-
-instrument_market_dependencies!(JsCdsOption, "CdsOption");
-
-instrument_pricing!(JsCdsOption, "CdsOption");
+instrument_surface!(JsCdsOption, "CdsOption", JsCdsOptionBuilder);
 
 getters!(JsCdsOption, "CdsOption", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key of the Bloomberg CDSO quadrature pricer.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Option strike in its serde form.
         /// @returns `{ spread: "<decimal rate>" }` or `{ clean_price_pct: "<price points>" }`.
         strike as strike => json(i.strike),
@@ -94,6 +85,8 @@ getters!(JsCdsOption, "CdsOption", |i| {
         /// @returns The coupon, or `null` when the strike spread is the coupon.
         coupon_bp as couponBp => json(i.coupon_bp.and_then(|d| rust_decimal::prelude::ToPrimitive::to_f64(&d))),
 });
+
+common_getters!(JsCdsOption, "CdsOption", attributes);
 
 factories!(JsCdsOption, "CdsOption", finstack_quant_valuations::instruments::CdsOption, {
         /// Canonical 100bp-strike call on a 5-year USD 10,000,000 corporate CDS (mirrors Rust `CdsOption::example`): expiry 2025-06-20, CDS maturity 2030-06-20, cash settlement, 40% recovery, curves `USD-OIS` / `CORP-HAZARD`, vol surface `CDSOPT-VOL`.
@@ -228,12 +221,9 @@ setters!(JsCdsOptionBuilder, "CdsOptionBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         coupon_bp as couponBp => dec,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsCdsOptionBuilder, "CdsOptionBuilder", attributes);
 
 handle_setters!(JsCdsOptionBuilder, "CdsOptionBuilder", {
         /// Set the option notional.
