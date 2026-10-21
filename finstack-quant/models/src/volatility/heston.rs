@@ -825,7 +825,7 @@ mod tests {
                 100.0,
                 100.0,
                 t,
-                &finstack_quant_models::closed_form::HestonPricingParams {
+                &crate::closed_form::HestonPricingParams {
                     r: 0.05,
                     q: 0.0,
                     model: params,
@@ -837,7 +837,7 @@ mod tests {
                 100.0,
                 &[100.0],
                 t,
-                &finstack_quant_models::closed_form::HestonPricingParams {
+                &crate::closed_form::HestonPricingParams {
                     r: 0.05,
                     q: 0.0,
                     model: params,

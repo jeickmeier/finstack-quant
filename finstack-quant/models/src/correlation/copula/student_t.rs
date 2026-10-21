@@ -902,8 +902,8 @@ mod tests {
     /// and fails the tolerance.
     #[test]
     fn quadrature_matches_per_name_mc_joint_default_prob() {
-        use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-        use finstack_quant_models::monte_carlo::traits::RandomStream;
+        use crate::monte_carlo::rng::philox::PhiloxRng;
+        use crate::monte_carlo::traits::RandomStream;
 
         let nu = 5.0;
         let copula = StudentTCopula::new(nu).expect("valid df");
@@ -947,8 +947,8 @@ mod tests {
         // W = χ²(ν)/ν must be marginally t(ν): the fraction of draws below
         // t_ν⁻¹(PD) must equal PD. Each period draws one shared mixing W and
         // per-name idiosyncratic εᵢ.
-        use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-        use finstack_quant_models::monte_carlo::traits::RandomStream;
+        use crate::monte_carlo::rng::philox::PhiloxRng;
+        use crate::monte_carlo::traits::RandomStream;
 
         let nu = 6.0;
         let copula = StudentTCopula::new(nu).expect("valid df");

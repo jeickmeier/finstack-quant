@@ -22,7 +22,7 @@
 
 use super::super::clamped_cdr_to_mdr;
 use super::traits::StochasticDefault;
-use crate::correlation::copula::{Copula, CopulaSpec};
+use crate::correlation::{Copula, CopulaSpec};
 
 /// Copula-based stochastic default model.
 ///

@@ -74,7 +74,7 @@
 //!
 //! - [`CdsTranche`] for instrument struct
 //! - [`finstack_quant_valuations_core::instruments::PayReceive`] for buyer (`Pay`) vs seller (`Receive`)
-//! - [`finstack_quant_models::correlation::copula`] for copula model implementations
+//! - [`finstack_quant_models::correlation`] for copula model implementations
 //! - Base correlation calibration via plan-driven `calibration::api`
 
 mod credit_risk;
@@ -83,7 +83,6 @@ pub(crate) mod parameters;
 pub(crate) mod pricing;
 mod types;
 
-pub use finstack_quant_models::correlation::copula::CopulaSpec;
 pub use parameters::CdsTrancheParams;
 pub use types::{CdsTranche, CdsTrancheBuilder};
 

@@ -1,7 +1,6 @@
 //! Scenario configuration for stochastic structured-credit pricing.
 
-use finstack_quant_models::correlation::latent_factor::LatentFactorSpec;
-use finstack_quant_models::correlation::recovery::RecoverySpec;
+use finstack_quant_models::correlation::{LatentFactorSpec, RecoverySpec};
 use finstack_quant_models::credit::pool::{StochasticDefaultSpec, StochasticPrepaySpec};
 
 /// Internal inputs shared by structured-credit setup and stochastic pricing.

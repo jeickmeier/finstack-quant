@@ -1078,9 +1078,9 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 #     arguments of pit_to_ttc / ttc_to_pit)
 #   - lgd::SeniorityClass / SeniorityCalibration, lgd::CreditConversionFactor,
 #     lgd::DownturnMethod (string / float / `method` + `params` on the host side)
-    #   - toggle_exercise::{ThresholdToggle, StochasticToggle, OptimalToggle}
+#   - credit::{ThresholdToggle, StochasticToggle, OptimalToggle}
 #     (reached through ToggleExerciseModel.kind / .params)
-#   - dynamic_recovery::DynamicRecoveryModel, endogenous_hazard::LeverageHazardMap
+#   - credit::{DynamicRecoveryModel, LeverageHazardMap}
 #     (reached through DynamicRecoverySpec.kind / .model and
 #     EndogenousHazardSpec.kind / .leverage_hazard_map)
 #   - MigrationSimulator::simulate / empirical_matrix with a caller-supplied

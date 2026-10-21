@@ -4,18 +4,18 @@
 //! This module provides the mathematical primitives for credit migration modeling
 //! (JLT / CreditMetrics-style transition matrix approaches):
 //!
-//! - [`crate::credit::migration::scale::RatingScale`]: ordered state set; preset S&P/Fitch scales included.
-//! - [`crate::credit::migration::matrix::TransitionMatrix`]: validated row-stochastic N×N matrix with time horizon.
-//! - [`crate::credit::migration::generator::GeneratorMatrix`]: continuous-time intensity matrix Q, with extraction
+//! - [`RatingScale`]: ordered state set; preset S&P/Fitch scales included.
+//! - [`TransitionMatrix`]: validated row-stochastic N×N matrix with time horizon.
+//! - [`GeneratorMatrix`]: continuous-time intensity matrix Q, with extraction
 //!   from annual transition matrices via matrix logarithm.
-//! - [`crate::credit::migration::projection`]: compute P(t) = exp(Q · t) for arbitrary horizons.
-//! - [`crate::credit::migration::simulation`]: Gillespie-algorithm CTMC path simulation.
+//! - [`project`]: compute P(t) = exp(Q · t) for arbitrary horizons.
+//! - [`MigrationSimulator`]: Gillespie-algorithm CTMC path simulation.
 //!
 //! # Quick start
 //!
 //! ```
 //! use finstack_quant_models::credit::migration::{
-//!     RatingScale, GeneratorMatrix, projection,
+//!     RatingScale, GeneratorMatrix, project,
 //! };
 //!
 //! // 2-state generator (AAA defaults at rate 0.01/yr)
@@ -25,7 +25,7 @@
 //!     .expect("valid generator");
 //!
 //! // 5-year transition matrix
-//! let p5 = projection::project(&gen, 5.0).expect("projection succeeded");
+//! let p5 = project(&gen, 5.0).expect("projection succeeded");
 //! let pd = p5.probability("AAA", "D").unwrap();
 //! assert!(pd > 0.0 && pd < 1.0);
 //! ```
@@ -41,17 +41,18 @@
 //!   Markov Chains via Empirical Transition Matrices." *Mathematical Finance*,
 //!   11(2), 245-265.
 
-pub mod error;
-pub mod generator;
-pub mod matrix;
-pub mod projection;
-pub mod scale;
-pub mod simulation;
+mod error;
+mod generator;
+mod matrix;
+mod projection;
+mod scale;
+mod simulation;
 #[cfg(test)]
 mod tests;
 
 pub use error::MigrationError;
 pub use generator::GeneratorMatrix;
 pub use matrix::TransitionMatrix;
+pub use projection::project;
 pub use scale::RatingScale;
 pub use simulation::{default_rate, MigrationSimulator, RatingPath};

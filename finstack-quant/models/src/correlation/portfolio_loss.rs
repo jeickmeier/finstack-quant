@@ -9,11 +9,11 @@
 use std::collections::HashSet;
 
 use super::{Copula, CopulaSpec, RecoveryModel, RecoverySpec};
+use crate::monte_carlo::rng::philox::PhiloxRng;
+use crate::monte_carlo::traits::RandomStream;
 use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::validation::{validate_f64_non_negative, validate_f64_unit_interval};
 use finstack_quant_core::{Error, Result};
-use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-use finstack_quant_models::monte_carlo::traits::RandomStream;
 
 /// Maximum number of paths accepted by the portfolio-loss simulation.
 ///

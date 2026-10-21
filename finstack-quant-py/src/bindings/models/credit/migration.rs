@@ -2,7 +2,7 @@
 
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use finstack_quant_models::credit::migration::{
-    projection, GeneratorMatrix, MigrationSimulator, RatingPath, RatingScale, TransitionMatrix,
+    self, GeneratorMatrix, MigrationSimulator, RatingPath, RatingScale, TransitionMatrix,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
@@ -638,7 +638,7 @@ impl PyRatingPaths {
     /// Fraction of paths that reached the default state.
     #[getter]
     fn default_rate(&self) -> f64 {
-        finstack_quant_models::credit::migration::default_rate(&self.inner)
+        migration::default_rate(&self.inner)
     }
 
     /// Long-format ``pandas.DataFrame`` of every transition.
@@ -855,7 +855,7 @@ wire_methods!(
 #[pyfunction]
 #[pyo3(text_signature = "(generator, t)")]
 fn project(generator: &PyGeneratorMatrix, t: f64) -> PyResult<PyTransitionMatrix> {
-    projection::project(&generator.inner, t)
+    migration::project(&generator.inner, t)
         .map(PyTransitionMatrix::from_inner)
         .map_err(migration_to_py)
 }

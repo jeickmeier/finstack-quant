@@ -9,8 +9,7 @@ use crate::utils::input::{
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_factor::risk::flatten_square_matrix;
 use finstack_quant_models::credit::migration::{
-    self, projection, GeneratorMatrix, MigrationSimulator, RatingPath, RatingScale,
-    TransitionMatrix,
+    self, GeneratorMatrix, MigrationSimulator, RatingPath, RatingScale, TransitionMatrix,
 };
 use wasm_bindgen::prelude::*;
 
@@ -659,7 +658,7 @@ impl JsMigrationSimulator {
 /// `computation` error if the matrix exponential fails.
 #[wasm_bindgen(js_name = project)]
 pub fn project(generator: &JsGeneratorMatrix, t: JsValue) -> Result<JsTransitionMatrix, JsValue> {
-    projection::project(&generator.inner, js_f64(&t, "t")?)
+    migration::project(&generator.inner, js_f64(&t, "t")?)
         .map(|inner| JsTransitionMatrix { inner })
         .map_err(to_js_err)
 }

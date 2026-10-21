@@ -18,7 +18,7 @@ use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{HashMap, Result};
 use finstack_quant_models::correlation::{CopulaSpec, LatentFactorSpec, RecoverySpec};
-use finstack_quant_models::credit::pool::prepayment::PrepaymentState;
+use finstack_quant_models::credit::pool::PrepaymentState;
 use finstack_quant_models::credit::pool::{
     PerNameCopulaDefault, StochasticDefault, StochasticDefaultSpec, StochasticPrepaySpec,
     StochasticPrepayment,

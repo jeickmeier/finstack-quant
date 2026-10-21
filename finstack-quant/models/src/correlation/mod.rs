@@ -7,9 +7,10 @@
 //!
 //! # Components
 //!
-//! - [`crate::correlation::copula`]: Copula models for default correlation (Gaussian, Student-t, RFL, Multi-factor)
-//! - [`crate::correlation::recovery`]: Recovery rate models (constant, market-correlated)
-//! - [`crate::correlation::latent_factor`]: Factor models for correlated behavior
+//! - [`Copula`] / [`CopulaSpec`]: Copula models for default correlation (Gaussian, Student-t, RFL, Multi-factor)
+//! - [`RecoveryModel`] / [`RecoverySpec`]: Recovery rate models (constant, market-correlated)
+//! - [`LatentFactorSpec`]: Factor models for correlated behavior
+//! - [`simulate_portfolio_loss`]: Monte Carlo portfolio loss distribution
 //!
 //! Joint probability utilities (`CorrelatedBernoulli`, `correlation_bounds`,
 //! `joint_probabilities`) live in [`finstack_quant_core::math::probability`];
@@ -34,11 +35,11 @@
 //! - Factor-model and portfolio-risk context: `docs/REFERENCES.md#meucci-risk-and-asset-allocation`
 //!
 
-pub mod copula;
+mod copula;
 mod error;
-pub mod latent_factor;
-pub mod portfolio_loss;
-pub mod recovery;
+mod latent_factor;
+mod portfolio_loss;
+mod recovery;
 
 pub use copula::{
     Copula, CopulaSpec, FactorPairIntegrand, GaussianCopula, MultiFactorCopula,

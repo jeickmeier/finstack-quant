@@ -13,7 +13,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error as CoreError, Result};
-use finstack_quant_models::correlation::copula::{Copula, CopulaSpec, GaussianCopula};
+use finstack_quant_models::correlation::{Copula, CopulaSpec, GaussianCopula};
 use finstack_quant_valuations_core::instruments::PayReceive;
 
 impl CdsTranchePricer {

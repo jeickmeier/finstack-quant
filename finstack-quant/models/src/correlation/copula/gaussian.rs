@@ -355,8 +355,8 @@ mod tests {
         // N(0,1): the fraction of draws below Φ⁻¹(PD) must equal PD. This is
         // the correctness anchor for finite-pool simulation — without it the
         // realized default count would be biased.
-        use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-        use finstack_quant_models::monte_carlo::traits::RandomStream;
+        use crate::monte_carlo::rng::philox::PhiloxRng;
+        use crate::monte_carlo::traits::RandomStream;
 
         let copula = GaussianCopula::new();
         let pd = 0.05;

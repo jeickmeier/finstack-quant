@@ -6,9 +6,8 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_credit::cds_tranche::{
-    CdsTrancheParams, CdsTranchePricer, CopulaSpec,
-};
+use finstack_quant_models::correlation::CopulaSpec;
+use finstack_quant_valuations_credit::cds_tranche::{CdsTrancheParams, CdsTranchePricer};
 use time::macros::date;
 
 // ==================== Copula Specification Tests ====================

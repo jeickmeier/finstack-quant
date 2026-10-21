@@ -3333,7 +3333,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
             "type_name": "EnhancedMonteCarloResult",
             "kind": "output",
-            "bytes": 52479
+            "bytes": 52468
           },
           {
             "path": "schemas/results/1/equity_metrics.schema.json",
@@ -5443,7 +5443,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
             "type_name": "EnhancedMonteCarloResult",
             "kind": "output",
-            "bytes": 52479
+            "bytes": 52468
           },
           {
             "domain": "valuations",

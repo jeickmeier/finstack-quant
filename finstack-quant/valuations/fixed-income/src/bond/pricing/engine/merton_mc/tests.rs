@@ -1,6 +1,6 @@
 use super::*;
 use crate::bond::pricing::engine::merton_mc::MertonMcCalibrationSpec;
-use finstack_quant_models::credit::toggle_exercise::ThresholdDirection;
+use finstack_quant_models::credit::ThresholdDirection;
 use finstack_quant_models::credit::{
     AssetDynamics, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,
     MertonBarrierType, MertonModel, ToggleExerciseModel,
