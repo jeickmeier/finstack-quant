@@ -4,8 +4,9 @@ use super::fixtures::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::instruments::NotionalExchange;
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_rates::xccy_swap::{NotionalExchange, XccySwap};
+use finstack_quant_valuations_rates::xccy_swap::XccySwap;
 use rust_decimal::Decimal;
 
 #[test]
@@ -495,7 +496,7 @@ fn mtm_reset_still_emits_notional_rebals_with_overnight_leg() {
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_valuations_rates::xccy_swap::ResettingSide;
+    use finstack_quant_valuations_core::instruments::ResettingSide;
 
     let base = d(2025, 1, 2);
     let maturity = d(2027, 1, 2);

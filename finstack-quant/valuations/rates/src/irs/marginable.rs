@@ -91,8 +91,8 @@ impl Marginable for InterestRateSwap {
             * ONE_BASIS_POINT;
 
         let sign = match self.side {
-            crate::irs::PayReceive::Pay => 1.0,
-            crate::irs::PayReceive::Receive => -1.0,
+            finstack_quant_valuations_core::instruments::PayReceive::Pay => 1.0,
+            finstack_quant_valuations_core::instruments::PayReceive::Receive => -1.0,
         };
 
         let buckets: &[(&str, f64, f64)] = &[
@@ -167,7 +167,7 @@ mod tests {
             0.035,
             start,
             end,
-            crate::irs::PayReceive::Pay,
+            finstack_quant_valuations_core::instruments::PayReceive::Pay,
         )
         .expect("swap creation");
 
@@ -197,7 +197,7 @@ mod tests {
             0.035,
             start,
             end,
-            crate::irs::PayReceive::Pay,
+            finstack_quant_valuations_core::instruments::PayReceive::Pay,
         )
         .expect("swap creation");
 
@@ -232,7 +232,7 @@ mod tests {
             0.035,
             start,
             end,
-            crate::irs::PayReceive::Pay,
+            finstack_quant_valuations_core::instruments::PayReceive::Pay,
         )
         .expect("swap creation");
 
@@ -284,7 +284,7 @@ mod tests {
             0.035,
             start,
             end,
-            crate::irs::PayReceive::Pay,
+            finstack_quant_valuations_core::instruments::PayReceive::Pay,
         )
         .expect("swap creation");
 
@@ -312,7 +312,7 @@ mod tests {
             0.035,
             start,
             end,
-            crate::irs::PayReceive::Pay,
+            finstack_quant_valuations_core::instruments::PayReceive::Pay,
         )
         .expect("swap");
         swap.float_leg.forward_curve_id = swap.fixed_leg.discount_curve_id.clone();

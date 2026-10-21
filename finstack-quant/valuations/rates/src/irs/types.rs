@@ -24,10 +24,10 @@ use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
+pub(crate) use finstack_quant_valuations_core::instruments::PayReceive;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FixedLegSpec;
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FloatLegSpec;
+pub(crate) use finstack_quant_valuations_core::instruments::FixedLegSpec;
+pub(crate) use finstack_quant_valuations_core::instruments::FloatLegSpec;
 
 /// Leg-level conventions for building a vanilla fixed-vs-float IRS.
 ///

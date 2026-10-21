@@ -173,9 +173,9 @@ pub use common_impl::traits::{
 pub use common_impl::parameters::{
     BermudanCallProvision, BondConvention, CommodityUnderlyingParams, CreditParams,
     EquityUnderlyingParams, ExerciseStyle, FinancingLegSpec, FixedLegSpec, FloatLegSpec,
-    FxUnderlyingParams, IndexUnderlyingParams, Monitoring, NdfQuoteConvention, OptionMarketParams,
-    OptionType, PayReceive, PremiumLegSpec, ProtectionLegSpec, QuantoSpec, SettlementType,
-    TotalReturnLegSpec, VolatilityModel,
+    FxUnderlyingParams, IndexUnderlyingParams, Monitoring, NdfQuoteConvention, NotionalExchange,
+    OptionMarketParams, OptionType, PayReceive, PremiumLegSpec, ProtectionLegSpec, QuantoSpec,
+    ResettingSide, SettlementType, TotalReturnLegSpec, VolatilityModel,
 };
 
 pub use common_impl::parameters::trs_common::TrsScheduleSpec;

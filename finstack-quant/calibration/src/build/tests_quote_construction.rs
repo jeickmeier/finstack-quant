@@ -18,7 +18,7 @@ use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, InflationSwapConventionId,
 };
-use finstack_quant_valuations_rates::InflationSwap;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use time::Month;
 
 // Comprehensive quote-to-instrument construction test for canonical calibration engine.

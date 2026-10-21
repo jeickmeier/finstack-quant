@@ -45,7 +45,7 @@
 //!
 //! # See Also
 //!
-//! - [`Deposit`] for instrument struct
+//! - [`Deposit`](crate::deposit::Deposit) for instrument struct
 //! - Plan-driven calibration in `calibration::api` (Discount step) for curve bootstrap
 
 pub(crate) mod metrics;

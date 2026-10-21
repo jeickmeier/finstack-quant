@@ -104,7 +104,7 @@ fn bench_swap_cashflow_generation(c: &mut Criterion) {
         0.04,
         start,
         end,
-        finstack_quant_valuations::instruments::rates::irs::PayReceive::Pay,
+        finstack_quant_valuations::instruments::PayReceive::Pay,
     )
     .expect("Failed to create swap for benchmark");
 

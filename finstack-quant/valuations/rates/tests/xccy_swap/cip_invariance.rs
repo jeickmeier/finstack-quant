@@ -18,9 +18,8 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::FloatLegSpec;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_rates::xccy_swap::{
-    NotionalExchange, ResettingSide, XccySwap, XccySwapLeg,
-};
+use finstack_quant_valuations_core::instruments::{NotionalExchange, ResettingSide};
+use finstack_quant_valuations_rates::xccy_swap::{XccySwap, XccySwapLeg};
 use rust_decimal::Decimal;
 use std::sync::Arc;
 use time::Month;

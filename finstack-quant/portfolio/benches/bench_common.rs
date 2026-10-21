@@ -762,7 +762,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let swaption_id = format!("SWAPTION_{}", i);
         let expiry = Date::from_calendar_date(2026, Month::July, 1).unwrap();
         let swap_end = Date::from_calendar_date(2030, Month::July, 1).unwrap();
-        let fixed = finstack_quant_valuations::instruments::rates::irs::FixedLegSpec {
+        let fixed = finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
             rate: rust_decimal::Decimal::try_from(0.04).expect("valid literal"),
             frequency: Tenor::semi_annual(),
@@ -776,7 +776,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             payment_lag_days: 0,
             end_of_month: false,
         };
-        let float = finstack_quant_valuations::instruments::rates::irs::FloatLegSpec {
+        let float = finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
             forward_curve_id: finstack_quant_core::types::CurveId::new("USD-SOFR-3M"),
             spread_bp: rust_decimal::Decimal::ZERO,

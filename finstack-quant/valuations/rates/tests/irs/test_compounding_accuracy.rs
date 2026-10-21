@@ -11,8 +11,8 @@ use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_rates::irs::{FixedLegSpec, FloatLegSpec, PayReceive};
-use finstack_quant_valuations_rates::InterestRateSwap;
+use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
+use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use time::Month;
 
 // Overnight compounded fixtures need a positive projection-curve tenor.
