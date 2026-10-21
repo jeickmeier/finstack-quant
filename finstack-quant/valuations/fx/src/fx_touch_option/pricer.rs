@@ -12,7 +12,6 @@ pub(crate) fn compute_pv(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
-    inst.validate()?;
     if as_of > inst.expiry {
         return Ok(Money::from((0_i64, inst.quote_currency)));
     }
@@ -39,6 +38,7 @@ pub(crate) fn compute_pv(
         r_foreign: r_f,
         sigma,
         t,
+        ..
     } = crate::shared::collect_fx_option_inputs(input_request(inst, curves, as_of))?;
 
     if t <= 0.0 {
@@ -90,7 +90,7 @@ pub(crate) fn compute_pv(
 
 /// Resolve the matrix-based spot needed by touch-option metrics.
 pub(crate) fn fx_spot(inst: &FxTouchOption, curves: &MarketContext, as_of: Date) -> Result<f64> {
-    crate::shared::resolve_fx_spot(input_request(inst, curves, as_of))
+    input_request(inst, curves, as_of).spot()
 }
 
 fn input_request<'a>(
@@ -98,8 +98,7 @@ fn input_request<'a>(
     curves: &'a MarketContext,
     as_of: Date,
 ) -> crate::shared::FxOptionInputRequest<'a> {
-    use crate::shared::{FxOptionInputRequest, FxSpotSource};
-    FxOptionInputRequest {
+    crate::shared::FxOptionInputRequest {
         market: curves,
         as_of,
         base_currency: inst.base_currency,
@@ -111,7 +110,7 @@ fn input_request<'a>(
         vol_surface_id: inst.vol_surface_id.as_str(),
         strike: inst.barrier,
         instrument_pricing_overrides: &inst.instrument_pricing_overrides,
-        spot_source: FxSpotSource::Matrix,
+        spot_id: None,
         rate_context: "FxTouchOption",
     }
 }

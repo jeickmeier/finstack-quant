@@ -402,12 +402,7 @@ impl QuantoOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
         Ok(Some(
@@ -428,41 +423,28 @@ impl QuantoOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
         let base_pv = self.value(market, as_of)?.amount();
-
-        let spot_scalar = market.get_price(&self.spot_id)?;
-        let current_spot =
-            finstack_quant_valuations_core::metrics::scalar_numeric_value(spot_scalar);
-        let bump_size = current_spot * bumps.spot_bump_decimal;
-        if bump_size <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        let up = finstack_quant_valuations_core::metrics::bump_scalar_price(
-            market,
-            &self.spot_id,
+        let current_spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(
+            market.get_price(&self.spot_id)?,
+        );
+        Ok(Some(crate::shared::spot_gamma(
+            self,
+            as_of,
+            base_pv,
+            current_spot,
             bumps.spot_bump_decimal,
-        )?;
-        let pv_up = self.value(&up, as_of)?.amount();
-        let dn = finstack_quant_valuations_core::metrics::bump_scalar_price(
-            market,
-            &self.spot_id,
-            -bumps.spot_bump_decimal,
-        )?;
-        let pv_dn = self.value(&dn, as_of)?.amount();
-
-        Ok(Some(
-            (pv_up - 2.0 * base_pv + pv_dn) / (bump_size * bump_size),
-        ))
+            |pct| {
+                finstack_quant_valuations_core::metrics::bump_scalar_price(
+                    market,
+                    &self.spot_id,
+                    pct,
+                )
+            },
+        )?))
     }
     fn option_vega(
         &self,
@@ -472,12 +454,7 @@ impl QuantoOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
@@ -514,26 +491,17 @@ impl QuantoOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
-        let base_pv = self.value(market, as_of)?.amount();
-        let bump_bp = bumps.rate_bump_bp;
-        let bumped = finstack_quant_valuations_core::metrics::bump_discount_curve_parallel(
+        Ok(Some(crate::shared::discount_rho_bp(
+            self,
             market,
+            as_of,
             &self.domestic_discount_curve_id,
-            bump_bp,
-        )?;
-        let pv_bumped = self.value(&bumped, as_of)?.amount();
-        Ok(Some((pv_bumped - base_pv) / bump_bp))
+            bumps.rate_bump_bp,
+        )?))
     }
     fn option_foreign_rho_bp(
         &self,
@@ -541,26 +509,17 @@ impl QuantoOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
-        let base_pv = self.value(market, as_of)?.amount();
-        let bump_bp = bumps.rate_bump_bp;
-        let bumped = finstack_quant_valuations_core::metrics::bump_discount_curve_parallel(
+        Ok(Some(crate::shared::discount_rho_bp(
+            self,
             market,
+            as_of,
             &self.foreign_discount_curve_id,
-            bump_bp,
-        )?;
-        let pv_bumped = self.value(&bumped, as_of)?.amount();
-        Ok(Some((pv_bumped - base_pv) / bump_bp))
+            bumps.rate_bump_bp,
+        )?))
     }
     fn option_vanna(
         &self,
@@ -568,22 +527,14 @@ impl QuantoOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
         let spot_scalar = market.get_price(&self.spot_id)?;
         let current_spot =
             finstack_quant_valuations_core::metrics::scalar_numeric_value(spot_scalar);
-        let spot_bump = current_spot * bumps.spot_bump_decimal;
-        if spot_bump <= 0.0 {
+        if current_spot * bumps.spot_bump_decimal <= 0.0 {
             return Ok(Some(0.0));
         }
         // Spot delta in each equity-vol scenario (central diff in spot).
@@ -595,25 +546,20 @@ impl QuantoOption {
                 self.vol_surface_id.as_str(),
                 bumps.vol_bump_decimal,
             )?;
-        let delta_at = |inst: &Self,
-                        vol_market: &finstack_quant_core::market_data::context::MarketContext|
-         -> finstack_quant_core::Result<f64> {
-            let up = finstack_quant_valuations_core::metrics::bump_scalar_price(
-                vol_market,
-                &self.spot_id,
-                bumps.spot_bump_decimal,
-            )?;
-            let dn = finstack_quant_valuations_core::metrics::bump_scalar_price(
-                vol_market,
-                &self.spot_id,
-                -bumps.spot_bump_decimal,
-            )?;
-            let pv_up = inst.value(&up, as_of)?.amount();
-            let pv_dn = inst.value(&dn, as_of)?.amount();
-            Ok((pv_up - pv_dn) / (2.0 * spot_bump))
-        };
-        let delta_up = delta_at(&inst_vol_up, &market_vol_up)?;
-        let delta_dn = delta_at(&inst_vol_dn, &market_vol_dn)?;
+        let delta_up = finstack_quant_valuations_core::metrics::central_diff_scalar_relative(
+            &inst_vol_up,
+            &market_vol_up,
+            as_of,
+            &self.spot_id,
+            bumps.spot_bump_decimal,
+        )?;
+        let delta_dn = finstack_quant_valuations_core::metrics::central_diff_scalar_relative(
+            &inst_vol_dn,
+            &market_vol_dn,
+            as_of,
+            &self.spot_id,
+            bumps.spot_bump_decimal,
+        )?;
 
         // Report vanna per **vol point** on the σ axis (consistent with vega
         // and `MetricId::Vanna`): normalize by the bump width expressed in
@@ -631,12 +577,7 @@ impl QuantoOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
@@ -713,8 +654,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for QuantoOption {
         use crate::quanto_option::pricer::QuantoOptionAnalyticalPricer;
         use finstack_quant_valuations_core::pricer::Pricer;
 
-        self.validate()?;
-
         let pricer = QuantoOptionAnalyticalPricer;
         let result = pricer
             .price_dyn(self, market, as_of)
@@ -731,25 +670,14 @@ impl finstack_quant_valuations_core::instruments::Instrument for QuantoOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
-        // Quanto FX policy stamp. `fx_spot_id` short-circuits the matrix,
-        // so triangulation is unknown / not applicable in that case.
-        let fx_triangulated = if self.fx_spot_id.is_some() {
-            None
-        } else {
-            use finstack_quant_core::money::fx::FxQuery;
-            market
-                .fx()
-                .and_then(|fx| {
-                    fx.rate(FxQuery::new(self.base_currency, self.quote_currency, as_of))
-                        .ok()
-                })
-                .map(|q| q.triangulated)
-        };
-        Some(
-            finstack_quant_valuations_core::results::ValuationDetails::Fx(
-                finstack_quant_valuations_core::results::FxValuationDetails { fx_triangulated },
-            ),
-        )
+        // `fx_spot_id` short-circuits the matrix, so triangulation does not apply.
+        Some(crate::shared::fx_valuation_details(
+            market,
+            self.base_currency,
+            self.quote_currency,
+            as_of,
+            self.fx_spot_id.is_some(),
+        ))
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();

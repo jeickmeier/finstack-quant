@@ -309,14 +309,13 @@ impl FxBarrierOption {
             Some(spot_id) => finstack_quant_valuations_core::metrics::bump_scalar_price(
                 market, spot_id, bump_pct,
             ),
-            None => Ok(market
-                .clone()
-                .insert_fx(market.fx_required()?.with_bumped_rate(
-                    self.base_currency,
-                    self.quote_currency,
-                    bump_pct,
-                    as_of,
-                )?)),
+            None => crate::shared::fx_matrix_bumped_market(
+                market,
+                self.base_currency,
+                self.quote_currency,
+                as_of,
+                bump_pct,
+            ),
         }
     }
 
@@ -329,17 +328,9 @@ impl FxBarrierOption {
         spot: f64,
         bump_pct: f64,
     ) -> finstack_quant_core::Result<f64> {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
-        let up = self.spot_bumped_market(market, as_of, bump_pct)?;
-        let down = self.spot_bumped_market(market, as_of, -bump_pct)?;
-        let pv_up = self.value(&up, as_of)?.amount();
-        let pv_dn = self.value(&down, as_of)?.amount();
-        finstack_quant_valuations_core::metrics::central_diff_by_width(
-            pv_up,
-            pv_dn,
-            2.0 * spot * bump_pct,
-        )
+        crate::shared::spot_delta(self, as_of, spot, bump_pct, |pct| {
+            self.spot_bumped_market(market, as_of, pct)
+        })
     }
 
     fn option_delta(
@@ -348,12 +339,7 @@ impl FxBarrierOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
         let spot = crate::fx_barrier_option::pricer::resolve_fx_spot(self, market, as_of)?;
@@ -372,31 +358,20 @@ impl FxBarrierOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
         let base_pv = self.value(market, as_of)?.amount();
-
         let current_spot = crate::fx_barrier_option::pricer::resolve_fx_spot(self, market, as_of)?;
-        let bump_size = current_spot * bumps.spot_bump_decimal;
-        if bump_size <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        let up = self.spot_bumped_market(market, as_of, bumps.spot_bump_decimal)?;
-        let pv_up = self.value(&up, as_of)?.amount();
-        let down = self.spot_bumped_market(market, as_of, -bumps.spot_bump_decimal)?;
-        let pv_down = self.value(&down, as_of)?.amount();
-
-        Ok(Some(
-            (pv_up - 2.0 * base_pv + pv_down) / (bump_size * bump_size),
-        ))
+        Ok(Some(crate::shared::spot_gamma(
+            self,
+            as_of,
+            base_pv,
+            current_spot,
+            bumps.spot_bump_decimal,
+            |pct| self.spot_bumped_market(market, as_of, pct),
+        )?))
     }
     fn option_vega(
         &self,
@@ -406,12 +381,7 @@ impl FxBarrierOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
@@ -434,26 +404,17 @@ impl FxBarrierOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
-        let base_pv = self.value(market, as_of)?.amount();
-        let bump_bp = bumps.rate_bump_bp;
-        let bumped = finstack_quant_valuations_core::metrics::bump_discount_curve_parallel(
+        Ok(Some(crate::shared::discount_rho_bp(
+            self,
             market,
+            as_of,
             &self.domestic_discount_curve_id,
-            bump_bp,
-        )?;
-        let pv_bumped = self.value(&bumped, as_of)?.amount();
-        Ok(Some((pv_bumped - base_pv) / bump_bp))
+            bumps.rate_bump_bp,
+        )?))
     }
     fn option_vanna(
         &self,
@@ -461,12 +422,7 @@ impl FxBarrierOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
@@ -505,12 +461,7 @@ impl FxBarrierOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 

@@ -24,7 +24,6 @@ pub(crate) fn compute_pv(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
-    inst.validate()?;
     let settlement_date = inst.effective_settlement_date()?;
     if as_of > settlement_date {
         return Ok(Money::from((0_i64, inst.notional.currency())));
@@ -175,16 +174,7 @@ fn partial_realized_variance_with_dates(
     as_of: Date,
     obs_dates: &[Date],
 ) -> Result<f64> {
-    realized_variance_with_factor(inst, context, as_of, obs_dates, annualization_factor(inst))
-}
-
-fn realized_variance_with_factor(
-    inst: &FxVarianceSwap,
-    context: &MarketContext,
-    as_of: Date,
-    obs_dates: &[Date],
-    annualization_factor: f64,
-) -> Result<f64> {
+    let annualization_factor = annualization_factor(inst);
     if inst.realized_var_method.requires_ohlc() {
         let (open, high, low, close) =
             get_historical_ohlc_with_dates(inst, context, as_of, obs_dates)?;

@@ -820,7 +820,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for Ndf {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        self.validate()?;
         // End-of-day policy: settlement remains live on maturity.
         if crate::shared::event_has_occurred(self.maturity, as_of) {
             return Ok(Money::from((0_i64, self.settlement_currency)));
@@ -846,18 +845,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
         if crate::shared::event_has_occurred(self.maturity, as_of) {
-            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
-                Vec::new(),
-                finstack_quant_core::dates::DayCount::Act365F,
-                finstack_quant_cashflows::ScheduleBuildOpts {
-                    notional_hint: Some(Money::from((0_i64, self.settlement_currency))),
-                    meta: finstack_quant_cashflows::builder::CashFlowMeta {
-                        representation:
-                            finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual,
-                        ..Default::default()
-                    },
-                },
-            ));
+            return Ok(crate::shared::settled_schedule(Some(Money::from((
+                0_i64,
+                self.settlement_currency,
+            )))));
         }
         let settlement_amount = self.settlement_amount(market, as_of)?;
         let ccy = self.settlement_currency;
