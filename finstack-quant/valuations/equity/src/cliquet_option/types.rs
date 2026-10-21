@@ -323,23 +323,7 @@ impl CliquetOption {
                 )));
             }
         }
-        for (d, v) in &self.past_fixings {
-            if !v.is_finite() || *v <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CliquetOption past_fixings[{}] = {} must be finite and positive",
-                    d, v
-                )));
-            }
-        }
-        Ok(())
-    }
-
-    /// Look up the observed fixing for a reset date, if provided.
-    pub fn fixing_on(&self, date: Date) -> Option<f64> {
-        self.past_fixings
-            .iter()
-            .find(|(d, _)| *d == date)
-            .map(|(_, v)| *v)
+        crate::past_fixings::validate_positive_fixings(&"CliquetOption", &self.past_fixings)
     }
 
     /// Create a canonical example cliquet option (quarterly resets with local/global caps).
@@ -391,20 +375,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for CliquetOption {
         &self,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
     {
-        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
-        deps.add_discount_curve(self.discount_curve_id.clone());
-        deps.add_market_scalar_id(self.spot_id.as_str());
-        deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
-                self.vol_surface_id.clone(),
-                Some(self.spot_id.clone()),
-                None,
-            ),
-        );
-        if let Some(dividend_yield) = &self.div_yield_id {
-            deps.add_market_scalar_id(dividend_yield.as_str());
-        }
-        Ok(deps)
+        Ok(crate::equity_vol_dependencies(
+            &self.discount_curve_id,
+            &self.spot_id,
+            &self.vol_surface_id,
+            None,
+            self.div_yield_id.as_ref(),
+        ))
     }
 
     fn base_value(
@@ -445,7 +422,11 @@ impl finstack_quant_valuations_core::instruments::Instrument for CliquetOption {
             .reset_dates
             .iter()
             .copied()
-            .filter(|date| *date >= as_of && *date < rolled_date && self.fixing_on(*date).is_none())
+            .filter(|date| {
+                *date >= as_of
+                    && *date < rolled_date
+                    && crate::past_fixings::fixing_on(&self.past_fixings, *date).is_none()
+            })
             .collect();
         let needs_initial_level =
             self.initial_level.is_none() && self.reset_dates.iter().any(|date| *date < rolled_date);

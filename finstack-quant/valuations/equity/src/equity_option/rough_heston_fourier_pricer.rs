@@ -4,10 +4,7 @@
 //! to price European equity options under the rough Heston model (El Euch & Rosenbaum 2019).
 //! Model parameters are sourced from required market scalars.
 
-use super::pricing::{
-    collect_inputs, reject_future_discrete_dividends_for_stochastic_vol, require_european,
-    resolve_lifecycle_value,
-};
+use super::pricing::{stochastic_vol_inputs, ModelInputs};
 use super::types::EquityOption;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -60,70 +57,24 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonF
             instrument,
             finstack_quant_valuations_core::pricer::InstrumentType::EquityOption,
         )?;
-        if let Some(pv) =
-            resolve_lifecycle_value(equity_option, market, as_of).map_err(|error| {
-                finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
-                    error.to_string(),
-                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                        equity_option,
-                    )
-                    .model(finstack_quant_valuations_core::pricer::ModelKey::RoughHestonFourier),
-                )
-            })?
-        {
-            return Ok(
-                finstack_quant_valuations_core::results::ValuationResult::stamped(
-                    equity_option.id(),
-                    as_of,
-                    pv,
-                ),
-            );
-        }
-        require_european(equity_option, "Rough Heston Fourier").map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
-                e.to_string(),
-                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                    equity_option,
-                ),
-            )
-        })?;
-
-        reject_future_discrete_dividends_for_stochastic_vol(
+        let (spot, r, q, t) = match stochastic_vol_inputs(
             equity_option,
+            market,
             as_of,
             finstack_quant_valuations_core::pricer::ModelKey::RoughHestonFourier,
             "rough Heston Fourier",
-        )?;
-
-        let inputs = collect_inputs(equity_option, market, as_of).map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
-                e.to_string(),
-                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                    equity_option,
-                )
-                .model(finstack_quant_valuations_core::pricer::ModelKey::RoughHestonFourier),
-            )
-        })?;
-        let (spot, r, q, _sigma, t) = (inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol);
-
-        if t <= 0.0 {
-            let intrinsic = match equity_option.option_type {
-                OptionType::Call => (spot - equity_option.strike).max(0.0),
-                OptionType::Put => (equity_option.strike - spot).max(0.0),
-            };
-            return Ok(finstack_quant_valuations_core::results::ValuationResult::stamped(
-                equity_option.id(),
-                as_of,
-                Money::new(intrinsic * equity_option.quantity, equity_option.currency).map_err(
-                    |error| {
-                        finstack_quant_valuations_core::pricer::PricingError::from_core(
-                            error,
-                            finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(equity_option),
-                        )
-                    },
-                )?,
-            ));
-        }
+        )? {
+            ModelInputs::Settled(pv) => {
+                return Ok(
+                    finstack_quant_valuations_core::results::ValuationResult::stamped(
+                        equity_option.id(),
+                        as_of,
+                        pv,
+                    ),
+                );
+            }
+            ModelInputs::Live(inputs) => (inputs.spot, inputs.r, inputs.q, inputs.t_vol),
+        };
 
         let err_ctx = finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
             equity_option,

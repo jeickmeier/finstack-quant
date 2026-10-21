@@ -8,7 +8,6 @@ use crate::dcf_equity::{pricer, DiscountedCashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{
     sensitivities::rf_component_dv01::RfComponentPriced, MetricCalculator, MetricContext,
     MetricRegistry,
@@ -25,17 +24,6 @@ impl RfComponentPriced for DiscountedCashFlow {
     }
 }
 
-/// Helper: downcast to [`DiscountedCashFlow`] or return a validation error.
-fn downcast_dcf(context: &MetricContext) -> Result<&DiscountedCashFlow> {
-    context
-        .instrument
-        .as_any()
-        .downcast_ref::<DiscountedCashFlow>()
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation("Expected DiscountedCashFlow instrument".into())
-        })
-}
-
 /// Calculator for Enterprise Value metric.
 ///
 /// Computes EV from PV components directly (before equity bridge / discounts).
@@ -44,25 +32,20 @@ struct EnterpriseValueCalculator;
 
 impl MetricCalculator for EnterpriseValueCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let dcf = downcast_dcf(context)?;
-        // Compute EV directly from discounted PV components (before equity bridge / discounts).
-        let terminal_value = dcf.calculate_terminal_value()?;
-        let pv_explicit = dcf.calculate_pv_explicit_flows();
-        let pv_terminal = dcf.discount_terminal_value(terminal_value)?;
+        let dcf: &DiscountedCashFlow = context.instrument_as()?;
+        let (pv_explicit, pv_terminal) = pricer::pv_components_with_rf_bump(dcf, &|_| 0.0)?;
         Ok(pv_explicit + pv_terminal)
     }
 }
 
 /// Calculator for Equity Value metric.
 ///
-/// Consistent with the `value()` method: applies equity bridge and valuation discounts.
+/// The priced value: equity bridge and valuation discounts applied.
 struct EquityValueCalculator;
 
 impl MetricCalculator for EquityValueCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let dcf = downcast_dcf(context)?;
-        let equity = dcf.value(context.curves.as_ref(), context.as_of)?;
-        Ok(equity.amount())
+        Ok(context.base_value.amount())
     }
 }
 
@@ -73,9 +56,8 @@ struct TerminalValuePVCalculator;
 
 impl MetricCalculator for TerminalValuePVCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let dcf = downcast_dcf(context)?;
-        let terminal_value = dcf.calculate_terminal_value()?;
-        dcf.discount_terminal_value(terminal_value)
+        let dcf: &DiscountedCashFlow = context.instrument_as()?;
+        Ok(pricer::pv_components_with_rf_bump(dcf, &|_| 0.0)?.1)
     }
 }
 
@@ -89,15 +71,15 @@ struct EquityPricePerShareCalculator;
 
 impl MetricCalculator for EquityPricePerShareCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let dcf = downcast_dcf(context)?;
-        let equity = dcf.value(context.curves.as_ref(), context.as_of)?;
-        dcf.equity_value_per_share(equity.amount()).ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "DCF '{}' EquityPricePerShare requires shares_outstanding to be set \
+        let dcf: &DiscountedCashFlow = context.instrument_as()?;
+        dcf.equity_value_per_share(context.base_value.amount())
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "DCF '{}' EquityPricePerShare requires shares_outstanding to be set \
                  and diluted shares to be positive",
-                dcf.id.as_str()
-            ))
-        })
+                    dcf.id.as_str()
+                ))
+            })
     }
 }
 
@@ -110,14 +92,14 @@ struct EquitySharesCalculator;
 
 impl MetricCalculator for EquitySharesCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let dcf = downcast_dcf(context)?;
-        let equity = dcf.value(context.curves.as_ref(), context.as_of)?;
-        dcf.diluted_shares(equity.amount()).ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "DCF '{}' EquityShares requires shares_outstanding to be set",
-                dcf.id.as_str()
-            ))
-        })
+        let dcf: &DiscountedCashFlow = context.instrument_as()?;
+        dcf.diluted_shares(context.base_value.amount())
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "DCF '{}' EquityShares requires shares_outstanding to be set",
+                    dcf.id.as_str()
+                ))
+            })
     }
 }
 

@@ -66,7 +66,7 @@ impl EquityReturnModel<'_> {
     /// without the observed level the realized move (and hence equity delta)
     /// cannot be computed.
     fn period_start_level(&self, period_start: Date) -> Result<f64> {
-        if let Some(level) = self.trs.fixing_on(period_start) {
+        if let Some(level) = crate::past_fixings::fixing_on(&self.trs.past_fixings, period_start) {
             return Ok(level);
         }
         if period_start <= self.trs.schedule.start {
@@ -84,7 +84,7 @@ impl EquityReturnModel<'_> {
     }
 
     fn period_end_level(&self, period_end: Date, as_of: Date) -> Result<f64> {
-        if let Some(level) = self.trs.fixing_on(period_end) {
+        if let Some(level) = crate::past_fixings::fixing_on(&self.trs.past_fixings, period_end) {
             return Ok(level);
         }
         if period_end == as_of {
