@@ -16,8 +16,9 @@ use std::hint::black_box;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use finstack_quant_core::market_data::hierarchy::HierarchyTarget;
 use finstack_quant_scenarios::{
-    CurveKind, InstrumentType, OperationSpec, ScenarioEngine, ScenarioSpec, TimeRollMode,
+    CurveKind, OperationSpec, ScenarioEngine, ScenarioSpec, TimeRollMode,
 };
+use finstack_quant_valuations::pricer::InstrumentType;
 use fixtures::{
     apply_market, apply_with_instruments, compose_specs, hierarchy_hazard_market, hierarchy_market,
     lean_market, sample_bonds, spec, USD_SOFR,
