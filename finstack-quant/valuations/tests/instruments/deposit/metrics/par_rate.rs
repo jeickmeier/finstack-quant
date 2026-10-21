@@ -127,7 +127,7 @@ fn test_par_rate_sensitivity_to_curve_steepness() {
 fn test_par_rate_zero_for_zero_period() {
     // Setup - zero period deposit (start == end) is invalid
     let base = date(2025, 1, 1);
-    let result = finstack_quant_valuations::instruments::Deposit::builder()
+    let result = finstack_quant_valuations::instruments::rates::deposit::Deposit::builder()
         .id(finstack_quant_core::types::InstrumentId::new(
             "DEP-ZERO-PARRATE",
         ))

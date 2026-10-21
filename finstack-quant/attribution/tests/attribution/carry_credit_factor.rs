@@ -18,8 +18,9 @@ use finstack_quant_factor::credit::hierarchy::{
     VolState,
 };
 use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
-use finstack_quant_valuations::instruments::{Attributes, Bond};
+use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use std::collections::BTreeMap;
 use time::Month;

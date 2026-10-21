@@ -6,7 +6,7 @@ mod test_utils {
     ));
 }
 
-use finstack_quant_valuations::instruments::RateOptionType;
+use finstack_quant_valuations::instruments::rates::cap_floor::RateOptionType;
 
 use super::shifts::*;
 use super::*;

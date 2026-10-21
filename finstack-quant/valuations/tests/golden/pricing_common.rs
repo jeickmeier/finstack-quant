@@ -126,7 +126,8 @@ mod tests {
     use crate::golden::golden::schema::SCHEMA;
     use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope, InstrumentJson};
+    use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+    use finstack_quant_valuations::instruments::Instrument;
 
     fn pricing_fixture(market: serde_json::Value) -> GoldenFixture {
         let json = serde_json::json!({
@@ -496,7 +497,7 @@ mod tests {
             let deal = instrument
                 .as_instrument()
                 .as_any()
-                .downcast_ref::<finstack_quant_valuations::instruments::StructuredCredit>()
+                .downcast_ref::<finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit>()
                 .unwrap();
             let asset = deal
                 .pool

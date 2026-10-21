@@ -14,15 +14,21 @@
 //!
 //! Each retired spelling is rejected by `deny_unknown_fields`.
 
+use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
+use finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
+use finstack_quant_valuations::instruments::exotics::callable_range_accrual::CallableRangeAccrual;
+use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;
 use finstack_quant_valuations::instruments::fixed_income::bond::CallPut;
+use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     ControlledAccumulationSpec, ReinvestmentPeriod,
 };
-use finstack_quant_valuations::instruments::{
-    AssetBackedFacility, BermudanSwaption, CallableRangeAccrual, CdsOption, CdsTranche,
-    CmsSpreadOption, CommoditySpotOption, CommoditySwaption, EquityOption, RevolvingCredit,
-    StructuredCredit,
-};
+use finstack_quant_valuations::instruments::rates::cms_spread_option::CmsSpreadOption;
+use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};

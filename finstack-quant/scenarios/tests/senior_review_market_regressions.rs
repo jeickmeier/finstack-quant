@@ -15,10 +15,11 @@ use finstack_quant_scenarios::ScenarioMarketTarget;
 use finstack_quant_scenarios::{
     ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec, TenorMatchMode,
 };
-use finstack_quant_valuations::instruments::{
-    CompositeInstrument, CompositeLegSpec, CompositeSpec, Instrument, InstrumentJson,
-    RebalanceRule, WeightingMethod,
+use finstack_quant_valuations::instruments::composite::{
+    CompositeInstrument, CompositeLegSpec, CompositeSpec, RebalanceRule, WeightingMethod,
 };
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::pricer::InstrumentType;
 use time::macros::date;
 
@@ -247,7 +248,7 @@ fn descendant_shocks_refresh_warmed_nested_composite_values() {
             CompositeLegSpec::new(
                 "PARENT-SPOT",
                 InstrumentJson::Equity(
-                    finstack_quant_valuations::instruments::Equity::new(
+                    finstack_quant_valuations::instruments::equity::spot::Equity::new(
                         "PARENT-SPOT",
                         "PARENT-SPOT",
                         Currency::USD,

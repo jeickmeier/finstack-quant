@@ -305,7 +305,7 @@ pub(crate) fn extract_position_instrument(
     let payload = match extract_instrument(instrument)? {
         InstrumentArg::Typed(payload) => *payload,
         InstrumentArg::Envelope(json) => {
-            let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
+            let envelope: finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope =
                 serde_json::from_str(&json).map_err(display_to_py)?;
             envelope.instrument
         }

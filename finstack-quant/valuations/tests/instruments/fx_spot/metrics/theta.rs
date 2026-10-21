@@ -3,10 +3,8 @@
 use super::super::common::*;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{currency::Currency, dates::Date, money::Money};
-use finstack_quant_valuations::{
-    instruments::{FxSpot, Instrument},
-    metrics::MetricId,
-};
+use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
+use finstack_quant_valuations::{instruments::Instrument, metrics::MetricId};
 
 fn theta_for(fx: FxSpot, market: &MarketContext, as_of: Date) -> f64 {
     let result = fx

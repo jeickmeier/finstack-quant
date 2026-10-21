@@ -11,9 +11,8 @@
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::types::Rate;
-//! use finstack_quant_valuations::instruments::{
-//!     Bond, BondConvention, Instrument, PricingOptions,
-//! };
+//! use finstack_quant_valuations::instruments::{BondConvention, Instrument, PricingOptions};
+//! use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 //! use finstack_quant_valuations::metrics::MetricId;
 //! use finstack_quant_core::market_data::context::MarketContext;
 //! use finstack_quant_core::market_data::term_structures::DiscountCurve;

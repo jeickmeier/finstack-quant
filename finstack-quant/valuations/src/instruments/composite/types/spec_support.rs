@@ -1,8 +1,8 @@
 //! Leg specifications, rebalance policy, weighting methods, resolved state,
 //! and shared numeric helpers for composite instruments.
 
+use crate::instruments::json_loader::InstrumentJson;
 use crate::instruments::Instrument;
-use crate::instruments::InstrumentJson;
 use crate::metrics::MetricId;
 use crate::results::composite::ResolvedCompositeLeg;
 use finstack_quant_core::currency::Currency;

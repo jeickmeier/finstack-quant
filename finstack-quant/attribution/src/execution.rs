@@ -113,7 +113,7 @@ impl AttributionSpec {
 impl AttributionInputs {
     pub(crate) fn execute_instrument(
         &self,
-        instrument: &finstack_quant_valuations::instruments::InstrumentJson,
+        instrument: &finstack_quant_valuations::instruments::json_loader::InstrumentJson,
         market_t0: &MarketContext,
         market_t1: &MarketContext,
     ) -> Result<AttributionResult> {
@@ -200,7 +200,8 @@ mod tests {
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
-    use finstack_quant_valuations::instruments::{InstrumentJson, MarketDependencies};
+    use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+    use finstack_quant_valuations::instruments::MarketDependencies;
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
@@ -312,7 +313,7 @@ mod tests {
     }
 
     fn spec_with_config(config: AttributionConfig) -> AttributionSpec {
-        let bond = finstack_quant_valuations::instruments::Bond::example()
+        let bond = finstack_quant_valuations::instruments::fixed_income::bond::Bond::example()
             .expect("test bond should build");
         let market = finstack_quant_core::market_data::context::MarketContextState::try_from(
             &MarketContext::new(),

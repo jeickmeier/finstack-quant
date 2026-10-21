@@ -38,7 +38,7 @@ instrument_class!(
     /// Typed wrapper for the Rust `CreditDefaultSwap` instrument (single-name CDS).
     JsCreditDefaultSwap,
     "CreditDefaultSwap",
-    finstack_quant_valuations::instruments::CreditDefaultSwap
+    finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap
 );
 
 instrument_builder_entry!(
@@ -110,7 +110,7 @@ getters!(JsCreditDefaultSwap, "CreditDefaultSwap", |i| {
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
 
-factories!(JsCreditDefaultSwap, "CreditDefaultSwap", finstack_quant_valuations::instruments::CreditDefaultSwap, {
+factories!(JsCreditDefaultSwap, "CreditDefaultSwap", finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap, {
         /// Canonical 5-year USD 10,000,000 investment-grade payer CDS (mirrors Rust `CreditDefaultSwap::example`): `isda_na` convention, 100bp running spread, 40% recovery, curves `USD-OIS` / `CORP-HAZARD`, premium 2024-03-20 to 2029-03-20.
         /// @returns The example CDS.
         /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
@@ -218,7 +218,7 @@ instrument_class!(
     /// Typed wrapper for the Rust `CdsIndex` instrument (CDX / iTraxx style index swap).
     JsCdsIndex,
     "CdsIndex",
-    finstack_quant_valuations::instruments::CdsIndex
+    finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex
 );
 
 instrument_builder_entry!(JsCdsIndex, "CdsIndex", JsCdsIndexBuilder);
@@ -292,7 +292,7 @@ getters!(JsCdsIndex, "CdsIndex", |i| {
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
 
-factories!(JsCdsIndex, "CdsIndex", finstack_quant_valuations::instruments::CdsIndex, {
+factories!(JsCdsIndex, "CdsIndex", finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex, {
         /// Canonical CDX.NA.IG series 42 USD 10,000,000 payer (mirrors Rust `CdsIndex::example`): 60bp running coupon, `single_curve` pricing off `CDX.NA.IG.HAZARD` discounted on `USD-OIS`, premium 2024-03-20 to 2029-12-20, 125 names.
         /// @returns The example index trade.
         /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
@@ -426,7 +426,7 @@ instrument_class!(
     /// Typed wrapper for the Rust `CdsTranche` instrument (synthetic index tranche).
     JsCdsTranche,
     "CdsTranche",
-    finstack_quant_valuations::instruments::CdsTranche
+    finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche
 );
 
 instrument_builder_entry!(JsCdsTranche, "CdsTranche", JsCdsTrancheBuilder);
@@ -515,7 +515,7 @@ getters!(JsCdsTranche, "CdsTranche", |i| {
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
 
-factories!(JsCdsTranche, "CdsTranche", finstack_quant_valuations::instruments::CdsTranche, {
+factories!(JsCdsTranche, "CdsTranche", finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche, {
         /// Canonical CDX.NA.IG 42 equity (0–3%) tranche, USD 10,000,000 (mirrors Rust `CdsTranche::example`): buy protection, 100bp running, maturity 2029-12-20, curves `USD-OIS` / `CDX.NA.IG.HAZARD`.
         /// @returns The example tranche.
         /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
@@ -668,7 +668,7 @@ instrument_class!(
     /// Typed wrapper for the Rust `ConvertibleBond` instrument.
     JsConvertibleBond,
     "ConvertibleBond",
-    finstack_quant_valuations::instruments::ConvertibleBond
+    finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond
 );
 
 instrument_builder_entry!(
@@ -755,7 +755,7 @@ getters!(JsConvertibleBond, "ConvertibleBond", |i| {
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
 
-factories!(JsConvertibleBond, "ConvertibleBond", finstack_quant_valuations::instruments::ConvertibleBond, {
+factories!(JsConvertibleBond, "ConvertibleBond", finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond, {
         /// Canonical 5-year USD 1,000,000 2% semi-annual convertible (mirrors Rust `ConvertibleBond::example`): ratio 25 shares per bond, voluntary conversion, underlying `"TECH"`, curves `USD-IG` / `USD-CREDIT-BBB`, issue 2024-01-15, maturity 2029-01-15.
         /// @returns The example bond.
         /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
@@ -921,7 +921,7 @@ impl JsCdsIndex {
     ) -> Result<JsCdsIndex, JsValue> {
         let preset: finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexParams =
             super::arg::json(&preset, "preset")?;
-        finstack_quant_valuations::instruments::CdsIndex::from_preset(
+        finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::from_preset(
             &preset,
             js_string(&id, "id")?,
             notional.inner,
@@ -976,7 +976,7 @@ impl JsCdsTranche {
     ) -> Result<JsCdsTranche, JsValue> {
         let params: finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams =
             super::arg::json(&params, "params")?;
-        finstack_quant_valuations::instruments::CdsTranche::standard(
+        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche::standard(
             js_string(&id, "id")?,
             &params,
             js_string(&discount_curve_id, "discountCurveId")?,

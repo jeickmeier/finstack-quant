@@ -4,11 +4,13 @@ use finstack_quant_core::{
     money::Money,
     types::{CurveId, InstrumentId},
 };
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
+use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
 use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind,
 };
 use finstack_quant_valuations::instruments::{
-    Attributes, EquityOption, EquityUnderlyingParams, ExerciseStyle, FxOption, FxUnderlyingParams,
+    Attributes, EquityUnderlyingParams, ExerciseStyle, FxUnderlyingParams,
     InstrumentPricingOverrides, OptionType, SettlementType,
 };
 

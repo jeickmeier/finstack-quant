@@ -13,9 +13,10 @@ use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PayoutTiming;
 use finstack_quant_core::types::{BarrierDirection, CurveId};
+use finstack_quant_valuations::instruments::fx::fx_barrier_option::FxBarrierOption;
 use finstack_quant_valuations::instruments::fx::fx_touch_option::{FxTouchOption, TouchType};
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-use finstack_quant_valuations::instruments::{FxBarrierOption, Instrument, PricingOptions};
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 
 const GOLDEN: &str = include_str!(

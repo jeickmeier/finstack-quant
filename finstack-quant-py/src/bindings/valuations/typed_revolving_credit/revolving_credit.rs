@@ -28,7 +28,7 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::pric
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
-use finstack_quant_valuations::instruments::InstrumentJson;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 
 use super::PyEnhancedMonteCarloResult;
 

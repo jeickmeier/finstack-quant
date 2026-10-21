@@ -395,7 +395,8 @@ mod tests {
     };
     use finstack_quant_factor::ISSUER_ID_META_KEY;
     use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
-    use finstack_quant_valuations::instruments::{Attributes, Bond, Instrument};
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+    use finstack_quant_valuations::instruments::{Attributes, Instrument};
     use std::sync::Arc;
     use time::Month;
 

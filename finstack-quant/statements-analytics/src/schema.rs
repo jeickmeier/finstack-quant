@@ -14,7 +14,7 @@ use finstack_quant_core::Result;
 use finstack_quant_statements::adjustments::NormalizationConfig;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
-use finstack_quant_valuations::instruments::InstrumentJson;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::results::ValuationResult;
 use serde_json::Value;
 

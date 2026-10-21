@@ -11,8 +11,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::composite::CompositeInstrument;
-use finstack_quant_valuations::instruments::instrument_json_of;
-use finstack_quant_valuations::instruments::{InstrumentEnvelope, PricingOptions};
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
+use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
+use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::metrics::{is_additive_metric, MetricId};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -132,7 +133,7 @@ struct PositionPrimitiveReport {
     paths: Vec<PortfolioPrimitivePath>,
     definitions: Vec<(
         InstrumentId,
-        finstack_quant_valuations::instruments::InstrumentJson,
+        finstack_quant_valuations::instruments::json_loader::InstrumentJson,
     )>,
 }
 
@@ -237,7 +238,7 @@ fn position_primitive_report(
 fn register_definition(
     definitions: &mut BTreeMap<String, String>,
     instrument_id: &InstrumentId,
-    definition: &finstack_quant_valuations::instruments::InstrumentJson,
+    definition: &finstack_quant_valuations::instruments::json_loader::InstrumentJson,
 ) -> Result<()> {
     let hash = InstrumentEnvelope::new(definition.clone()).content_hash()?;
     match definitions.get(instrument_id.as_str()) {

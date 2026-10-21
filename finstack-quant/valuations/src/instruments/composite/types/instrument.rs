@@ -10,9 +10,10 @@ use super::spec_support::{
     RebalanceRule, WeightingMethod, MIN_ABS_INPUT,
 };
 use crate::instruments::common_impl::dependencies::MarketDependencies;
+use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use crate::instruments::{
-    Attributes, Instrument, InstrumentEnvelope, InstrumentJson, InstrumentPricingOverrides,
-    MetricPricingOverrides, PricingOptions, ScenarioPricingOverrides,
+    Attributes, Instrument, InstrumentPricingOverrides, MetricPricingOverrides, PricingOptions,
+    ScenarioPricingOverrides,
 };
 use crate::metrics::{is_additive_metric, MetricId};
 use crate::results::composite::{
@@ -67,7 +68,8 @@ fn metrics_supported_by_leg(
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_valuations::instruments::{CompositeInstrument, Instrument};
+/// use finstack_quant_valuations::instruments::Instrument;
+/// use finstack_quant_valuations::instruments::composite::CompositeInstrument;
 ///
 /// let composite = CompositeInstrument::example()?;
 /// assert_eq!(composite.id(), "COMPOSITE-EXAMPLE");
@@ -143,12 +145,17 @@ impl CompositeInstrument {
     ///
     /// Returns an error if the generated example fails validation.
     pub fn example() -> Result<Self> {
-        let long = crate::instruments::Equity::new("COMPOSITE-LONG", "LONG", Currency::USD)
-            .with_quantity(1.0)
-            .with_quoted_spot(100.0);
-        let short = crate::instruments::Equity::new("COMPOSITE-SHORT", "SHORT", Currency::USD)
-            .with_quantity(1.0)
-            .with_quoted_spot(90.0);
+        let long =
+            crate::instruments::equity::spot::Equity::new("COMPOSITE-LONG", "LONG", Currency::USD)
+                .with_quantity(1.0)
+                .with_quoted_spot(100.0);
+        let short = crate::instruments::equity::spot::Equity::new(
+            "COMPOSITE-SHORT",
+            "SHORT",
+            Currency::USD,
+        )
+        .with_quantity(1.0)
+        .with_quoted_spot(90.0);
         let spec = CompositeSpec::new(
             "COMPOSITE-EXAMPLE",
             Currency::USD,
@@ -359,7 +366,7 @@ impl CompositeInstrument {
         for mut exposure in flattened {
             let instrument_json = exposure
                 .instrument()
-                .and_then(crate::instruments::instrument_json_of)
+                .and_then(crate::instruments::json_loader::instrument_json_of)
                 .ok_or_else(|| {
                     Error::Internal("primitive exposure lost its runtime instrument".to_string())
                 })?;
@@ -672,7 +679,7 @@ impl Instrument for CompositeInstrument {
     fn market_dependencies(&self) -> Result<MarketDependencies> {
         let mut dependencies = MarketDependencies::new();
         for (leg, instrument) in self.spec.legs.iter().zip(self.boxed_legs()?) {
-            dependencies.merge(crate::instruments::market_dependencies_of(
+            dependencies.merge(crate::instruments::json_loader::market_dependencies_of(
                 leg.instrument.as_ref(),
             )?);
             if let Some(notional) = instrument.notional()? {
@@ -750,9 +757,10 @@ mod tests {
         composite.state.resolved_legs.swap(0, 1);
         assert_current_definition(&composite, 110.0);
 
-        let added_equity = crate::instruments::Equity::new("THIRD", "THIRD", Currency::USD)
-            .with_quantity(1.0)
-            .with_quoted_spot(25.0);
+        let added_equity =
+            crate::instruments::equity::spot::Equity::new("THIRD", "THIRD", Currency::USD)
+                .with_quantity(1.0)
+                .with_quoted_spot(25.0);
         composite.spec.legs.push(CompositeLegSpec::new(
             "THIRD",
             InstrumentJson::Equity(added_equity),

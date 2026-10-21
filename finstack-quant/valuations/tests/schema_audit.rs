@@ -1,10 +1,11 @@
 //! Schema tests: verify every instrument example() serializes to valid JSON
 //! and roundtrips through InstrumentEnvelope serde.
 
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
+use finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo;
 use finstack_quant_valuations::instruments::json_loader::{
     instrument_registry, InstrumentEnvelope, InstrumentJson, InstrumentSchema,
 };
-use finstack_quant_valuations::instruments::{AgencyCmo, CdsOption};
 
 mod schema_roundtrip {
     use super::*;
@@ -797,7 +798,7 @@ mod generated_schema_contract {
 
             assert!(
                 serde_json::from_value::<
-                    finstack_quant_valuations::instruments::InstrumentEnvelope,
+                    finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope,
                 >(invalid.clone())
                 .is_err(),
                 "runtime serde accepted unknown field at {fixture}{pointer}"
@@ -827,7 +828,7 @@ mod generated_schema_contract {
 
             assert!(
                 serde_json::from_value::<
-                    finstack_quant_valuations::instruments::InstrumentEnvelope,
+                    finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope,
                 >(invalid.clone())
                 .is_err(),
                 "runtime serde accepted null {field}"
@@ -864,7 +865,7 @@ mod generated_schema_contract {
 
             assert!(
                 serde_json::from_value::<
-                    finstack_quant_valuations::instruments::InstrumentEnvelope,
+                    finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope,
                 >(invalid.clone())
                 .is_err(),
                 "runtime serde accepted {invalid_value} at {fixture}{pointer}"

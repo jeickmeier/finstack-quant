@@ -26,8 +26,9 @@ use finstack_quant_core::contract::{
     Severity, ValidationReport,
 };
 use finstack_quant_core::{FxHashMap, FxHashSet};
-use finstack_quant_valuations::instruments::instrument_json_of;
-use finstack_quant_valuations::instruments::{InstrumentEnvelope, MarketDependencies};
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
+use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
+use finstack_quant_valuations::instruments::MarketDependencies;
 use serde::de::{IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 

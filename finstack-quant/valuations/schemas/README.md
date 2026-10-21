@@ -257,7 +257,7 @@ umbrella crate's `finstack_quant::schema::validate()` resolves cross-crate
 that is wrong rather than the whole union.
 
 For persistence loading, use
-`finstack_quant_valuations::instruments::InstrumentEnvelope::from_slice_strict`
+`finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope::from_slice_strict`
 or the contract-specific strict loader listed in
 [`docs/CONTRACTS.md`](../../../docs/CONTRACTS.md).
 

@@ -10,9 +10,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_valuations::instruments::{
-    AsianOption, Autocallable, CliquetOption, Instrument, PricingOptions,
-};
+use finstack_quant_valuations::instruments::equity::autocallable::Autocallable;
+use finstack_quant_valuations::instruments::equity::cliquet_option::CliquetOption;
+use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 

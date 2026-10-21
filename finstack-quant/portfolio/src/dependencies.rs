@@ -444,7 +444,7 @@ pub(crate) mod tests {
     use super::*;
 
     pub(crate) fn credit_index_fixture() -> (
-        finstack_quant_valuations::instruments::CdsTranche,
+        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche,
         MarketContext,
         finstack_quant_core::dates::Date,
     ) {
@@ -488,7 +488,7 @@ pub(crate) mod tests {
             .insert_credit_index("INDEX", index)
             .expect("credit index dependencies");
         let mut tranche =
-            finstack_quant_valuations::instruments::CdsTranche::example().expect("tranche");
+            finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche::example().expect("tranche");
         tranche.credit_index_id = "INDEX".into();
         (tranche, market, as_of)
     }

@@ -324,7 +324,7 @@ mod replay_tests {
     fn replay_labels_mtm_separately_from_cash_inclusive_attribution() {
         let before = date!(2024 - 06 - 20);
         let after = date!(2024 - 07 - 05);
-        let bond = finstack_quant_valuations::instruments::Bond::fixed(
+        let bond = finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
             "COUPON",
             Money::from((1_000_000_i64, Currency::USD)),
             finstack_quant_core::types::Rate::from_decimal(0.05).unwrap(),

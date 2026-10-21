@@ -12,8 +12,8 @@ use finstack_quant_core::{
     Result,
 };
 use finstack_quant_factor::credit::hierarchy::CreditFactorModel;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
-use finstack_quant_valuations::instruments::InstrumentJson;
 use finstack_quant_valuations::metrics::MetricId;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn test_attribution_envelope_roundtrip() {
-        use finstack_quant_valuations::instruments::Bond;
+        use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
         let bond = Bond::fixed(
             "TEST-BOND",
@@ -480,7 +480,7 @@ mod tests {
 
     #[test]
     fn test_attribution_envelope_json_envelope_trait() {
-        use finstack_quant_valuations::instruments::Bond;
+        use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
         let bond = Bond::fixed(
             "TEST-BOND",
@@ -557,7 +557,7 @@ mod tests {
 
     #[test]
     fn validate_attribution_json_roundtrips_and_gates_schema() {
-        use finstack_quant_valuations::instruments::Bond;
+        use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
         let bond = Bond::fixed(
             "TEST-BOND",

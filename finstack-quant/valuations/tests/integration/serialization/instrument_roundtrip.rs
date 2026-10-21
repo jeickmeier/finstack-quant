@@ -9,6 +9,64 @@
 //! This confirms that the envelope format reconstructs each instrument shape
 //! without losing the identity needed for runtime dispatch.
 //
+use finstack_quant_valuations::instruments::commodity::commodity_asian_option::CommodityAsianOption;
+use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
+use finstack_quant_valuations::instruments::commodity::commodity_future::CommodityFuture;
+use finstack_quant_valuations::instruments::commodity::commodity_future_option::CommodityFutureOption;
+use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
+use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
+use finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;
+use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
+use finstack_quant_valuations::instruments::equity::autocallable::Autocallable;
+use finstack_quant_valuations::instruments::equity::cliquet_option::CliquetOption;
+use finstack_quant_valuations::instruments::equity::equity_future::EquityFuture;
+use finstack_quant_valuations::instruments::equity::equity_future_option::EquityFutureOption;
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
+use finstack_quant_valuations::instruments::equity::equity_total_return_future::EquityTotalReturnFuture;
+use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
+use finstack_quant_valuations::instruments::equity::pe_fund::PrivateMarketsFund;
+use finstack_quant_valuations::instruments::equity::spot::Equity;
+use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
+use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
+use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
+use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
+use finstack_quant_valuations::instruments::exotics::basket::Basket;
+use finstack_quant_valuations::instruments::exotics::lookback_option::LookbackOption;
+use finstack_quant_valuations::instruments::exotics::range_accrual::RangeAccrual;
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo;
+use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
+use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
+use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
+use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
+use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
+use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
+use finstack_quant_valuations::instruments::fixed_income::tba::AgencyTba;
+use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
+use finstack_quant_valuations::instruments::fx::fx_barrier_option::FxBarrierOption;
+use finstack_quant_valuations::instruments::fx::fx_digital_option::FxDigitalOption;
+use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
+use finstack_quant_valuations::instruments::fx::fx_future::FxFuture;
+use finstack_quant_valuations::instruments::fx::fx_future_option::FxFutureOption;
+use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
+use finstack_quant_valuations::instruments::fx::fx_swap::FxSwap;
+use finstack_quant_valuations::instruments::fx::fx_touch_option::FxTouchOption;
+use finstack_quant_valuations::instruments::fx::fx_variance_swap::FxVarianceSwap;
+use finstack_quant_valuations::instruments::fx::ndf::Ndf;
+use finstack_quant_valuations::instruments::fx::quanto_option::QuantoOption;
+use finstack_quant_valuations::instruments::rates::cms_option::CmsOption;
+use finstack_quant_valuations::instruments::rates::deposit::Deposit;
+use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
+use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwap;
+use finstack_quant_valuations::instruments::rates::ir_future::InterestRateFuture;
+use finstack_quant_valuations::instruments::rates::ir_future_option::InterestRateFutureOption;
+use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+use finstack_quant_valuations::instruments::rates::repo::Repo;
+use finstack_quant_valuations::instruments::rates::swaption::Swaption;
 use finstack_quant_valuations::instruments::*;
 //
 fn assert_roundtrip(expected_id: &str, json: json_loader::InstrumentJson) {

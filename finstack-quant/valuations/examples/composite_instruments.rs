@@ -8,11 +8,12 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::contract_specs::BondFutureSpecs;
 use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
-use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuture;
-use finstack_quant_valuations::instruments::{
-    CommodityUnderlyingParams, CompositeLegSpec, CompositeSpec, InstrumentEnvelope, InstrumentJson,
-    RebalanceRule, WeightingMethod,
+use finstack_quant_valuations::instruments::composite::{
+    CompositeLegSpec, CompositeSpec, RebalanceRule, WeightingMethod,
 };
+use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuture;
+use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
 use time::macros::date;
 
 fn treasury_future(

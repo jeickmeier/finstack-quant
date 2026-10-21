@@ -27,7 +27,7 @@
 //!
 //! ```rust
 //! use finstack_quant_valuations::instruments::equity::equity_option::{EquityOptionMarketData, EquityOptionParams};
-//! use finstack_quant_valuations::instruments::EquityOption;
+//! use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::types::{CurveId, PriceId};
@@ -65,10 +65,10 @@
 //!
 //! # See Also
 //!
-//! - [`EquityOption`] for vanilla options
-//! - [`VarianceSwap`] for variance/volatility swaps
-//! - [`Autocallable`] for structured notes
-//! - [`PrivateMarketsFund`] for PE/credit fund valuation
+//! - [`EquityOption`](crate::instruments::equity::equity_option::EquityOption) for vanilla options
+//! - [`VarianceSwap`](crate::instruments::equity::variance_swap::VarianceSwap) for variance/volatility swaps
+//! - [`Autocallable`](crate::instruments::equity::autocallable::Autocallable) for structured notes
+//! - [`PrivateMarketsFund`](crate::instruments::equity::pe_fund::PrivateMarketsFund) for PE/credit fund valuation
 //!
 //! The family lives in `finstack-quant-valuations-equity` and is re-exported
 //! here unchanged. `real_estate` stays in this crate: `RealEstateFinancing`
@@ -80,6 +80,3 @@ pub use finstack_quant_valuations_equity::*;
 
 /// Real estate assets and levered real-estate equity.
 pub mod real_estate;
-pub use real_estate::{
-    LeveredRealEstateEquity, RealEstateAsset, RealEstateFinancing, RealEstateValuationMethod,
-};

@@ -24,6 +24,8 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::math::stats::RealizedVarMethod;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
+use finstack_quant_valuations::instruments::equity::equity_future::EquityFuture;
+use finstack_quant_valuations::instruments::equity::equity_future_option::EquityFutureOption;
 use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
 use finstack_quant_valuations::instruments::equity::spot::Equity;
 use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
@@ -35,11 +37,11 @@ use finstack_quant_valuations::instruments::{
     Attributes, ExerciseStyle, InstrumentPricingOverrides, OptionType,
 };
 use finstack_quant_valuations::instruments::{
-    EquityFuture, EquityFutureOption, FutureOptionModel, FutureOptionPremiumStyle,
-    FutureOptionSettlement, FutureOptionTerms, ListedFutureTerms,
+    EquityUnderlyingParams, FinancingLegSpec, TrsScheduleSpec,
 };
 use finstack_quant_valuations::instruments::{
-    EquityUnderlyingParams, FinancingLegSpec, TrsScheduleSpec,
+    FutureOptionModel, FutureOptionPremiumStyle, FutureOptionSettlement, FutureOptionTerms,
+    ListedFutureTerms,
 };
 use rust_decimal::Decimal;
 use std::hint::black_box;
@@ -214,7 +216,7 @@ fn variance_swap(months: i64) -> VarianceSwap {
         .observation_calendar_id("USNY".into())
         .realized_var_method(RealizedVarMethod::CloseToClose)
         .price_series_policy(
-            finstack_quant_valuations::instruments::EquityPriceSeriesPolicy::Adjusted,
+            finstack_quant_valuations::instruments::equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
         )
         .side(PayReceive::Pay)
         .discount_curve_id(CurveId::new("USD-OIS"))

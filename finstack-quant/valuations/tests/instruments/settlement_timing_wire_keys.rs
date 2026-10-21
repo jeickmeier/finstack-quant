@@ -6,10 +6,12 @@
 //! final-settlement price rule. Each retired spelling is rejected by
 //! `deny_unknown_fields`.
 
+use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
+use finstack_quant_valuations::instruments::commodity::commodity_future::CommodityFuture;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
+use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_quant_valuations::instruments::rates::cap_floor::OvernightCouponConvention;
-use finstack_quant_valuations::instruments::{
-    AgencyMbsPassthrough, CdsOption, CommodityForward, CommodityFuture, Deposit,
-};
+use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;

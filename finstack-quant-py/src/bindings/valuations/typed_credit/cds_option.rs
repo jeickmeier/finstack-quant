@@ -9,7 +9,7 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;
-use finstack_quant_valuations::instruments::InstrumentJson;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use rust_decimal::Decimal;
 
 use super::super::convert::{
@@ -53,7 +53,8 @@ type CdsOptionBuilderInner =
 #[derive(Clone)]
 pub struct PyCdsOption {
     /// Inner canonical Rust CDS option.
-    pub(crate) inner: finstack_quant_valuations::instruments::CdsOption,
+    pub(crate) inner:
+        finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption,
 }
 
 impl PyCdsOption {
@@ -68,7 +69,7 @@ instrument_envelope_methods!(
     CdsOption,
     "cds_option",
     PyCdsOptionBuilder,
-    finstack_quant_valuations::instruments::CdsOption::builder()
+    finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption::builder()
 );
 instrument_pricing_methods!(PyCdsOption);
 
@@ -101,7 +102,7 @@ impl PyCdsOption {
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
         Ok(Self {
-            inner: finstack_quant_valuations::instruments::CdsOption::example()
+            inner: finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption::example()
                 .map_err(core_to_py)?,
         })
     }

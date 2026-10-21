@@ -15,11 +15,13 @@ use finstack_quant_core::{
     money::Money,
     types::Rate,
 };
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::{
-    instruments::{
-        fixed_income::{convertible::ConvertibleBond, inflation_linked_bond::InflationLinkedBond},
-        Bond, Instrument, PricingOptions,
+    instruments::fixed_income::{
+        convertible::ConvertibleBond, inflation_linked_bond::InflationLinkedBond,
     },
+    instruments::Instrument,
+    instruments::PricingOptions,
     metrics::MetricId,
 };
 use std::sync::Arc;

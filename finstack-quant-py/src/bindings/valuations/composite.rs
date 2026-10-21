@@ -13,12 +13,14 @@ use crate::bindings::pandas_utils::{serde_to_py, ColumnSchema};
 use crate::errors::core_to_py;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::composite::{
-    history, history_from_spec, CompositeExposureReport, CompositeHistoryRow, CompositeInstrument,
-    CompositeLegSpec, CompositeMarketObservation, CompositeRebalanceResult, CompositeSpec,
-    CompositeState, RebalanceRule, WeightingMethod,
+    history, history_from_spec, CompositeHistoryRow, CompositeInstrument, CompositeLegSpec,
+    CompositeMarketObservation, CompositeRebalanceResult, CompositeSpec, CompositeState,
+    RebalanceRule, WeightingMethod,
 };
-use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::results::composite::CompositeExposureReport;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 

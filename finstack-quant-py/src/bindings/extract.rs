@@ -34,7 +34,7 @@ use crate::bindings::valuations::typed_rates::{PyCapFloor, PyInterestRateSwap, P
 use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
 use crate::bindings::valuations::typed_structured_credit::PyStructuredCredit;
 use crate::errors::{display_to_py as to_py, portfolio_to_py};
-use finstack_quant_valuations::instruments::InstrumentJson;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::pricer::ParsedInstrument;
 
 // Instrument — typed-or-JSON extraction
@@ -85,7 +85,7 @@ impl InstrumentArg {
                 Ok(*instrument)
             }
             Self::Envelope(json) => {
-                finstack_quant_valuations::pricer::json::parse_instrument_from_json(&json)
+                finstack_quant_valuations::pricer::parse_instrument_from_json(&json)
             }
         }
     }

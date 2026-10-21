@@ -4,10 +4,12 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::{
-    CompositeInstrument, CompositeLegSpec, CompositeSpec, Equity, Instrument, InstrumentJson,
-    PricingOptions, RebalanceRule, WeightingMethod,
+use finstack_quant_valuations::instruments::composite::{
+    CompositeInstrument, CompositeLegSpec, CompositeSpec, RebalanceRule, WeightingMethod,
 };
+use finstack_quant_valuations::instruments::equity::spot::Equity;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use std::hint::black_box;
 use time::macros::date;
 

@@ -12,10 +12,9 @@ use finstack_quant_portfolio::{
     types::PositionId,
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
+use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use finstack_quant_valuations::instruments::rates::cms_swap::{CmsSwap, FundingLegSpec};
-use finstack_quant_valuations::instruments::{
-    Instrument, InstrumentEnvelope, InstrumentJson, MarketDependencies, PayReceive,
-};
+use finstack_quant_valuations::instruments::{Instrument, MarketDependencies, PayReceive};
 use indexmap::IndexMap;
 use time::macros::date;
 use time::Month;

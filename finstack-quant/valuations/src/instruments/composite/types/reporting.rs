@@ -1,7 +1,8 @@
 //! Execution, exposure, and valuation reporting types for composites.
 
 use super::instrument::CompositeInstrument;
-use crate::instruments::{InstrumentEnvelope, InstrumentJson, MetricPricingOverrides};
+use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use crate::instruments::MetricPricingOverrides;
 use crate::results::composite::{CompositeExposureReport, PrimitiveAggregate, PrimitiveExposure};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
@@ -47,7 +48,7 @@ pub struct CompositeRebalanceResult {
 /// instrument envelope and reading it back through the validating loader.
 mod composite_envelope {
     use super::CompositeInstrument;
-    use crate::instruments::{InstrumentEnvelope, InstrumentJson};
+    use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     pub(super) fn serialize<S: Serializer>(
@@ -112,7 +113,7 @@ pub(super) fn register_execution_definition(
 ) -> Result<()> {
     let definition = exposure
         .instrument()
-        .and_then(crate::instruments::instrument_json_of)
+        .and_then(crate::instruments::json_loader::instrument_json_of)
         .ok_or_else(|| {
             Error::Internal("primitive exposure lost its runtime instrument".to_string())
         })?;

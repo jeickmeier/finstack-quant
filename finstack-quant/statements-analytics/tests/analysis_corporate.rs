@@ -12,7 +12,7 @@ use finstack_quant_statements::checks::CheckSuite;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::AmountOrScalar;
 use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
-use finstack_quant_valuations::instruments::TerminalValueSpec;
+use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 use time::Month;
 
 fn non_finite_suite() -> CheckSuite {

@@ -12,7 +12,8 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
     CdsIndexConstituent, CdsIndexParams, IndexPricing,
 };
-use finstack_quant_valuations::instruments::{CreditParams, Instrument, InstrumentJson};
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::{CreditParams, Instrument};
 use rust_decimal::prelude::ToPrimitive;
 
 use super::super::convert::{
@@ -499,7 +500,8 @@ fn constituents_from_py(
 #[derive(Clone)]
 pub struct PyCdsIndex {
     /// Inner canonical Rust CDS index.
-    pub(crate) inner: finstack_quant_valuations::instruments::CdsIndex,
+    pub(crate) inner:
+        finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex,
 }
 
 impl PyCdsIndex {
@@ -514,7 +516,8 @@ instrument_envelope_methods!(
     CdsIndex,
     "cds_index",
     PyCdsIndexBuilder,
-    finstack_quant_valuations::instruments::CdsIndex::builder().constituents(Vec::new())
+    finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::builder()
+        .constituents(Vec::new())
 );
 instrument_pricing_methods!(PyCdsIndex);
 
@@ -539,7 +542,7 @@ impl PyCdsIndex {
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
         Ok(Self {
-            inner: finstack_quant_valuations::instruments::CdsIndex::example()
+            inner: finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::example()
                 .map_err(core_to_py)?,
         })
     }
@@ -598,7 +601,7 @@ impl PyCdsIndex {
         discount_curve_id: &str,
         credit_curve_id: &str,
     ) -> PyResult<Self> {
-        let inner = finstack_quant_valuations::instruments::CdsIndex::from_preset(
+        let inner = finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::from_preset(
             &preset.inner,
             InstrumentId::new(id.to_string()),
             money_from_py(notional, None, "notional")?,

@@ -2,9 +2,10 @@
 
 use finstack_quant_core::{currency::Currency, market_data::context::MarketContext, money::Money};
 use finstack_quant_margin::Marginable;
-use finstack_quant_valuations::instruments::{
-    EquityTotalReturnSwap, FiIndexTotalReturnSwap, InterestRateSwap, PayReceive,
-};
+use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
+use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
+use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+use finstack_quant_valuations::instruments::PayReceive;
 
 #[test]
 fn equity_delta_is_one_percent_of_the_directional_trade_exposure() {

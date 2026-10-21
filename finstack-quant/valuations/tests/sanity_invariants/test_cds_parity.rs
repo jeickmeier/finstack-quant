@@ -68,7 +68,9 @@ fn test_market(as_of: Date) -> MarketContext {
 }
 
 /// Create a 5Y CDS (buy protection).
-fn create_5y_cds_buy(as_of: Date) -> finstack_quant_valuations::instruments::CreditDefaultSwap {
+fn create_5y_cds_buy(
+    as_of: Date,
+) -> finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap {
     let start = as_of;
     let maturity = Date::from_calendar_date(as_of.year() + 5, as_of.month(), as_of.day())
         .expect("valid maturity");
@@ -86,7 +88,9 @@ fn create_5y_cds_buy(as_of: Date) -> finstack_quant_valuations::instruments::Cre
 }
 
 /// Create a 5Y CDS (sell protection).
-fn create_5y_cds_sell(as_of: Date) -> finstack_quant_valuations::instruments::CreditDefaultSwap {
+fn create_5y_cds_sell(
+    as_of: Date,
+) -> finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap {
     let start = as_of;
     let maturity = Date::from_calendar_date(as_of.year() + 5, as_of.month(), as_of.day())
         .expect("valid maturity");

@@ -46,9 +46,9 @@
 //!
 //! # See Also
 //!
-//! - [`Bond`] for standard fixed/floating rate bonds
-//! - [`StructuredCredit`] for ABS, CLO, and securitized products
-//! - [`AgencyMbsPassthrough`] for mortgage pass-throughs
+//! - [`Bond`](crate::instruments::fixed_income::bond::Bond) for standard fixed/floating rate bonds
+//! - [`StructuredCredit`](crate::instruments::fixed_income::structured_credit::StructuredCredit) for ABS, CLO, and securitized products
+//! - [`AgencyMbsPassthrough`](crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough) for mortgage pass-throughs
 //! - [`finstack_quant_cashflows`] for cashflow generation
 //!
 //! The family lives in `finstack-quant-valuations-fixed-income` and is

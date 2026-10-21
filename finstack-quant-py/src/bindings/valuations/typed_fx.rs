@@ -19,7 +19,8 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind,
 };
-use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::Instrument;
 
 use super::convert::{
     attributes_from_py, bdc_from_py, builder_repr, date_repr, day_count_from_py, enum_to_py_string,
@@ -101,7 +102,7 @@ type FxOptionBuilderInner = finstack_quant_valuations::instruments::fx::fx_optio
 #[derive(Clone)]
 pub struct PyFxForward {
     /// Inner canonical Rust FX forward.
-    pub(crate) inner: finstack_quant_valuations::instruments::FxForward,
+    pub(crate) inner: finstack_quant_valuations::instruments::fx::fx_forward::FxForward,
 }
 
 impl PyFxForward {
@@ -116,7 +117,7 @@ instrument_envelope_methods!(
     FxForward,
     "fx_forward",
     PyFxForwardBuilder,
-    finstack_quant_valuations::instruments::FxForward::builder()
+    finstack_quant_valuations::instruments::fx::fx_forward::FxForward::builder()
 );
 instrument_pricing_methods!(PyFxForward);
 
@@ -139,7 +140,7 @@ impl PyFxForward {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::FxForward::example()
+        finstack_quant_valuations::instruments::fx::fx_forward::FxForward::example()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -232,22 +233,23 @@ end_of_month=False)"
             .filter(|value| !value.is_none())
             .map(|value| bdc_from_py(value, "business_day_convention"))
             .transpose()?;
-        let inner = finstack_quant_valuations::instruments::FxForward::from_trade_date(
-            InstrumentId::new(id.to_string()),
-            base,
-            quote,
-            py_to_date(trade_date)?,
-            crate::bindings::core::dates::tenor::extract_tenor(tenor)?,
-            super::convert::money_from_py(notional, Some(base.as_ref()), "notional")?,
-            CurveId::new(domestic_discount_curve_id.to_string()),
-            CurveId::new(foreign_discount_curve_id.to_string()),
-            base_calendar_id,
-            quote_calendar_id,
-            settlement_days,
-            convention,
-            end_of_month,
-        )
-        .map_err(core_to_py)?;
+        let inner =
+            finstack_quant_valuations::instruments::fx::fx_forward::FxForward::from_trade_date(
+                InstrumentId::new(id.to_string()),
+                base,
+                quote,
+                py_to_date(trade_date)?,
+                crate::bindings::core::dates::tenor::extract_tenor(tenor)?,
+                super::convert::money_from_py(notional, Some(base.as_ref()), "notional")?,
+                CurveId::new(domestic_discount_curve_id.to_string()),
+                CurveId::new(foreign_discount_curve_id.to_string()),
+                base_calendar_id,
+                quote_calendar_id,
+                settlement_days,
+                convention,
+                end_of_month,
+            )
+            .map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -278,7 +280,7 @@ end_of_month=False)"
         quote: &Bound<'_, PyAny>,
     ) -> PyResult<u32> {
         Ok(
-            finstack_quant_valuations::instruments::FxForward::standard_settlement_days(
+            finstack_quant_valuations::instruments::fx::fx_forward::FxForward::standard_settlement_days(
                 crate::bindings::core::currency::extract_currency(base)?,
                 crate::bindings::core::currency::extract_currency(quote)?,
             ),
@@ -856,7 +858,7 @@ impl PyFxForwardBuilder {
 #[derive(Clone)]
 pub struct PyFxOption {
     /// Inner canonical Rust FX option.
-    pub(crate) inner: finstack_quant_valuations::instruments::FxOption,
+    pub(crate) inner: finstack_quant_valuations::instruments::fx::fx_option::FxOption,
 }
 
 impl PyFxOption {
@@ -871,7 +873,7 @@ instrument_envelope_methods!(
     FxOption,
     "fx_option",
     PyFxOptionBuilder,
-    finstack_quant_valuations::instruments::FxOption::builder()
+    finstack_quant_valuations::instruments::fx::fx_option::FxOption::builder()
 );
 instrument_pricing_methods!(PyFxOption);
 
@@ -909,7 +911,7 @@ impl PyFxOption {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::FxOption::example()
+        finstack_quant_valuations::instruments::fx::fx_option::FxOption::example()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -979,7 +981,7 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
     ) -> PyResult<Self> {
         let base = crate::bindings::core::currency::extract_currency(base_currency)?;
         let quote = crate::bindings::core::currency::extract_currency(quote_currency)?;
-        let inner = finstack_quant_valuations::instruments::FxOption::european(
+        let inner = finstack_quant_valuations::instruments::fx::fx_option::FxOption::european(
             InstrumentId::new(id.to_string()),
             base,
             quote,

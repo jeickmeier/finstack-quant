@@ -17,7 +17,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::{Bond, InstrumentJson};
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use time::Month;
 
 /// Flat continuously-compounded discount curve at rate `r`.

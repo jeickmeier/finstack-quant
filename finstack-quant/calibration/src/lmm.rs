@@ -650,8 +650,10 @@ mod tests {
     }
 
     fn bermudan_envelope_json(swaption: BermudanSwaption) -> String {
-        let envelope = finstack_quant_valuations::instruments::InstrumentEnvelope::new(
-            finstack_quant_valuations::instruments::InstrumentJson::BermudanSwaption(swaption),
+        let envelope = finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope::new(
+            finstack_quant_valuations::instruments::json_loader::InstrumentJson::BermudanSwaption(
+                swaption,
+            ),
         );
         serde_json::to_string(&envelope).expect("serialize Bermudan envelope")
     }
@@ -677,7 +679,7 @@ mod tests {
     #[test]
     fn from_json_rejects_non_bermudan_instrument() {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
-        let bond = finstack_quant_valuations::instruments::Bond::fixed(
+        let bond = finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
             "TEST-BOND",
             Money::from((1_000_000_i64, Currency::USD)),
             finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
@@ -687,8 +689,8 @@ mod tests {
             "USD-OIS",
         )
         .expect("bond");
-        let envelope = finstack_quant_valuations::instruments::InstrumentEnvelope::new(
-            finstack_quant_valuations::instruments::InstrumentJson::Bond(bond),
+        let envelope = finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope::new(
+            finstack_quant_valuations::instruments::json_loader::InstrumentJson::Bond(bond),
         );
         let json = serde_json::to_string(&envelope).expect("serialize bond envelope");
         let err = calibrate_bermudan_lmm_base_vol_from_json(&json, &MarketContext::new(), as_of)

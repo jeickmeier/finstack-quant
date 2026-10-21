@@ -656,7 +656,7 @@ mod tests {
             start,
         ));
 
-        let swap = finstack_quant_valuations::instruments::InterestRateSwap::example()
+        let swap = finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example()
             .expect("valid IRS fixture");
         let market_ctx = MarketContext::new();
         let (breakdown, _, _, _) = calculate_period_flows(
@@ -943,7 +943,7 @@ mod tests {
             start,
         ));
 
-        let swap = finstack_quant_valuations::instruments::InterestRateSwap::example()
+        let swap = finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example()
             .expect("valid IRS fixture");
         let market_ctx = MarketContext::new();
         let (breakdown, _, _, _) = calculate_period_flows(

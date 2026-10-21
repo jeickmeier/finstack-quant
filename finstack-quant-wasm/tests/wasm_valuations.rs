@@ -17,7 +17,7 @@ fn bond_instrument_json() -> String {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Rate;
     use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-    use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
+    use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 
     let bond = Bond::fixed(
         "TEST-BOND",
@@ -36,7 +36,7 @@ fn bond_instrument_json() -> String {
 
 fn term_loan_instrument_json() -> String {
     use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
-    use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
+    use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 
     let loan = TermLoan::example().expect("term loan example");
     serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::TermLoan(loan))).unwrap()
@@ -68,9 +68,8 @@ fn structured_credit_instrument_json() -> String {
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
     };
-    use finstack_quant_valuations::instruments::{
-        InstrumentEnvelope, InstrumentJson, InstrumentPricingOverrides,
-    };
+    use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
     use finstack_quant_valuations::results::structured_credit::TrancheSeniority;
     use time::Month;
 
@@ -139,7 +138,7 @@ fn invalid_structured_credit_instrument_json() -> String {
 
 fn fx_option_instrument_json() -> String {
     use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
-    use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
+    use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 
     let option = FxOption::example().expect("fx option example");
     serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::FxOption(option))).unwrap()

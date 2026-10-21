@@ -308,7 +308,7 @@ use super::typed::arg;
 use finstack_quant_valuations::instruments::composite::{
     CompositeHistoryRow, CompositeLegSpec, RebalanceRule, WeightingMethod,
 };
-use finstack_quant_valuations::instruments::InstrumentEnvelope;
+use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
 
 /// `WeightingMethod::FixedQuantity`: leg quantities are the leg scores.
 /// @returns The `WeightingMethod` plain object.

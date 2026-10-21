@@ -56,7 +56,8 @@ fn create_5y_swap(
     as_of: Date,
     fixed_rate: f64,
     side: PayReceive,
-) -> finstack_quant_core::Result<finstack_quant_valuations::instruments::InterestRateSwap> {
+) -> finstack_quant_core::Result<finstack_quant_valuations::instruments::rates::irs::InterestRateSwap>
+{
     let start = as_of;
     let end = Date::from_calendar_date(as_of.year() + 5, as_of.month(), as_of.day())
         .expect("valid end date");

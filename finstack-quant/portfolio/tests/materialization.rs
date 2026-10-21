@@ -15,10 +15,10 @@ use finstack_quant_portfolio::materialization::{
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::{Entity, PositionId};
 use finstack_quant_portfolio::{Error, Portfolio};
+use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::{
-    Attributes, Instrument, InstrumentEnvelope, InstrumentJson, MarketDependencies,
-    VolatilityDependency,
+    Attributes, Instrument, MarketDependencies, VolatilityDependency,
 };
 use finstack_quant_valuations::pricer::InstrumentType;
 use indexmap::IndexMap;

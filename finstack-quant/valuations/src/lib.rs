@@ -72,10 +72,8 @@
 //!     dates::create_date,
 //!     market_data::context::MarketContext,
 //! };
-//! use finstack_quant_valuations::{
-//!     instruments::{Equity, Instrument, PricingOptions},
-//!     metrics::MetricId,
-//! };
+//! use finstack_quant_valuations::{instruments::Instrument, instruments::PricingOptions, metrics::MetricId};
+//! use finstack_quant_valuations::instruments::equity::spot::Equity;
 //! use time::Month;
 //!
 //! # fn main() -> finstack_quant_core::Result<()> {

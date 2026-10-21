@@ -2,10 +2,10 @@
 //! `RevolvingCredit`, `AssetBackedFacility`).
 //!
 //! Thin wrappers over the canonical Rust structs
-//! [`finstack_quant_valuations::instruments::Bond`],
-//! [`finstack_quant_valuations::instruments::TermLoan`],
-//! [`finstack_quant_valuations::instruments::RevolvingCredit`] and
-//! [`finstack_quant_valuations::instruments::AssetBackedFacility`]. Construction
+//! [`finstack_quant_valuations::instruments::fixed_income::bond::Bond`],
+//! [`finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan`],
+//! [`finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit`] and
+//! [`finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility`]. Construction
 //! and validation stay in Rust; the wrappers convert to and from the canonical
 //! `finstack_quant.instrument/1` envelope accepted by the JSON loader.
 //!
@@ -19,12 +19,12 @@ use crate::api::core::types::{JsBps, JsRate};
 use crate::utils::input::{js_f64, js_string, json_text};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::StubKind;
-use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use wasm_bindgen::prelude::*;
 
 crate::api::valuations::typed::macros::instrument_class!(
     /// Typed wrapper for the canonical Rust Bond instrument.
-    JsBond, "Bond", finstack_quant_valuations::instruments::Bond
+    JsBond, "Bond", finstack_quant_valuations::instruments::fixed_income::bond::Bond
 );
 
 #[wasm_bindgen(js_class = Bond)]
@@ -56,7 +56,7 @@ impl JsBond {
         let maturity: &str = &js_string(&maturity, "maturity")?;
         let stub: &str = &js_string(&stub, "stub")?;
         let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
-        let inner = finstack_quant_valuations::instruments::Bond::fixed(
+        let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
             id,
             notional.inner,
             coupon_rate.inner,
@@ -102,18 +102,19 @@ impl JsBond {
         let maturity: &str = &js_string(&maturity, "maturity")?;
         let convention: &str = &js_string(&convention, "convention")?;
         let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
-        let inner = finstack_quant_valuations::instruments::Bond::with_convention(
-            id,
-            notional.inner,
-            coupon_rate.inner,
-            parse_iso_date(issue_date)?,
-            parse_iso_date(maturity)?,
-            convention
-                .parse::<finstack_quant_valuations::instruments::BondConvention>()
-                .map_err(to_js_err)?,
-            discount_curve_id,
-        )
-        .map_err(to_js_err)?;
+        let inner =
+            finstack_quant_valuations::instruments::fixed_income::bond::Bond::with_convention(
+                id,
+                notional.inner,
+                coupon_rate.inner,
+                parse_iso_date(issue_date)?,
+                parse_iso_date(maturity)?,
+                convention
+                    .parse::<finstack_quant_valuations::instruments::BondConvention>()
+                    .map_err(to_js_err)?,
+                discount_curve_id,
+            )
+            .map_err(to_js_err)?;
         Ok(JsBond { inner })
     }
 
@@ -172,7 +173,7 @@ impl JsBond {
         let issue_date: &str = &js_string(&issue_date, "issueDate")?;
         let maturity: &str = &js_string(&maturity, "maturity")?;
         let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
-        let inner = finstack_quant_valuations::instruments::Bond::floating(
+        let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating(
             id,
             notional.inner,
             forward_curve_id,
@@ -221,7 +222,7 @@ impl JsBond {
         convention: JsValue,
         discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
-        let inner = finstack_quant_valuations::instruments::Bond::floating_with_convention(
+        let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating_with_convention(
             js_string(&id, "id")?,
             notional.inner,
             js_string(&forward_curve_id, "forwardCurveId")?,
@@ -258,7 +259,7 @@ impl JsBond {
         maturity: JsValue,
         discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
-        let inner = finstack_quant_valuations::instruments::Bond::zero_coupon(
+        let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::zero_coupon(
             js_string(&id, "id")?,
             notional.inner,
             parse_iso_date(&js_string(&issue_date, "issueDate")?)?,
@@ -274,7 +275,7 @@ impl JsBond {
     /// @returns The example bond.
     /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
     pub fn example() -> Result<JsBond, JsValue> {
-        finstack_quant_valuations::instruments::Bond::example()
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::example()
             .map(|inner| JsBond { inner })
             .map_err(to_js_err)
     }
@@ -285,7 +286,7 @@ impl JsBond {
     /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
     #[wasm_bindgen(js_name = exampleFloating)]
     pub fn example_floating() -> Result<JsBond, JsValue> {
-        finstack_quant_valuations::instruments::Bond::example_floating()
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::example_floating()
             .map(|inner| JsBond { inner })
             .map_err(to_js_err)
     }
@@ -296,7 +297,7 @@ impl JsBond {
     /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
     #[wasm_bindgen(js_name = exampleCallable)]
     pub fn example_callable() -> Result<JsBond, JsValue> {
-        finstack_quant_valuations::instruments::Bond::example_callable()
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::example_callable()
             .map(|inner| JsBond { inner })
             .map_err(to_js_err)
     }
@@ -307,7 +308,7 @@ impl JsBond {
     /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
     #[wasm_bindgen(js_name = exampleAmortizing)]
     pub fn example_amortizing() -> Result<JsBond, JsValue> {
-        finstack_quant_valuations::instruments::Bond::example_amortizing()
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::example_amortizing()
             .map(|inner| JsBond { inner })
             .map_err(to_js_err)
     }
@@ -341,7 +342,7 @@ impl JsBond {
 
 crate::api::valuations::typed::macros::instrument_class!(
     /// Typed wrapper for the canonical Rust TermLoan instrument.
-    JsTermLoan, "TermLoan", finstack_quant_valuations::instruments::TermLoan
+    JsTermLoan, "TermLoan", finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan
 );
 
 #[wasm_bindgen(js_class = TermLoan)]
@@ -353,7 +354,7 @@ impl JsTermLoan {
     /// @returns The example loan.
     /// @throws If construction fails (should not occur).
     pub fn example() -> Result<JsTermLoan, JsValue> {
-        finstack_quant_valuations::instruments::TermLoan::example()
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan::example()
             .map(|inner| JsTermLoan { inner })
             .map_err(to_js_err)
     }
@@ -364,7 +365,7 @@ impl JsTermLoan {
     /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
     #[wasm_bindgen(js_name = exampleFloatingWithDdtl)]
     pub fn example_floating_with_ddtl() -> Result<JsTermLoan, JsValue> {
-        finstack_quant_valuations::instruments::TermLoan::example_floating_with_ddtl()
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan::example_floating_with_ddtl()
             .map(|inner| JsTermLoan { inner })
             .map_err(to_js_err)
     }
@@ -374,15 +375,16 @@ impl JsTermLoan {
     /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
     #[wasm_bindgen(js_name = exampleCallable)]
     pub fn example_callable() -> Result<JsTermLoan, JsValue> {
-        finstack_quant_valuations::instruments::TermLoan::example_callable()
-            .map(|inner| JsTermLoan { inner })
-            .map_err(to_js_err)
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan::example_callable(
+        )
+        .map(|inner| JsTermLoan { inner })
+        .map_err(to_js_err)
     }
 }
 
 crate::api::valuations::typed::macros::instrument_class!(
     /// Typed wrapper for the canonical Rust AssetBackedFacility instrument.
-    JsAssetBackedFacility, "AssetBackedFacility", finstack_quant_valuations::instruments::AssetBackedFacility
+    JsAssetBackedFacility, "AssetBackedFacility", finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility
 );
 
 #[wasm_bindgen(js_class = AssetBackedFacility)]
@@ -392,7 +394,7 @@ impl JsAssetBackedFacility {
     /// @returns The example facility.
     /// @throws If construction fails (should not occur).
     pub fn example() -> Result<JsAssetBackedFacility, JsValue> {
-        finstack_quant_valuations::instruments::AssetBackedFacility::example()
+        finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility::example()
             .map(|inner| JsAssetBackedFacility { inner })
             .map_err(to_js_err)
     }
@@ -469,7 +471,7 @@ impl JsAssetBackedFacility {
 
 crate::api::valuations::typed::macros::instrument_class!(
     /// Typed wrapper for the canonical Rust RevolvingCredit instrument.
-    JsRevolvingCredit, "RevolvingCredit", finstack_quant_valuations::instruments::RevolvingCredit
+    JsRevolvingCredit, "RevolvingCredit", finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit
 );
 
 #[wasm_bindgen(js_class = RevolvingCredit)]
@@ -481,7 +483,7 @@ impl JsRevolvingCredit {
     /// @returns The example facility.
     /// @throws If construction fails (should not occur).
     pub fn example() -> Result<JsRevolvingCredit, JsValue> {
-        finstack_quant_valuations::instruments::RevolvingCredit::example()
+        finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit::example()
             .map(|inner| JsRevolvingCredit { inner })
             .map_err(to_js_err)
     }

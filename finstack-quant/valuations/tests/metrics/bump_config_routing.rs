@@ -37,13 +37,15 @@ use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider, S
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierType;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::exotics::lookback_option::{
     LookbackOption, LookbackType,
 };
+use finstack_quant_valuations::instruments::fx::fx_barrier_option::FxBarrierOption;
 use finstack_quant_valuations::instruments::fx::quanto_option::QuantoOption;
 use finstack_quant_valuations::instruments::{
-    Attributes, EquityOption, FxBarrierOption, Instrument, InstrumentPricingOverrides,
-    MetricPricingOverrides, Monitoring, OptionType, PricingOptions,
+    Attributes, Instrument, InstrumentPricingOverrides, MetricPricingOverrides, Monitoring,
+    OptionType, PricingOptions,
 };
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations_test_support::date::date;
@@ -380,7 +382,7 @@ const FX_VOL: f64 = 0.12;
 fn fx_fixture_with_strike(
     strike: f64,
 ) -> (
-    finstack_quant_valuations::instruments::FxOption,
+    finstack_quant_valuations::instruments::fx::fx_option::FxOption,
     MarketContext,
     Date,
 ) {
@@ -406,7 +408,7 @@ fn fx_fixture_with_strike(
 }
 
 fn fx_fixture() -> (
-    finstack_quant_valuations::instruments::FxOption,
+    finstack_quant_valuations::instruments::fx::fx_option::FxOption,
     MarketContext,
     Date,
 ) {

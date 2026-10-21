@@ -16,9 +16,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_valuations::instruments::{
-    ExerciseStyle, FutureOptionTerms, Instrument, InterestRateFutureOption,
-};
+use finstack_quant_valuations::instruments::rates::ir_future_option::InterestRateFutureOption;
+use finstack_quant_valuations::instruments::{ExerciseStyle, FutureOptionTerms, Instrument};
 use std::hint::black_box;
 use time::macros::date;
 

@@ -585,9 +585,10 @@ fn envelope_with(example: &str, pointer: &str, key: &str, value: serde_json::Val
 }
 
 fn assert_envelope_rejects(json: &str, key: &str) {
-    let err =
-        serde_json::from_str::<finstack_quant_valuations::instruments::InstrumentEnvelope>(json)
-            .expect_err("retired key must be rejected");
+    let err = serde_json::from_str::<
+        finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope,
+    >(json)
+    .expect_err("retired key must be rejected");
     assert!(err.to_string().contains(key), "{err}");
 }
 

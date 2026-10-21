@@ -36,9 +36,10 @@ pub fn calculate_var(
     config: Option<JsValue>,
     model: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let parsed = finstack_quant_valuations::pricer::json::parse_boxed_instruments_from_json(
-        &json_text(&instruments_json, "instrumentsJson")?,
-    )
+    let parsed = finstack_quant_valuations::pricer::parse_boxed_instruments_from_json(&json_text(
+        &instruments_json,
+        "instrumentsJson",
+    )?)
     .map_err(to_js_err)?;
     let market = parse_market_json(&json_text(&market_json, "marketJson")?)?;
     let history: MarketHistory = from_js_json(&history_json, "historyJson")?;

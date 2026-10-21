@@ -16,8 +16,9 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
-use finstack_quant_valuations::instruments::market_dependencies_of;
-use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
+use finstack_quant_valuations::instruments::json_loader::market_dependencies_of;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
 
 /// Build a discount curve with the given ID and flat rate.

@@ -7,7 +7,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::Deposit;
+use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
 

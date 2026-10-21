@@ -404,7 +404,8 @@ fn equity_vol_factor() -> FactorDefinition {
 #[test]
 fn vol_factor_delta_matches_equity_option_vega() -> Result<()> {
     use finstack_quant_core::math::special_functions::norm_pdf;
-    use finstack_quant_valuations::instruments::{EquityOption, OptionType};
+    use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
+    use finstack_quant_valuations::instruments::OptionType;
 
     let as_of = make_date(2025, Month::January, 2)?;
     let expiry = make_date(2025, Month::July, 2)?;

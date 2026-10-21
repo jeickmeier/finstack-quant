@@ -8,8 +8,9 @@ use finstack_quant_scenarios::{
     ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec, TimeRollMode,
 };
 use finstack_quant_statements::types::FinancialModelSpec;
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::{Attributes, Bond, Instrument};
+use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use time::Month;
 
 #[test]

@@ -5,10 +5,6 @@ mod reporting;
 mod spec;
 mod spec_support;
 
-pub use crate::results::composite::{
-    CompositeExposureReport, CompositeLegValuation, CompositeValuationDetails, PrimitiveAggregate,
-    PrimitiveExposure, ResolvedCompositeLeg,
-};
 pub use instrument::CompositeInstrument;
 pub use reporting::{CompositeRebalanceResult, CompositeTrade};
 pub use spec::CompositeSpec;
@@ -22,8 +18,10 @@ pub use spec_support::{
 mod tests {
     use super::spec_support::normalized_scores;
     use super::*;
-    use crate::instruments::{Instrument, InstrumentEnvelope, InstrumentJson, PricingOptions};
+    use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+    use crate::instruments::{Instrument, PricingOptions};
     use crate::metrics::MetricId;
+    use crate::results::composite::CompositeValuationDetails;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Tenor;
     use finstack_quant_core::expr::Expr;
@@ -42,7 +40,7 @@ mod tests {
         CompositeLegSpec::new(
             id,
             InstrumentJson::Equity(
-                crate::instruments::Equity::new(id, id, Currency::USD)
+                crate::instruments::equity::spot::Equity::new(id, id, Currency::USD)
                     .with_quantity(shares)
                     .with_quoted_spot(price),
             ),
@@ -75,9 +73,13 @@ mod tests {
                 CompositeLegSpec::new(
                     "EUR-LEG",
                     InstrumentJson::Equity(
-                        crate::instruments::Equity::new("EUR-LEG", "EUR-LEG", Currency::EUR)
-                            .with_quantity(1.0)
-                            .with_quoted_spot(100.0),
+                        crate::instruments::equity::spot::Equity::new(
+                            "EUR-LEG",
+                            "EUR-LEG",
+                            Currency::EUR,
+                        )
+                        .with_quantity(1.0)
+                        .with_quoted_spot(100.0),
                     ),
                     1.0,
                 ),
@@ -122,7 +124,7 @@ mod tests {
             CompositeLegSpec::new(
                 "A",
                 InstrumentJson::Equity(
-                    crate::instruments::Equity::new("A", "A", Currency::USD)
+                    crate::instruments::equity::spot::Equity::new("A", "A", Currency::USD)
                         .with_quantity(1.0)
                         .with_quoted_spot(1.0),
                 ),
@@ -131,7 +133,7 @@ mod tests {
             CompositeLegSpec::new(
                 "B",
                 InstrumentJson::Equity(
-                    crate::instruments::Equity::new("B", "B", Currency::USD)
+                    crate::instruments::equity::spot::Equity::new("B", "B", Currency::USD)
                         .with_quantity(1.0)
                         .with_quoted_spot(1.0),
                 ),
@@ -140,7 +142,7 @@ mod tests {
             CompositeLegSpec::new(
                 "C",
                 InstrumentJson::Equity(
-                    crate::instruments::Equity::new("C", "C", Currency::USD)
+                    crate::instruments::equity::spot::Equity::new("C", "C", Currency::USD)
                         .with_quantity(1.0)
                         .with_quoted_spot(1.0),
                 ),
@@ -216,14 +218,16 @@ mod tests {
             CompositeLegSpec::new(
                 "A",
                 InstrumentJson::Equity(
-                    crate::instruments::Equity::new("A", "A", Currency::USD).with_spot_id("A"),
+                    crate::instruments::equity::spot::Equity::new("A", "A", Currency::USD)
+                        .with_spot_id("A"),
                 ),
                 1.0,
             ),
             CompositeLegSpec::new(
                 "B",
                 InstrumentJson::Equity(
-                    crate::instruments::Equity::new("B", "B", Currency::USD).with_spot_id("B"),
+                    crate::instruments::equity::spot::Equity::new("B", "B", Currency::USD)
+                        .with_spot_id("B"),
                 ),
                 -1.0,
             ),
@@ -325,10 +329,11 @@ mod tests {
         );
 
         let mut wrong = json;
-        wrong["instrument"] = serde_json::to_value(crate::instruments::InstrumentEnvelope::new(
-            crate::instruments::Equity::example()?.into(),
-        ))
-        .map_err(|error| Error::Internal(error.to_string()))?;
+        wrong["instrument"] =
+            serde_json::to_value(crate::instruments::json_loader::InstrumentEnvelope::new(
+                crate::instruments::equity::spot::Equity::example()?.into(),
+            ))
+            .map_err(|error| Error::Internal(error.to_string()))?;
         let error = serde_json::from_value::<CompositeRebalanceResult>(wrong)
             .expect_err("a non-composite envelope must be rejected");
         assert!(error
@@ -471,7 +476,7 @@ mod tests {
         own_theta: &str,
     ) -> Result<(
         CompositeInstrument,
-        crate::instruments::Deposit,
+        crate::instruments::rates::deposit::Deposit,
         MarketContext,
     )> {
         let as_of = date!(2024 - 01 - 02);
@@ -481,10 +486,10 @@ mod tests {
                 .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
                 .build()?;
         let market = MarketContext::new().insert(curve);
-        let mut own = crate::instruments::Deposit::example()?;
+        let mut own = crate::instruments::rates::deposit::Deposit::example()?;
         own.id = InstrumentId::new("DEP-OWN");
         own.metric_pricing_overrides.theta_period = Some(Tenor::parse(own_theta)?);
-        let mut inherit = crate::instruments::Deposit::example()?;
+        let mut inherit = crate::instruments::rates::deposit::Deposit::example()?;
         inherit.id = InstrumentId::new("DEP-INHERIT");
         let spec = CompositeSpec::new(
             "DEP-PAIR",
@@ -677,14 +682,16 @@ mod tests {
             CompositeLegSpec::new(
                 "A",
                 InstrumentJson::Equity(
-                    crate::instruments::Equity::new("A", "A", Currency::USD).with_spot_id("A"),
+                    crate::instruments::equity::spot::Equity::new("A", "A", Currency::USD)
+                        .with_spot_id("A"),
                 ),
                 1.0,
             ),
             CompositeLegSpec::new(
                 "B",
                 InstrumentJson::Equity(
-                    crate::instruments::Equity::new("B", "B", Currency::USD).with_spot_id("B"),
+                    crate::instruments::equity::spot::Equity::new("B", "B", Currency::USD)
+                        .with_spot_id("B"),
                 ),
                 -1.0,
             ),

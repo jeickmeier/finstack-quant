@@ -54,9 +54,10 @@ fn tied_custom_coupon_intervals_choose_shorter_frequency() {
         None,
     )
     .expect("custom bond JSON");
-    let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
+    let envelope: finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope =
         serde_json::from_str(&wire).expect("bond envelope");
-    let finstack_quant_valuations::instruments::InstrumentJson::Bond(bond) = envelope.instrument
+    let finstack_quant_valuations::instruments::json_loader::InstrumentJson::Bond(bond) =
+        envelope.instrument
     else {
         panic!("expected bond")
     };
@@ -120,10 +121,10 @@ fn tranche_table_retains_empty_schema_sums_duplicates_and_rejects_currency_loss(
 
 #[test]
 fn retired_public_options_are_rejected_in_json() {
-    use finstack_quant_valuations::instruments::{
-        fixed_income::revolving_credit::{StochasticUtilizationSpec, UtilizationProcess},
-        Swaption,
+    use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
+        StochasticUtilizationSpec, UtilizationProcess,
     };
+    use finstack_quant_valuations::instruments::rates::swaption::Swaption;
     let mut swaption = serde_json::to_value(Swaption::example().unwrap()).unwrap();
     swaption["exercise_style"] = serde_json::json!("european");
     assert!(serde_json::from_value::<Swaption>(swaption)

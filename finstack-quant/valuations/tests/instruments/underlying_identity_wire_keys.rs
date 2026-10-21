@@ -7,12 +7,27 @@
 
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_valuations::instruments::{
-    AsianOption, BarrierOption, CommodityAsianOption, CommodityForward, CommodityFuture,
-    CommoditySpotOption, CommoditySpreadOption, CommoditySwap, CommoditySwaption, ConvertibleBond,
-    Equity, EquityFuture, EquityOption, FxForward, FxFuture, FxSpot, LookbackOption, Ndf,
-    QuantoOption, VarianceSwap, VolatilityDependency,
-};
+use finstack_quant_valuations::instruments::commodity::commodity_asian_option::CommodityAsianOption;
+use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
+use finstack_quant_valuations::instruments::commodity::commodity_future::CommodityFuture;
+use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
+use finstack_quant_valuations::instruments::commodity::commodity_spread_option::CommoditySpreadOption;
+use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
+use finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;
+use finstack_quant_valuations::instruments::equity::equity_future::EquityFuture;
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
+use finstack_quant_valuations::instruments::equity::spot::Equity;
+use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
+use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
+use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
+use finstack_quant_valuations::instruments::exotics::lookback_option::LookbackOption;
+use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
+use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
+use finstack_quant_valuations::instruments::fx::fx_future::FxFuture;
+use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
+use finstack_quant_valuations::instruments::fx::ndf::Ndf;
+use finstack_quant_valuations::instruments::fx::quanto_option::QuantoOption;
+use finstack_quant_valuations::instruments::VolatilityDependency;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;

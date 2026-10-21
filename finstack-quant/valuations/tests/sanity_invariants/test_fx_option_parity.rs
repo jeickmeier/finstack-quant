@@ -16,11 +16,12 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
 use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind,
 };
 use finstack_quant_valuations::instruments::OptionType;
-use finstack_quant_valuations::instruments::{Attributes, FxOption, Instrument};
+use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
 use time::Month;
