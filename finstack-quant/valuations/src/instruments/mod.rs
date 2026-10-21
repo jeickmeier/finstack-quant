@@ -189,12 +189,20 @@ pub use fixed_income::{
     FiIndexTotalReturnSwap, InflationLinkedBond, PoolType, RevolvingCredit, TbaTerm, TermLoan,
 };
 
-pub use rates::{
-    BasisSwap, BermudanSwaption, CapFloor, CmsOption, CmsSpreadOption, CmsSwap, CollateralSpec,
-    CollateralType, Deposit, ForwardRateAgreement, InflationCapFloor, InflationSwap,
-    InterestRateFuture, InterestRateSwap, RateOptionType, Repo, RepoType, Swaption, XccySwap,
-    YoYInflationSwap,
-};
+pub use rates::basis_swap::BasisSwap;
+pub use rates::cap_floor::{CapFloor, RateOptionType};
+pub use rates::cms_option::CmsOption;
+pub use rates::cms_spread_option::CmsSpreadOption;
+pub use rates::cms_swap::CmsSwap;
+pub use rates::deposit::Deposit;
+pub use rates::fra::ForwardRateAgreement;
+pub use rates::inflation_cap_floor::InflationCapFloor;
+pub use rates::inflation_swap::{InflationSwap, YoYInflationSwap};
+pub use rates::ir_future::InterestRateFuture;
+pub use rates::irs::InterestRateSwap;
+pub use rates::repo::{CollateralSpec, CollateralType, Repo, RepoType};
+pub use rates::swaption::{BermudanSwaption, Swaption};
+pub use rates::xccy_swap::XccySwap;
 
 pub use credit_derivatives::{
     cds::CreditDefaultSwap, cds_index::CdsIndex, cds_option::CdsOption, cds_tranche::CdsTranche,
@@ -234,7 +242,7 @@ pub use commodity::{
     commodity_swaption::CommoditySwaption,
 };
 
-pub use rates::InterestRateFutureOption;
+pub use rates::ir_future_option::InterestRateFutureOption;
 
 pub use composite::{
     CompositeExposureReport, CompositeHistoryRow, CompositeInstrument, CompositeLegSpec,

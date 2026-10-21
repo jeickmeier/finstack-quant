@@ -35,8 +35,10 @@ use finstack_quant_valuations_core::market::conventions::ids::{
 };
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_core::recalibration::QuoteBump;
-use finstack_quant_valuations_rates::InflationSwap;
-use finstack_quant_valuations_rates::{ForwardRateAgreement, InterestRateFuture, InterestRateSwap};
+use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
+use finstack_quant_valuations_rates::ir_future::InterestRateFuture;
+use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use rust_decimal::Decimal;
 use time::Month;
 

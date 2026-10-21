@@ -76,7 +76,7 @@ fn test_build_xccy_basis_swap() {
 #[cfg(test)]
 mod mtm_reset_builder_tests {
     use super::*;
-    use finstack_quant_valuations_rates::xccy_swap::{NotionalExchange, ResettingSide};
+    use finstack_quant_valuations_core::instruments::{NotionalExchange, ResettingSide};
 
     #[test]
     fn building_g10_pair_produces_mtm_resetting_swap() {

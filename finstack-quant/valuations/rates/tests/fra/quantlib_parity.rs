@@ -34,9 +34,9 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
-use finstack_quant_valuations_rates::irs::PayReceive;
 use finstack_quant_valuations_test_support::assert_parity;
 use finstack_quant_valuations_test_support::parity::ParityConfig;
 use rust_decimal::Decimal;

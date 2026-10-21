@@ -461,9 +461,8 @@ fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
     use finstack_quant_core::market_data::term_structures::{NelsonSiegelModel, ParametricCurve};
     use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations_rates::irs::{
-        ConventionSwapParams, InterestRateSwap, PayReceive,
-    };
+    use finstack_quant_valuations_core::instruments::PayReceive;
+    use finstack_quant_valuations_rates::irs::{ConventionSwapParams, InterestRateSwap};
 
     // Each term is (overnight accrual start, overnight accrual end, delayed
     // payment time, fixed coupon fraction). This reprices directly on the

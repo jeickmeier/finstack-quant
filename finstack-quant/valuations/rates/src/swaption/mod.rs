@@ -90,7 +90,7 @@
 //!
 //! # Examples
 //!
-//! See [`Swaption`] for construction and usage examples.
+//! See [`Swaption`](crate::swaption::Swaption) for construction and usage examples.
 //!
 //! # See Also
 //!

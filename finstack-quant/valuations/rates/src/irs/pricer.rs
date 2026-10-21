@@ -21,7 +21,7 @@
 //! - Hull, J. C. (2018). *Options, Futures, and Other Derivatives*. Chapter 7. `docs/REFERENCES.md#hull-options-futures`
 //! - Kahan, W. (1965). "Further Remarks on Reducing Truncation Errors." `docs/REFERENCES.md#kahan-1965`
 
-use crate::irs::{InterestRateSwap, PayReceive};
+use crate::irs::InterestRateSwap;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -29,6 +29,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
+use finstack_quant_valuations_core::instruments::PayReceive;
 
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -442,7 +443,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-SEASONED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(crate::irs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .fixed_leg(
                 finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -529,7 +530,7 @@ mod tests {
         let swap_no_lookback = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-NO-LOOKBACK"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
-            .side(crate::irs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .fixed_leg(
                 finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -616,7 +617,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-MISSING-CAL"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
-            .side(crate::irs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .fixed_leg(
                 finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -698,7 +699,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-NO-CALENDAR"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
-            .side(crate::irs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .fixed_leg(
                 finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -785,7 +786,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-VALUE-RAW-NO-FWD"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
-            .side(crate::irs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .fixed_leg(
                 finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -857,7 +858,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-SCHEDULE-NO-FWD"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
-            .side(crate::irs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .fixed_leg(
                 finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -958,7 +959,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-SCHEDULE-SEASONED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(crate::irs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .fixed_leg(
                 finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -1046,7 +1047,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-IDENTITY-TEST"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
-            .side(crate::irs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .fixed_leg(
                 finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),

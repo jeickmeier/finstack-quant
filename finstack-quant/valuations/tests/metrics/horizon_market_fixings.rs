@@ -19,10 +19,10 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::rates::irs::{FixedLegSpec, FloatLegSpec, PayReceive};
 use finstack_quant_valuations::instruments::{
     BreakevenConfig, BreakevenMode, BreakevenTarget, Instrument, InterestRateSwap, PricingOptions,
 };
+use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
 use finstack_quant_valuations::metrics::MetricId;
 use std::collections::HashMap;
 use time::macros::date;

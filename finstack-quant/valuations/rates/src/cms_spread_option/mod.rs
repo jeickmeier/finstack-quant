@@ -13,7 +13,7 @@
 //!
 //! # See Also
 //!
-//! - [`CmsSpreadOption`] for instrument definition
+//! - [`CmsSpreadOption`](crate::cms_spread_option::CmsSpreadOption) for instrument definition
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;

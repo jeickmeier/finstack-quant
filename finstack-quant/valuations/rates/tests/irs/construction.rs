@@ -10,7 +10,8 @@ use crate::support::rates as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_rates::irs::{InterestRateSwap, PayReceive};
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use time::macros::date;
 
 #[test]

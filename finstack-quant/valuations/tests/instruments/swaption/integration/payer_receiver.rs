@@ -7,11 +7,10 @@ use finstack_quant_core::market_data::surfaces::{
     VolGridOpts, VolInterpolationMode, VolSurface, VolSurfaceAxis,
 };
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::rates::irs::{
-    FixedLegSpec, FloatLegSpec, InterestRateSwap, PayReceive,
-};
+use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::VolatilityModel;
+use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
 use time::macros::date;
