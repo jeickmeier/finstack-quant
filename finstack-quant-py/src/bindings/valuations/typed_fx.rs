@@ -106,30 +106,12 @@ pub struct PyFxForward {
 }
 
 instrument_envelope_methods!(
-    PyFxForward,
+    PyFxForward("FxForward"),
     FxForward,
-    "fx_forward",
     builder = PyFxForwardBuilder("FxForwardBuilder", fields),
     seed = finstack_quant_valuations::instruments::FxForward::builder(),
-    /// Build the validated FX forward.
-    ///
-    /// Validation is the Rust ``FxForward::builder().build()`` invariants
-    /// only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// FxForward
-    ///     The validated FX forward.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed FX forward fails validation (for example,
-    ///     ``base_currency`` equals ``quote_currency``).
-    build
 );
-instrument_pricing_methods!(PyFxForward);
+instrument_pricing_methods!(PyFxForward, "FxForward");
 
 #[pymethods]
 impl PyFxForward {
@@ -806,30 +788,12 @@ pub struct PyFxOption {
 }
 
 instrument_envelope_methods!(
-    PyFxOption,
+    PyFxOption("FxOption"),
     FxOption,
-    "fx_option",
     builder = PyFxOptionBuilder("FxOptionBuilder", fields),
     seed = finstack_quant_valuations::instruments::FxOption::builder(),
-    /// Build the validated FX option.
-    ///
-    /// Validation is the Rust ``FxOption::builder().build()`` invariants
-    /// only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// FxOption
-    ///     The validated FX option.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed FX option fails validation (for example,
-    ///     ``base_currency`` equals ``quote_currency``).
-    build
 );
-instrument_pricing_methods!(PyFxOption);
+instrument_pricing_methods!(PyFxOption, "FxOption");
 
 /// Build an `FxDeltaConvention` from the loose Python inputs.
 fn delta_convention_from_parts(
@@ -1080,112 +1044,7 @@ crate::bindings::macros::py_getters!(PyFxOption |s| {
     vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 });
 
-instrument_greek_methods!(PyFxOption {
-    /// Spot delta of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Spot delta produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce delta.
-    delta,
-    /// Spot gamma of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Spot gamma produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce gamma.
-    gamma,
-    /// Vega of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Vega produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce vega.
-    vega,
-    /// Theta of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Theta produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce theta.
-    theta,
-    /// Domestic-rate rho of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Domestic-rate rho produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce rho.
-    rho,
-    /// Foreign-rate rho of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Foreign-rate rho produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce foreign rho.
-    foreign_rho,
-    /// Vanna of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Vanna produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce vanna.
-    vanna,
-    /// Volga of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Volga produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce volga.
-    volga,
-});
+instrument_greek_methods!(PyFxOption("FxOption") { delta, gamma, vega, theta, rho, foreign_rho, vanna, volga });
 
 /// Fluent builder for ``FxOption``; wraps the Rust
 /// ``FinancialBuilder``-generated builder (consuming setters).

@@ -47,45 +47,12 @@ pub struct PyStructuredCredit {
 }
 
 instrument_envelope_methods!(
-    PyStructuredCredit,
+    PyStructuredCredit("StructuredCredit"),
     StructuredCredit,
-    "structured_credit",
     builder = PyStructuredCreditBuilder("StructuredCreditBuilder", no_fields),
     seed = StructuredCredit::builder(),
-    builder_doc = [
-        " ",
-        " Notes",
-        " -----",
-        " The builder pre-seeds ``market_conditions``, ``deal_metadata`` and",
-        " ``hedge_swaps`` with their Rust ``Default`` values (the Rust builder",
-        " fields have no default), which the corresponding setters",
-        " (``market_conditions``, ``waterfall_rules``, ``fees``, ``credit_model``,",
-        " ``hedge_swaps`` ...) can override with typed objects, dicts or JSON",
-        " strings. Prefer :meth:`new_abs` / :meth:`new_clo` / :meth:`new_cmbs` /",
-        " :meth:`new_rmbs` for registry-calibrated deal-type defaults; use this",
-        " builder for full manual control.",
-    ],
-    /// Build the validated structured-credit deal.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCredit
-    ///     The validated deal.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed deal fails pricing validation.
-    build
 );
-instrument_pricing_methods!(
-    PyStructuredCredit,
-    model_doc = [
-        "     ``\"default\"`` is the deal's ``default_model``: the deterministic",
-        "     ``\"discounting\"`` waterfall.",
-    ]
-);
+instrument_pricing_methods!(PyStructuredCredit, "StructuredCredit");
 
 #[pymethods]
 impl PyStructuredCredit {

@@ -1,14 +1,21 @@
 """
-Python bindings for the corresponding finstack-quant Rust API.
+Typed instruments, builders, and JSON pricing, metric and cashflow helpers.
 
-Every typed instrument ``from_json`` classmethod accepts either canonical bare
-``{"type": ..., "spec": ...}`` JSON or a versioned
-``{"schema": "finstack_quant.instrument/1", "instrument": ...}`` envelope.
-Inputs larger than 16 MiB raise ``ValueError`` before parsing.
+Mirrors ``finstack_quant_valuations::instruments``. Every typed instrument
+class and its builder live directly in this module, next to the JSON helpers
+(``price_instrument``, ``validate_instrument_json``, ``instrument_cashflows``).
+
+Every typed instrument ``from_json`` accepts only the versioned
+``{"schema": "finstack_quant.instrument/1", "instrument": ...}`` envelope
+whose ``instrument.type`` matches the class; bare ``{"type", "spec"}``
+payloads and cross-type coercion are rejected. Inputs larger than 16 MiB
+raise ``ValueError`` before parsing.
 
 Examples
 --------
->>> from finstack_quant.valuations.instruments import list_models, list_models_grouped
+>>> from finstack_quant.valuations.instruments import TermLoan, list_models_grouped
+>>> TermLoan.example().id
+'TERM-LOAN-USD-5Y'
 >>> models = list_models_grouped()["bond"]
 >>> all(model in models for model in ("discounting", "hazard_rate", "tree", "rates_credit"))
 True
@@ -829,7 +836,8 @@ class Bond:
         -------
         dict[str, object]
             Serde form of ``MarketDependencies`` (``curves`` grouped by role,
-            fixings, volatility surfaces, FX pairs).
+            ``credit_index_ids``, ``market_scalar_ids``,
+            ``volatility_dependencies``, ``fx_pairs``, ``series_ids``).
 
         Raises
         ------
@@ -3351,7 +3359,8 @@ class TermLoan:
         -------
         dict[str, object]
             Serde form of ``MarketDependencies`` (``curves`` grouped by role,
-            fixings, volatility surfaces, FX pairs).
+            ``credit_index_ids``, ``market_scalar_ids``,
+            ``volatility_dependencies``, ``fx_pairs``, ``series_ids``).
 
         Raises
         ------
@@ -5967,7 +5976,8 @@ class InterestRateSwap:
         -------
         dict[str, object]
             Serde form of ``MarketDependencies`` (``curves`` grouped by role,
-            fixings, volatility surfaces, FX pairs).
+            ``credit_index_ids``, ``market_scalar_ids``,
+            ``volatility_dependencies``, ``fx_pairs``, ``series_ids``).
 
         Raises
         ------
@@ -6757,7 +6767,8 @@ class Swaption:
         -------
         dict[str, object]
             Serde form of ``MarketDependencies`` (``curves`` grouped by role,
-            fixings, volatility surfaces, FX pairs).
+            ``credit_index_ids``, ``market_scalar_ids``,
+            ``volatility_dependencies``, ``fx_pairs``, ``series_ids``).
 
         Raises
         ------
@@ -7706,7 +7717,8 @@ class CapFloor:
         -------
         dict[str, object]
             Serde form of ``MarketDependencies`` (``curves`` grouped by role,
-            fixings, volatility surfaces, FX pairs).
+            ``credit_index_ids``, ``market_scalar_ids``,
+            ``volatility_dependencies``, ``fx_pairs``, ``series_ids``).
 
         Raises
         ------
@@ -25420,8 +25432,10 @@ class StructuredCredit:
 
         The builder pre-seeds ``market_conditions``, ``deal_metadata`` and
         ``hedge_swaps`` with their Rust ``Default`` values (the Rust
-        builder fields have no default), which the corresponding ``*_json``
-        setters can override. Prefer :meth:`new_abs` / :meth:`new_clo` /
+        builder fields have no default), which the corresponding setters
+        (``market_conditions``, ``waterfall_rules``, ``fees``,
+        ``credit_model``, ``hedge_swaps`` ...) can override with typed
+        objects, dicts or JSON strings. Prefer :meth:`new_abs` / :meth:`new_clo` /
         :meth:`new_cmbs` / :meth:`new_rmbs` for registry-calibrated deal-type
         defaults; use this builder for full manual control.
 
@@ -27986,7 +28000,8 @@ class StructuredCreditBuilder:
         Raises
         ------
         ValueError
-            If a required field is missing or Rust validation fails.
+            If the builder was already consumed, a required field is missing,
+            or the completed deal fails pricing validation.
         """
         ...
 

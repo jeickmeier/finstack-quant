@@ -5,6 +5,9 @@ Specifications embed canonical instruments, resolve signed quantities only at
 initialization or explicit rebalance, and expose recursive primitive value,
 risk, concentration, execution, and dated total-return reports.
 
+``CompositeSpec.initialize`` covers both fixed and dynamic weighting; there
+is no separate ``initialize_fixed`` export.
+
 Examples
 --------
 >>> import datetime, json
@@ -568,7 +571,7 @@ class RebalanceRule:
             Rebalance cadence as a ``Tenor`` or tenor string such as ``"1D"``,
             ``"1W"``, ``"1M"`` or ``"3M"``.
         calendar_id : str
-            Registered calendar identifier such as ``weekends``.
+            Registered calendar identifier such as ``weekends_only``.
         business_day_convention : str
             Canonical convention such as ``following`` or ``modified_following``.
         end : datetime.date | datetime.datetime | pandas.Timestamp | str | None
@@ -1485,7 +1488,7 @@ class CompositeExposureReport:
     @property
     def path_count(self) -> int:
         """
-        Return the number of recursive primitive paths.
+        Return the number of recursive primitive paths before overlap netting.
 
         Returns
         -------
@@ -1843,6 +1846,10 @@ def history_from_spec(
     """
     Initialize at the first observation and calculate chronological rows.
 
+    Warmup observations feed dynamic weighting only. The first output row
+    has ``return_index = 100`` and zero P&L. Scheduled rebalances are
+    close-effective.
+
     Parameters
     ----------
     spec : CompositeSpec
@@ -1914,6 +1921,9 @@ def history(
 ) -> CompositeHistoryResult:
     """
     Calculate chronological rows from an already-resolved initial state.
+
+    Period return is ``pnl / capital``. The initial effective date must be
+    on or before the first observation.
 
     Parameters
     ----------

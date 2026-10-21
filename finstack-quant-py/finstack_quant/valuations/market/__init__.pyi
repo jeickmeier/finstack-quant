@@ -41,7 +41,8 @@ class RateIndexConventions:
 
     Returned by :meth:`ConventionRegistry.require_rate_index`. Every field is a
     read-only property; enum-valued fields are serde strings so they can be
-    passed straight back into builders and leg specs.
+    passed straight back into builders and leg specs. Build a standard swap
+    from them with ``InterestRateSwap.from_conventions``.
 
     Examples
     --------
@@ -474,7 +475,7 @@ class CdsConventionSpec:
     @property
     def settlement_days(self) -> int:
         """
-        Settlement lag in business days (T+n).
+        Settlement lag in business days (T+n; SNAC is T+1 for the step-in date).
 
         Returns
         -------
@@ -1355,6 +1356,8 @@ class ConventionRegistry:
     indices, CDS families, swaptions, inflation swaps, IR futures,
     cross-currency pairs) are loaded once from the crate's embedded JSON and
     shared. Lookups are read-only; missing identifiers raise ``KeyError``.
+    Construction raises ``RuntimeError`` if the embedded convention tables
+    fail to load (a packaging error).
 
     Examples
     --------

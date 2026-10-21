@@ -57,30 +57,12 @@ pub struct PyEquityOption {
 }
 
 instrument_envelope_methods!(
-    PyEquityOption,
+    PyEquityOption("EquityOption"),
     EquityOption,
-    "equity_option",
     builder = PyEquityOptionBuilder("EquityOptionBuilder", fields),
     seed = finstack_quant_valuations::instruments::EquityOption::builder(),
-    /// Build the validated equity option.
-    ///
-    /// Validation is the Rust ``EquityOption::builder().build()`` invariants
-    /// only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOption
-    ///     The validated equity option.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed option fails validation (non-positive strike,
-    ///     zero quantity, unsorted dividends, inconsistent exercise state).
-    build
 );
-instrument_pricing_methods!(PyEquityOption);
+instrument_pricing_methods!(PyEquityOption, "EquityOption");
 
 #[pymethods]
 impl PyEquityOption {
@@ -361,73 +343,7 @@ crate::bindings::macros::py_getters!(PyEquityOption |s| {
     div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(|id| id.to_string());
 });
 
-instrument_greek_methods!(PyEquityOption {
-    /// Spot delta of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Delta produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce delta.
-    delta,
-    /// Gamma of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Gamma produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce gamma.
-    gamma,
-    /// Vega of the option (per 1% vol).
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Vega produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce vega.
-    vega,
-    /// Theta of the option (per day on ``metric_pricing_overrides.theta_day_basis``, calendar days by default).
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Theta produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce theta.
-    theta,
-    /// Rho of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Rho produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce rho.
-    rho,
-});
+instrument_greek_methods!(PyEquityOption("EquityOption") { delta, gamma, vega, theta, rho });
 
 /// Fluent builder for ``EquityOption``; wraps the Rust
 /// ``FinancialBuilder``-generated builder (consuming setters).

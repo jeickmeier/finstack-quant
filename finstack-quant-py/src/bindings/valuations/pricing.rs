@@ -10,6 +10,7 @@ use crate::bindings::module_utils::{
     opt_spec_from_py, py_to_json_string, py_to_serde, spec_from_py,
 };
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, display_to_py, value_error};
 use finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope;
 use finstack_quant_valuations::instruments::MetricPricingOverrides;
@@ -719,32 +720,7 @@ fn list_models_grouped() -> std::collections::BTreeMap<String, Vec<String>> {
     finstack_quant_valuations::pricer::list_models_grouped()
 }
 
-/// Return the maintained liquid listed-derivatives coverage catalog.
-///
-/// Parameters
-/// ----------
-/// exchange : str | None, optional
-///     Exact venue filter: ``"cme"``, ``"eurex"``, ``"montreal"``, or
-///     ``"sgx"``. ``None`` returns all venues.
-///
-/// Returns
-/// -------
-/// list[dict[str, object]]
-///     Product-family rows with the canonical instrument type, exercised
-///     features, source URL, and any residual modelling gap.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``exchange`` is not one of the accepted canonical venue names, or
-///     if the embedded listed-product sidecar is invalid.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.market import listed_product_catalog
-/// >>> rows = listed_product_catalog("cme")
-/// >>> all(row["exchange"] == "cme" for row in rows)
-/// True
+#[doc = pydoc!("finstack_quant.valuations.market", "listed_product_catalog")]
 #[pyfunction(signature = (exchange=None))]
 fn listed_product_catalog<'py>(
     py: Python<'py>,

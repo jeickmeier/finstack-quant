@@ -284,36 +284,12 @@ pub struct PyBond {
 }
 
 instrument_envelope_methods!(
-    PyBond,
+    PyBond("Bond"),
     Bond,
-    "bond",
     builder = PyBondBuilder("BondBuilder", fields),
     seed = finstack_quant_valuations::instruments::Bond::builder(),
-    /// Build the validated bond.
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     The validated bond.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing
-    ///     (the message names the field), or the bond fails validation.
-    build
 );
-instrument_pricing_methods!(
-    PyBond,
-    model_doc = [
-        "     For bonds, ``\"discounting\"`` prices non-callable rates-only PV and",
-        "     ``\"hazard_rate\"`` non-callable fractional recovery of par;",
-        "     ``\"tree\"`` values rates-only exercise rights and ``\"rates_credit\"``",
-        "     values call, put and return-floor rights jointly with credit risk",
-        "     (its stochastic pricing adds Monte Carlo convergence and",
-        "     reproducibility diagnostics to ``details``).",
-    ]
-);
+instrument_pricing_methods!(PyBond, "Bond");
 
 #[pymethods]
 impl PyBond {
@@ -1483,26 +1459,12 @@ pub struct PyTermLoan {
 }
 
 instrument_envelope_methods!(
-    PyTermLoan,
+    PyTermLoan("TermLoan"),
     TermLoan,
-    "term_loan",
     builder = PyTermLoanBuilder("TermLoanBuilder", fields),
     seed = finstack_quant_valuations::instruments::TermLoan::builder(),
-    /// Build the validated term loan.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoan
-    ///     The validated loan.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing
-    ///     (the message names the field), or the loan fails validation.
-    build
 );
-instrument_pricing_methods!(PyTermLoan);
+instrument_pricing_methods!(PyTermLoan, "TermLoan");
 
 #[pymethods]
 impl PyTermLoan {

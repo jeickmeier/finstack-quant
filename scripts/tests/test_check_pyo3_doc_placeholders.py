@@ -139,3 +139,26 @@ instrument_envelope_methods!(
     assert [(error.owner, error.message) for error in _MODULE.placeholder_errors(fixture)] == [
         ("size", "callability-only doctest"),
     ]
+
+
+def test_stub_sourced_owners_are_out_of_scope(tmp_path: Path) -> None:
+    """Owners documented by `pydoc!` carry no Rust prose; the stub checker covers them."""
+    fixture = tmp_path / "stub_sourced.rs"
+    fixture.write_text(
+        """#[doc = pydoc!("finstack_quant.widgets", "Widget")]
+#[pyclass]
+struct Widget;
+
+#[pymethods]
+impl Widget {
+    #[doc = pydoc!("finstack_quant.widgets", "Widget.create")]
+    #[staticmethod]
+    fn create() -> Self {
+        Self
+    }
+}
+""",
+        encoding="utf-8",
+    )
+
+    assert _MODULE.public_pyo3_doc_blocks(fixture) == []

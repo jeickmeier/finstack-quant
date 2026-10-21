@@ -438,30 +438,12 @@ pub struct PyConvertibleBond {
 }
 
 instrument_envelope_methods!(
-    PyConvertibleBond,
+    PyConvertibleBond("ConvertibleBond"),
     ConvertibleBond,
-    "convertible_bond",
     builder = PyConvertibleBondBuilder("ConvertibleBondBuilder", fields),
     seed = finstack_quant_valuations::instruments::ConvertibleBond::builder(),
-    /// Build the validated convertible bond.
-    ///
-    /// Validation is the Rust ``ConvertibleBond::builder().build()``
-    /// invariants only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBond
-    ///     The validated convertible bond.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed bond fails validation (for example, conversion
-    ///     terms set neither ``ratio`` nor ``price``).
-    build
 );
-instrument_pricing_methods!(PyConvertibleBond);
+instrument_pricing_methods!(PyConvertibleBond, "ConvertibleBond");
 
 #[pymethods]
 impl PyConvertibleBond {
