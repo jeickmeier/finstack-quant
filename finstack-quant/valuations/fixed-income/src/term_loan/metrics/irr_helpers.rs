@@ -2,15 +2,9 @@
 //!
 //! This module provides unified IRR solving for YTM, YTC, YTW, and YT2Y/3Y/4Y metrics.
 //!
-//! All helpers use **kind-aware cashflow filtering** from the full schedule to ensure
-//! correct treatment at exercise boundaries:
-//! - Coupons/fees (all variants: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`):
-//!   included up to AND including the exercise date
-//! - Amortization/Notional (including negative funding legs): included only
-//!   BEFORE the exercise date (the pre-exercise outstanding used for the
-//!   redemption leg captures exercise-date amortization; draws on or after
-//!   exercise are cancelled by the prepayment)
-//! - PIK: always excluded (capitalization, not cash)
+//! All helpers select the schedule's cash-settlement flows (PIK excluded) paid
+//! after settlement and on or before the exercise date; the redemption leg is
+//! the claim remaining after exercise-date events.
 
 use std::sync::Arc;
 
@@ -146,19 +140,14 @@ pub(super) fn target_price_from_quote_or_model(
 ///
 /// # Flow selection
 ///
-/// Uses the full cashflow schedule for precise kind-based filtering:
-/// - **Coupons and fees** (`Fixed`, `FloatReset`, `Stub`, `Fee`, `CommitmentFee`,
-///   `UsageFee`, `FacilityFee`): included up to AND including `exercise_date` --
-///   the holder receives accrued interest and fee payments on the exercise date.
-/// - **Amortization** and **Notional** (redemptions and funding legs): included
-///   only BEFORE `exercise_date`. Negative Notional flows are the holder's
-///   future DDTL funding outflows; they must be in the flow set because the
-///   redemption parameter is the pre-exercise outstanding, which includes the
-///   balances those draws create. At the exercise date itself, amortization
-///   and scheduled redemptions are implicitly captured in the pre-exercise
-///   outstanding used for the redemption parameter, and any draw on or after
-///   exercise is cancelled by the prepayment.
-/// - **PIK**: always excluded (capitalization, not cash).
+/// Every cash-settlement flow ([`CFKind::is_cash_settlement`], the same set
+/// YTM uses) paid after settlement and on or before `exercise_date` is
+/// included: coupons, fees, scheduled amortization and redemptions, and
+/// negative Notional DDTL funding legs. The redemption parameter is the claim
+/// remaining after those exercise-date events, so nothing is counted twice.
+/// PIK is excluded (capitalization, not cash). For the maturity leg, pass the
+/// final *payment* date (see [`maturity_exercise_date`]) so a final payment
+/// rolled past the unadjusted maturity is kept.
 ///
 /// # Arguments
 ///
@@ -189,33 +178,16 @@ pub(super) fn solve_irr_to_exercise(
     // Initial price leg at settlement date (negative = cash outflow for purchase)
     flows.push((settlement_date, -target_price.amount()));
 
-    // Kind-aware flow selection from the full schedule.
-    // Scheduled cash is paid before exercise. Redemption covers the remaining
-    // claim after PIK capitalization and scheduled principal repayments.
+    // Scheduled cash paid on or before the exercise date. Redemption covers
+    // the remaining claim after PIK capitalization and scheduled principal.
     for cf in schedule.get_flows() {
         if cf.date <= settlement_date || cf.date > exercise_date {
             continue;
         }
-        match cf.kind {
-            // Coupons, interest, and all fee variants: include up to AND including
-            // exercise date.  We match all fee kinds (`Fee`, `CommitmentFee`,
-            // `UsageFee`, `FacilityFee`) to be forward-compatible if the cashflow
-            // builder ever emits these specific fee variants directly.
-            CFKind::Fixed
-            | CFKind::FloatReset
-            | CFKind::Stub
-            | CFKind::Fee
-            | CFKind::CommitmentFee
-            | CFKind::UsageFee
-            | CFKind::FacilityFee
-            | CFKind::LcFee
-            | CFKind::FrontingFee
-            | CFKind::Amortization
-            | CFKind::Notional => {
-                flows.push((cf.date, cf.amount.amount()));
-            }
-            // PIK is capitalized into the remaining exercise claim.
-            _ => {}
+        // Same cash-settlement kinds as YTM; PIK is capitalized into the
+        // remaining exercise claim.
+        if cf.kind.is_cash_settlement() {
+            flows.push((cf.date, cf.amount.amount()));
         }
     }
 
@@ -223,6 +195,26 @@ pub(super) fn solve_irr_to_exercise(
     flows.push((exercise_date, redemption.amount()));
 
     xirr_with_daycount(flows.as_slice(), loan.day_count, None)
+}
+
+/// Exercise date of the hold-to-maturity leg: the final scheduled payment
+/// date, or the contractual maturity if that is later.
+///
+/// A business-day convention can roll the final coupon and redemption past the
+/// unadjusted `loan.maturity`; truncating at the unadjusted date would drop
+/// them from the YTW maturity leg while YTM keeps them.
+///
+/// # Arguments
+///
+/// * `loan` - Term loan whose contractual `maturity` is the floor.
+/// * `schedule` - Full internal cashflow schedule with adjusted payment dates.
+pub(super) fn maturity_exercise_date(loan: &TermLoan, schedule: &CashFlowSchedule) -> Date {
+    schedule
+        .get_flows()
+        .iter()
+        .map(|cf| cf.date)
+        .max()
+        .map_or(loan.maturity, |last| last.max(loan.maturity))
 }
 
 /// Solve IRR to a fixed horizon using kind-aware filtering and outstanding at horizon.

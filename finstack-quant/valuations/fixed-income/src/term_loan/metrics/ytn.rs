@@ -8,7 +8,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 use super::irr_helpers::{
-    cached_full_schedule, solve_irr_to_date, target_price_from_quote_or_model,
+    cached_full_schedule, maturity_exercise_date, solve_irr_to_date,
+    target_price_from_quote_or_model,
 };
 
 /// Compute a date N years ahead of `as_of`, with leap-year fallback.
@@ -45,7 +46,9 @@ macro_rules! define_ytn {
                         as_of,
                         context.base_value,
                     )?;
-                    (loan.maturity, target_price)
+                    // Cap at the final payment date so a rolled final
+                    // payment stays in the hold-to-maturity leg.
+                    (maturity_exercise_date(loan, &schedule), target_price)
                 };
 
                 let target = years_ahead(as_of, $years)?;

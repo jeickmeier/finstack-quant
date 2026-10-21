@@ -10,8 +10,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 use super::irr_helpers::{
-    cached_full_schedule, exercisable_call_candidates, solve_irr_to_exercise,
-    target_price_from_quote_or_model,
+    cached_full_schedule, exercisable_call_candidates, maturity_exercise_date,
+    solve_irr_to_exercise, target_price_from_quote_or_model,
 };
 
 /// Yield-to-worst calculator for callable term loans.
@@ -32,7 +32,11 @@ impl MetricCalculator for YtwCalculator {
         let (currency, maturity, candidate_calls) = {
             let loan: &TermLoan = context.instrument_as()?;
             let calls = exercisable_call_candidates(loan, &schedule, as_of, &context.curves)?;
-            (loan.currency, loan.maturity, calls)
+            (
+                loan.currency,
+                maturity_exercise_date(loan, &schedule),
+                calls,
+            )
         };
         let dirty_now = {
             let loan: &TermLoan = context.instrument_as()?;
@@ -49,7 +53,8 @@ impl MetricCalculator for YtwCalculator {
         let mut candidates: Vec<(Date, Money)> = Vec::with_capacity(candidate_calls.len() + 1);
         candidates.extend(candidate_calls);
 
-        // The canonical schedule already includes final redemption.
+        // The canonical schedule already includes final redemption, paid on the
+        // (possibly rolled) final payment date.
         candidates.push((maturity, Money::from((0_i64, currency))));
 
         // Re-borrow the loan for the IRR solver (only immutable borrows of

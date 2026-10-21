@@ -605,7 +605,7 @@ mod tests {
 
         assert_eq!(result.mc_result.estimate.num_paths, 8);
         assert_eq!(result.path_results.len(), 8);
-        assert!(result.mc_result.estimate.std_dev.is_none());
+        assert!(result.mc_result.estimate.std_dev.is_some());
         assert!(result.mc_result.estimate.median.is_none());
         assert!(result.mc_result.estimate.percentile_25.is_none());
         assert!(result.mc_result.estimate.percentile_75.is_none());

@@ -46,7 +46,7 @@
 use super::super::results::MoneyEstimate;
 use super::lsq::regression_coefficients_with_basis;
 use crate::monte_carlo::discretization::ExactGbm;
-use crate::monte_carlo::estimate::Estimate;
+use crate::monte_carlo::estimate::{independent_estimator_stats, Estimate};
 use crate::monte_carlo::pricer::basis::{build_lsmc_basis, BasisFunctions, BasisKind, LsmcBasis};
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::rng::philox::PhiloxRng;
@@ -630,44 +630,17 @@ impl LsmcPricer {
         intrinsic_floor: Option<f64>,
         currency: Currency,
     ) -> finstack_quant_core::Result<MoneyEstimate> {
-        let mut stats = OnlineStats::new();
-        if self.config.antithetic {
-            for pair in path_pvs.chunks_exact(2) {
-                stats.update(0.5 * (pair[0] + pair[1]));
-            }
-        } else {
-            for &value in path_pvs {
-                stats.update(value);
-            }
+        let stats = independent_estimator_stats(path_pvs, self.config.antithetic)?;
+        let mut estimate = Estimate::from_stats(&stats);
+        if let Some(intrinsic) = intrinsic_floor.filter(|&value| stats.mean() < value) {
+            let (lo, hi) = estimate.ci_95;
+            let lower = lo.max(intrinsic);
+            estimate.mean = intrinsic;
+            estimate.ci_95 = (lower, hi.max(lower));
         }
-
-        let (mean, stderr, ci_95, std_dev) =
-            if let Some(intrinsic) = intrinsic_floor.filter(|&value| stats.mean() < value) {
-                let (lo, hi) = stats.confidence_interval(0.05);
-                let lower = lo.max(intrinsic);
-                (
-                    intrinsic,
-                    stats.stderr(),
-                    (lower, hi.max(lower)),
-                    stats.std_dev(),
-                )
-            } else {
-                (
-                    stats.mean(),
-                    stats.stderr(),
-                    stats.confidence_interval(0.05),
-                    stats.std_dev(),
-                )
-            };
-
-        let num_simulated_paths = if self.config.antithetic {
-            2 * self.config.num_paths
-        } else {
-            self.config.num_paths
-        };
-        let estimate = Estimate::new(mean, stderr, ci_95, self.config.num_paths)
-            .with_num_simulated_paths(num_simulated_paths)
-            .with_std_dev(std_dev);
+        if self.config.antithetic {
+            estimate = estimate.with_num_simulated_paths(2 * stats.count());
+        }
 
         MoneyEstimate::from_estimate(estimate, currency)
     }
