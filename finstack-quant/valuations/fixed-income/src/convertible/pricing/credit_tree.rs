@@ -2,7 +2,7 @@
 
 use finstack_quant_core::{Error, Result};
 
-use finstack_quant_models::EvolutionParams;
+use finstack_quant_models::trees::tree_framework::EvolutionParams;
 
 use super::valuator::ConvertibleBondValuator;
 

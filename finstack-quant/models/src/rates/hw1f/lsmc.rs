@@ -54,16 +54,16 @@
 //! - Longstaff-Schwartz LSMC and Monte Carlo exercise: `docs/REFERENCES.md#glasserman-2004-monte-carlo`
 //! - Hull-White short-rate context: `docs/REFERENCES.md#hull-options-futures`
 
-use crate::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
+use crate::monte_carlo::discretization::ExactHullWhite1F;
 use crate::monte_carlo::pricer::lsq::solve_least_squares;
 use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
 use crate::monte_carlo::results::MoneyEstimate;
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::{Discretization, PathState, RandomStream, StateKey};
-use crate::rates::hw1f::bank_account::bank_step_factor;
-use crate::rates::hw1f::config::Hw1fMcConfig;
-use crate::rates::hw1f::exercise::ExerciseBoundaryPayoff;
-use crate::rates::hw1f::mc::{build_event_aligned_grid, money_estimate_from_pairs};
+use crate::rates::hw1f::bank_step_factor;
+use crate::rates::hw1f::ExerciseBoundaryPayoff;
+use crate::rates::hw1f::Hw1fMcConfig;
+use crate::rates::hw1f::{build_event_aligned_grid, money_estimate_from_pairs};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::Result;

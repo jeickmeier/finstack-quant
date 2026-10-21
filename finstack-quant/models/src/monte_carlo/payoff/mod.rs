@@ -40,5 +40,3 @@ pub(crate) fn require_finite_state(
     }
     Ok(value)
 }
-
-pub use vanilla::EuropeanCall;

@@ -20,9 +20,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::{FxHashMap, Result};
 use finstack_quant_models::correlation::{CopulaSpec, LatentFactorSpec, RecoverySpec};
 use finstack_quant_models::credit::pool::prepayment::PrepaymentState;
+use finstack_quant_models::credit::pool::prepayment::{StochasticPrepaySpec, StochasticPrepayment};
 use finstack_quant_models::credit::pool::{
-    PerNameCopulaDefault, StochasticDefault, StochasticDefaultSpec, StochasticPrepaySpec,
-    StochasticPrepayment,
+    PerNameCopulaDefault, StochasticDefault, StochasticDefaultSpec,
 };
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::RandomStream;

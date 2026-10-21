@@ -60,7 +60,7 @@
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
-use finstack_quant_models::closed_form::volatility::black_call;
+use finstack_quant_models::closed_form::black_call;
 use finstack_quant_models::volatility::implied_vol_black;
 use finstack_quant_valuations_rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
 use finstack_quant_valuations_rates::swaption::BermudanSwaption;

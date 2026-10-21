@@ -128,7 +128,8 @@ pub struct OhlsonOScoreInput {
 /// for the recommended input shape.
 ///
 /// ```
-/// use finstack_quant_models::credit::scoring::{ohlson_o_score, OhlsonOScoreInput, ScoringZone};
+/// use finstack_quant_models::credit::scoring::ScoringZone;
+/// use finstack_quant_models::credit::scoring::ohlson::{ohlson_o_score, OhlsonOScoreInput};
 ///
 /// let healthy = OhlsonOScoreInput {
 ///     log_total_assets_adjusted: 12.0,

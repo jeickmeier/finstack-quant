@@ -27,8 +27,8 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff};
-use finstack_quant_models::rates::hw1f::config::Hw1fMcConfig;
-use finstack_quant_models::rates::hw1f::lsmc::Hw1fLsmcPricer;
+use finstack_quant_models::rates::hw1f::Hw1fLsmcPricer;
+use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 use finstack_quant_models::rates::hw1f::{ExerciseBoundaryPayoff, ShortRateBasis};
 
 /// Simplified swaption-proxy payoff: records no path-dependent cashflows

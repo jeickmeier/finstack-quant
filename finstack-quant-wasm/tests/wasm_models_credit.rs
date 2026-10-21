@@ -2,9 +2,10 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_models::credit::{
-    DynamicRecoverySpec, EndogenousHazardSpec, MertonModel, ToggleExerciseModel,
-};
+use finstack_quant_models::credit::dynamic_recovery::DynamicRecoverySpec;
+use finstack_quant_models::credit::endogenous_hazard::EndogenousHazardSpec;
+use finstack_quant_models::credit::toggle_exercise::ToggleExerciseModel;
+use finstack_quant_models::credit::MertonModel;
 use finstack_quant_wasm::api::models::credit::*;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;

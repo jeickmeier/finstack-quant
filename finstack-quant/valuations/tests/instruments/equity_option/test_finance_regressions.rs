@@ -35,7 +35,7 @@ fn cash_dividend_theta_matches_smooth_calendar_repricing() {
                         amount * (-rate * (date - as_of).whole_days() as f64 / 365.0).exp()
                     })
                     .sum();
-                let base = finstack_quant_models::closed_form::bs_greeks(
+                let base = finstack_quant_models::closed_form::vanilla::bs_greeks(
                     100.0 - dividend_pv,
                     option.strike,
                     rate,

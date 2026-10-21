@@ -5,10 +5,10 @@
 
 use super::payoff::CapletFloorletInputs;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::closed_form::bachelier_price_with_annuity;
 use finstack_quant_models::closed_form::{
     bachelier_delta_call, bachelier_delta_put, bachelier_gamma, bachelier_vega,
 };
-use finstack_quant_models::volatility::bachelier_price_with_annuity;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
 
 /// Price a caplet/floorlet using Bachelier's normal model.

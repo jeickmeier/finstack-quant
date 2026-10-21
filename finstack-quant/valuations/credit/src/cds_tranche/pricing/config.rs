@@ -3,7 +3,7 @@
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
-use finstack_quant_models::correlation::copula::{Copula, CopulaSpec};
+use finstack_quant_models::correlation::{Copula, CopulaSpec};
 
 // Pricing Model Constants
 //

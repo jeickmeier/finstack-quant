@@ -9,7 +9,7 @@ use crate::errors::core_to_py;
 use finstack_quant_models::monte_carlo::greeks::gbm_european::{
     finite_diff_delta_gbm, finite_diff_gamma_gbm, GbmEuropeanFdSpec,
 };
-use finstack_quant_models::OptionType;
+use finstack_quant_models::types::OptionType;
 use pyo3::prelude::*;
 
 #[allow(clippy::too_many_arguments)]

@@ -7,13 +7,13 @@
 //!
 //! # Components
 //!
-//! - [`crate::correlation::copula`]: Copula models for default correlation (Gaussian, Student-t, RFL, Multi-factor)
-//! - [`crate::correlation::recovery`]: Recovery rate models (constant, market-correlated)
-//! - [`crate::correlation::latent_factor`]: Factor models for correlated behavior
+//! - `crate::correlation::copula`: Copula models for default correlation (Gaussian, Student-t, RFL, Multi-factor)
+//! - `crate::correlation::recovery`: Recovery rate models (constant, market-correlated)
+//! - `crate::correlation::latent_factor`: Factor models for correlated behavior
 //!
-//! Joint probability utilities ([`crate::correlation::CorrelatedBernoulli`],
-//! [`crate::correlation::correlation_bounds`],
-//! [`crate::correlation::joint_probabilities`]) are re-exported from
+//! Joint probability utilities ([`finstack_quant_core::math::probability::CorrelatedBernoulli`],
+//! [`finstack_quant_core::math::probability::correlation_bounds`],
+//! [`finstack_quant_core::math::probability::joint_probabilities`]) are re-exported from
 //! [`finstack_quant_core::math::probability`].
 //!
 //! Matrix-validation helpers (`validate_correlation_matrix`,
@@ -24,8 +24,8 @@
 //!
 //! # Utilities
 //!
-//! - [`crate::correlation::validate_correlation_matrix`]: Validate correlation matrices
-//! - [`crate::correlation::correlation_bounds`]: Fréchet-Hoeffding bounds for correlated Bernoulli
+//! - [`finstack_quant_core::math::linalg::validate_correlation_matrix`]: Validate correlation matrices
+//! - [`finstack_quant_core::math::probability::correlation_bounds`]: Fréchet-Hoeffding bounds for correlated Bernoulli
 //!
 //! # Conventions
 //!
@@ -43,23 +43,17 @@
 //! - Factor-model and portfolio-risk context: `docs/REFERENCES.md#meucci-risk-and-asset-allocation`
 //!
 
-pub mod copula;
+pub(crate) mod copula;
 mod error;
-pub mod latent_factor;
-pub mod portfolio_loss;
-pub mod recovery;
+pub(crate) mod latent_factor;
+pub(crate) mod portfolio_loss;
+pub(crate) mod recovery;
 
 pub use copula::{
     Copula, CopulaSpec, FactorPairIntegrand, GaussianCopula, MultiFactorCopula,
     RandomFactorLoadingCopula, StudentTCopula,
 };
 pub use error::{Error, Result};
-pub use finstack_quant_core::math::linalg::{
-    nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts,
-};
-pub use finstack_quant_core::math::probability::{
-    correlation_bounds, joint_probabilities, CorrelatedBernoulli,
-};
 pub use latent_factor::{
     LatentFactorKind, LatentFactorSpec, LatentMultiFactor, LatentSingleFactor, LatentTwoFactor,
 };

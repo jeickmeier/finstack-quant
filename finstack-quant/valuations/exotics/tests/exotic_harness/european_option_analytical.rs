@@ -22,8 +22,8 @@ use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
-use finstack_quant_models::rates::hw1f::config::Hw1fMcConfig;
-use finstack_quant_models::rates::hw1f::mc::Hw1fMcPricer;
+use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
+use finstack_quant_models::rates::hw1f::Hw1fMcPricer;
 
 /// Standard-normal PDF φ(x) = exp(−x²/2) / √(2π).
 fn normal_pdf(x: f64) -> f64 {

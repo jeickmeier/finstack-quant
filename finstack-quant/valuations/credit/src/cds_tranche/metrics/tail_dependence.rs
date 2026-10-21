@@ -13,7 +13,7 @@
 //! - **Gaussian copula**: λ_L = 0 (no tail dependence)
 //! - **Student-t copula**: λ_L > 0 (positive tail dependence)
 //! - **Random Factor Loading**: no closed form — reported as `NaN` per the
-//!   [`Copula::tail_dependence`](finstack_quant_models::correlation::copula::Copula::tail_dependence)
+//!   [`Copula::tail_dependence`](finstack_quant_models::correlation::Copula::tail_dependence)
 //!   contract (use `RandomFactorLoadingCopula::stress_correlation_proxy` for a
 //!   heuristic stress gauge)
 //!

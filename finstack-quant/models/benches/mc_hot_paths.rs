@@ -17,8 +17,9 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::fractional::HurstExponent;
+use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
-use finstack_quant_models::monte_carlo::discretization::{ExactHullWhite1F, QeHeston};
+use finstack_quant_models::monte_carlo::discretization::ExactHullWhite1F;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;

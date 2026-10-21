@@ -105,8 +105,6 @@ pub mod variance_reduction;
 #[cfg(test)]
 mod mc_process_params_serialization;
 
-pub use traits::RandomStream;
-
 /// Reject a non-finite or non-positive volatility before a convenience pricer runs.
 ///
 /// The generic GBM process accepts `sigma == 0` (a deterministic forward), but

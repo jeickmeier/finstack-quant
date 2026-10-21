@@ -5,9 +5,9 @@
 //! violation. Checks return `Vec<ArbitrageViolation>` (empty means pass) and
 //! never mutate input.
 
-pub mod butterfly;
-pub mod calendar_spread;
-pub mod local_vol_density;
+pub(crate) mod butterfly;
+pub(crate) mod calendar_spread;
+pub(crate) mod local_vol_density;
 
 pub use butterfly::ButterflyCheck;
 pub use calendar_spread::CalendarSpreadCheck;

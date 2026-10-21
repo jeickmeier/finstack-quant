@@ -52,7 +52,7 @@ pub(super) fn adaptive_chunk_size(num_paths: usize) -> usize {
 /// Build the engine-side correlation factor for shock transformation.
 ///
 /// Returns `None` when the discretization applies correlation internally
-/// (e.g. [`crate::monte_carlo::discretization::QeHeston`]) or when the process does not
+/// (e.g. [`crate::monte_carlo::discretization::qe_heston::QeHeston`]) or when the process does not
 /// declare a correlation matrix via [`StochasticProcess::factor_correlation`].
 /// Otherwise returns a Cholesky factor of the declared matrix, which the
 /// engine applies to raw independent shocks before each

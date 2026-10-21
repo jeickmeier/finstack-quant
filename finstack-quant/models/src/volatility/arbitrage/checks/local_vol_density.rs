@@ -11,7 +11,7 @@
 //! non-negative.
 
 use super::classify_severity;
-use crate::volatility::arbitrage::types::{ArbitrageType, ArbitrageViolation, ViolationLocation};
+use crate::volatility::arbitrage::{ArbitrageType, ArbitrageViolation, ViolationLocation};
 use crate::volatility::dupire::{dupire_node, MoneynessLookup};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 

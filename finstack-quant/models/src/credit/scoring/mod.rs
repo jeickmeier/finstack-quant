@@ -11,7 +11,7 @@
 //! - [`altman_z_prime`]: Z'-Score variant for private firms.
 //! - [`altman_z_double_prime`]: Z''-Score variant for non-manufacturing firms.
 //! - [`altman_em_score`]: EM-Score variant for emerging-market corporates (+3.25 constant).
-//! - [`ohlson_o_score`]: Ohlson O-Score (1980) nine-predictor logistic model.
+//! - [`ohlson_o_score`](crate::credit::scoring::ohlson::ohlson_o_score): Ohlson O-Score (1980) nine-predictor logistic model.
 //! - [`zmijewski_score`]: Zmijewski (1984) three-predictor probit model.
 //!
 //! # Examples
@@ -31,18 +31,17 @@
 //! assert_eq!(result.zone, ScoringZone::Safe);
 //! ```
 
-pub mod altman;
+pub(crate) mod altman;
 pub mod ohlson;
 #[cfg(test)]
 mod tests;
-pub mod types;
-pub mod zmijewski;
+pub(crate) mod types;
+pub(crate) mod zmijewski;
 
 pub use altman::{
     altman_em_score, altman_z_double_prime, altman_z_prime, altman_z_score,
     AltmanZDoublePrimeInput, AltmanZPrimeInput, AltmanZScoreInput, EM_SCORE_CONSTANT,
     EM_SCORE_DISTRESS_THRESHOLD, EM_SCORE_SAFE_THRESHOLD,
 };
-pub use ohlson::{ohlson_o_score, OhlsonOScoreInput};
 pub use types::{CreditScoringError, ScoringResult, ScoringZone};
 pub use zmijewski::{zmijewski_score, ZmijewskiInput};

@@ -168,7 +168,7 @@ impl BarrierOptionMcPricer {
                 t_vol,
                 inst.option_type,
             );
-            let unit = finstack_quant_models::closed_form::checked_closed_form_value(
+            let unit = finstack_quant_models::closed_form::vanilla::checked_closed_form_value(
                 unit,
                 "barrier knocked-in vanilla price",
             )?;
@@ -412,7 +412,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
                 t,
                 barrier_opt.option_type,
             );
-            let unit = finstack_quant_models::closed_form::checked_closed_form_value(
+            let unit = finstack_quant_models::closed_form::vanilla::checked_closed_form_value(
                 unit,
                 "barrier observed-breach vanilla price",
             )?;
@@ -446,7 +446,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         };
         // The closed-form leaves return NaN sentinels for out-of-domain input;
         // convert that to an error before `Money::new` panics on non-finite.
-        let price = finstack_quant_models::closed_form::checked_closed_form_value(
+        let price = finstack_quant_models::closed_form::vanilla::checked_closed_form_value(
             price * barrier_opt.quantity + rebate_val,
             "barrier closed-form price",
         )?;

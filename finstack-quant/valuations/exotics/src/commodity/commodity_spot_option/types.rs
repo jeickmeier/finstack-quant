@@ -8,7 +8,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithParams;
-use finstack_quant_models::trees::binomial_tree::BinomialTree;
+use finstack_quant_models::trees::BinomialTree;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::{
     CommodityConvention, CommodityUnderlyingParams, OptionMarketParams,
 };
@@ -998,7 +998,7 @@ impl CommoditySpotOption {
             return Ok(Some(intrinsic_delta * df * self.quantity * self.multiplier));
         }
 
-        let d1 = finstack_quant_models::d1_d2_black76(forward, self.strike, sigma, t).0;
+        let d1 = finstack_quant_models::volatility::d1_d2_black76(forward, self.strike, sigma, t).0;
         let nd1 = norm_cdf(d1);
 
         let delta_unit = match self.option_type {
@@ -1151,7 +1151,7 @@ impl CommoditySpotOption {
         let forward = self.forward_price(market, as_of)?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let df = disc.df_between_dates(as_of, self.expiry)?;
-        let d1 = finstack_quant_models::d1_d2_black76(forward, self.strike, sigma, t).0;
+        let d1 = finstack_quant_models::volatility::d1_d2_black76(forward, self.strike, sigma, t).0;
         let vega_abs = df * forward * norm_pdf(d1) * t.sqrt();
         Ok(Some(vega_abs * 0.01 * self.quantity * self.multiplier))
     }

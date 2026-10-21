@@ -153,7 +153,7 @@ pub(super) fn normal_caplet_price(
     df: f64,
     is_cap: bool,
 ) -> f64 {
-    use finstack_quant_models::closed_form::volatility::{bachelier_call, bachelier_put};
+    use finstack_quant_models::closed_form::{bachelier_call, bachelier_put};
     let unit_price = if is_cap {
         bachelier_call(forward, strike, vol, expiry)
     } else {
@@ -163,5 +163,5 @@ pub(super) fn normal_caplet_price(
 }
 
 fn normal_caplet_vega(forward: f64, strike: f64, vol: f64, expiry: f64) -> f64 {
-    finstack_quant_models::closed_form::volatility::bachelier_vega(forward, strike, vol, expiry)
+    finstack_quant_models::closed_form::bachelier_vega(forward, strike, vol, expiry)
 }

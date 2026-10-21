@@ -186,7 +186,7 @@ impl GbmParams {
 /// constant-drift GBM is the special case `M(t) = (r − q)·t`.
 ///
 /// Attaching a schedule to a [`GbmProcess`] lets
-/// [`ExactGbm`](crate::monte_carlo::discretization::exact::ExactGbm) price path-dependent
+/// [`ExactGbm`](crate::monte_carlo::discretization::ExactGbm) price path-dependent
 /// payoffs (Asian, lookback) on a non-flat rate curve without the per-fixing
 /// forward bias a single maturity-averaged drift introduces.
 #[derive(Debug, Clone)]
@@ -307,7 +307,7 @@ impl GbmProcess {
 
     /// Attach a deterministic time-varying drift schedule.
     ///
-    /// When present, [`ExactGbm`](crate::monte_carlo::discretization::exact::ExactGbm) uses
+    /// When present, [`ExactGbm`](crate::monte_carlo::discretization::ExactGbm) uses
     /// the schedule's per-step log-drift increment instead of the constant
     /// `(r − q)·Δt`, removing the per-fixing forward bias on a non-flat rate
     /// curve. The instantaneous [`StochasticProcess::drift`] (used by generic

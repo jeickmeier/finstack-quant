@@ -27,7 +27,7 @@
 //! - BSM expected prices are discounted spot-based values; QuantLib computed
 //!   them via `blackFormula` on `F = S*exp((r-q)T)` with `discount =
 //!   exp(-rT)`, which is identical to the BSM spot formula implemented by
-//!   [`finstack_quant_models::closed_form::bs_price`].
+//!   [`finstack_quant_models::closed_form::vanilla::bs_price`].
 //! - QuantLib `sabrVolatility(strike, forward, T, alpha, beta, nu, rho)`
 //!   swaps the (nu, rho) order relative to [`SabrParameters::new`].
 //!
@@ -318,7 +318,7 @@ fn test_vol_models_quantlib_parity() {
                     continue;
                 }
                 *counts.entry("bsm").or_default() += 1;
-                let call = finstack_quant_models::closed_form::bs_price(
+                let call = finstack_quant_models::closed_form::vanilla::bs_price(
                     *spot,
                     *strike,
                     *rate,
@@ -328,7 +328,7 @@ fn test_vol_models_quantlib_parity() {
                     finstack_quant_models::types::OptionType::Call,
                 )
                 .expect("valid Black-Scholes inputs");
-                let put = finstack_quant_models::closed_form::bs_price(
+                let put = finstack_quant_models::closed_form::vanilla::bs_price(
                     *spot,
                     *strike,
                     *rate,
@@ -467,7 +467,7 @@ fn test_vol_models_quantlib_parity() {
                         q: *dividend_yield,
                         model: params,
                     },
-                    finstack_quant_models::OptionType::Put,
+                    finstack_quant_models::types::OptionType::Put,
                     None,
                 )
                 .expect("checked Heston price");

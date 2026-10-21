@@ -301,7 +301,7 @@ mod gbm_barrier {
 /// The genuine `SabrParameters` (the production pricer type) is exercised — not a
 /// re-implementation.
 mod sabr_beta {
-    use finstack_quant_models::SabrParameters;
+    use finstack_quant_models::volatility::sabr::SabrParameters;
 
     /// **β=1 ATM, ν=0 ⇒ vol = α, for any forward.**
     ///

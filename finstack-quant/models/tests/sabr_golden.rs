@@ -1,6 +1,6 @@
 //! SABR volatility-model golden tests and fixture validation.
 
-use finstack_quant_models::SabrParameters;
+use finstack_quant_models::volatility::sabr::SabrParameters;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};

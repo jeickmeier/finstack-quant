@@ -617,7 +617,8 @@ mod projection_tests {
 
 #[cfg(test)]
 mod simulation_tests {
-    use crate::credit::migration::{simulation::MigrationSimulator, GeneratorMatrix, RatingScale};
+    use crate::credit::migration::MigrationSimulator;
+    use crate::credit::migration::{GeneratorMatrix, RatingScale};
 
     fn two_state_gen() -> GeneratorMatrix {
         let scale = RatingScale::custom(vec!["IG".to_string(), "D".to_string()]).unwrap();

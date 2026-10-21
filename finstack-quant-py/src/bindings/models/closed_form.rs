@@ -22,15 +22,17 @@ use crate::bindings::pandas_utils::{
 };
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
-use finstack_quant_models::closed_form::implied_vol::{black76_implied_vol, bs_implied_vol};
+use finstack_quant_models::closed_form::heston::{heston_price, HestonPricingParams};
+use finstack_quant_models::closed_form::vanilla::{
+    bs_greeks, bs_price, vanilla_expiry_payoff, BsGreeks, DEFAULT_THETA_DAYS_PER_YEAR,
+};
 use finstack_quant_models::closed_form::{
     asian_option_price, bachelier_greeks, bachelier_price, barrier_call, barrier_put,
-    black76_greeks, black76_price, black_shifted_price, black_shifted_vega, bs_greeks, bs_price,
-    heston_price, lookback_option_price, quanto_option_price, vanilla_expiry_payoff, BsGreeks,
-    ForwardGreeks, HestonPricingParams, DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE,
-    DEFAULT_THETA_DAYS_PER_YEAR,
+    black76_greeks, black76_price, black_shifted_price, black_shifted_vega, lookback_option_price,
+    quanto_option_price, ForwardGreeks, DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE,
 };
-use finstack_quant_models::OptionType;
+use finstack_quant_models::closed_form::{black76_implied_vol, bs_implied_vol};
+use finstack_quant_models::types::OptionType;
 use pyo3::prelude::*;
 
 const BS_GREEK_LABELS: [&str; 6] = ["delta", "gamma", "vega", "theta", "rho_r", "rho_q"];

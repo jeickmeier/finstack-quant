@@ -11,7 +11,7 @@
 //!
 //! ```
 //! use finstack_quant_models::monte_carlo::convenience;
-//! use finstack_quant_models::OptionType;
+//! use finstack_quant_models::types::OptionType;
 //!
 //! let pricer = convenience::european_pricer(Some(1_000), Some(7), Some(false))
 //!     .expect("valid path count");

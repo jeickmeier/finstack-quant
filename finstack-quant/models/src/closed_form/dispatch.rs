@@ -13,10 +13,8 @@
 //!
 //! # Examples
 //! ```rust
-//! use finstack_quant_models::OptionType;
-//! use finstack_quant_models::closed_form::dispatch::{
-//!     asian_option_price, barrier_call, barrier_put,
-//! };
+//! use finstack_quant_models::types::OptionType;
+//! use finstack_quant_models::closed_form::{asian_option_price, barrier_call, barrier_put};
 //!
 //! let barrier = barrier_call(100.0, 100.0, 90.0, 0.05, 0.02, 0.20, 1.0, "down", "out")?;
 //! assert!(barrier > 0.0);

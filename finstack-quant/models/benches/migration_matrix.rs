@@ -5,7 +5,7 @@
 //! the path that shares the `RatingScale` via `Arc` instead of cloning it.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_models::credit::migration::simulation::MigrationSimulator;
+use finstack_quant_models::credit::migration::MigrationSimulator;
 use finstack_quant_models::credit::migration::{GeneratorMatrix, RatingScale};
 use std::hint::black_box;
 

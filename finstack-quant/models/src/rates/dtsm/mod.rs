@@ -65,11 +65,11 @@
 //!   Bond Returns." *Journal of Fixed Income*, 1(1), 54-61. `docs/REFERENCES.md#litterman-scheinkman-1991`
 
 /// Diebold-Li dynamic Nelson-Siegel model. `docs/REFERENCES.md#diebold-li-2006` `docs/REFERENCES.md#nelson-siegel-1987`
-pub mod diebold_li;
+pub(crate) mod diebold_li;
 /// PCA-based yield curve analysis.
-pub mod pca;
+pub(crate) mod pca;
 /// Shared types: YieldPanel, FactorTimeSeries, YieldForecast.
-pub mod types;
+pub(crate) mod types;
 
 pub use diebold_li::{nelson_siegel_yields, DieboldLi};
 pub use pca::{YieldPca, YieldPcaView};

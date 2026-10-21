@@ -300,7 +300,7 @@ impl InflationLinkedBond {
             1.0,
             sigma,
             expiry,
-            finstack_quant_models::OptionType::Put,
+            finstack_quant_models::types::OptionType::Put,
         )?;
         Ok(forward + floor)
     }

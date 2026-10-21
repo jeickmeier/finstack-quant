@@ -8,7 +8,7 @@ use finstack_quant_models::monte_carlo::pricer::basis::BasisKind;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 use finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
-use finstack_quant_models::OptionType;
+use finstack_quant_models::types::OptionType;
 use pyo3::prelude::*;
 
 /// Render a bool the way Python's `repr` does.

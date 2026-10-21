@@ -5,19 +5,19 @@
 //! closed-form HW1F analytics (bond-price coefficients, caplet and bond-option
 //! formulas, calibration parameters) live in [`crate::rates::hull_white`]; the
 //! process and its exact scheme in [`crate::monte_carlo::process::ou`] and
-//! [`crate::monte_carlo::discretization::exact_hw1f`]. This module adds what a
+//! `crate::monte_carlo::discretization::exact_hw1f`. This module adds what a
 //! product pricer needs on top of them:
 //!
-//! - [`curve`]: θ(t) preparation from a discount curve and affine term-forward
+//! - `curve`: θ(t) preparation from a discount curve and affine term-forward
 //!   reconstruction ([`prepare_hw1f_params`], [`Hw1fTermForward`],
 //!   [`PeriodForwardCoeffs`]).
-//! - [`mc`]: the generic [`Hw1fMcPricer`] orchestrator for payoffs without
+//! - `mc`: the generic [`Hw1fMcPricer`] orchestrator for payoffs without
 //!   exercise, with event-aligned grids and pathwise bank-account numeraire.
-//! - [`lsmc`]: the [`Hw1fLsmcPricer`] Longstaff-Schwartz harness for payoffs
+//! - `lsmc`: the [`Hw1fLsmcPricer`] Longstaff-Schwartz harness for payoffs
 //!   implementing [`ExerciseBoundaryPayoff`].
-//! - [`config`]: [`Hw1fMcConfig`] runtime settings with crate-level defaults
+//! - `config`: [`Hw1fMcConfig`] runtime settings with crate-level defaults
 //!   from the Monte Carlo defaults registry.
-//! - [`bank_account`], [`cumulative_coupon`], [`exercise`]: numeraire,
+//! - `bank_account`, `cumulative_coupon`, `exercise`: numeraire,
 //!   coupon-tracking and regression-basis helpers shared by the payoffs.
 //!
 //! Instrument-level concerns (reading pricing overrides, resolving calibrated
@@ -35,31 +35,31 @@
 //! ```
 
 /// Pathwise money-market account (bank-account numeraire) helpers.
-pub mod bank_account;
+pub(crate) mod bank_account;
 pub use bank_account::{accumulate_bank_factors, bank_step_factor};
 
 /// Runtime Monte Carlo configuration shared by the HW1F engines.
-pub mod config;
+pub(crate) mod config;
 pub use config::{Hw1fMcConfig, SampleSplit};
 
 /// Cumulative coupon tracker for path-dependent products (TARN, snowball).
-pub mod cumulative_coupon;
+pub(crate) mod cumulative_coupon;
 pub use cumulative_coupon::{CouponEvent, CumulativeCouponTracker};
 
 /// HW1F θ(t) preparation and term-forward bond reconstruction.
-pub mod curve;
+pub(crate) mod curve;
 pub use curve::{
     initial_short_rate_from_curve, prepare_hw1f_params, Hw1fTermForward, PeriodForwardCoeffs,
 };
 
 /// Exercise-boundary protocol and regression basis for LSMC-priced rate exotics.
-pub mod exercise;
+pub(crate) mod exercise;
 pub use exercise::{ExerciseBoundaryPayoff, ShortRateBasis};
 
 /// Generic HW1F Longstaff-Schwartz Monte Carlo pricer for callable rate exotics.
-pub mod lsmc;
+pub(crate) mod lsmc;
 pub use lsmc::Hw1fLsmcPricer;
 
 /// Generic HW1F Monte Carlo orchestrator for path-dependent rate exotics.
-pub mod mc;
+pub(crate) mod mc;
 pub use mc::{build_event_aligned_grid, money_estimate_from_pairs, Hw1fMcPricer};

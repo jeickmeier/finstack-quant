@@ -4,12 +4,12 @@
 //! This module provides the mathematical primitives for credit migration modeling
 //! (JLT / CreditMetrics-style transition matrix approaches):
 //!
-//! - [`crate::credit::migration::scale::RatingScale`]: ordered state set; preset S&P/Fitch scales included.
-//! - [`crate::credit::migration::matrix::TransitionMatrix`]: validated row-stochastic N×N matrix with time horizon.
-//! - [`crate::credit::migration::generator::GeneratorMatrix`]: continuous-time intensity matrix Q, with extraction
+//! - [`crate::credit::migration::RatingScale`]: ordered state set; preset S&P/Fitch scales included.
+//! - [`crate::credit::migration::TransitionMatrix`]: validated row-stochastic N×N matrix with time horizon.
+//! - [`crate::credit::migration::GeneratorMatrix`]: continuous-time intensity matrix Q, with extraction
 //!   from annual transition matrices via matrix logarithm.
 //! - [`crate::credit::migration::projection`]: compute P(t) = exp(Q · t) for arbitrary horizons.
-//! - [`crate::credit::migration::simulation`]: Gillespie-algorithm CTMC path simulation.
+//! - `crate::credit::migration::simulation`: Gillespie-algorithm CTMC path simulation.
 //!
 //! # Quick start
 //!
@@ -41,12 +41,12 @@
 //!   Markov Chains via Empirical Transition Matrices." *Mathematical Finance*,
 //!   11(2), 245-265.
 
-pub mod error;
-pub mod generator;
-pub mod matrix;
+pub(crate) mod error;
+pub(crate) mod generator;
+pub(crate) mod matrix;
 pub mod projection;
-pub mod scale;
-pub mod simulation;
+pub(crate) mod scale;
+pub(crate) mod simulation;
 #[cfg(test)]
 mod tests;
 

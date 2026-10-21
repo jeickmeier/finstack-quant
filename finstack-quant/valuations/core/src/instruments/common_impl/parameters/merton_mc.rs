@@ -6,9 +6,10 @@
 //! module holds only the serializable vocabulary embedded in
 //! [`ModelConfig`](crate::instruments::ModelConfig).
 
-use finstack_quant_models::credit::{
-    DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel, ToggleExerciseModel,
-};
+use finstack_quant_models::credit::dynamic_recovery::DynamicRecoverySpec;
+use finstack_quant_models::credit::endogenous_hazard::EndogenousHazardSpec;
+use finstack_quant_models::credit::toggle_exercise::ToggleExerciseModel;
+use finstack_quant_models::credit::{MertonBarrierType, MertonModel};
 
 /// Barrier-crossing detection policy for first-passage default simulation.
 ///

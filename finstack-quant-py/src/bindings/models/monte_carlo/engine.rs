@@ -144,7 +144,7 @@ fn price_heston(
     currency: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyMoneyEstimate> {
     use finstack_quant_models::monte_carlo::pricer::heston as canonical;
-    use finstack_quant_models::OptionType;
+    use finstack_quant_models::types::OptionType;
 
     let ccy = extract_optional_currency(currency)?;
     py.detach(|| {

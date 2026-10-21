@@ -45,7 +45,7 @@
 
 use super::super::results::MoneyEstimate;
 use super::lsq::regression_coefficients_with_basis;
-use crate::monte_carlo::discretization::exact::ExactGbm;
+use crate::monte_carlo::discretization::ExactGbm;
 use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::pricer::basis::{build_lsmc_basis, BasisFunctions, BasisKind, LsmcBasis};
 use crate::monte_carlo::process::gbm::GbmProcess;
@@ -1715,7 +1715,7 @@ mod tests {
         let div_yield = 0.0;
         let vol = 0.2;
         let expiry = 1.0;
-        let european = crate::closed_form::bs_price(
+        let european = crate::closed_form::vanilla::bs_price(
             spot,
             strike,
             rate,
@@ -1759,7 +1759,7 @@ mod tests {
         let div_yield = 0.0;
         let vol = 0.2;
         let expiry = 1.0;
-        let european = crate::closed_form::bs_price(
+        let european = crate::closed_form::vanilla::bs_price(
             spot,
             strike,
             rate,

@@ -6,7 +6,7 @@
 //!
 //! # Architecture
 //!
-//! - **Types** ([`types`]): Violation
+//! - **Types** (`types`): Violation
 //!   taxonomy, severity model, and report
 //! - **Checks** ([`checks`]):
 //!   [`ButterflyCheck`], [`CalendarSpreadCheck`] and [`LocalVolDensityCheck`],
@@ -47,9 +47,9 @@
 //! ```
 
 pub mod checks;
-pub mod types;
+pub(crate) mod types;
+use checks::{ButterflyCheck, CalendarSpreadCheck, LocalVolDensityCheck};
 
-pub use checks::{ButterflyCheck, CalendarSpreadCheck, LocalVolDensityCheck};
 pub use types::{
     ArbitrageReport, ArbitrageSeverity, ArbitrageType, ArbitrageViolation, ViolationLocation,
 };

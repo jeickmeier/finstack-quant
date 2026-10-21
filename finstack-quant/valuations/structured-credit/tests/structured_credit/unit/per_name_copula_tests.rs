@@ -24,8 +24,9 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::credit::pool::prepayment::StochasticPrepaySpec;
 use finstack_quant_models::credit::pool::{
-    CorrelationStructure, PoolGranularity, StochasticDefaultSpec, StochasticPrepaySpec,
+    CorrelationStructure, PoolGranularity, StochasticDefaultSpec,
 };
 use finstack_quant_valuations_core::results::structured_credit::{
     StochasticPricingResult, StructuredCreditPricingMode, TrancheSeniority,

@@ -81,7 +81,7 @@ fn positive_time_greeks_match_frozen_annuity_formulas_and_bumps() {
     use finstack_quant_models::closed_form::{
         bachelier_call, bachelier_put, black_call, black_put,
     };
-    use finstack_quant_models::volatility::SabrParameters;
+    use finstack_quant_models::volatility::sabr::SabrParameters;
     use finstack_quant_valuations::instruments::{
         InstrumentPricingOverrides, OptionType, VolatilityModel,
     };

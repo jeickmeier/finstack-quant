@@ -139,7 +139,7 @@ mean-reverting probabilities) with a Brent solve on the per-step additive shift
 in `x`.
 
 ```rust
-use finstack_quant_models::trees::{ShortRateTree, ShortRateTreeConfig};
+use finstack_quant_models::trees::short_rate_tree::{ShortRateTree, ShortRateTreeConfig};
 
 // Ho-Lee, 100 steps, 80 bp normal vol. Or: ShortRateTreeConfig::bdt(100, 0.20),
 // ShortRateTreeConfig::black_karasinski(100, 0.20, 0.03)
@@ -244,7 +244,7 @@ backward induction, which is what makes them exact duals and lets the lattice
 reproduce the survival curve as the valuator sees it.
 
 ```rust
-use finstack_quant_models::trees::{RatesCreditConfig, RatesCreditTree};
+use finstack_quant_models::trees::two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree};
 
 let config = RatesCreditConfig {
     steps: 100,

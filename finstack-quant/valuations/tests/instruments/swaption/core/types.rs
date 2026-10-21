@@ -7,7 +7,7 @@ use finstack_quant_valuations::instruments::OptionType;
 use crate::instruments::swaption::common::*;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::dates::{Tenor, TenorUnit};
-use finstack_quant_models::volatility::SabrParameters;
+use finstack_quant_models::volatility::sabr::SabrParameters;
 use finstack_quant_valuations::instruments::pricing_overrides::VolSurfaceExtrapolation;
 use finstack_quant_valuations::instruments::rates::swaption::{
     BermudanSchedule, BermudanSwaption, CashSettlementMethod, Swaption,

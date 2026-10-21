@@ -5,7 +5,7 @@
 //! `finite_diff_gamma`, so the pipeline — including registry-backed defaults —
 //! is defined once in Rust.
 
-use crate::monte_carlo::discretization::exact::ExactGbm;
+use crate::monte_carlo::discretization::ExactGbm;
 use crate::monte_carlo::engine::{McEngine, McEngineConfig};
 use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::greeks::finite_diff::{

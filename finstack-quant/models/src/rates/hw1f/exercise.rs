@@ -6,7 +6,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 
 /// Additional contract a `Payoff` must implement to be priced via LSMC
-/// in [`crate::rates::hw1f::lsmc::Hw1fLsmcPricer`].
+/// in [`crate::rates::hw1f::Hw1fLsmcPricer`].
 ///
 /// The harness handles path simulation, discounting, and backward regression;
 /// each product implements the three product-specific hooks below.

@@ -18,10 +18,14 @@ use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_object_to_single_row_dataframe, serde_to_py, values_to_series,
 };
 use crate::errors::{core_to_py, value_error};
+use finstack_quant_models::credit::dynamic_recovery::DynamicRecoverySpec;
+use finstack_quant_models::credit::endogenous_hazard::EndogenousHazardSpec;
+use finstack_quant_models::credit::toggle_exercise::{
+    CreditState, CreditStateVariable, ThresholdDirection, ToggleExerciseModel,
+};
 use finstack_quant_models::credit::{
-    moodys_warf_factor as rust_moodys_warf_factor, AssetDynamics, CreditState, CreditStateVariable,
-    DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel, RatingFactorTable,
-    SimulatedPaths, ThresholdDirection, ToggleExerciseModel,
+    moodys_warf_factor as rust_moodys_warf_factor, AssetDynamics, MertonBarrierType, MertonModel,
+    RatingFactorTable, SimulatedPaths,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};

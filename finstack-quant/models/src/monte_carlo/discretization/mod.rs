@@ -1,6 +1,6 @@
 //! Time-stepping schemes for stochastic differential equations.
 //!
-//! Start with [`exact`] whenever an analytical transition is available because
+//! Start with `exact` whenever an analytical transition is available because
 //! it avoids discretization bias. This module includes general-purpose Euler /
 //! Milstein schemes and model-specific QE schemes for Heston and CIR dynamics.
 //!
@@ -10,23 +10,21 @@
 pub mod cheyette_rough;
 pub mod credit_line;
 pub mod euler;
-pub mod exact;
+pub(crate) mod exact;
 pub mod exact_gbm_dividends;
-pub mod exact_hw1f;
+pub(crate) mod exact_hw1f;
 pub mod lmm_predictor_corrector;
 pub mod milstein;
-pub mod qe_cir;
+pub(crate) mod qe_cir;
 pub(crate) mod qe_common;
 pub mod qe_heston;
 pub mod rough_bergomi;
 pub mod rough_heston;
-pub mod schwartz_smith;
+pub(crate) mod schwartz_smith;
 
-pub use euler::EulerMaruyama;
 pub use exact::{ExactGbm, ExactMultiGbm};
 pub use exact_hw1f::ExactHullWhite1F;
 pub use qe_cir::QeCir;
-pub use qe_heston::QeHeston;
 pub use schwartz_smith::ExactSchwartzSmith;
 
 #[cfg(test)]

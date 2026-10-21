@@ -397,7 +397,7 @@ where
 mod tests {
     use super::super::super::engine::McEngineConfig;
     use super::*;
-    use crate::monte_carlo::discretization::exact::ExactGbm;
+    use crate::monte_carlo::discretization::ExactGbm;
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
     use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
     use crate::monte_carlo::rng::philox::PhiloxRng;
@@ -425,7 +425,7 @@ mod tests {
     }
 
     fn bs_call(spot: f64) -> f64 {
-        crate::closed_form::bs_price(
+        crate::closed_form::vanilla::bs_price(
             spot,
             STRIKE,
             RATE,
@@ -654,7 +654,7 @@ mod tests {
 
     #[test]
     fn paired_greeks_reject_missing_dedicated_dividend_scheme() {
-        use crate::monte_carlo::discretization::EulerMaruyama;
+        use crate::monte_carlo::discretization::euler::EulerMaruyama;
         use crate::monte_carlo::process::gbm_dividends::GbmWithDividends;
 
         let engine = test_engine(8);

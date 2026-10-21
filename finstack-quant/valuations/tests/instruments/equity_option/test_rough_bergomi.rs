@@ -100,7 +100,7 @@ fn rbergomi_small_eta_converges_to_black_scholes() {
     // The pricer day-counts the expiry on Act365F; 2024 is a leap year, so the
     // accrual is 366/365 years. Use the same maturity for the BS reference.
     let t = 366.0 / 365.0;
-    let bs_price = finstack_quant_models::closed_form::bs_price(
+    let bs_price = finstack_quant_models::closed_form::vanilla::bs_price(
         spot,
         strike,
         0.0,
@@ -140,7 +140,7 @@ fn rbergomi_nonzero_rate_price_is_discounted() {
 
     // Act365F over a leap year ⇒ t = 366/365.
     let t = 366.0 / 365.0;
-    let bs_price = finstack_quant_models::closed_form::bs_price(
+    let bs_price = finstack_quant_models::closed_form::vanilla::bs_price(
         spot,
         strike,
         rate,

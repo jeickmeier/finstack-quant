@@ -33,7 +33,7 @@ use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::process::ou::{
     calibrate_theta_from_curve, HullWhite1FProcess,
 };
-use finstack_quant_models::rates::hw1f::mc::build_event_aligned_grid;
+use finstack_quant_models::rates::hw1f::build_event_aligned_grid;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 
 /// Pricing method for Bermudan swaptions.

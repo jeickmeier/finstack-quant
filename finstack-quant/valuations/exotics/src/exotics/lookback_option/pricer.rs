@@ -263,7 +263,7 @@ pub(crate) fn compute_pv(
     pricer.price_internal(inst, curves, as_of)
 }
 
-use finstack_quant_models::closed_form::lookback::{
+use finstack_quant_models::closed_form::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
     floating_strike_lookback_put,
 };
@@ -552,7 +552,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
         let currency = lookback.currency;
         // Closed-form leaves signal out-of-domain input with a NaN sentinel;
         // convert to an error before `Money::new` panics on non-finite.
-        let price = finstack_quant_models::closed_form::checked_closed_form_value(
+        let price = finstack_quant_models::closed_form::vanilla::checked_closed_form_value(
             price,
             "lookback closed-form price",
         )?;
@@ -605,7 +605,7 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-    use finstack_quant_models::closed_form::lookback::{
+    use finstack_quant_models::closed_form::{
         fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
         floating_strike_lookback_put,
     };

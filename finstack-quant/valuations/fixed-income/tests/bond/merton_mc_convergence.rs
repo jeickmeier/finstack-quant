@@ -9,9 +9,9 @@
 //! - Default rate increases with leverage
 //! - PIK accrual increases terminal notional
 
-use finstack_quant_models::credit::{
-    AssetDynamics, DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel,
-};
+use finstack_quant_models::credit::dynamic_recovery::DynamicRecoverySpec;
+use finstack_quant_models::credit::endogenous_hazard::EndogenousHazardSpec;
+use finstack_quant_models::credit::{AssetDynamics, MertonBarrierType, MertonModel};
 use finstack_quant_valuations_core::instruments::{MertonMcConfig, PikMode, PikSchedule};
 use finstack_quant_valuations_fixed_income::bond::pricing::engine::merton_mc::{
     MertonMcEngine, MertonMcRun,

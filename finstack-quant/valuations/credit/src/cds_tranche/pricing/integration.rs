@@ -4,7 +4,7 @@ use super::config::{CdsTranchePricer, INTEGRATION_MAX_DEPTH, INTEGRATION_TOLERAN
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::special_functions::norm_pdf;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_models::correlation::copula::{CopulaSpec, FactorPairIntegrand};
+use finstack_quant_models::correlation::{CopulaSpec, FactorPairIntegrand};
 use std::cell::RefCell;
 
 /// The omitted two-sided normal mass is below 1.524e-23. Every capped pool
