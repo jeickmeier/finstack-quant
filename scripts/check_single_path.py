@@ -21,7 +21,12 @@ Usage (rustdoc JSON needs nightly; hidden and private items must be included so
         --exclude finstack-quant-py --exclude finstack-quant-wasm \
         --exclude finstack-quant-valuations-macros --exclude finstack-quant-test-utils \
         --exclude finstack-quant-valuations-test-support
-    python3 scripts/check_single_path.py target/doc single_path_report.md
+    uv run --no-sync python scripts/check_single_path.py target/doc single_path_report.md
+
+Pass `--compare <base_doc_dir>` (rustdoc JSON built the same way from the base
+commit) to also list every item identity that was reachable before and is not
+now. Making a module private can leave a public item it holds unnameable with
+no compiler warning; the run exits 1 if any non-module item is lost.
 
 Path segments marked with a dagger are `#[doc(hidden)]` items.
 """
@@ -33,6 +38,7 @@ import sys
 
 DOC = Path(sys.argv[1])
 OUT = Path(sys.argv[2])
+COMPARE = Path(sys.argv[sys.argv.index("--compare") + 1]) if "--compare" in sys.argv else None
 UMBRELLA = "finstack_quant"
 WS_PREFIX = "finstack_quant"
 
@@ -178,10 +184,7 @@ class Crate:
 
 def main():
     """Load every workspace crate's rustdoc JSON and write the Markdown report."""
-    crates = {}
-    for f in sorted(DOC.glob("finstack_quant*.json")):
-        c = Crate(f)
-        crates[c.name] = c
+    crates = load(DOC)
 
     lines = []
     w = lines.append
@@ -275,8 +278,35 @@ def main():
         head.append(
             f"\nUmbrella `finstack_quant::` view: **{len(umbrella_dups)}** items reachable at more than one path."
         )
+    lost_items = []
+    if COMPARE is not None:
+        before = {}
+        for c in load(COMPARE).values():
+            for ident, ps in c.reach.items():
+                before.setdefault(ident, (c.kind_of[ident], sorted(set(ps))))
+        after = {ident for c in crates.values() for ident in c.reach}
+        lost = sorted(set(before) - after)
+        lost_items = [ident for ident in lost if before[ident][0] != "module"]
+        head.append(f"\nCompared with `{COMPARE}`: **{len(lost)}** identities no longer reachable "
+                    f"(**{len(lost_items)}** of them not modules).")
+        if lost:
+            lines.append("\n## no longer reachable\n")
+            for ident in lost:
+                kind, ps = before[ident]
+                lines.append(f"- [{kind}] {ident}  (was at {', '.join(ps)})")
     OUT.write_text("\n".join(head + lines) + "\n")
     print("\n".join(head))
+    if lost_items:
+        sys.exit(1)
+
+
+def load(doc_dir):
+    """Parse every workspace crate's rustdoc JSON under `doc_dir`, keyed by crate name."""
+    crates = {}
+    for f in sorted(doc_dir.glob("finstack_quant*.json")):
+        c = Crate(f)
+        crates[c.name] = c
+    return crates
 
 
 main()
