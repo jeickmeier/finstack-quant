@@ -1,8 +1,11 @@
 use super::compute::clear_price_driving_overrides;
-use crate::bond::metrics::price_yield_spread::z_spread::BondZSpreadPricingKernel;
+use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::{Bond, CashflowSpec};
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::z_spread_discount_factor;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::pricer::ModelKey;
 
@@ -175,8 +178,222 @@ pub(super) fn price_from_asw_market(
         ));
     }
     let (coupon_pv, float_pv, float_annuity) =
-        crate::bond::metrics::price_yield_spread::asw::settlement_asw_components(
-            bond, curves, as_of,
-        )?;
+        super::annuity::settlement_asw_components(bond, curves, as_of)?;
     Ok((1.0 + coupon_pv - float_pv - asw_market * float_annuity) * bond.notional.amount())
+}
+
+/// Yield-to-worst at the quoted clean price and the cashflow path it selects.
+///
+/// Both are measured from the bond's quote/settlement date.
+#[derive(Debug, Clone)]
+pub(crate) struct WorkoutPath {
+    /// Yield-to-worst (Street compounding) at the quoted clean price.
+    pub(crate) yield_rate: f64,
+    /// Holder cashflows of the worst exit path.
+    pub(crate) flows: Vec<(Date, Money)>,
+}
+
+/// Workout path of a bond with exercise rights at its quoted clean price.
+///
+/// Returns `None` when the effective bond (return floor lowered into its call
+/// schedule) has no call/put options or the bond carries no quoted clean
+/// price.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose quoted clean price and exercise schedule are used.
+/// * `curves` - Market context for the cashflow schedule and floor lowering.
+/// * `as_of` - Valuation date; the quote date is derived from it.
+/// * `flows` - Holder cashflows entitled at the quote date.
+pub(crate) fn quoted_workout_path(
+    bond: &Bond,
+    curves: &MarketContext,
+    as_of: Date,
+    flows: &[(Date, Money)],
+) -> Result<Option<WorkoutPath>> {
+    let effective_bond = bond.effective_for_pricing(curves, as_of)?;
+    if !effective_bond
+        .call_put
+        .as_ref()
+        .is_some_and(|cp| cp.has_options())
+    {
+        return Ok(None);
+    }
+
+    let Some(clean_px) = bond
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct
+    else {
+        return Ok(None);
+    };
+
+    let quote_ctx = QuoteDateContext::new(bond, curves, as_of)?;
+    let dirty_now = Money::new(
+        quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount()),
+        bond.notional.currency(),
+    )?;
+    let schedule = effective_bond.full_cashflow_schedule(curves)?;
+    let (yield_rate, flows) = super::solve_ytw_from_flows(
+        &effective_bond,
+        curves,
+        flows,
+        quote_ctx.quote_date,
+        dirty_now,
+        &schedule,
+    )?;
+
+    Ok(Some(WorkoutPath { yield_rate, flows }))
+}
+
+/// Maturity-aware initial Brent bracket half-width, in decimal units.
+///
+/// The bracket scales from `base_bracket_bp` at zero maturity to twice that
+/// at 30 years and beyond (`base × (1 + min(years/30, 1))`), capped at
+/// `max_bracket_bp`. Years are measured ACT/365F from `as_of` to maturity;
+/// this is a numerical heuristic, independent of the coupon day count.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose maturity sets the horizon.
+/// * `as_of` - Quote/settlement date the horizon starts from; on or after
+///   maturity the base bracket is returned.
+/// * `base_bracket_bp` - Half-width in basis points for a zero-length horizon.
+/// * `max_bracket_bp` - Maximum half-width in basis points after scaling.
+fn maturity_scaled_bracket(
+    bond: &Bond,
+    as_of: Date,
+    base_bracket_bp: f64,
+    max_bracket_bp: f64,
+) -> finstack_quant_core::Result<f64> {
+    if as_of >= bond.maturity {
+        return Ok(base_bracket_bp / 10_000.0);
+    }
+    let years = finstack_quant_core::dates::DayCount::Act365F
+        .year_fraction(as_of, bond.maturity, DayCountContext::default())?
+        .max(0.0);
+    let maturity_scale = 1.0 + (years / 30.0).min(1.0);
+    Ok((base_bracket_bp * maturity_scale).min(max_bracket_bp) / 10_000.0)
+}
+
+/// Z-spread repricing kernel: the bond's spread cashflows (the quoted workout
+/// path for option-bearing bonds) with their year fractions and base discount
+/// factors from the quote date, cached once for repeated spread repricing.
+pub(crate) struct BondZSpreadPricingKernel {
+    pub(crate) quote_date: Date,
+    cached_flows: Vec<(f64, f64, f64)>,
+    compounds_per_year: f64,
+}
+
+impl BondZSpreadPricingKernel {
+    pub(crate) fn new(
+        bond: &Bond,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Self> {
+        let quote_ctx = QuoteDateContext::new(bond, curves, as_of)?;
+        let flows = quote_ctx.entitled_flows(bond, curves, as_of)?;
+        let quote_date = quote_ctx.quote_date;
+        let spread_flows = match quoted_workout_path(bond, curves, as_of, &flows)? {
+            Some(workout) => workout.flows,
+            None if bond.has_exercise_rights() => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Z-spread pricing for option-bearing bond '{}' requires an explicit quoted clean price to select a workout path; use OAS for model-based optional pricing",
+                    bond.id.as_str()
+                )));
+            }
+            None => flows,
+        };
+        let disc = curves.get_discount(&bond.discount_curve_id)?;
+        let day_count = disc.day_count();
+        let periods = if day_count == finstack_quant_core::dates::DayCount::Act365L {
+            crate::bond::pricing::time_basis::bond_coupon_periods(bond)?
+        } else {
+            Vec::new()
+        };
+        let cached_flows = spread_flows
+            .iter()
+            .filter(|(date, _)| *date > quote_date)
+            .map(
+                |(date, amount)| -> finstack_quant_core::Result<(f64, f64, f64)> {
+                    // Supply the coupon frequency so ICMA-style curve day
+                    // counts (which require a reference frequency) don't
+                    // hard-error; ignored by ACT/30-360 conventions.
+                    let t = if day_count == finstack_quant_core::dates::DayCount::Act365L {
+                        crate::bond::pricing::time_basis::act365l_year_fraction(
+                            bond.cashflow_spec.frequency(),
+                            &periods,
+                            quote_date,
+                            *date,
+                        )?
+                    } else {
+                        day_count.year_fraction(
+                            quote_date,
+                            *date,
+                            DayCountContext {
+                                frequency: Some(bond.cashflow_spec.frequency()),
+                                coupon_period:
+                                    finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
+                                        day_count,
+                                        bond.cashflow_spec.frequency(),
+                                        spread_flows.iter().map(|(d, _)| *d),
+                                        quote_date,
+                                    ),
+                                ..DayCountContext::default()
+                            },
+                        )?
+                    };
+                    let df_base = disc.df_between_dates(quote_date, *date)?;
+                    Ok((t, df_base, amount.amount()))
+                },
+            )
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+
+        Ok(Self {
+            quote_date,
+            cached_flows,
+            compounds_per_year: bond.cashflow_spec.frequency().compounding_frequency(),
+        })
+    }
+
+    pub(crate) fn price(&self, z: f64) -> finstack_quant_core::Result<f64> {
+        let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+        for (t, df_base, amount) in &self.cached_flows {
+            let df_z = z_spread_discount_factor(*df_base, *t, z, self.compounds_per_year)?;
+            pv.add(*amount * df_z);
+        }
+        Ok(pv.total())
+    }
+}
+
+/// Solve `kernel.price(s) = target` for the additive spread `s` (decimal).
+///
+/// Brent starts at `0.0` with a maturity-aware initial bracket (see
+/// [`maturity_scaled_bracket`]). A kernel pricing failure (a non-positive
+/// discount factor or compounding denominator at a deeply negative spread)
+/// aborts the solve and is returned as-is rather than steering the bracket.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose maturity scales the initial bracket.
+/// * `kernel` - Spread repricing kernel; its PV is decreasing in the spread.
+/// * `target` - Dirty target value in currency at the kernel's quote date.
+/// * `bracket_from` - Date from which the bracket's maturity horizon is measured.
+/// * `base_bracket_bp` - Bracket half-width in basis points at zero horizon.
+/// * `max_bracket_bp` - Cap on the scaled bracket half-width, in basis points.
+/// * `tolerance` - Brent tolerance on the spread axis (decimal).
+pub(crate) fn solve_kernel_spread(
+    bond: &Bond,
+    kernel: &BondZSpreadPricingKernel,
+    target: f64,
+    bracket_from: Date,
+    base_bracket_bp: f64,
+    max_bracket_bp: f64,
+    tolerance: f64,
+) -> finstack_quant_core::Result<f64> {
+    let bracket = maturity_scaled_bracket(bond, bracket_from, base_bracket_bp, max_bracket_bp)?;
+    BrentSolver::new()
+        .tolerance(tolerance)
+        .initial_bracket_size(Some(bracket))
+        .solve_fallible(|z| Ok(kernel.price(z)? - target), 0.0)
 }

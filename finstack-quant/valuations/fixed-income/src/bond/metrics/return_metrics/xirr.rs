@@ -25,10 +25,11 @@
 //! - `(issue_date, -V0)` is the initial outflow (holder pays `V0`).
 //! - All subsequent positive flows received by the holder are inflows.
 
-use super::moic::{cost_basis, lifetime_dated_cashflows};
+use super::moic::{cost_basis, exit_paths, lifetime_dated_cashflows, ExitPaths};
 use crate::bond::Bond;
 use finstack_quant_core::cashflow::xirr_with_daycount;
-use finstack_quant_core::dates::DayCount;
+use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 fn day_count(bond: &Bond) -> DayCount {
@@ -60,17 +61,25 @@ impl MetricCalculator for XirrCalculator {
     fn calculate(&self, ctx: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = ctx.instrument_as()?;
         let (t0, v0) = cost_basis(bond)?;
-        let day_count = day_count(bond);
-
-        let mut flows: Vec<(finstack_quant_core::dates::Date, f64)> = vec![(t0, -v0)];
-        for (d, m) in lifetime_dated_cashflows(bond, &ctx.curves)? {
-            if d > t0 {
-                flows.push((d, m.amount()));
-            }
-        }
-
-        xirr_with_daycount(&flows, day_count, None)
+        let flows = lifetime_dated_cashflows(bond, &ctx.curves)?;
+        xirr_with_daycount(
+            &held_to_maturity_path(&flows, t0, v0),
+            day_count(bond),
+            None,
+        )
     }
+}
+
+/// Held-to-maturity XIRR path: `(t0, -v0)` followed by every holder flow
+/// strictly after `t0`.
+fn held_to_maturity_path(flows: &[(Date, Money)], t0: Date, v0: f64) -> Vec<(Date, f64)> {
+    let mut path = vec![(t0, -v0)];
+    for (d, m) in flows {
+        if *d > t0 {
+            path.push((*d, m.amount()));
+        }
+    }
+    path
 }
 
 /// Worst (minimum) realized XIRR across **all** exits: every early-call/put
@@ -104,49 +113,28 @@ pub(crate) struct XirrToWorstCalculator;
 
 impl MetricCalculator for XirrToWorstCalculator {
     fn calculate(&self, ctx: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let bond: &Bond = ctx.instrument_as()?;
-        let (t0, v0) = cost_basis(bond)?;
-        let day_count = day_count(bond);
+        let day_count = day_count(ctx.instrument_as()?);
+        let ExitPaths {
+            t0,
+            v0,
+            flows,
+            exits,
+        } = exit_paths(ctx)?;
 
-        // Lower any return-floor into call_put before enumerating exit paths.
-        let eff = bond.effective_for_pricing(&ctx.curves, ctx.as_of)?;
-        let flows = lifetime_dated_cashflows(&eff, &ctx.curves)?;
-        let schedule = eff.full_cashflow_schedule(&ctx.curves)?;
-        let basis = crate::bond::pricing::quote_conversions::RedemptionBasis::new(
-            &schedule,
-            &eff.accrual_config(),
-        )?;
-
-        let candidates =
-            crate::bond::pricing::quote_conversions::enumerate_exit_paths(&eff, &flows, ctx.as_of);
-
-        // Maturity path.
-        let mut mat: Vec<(finstack_quant_core::dates::Date, f64)> = vec![(t0, -v0)];
-        for (d, m) in &flows {
-            if *d > t0 {
-                mat.push((*d, m.amount()));
-            }
-        }
-        let mut worst = xirr_with_daycount(&mat, day_count, None)?;
+        let mut worst =
+            xirr_with_daycount(&held_to_maturity_path(&flows, t0, v0), day_count, None)?;
 
         // Each call/put candidate path.
-        for cand in candidates {
-            let mut path: Vec<(finstack_quant_core::dates::Date, f64)> = vec![(t0, -v0)];
+        for (exit_date, redemption) in exits {
+            let mut path: Vec<(Date, f64)> = vec![(t0, -v0)];
             for (d, m) in &flows {
-                if *d > t0 && *d <= cand.date {
+                if *d > t0 && *d <= exit_date {
                     path.push((*d, m.amount()));
                 }
             }
             // Exercise prices are clean; accrued is a same-date holder receipt
             // and must be included exactly once in the realized return path.
-            let redemption = crate::bond::pricing::quote_conversions::exercise_redemption_amount(
-                &eff,
-                &ctx.curves,
-                &flows,
-                &basis,
-                &cand,
-            )?;
-            path.push((cand.date, redemption));
+            path.push((exit_date, redemption));
 
             if let Ok(r) = xirr_with_daycount(&path, day_count, None) {
                 worst = worst.min(r);

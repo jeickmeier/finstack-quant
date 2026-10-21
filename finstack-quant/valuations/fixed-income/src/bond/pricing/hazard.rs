@@ -79,11 +79,7 @@ impl HazardBondEngine {
 
     /// Reject option-bearing bonds at the deterministic straight-bond leaf.
     fn reject_embedded_options(bond: &Bond) -> Result<()> {
-        let has_call_put = bond
-            .call_put
-            .as_ref()
-            .is_some_and(crate::bond::CallPutSchedule::has_options);
-        if has_call_put || bond.return_floor.is_some() {
+        if bond.has_exercise_rights() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "HazardBondEngine is a straight-bond leaf and cannot price embedded options \
                  for bond '{}'; use the 'rates_credit' model for joint rates-credit optional pricing",

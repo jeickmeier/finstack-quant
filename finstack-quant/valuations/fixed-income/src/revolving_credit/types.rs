@@ -4,9 +4,7 @@
 //! stochastic cashflow modeling. Supports standard fee structures (upfront,
 //! commitment, usage, and facility fees) and both fixed and floating rate bases.
 
-use finstack_quant_core::dates::{
-    calendar_by_id_strict, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
@@ -931,19 +929,7 @@ impl RevolvingCredit {
     /// range, the shifted date exceeds the calendar, `calendar_id` names an
     /// unknown calendar, or the business-day roll fails.
     pub fn settlement_date(&self, as_of: Date) -> finstack_quant_core::Result<Date> {
-        if self.settlement_days == 0 {
-            return Ok(as_of);
-        }
-        let settlement_days = i32::try_from(self.settlement_days).map_err(|_| {
-            finstack_quant_core::Error::Validation("settlement days exceed supported range".into())
-        })?;
-        match self.calendar_id.as_deref() {
-            Some(calendar_id) => {
-                let calendar = calendar_by_id_strict(calendar_id)?;
-                as_of.add_business_days(settlement_days, calendar)
-            }
-            None => as_of.add_weekdays(settlement_days),
-        }
+        crate::loan_terms::settlement_date(as_of, self.settlement_days, self.calendar_id.as_deref())
     }
 
     /// Drawn balance on `date` of a deterministic draw/repay schedule.
@@ -993,11 +979,7 @@ impl RevolvingCredit {
     ///
     /// * `date` - Date the commitment is wanted for.
     pub fn commitment_at(&self, date: Date) -> Money {
-        self.commitment_steps
-            .iter()
-            .rev()
-            .find(|step| step.date <= date)
-            .map_or(self.commitment, |step| step.amount)
+        crate::loan_terms::commitment_in_force(&self.commitment_steps, self.commitment, date)
     }
 
     /// Drawn balance at the simulation anchor over the commitment in force on
@@ -1296,19 +1278,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for RevolvingCredit {
         }
 
         use crate::revolving_credit::cashflow_engine::CashflowEngine;
-        // Resolve fixings for floating-rate facilities (graceful: None if missing)
-        let fixings = match &self.rate {
-            RateSpec::Floating(spec) => {
-                finstack_quant_core::market_data::fixings::get_fixing_series(
-                    curves,
-                    spec.forward_curve_id.as_ref(),
-                )
-                .ok()
-            }
-            RateSpec::Fixed { .. } => None,
-        };
-        let engine = CashflowEngine::new(self, Some(curves), as_of, fixings)?;
-        let path_schedule = engine.generate_deterministic()?;
+        let path_schedule = CashflowEngine::deterministic(self, curves, as_of)?;
         Ok(path_schedule.schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))

@@ -1,9 +1,6 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::bond::Bond;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
-use std::borrow::Cow;
 
 /// Calculates yield-basis DV01 for bonds.
 ///
@@ -19,32 +16,6 @@ use std::borrow::Cow;
 /// curve-bump basis.
 pub(crate) struct YieldDv01Calculator;
 
-pub(crate) fn yield_basis_dv01(
-    context: &mut MetricContext,
-    duration_mod: f64,
-    ytm: f64,
-) -> finstack_quant_core::Result<f64> {
-    let workout = super::context_workout_path(context)?;
-    let bond: &Bond = context.instrument_as()?;
-    let flows = context.require_cashflows()?;
-
-    let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
-    let (yield_rate, risk_flows, quote_date) =
-        if let Some((workout_yield, workout_flows, workout_quote_date)) = workout {
-            (workout_yield, Cow::Owned(workout_flows), workout_quote_date)
-        } else {
-            (ytm, Cow::Borrowed(flows), quote_ctx.quote_date)
-        };
-    let price = crate::bond::pricing::quote_conversions::price_from_ytm(
-        bond,
-        risk_flows.as_ref(),
-        quote_date,
-        yield_rate,
-    )?;
-
-    Ok(-(price * duration_mod * 0.0001))
-}
-
 impl MetricCalculator for YieldDv01Calculator {
     fn dependencies(&self) -> &[MetricId] {
         // Ytm is required alongside DurationMod for the price-from-yield repricing.
@@ -56,7 +27,7 @@ impl MetricCalculator for YieldDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let duration_mod = context.computed_metric(&MetricId::DurationMod)?;
         let ytm = context.computed_metric(&MetricId::Ytm)?;
-
-        yield_basis_dv01(context, duration_mod, ytm)
+        let price = super::yield_risk_basis(context, ytm)?.price;
+        Ok(-(price * duration_mod * 0.0001))
     }
 }

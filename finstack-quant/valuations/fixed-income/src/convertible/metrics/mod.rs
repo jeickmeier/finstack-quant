@@ -26,6 +26,39 @@ use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
 
+/// Settlement dirty value in currency implied by the quoted clean price
+/// (percent of par, scaled to notional) plus accrued, or `None` on or after
+/// maturity.
+///
+/// # Errors
+///
+/// Returns `InputError::NotFound` when the bond has no
+/// `quoted_clean_price_pct`, or an error when accrued interest fails.
+fn quoted_dirty_target(
+    bond: &ConvertibleBond,
+    market: &finstack_quant_core::market_data::context::MarketContext,
+    as_of: finstack_quant_core::dates::Date,
+) -> Result<Option<f64>> {
+    if as_of >= bond.maturity {
+        return Ok(None);
+    }
+    let quoted_clean_price_pct = bond
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct
+        .ok_or_else(|| {
+            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
+                id: "instrument_pricing_overrides.market_quotes.quoted_clean_price_pct".to_string(),
+            })
+        })?;
+    let accrued = crate::convertible::pricing::calculate_accrued_interest(bond, market, as_of)?;
+    // `quoted_clean_price_pct` is percentage-of-par (e.g. 99.5 = 99.5% of face);
+    // `accrued` and model prices are notional-scaled currency amounts.
+    Ok(Some(
+        quoted_clean_price_pct * bond.notional.amount() / 100.0 + accrued,
+    ))
+}
+
 /// Register convertible bond metrics into the registry.
 pub(crate) fn register_convertible_metrics(
     registry: &mut MetricRegistry,

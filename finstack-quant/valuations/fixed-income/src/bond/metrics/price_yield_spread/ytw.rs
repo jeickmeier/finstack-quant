@@ -46,8 +46,8 @@ impl MetricCalculator for YtwCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         // Bonds with exercise rights and a quoted price share the workout path
         // cached for the other workout metrics.
-        if let Some((ytw, _, _)) = super::super::context_workout_path(context)? {
-            return Ok(ytw);
+        if let Some(path) = super::super::context_workout_path(context)? {
+            return Ok(path.yield_rate);
         }
         let bond: &Bond = context.instrument_as()?;
 

@@ -5,7 +5,7 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
-use super::drawn_balance_as_of;
+use super::{drawn_at, undrawn_at};
 
 /// Calculator for approximate weighted average cost across all fees and interest.
 ///
@@ -32,14 +32,16 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
 
         let base_rate = match &facility.rate {
             finstack_quant_cashflows::builder::RateSpec::Fixed { rate } => {
-                *rate + facility.margin_delta_bp_at(context.as_of) * 1e-4
+                crate::revolving_credit::utils::fixed_rate_at(facility, *rate, context.as_of)
             }
             finstack_quant_cashflows::builder::RateSpec::Floating(spec) => {
                 let fwd = context.curves.get_forward(spec.forward_curve_id.as_str())?;
                 let index_rate = average_forward_rate(&fwd, facility, context.as_of)?;
-                let mut params =
-                    finstack_quant_cashflows::builder::FloatingRateParams::try_from(spec)?;
-                params.spread_bp += facility.margin_delta_bp_at(context.as_of);
+                let params = crate::revolving_credit::utils::floating_params_at(
+                    facility,
+                    spec,
+                    context.as_of,
+                )?;
                 finstack_quant_cashflows::builder::calculate_floating_rate(index_rate, &params)
             }
         };
@@ -51,9 +53,9 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
             return Ok(0.0);
         }
 
-        let drawn_amt = drawn_balance_as_of(facility, context.as_of)?.amount();
+        let drawn_amt = drawn_at(facility, context.as_of, context.as_of)?.amount();
         let lc_amt = facility.lc_outstanding_at(as_of).amount();
-        let undrawn_amt = (commitment - drawn_amt - lc_amt).max(0.0);
+        let undrawn_amt = undrawn_at(facility, as_of, drawn_amt);
 
         // Interest on drawn
         let interest_cost = drawn_amt * base_rate;

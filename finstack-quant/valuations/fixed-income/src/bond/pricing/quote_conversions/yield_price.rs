@@ -126,46 +126,15 @@ pub fn df_from_yield(
             if w <= 1e-12 {
                 w = 1.0 / m;
             }
-            df_moosmuller_with_first_period(ytm, t, m, w)?
+            // Whole coupon periods after the first are `round((t - w) * m)`.
+            let k_minus_1 = if t <= w + 1e-12 {
+                0.0
+            } else {
+                ((t - w) * m).round().max(0.0)
+            };
+            moosmuller_df(ytm, m, w, k_minus_1)?
         }
     })
-}
-
-/// Moosmüller discount factor with a schedule-flagged first-period length `w`.
-///
-/// ```text
-/// DF_1 = 1 / (1 + y * w)
-/// DF_k = 1 / (1 + y * w) * (1 + y / f)^{1-k}   for k ≥ 2
-/// ```
-///
-/// `w` is the year fraction from settlement to the next coupon and `f` is `m`.
-/// Subsequent coupon counts are inferred as `round((t - w) * m)`.
-pub(super) fn df_moosmuller_with_first_period(
-    ytm: f64,
-    t: f64,
-    m: f64,
-    first_period_len: f64,
-) -> finstack_quant_core::Result<f64> {
-    let w = first_period_len;
-    let simple_denom = 1.0 + ytm * w;
-    if simple_denom <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Moosmüller simple-interest denom (1 + y*w) = {simple_denom} is non-positive for ytm={ytm}, w={w}"
-        )));
-    }
-    let df_simple = 1.0 / simple_denom;
-    if t <= first_period_len + 1e-12 {
-        return Ok(df_simple);
-    }
-
-    let periodic_base = 1.0 + ytm / m;
-    if periodic_base <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Moosmüller periodic base (1 + y/m) = {periodic_base} is non-positive for ytm={ytm}, m={m}"
-        )));
-    }
-    let k_minus_1 = ((t - first_period_len) * m).round().max(0.0);
-    Ok(df_simple * periodic_base.powf(-k_minus_1))
 }
 
 /// Measure raw dated cashflows using the context their dates can establish.
@@ -372,7 +341,7 @@ pub(crate) fn price_from_ytm_timed(
                         moosmuller_date = Some(date);
                     }
                     let m = frequency.payments_per_year().max(1.0);
-                    moosmuller_df_for_coupon(ytm, m, w, moosmuller_k)?
+                    moosmuller_df(ytm, m, w, f64::from(moosmuller_k.saturating_sub(1)))?
                 }
                 _ => df_from_yield(ytm, t, comp, frequency)?,
             };
@@ -382,7 +351,16 @@ pub(crate) fn price_from_ytm_timed(
     Ok(pv.total())
 }
 
-fn moosmuller_df_for_coupon(ytm: f64, m: f64, w: f64, k: u32) -> finstack_quant_core::Result<f64> {
+/// Moosmüller discount factor of the coupon `k_minus_1` whole periods after
+/// the first (simple-interest) period of length `w`.
+///
+/// ```text
+/// DF_1 = 1 / (1 + y * w)
+/// DF_k = 1 / (1 + y * w) * (1 + y / f)^{1-k}   for k ≥ 2
+/// ```
+///
+/// `w` is the year fraction from settlement to the next coupon and `f` is `m`.
+fn moosmuller_df(ytm: f64, m: f64, w: f64, k_minus_1: f64) -> finstack_quant_core::Result<f64> {
     let simple_denom = 1.0 + ytm * w;
     if simple_denom <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -390,7 +368,7 @@ fn moosmuller_df_for_coupon(ytm: f64, m: f64, w: f64, k: u32) -> finstack_quant_
         )));
     }
     let df_simple = 1.0 / simple_denom;
-    if k <= 1 {
+    if k_minus_1 <= 0.0 {
         return Ok(df_simple);
     }
     let periodic_base = 1.0 + ytm / m;
@@ -399,7 +377,7 @@ fn moosmuller_df_for_coupon(ytm: f64, m: f64, w: f64, k: u32) -> finstack_quant_
             "Moosmüller periodic base (1 + y/m) = {periodic_base} is non-positive for ytm={ytm}, m={m}"
         )));
     }
-    Ok(df_simple * periodic_base.powf(-f64::from(k.saturating_sub(1))))
+    Ok(df_simple * periodic_base.powf(-k_minus_1))
 }
 
 /// Price from ytm (using Street convention).
@@ -999,7 +977,7 @@ pub(crate) fn price_from_i_spread(
     as_of: Date,
     i_spread: f64,
 ) -> finstack_quant_core::Result<f64> {
-    use crate::bond::metrics::price_yield_spread::i_spread::i_spread_par_rate;
+    use super::i_spread_par_rate;
 
     let disc = curves.get_discount(&bond.discount_curve_id)?;
     let effective_bond = bond.effective_for_pricing(curves, as_of)?;
@@ -1057,6 +1035,25 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::Rate;
     use time::macros::date;
+
+    #[test]
+    fn time_based_moosmuller_counts_whole_periods_after_the_first() {
+        let (ytm, w) = (0.04, 0.125);
+        let simple = 1.0 / (1.0 + ytm * w);
+        let df = |t: f64| {
+            df_from_yield(
+                ytm,
+                t,
+                YieldCompounding::Moosmuller,
+                finstack_quant_core::dates::Tenor::semi_annual(),
+            )
+            .expect("df")
+        };
+        // Inside the first period only simple interest applies.
+        assert_eq!(df(w), simple);
+        // Two whole semi-annual periods after the first.
+        assert_eq!(df(w + 1.0), simple * (1.0 + ytm / 2.0).powf(-2.0));
+    }
 
     #[test]
     fn exit_windows_keep_exact_contractual_boundaries() {
@@ -1269,25 +1266,27 @@ mod tests {
         let make_whole_flows = make_whole_bond
             .pricing_dated_cashflows(&market, as_of)
             .expect("pricing flows");
-        let (_, make_whole_path, _) = crate::bond::metrics::quoted_workout_path(
+        let make_whole_path = crate::bond::pricing::quote_conversions::quoted_workout_path(
             &make_whole_bond,
             &market,
             as_of,
             &make_whole_flows,
         )
         .expect("make-whole workout")
-        .expect("callable workout path");
+        .expect("callable workout path")
+        .flows;
         let fixed_flows = fixed_strike_bond
             .pricing_dated_cashflows(&market, as_of)
             .expect("pricing flows");
-        let (_, fixed_path, _) = crate::bond::metrics::quoted_workout_path(
+        let fixed_path = crate::bond::pricing::quote_conversions::quoted_workout_path(
             &fixed_strike_bond,
             &market,
             as_of,
             &fixed_flows,
         )
         .expect("fixed-strike workout")
-        .expect("callable workout path");
+        .expect("callable workout path")
+        .flows;
 
         let make_whole_exit = make_whole_path
             .iter()

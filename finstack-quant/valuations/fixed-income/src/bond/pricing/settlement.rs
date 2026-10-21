@@ -18,7 +18,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
-use crate::bond::{Bond, CashflowSpec};
+use crate::bond::Bond;
 
 /// Compute the settlement date from a trade/valuation date.
 ///
@@ -36,43 +36,10 @@ pub(crate) fn settlement_date(bond: &Bond, as_of: Date) -> Result<Date> {
             "bond settlement_days {sd_u32} exceeds the supported range"
         ))
     })?;
-    let (calendar_id, business_day_convention) = match &bond.cashflow_spec {
-        CashflowSpec::Fixed(spec) => (
-            spec.schedule.calendar_id.as_str(),
-            spec.schedule.business_day_convention,
-        ),
-        CashflowSpec::Floating(spec) => (
-            spec.schedule.calendar_id.as_str(),
-            spec.schedule.business_day_convention,
-        ),
-        CashflowSpec::StepUp(spec) => (
-            spec.schedule.calendar_id.as_str(),
-            spec.schedule.business_day_convention,
-        ),
-        CashflowSpec::Amortizing { base, .. } => match &**base {
-            CashflowSpec::Fixed(spec) => (
-                spec.schedule.calendar_id.as_str(),
-                spec.schedule.business_day_convention,
-            ),
-            CashflowSpec::Floating(spec) => (
-                spec.schedule.calendar_id.as_str(),
-                spec.schedule.business_day_convention,
-            ),
-            CashflowSpec::StepUp(spec) => (
-                spec.schedule.calendar_id.as_str(),
-                spec.schedule.business_day_convention,
-            ),
-            CashflowSpec::Amortizing { .. } => {
-                return Err(finstack_quant_core::Error::Validation(
-                    "nested amortizing bond cashflow specifications are unsupported".to_string(),
-                ));
-            }
-        },
-    };
-
-    let cal = finstack_quant_core::dates::calendar_by_id_strict(calendar_id)?;
+    let schedule = bond.cashflow_spec.schedule();
+    let cal = finstack_quant_core::dates::calendar_by_id_strict(&schedule.calendar_id)?;
     let advanced = as_of.add_business_days(sd, cal)?;
-    let adjusted = adjust(advanced, business_day_convention, cal)?;
+    let adjusted = adjust(advanced, schedule.business_day_convention, cal)?;
     Ok(adjusted.max(bond.issue_date))
 }
 
@@ -352,7 +319,7 @@ mod tests {
     #[test]
     fn settlement_rejects_unknown_calendar() {
         let mut bond = t2_bond();
-        if let CashflowSpec::Fixed(spec) = &mut bond.cashflow_spec {
+        if let crate::bond::CashflowSpec::Fixed(spec) = &mut bond.cashflow_spec {
             spec.schedule.calendar_id = "missing-calendar".into();
         }
         let err = settlement_date(&bond, date!(2025 - 01 - 02))

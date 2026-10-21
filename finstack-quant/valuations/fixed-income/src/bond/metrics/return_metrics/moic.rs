@@ -69,17 +69,95 @@ pub(crate) fn lifetime_dated_cashflows(
         finstack_quant_core::money::Money,
     )>,
 > {
-    use finstack_quant_core::cashflow::CFKind;
-
     let schedule = bond.full_cashflow_schedule(curves)?;
     Ok(schedule
         .into_flows()
         .into_iter()
-        .filter(|cf| {
-            cf.kind != CFKind::Pik && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0)
-        })
+        .filter(Bond::is_holder_cashflow)
         .map(|cf| (cf.date, cf.amount))
         .collect())
+}
+
+/// Held-to-maturity money multiple: all positive holder inflows strictly
+/// after the cost-basis date `t0`, divided by `v0`.
+fn held_to_maturity_moic(
+    flows: &[(
+        finstack_quant_core::dates::Date,
+        finstack_quant_core::money::Money,
+    )],
+    t0: finstack_quant_core::dates::Date,
+    v0: f64,
+) -> f64 {
+    flows
+        .iter()
+        .filter(|(d, _)| *d > t0)
+        .map(|(_, m)| m.amount().max(0.0))
+        .sum::<f64>()
+        / v0
+}
+
+/// Inputs shared by the to-worst return metrics: the cost basis, the
+/// effective bond's lifetime holder flows and every early-exit candidate with
+/// its redemption amount.
+pub(crate) struct ExitPaths {
+    /// Cost-basis anchor date (the issue date).
+    pub(crate) t0: finstack_quant_core::dates::Date,
+    /// Invested capital `V0` in currency.
+    pub(crate) v0: f64,
+    /// Lifetime holder cashflows of the effective (floor-lowered) bond.
+    pub(crate) flows: Vec<(
+        finstack_quant_core::dates::Date,
+        finstack_quant_core::money::Money,
+    )>,
+    /// Each call/put exit date with its redemption amount (clean price plus
+    /// accrued, in currency).
+    pub(crate) exits: Vec<(finstack_quant_core::dates::Date, f64)>,
+}
+
+/// Enumerate the held-to-maturity flows and every call/put exit of the
+/// context's bond, with any return floor lowered into its call schedule.
+///
+/// # Errors
+///
+/// Returns an error if the instrument is not a `Bond`, the cost basis is
+/// invalid, the effective bond cannot be derived, or cashflow generation or
+/// redemption resolution fails.
+pub(crate) fn exit_paths(ctx: &MetricContext) -> finstack_quant_core::Result<ExitPaths> {
+    let bond: &Bond = ctx.instrument_as()?;
+    let (t0, v0) = cost_basis(bond)?;
+
+    // Lower any return-floor into call_put before enumerating exit paths.
+    let eff = bond.effective_for_pricing(&ctx.curves, ctx.as_of)?;
+    let flows = lifetime_dated_cashflows(&eff, &ctx.curves)?;
+    let schedule = eff.full_cashflow_schedule(&ctx.curves)?;
+    let basis = crate::bond::pricing::quote_conversions::RedemptionBasis::new(
+        &schedule,
+        &eff.accrual_config(),
+    )?;
+    let exits =
+        crate::bond::pricing::quote_conversions::enumerate_exit_paths(&eff, &flows, ctx.as_of)
+            .iter()
+            .map(|cand| {
+                // Call/put schedule prices are clean. Exercise pays accrued
+                // after same-day scheduled distributions, matching the
+                // pricing kernel.
+                let redemption =
+                    crate::bond::pricing::quote_conversions::exercise_redemption_amount(
+                        &eff,
+                        &ctx.curves,
+                        &flows,
+                        &basis,
+                        cand,
+                    )?;
+                Ok((cand.date, redemption))
+            })
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+    Ok(ExitPaths {
+        t0,
+        v0,
+        flows,
+        exits,
+    })
 }
 
 /// MOIC if held to maturity.
@@ -102,12 +180,7 @@ impl MetricCalculator for MoicCalculator {
         let bond: &Bond = ctx.instrument_as()?;
         let (t0, v0) = cost_basis(bond)?;
         let flows = lifetime_dated_cashflows(bond, &ctx.curves)?;
-        let total_in: f64 = flows
-            .iter()
-            .filter(|(d, _)| *d > t0)
-            .map(|(_, m)| m.amount().max(0.0))
-            .sum();
-        Ok(total_in / v0)
+        Ok(held_to_maturity_moic(&flows, t0, v0))
     }
 }
 
@@ -141,47 +214,22 @@ pub(crate) struct MoicToWorstCalculator;
 
 impl MetricCalculator for MoicToWorstCalculator {
     fn calculate(&self, ctx: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let bond: &Bond = ctx.instrument_as()?;
-        let (t0, v0) = cost_basis(bond)?;
-
-        // Lower any return-floor into call_put before enumerating exit paths.
-        let eff = bond.effective_for_pricing(&ctx.curves, ctx.as_of)?;
-        let flows = lifetime_dated_cashflows(&eff, &ctx.curves)?;
-        let schedule = eff.full_cashflow_schedule(&ctx.curves)?;
-        let basis = crate::bond::pricing::quote_conversions::RedemptionBasis::new(
-            &schedule,
-            &eff.accrual_config(),
-        )?;
-
-        let candidates =
-            crate::bond::pricing::quote_conversions::enumerate_exit_paths(&eff, &flows, ctx.as_of);
-
-        // Held-to-maturity path: all positive inflows after issue.
-        let to_mat: f64 = flows
-            .iter()
-            .filter(|(d, _)| *d > t0)
-            .map(|(_, m)| m.amount().max(0.0))
-            .sum::<f64>()
-            / v0;
+        let ExitPaths {
+            t0,
+            v0,
+            flows,
+            exits,
+        } = exit_paths(ctx)?;
 
         // Worst across maturity and each call/put candidate.
-        let mut worst = to_mat;
-        for cand in candidates {
+        let mut worst = held_to_maturity_moic(&flows, t0, v0);
+        for (exit_date, redemption) in exits {
             // Coupons received in (issue, exit_date].
             let coupons: f64 = flows
                 .iter()
-                .filter(|(d, _)| *d > t0 && *d <= cand.date)
+                .filter(|(d, _)| *d > t0 && *d <= exit_date)
                 .map(|(_, m)| m.amount().max(0.0))
                 .sum();
-            // Call/put schedule prices are clean. Exercise pays accrued after
-            // same-day scheduled distributions, matching the pricing kernel.
-            let redemption = crate::bond::pricing::quote_conversions::exercise_redemption_amount(
-                &eff,
-                &ctx.curves,
-                &flows,
-                &basis,
-                &cand,
-            )?;
             worst = worst.min((coupons + redemption) / v0);
         }
 

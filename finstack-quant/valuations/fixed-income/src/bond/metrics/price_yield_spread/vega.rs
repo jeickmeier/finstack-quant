@@ -10,10 +10,6 @@ use finstack_quant_valuations_core::pricer::ModelKey;
 #[derive(Debug, Clone, Default)]
 pub(crate) struct BondVegaCalculator;
 
-fn has_embedded_options(bond: &Bond) -> bool {
-    bond.return_floor.is_some() || bond.call_put.as_ref().is_some_and(|cp| cp.has_options())
-}
-
 /// The short-rate volatility input the selected bond model reads.
 #[derive(Debug, Clone, Copy)]
 enum ShortRateSigma {
@@ -89,7 +85,7 @@ fn holder_option_value_at_vol(
 impl MetricCalculator for BondVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = context.instrument_as()?;
-        if !has_embedded_options(bond) {
+        if !bond.has_exercise_rights() {
             return Ok(0.0);
         }
 

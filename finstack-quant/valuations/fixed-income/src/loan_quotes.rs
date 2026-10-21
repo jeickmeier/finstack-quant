@@ -1,6 +1,7 @@
 //! Quote arithmetic shared by loan-style instruments (term loans, revolving
 //! credit facilities): discount-margin repricing, the discount-margin solve,
-//! and the running all-in rate. Each instrument supplies its own flows,
+//! the running all-in rate, yield to maturity and the per-context schedule
+//! cache. Each instrument supplies its own flows,
 //! settlement date and outstanding path; nothing here reads an instrument.
 //!
 //! # Conventions
@@ -32,6 +33,73 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
+
+/// The context instrument's quote schedule, built by `build` on first use and
+/// cached on the context's `internal_schedule` for later metrics.
+///
+/// # Errors
+///
+/// Returns an error when the context instrument is not a `T` or `build` fails.
+pub(crate) fn cached_schedule<T: 'static>(
+    context: &mut finstack_quant_valuations_core::metrics::MetricContext,
+    build: impl FnOnce(
+        &T,
+        &finstack_quant_core::market_data::context::MarketContext,
+        Date,
+    ) -> Result<CashFlowSchedule>,
+) -> Result<std::sync::Arc<CashFlowSchedule>> {
+    if let Some(schedule) = &context.internal_schedule {
+        return Ok(std::sync::Arc::clone(schedule));
+    }
+    let schedule = std::sync::Arc::new(build(
+        context.instrument_as::<T>()?,
+        &context.curves,
+        context.as_of,
+    )?);
+    context.internal_schedule = Some(std::sync::Arc::clone(&schedule));
+    Ok(schedule)
+}
+
+/// Yield to maturity on `day_count`: the IRR of the price leg
+/// `(settlement, price_leg)` (negative: the purchase outflow) and every cash
+/// settlement flow of `schedule` dated after `settlement` (PIK excluded).
+///
+/// # Errors
+///
+/// Returns an error when the XIRR does not converge or a flow is not finite.
+pub(crate) fn ytm_from_schedule(
+    schedule: &CashFlowSchedule,
+    settlement: Date,
+    price_leg: f64,
+    day_count: DayCount,
+) -> Result<f64> {
+    let mut flows = vec![(settlement, price_leg)];
+    flows.extend(
+        schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.date > settlement && cf.kind.is_cash_settlement())
+            .map(|cf| (cf.date, cf.amount.amount())),
+    );
+    finstack_quant_core::cashflow::xirr_with_daycount(&flows, day_count, None)
+}
+
+/// Contractual floating margin of `spec` as a decimal (`spread_bp × 1e-4`).
+///
+/// # Errors
+///
+/// Returns a validation error when `spread_bp` is not representable as `f64`.
+pub(crate) fn floating_margin(
+    spec: &finstack_quant_cashflows::builder::FloatingRateSpec,
+) -> Result<f64> {
+    use rust_decimal::prelude::ToPrimitive;
+
+    Ok(spec.spread_bp.to_f64().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "floating spread_bp is not representable as f64".to_string(),
+        )
+    })? * 1e-4)
+}
 
 /// Absolute sanity bound on a solved discount margin, decimal (±5000 bp).
 /// Distressed loans legitimately solve well above 2000 bp; the bound only
@@ -209,6 +277,40 @@ pub struct OidEirSchedule {
     pub effective_rate: f64,
     /// Period-by-period amortization details.
     pub periods: Vec<OidEirPeriod>,
+}
+
+impl OidEirSchedule {
+    /// Store `oid_eir_rate` and the dated `oid_eir_amortization` /
+    /// `oid_eir_carrying_value` series on `context`, returning the total
+    /// amortization.
+    pub(crate) fn record(
+        &self,
+        context: &mut finstack_quant_valuations_core::metrics::MetricContext,
+    ) -> f64 {
+        use finstack_quant_valuations_core::metrics::MetricId;
+
+        context
+            .computed
+            .insert(MetricId::custom("oid_eir_rate"), self.effective_rate);
+        if !self.periods.is_empty() {
+            context.store_bucketed_series(
+                MetricId::custom("oid_eir_amortization"),
+                self.periods
+                    .iter()
+                    .map(|p| (p.date.to_string(), p.oid_amortization.amount())),
+            );
+            context.store_bucketed_series(
+                MetricId::custom("oid_eir_carrying_value"),
+                self.periods
+                    .iter()
+                    .map(|p| (p.date.to_string(), p.closing_balance.amount())),
+            );
+        }
+        self.periods
+            .iter()
+            .map(|p| p.oid_amortization.amount())
+            .sum()
+    }
 }
 
 /// Build an effective-interest-rate amortization schedule from a full

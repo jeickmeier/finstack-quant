@@ -1,7 +1,8 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use super::z_spread::{quote_date_dirty_target, solve_kernel_spread, BondZSpreadPricingKernel};
+use super::quote_date_dirty_target;
 use crate::bond::pricing::quote_conversions::clear_price_driving_overrides;
+use crate::bond::pricing::quote_conversions::{solve_kernel_spread, BondZSpreadPricingKernel};
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};

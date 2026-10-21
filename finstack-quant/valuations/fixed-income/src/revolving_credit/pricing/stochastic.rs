@@ -1,13 +1,13 @@
 //! Stochastic Monte Carlo revolving-credit pricing.
 
 use super::path_generator::generate_three_factor_paths;
-use super::path_pricing::resolve_fixings;
 use super::results::EnhancedMonteCarloResult;
 use super::unified::{
     RevolvingCreditPricer, DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR,
 };
 use crate::revolving_credit::cashflow_engine::CashflowEngine;
 use crate::revolving_credit::types::{DrawRepaySpec, RevolvingCredit, RevolvingCreditMcRun};
+use crate::revolving_credit::utils::resolve_fixings;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
 use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};

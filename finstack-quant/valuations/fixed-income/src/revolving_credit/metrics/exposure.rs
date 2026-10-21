@@ -6,7 +6,7 @@ use crate::revolving_credit::RevolvingCredit;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
-use super::drawn_balance_as_of;
+use super::{drawn_at, undrawn_at};
 
 /// Exposure at default on the valuation date, in the facility currency:
 /// the drawn balance plus `leq` of the undrawn commitment plus the LC
@@ -19,9 +19,8 @@ impl MetricCalculator for ExposureAtDefaultCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let facility: &RevolvingCredit = context.instrument_as()?;
         let as_of = context.as_of;
-        let drawn = drawn_balance_as_of(facility, as_of)?.amount();
-        let lc = facility.lc_outstanding_at(as_of).amount();
-        let undrawn = (facility.commitment_at(as_of).amount() - drawn - lc).max(0.0);
+        let drawn = drawn_at(facility, as_of, as_of)?.amount();
+        let undrawn = undrawn_at(facility, as_of, drawn);
         Ok(drawn + facility.leq * undrawn + facility.lc_exposure_at_default(as_of))
     }
 }

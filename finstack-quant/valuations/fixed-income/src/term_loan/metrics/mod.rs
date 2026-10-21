@@ -84,7 +84,6 @@ use self::irr_helpers::target_price_from_quote_or_model;
 use crate::term_loan::TermLoan;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
-use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
 
 /// Register all term loan metrics with the global registry.
@@ -245,32 +244,7 @@ impl MetricCalculator for OidEirAmortizationCalculator {
         let market = &context.curves;
 
         let schedule = crate::term_loan::cashflows::build_oid_eir_schedule(loan, market)?;
-
-        context
-            .computed
-            .insert(MetricId::custom("oid_eir_rate"), schedule.effective_rate);
-
-        if !schedule.periods.is_empty() {
-            let amort_series = schedule
-                .periods
-                .iter()
-                .map(|p| (p.date.to_string(), p.oid_amortization.amount()));
-            context.store_bucketed_series(MetricId::custom("oid_eir_amortization"), amort_series);
-
-            let carrying_series = schedule
-                .periods
-                .iter()
-                .map(|p| (p.date.to_string(), p.closing_balance.amount()));
-            context
-                .store_bucketed_series(MetricId::custom("oid_eir_carrying_value"), carrying_series);
-        }
-
-        let total = schedule
-            .periods
-            .iter()
-            .map(|p| p.oid_amortization.amount())
-            .sum();
-        Ok(total)
+        Ok(schedule.record(context))
     }
 }
 

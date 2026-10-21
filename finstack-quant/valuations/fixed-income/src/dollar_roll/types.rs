@@ -278,9 +278,7 @@ impl DollarRoll {
 
     /// Effective settlement class (explicit or inferred from agency + term).
     pub fn effective_settlement_class(&self) -> SifmaSettlementClass {
-        self.settlement_class.unwrap_or_else(|| {
-            SifmaSettlementClass::from_agency_term(self.agency.as_str(), self.term.years())
-        })
+        crate::tba::settlement_class(self.settlement_class, self.agency, self.term)
     }
 
     /// Resolve the front-month settlement date.
@@ -288,7 +286,11 @@ impl DollarRoll {
         if let Some(d) = self.front_settlement_date {
             return Ok(d);
         }
-        self.front_leg()?.effective_settlement_date()
+        crate::tba::sifma_settlement(
+            self.front_settlement_year,
+            self.front_settlement_month,
+            self.effective_settlement_class(),
+        )
     }
 
     /// Resolve the back-month settlement date.
@@ -296,7 +298,11 @@ impl DollarRoll {
         if let Some(d) = self.back_settlement_date {
             return Ok(d);
         }
-        self.back_leg()?.effective_settlement_date()
+        crate::tba::sifma_settlement(
+            self.back_settlement_year,
+            self.back_settlement_month,
+            self.effective_settlement_class(),
+        )
     }
 
     /// Create the front-month TBA leg.
@@ -305,20 +311,12 @@ impl DollarRoll {
     /// so pricing (mark-to-market) discounts to the same settlement date the
     /// carry analytics use.
     pub fn front_leg(&self) -> finstack_quant_core::Result<AgencyTba> {
-        AgencyTba::builder()
-            .id(InstrumentId::new(format!("{}-FRONT", self.id.as_str())))
-            .agency(self.agency)
-            .coupon(self.coupon)
-            .term(self.term)
-            .settlement_year(self.front_settlement_year)
-            .settlement_month(self.front_settlement_month)
-            .settlement_class_opt(Some(self.effective_settlement_class()))
-            .settlement_date_opt(self.front_settlement_date)
-            .notional(self.notional)
-            .trade_price(self.front_price)
-            .prepayment_spec_opt(self.prepayment_spec.clone())
-            .discount_curve_id(self.discount_curve_id.clone())
-            .build()
+        self.leg(
+            "FRONT",
+            (self.front_settlement_year, self.front_settlement_month),
+            self.front_settlement_date,
+            self.front_price,
+        )
     }
 
     /// Create the back-month TBA leg.
@@ -327,17 +325,34 @@ impl DollarRoll {
     /// so pricing (mark-to-market) discounts to the same settlement date the
     /// carry analytics use.
     pub fn back_leg(&self) -> finstack_quant_core::Result<AgencyTba> {
+        self.leg(
+            "BACK",
+            (self.back_settlement_year, self.back_settlement_month),
+            self.back_settlement_date,
+            self.back_price,
+        )
+    }
+
+    /// One TBA leg of the roll: id suffix, settlement `(year, month)`,
+    /// optional explicit settlement date and trade price (% of par).
+    fn leg(
+        &self,
+        suffix: &str,
+        (year, month): (i32, u8),
+        settlement_date: Option<Date>,
+        price: f64,
+    ) -> finstack_quant_core::Result<AgencyTba> {
         AgencyTba::builder()
-            .id(InstrumentId::new(format!("{}-BACK", self.id.as_str())))
+            .id(InstrumentId::new(format!("{}-{suffix}", self.id.as_str())))
             .agency(self.agency)
             .coupon(self.coupon)
             .term(self.term)
-            .settlement_year(self.back_settlement_year)
-            .settlement_month(self.back_settlement_month)
+            .settlement_year(year)
+            .settlement_month(month)
             .settlement_class_opt(Some(self.effective_settlement_class()))
-            .settlement_date_opt(self.back_settlement_date)
+            .settlement_date_opt(settlement_date)
             .notional(self.notional)
-            .trade_price(self.back_price)
+            .trade_price(price)
             .prepayment_spec_opt(self.prepayment_spec.clone())
             .discount_curve_id(self.discount_curve_id.clone())
             .build()

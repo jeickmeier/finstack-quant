@@ -258,17 +258,7 @@ impl Bond {
     /// The bond with the fixed coupon schedule configured to use `stub`.
     #[must_use]
     pub fn with_stub(mut self, stub: StubKind) -> Self {
-        match &mut self.cashflow_spec {
-            CashflowSpec::Fixed(spec) => spec.schedule.stub = stub,
-            CashflowSpec::StepUp(spec) => spec.schedule.stub = stub,
-            CashflowSpec::Amortizing { base, .. } => match base.as_mut() {
-                CashflowSpec::Fixed(spec) => spec.schedule.stub = stub,
-                CashflowSpec::StepUp(spec) => spec.schedule.stub = stub,
-                CashflowSpec::Floating(spec) => spec.schedule.stub = stub,
-                CashflowSpec::Amortizing { .. } => {}
-            },
-            CashflowSpec::Floating(spec) => spec.schedule.stub = stub,
-        }
+        self.cashflow_spec.schedule_mut().stub = stub;
         self
     }
 

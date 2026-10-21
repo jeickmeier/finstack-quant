@@ -1,15 +1,25 @@
-//! Bond price, yield, spread, duration, and risk metric calculations.
+//! Yield-to-maturity calculators (Street and Moosmüller compounding).
 //!
+use super::quote_date_dirty_target;
+use crate::bond::pricing::quote_conversions::YieldCompounding;
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
-/// Calculates yield to maturity (YTM) for bonds.
+/// Calculates yield to maturity (YTM) for bonds under one compounding
+/// convention.
 ///
 /// YTM is defined here as the internal rate of return that equates the present
 /// value of **all projected future cashflows** to the current dirty market
 /// price (quoted clean price plus accrued interest at the **quote date**).
+/// The registry registers it twice: `Ytm` with
+/// [`YieldCompounding::Street`] and `MoosmullerYtm` with
+/// [`YieldCompounding::Moosmuller`], which solves the schedule-aware
+///
+/// ```text
+/// PV = 1/(1 + y*w) * [CF_1 + Σ_{k≥2} CF_k / (1 + y/f)^{k-1}]
+/// ```
 ///
 /// # Quote-Date Convention
 ///
@@ -40,15 +50,14 @@ use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 /// # Dependencies
 ///
 /// None (accrued is computed internally at quote_date).
-pub(crate) struct YtmCalculator;
+pub(crate) struct YtmCalculator {
+    /// Compounding convention the yield is solved under.
+    pub(crate) compounding: YieldCompounding,
+}
 
 impl MetricCalculator for YtmCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = context.instrument_as()?;
-        let maybe_clean_px = bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_clean_price_pct;
         let notional = bond.notional;
         let day_count = bond.cashflow_spec.day_count();
         let discount_curve_id = bond.discount_curve_id.to_owned();
@@ -59,31 +68,13 @@ impl MetricCalculator for YtmCalculator {
         // Compute quote-date context (settlement date and accrued at settlement)
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
 
-        // Determine dirty price in currency at the quote date.
-        //
-        // Preferred path: use quoted clean price (market quote) plus accrued
-        // interest at the quote date to build the dirty market price.
-        // When no quoted clean price is available, fall back to the model PV
-        // adjusted for time value between as_of and quote_date.
-        let dirty: Money = if let Some(clean_px) = maybe_clean_px {
-            // Compute dirty price at quote_date: clean% × notional + accrued_at_quote
-            let dirty_amt = quote_ctx.dirty_from_clean_pct(clean_px, notional.amount());
-            Money::new(dirty_amt, notional.currency())?
-        } else {
-            // Fallback: forward-value the model PV (computed at `as_of`) to the
-            // quote/settlement date so the solved YTM discounts cashflows from
-            // the same origin (`quote_date`) at which the dirty price is
-            // expressed (see `model_dirty_at_quote_date` for the carry
-            // rationale shared with the Z-spread and DM fallbacks).
-            let pv_at_quote = crate::bond::pricing::settlement::model_dirty_at_quote_date(
-                bond,
-                &context.curves,
-                context.as_of,
-                quote_ctx.quote_date,
-                context.base_value.amount(),
-            )?;
-            Money::new(pv_at_quote, notional.currency())?
-        };
+        // Dirty price in currency at the quote date: the quoted clean price
+        // plus accrued there, otherwise the model PV carried to the quote date
+        // so the solved yield discounts from the same origin.
+        let dirty = Money::new(
+            quote_date_dirty_target(bond, context, &quote_ctx)?,
+            notional.currency(),
+        )?;
 
         // Build and cache flows and hints if not already present. Coupon
         // entitlement is tested at the quote/settlement date so a trade whose
@@ -98,10 +89,9 @@ impl MetricCalculator for YtmCalculator {
         }
         let flows = context.require_cashflows()?;
 
-        // Solve for YTM using shared solver with Street compounding (default)
         // Time origin is the quote_date (settlement date) to match market convention
         let bond: &Bond = context.instrument_as()?;
-        let ytm = crate::bond::pricing::ytm_solver::solve_bond_ytm(
+        crate::bond::pricing::ytm_solver::solve_bond_ytm(
             bond,
             flows,
             quote_ctx.quote_date,
@@ -110,11 +100,9 @@ impl MetricCalculator for YtmCalculator {
                 day_count,
                 notional,
                 coupon_rate: coupon,
-                compounding: crate::bond::pricing::quote_conversions::YieldCompounding::Street,
+                compounding: self.compounding,
                 frequency,
             },
-        )?;
-
-        Ok(ytm)
+        )
     }
 }

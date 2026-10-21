@@ -42,31 +42,13 @@ pub(crate) fn compute_conversion_value(bond: &ConvertibleBond, spot: f64) -> Res
             lower_conversion_price,
             ..
         } => {
-            if *lower_conversion_price <= 0.0 || *upper_conversion_price <= 0.0 {
-                return Err(Error::Validation(format!(
-                    "Conversion prices must be positive: lower={}, upper={}",
-                    lower_conversion_price, upper_conversion_price
-                )));
-            }
-            // Reject inverted bounds. Without this guard the three-regime payoff
-            // below collapses degenerately (no `lower < spot <= upper` regime
-            // can fire) and produces NaN-adjacent values that propagate
-            // silently into PV. Data-entry inversion at trade capture is the
-            // most likely source.
-            if *lower_conversion_price > *upper_conversion_price {
-                return Err(Error::Validation(format!(
-                    "MandatoryVariable conversion bounds inverted: lower={lower_conversion_price} \
-                     must be <= upper={upper_conversion_price}"
-                )));
-            }
-            let face = bond.notional.amount();
-            if spot <= *lower_conversion_price {
-                Ok((face / lower_conversion_price) * spot)
-            } else if spot <= *upper_conversion_price {
-                Ok(face)
-            } else {
-                Ok((face / upper_conversion_price) * spot)
-            }
+            validate_mandatory_variable_bounds(*lower_conversion_price, *upper_conversion_price)?;
+            Ok(mandatory_variable_value(
+                bond.notional.amount(),
+                *lower_conversion_price,
+                *upper_conversion_price,
+                spot,
+            ))
         }
         _ => {
             let conversion_ratio =
@@ -77,6 +59,71 @@ pub(crate) fn compute_conversion_value(bond: &ConvertibleBond, spot: f64) -> Res
             Ok(spot * conversion_ratio)
         }
     }
+}
+
+/// Reject non-positive or inverted mandatory-variable conversion prices.
+///
+/// Without the inversion guard the three-regime payoff of
+/// [`mandatory_variable_value`] collapses degenerately (no
+/// `lower < spot <= upper` regime can fire) and produces NaN-adjacent values
+/// that propagate silently into PV. Data-entry inversion at trade capture is
+/// the most likely source.
+///
+/// # Errors
+///
+/// Returns a validation error when either price is not positive or
+/// `lower > upper`.
+pub(super) fn validate_mandatory_variable_bounds(lower: f64, upper: f64) -> Result<()> {
+    if lower <= 0.0 || upper <= 0.0 {
+        return Err(Error::Validation(format!(
+            "Conversion prices must be positive: lower={}, upper={}",
+            lower, upper
+        )));
+    }
+    if lower > upper {
+        return Err(Error::Validation(format!(
+            "MandatoryVariable conversion bounds inverted: lower={lower} \
+             must be <= upper={upper}"
+        )));
+    }
+    Ok(())
+}
+
+/// Mandatory-variable conversion value of `face` at `spot`: maximum shares
+/// `face / lower` below `lower`, par between the bounds, minimum shares
+/// `face / upper` above `upper`.
+pub(super) fn mandatory_variable_value(face: f64, lower: f64, upper: f64, spot: f64) -> f64 {
+    if spot <= lower {
+        (face / lower) * spot
+    } else if spot <= upper {
+        face
+    } else {
+        (face / upper) * spot
+    }
+}
+
+/// Survival from `start` to `end` conditional on survival to `start`,
+/// `S(end) / S(start)`; `1.0` without a hazard curve.
+///
+/// # Errors
+///
+/// Returns a validation error when `S(start)` is not positive, or when the
+/// curve cannot evaluate either date.
+pub(super) fn conditional_survival(
+    hazard: Option<&finstack_quant_core::market_data::term_structures::HazardCurve>,
+    start: Date,
+    end: Date,
+) -> Result<f64> {
+    let Some(curve) = hazard else {
+        return Ok(1.0);
+    };
+    let sp = curve.survival_at_dates(&[start, end])?;
+    if sp[0] <= 0.0 {
+        return Err(Error::Validation(
+            "convertible requires positive survival".into(),
+        ));
+    }
+    Ok(sp[1] / sp[0])
 }
 
 /// Default lattice step count when
@@ -101,32 +148,19 @@ fn tree_steps(bond: &ConvertibleBond) -> Result<usize> {
     Ok(steps)
 }
 
-/// Resolved market data identifiers for Greek bumping.
-struct ResolvedIds {
-    spot_id: PriceId,
-}
-
-/// Extracted equity market state.
-struct EquityState {
-    spot: f64,
-    spot_scalar: MarketScalar,
-    volatility: f64,
-    dividend_yield: f64,
-    risk_free_rate: f64,
-    time_to_maturity: f64,
-    resolved_ids: ResolvedIds,
-}
-
-/// Extract equity market state from market context.
+/// Prepare all necessary inputs for pricing and greeks calculation: the
+/// cashflow schedule and the equity market state.
 ///
 /// Uses **Act/365F** for all process/option time calculations (time_to_maturity,
 /// vol surface lookup, drift estimation). This is deliberately decoupled from
 /// the bond's coupon accrual day count, which can be 30/360 or other conventions.
-fn extract_equity_state(
+pub(super) fn prepare_for_pricing(
     bond: &ConvertibleBond,
     ctx: &MarketContext,
     as_of: Date,
-) -> Result<EquityState> {
+) -> Result<PricingInputs> {
+    let cashflow_schedule = build_convertible_schedule(bond, ctx)?;
+
     // Get spot price, preserving the original scalar variant for type-safe bumping
     let spot_scalar = ctx.get_price(&bond.spot_id)?.clone();
     let spot = bond.spot_value(&spot_scalar)?;
@@ -182,18 +216,15 @@ fn extract_equity_state(
 
     let dividend_yield = resolve_dividend_yield(ctx, bond)?;
 
-    let resolved_ids = ResolvedIds {
-        spot_id: bond.spot_id.clone(),
-    };
-
-    Ok(EquityState {
+    Ok(PricingInputs {
+        cashflow_schedule,
         spot,
-        spot_scalar,
         volatility,
         dividend_yield,
         risk_free_rate,
         time_to_maturity,
-        resolved_ids,
+        spot_id: bond.spot_id.clone(),
+        spot_scalar,
     })
 }
 
@@ -235,30 +266,10 @@ pub(super) struct PricingInputs {
     dividend_yield: f64,
     risk_free_rate: f64,
     pub(super) time_to_maturity: f64,
-    resolved_ids: ResolvedIds,
+    /// Market identifier of the equity spot, for Greek bumping.
+    spot_id: PriceId,
     /// Original spot scalar from market context, preserved for type-safe bumping.
     spot_scalar: MarketScalar,
-}
-
-/// Prepare all necessary inputs for pricing and greeks calculation.
-pub(super) fn prepare_for_pricing(
-    bond: &ConvertibleBond,
-    market_context: &MarketContext,
-    as_of: Date,
-) -> Result<PricingInputs> {
-    let cashflow_schedule = build_convertible_schedule(bond, market_context)?;
-    let eq = extract_equity_state(bond, market_context, as_of)?;
-
-    Ok(PricingInputs {
-        cashflow_schedule,
-        spot: eq.spot,
-        volatility: eq.volatility,
-        dividend_yield: eq.dividend_yield,
-        risk_free_rate: eq.risk_free_rate,
-        time_to_maturity: eq.time_to_maturity,
-        resolved_ids: eq.resolved_ids,
-        spot_scalar: eq.spot_scalar,
-    })
 }
 
 /// Resolve an already-exercised contract without recreating its debt or options.
@@ -278,18 +289,12 @@ fn resolved_value(
         }
         let discount = market.get_discount(bond.discount_curve_id.as_str())?;
         let df = discount.df_between_dates(as_of, claim.delivery_date)?;
-        let survival = if let Some(id) = &bond.credit_curve_id {
-            let curve = market.get_hazard(id.as_str())?;
-            let sp = curve.survival_at_dates(&[as_of, claim.delivery_date])?;
-            if sp[0] <= 0.0 {
-                return Err(Error::Validation(
-                    "convertible requires positive survival".into(),
-                ));
-            }
-            sp[1] / sp[0]
-        } else {
-            1.0
-        };
+        let hazard = bond
+            .credit_curve_id
+            .as_ref()
+            .map(|id| market.get_hazard(id.as_str()))
+            .transpose()?;
+        let survival = conditional_survival(hazard.as_deref(), as_of, claim.delivery_date)?;
         // Pending fixed cash has its own contractual principal; the extinguished
         // bond notional must never be recovered again.
         let recovery = bond.recovery_rate.unwrap_or(0.0)
@@ -346,17 +351,7 @@ fn resolved_value(
             && !cf.kind.is_principal_like();
         let pending_redemption = mandatory_date.is_none() && cf.kind.is_principal_like();
         if earned_coupon || pending_redemption {
-            let survival = if let Some(curve) = &hazard {
-                let sp = curve.survival_at_dates(&[as_of, cf.date])?;
-                if sp[0] <= 0.0 {
-                    return Err(Error::Validation(
-                        "convertible requires positive survival".into(),
-                    ));
-                }
-                sp[1] / sp[0]
-            } else {
-                1.0
-            };
+            let survival = conditional_survival(hazard.as_deref(), as_of, cf.date)?;
             let df = discount.df_between_dates(as_of, cf.date)?;
             let recovery = if pending_redemption {
                 bond.recovery_rate.unwrap_or(0.0)
@@ -402,17 +397,7 @@ fn price_convertible_bond_with_inputs(
             .iter()
             .filter(|cf| cf.date >= as_of && cf.kind.is_cash_settlement())
         {
-            let survival = if let Some(curve) = &hazard {
-                let sp = curve.survival_at_dates(&[as_of, cf.date])?;
-                if sp[0] <= 0.0 {
-                    return Err(Error::Validation(
-                        "convertible requires positive survival".into(),
-                    ));
-                }
-                sp[1] / sp[0]
-            } else {
-                1.0
-            };
+            let survival = conditional_survival(hazard.as_deref(), as_of, cf.date)?;
             let df = discount.df_between_dates(as_of, cf.date)?;
             if cf.kind.is_principal_like() {
                 principal += cf.amount.amount();
@@ -656,14 +641,12 @@ pub fn calculate_convertible_greeks(
             })
         };
 
-        let market_up = market.clone().insert_price(
-            inputs.resolved_ids.spot_id.as_str(),
-            bump_scalar(inputs.spot + h_spot)?,
-        );
-        let market_down = market.clone().insert_price(
-            inputs.resolved_ids.spot_id.as_str(),
-            bump_scalar(inputs.spot - h_spot)?,
-        );
+        let market_up = market
+            .clone()
+            .insert_price(inputs.spot_id.as_str(), bump_scalar(inputs.spot + h_spot)?);
+        let market_down = market
+            .clone()
+            .insert_price(inputs.spot_id.as_str(), bump_scalar(inputs.spot - h_spot)?);
 
         let price_up = price_convertible_bond(bond, &market_up, as_of)?.amount();
         let price_down = price_convertible_bond(bond, &market_down, as_of)?.amount();
@@ -839,17 +822,7 @@ pub(crate) fn settlement_dirty_price(
         .iter()
         .filter(|cf| cf.date > as_of && cf.date <= settle && cf.kind.is_cash_settlement())
     {
-        let survival = if let Some(curve) = &hazard {
-            let sp = curve.survival_at_dates(&[as_of, cf.date])?;
-            if sp[0] <= 0.0 {
-                return Err(Error::Validation(
-                    "convertible requires positive survival".into(),
-                ));
-            }
-            sp[1] / sp[0]
-        } else {
-            1.0
-        };
+        let survival = conditional_survival(hazard.as_deref(), as_of, cf.date)?;
         interim += cf.amount.amount() * discount.df_between_dates(as_of, cf.date)? * survival;
     }
     Ok((present_value - interim) / discount.df_between_dates(as_of, settle)?)

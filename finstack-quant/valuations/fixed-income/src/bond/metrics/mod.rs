@@ -35,6 +35,7 @@
 //!   `FIXED_INCOME` family
 //! - [`finstack_quant_valuations_core::metrics`] for the metrics framework
 
+use crate::bond::pricing::quote_conversions::WorkoutPath;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
@@ -75,17 +76,12 @@ pub(crate) use dv01::{BondBucketedDv01Calculator, BondDv01Calculator};
 pub(crate) use price_yield_spread::{
     AssetSwapMarketCalculator, AssetSwapParCalculator, BondVegaCalculator, CleanPriceCalculator,
     DirtyPriceCalculator, EmbeddedOptionValueCalculator, ISpreadCalculator,
-    JapaneseSimpleYieldCalculator, MoosmullerYtmCalculator, OasCalculator, YtmCalculator,
-    YtwCalculator,
+    JapaneseSimpleYieldCalculator, OasCalculator, YtmCalculator, YtwCalculator,
 };
 pub use price_yield_spread::{DiscountMarginCalculator, ZSpreadCalculator};
 pub(crate) use spread_duration::BondSpreadDurationCalculator;
 pub(crate) use wal::BondWalCalculator;
 pub(crate) use yield_dv01::YieldDv01Calculator;
-
-type BondCashflowPath = Vec<(Date, Money)>;
-/// Yield-to-worst at the quoted price, its cashflow path and the quote date.
-pub(crate) type QuotedWorkoutPath = (f64, BondCashflowPath, Date);
 
 /// Pricing model the metric request selected, else the bond's default model.
 pub(crate) fn active_model(
@@ -137,19 +133,18 @@ pub(crate) fn bond_risk_basis(
     )
 }
 
-/// [`quoted_workout_path`] for the context's bond on its entitled flows at
+/// [`quoted_workout_path`](crate::bond::pricing::quote_conversions::quoted_workout_path) for the context's bond on its entitled flows at
 /// the quote date, computed once per metric request and cached on the
 /// context.
 pub(crate) fn context_workout_path(
     context: &mut finstack_quant_valuations_core::metrics::MetricContext,
-) -> finstack_quant_core::Result<Option<QuotedWorkoutPath>> {
+) -> finstack_quant_core::Result<Option<WorkoutPath>> {
     if let Some(cached) = context.ext::<WorkoutPathCache>() {
         return Ok(cached.0.clone());
     }
     let path = {
         let bond: &crate::bond::Bond = context.instrument_as()?;
-        let may_have_workout = (bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options()))
+        let may_have_workout = bond.has_exercise_rights()
             && bond
                 .instrument_pricing_overrides
                 .market_quotes
@@ -165,57 +160,69 @@ pub(crate) fn context_workout_path(
             context.as_of,
         )?;
         let flows = quote_ctx.entitled_flows(bond, &context.curves, context.as_of)?;
-        quoted_workout_path(bond, context.curves.as_ref(), context.as_of, &flows)?
+        crate::bond::pricing::quote_conversions::quoted_workout_path(
+            bond,
+            context.curves.as_ref(),
+            context.as_of,
+            &flows,
+        )?
     };
     context.set_ext(WorkoutPathCache(path.clone()));
     Ok(path)
 }
 
+/// Quoted-yield risk inputs shared by Macaulay duration, convexity and yield
+/// DV01: the workout yield and path when one is quoted, else `ytm` on the
+/// context's cached flows, timed from the quote date.
+pub(crate) struct YieldRiskBasis {
+    /// Yield the risk is measured at (workout yield or YTM).
+    pub(crate) yield_rate: f64,
+    /// Risk cashflows with their year fractions from the quote date.
+    pub(crate) timed: Vec<(Date, f64, Money)>,
+    /// Street-compounded price of `timed` at `yield_rate`.
+    pub(crate) price: f64,
+}
+
+/// Build the [`YieldRiskBasis`] for the context's bond.
+///
+/// # Arguments
+///
+/// * `context` - Metric context whose cached cashflows (built by the `Ytm`
+///   dependency) and quoted workout path are used.
+/// * `ytm` - Yield to maturity used when the bond has no quoted workout path.
+pub(crate) fn yield_risk_basis(
+    context: &mut finstack_quant_valuations_core::metrics::MetricContext,
+    ytm: f64,
+) -> finstack_quant_core::Result<YieldRiskBasis> {
+    let workout = context_workout_path(context)?;
+    let bond: &crate::bond::Bond = context.instrument_as()?;
+    let flows = context.require_cashflows()?;
+    let quote_date = crate::bond::pricing::settlement::settlement_date(bond, context.as_of)?;
+    let (yield_rate, risk_flows) = match workout {
+        Some(path) => (path.yield_rate, std::borrow::Cow::Owned(path.flows)),
+        None => (ytm, std::borrow::Cow::Borrowed(flows)),
+    };
+    let timed = crate::bond::pricing::quote_conversions::bond_flow_times(
+        bond,
+        risk_flows.as_ref(),
+        quote_date,
+    )?;
+    let price = crate::bond::pricing::quote_conversions::price_from_ytm_timed(
+        &timed,
+        bond.cashflow_spec.frequency(),
+        yield_rate,
+        crate::bond::pricing::quote_conversions::YieldCompounding::Street,
+    )?;
+    Ok(YieldRiskBasis {
+        yield_rate,
+        timed,
+        price,
+    })
+}
+
 /// Quoted workout path cached on the metric context for the bond under
 /// evaluation; `None` records that the bond has no quoted workout path.
-struct WorkoutPathCache(Option<QuotedWorkoutPath>);
-
-pub(crate) fn quoted_workout_path(
-    bond: &crate::bond::Bond,
-    curves: &finstack_quant_core::market_data::context::MarketContext,
-    as_of: Date,
-    flows: &[(Date, Money)],
-) -> finstack_quant_core::Result<Option<QuotedWorkoutPath>> {
-    let effective_bond = bond.effective_for_pricing(curves, as_of)?;
-    if !effective_bond
-        .call_put
-        .as_ref()
-        .is_some_and(|cp| cp.has_options())
-    {
-        return Ok(None);
-    }
-
-    let Some(clean_px) = bond
-        .instrument_pricing_overrides
-        .market_quotes
-        .quoted_clean_price_pct
-    else {
-        return Ok(None);
-    };
-
-    let quote_ctx = crate::bond::pricing::settlement::QuoteDateContext::new(bond, curves, as_of)?;
-    let dirty_now = Money::new(
-        quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount()),
-        bond.notional.currency(),
-    )?;
-    let schedule = effective_bond.full_cashflow_schedule(curves)?;
-    let (workout_yield, workout_flows) =
-        crate::bond::pricing::quote_conversions::solve_ytw_from_flows(
-            &effective_bond,
-            curves,
-            flows,
-            quote_ctx.quote_date,
-            dirty_now,
-            &schedule,
-        )?;
-
-    Ok(Some((workout_yield, workout_flows, quote_ctx.quote_date)))
-}
+struct WorkoutPathCache(Option<WorkoutPath>);
 
 /// Registers all bond metrics to a registry.
 ///
@@ -229,6 +236,7 @@ pub(crate) fn quoted_workout_path(
 pub(crate) fn register_bond_metrics(
     registry: &mut finstack_quant_valuations_core::metrics::MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
+    use crate::bond::pricing::quote_conversions::YieldCompounding;
     use finstack_quant_valuations_core::metrics::sensitivities::cross_factor::{
         make_credit_bumper, make_rates_bumper, CrossFactorCalculator,
     };
@@ -241,10 +249,10 @@ pub(crate) fn register_bond_metrics(
             (Accrued, AccruedInterestCalculator),
             (DirtyPrice, DirtyPriceCalculator),
             (CleanPrice, CleanPriceCalculator),
-            (Ytm, YtmCalculator),
+            (Ytm, YtmCalculator { compounding: YieldCompounding::Street }),
             (Ytw, YtwCalculator),
             (JapaneseSimpleYield, JapaneseSimpleYieldCalculator),
-            (MoosmullerYtm, MoosmullerYtmCalculator),
+            (MoosmullerYtm, YtmCalculator { compounding: YieldCompounding::Moosmuller }),
 
             (DurationMac, MacaulayDurationCalculator),
             (DurationMod, ModifiedDurationCalculator),

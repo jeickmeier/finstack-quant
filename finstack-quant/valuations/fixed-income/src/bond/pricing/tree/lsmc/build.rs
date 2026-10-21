@@ -6,17 +6,6 @@ pub(super) fn required_date(value: Option<Date>, label: &str) -> Result<Date> {
     value.ok_or_else(|| Error::Validation(format!("floating coupon is missing {label} metadata")))
 }
 
-pub(super) fn floating_coupon_spec(bond: &Bond) -> Option<&FloatingCouponSpec> {
-    match &bond.cashflow_spec {
-        CashflowSpec::Floating(spec) => Some(spec),
-        CashflowSpec::Amortizing { base, .. } => match base.as_ref() {
-            CashflowSpec::Floating(spec) => Some(spec),
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
 pub(super) fn contractual_reset_date(start: Date, spec: &FloatingCouponSpec) -> Result<Date> {
     let calendar_id = spec
         .rate_spec

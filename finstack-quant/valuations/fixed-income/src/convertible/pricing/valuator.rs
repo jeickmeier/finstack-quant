@@ -112,18 +112,8 @@ impl ConvertibleBondValuator {
             .as_ref()
             .map(|id| market_context.get_hazard(id.as_str()))
             .transpose()?;
-        let survival_between = |start: Date, end: Date| -> Result<f64> {
-            if let Some(curve) = &hazard {
-                let survival = curve.survival_at_dates(&[start, end])?;
-                if survival[0] <= 0.0 {
-                    return Err(Error::Validation(
-                        "convertible requires positive survival at valuation".into(),
-                    ));
-                }
-                Ok(survival[1] / survival[0])
-            } else {
-                Ok(1.0)
-            }
+        let survival_between = |start: Date, end: Date| {
+            super::engine::conditional_survival(hazard.as_deref(), start, end)
         };
         let mut coupon_map: HashMap<usize, f64> = HashMap::default();
         let mut principal_map: HashMap<usize, f64> = HashMap::default();
@@ -371,18 +361,10 @@ impl ConvertibleBondValuator {
             ..
         } = &bond.conversion.policy
         {
-            if *lower_conversion_price <= 0.0 || *upper_conversion_price <= 0.0 {
-                return Err(Error::Validation(format!(
-                    "Conversion prices must be positive: lower={}, upper={}",
-                    lower_conversion_price, upper_conversion_price
-                )));
-            }
-            if *lower_conversion_price > *upper_conversion_price {
-                return Err(Error::Validation(format!(
-                    "MandatoryVariable conversion bounds inverted: lower={lower_conversion_price} \
-                     must be <= upper={upper_conversion_price}"
-                )));
-            }
+            super::engine::validate_mandatory_variable_bounds(
+                *lower_conversion_price,
+                *upper_conversion_price,
+            )?;
         }
 
         Ok(Self {
@@ -544,15 +526,12 @@ impl ConvertibleBondValuator {
                 upper_conversion_price,
                 lower_conversion_price,
                 ..
-            } => {
-                if spot <= *lower_conversion_price {
-                    (self.face_value / lower_conversion_price) * spot
-                } else if spot <= *upper_conversion_price {
-                    self.face_value
-                } else {
-                    (self.face_value / upper_conversion_price) * spot
-                }
-            }
+            } => super::engine::mandatory_variable_value(
+                self.face_value,
+                *lower_conversion_price,
+                *upper_conversion_price,
+                spot,
+            ),
             _ => spot * self.conversion_ratio,
         };
         base * ratio_accretion * self.principal_by_step[step] / self.face_value

@@ -19,9 +19,7 @@
 //! Returned in **decimal** (e.g., 0.01 = 100bp), consistent with other spread
 //! metrics in the library.
 
-use crate::convertible::pricing::{
-    calculate_accrued_interest, price_convertible_bond, settlement_dirty_price,
-};
+use crate::convertible::pricing::{price_convertible_bond, settlement_dirty_price};
 use crate::convertible::ConvertibleBond;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;
@@ -35,28 +33,9 @@ impl MetricCalculator for OasCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bond: &ConvertibleBond = context.instrument_as()?;
         let as_of = context.as_of;
-
-        if as_of >= bond.maturity {
+        let Some(target_dirty) = super::quoted_dirty_target(bond, &context.curves, as_of)? else {
             return Ok(0.0);
-        }
-
-        let quoted_clean_price_pct = bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_clean_price_pct
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
-                        .to_string(),
-                })
-            })?;
-
-        let accrued = calculate_accrued_interest(bond, &context.curves, as_of)?;
-        // `quoted_clean_price_pct` is percentage-of-par (e.g. 99.5 = 99.5% of face).
-        // `accrued` and the model price are both notional-scaled currency amounts.
-        // Scale the percentage quote to notional so the solver objective compares
-        // commensurate values — mirroring the term-loan `target_price_from_quote_or_model`.
-        let target_dirty = quoted_clean_price_pct * bond.notional.amount() / 100.0 + accrued;
+        };
 
         // Use the same tree discretization as the registry pricer and every
         // other convertible metric so the solved OAS reprices to the quote

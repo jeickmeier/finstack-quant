@@ -147,21 +147,13 @@ impl TreePricer {
     }
 
     fn uses_path_dependent_lsmc(tree: &RatesCreditTree, bond: &Bond) -> bool {
-        let has_options = bond
-            .call_put
-            .as_ref()
-            .is_some_and(|schedule| schedule.has_options())
-            || bond.return_floor.is_some();
-        has_options && (tree.get_config().rate_vol > 0.0 || tree.get_config().hazard_vol > 0.0)
+        bond.has_exercise_rights()
+            && (tree.get_config().rate_vol > 0.0 || tree.get_config().hazard_vol > 0.0)
     }
 
     fn uses_sampled_bullet(tree: &RatesCreditTree, bond: &Bond) -> bool {
-        let has_options = bond
-            .call_put
-            .as_ref()
-            .is_some_and(|schedule| schedule.has_options())
-            || bond.return_floor.is_some();
-        !has_options && (tree.get_config().rate_vol > 0.0 || tree.get_config().hazard_vol > 0.0)
+        !bond.has_exercise_rights()
+            && (tree.get_config().rate_vol > 0.0 || tree.get_config().hazard_vol > 0.0)
     }
 
     fn uses_deterministic_short_rate(&self) -> bool {
@@ -174,17 +166,9 @@ impl TreePricer {
     }
 
     fn validate_selected_model_capabilities(&self, bond: &Bond) -> Result<()> {
-        fn is_floating(spec: &crate::bond::CashflowSpec) -> bool {
-            match spec {
-                crate::bond::CashflowSpec::Floating(_) => true,
-                crate::bond::CashflowSpec::Amortizing { base, .. } => is_floating(base),
-                _ => false,
-            }
-        }
-
         if self.model == BondTreeModel::RatesOnly
             && !self.uses_deterministic_short_rate()
-            && is_floating(&bond.cashflow_spec)
+            && bond.has_floating_coupons()
         {
             return Err(Error::Validation(format!(
                 "Bond '{}' selects stochastic rates-only tree pricing for a floating coupon, but that tree preprojects coupons. Set instrument_pricing_overrides.model_config.hw1f_sigma = 0 (with hw1f_mean_reversion) for deterministic rates, or set credit_curve_id to a hazard curve and price with 'rates_credit' for pathwise term and overnight reset replay.",

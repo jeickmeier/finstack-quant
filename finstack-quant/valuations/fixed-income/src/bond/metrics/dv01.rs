@@ -25,8 +25,7 @@ impl MetricCalculator for BondDv01Calculator {
         let Ok(bond) = context.instrument_as::<Bond>() else {
             return Cow::Borrowed(self.dependencies());
         };
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
         let has_price_driver = bond
             .instrument_pricing_overrides
             .market_quotes
@@ -42,8 +41,7 @@ impl MetricCalculator for BondDv01Calculator {
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = context.instrument_as()?;
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
         let basis = super::bond_risk_basis(context);
 
         if basis != BondRiskBasis::CallableOas {
@@ -53,10 +51,7 @@ impl MetricCalculator for BondDv01Calculator {
                 .has_price_driver()
                 && !has_options
             {
-                return finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
-                    finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined(),
-                )
-                .calculate(context);
+                return parallel_dv01(context);
             }
 
             // Default (Workout) basis: a bond with embedded exercise rights is handled by
@@ -70,9 +65,7 @@ impl MetricCalculator for BondDv01Calculator {
             // and curve-bumped that bullet, which silently discarded the
             // option and reported a curve sensitivity inconsistent in both
             // methodology and units with the rest of the Workout-basis family.
-            let duration_mod = context.computed_metric(&MetricId::DurationMod)?;
-            let ytm = context.computed_metric(&MetricId::Ytm)?;
-            return super::yield_dv01::yield_basis_dv01(context, duration_mod, ytm);
+            return super::yield_dv01::YieldDv01Calculator.calculate(context);
         }
 
         let has_price_driver = bond
@@ -80,19 +73,11 @@ impl MetricCalculator for BondDv01Calculator {
             .market_quotes
             .has_price_driver();
         if !has_price_driver {
-            return finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
-                finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined(),
-            )
-            .calculate(context);
+            return parallel_dv01(context);
         }
 
         if !has_options {
-            return super::risk_view::with_bond_risk_view(context, |ctx| {
-                finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
-                    finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined(),
-                )
-                .calculate(ctx)
-            });
+            return super::risk_view::with_bond_risk_view(context, parallel_dv01);
         }
 
         let (risk_bond, _) = option_risk_bond_and_base_price(bond, context)?;
@@ -100,6 +85,14 @@ impl MetricCalculator for BondDv01Calculator {
 
         curve_bump_dv01(&risk_bond, context, &curve_id)
     }
+}
+
+/// Generic parallel combined-curve DV01 of the context's instrument.
+fn parallel_dv01(context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+    use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
+        Dv01CalculatorConfig, UnifiedDv01Calculator,
+    };
+    UnifiedDv01Calculator::new(Dv01CalculatorConfig::parallel_combined()).calculate(context)
 }
 
 fn curve_bump_dv01(

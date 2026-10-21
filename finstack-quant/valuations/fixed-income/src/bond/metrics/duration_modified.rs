@@ -33,8 +33,7 @@ impl MetricCalculator for ModifiedDurationCalculator {
         let Ok(bond) = context.instrument_as::<Bond>() else {
             return Cow::Borrowed(self.dependencies());
         };
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
             Cow::Borrowed(&[])
         } else {
@@ -47,8 +46,7 @@ impl MetricCalculator for ModifiedDurationCalculator {
 
         // Callable/OAS model risk is opt-in. The default matches Bloomberg YAS
         // Workout risk: quoted-yield duration on maturity/workout cashflows.
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
             return Ok(
                 super::effective::effective_duration_convexity(bond, context, None)?.duration,
@@ -66,7 +64,7 @@ impl MetricCalculator for ModifiedDurationCalculator {
         let d_mac = context.computed_metric(&MetricId::DurationMac)?;
 
         let denominator_yield = if has_options {
-            workout.map_or(ytm, |(workout_yield, _, _)| workout_yield)
+            workout.map_or(ytm, |path| path.yield_rate)
         } else {
             ytm
         };

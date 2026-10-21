@@ -28,7 +28,6 @@ use crate::loan_quotes::{pv_with_discount_margin, solve_discount_margin};
 use crate::term_loan::pricing::TermLoanDiscountingPricer;
 use crate::term_loan::TermLoan;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
-use rust_decimal::prelude::ToPrimitive;
 
 /// Discount margin calculator for floating rate term loans.
 ///
@@ -44,11 +43,7 @@ impl MetricCalculator for DiscountMarginCalculator {
         // should not request this metric.
         let contractual_margin = match &loan.rate {
             finstack_quant_cashflows::builder::RateSpec::Floating(spec) => {
-                spec.spread_bp.to_f64().ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(
-                        "floating spread_bp is not representable as f64".to_string(),
-                    )
-                })? * 1e-4
+                crate::loan_quotes::floating_margin(spec)?
             }
             finstack_quant_cashflows::builder::RateSpec::Fixed { .. } => {
                 return Err(finstack_quant_core::Error::Validation(
