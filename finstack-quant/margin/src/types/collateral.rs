@@ -346,7 +346,7 @@ mod collateral_maturity_tests {
 /// # Example
 ///
 /// ```
-/// use finstack_quant_margin::{CollateralEligibility, EligibleCollateralSchedule};
+/// use finstack_quant_margin::types::{CollateralEligibility, EligibleCollateralSchedule};
 ///
 /// // Start from a standard schedule (BCBS-IOSCO compliant)
 /// let schedule = EligibleCollateralSchedule::bcbs_standard()?;

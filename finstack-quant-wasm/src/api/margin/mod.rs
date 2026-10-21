@@ -31,7 +31,7 @@ fn js_money(value: &JsValue, label: &str, currency: Currency) -> Result<Money, J
 }
 
 /// An amount in major units of a CSA's base currency.
-fn base_money(csa: &finstack_quant_margin::CsaSpec, amount: f64) -> Result<Money, JsValue> {
+fn base_money(csa: &finstack_quant_margin::types::CsaSpec, amount: f64) -> Result<Money, JsValue> {
     Money::new(amount, csa.base_currency).map_err(to_js_err)
 }
 

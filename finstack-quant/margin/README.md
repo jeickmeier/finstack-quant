@@ -53,7 +53,7 @@ public constructors such as `CsaSpec::regulatory_from_config`,
 ### Bilateral OTC spec
 
 ```rust
-use finstack_quant_margin::{CsaSpec, OtcMarginSpec};
+use finstack_quant_margin::types::{CsaSpec, OtcMarginSpec};
 
 let csa = CsaSpec::usd_regulatory()?;
 let spec = OtcMarginSpec::bilateral_simm(csa);
@@ -70,7 +70,9 @@ from the embedded registry.
 
 ```rust
 use finstack_quant_core::currency::Currency;
-use finstack_quant_margin::{SimmCalculator, SimmSensitivities, SimmVersion};
+use finstack_quant_margin::SimmVersion;
+use finstack_quant_margin::calculators::im::SimmCalculator;
+use finstack_quant_margin::types::SimmSensitivities;
 
 let calc = SimmCalculator::new(SimmVersion::V2_6)?;
 
@@ -97,7 +99,8 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use time::Month;
 use finstack_quant_core::money::Money;
-use finstack_quant_margin::{CsaSpec, VmCalculator};
+use finstack_quant_margin::types::CsaSpec;
+use finstack_quant_margin::calculators::VmCalculator;
 
 let calc = VmCalculator::new(CsaSpec::usd_regulatory()?);
 
@@ -122,9 +125,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_margin::{
-    Marginable, NettingSetId, OtcMarginSpec, SimmCalculator, SimmSensitivities, SimmVersion,
-};
+use finstack_quant_margin::{Marginable, SimmVersion};
+use finstack_quant_margin::types::{NettingSetId, OtcMarginSpec, SimmSensitivities};
+use finstack_quant_margin::calculators::im::SimmCalculator;
 
 struct ExampleTrade {
     id: String,

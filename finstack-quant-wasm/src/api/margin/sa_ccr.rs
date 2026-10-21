@@ -10,7 +10,7 @@ use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin::regulatory::sa_ccr::{
     saccr_ead as saccr_ead_rs, SaCcrEngine, SaCcrNettingSetConfig, SaCcrTrade,
 };
-use finstack_quant_margin::NettingSetId;
+use finstack_quant_margin::types::NettingSetId;
 use wasm_bindgen::prelude::*;
 
 // ---------------------------------------------------------------------------

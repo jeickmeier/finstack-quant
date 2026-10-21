@@ -1,7 +1,7 @@
 //! Expiry-resolved SIMM curvature input conversion.
 
 use crate::errors::core_to_py;
-use finstack_quant_margin::SimmCurvatureSensitivity;
+use finstack_quant_margin::types::SimmCurvatureSensitivity;
 use pyo3::prelude::*;
 
 /// One expiry-resolved volatility-weighted vega before historical SIMM curvature scaling.

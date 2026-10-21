@@ -6,10 +6,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{FxHashMap, FxHashSet};
 
-use finstack_quant_margin::{
-    ClearingHouseImCalculator, ImCalculator, ImMethodology, NettingSetId, ScheduleAssetClass,
-    ScheduleImCalculator, SimmCalculator, SimmSensitivities, VmCalculator,
-};
+use finstack_quant_margin::calculators::im::schedule::{ScheduleAssetClass, ScheduleImCalculator};
+use finstack_quant_margin::calculators::im::{ClearingHouseImCalculator, SimmCalculator};
+use finstack_quant_margin::calculators::{ImCalculator, VmCalculator};
+use finstack_quant_margin::types::{ImMethodology, NettingSetId, SimmSensitivities};
 
 use crate::margin::netting_set::NettingSet;
 use crate::margin::results::{NettingSetMargin, PortfolioMarginResult};
@@ -644,9 +644,9 @@ mod tests {
     use crate::types::{Entity, DUMMY_ENTITY_ID};
     use crate::Portfolio;
     use finstack_quant_core::types::Attributes;
-    use finstack_quant_margin::{
-        ClearingHouseImCalculator, CsaSpec, Marginable, OtcMarginSpec, VmParameters,
-    };
+    use finstack_quant_margin::calculators::im::ClearingHouseImCalculator;
+    use finstack_quant_margin::types::{CsaSpec, OtcMarginSpec, VmParameters};
+    use finstack_quant_margin::Marginable;
     use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
@@ -844,7 +844,7 @@ mod tests {
     fn production_schedule_dispatches_and_csa_methodology_conflicts_fail() {
         let as_of = date!(2024 - 01 - 01);
         let mut spec = OtcMarginSpec::bilateral_schedule(
-            finstack_quant_margin::CsaSpec::usd_regulatory().unwrap(),
+            finstack_quant_margin::types::CsaSpec::usd_regulatory().unwrap(),
         );
         spec.csa.im_params.as_mut().unwrap().methodology = ImMethodology::Schedule;
         let instrument = Arc::new(
@@ -966,7 +966,7 @@ mod tests {
 
     #[test]
     fn different_credit_classifications_share_one_agreement() {
-        use finstack_quant_margin::{SimmCreditClassification, SimmCreditSector};
+        use finstack_quant_margin::types::{SimmCreditClassification, SimmCreditSector};
         let first = OtcMarginSpec::usd_bilateral()
             .expect("CSA")
             .with_simm_credit_classification(SimmCreditClassification::Qualifying {

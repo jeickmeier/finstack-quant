@@ -44,10 +44,10 @@ pub(crate) mod aggregation;
 mod curvature;
 mod delta;
 mod drc;
-pub mod engine;
+pub(crate) mod engine;
 pub mod params;
 mod rrao;
-pub mod types;
+pub(crate) mod types;
 mod vega;
 mod wire;
 

@@ -8,10 +8,10 @@ use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_margin::constants::DURATION_APPROXIMATION_FACTOR;
+use finstack_quant_margin::types::NettingSetId;
+use finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_margin::types::SimmSensitivities;
 use finstack_quant_margin::Marginable;
-use finstack_quant_margin::NettingSetId;
-use finstack_quant_margin::OtcMarginSpec;
-use finstack_quant_margin::SimmSensitivities;
 use finstack_quant_valuations_core::instruments::common_impl::margin::assign_ir_tenor_bucket;
 use finstack_quant_valuations_core::instruments::common_impl::margin::netting_set_id_from_spec;
 use finstack_quant_valuations_core::instruments::common_impl::margin::repriced_bucketed_dv01;
@@ -148,7 +148,7 @@ mod tests {
     }
     use super::*;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_margin::ClearingStatus;
+    use finstack_quant_margin::types::ClearingStatus;
     use finstack_quant_valuations_test_support::discount_forward_curves as discount_forward_curve_support;
     use time::Month;
 

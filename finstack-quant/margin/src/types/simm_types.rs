@@ -1,7 +1,7 @@
 //! SIMM risk classification and sensitivity types.
 //!
 //! Types for ISDA SIMM categorization and sensitivity inputs,
-//! used by the [`Marginable`](crate::traits::Marginable) trait
+//! used by the [`Marginable`](crate::Marginable) trait
 //! and SIMM calculator.
 
 use super::SimmCurvatureSensitivity;
@@ -500,7 +500,7 @@ impl From<SimmSensitivitiesJson> for SimmSensitivities {
 /// # Example
 ///
 /// ```
-/// use finstack_quant_margin::{SimmCreditSector, SimmSensitivities};
+/// use finstack_quant_margin::types::{SimmCreditSector, SimmSensitivities};
 /// use finstack_quant_core::currency::Currency;
 ///
 /// let mut sensitivities = SimmSensitivities::new(Currency::USD);
@@ -784,7 +784,7 @@ impl SimmSensitivities {
     /// The SIMM calculator looks every tenor and commodity bucket up in its
     /// registry tables and silently skips keys it does not know, so an
     /// unvalidated typo (`"7Y"`, `"bucket 18"`) under-states margin without
-    /// any signal. [`crate::SimmCalculator::calculate_from_sensitivities`]
+    /// any signal. [`crate::calculators::im::SimmCalculator::calculate_from_sensitivities`]
     /// calls this before pricing; call it directly to check a container
     /// built from external data.
     ///

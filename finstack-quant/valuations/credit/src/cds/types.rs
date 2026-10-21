@@ -820,8 +820,9 @@ mod tests {
     #[test]
     fn simm_margin_spec_without_credit_classification_is_rejected() {
         let mut cds = CreditDefaultSwap::example().expect("example");
-        cds.margin_spec =
-            Some(finstack_quant_margin::OtcMarginSpec::usd_bilateral().expect("margin spec"));
+        cds.margin_spec = Some(
+            finstack_quant_margin::types::OtcMarginSpec::usd_bilateral().expect("margin spec"),
+        );
 
         let error = cds.validate().expect_err("classification is mandatory");
         assert!(error.to_string().contains("simm_credit_classification"));
@@ -831,11 +832,11 @@ mod tests {
     fn classified_simm_margin_spec_is_valid() {
         let mut cds = CreditDefaultSwap::example().expect("example");
         cds.margin_spec = Some(
-            finstack_quant_margin::OtcMarginSpec::usd_bilateral()
+            finstack_quant_margin::types::OtcMarginSpec::usd_bilateral()
                 .expect("margin spec")
                 .with_simm_credit_classification(
-                    finstack_quant_margin::SimmCreditClassification::Qualifying {
-                        sector: finstack_quant_margin::SimmCreditSector::Financial,
+                    finstack_quant_margin::types::SimmCreditClassification::Qualifying {
+                        sector: finstack_quant_margin::types::SimmCreditSector::Financial,
                     },
                 ),
         );
