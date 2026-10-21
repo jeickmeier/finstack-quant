@@ -12,6 +12,7 @@ pub(super) const HESTON_TAIL_LOG_TARGET: f64 = 27.631_021_115_928_547;
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "RawHestonPricingParams")]
 /// Market inputs for closed-form Heston pricing.
 ///
 /// The stochastic parameters are stored once in the canonical models-layer
@@ -30,6 +31,47 @@ pub struct HestonPricingParams {
     /// Canonical Heston stochastic parameters.
     #[serde(flatten)]
     pub model: HestonParams,
+}
+
+/// Raw deserialization state of [`HestonPricingParams`].
+///
+/// Mirrors the serialized (flat) field layout exactly; conversion runs
+/// [`HestonPricingParams::new`] validation. Flat rather than a flattened
+/// [`HestonParams`] because serde's `flatten` ignores unknown fields.
+#[derive(Debug, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct RawHestonPricingParams {
+    /// Continuously compounded risk-free rate as an annual decimal.
+    r: f64,
+    /// Continuously compounded dividend or foreign yield as an annual decimal.
+    q: f64,
+    /// Initial variance.
+    v0: f64,
+    /// Mean reversion speed.
+    kappa: f64,
+    /// Long-run variance.
+    theta: f64,
+    /// Vol-of-vol.
+    sigma_v: f64,
+    /// Spot-variance correlation.
+    rho: f64,
+}
+
+impl TryFrom<RawHestonPricingParams> for HestonPricingParams {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(raw: RawHestonPricingParams) -> finstack_quant_core::Result<Self> {
+        Self::new(
+            raw.r,
+            raw.q,
+            raw.kappa,
+            raw.theta,
+            raw.sigma_v,
+            raw.rho,
+            raw.v0,
+        )
+    }
 }
 
 impl Deref for HestonPricingParams {
