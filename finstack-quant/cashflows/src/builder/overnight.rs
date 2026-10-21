@@ -5,10 +5,11 @@
 //! observation rates for the full accrual period or for a partial accrual that
 //! ends on an exercise date.
 
-use finstack_quant_core::dates::{Date, DateExt, HolidayCalendar};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, HolidayCalendar};
 use finstack_quant_core::{Error, Result};
 use std::sync::Arc;
 
+use super::rate_helpers::apply_bp_bounds;
 use super::specs::{FloatingLegCompounding, OvernightIndexConstraintApplication};
 
 /// One dated observation and the calendar-day interval that it weights.
@@ -16,9 +17,9 @@ use super::specs::{FloatingLegCompounding, OvernightIndexConstraintApplication};
 /// `observation_date` identifies the fixing supplied to the replay callback.
 /// `weight_start..weight_end` identifies the half-open interval over which that
 /// fixing accrues. These differ under lookback, and both weight dates move
-/// under observation shift. `rate_tenor_days` preserves the tenor used when a
-/// projected overnight rate is sampled; it is one day even when a
-/// Friday fixing carries a three-day weekend weight.
+/// under observation shift. A projected fixing is always the one-day forward
+/// from `observation_date`, even when a Friday fixing carries a three-day
+/// weekend weight.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OvernightObservationSlice {
     /// Business date whose overnight fixing or simulated rate is observed.
@@ -29,10 +30,26 @@ pub struct OvernightObservationSlice {
     pub weight_end: Date,
     /// Number of calendar days in `weight_start..weight_end`.
     pub weight_days: u32,
-    /// Calendar-day tenor used to project the observation rate from a curve.
-    /// Always one day for compiled schedules, independently of `weight_days`
-    /// when a business-day fixing carries through a weekend or holiday.
-    pub rate_tenor_days: u32,
+}
+
+/// Annualization basis (days per year) of an overnight compounding day count.
+///
+/// # Arguments
+///
+/// * `day_count` - Overnight index day count; `Act360` and `Act365F` are the
+///   only compounding conventions supported.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` for any other day count.
+pub fn overnight_day_count_basis(day_count: DayCount) -> Result<f64> {
+    match day_count {
+        DayCount::Act360 => Ok(360.0),
+        DayCount::Act365F => Ok(365.0),
+        other => Err(Error::Validation(format!(
+            "overnight compounding requires Act360 or Act365F; got {other:?}"
+        ))),
+    }
 }
 
 /// Index-floor and index-cap policy applied during overnight replay.
@@ -171,8 +188,8 @@ impl OvernightObservationSchedule {
             }
             _ => 0,
         };
-        let observation_start = shift_back(accrual_start, observation_shift, calendar)?;
-        let observation_end = shift_back(accrual_end, observation_shift, calendar)?;
+        let observation_start = accrual_start.add_business_days(-observation_shift, calendar)?;
+        let observation_end = accrual_end.add_business_days(-observation_shift, calendar)?;
         if accrual_end > accrual_start && observation_end <= observation_start {
             return Err(Error::Validation(format!(
                 "positive overnight accrual period [{accrual_start}, {accrual_end}) has an empty \
@@ -199,7 +216,7 @@ impl OvernightObservationSchedule {
         let mut observation_cutoffs = Vec::with_capacity(cutoff_capacity);
         let mut cutoff = accrual_start;
         loop {
-            observation_cutoffs.push(shift_back(cutoff, observation_shift, calendar)?);
+            observation_cutoffs.push(cutoff.add_business_days(-observation_shift, calendar)?);
             if cutoff == accrual_end {
                 break;
             }
@@ -455,7 +472,11 @@ impl OvernightObservationSchedule {
                 slice.weight_days = weight_days;
                 let rate = observation_rate(&slice)?;
                 let constrained = if daily_constraints {
-                    constrain_rate(rate, accumulator.constraints)
+                    apply_bp_bounds(
+                        rate,
+                        accumulator.constraints.index_floor_bp,
+                        accumulator.constraints.index_cap_bp,
+                    )
                 } else {
                     rate
                 };
@@ -578,9 +599,11 @@ impl OvernightRateAccumulator {
                 self.day_count_basis,
             ),
             OvernightIndexConstraintApplication::Daily => projected_rate,
-            OvernightIndexConstraintApplication::Period => {
-                constrain_rate(projected_rate, self.constraints)
-            }
+            OvernightIndexConstraintApplication::Period => apply_bp_bounds(
+                projected_rate,
+                self.constraints.index_floor_bp,
+                self.constraints.index_cap_bp,
+            ),
         };
         if !projected_rate.is_finite() || !constrained_rate.is_finite() {
             return Err(Error::Validation(
@@ -612,11 +635,7 @@ impl OvernightBusinessDays {
                 "lookback lead = {lead_business_days} exceeds i32::MAX"
             ))
         })?;
-        let earliest = if lead == 0 {
-            window_start
-        } else {
-            window_start.add_business_days(-lead, calendar)?
-        };
+        let earliest = window_start.add_business_days(-lead, calendar)?;
         let span = non_negative_days(earliest, window_end, "overnight observation window")?;
         let capacity = usize::try_from(span).unwrap_or(usize::MAX) / 5 * 2 + 8;
         let mut days = Vec::with_capacity(capacity);
@@ -674,7 +693,6 @@ fn compile_window(
                 weight_end,
                 "leading overnight observation slice",
             )?,
-            rate_tenor_days: 1,
         });
         current = weight_end;
     }
@@ -691,7 +709,6 @@ fn compile_window(
                 weight_start: current,
                 weight_end: next,
                 weight_days,
-                rate_tenor_days: 1,
             });
             ordinal += 1;
         } else if let Some(last) = observations.last_mut() {
@@ -719,17 +736,8 @@ fn apply_lockout(observations: &mut [OvernightObservationSlice], lockout_days: u
     let source = observations[lockout_start - 1];
     for observation in &mut observations[lockout_start..] {
         observation.observation_date = source.observation_date;
-        observation.rate_tenor_days = source.rate_tenor_days;
     }
     Ok(())
-}
-
-fn shift_back(date: Date, shift_days: i32, calendar: &dyn HolidayCalendar) -> Result<Date> {
-    if shift_days == 0 {
-        Ok(date)
-    } else {
-        date.add_business_days(-shift_days, calendar)
-    }
 }
 
 fn non_negative_days(start: Date, end: Date, label: &str) -> Result<u32> {
@@ -775,16 +783,6 @@ fn validate_constraints(constraints: OvernightRateConstraints) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn constrain_rate(mut rate: f64, constraints: OvernightRateConstraints) -> f64 {
-    if let Some(floor_bp) = constraints.index_floor_bp {
-        rate = rate.max(floor_bp * 1e-4);
-    }
-    if let Some(cap_bp) = constraints.index_cap_bp {
-        rate = rate.min(cap_bp * 1e-4);
-    }
-    rate
 }
 
 fn annualize(accumulator: f64, is_simple: bool, total_days: u32, basis: f64) -> f64 {

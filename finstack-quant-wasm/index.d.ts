@@ -8787,6 +8787,68 @@ export interface CoreNamespace {
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `df` is non-finite or not strictly positive.
    */
   studentTInvCdf(p: number, df: number): number;
+
+  /**
+   * Parse a cashflow kind label into its `CFKind` wire string.
+   *
+   * Parsed by Rust `CFKind::from_str`: the snake_case wire string, ASCII case
+   * ignored, plus the aliases `"coupon"` and `"principal"`.
+   *
+   * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
+   * @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
+   * @throws If `name` is not a string (kind `invalid_type`) or names no cashflow kind (kind `validation`).
+   */
+  cfKindParse(name: string): generated.cashflows.CFKind;
+
+  /**
+   * Whether a cashflow kind is interest-like (fixed, floating, inflation or stub coupon).
+   *
+   * @param kind - `CFKind` wire string.
+   * @returns `true` for coupon-type kinds; fees, principal and margin kinds are `false`.
+   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
+   */
+  cfKindIsInterestLike(kind: generated.cashflows.CFKind): boolean;
+
+  /**
+   * Whether a cashflow kind changes or returns principal.
+   *
+   * @param kind - `CFKind` wire string.
+   * @returns `true` for notional, PIK, amortization, prepayment, revolving draw/repayment and defaulted-notional kinds.
+   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
+   */
+  cfKindIsPrincipalLike(kind: generated.cashflows.CFKind): boolean;
+
+  /**
+   * Whether a cashflow kind settles in cash.
+   *
+   * Non-cash state rows (`pik`, `defaulted_notional`) are excluded from
+   * settlement sums such as `datedFlows`.
+   *
+   * @param kind - `CFKind` wire string.
+   * @returns `true` when flows of this kind are paid or received in cash.
+   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
+   */
+  cfKindIsCashSettlement(kind: generated.cashflows.CFKind): boolean;
+
+  /**
+   * Date on which a cashflow changes the outstanding balance.
+   *
+   * Mirrors Rust `CashFlow::get_balance_date`: the flow's `principal_date`
+   * when set, otherwise its payment `date`.
+   *
+   * @param flow - `CashFlow` wire object.
+   * @returns ISO-8601 balance date.
+   * @throws If `flow` is not a `CashFlow` (kind `validation`).
+   */
+  cashFlowGetBalanceDate(flow: generated.cashflows.CashFlow): generated.core.DateWire;
+
+  /**
+   * Check a cashflow's invariants.
+   *
+   * @param flow - `CashFlow` wire object.
+   * @throws If `flow` is not a `CashFlow`, its amount, accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
+   */
+  cashFlowValidate(flow: generated.cashflows.CashFlow): void;
 }
 
 /**
@@ -13664,7 +13726,7 @@ export declare const margin: MarginNamespace;
  * day count and metadata.
  *
  * Obtain one from `CashFlowSchedule.builder()`, `buildCashflowSchedule`,
- * `CashFlowSchedule.fromJson` or `CashFlowSchedule.fromParts`. Methods that
+ * `CashFlowSchedule.fromJson` or `CashFlowSchedule.fromFlows`. Methods that
  * return a schedule return a new handle and leave this one unchanged.
  */
 export interface CashFlowSchedule extends WasmOwned {
@@ -13782,17 +13844,15 @@ export interface CashFlowSchedule extends WasmOwned {
    * @param market - `MarketContext` handle holding the discount (and credit) curve.
    * @param discCurveId - Identifier of the discount curve in `market`, for example `"USD-OIS"`.
    * @param base - ISO-8601 valuation date that discounting starts from.
-   * @param dayCount - Optional `DayCount` wire string for discounting year fractions; omitted means `"act_365f"`.
    * @param creditCurveId - Optional identifier of a hazard curve in `market`; omitted means no credit adjustment.
    * @returns `PeriodAggregation`: `{ periodId: { currency: Money } }` of PV per period and currency.
    * @throws If a curve is missing from `market` (kind `not_found`), or an argument is malformed or a discount factor cannot be computed (kind `invalid_type` or `validation`).
    */
   pvByPeriod(
-    periods: readonly generated.statements.Period[],
+    periods: readonly generated.core.Period[],
     market: MarketContext,
     discCurveId: string,
     base: string,
-    dayCount?: generated.core.DayCount | null,
     creditCurveId?: string | null
   ): generated.cashflows.PeriodAggregation;
   /**
@@ -13831,32 +13891,12 @@ export interface CashFlowScheduleConstructor {
    */
   builder(): CashFlowBuilder;
   /**
-   * Assemble a schedule from existing flows, notional, day count and metadata.
-   *
-   * Flows are put into the canonical schedule order; nothing is validated
-   * until `validate()` or an analytic runs.
-   *
-   * @param flows - `CashFlow` wire objects.
-   * @param notional - `Notional` wire object: initial balance and amortization rule.
-   * @param dayCount - `DayCount` wire string (for example `"act_360"`) used for accrual and year fractions.
-   * @param meta - `CashFlowMeta` wire object: representation, calendar ids, commitment, issue date and maturity.
-   * @returns The assembled `CashFlowSchedule`.
-   * @throws If an argument does not match its wire type (kind `validation`).
-   */
-  fromParts(
-    flows: readonly generated.cashflows.CashFlow[],
-    notional: generated.cashflows.Notional,
-    dayCount: generated.core.DayCount,
-    meta: generated.cashflows.CashFlowMeta
-  ): CashFlowSchedule;
-  /**
    * Assemble a schedule from externally supplied flows, validating every row
    * (Rust `CashFlowSchedule::from_flows`).
    *
    * Each flow must pass `CashFlow::validate` (finite amount and rate, a
    * finite non-negative `accrual_factor`, a reset date not after the payment
-   * date) before the rows are sorted; use `fromParts` to assemble rows
-   * without validation. (Python's `from_flows` also reads a pandas
+   * date) before the rows are sorted. (Python's `from_flows` also reads a pandas
    * DataFrame; WASM takes the flow list.)
    *
    * @param flows - `CashFlow` wire objects.
@@ -14328,7 +14368,7 @@ export interface CashflowsNamespace {
    * @param dayCount - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
    * @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
    * @returns The `CashFlowSchedule` handle, flows in canonical order.
-   * @throws If an argument does not match its wire type (kind `validation`).
+   * @throws If an argument does not match its wire type, or a flow is invalid (kind `validation`).
    */
   scheduleFromDatedFlows(
     flows: readonly DatedFlowJson[],
@@ -14344,7 +14384,7 @@ export interface CashflowsNamespace {
    * @param dayCount - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
    * @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
    * @returns The `CashFlowSchedule` handle, flows in canonical order.
-   * @throws If an argument does not match its wire type (kind `validation`).
+   * @throws If an argument does not match its wire type, or a flow is invalid (kind `validation`).
    */
   scheduleFromClassifiedFlows(
     flows: readonly generated.cashflows.CashFlow[],
@@ -14431,7 +14471,7 @@ export interface CashflowsNamespace {
    */
   aggregateByPeriod(
     flows: readonly DatedFlowJson[],
-    periods: readonly generated.statements.Period[]
+    periods: readonly generated.core.Period[]
   ): generated.cashflows.PeriodAggregation;
 
   /**
@@ -14470,12 +14510,12 @@ export interface CashflowsNamespace {
    * Materialize the reset observations crossed by a realized-forward market roll.
    *
    * Every projected fixing recorded in the schedules' metadata with a date in
-   * `(oldDate, newDate]` is written into a copy of the market as an observed
+   * `[oldDate, newDate]` is written into a copy of the market as an observed
    * fixing; existing observations take precedence and are kept unchanged.
    *
    * @param market - `MarketContext` handle of the pre-roll market; it is not modified.
    * @param schedules - Schedules projected on `market` at `oldDate`: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
-   * @param oldDate - ISO-8601 exclusive start of the fixing window.
+   * @param oldDate - ISO-8601 inclusive start of the fixing window: same-day projections become observed.
    * @param newDate - ISO-8601 inclusive end of the window; must be on or after `oldDate`.
    * @returns A new `MarketContext` handle with the crossed fixings materialized; release it with free().
    * @throws If the window runs backward, a fixing-series identifier is malformed, a crossed projection is unavailable or non-finite, or two schedules project the same index and date differently (kind `validation`).
@@ -14488,76 +14528,15 @@ export interface CashflowsNamespace {
   ): MarketContext;
 
   /**
-   * Parse a cashflow kind label into its `CFKind` wire string.
-   *
-   * Matching is exact (Rust `CFKind::from_str`): the label is the snake_case
-   * wire string itself, as used by the `kind` field of a `CashFlow`.
-   *
-   * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
-   * @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
-   * @throws If `name` is not a string (kind `invalid_type`) or names no cashflow kind (kind `validation`).
-   */
-  cfKindParse(name: string): generated.cashflows.CFKind;
-
-  /**
-   * Whether a cashflow kind is interest-like (fixed, floating, inflation or stub coupon).
-   *
-   * @param kind - `CFKind` wire string.
-   * @returns `true` for coupon-type kinds; fees, principal and margin kinds are `false`.
-   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
-   */
-  cfKindIsInterestLike(kind: generated.cashflows.CFKind): boolean;
-
-  /**
-   * Whether a cashflow kind changes or returns principal.
-   *
-   * @param kind - `CFKind` wire string.
-   * @returns `true` for notional, PIK, amortization, prepayment, revolving draw/repayment and defaulted-notional kinds.
-   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
-   */
-  cfKindIsPrincipalLike(kind: generated.cashflows.CFKind): boolean;
-
-  /**
-   * Whether a cashflow kind settles in cash.
-   *
-   * Non-cash state rows (`pik`, `defaulted_notional`) are excluded from
-   * settlement sums such as `datedFlows`.
-   *
-   * @param kind - `CFKind` wire string.
-   * @returns `true` when flows of this kind are paid or received in cash.
-   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
-   */
-  cfKindIsCashSettlement(kind: generated.cashflows.CFKind): boolean;
-
-  /**
-   * Date on which a cashflow changes the outstanding balance.
-   *
-   * Mirrors Rust `CashFlow::get_balance_date`: the flow's `principal_date`
-   * when set, otherwise its payment `date`.
-   *
-   * @param flow - `CashFlow` wire object.
-   * @returns ISO-8601 balance date.
-   * @throws If `flow` is not a `CashFlow` (kind `validation`).
-   */
-  cashFlowGetBalanceDate(flow: generated.cashflows.CashFlow): generated.core.DateWire;
-
-  /**
-   * Check a cashflow's invariants.
-   *
-   * @param flow - `CashFlow` wire object.
-   * @throws If `flow` is not a `CashFlow`, its amount, accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
-   */
-  cashFlowValidate(flow: generated.cashflows.CashFlow): void;
-
-  /**
    * Recurring fee quoted in basis points of a drawn or undrawn balance.
    *
    * The argument is the `periodic_bp` payload of `FeeSpec`, parsed by the Rust
-   * serde contract: `stub` defaults to `"short_front"` and `accrual_basis` to
-   * `"point_in_time"`; every other field is required. (Python's
+   * serde contract: `business_day_convention` defaults to `"modified_following"`,
+   * `stub` to `"short_front"` and `accrual_basis` to `"point_in_time"`; every
+   * other field is required. (Python's
    * `FeeSpec.periodic_bp` takes the same fields positionally.)
    *
-   * @param fields - `{ base, bp, frequency, day_count, business_day_convention, calendar_id, stub?, accrual_basis? }`: `base` is a `FeeBase`, `bp` an exact decimal string in basis points per annum (`"25"` = 0.25%), `frequency` a `Tenor`.
+   * @param fields - `{ base, bp, frequency, day_count, business_day_convention?, calendar_id, stub?, accrual_basis? }`: `base` is a `FeeBase`, `bp` an exact decimal string in basis points per annum (`"25"` = 0.25%), `frequency` a `Tenor`.
    * @returns Canonical `FeeSpec` wire value `{ periodic_bp: { ... } }` with defaults filled in.
    * @throws If `fields` is missing a required field, has an unknown field or a field of the wrong shape (kind `validation`).
    */
@@ -14643,14 +14622,6 @@ export interface CashflowsNamespace {
    * @throws If `notional` is not a `Notional`, its initial balance is negative or non-finite, or its amortization rule mixes currencies, exceeds the initial balance, has a percentage outside `[0, 1]` or has dates out of order (kind `validation`).
    */
   notionalValidate(notional: generated.cashflows.Notional): void;
-
-  /**
-   * Constant 2% CDR baseline.
-   *
-   * @returns `DefaultModelSpec` wire object `{ curve: "constant", cdr: 0.02 }`.
-   * @throws If the model cannot be serialized.
-   */
-  defaultModelSpecCdr2pct(): generated.cashflows.DefaultModelSpec;
 
   /**
    * Check a default model's curve parameters.
@@ -35617,44 +35588,6 @@ export interface ScenariosNamespace {
     calendarId?: string
   ): HorizonReport;
   /**
-   * Build an FX spot percent shock operation.
-   *
-   * Free-function twin of Python `OperationSpec.market_fx_pct` (Rust
-   * `OperationSpec::MarketFxPct`).
-   * @param base - ISO-4217 code of the base currency being strengthened or weakened.
-   * @param quote - ISO-4217 code of the quote currency; must differ from `base` to validate.
-   * @param pct - Shock in percentage points (`5.0` = base +5% against quote); validation rejects `pct <= -100`.
-   * @returns The `market_fx_pct` operation object.
-   * @throws Error - Throws a `TypeError` for a non-string code or non-number `pct`, and a `validation` error for an unknown currency code.
-   */
-  operationSpecMarketFxPct(base: string, quote: string, pct: number): OperationSpec;
-  /**
-   * Build an equity price percent shock for a list of identifiers.
-   *
-   * Free-function twin of Python `OperationSpec.equity_price_pct` (Rust
-   * `OperationSpec::EquityPricePct`).
-   * @param ids - Equity price identifiers in the market context; every one receives the shock.
-   * @param pct - Shock in percentage points (`-10.0` = -10%); validation rejects `pct < -100`.
-   * @returns The `equity_price_pct` operation object.
-   * @throws Error - Throws a `TypeError` when `ids` is not an array of strings or `pct` is not a number.
-   */
-  operationSpecEquityPricePct(ids: string[], pct: number): OperationSpec;
-  /**
-   * Build an instrument price percent shock selected by exact attribute match.
-   *
-   * Free-function twin of Python `OperationSpec.instrument_price_pct_by_attr`
-   * (Rust `OperationSpec::InstrumentPricePctByAttr`). Applying it requires an
-   * instrument inventory.
-   * @param attrs - `{key: value}` object or array of `[key, value]` pairs; order is preserved and every pair must match the instrument's attributes.
-   * @param pct - Price shock in percentage points (`-5.0` = -5%).
-   * @returns The `instrument_price_pct_by_attr` operation object.
-   * @throws Error - Throws a `TypeError` for a non-object `attrs` or non-number `pct`, and a `validation` error when `attrs` is not a string-to-string mapping or pair list.
-   */
-  operationSpecInstrumentPricePctByAttr(
-    attrs: Record<string, string> | [string, string][],
-    pct: number
-  ): OperationSpec;
-  /**
    * Expand a parallel shift into one operation per curve identifier.
    * @param curveKind - Canonical discount, forward, par_cds, inflation or commodity family label.
    * @param curveIds - Ordered array of curve identifiers; empty input returns an empty array.
@@ -35669,282 +35602,6 @@ export interface ScenariosNamespace {
     bp: number,
     discountCurveId?: string
   ): OperationSpec[];
-  /**
-   * Build a parallel basis-point curve shift for one curve or several.
-   *
-   * Free-function twin of Python `OperationSpec.curve_parallel_bp`. A single
-   * identifier builds Rust `OperationSpec::CurveParallelBp`; an array expands
-   * through Rust `ScenarioSpec::parallel_bp_many` to one operation per
-   * identifier, in the given order.
-   * @param curveKind - Canonical discount, forward, par_cds, inflation or commodity family label.
-   * @param curveId - Identifier of the single curve receiving the shift.
-   * @param bp - Additive basis points; percent of forward for commodity curves.
-   * @param discountCurveId - Optional discount curve used to re-bootstrap ParCDS quotes.
-   * @returns One curve_parallel_bp operation object.
-   * @throws Error - Throws TypeError for non-string identifiers or non-numeric bp, and a validation error for an unknown curve family.
-   */
-  operationSpecCurveParallelBp(
-    curveKind: CurveKind,
-    curveId: string,
-    bp: number,
-    discountCurveId?: string
-  ): OperationSpec;
-  /**
-   * Build node-level basis-point shifts on a curve.
-   *
-   * Free-function twin of Python `OperationSpec.curve_node_bp` (Rust
-   * `OperationSpec::CurveNodeBp`).
-   * @param curveKind - Curve family label: `"discount"`, `"forward"`, `"par_cds"`, `"inflation"` or `"commodity"`.
-   * @param curveId - Identifier of the curve whose pillars are shifted.
-   * @param nodes - Array of `[tenor, bp]` pairs, e.g. `[["2Y", 10], ["10Y", -5]]`; bp is additive basis points (percent of forward for commodity curves).
-   * @param matchMode - Optional pillar alignment label, `"exact"` or `"interpolate"`; omit for the Rust default (`TenorMatchMode::default()`, `"interpolate"`).
-   * @param discountCurveId - Optional discount curve used when re-bootstrapping shocked ParCDS quotes.
-   * @returns The `curve_node_bp` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown `curveKind` / `matchMode` label or `nodes` that are not `[string, number]` pairs.
-   */
-  operationSpecCurveNodeBp(
-    curveKind: CurveKind,
-    curveId: string,
-    nodes: [string, number][],
-    matchMode?: TenorMatchMode,
-    discountCurveId?: string
-  ): OperationSpec;
-  /**
-   * Build a parallel shock to a volatility-index curve.
-   *
-   * Free-function twin of Python `OperationSpec.vol_index_parallel_pts` (Rust
-   * `OperationSpec::VolIndexParallelPts`).
-   * @param curveId - Identifier of the volatility-index curve.
-   * @param points - Additive shift in absolute index points (`1.0` moves 18.5 to 19.5).
-   * @returns The `vol_index_parallel_pts` operation object.
-   * @throws Error - Throws a `TypeError` when `curveId` is not a string or `points` is not a number.
-   */
-  operationSpecVolIndexParallelPts(curveId: string, points: number): OperationSpec;
-  /**
-   * Build node-level shocks to a volatility-index curve.
-   *
-   * Free-function twin of Python `OperationSpec.vol_index_node_pts` (Rust
-   * `OperationSpec::VolIndexNodePts`).
-   * @param curveId - Identifier of the volatility-index curve.
-   * @param nodes - Array of `[tenor, points]` pairs; points are additive absolute index points.
-   * @param matchMode - Optional pillar alignment label, `"exact"` or `"interpolate"`; omit for the Rust default (`TenorMatchMode::default()`, `"interpolate"`).
-   * @returns The `vol_index_node_pts` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown `matchMode` label or `nodes` that are not `[string, number]` pairs.
-   */
-  operationSpecVolIndexNodePts(
-    curveId: string,
-    nodes: [string, number][],
-    matchMode?: TenorMatchMode
-  ): OperationSpec;
-  /**
-   * Build a parallel shift to a base-correlation surface.
-   *
-   * Free-function twin of Python `OperationSpec.base_corr_parallel_pts` (Rust
-   * `OperationSpec::BaseCorrParallelPts`).
-   * @param surfaceId - Identifier of the base-correlation surface.
-   * @param points - Additive shift in decimal correlation (`0.02` = +0.02, not percentage points).
-   * @returns The `base_corr_parallel_pts` operation object.
-   * @throws Error - Throws a `TypeError` when `surfaceId` is not a string or `points` is not a number.
-   */
-  operationSpecBaseCorrParallelPts(surfaceId: string, points: number): OperationSpec;
-  /**
-   * Build a bucketed shift to a base-correlation surface.
-   *
-   * Free-function twin of Python `OperationSpec.base_corr_bucket_pts` (Rust
-   * `OperationSpec::BaseCorrBucketPts`).
-   * @param surfaceId - Identifier of the base-correlation surface.
-   * @param points - Additive shift in decimal correlation (`0.02` = +0.02).
-   * @param detachmentBp - Optional detachment points to shift, as integer basis points of the capital structure (`300` = 3%); omit to shift every bucket.
-   * @returns The `base_corr_bucket_pts` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error when `detachmentBp` is not an array of 32-bit integers.
-   */
-  operationSpecBaseCorrBucketPts(
-    surfaceId: string,
-    points: number,
-    detachmentBp?: number[]
-  ): OperationSpec;
-  /**
-   * Build a parallel percent shift to a volatility surface.
-   *
-   * Free-function twin of Python `OperationSpec.vol_surface_parallel_pct` (Rust
-   * `OperationSpec::VolSurfaceParallelPct`).
-   * @param volSurfaceId - Identifier of the volatility surface.
-   * @param pct - Relative shift in percentage points (`10.0` scales every vol by 1.10).
-   * @returns The `vol_surface_parallel_pct` operation object.
-   * @throws Error - Throws a `TypeError` when `volSurfaceId` is not a string or `pct` is not a number.
-   */
-  operationSpecVolSurfaceParallelPct(volSurfaceId: string, pct: number): OperationSpec;
-  /**
-   * Build a bucketed percent shock to a volatility surface.
-   *
-   * Free-function twin of Python `OperationSpec.vol_surface_bucket_pct` (Rust
-   * `OperationSpec::VolSurfaceBucketPct`).
-   * @param volSurfaceId - Identifier of the volatility surface.
-   * @param pct - Relative shift in percentage points applied to the selected buckets.
-   * @param tenors - Optional expiry tenors (e.g. `["1M", "1Y"]`) restricting the shock; omit for every expiry.
-   * @param strikes - Optional strikes, in the surface's own strike units, restricting the shock; omit for every strike.
-   * @returns The `vol_surface_bucket_pct` operation object.
-   * @throws Error - Throws a `TypeError` when an argument has the wrong JavaScript type (`tenors` must be an array of strings, `strikes` an array of numbers).
-   */
-  operationSpecVolSurfaceBucketPct(
-    volSurfaceId: string,
-    pct: number,
-    tenors?: string[],
-    strikes?: number[]
-  ): OperationSpec;
-  /**
-   * Build a statement forecast percent change on one node.
-   *
-   * Free-function twin of Python `OperationSpec.stmt_forecast_percent` (Rust
-   * `OperationSpec::StmtForecastPercent`).
-   * @param nodeId - Statement node identifier whose forecast values are scaled.
-   * @param pct - Change in percentage points (`-5.0` = -5%).
-   * @returns The `stmt_forecast_percent` operation object.
-   * @throws Error - Throws a `TypeError` when `nodeId` is not a string or `pct` is not a number.
-   */
-  operationSpecStmtForecastPercent(nodeId: string, pct: number): OperationSpec;
-  /**
-   * Build a statement forecast value assignment on one node.
-   *
-   * Free-function twin of Python `OperationSpec.stmt_forecast_assign` (Rust
-   * `OperationSpec::StmtForecastAssign`).
-   * @param nodeId - Statement node identifier whose forecast values are replaced.
-   * @param value - Replacement forecast value, in the node's own units.
-   * @returns The `stmt_forecast_assign` operation object.
-   * @throws Error - Throws a `TypeError` when `nodeId` is not a string or `value` is not a number.
-   */
-  operationSpecStmtForecastAssign(nodeId: string, value: number): OperationSpec;
-  /**
-   * Build an operation binding a statement rate node to a market curve.
-   *
-   * Free-function twin of Python `OperationSpec.rate_binding` (Rust
-   * `OperationSpec::RateBinding`).
-   * @param binding - `RateBindingSpec` object or JSON: `node_id`, `curve_id`, `tenor`, optional `compounding` (default `"continuous"`) and `day_count`.
-   * @returns The `rate_binding` operation object.
-   * @throws Error - Throws a `TypeError` when `binding` is not an object or JSON string and a `validation` error when it does not match the `RateBindingSpec` contract.
-   */
-  operationSpecRateBinding(binding: RateBindingSpec | string): OperationSpec;
-  /**
-   * Build an instrument spread shock selected by exact attribute match.
-   *
-   * Free-function twin of Python `OperationSpec.instrument_spread_bp_by_attr`
-   * (Rust `OperationSpec::InstrumentSpreadBpByAttr`). Applying it requires an
-   * instrument inventory.
-   * @param attrs - `{key: value}` object or array of `[key, value]` pairs; order is preserved and every pair must match the instrument's attributes.
-   * @param bp - Additive spread shock in basis points (1 bp = 1e-4).
-   * @returns The `instrument_spread_bp_by_attr` operation object.
-   * @throws Error - Throws a `TypeError` for a non-object `attrs` or non-number `bp`, and a `validation` error when `attrs` is not a string-to-string mapping or pair list.
-   */
-  operationSpecInstrumentSpreadBpByAttr(
-    attrs: Record<string, string> | [string, string][],
-    bp: number
-  ): OperationSpec;
-  /**
-   * Build an instrument price percent shock selected by instrument type.
-   *
-   * Free-function twin of Python `OperationSpec.instrument_price_pct_by_type`
-   * (Rust `OperationSpec::InstrumentPricePctByType`). Applying it requires an
-   * instrument inventory.
-   * @param instrumentTypes - Snake_case instrument type identifiers, e.g. `["bond", "cds_index"]`.
-   * @param pct - Price shock in percentage points (`-5.0` = -5%).
-   * @returns The `instrument_price_pct_by_type` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown instrument type.
-   */
-  operationSpecInstrumentPricePctByType(instrumentTypes: string[], pct: number): OperationSpec;
-  /**
-   * Build an instrument spread shock selected by instrument type.
-   *
-   * Free-function twin of Python `OperationSpec.instrument_spread_bp_by_type`
-   * (Rust `OperationSpec::InstrumentSpreadBpByType`). Applying it requires an
-   * instrument inventory.
-   * @param instrumentTypes - Snake_case instrument type identifiers, e.g. `["bond", "cds_index"]`.
-   * @param bp - Additive spread shock in basis points (1 bp = 1e-4).
-   * @returns The `instrument_spread_bp_by_type` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown instrument type.
-   */
-  operationSpecInstrumentSpreadBpByType(instrumentTypes: string[], bp: number): OperationSpec;
-  /**
-   * Build a structured-credit asset-correlation shock.
-   *
-   * Free-function twin of Python `OperationSpec.asset_correlation_pts` (Rust
-   * `OperationSpec::AssetCorrelationPts`).
-   * @param deltaPts - Additive shift in decimal correlation (`0.05` adds 0.05 to the asset correlation).
-   * @returns The `asset_correlation_pts` operation object.
-   * @throws Error - Throws a `TypeError` when `deltaPts` is not a number.
-   */
-  operationSpecAssetCorrelationPts(deltaPts: number): OperationSpec;
-  /**
-   * Build a structured-credit prepay/default correlation shock.
-   *
-   * Free-function twin of Python `OperationSpec.prepay_default_correlation_pts`
-   * (Rust `OperationSpec::PrepayDefaultCorrelationPts`).
-   * @param deltaPts - Additive shift in decimal correlation between prepayment and default.
-   * @returns The `prepay_default_correlation_pts` operation object.
-   * @throws Error - Throws a `TypeError` when `deltaPts` is not a number.
-   */
-  operationSpecPrepayDefaultCorrelationPts(deltaPts: number): OperationSpec;
-  /**
-   * Build a hierarchy-targeted parallel curve shift.
-   *
-   * Free-function twin of Python `OperationSpec.hierarchy_curve_parallel_bp`
-   * (Rust `OperationSpec::HierarchyCurveParallelBp`).
-   * @param curveKind - Curve family label: `"discount"`, `"forward"`, `"par_cds"`, `"inflation"` or `"commodity"`.
-   * @param target - `HierarchyTarget` object or JSON (`{path, tag_filter?}`) selecting the market-data subtree.
-   * @param bp - Additive shift in basis points (percent of forward for commodity curves).
-   * @param discountCurveId - Optional discount curve used when re-bootstrapping shocked ParCDS quotes.
-   * @returns The `hierarchy_curve_parallel_bp` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown `curveKind` label or a `target` that is not a `HierarchyTarget`.
-   */
-  operationSpecHierarchyCurveParallelBp(
-    curveKind: CurveKind,
-    target: HierarchyTarget | string,
-    bp: number,
-    discountCurveId?: string
-  ): OperationSpec;
-  /**
-   * Build a hierarchy-targeted volatility-surface percent shift.
-   *
-   * Free-function twin of Python
-   * `OperationSpec.hierarchy_vol_surface_parallel_pct` (Rust
-   * `OperationSpec::HierarchyVolSurfaceParallelPct`).
-   * @param target - `HierarchyTarget` object or JSON (`{path, tag_filter?}`) selecting the market-data subtree.
-   * @param pct - Relative shift in percentage points applied to every targeted surface.
-   * @returns The `hierarchy_vol_surface_parallel_pct` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error when `target` is not a `HierarchyTarget`.
-   */
-  operationSpecHierarchyVolSurfaceParallelPct(
-    target: HierarchyTarget | string,
-    pct: number
-  ): OperationSpec;
-  /**
-   * Build a hierarchy-targeted equity price percent shift.
-   *
-   * Free-function twin of Python `OperationSpec.hierarchy_equity_price_pct`
-   * (Rust `OperationSpec::HierarchyEquityPricePct`).
-   * @param target - `HierarchyTarget` object or JSON (`{path, tag_filter?}`) selecting the market-data subtree.
-   * @param pct - Price shock in percentage points applied to every targeted equity.
-   * @returns The `hierarchy_equity_price_pct` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error when `target` is not a `HierarchyTarget`.
-   */
-  operationSpecHierarchyEquityPricePct(
-    target: HierarchyTarget | string,
-    pct: number
-  ): OperationSpec;
-  /**
-   * Build a hierarchy-targeted base-correlation parallel shift.
-   *
-   * Free-function twin of Python
-   * `OperationSpec.hierarchy_base_corr_parallel_pts` (Rust
-   * `OperationSpec::HierarchyBaseCorrParallelPts`).
-   * @param target - `HierarchyTarget` object or JSON (`{path, tag_filter?}`) selecting the market-data subtree.
-   * @param points - Additive shift in decimal correlation (`0.02` = +0.02).
-   * @returns The `hierarchy_base_corr_parallel_pts` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error when `target` is not a `HierarchyTarget`.
-   */
-  operationSpecHierarchyBaseCorrParallelPts(
-    target: HierarchyTarget | string,
-    points: number
-  ): OperationSpec;
   /**
    * Build a time-roll operation moving the valuation horizon forward.
    *

@@ -578,14 +578,14 @@ impl CreditDefaultSwap {
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+        finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.premium_leg.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
                 ..Default::default()
             },
-        ))
+        )
     }
 
     /// ISDA-standard coupon date schedule (IMM 20th dates).

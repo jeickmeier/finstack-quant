@@ -264,7 +264,7 @@ impl ForwardCurveTarget {
                             .float_leg
                             .calendar_id
                             .as_deref()
-                            .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+                            .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID),
                         end_of_month: swap.float_leg.end_of_month,
                         day_count: finstack_quant_core::dates::DayCount::Act365F,
                         payment_lag_days: swap.float_leg.payment_lag_days,
@@ -726,6 +726,26 @@ mod tests {
         fn clone_box(&self) -> Box<dyn Instrument> {
             Box::new(self.clone())
         }
+    }
+
+    /// A forward step that omits `method` must default to the only method the
+    /// forward target accepts, not to a bootstrap it rejects at solve time.
+    #[test]
+    fn forward_params_default_to_global_solve() {
+        let params: ForwardCurveParams = serde_json::from_value(serde_json::json!({
+            "curve_id": "USD-SOFR-3M",
+            "currency": "USD",
+            "base_date": "2025-01-15",
+            "tenor_years": 0.25,
+            "discount_curve_id": "USD-OIS",
+        }))
+        .expect("forward params without method parse");
+        assert_eq!(
+            params.method,
+            CalibrationMethod::GlobalSolve {
+                use_analytical_jacobian: false
+            }
+        );
     }
 
     #[test]

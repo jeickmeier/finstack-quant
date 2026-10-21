@@ -275,6 +275,11 @@ fn attribute_composite_primitives(
             as_of_t0,
             as_of_t1,
         )?;
+        // `accumulate` sums amounts only; the composite records the FX
+        // policy its translated legs applied.
+        if aggregate.meta.fx_policy.is_none() {
+            aggregate.meta.fx_policy = primitive.meta.fx_policy.clone();
+        }
         aggregate.accumulate(primitive)?;
     }
 

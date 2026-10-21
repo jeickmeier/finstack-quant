@@ -1,16 +1,17 @@
 //! Python bindings for `finstack_quant_cashflows::builder` schedule types.
 
 use finstack_quant_cashflows::builder::{
-    merge_cashflow_schedules, CashFlowMeta, CashFlowSchedule, CashflowRepresentation,
+    merge_cashflow_schedules as rust_merge_cashflow_schedules, CashFlowMeta, CashFlowSchedule,
+    CashflowRepresentation,
 };
-use finstack_quant_cashflows::primitives::CashFlow;
+use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::bindings::cashflows::aggregation::PyPeriodAggregation;
-use crate::bindings::cashflows::primitives::{extract_cf_kind, PyCashFlow};
+use crate::bindings::core::cashflow::{extract_cf_kind, PyCashFlow};
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::periods::PyPeriod;
@@ -151,8 +152,8 @@ wire_methods!(PyCashFlowMeta, CashFlowMeta, "CashFlowMeta");
 
 /// Canonical, sorted cashflow schedule with notional, day count and metadata.
 ///
-/// Build one with ``CashFlowSchedule.builder()`` (fluent), ``from_flows`` /
-/// ``from_parts`` (explicit rows), or ``from_json``. Accessors return typed
+/// Build one with ``CashFlowSchedule.builder()`` (fluent), ``from_flows``
+/// (explicit rows, validated), or ``from_json``. Accessors return typed
 /// ``CashFlow`` rows; ``to_dataframe()`` exports a pandas frame; ``pv_by_period``
 /// discounts against a ``MarketContext``.
 ///
@@ -160,7 +161,7 @@ wire_methods!(PyCashFlowMeta, CashFlowMeta, "CashFlowMeta");
 /// --------
 /// >>> from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
 /// >>> from finstack_quant.core.dates import DayCount
-/// >>> CashFlowSchedule.from_parts([], Notional.par(1.0, "USD"), DayCount.ACT_360, CashFlowMeta()).get_notional().initial.amount
+/// >>> CashFlowSchedule.from_flows([], Notional.par(1.0, "USD"), DayCount.ACT_360, CashFlowMeta()).get_notional().initial.amount
 /// 1.0
 #[pyclass(
     name = "CashFlowSchedule",
@@ -295,56 +296,16 @@ impl PyCashFlowSchedule {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn builder() -> PyCashFlowBuilder {
-        PyCashFlowBuilder::new_default()
-    }
-
-    /// Build a schedule from explicit rows, a notional, a day count and metadata.
-    ///
-    /// Rows are sorted into canonical order. Mirrors Rust
-    /// ``CashFlowSchedule::from_parts``.
-    ///
-    /// Parameters
-    /// ----------
-    /// flows : list[CashFlow]
-    ///     Classified cashflow rows in any order.
-    /// notional : Notional
-    ///     Representative notional stamped on the schedule.
-    /// day_count : DayCount
-    ///     Representative day-count convention.
-    /// meta : CashFlowMeta
-    ///     Schedule-level metadata.
-    ///
-    /// Returns
-    /// -------
-    /// CashFlowSchedule
-    ///     Canonical schedule holding the sorted rows.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``flows`` is not a list of ``CashFlow``.
-    #[staticmethod]
-    #[pyo3(text_signature = "(flows, notional, day_count, meta)")]
-    fn from_parts(
-        flows: Vec<PyRef<'_, PyCashFlow>>,
-        notional: PyRef<'_, PyNotional>,
-        day_count: PyRef<'_, PyDayCount>,
-        meta: PyRef<'_, PyCashFlowMeta>,
-    ) -> Self {
-        Self::from_inner(CashFlowSchedule::from_parts(
-            flows.iter().map(|f| f.inner.clone()).collect(),
-            notional.inner.clone(),
-            day_count.inner,
-            meta.inner.clone(),
-        ))
+        PyCashFlowBuilder {
+            inner: CashFlowSchedule::builder(),
+        }
     }
 
     /// Build a schedule from ``CashFlow`` rows or a pandas DataFrame,
     /// validating every row.
     ///
     /// Both input shapes go through Rust ``CashFlowSchedule::from_flows``,
-    /// which checks each row (``CashFlow.validate``) before sorting; use
-    /// ``from_parts`` to assemble rows without validation.
+    /// which checks each row (``CashFlow.validate``) before sorting.
     ///
     /// Parameters
     /// ----------
@@ -382,7 +343,7 @@ impl PyCashFlowSchedule {
     /// --------
     /// >>> import datetime
     /// >>> from finstack_quant.cashflows.builder import CashFlowSchedule, Notional
-    /// >>> from finstack_quant.cashflows.primitives import CashFlow, CFKind
+    /// >>> from finstack_quant.core.cashflow import CashFlow, CFKind
     /// >>> from finstack_quant.core.dates import DayCount
     /// >>> from finstack_quant.core.money import Money
     /// >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED, 0.0)
@@ -557,9 +518,8 @@ impl PyCashFlowSchedule {
     /// disc_curve_id : str
     ///     Discount curve identifier.
     /// base : datetime.date or str
-    ///     Valuation date for discount times; flows on or before it get zero PV.
-    /// day_count : DayCount, optional
-    ///     Day-count for discount times (default Act/365F).
+    ///     Valuation date for discount factors and survival; flows on or before
+    ///     it get zero PV. Each curve uses its own day count.
     /// credit_curve_id : str, optional
     ///     Hazard curve identifier for credit-adjusted PV.
     ///
@@ -575,10 +535,9 @@ impl PyCashFlowSchedule {
     ///     If a curve id is not present in ``market``.
     /// ValueError
     ///     If periods overlap or discount inputs are inconsistent.
-    #[allow(clippy::too_many_arguments)]
     #[pyo3(
-        signature = (periods, market, disc_curve_id, base, day_count=None, credit_curve_id=None),
-        text_signature = "(self, periods, market, disc_curve_id, base, day_count=None, credit_curve_id=None)"
+        signature = (periods, market, disc_curve_id, base, credit_curve_id=None),
+        text_signature = "(self, periods, market, disc_curve_id, base, credit_curve_id=None)"
     )]
     fn pv_by_period<'py>(
         &self,
@@ -587,26 +546,17 @@ impl PyCashFlowSchedule {
         market: &Bound<'_, PyAny>,
         disc_curve_id: &str,
         base: &Bound<'_, PyAny>,
-        day_count: Option<PyRef<'_, PyDayCount>>,
         credit_curve_id: Option<&str>,
     ) -> PyResult<PyPeriodAggregation> {
         let periods: Vec<finstack_quant_core::dates::Period> =
             periods.iter().map(|p| p.inner.clone()).collect();
         let market = crate::bindings::extract::extract_market(py, market)?;
         let base = py_to_date(base)?;
-        let day_count = day_count.map(|d| d.inner);
         let disc_id = CurveId::from(disc_curve_id);
         let hazard_id = credit_curve_id.map(CurveId::from);
         let schedule = self.inner.clone();
         py.detach(move || {
-            schedule.pv_by_period(
-                &periods,
-                &market,
-                &disc_id,
-                hazard_id.as_ref(),
-                base,
-                day_count,
-            )
+            schedule.pv_by_period(&periods, &market, &disc_id, hazard_id.as_ref(), base)
         })
         .map(PyPeriodAggregation::from_inner)
         .map_err(core_to_py)
@@ -792,14 +742,14 @@ impl PyCashFlowSchedule {
 /// -------
 /// CashFlowSchedule
 ///     Combined schedule with all rows in canonical order.
-#[pyfunction(name = "merge_cashflow_schedules")]
+#[pyfunction]
 #[pyo3(text_signature = "(schedules, notional, day_count)")]
-pub(crate) fn py_merge_cashflow_schedules(
+pub(crate) fn merge_cashflow_schedules(
     schedules: Vec<PyRef<'_, PyCashFlowSchedule>>,
     notional: PyRef<'_, PyNotional>,
     day_count: PyRef<'_, PyDayCount>,
 ) -> PyCashFlowSchedule {
-    let inner = merge_cashflow_schedules(
+    let inner = rust_merge_cashflow_schedules(
         schedules.iter().map(|s| s.inner.clone()),
         notional.inner.clone(),
         day_count.inner,

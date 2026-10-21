@@ -15,7 +15,7 @@
 //!   CDR by month 120, constant thereafter
 //! - MDR (Monthly Default Rate) follows similar conversion to SMM
 
-use crate::cashflows::helpers::{FACTOR_TOLERANCE, RATE_TOLERANCE};
+use crate::helpers::{FACTOR_TOLERANCE, RATE_TOLERANCE};
 
 // PSA Golden Values
 
@@ -547,7 +547,8 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
         .build()
         .unwrap();
 
-    let pv = schedule.npv(&curve, base).unwrap();
+    let pv =
+        finstack_quant_core::cashflow::npv(&curve, base, &schedule.dated_flows().unwrap()).unwrap();
     assert!(
         (pv.amount() - 200.0).abs() < 1e-10,
         "plain npv should include realized recovery but exclude default write-down markers, got {}",
@@ -634,7 +635,6 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
         &"USD-OIS".into(),
         Some(&"USD-HZD".into()),
         base,
-        Some(DayCount::Act365F),
     );
     assert!(
         err_result.is_err(),
@@ -659,7 +659,6 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
             &"USD-OIS".into(),
             Some(&"USD-HZD".into()),
             base,
-            Some(DayCount::Act365F),
         )
         .unwrap();
 

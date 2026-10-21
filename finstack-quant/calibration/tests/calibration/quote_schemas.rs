@@ -42,7 +42,7 @@ fn cds_quote_id_and_bump_semantics() {
     };
     assert_eq!(q.id().as_str(), "CDS-ACME-5Y");
 
-    let bumped = q.bump_spread_bp(1.0);
+    let bumped = q.bump_spread_bp(1.0).expect("par spread bumps");
     match bumped {
         CdsQuote::CdsParSpread { spread_bp, .. } => {
             assert!(
@@ -65,24 +65,12 @@ fn cds_quote_id_and_bump_semantics() {
         upfront_pct: 0.02,
         recovery_rate: 0.40,
     };
-    let bumped2 = q2.bump_spread_bp(2.0);
-    match bumped2 {
-        CdsQuote::CdsUpfront {
-            coupon_bp,
-            upfront_pct,
-            ..
-        } => {
-            assert!(
-                (coupon_bp - 502.0).abs() < tolerances::TIGHT,
-                "running spread mismatch: expected 502.0, got {coupon_bp}"
-            );
-            assert!(
-                (upfront_pct - 0.02).abs() < tolerances::TIGHT,
-                "upfront pct should be unchanged: expected 0.02, got {upfront_pct}"
-            );
-        }
-        other @ CdsQuote::CdsParSpread { .. } => panic!("expected CdsUpfront, got {:?}", other),
-    }
+    // The upfront coupon is contractual (25/100/500/1000bp): bumping it would
+    // produce a quote validation rejects, so a spread bump is refused.
+    let error = q2
+        .bump_spread_bp(2.0)
+        .expect_err("upfront quotes carry no bumpable spread");
+    assert!(error.to_string().contains("upfront"), "{error}");
 }
 
 #[test]

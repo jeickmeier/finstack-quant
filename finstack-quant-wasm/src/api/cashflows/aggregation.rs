@@ -5,7 +5,9 @@ use crate::utils::input::{js_f64_seq, js_string_seq};
 use crate::utils::wire::js_wire;
 use crate::utils::{parse_iso_dates, to_js_err, to_js_value};
 use finstack_quant_cashflows::aggregation::{
-    aggregate_by_period, aggregate_cashflows_checked, calendar_year_ladder,
+    aggregate_by_period as rust_aggregate_by_period,
+    aggregate_cashflows_checked as rust_aggregate_cashflows_checked,
+    calendar_year_ladder as rust_calendar_year_ladder,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Period;
@@ -18,10 +20,10 @@ use wasm_bindgen::prelude::*;
 /// @returns `PeriodAggregation`: `{ periodId: { currency: Money } }`, with only periods that received a flow.
 /// @throws If an argument does not match its wire type, the periods are unsorted, overlapping or repeat an id, or a period total is non-finite or out of range (kind `validation`).
 #[wasm_bindgen(js_name = aggregateByPeriod)]
-pub fn aggregate_by_period_js(flows: JsValue, periods: JsValue) -> Result<JsValue, JsValue> {
+pub fn aggregate_by_period(flows: JsValue, periods: JsValue) -> Result<JsValue, JsValue> {
     let flows = dated_flows_arg(&flows, "flows")?;
     let periods = js_wire::<Vec<Period>>(&periods, "periods")?;
-    to_js_value(&aggregate_by_period(&flows, &periods).map_err(to_js_err)?)
+    to_js_value(&rust_aggregate_by_period(&flows, &periods).map_err(to_js_err)?)
 }
 
 /// Sum dated amounts that must all be in one currency.
@@ -31,10 +33,10 @@ pub fn aggregate_by_period_js(flows: JsValue, periods: JsValue) -> Result<JsValu
 /// @returns `Money` wire object: the compensated sum in `target`.
 /// @throws If a flow is in another currency or the sum cannot be represented (kind `validation`), or an argument does not match its wire type.
 #[wasm_bindgen(js_name = aggregateCashflowsChecked)]
-pub fn aggregate_cashflows_checked_js(flows: JsValue, target: JsValue) -> Result<JsValue, JsValue> {
+pub fn aggregate_cashflows_checked(flows: JsValue, target: JsValue) -> Result<JsValue, JsValue> {
     let flows = dated_flows_arg(&flows, "flows")?;
     let target = js_wire::<Currency>(&target, "target")?;
-    to_js_value(&aggregate_cashflows_checked(&flows, target).map_err(to_js_err)?)
+    to_js_value(&rust_aggregate_cashflows_checked(&flows, target).map_err(to_js_err)?)
 }
 
 /// Group dated cashflows into a calendar-year non-principal / principal / PV ladder.
@@ -48,7 +50,7 @@ pub fn aggregate_cashflows_checked_js(flows: JsValue, target: JsValue) -> Result
 /// @returns `{ year, non_principal, principal, pv }` rows in ascending year order.
 /// @throws If the arrays differ in length, a kind label is unknown, or an amount or PV is non-finite (kind `validation`), or an array has the wrong element type (kind `invalid_type`).
 #[wasm_bindgen(js_name = calendarYearLadder)]
-pub fn calendar_year_ladder_js(
+pub fn calendar_year_ladder(
     dates: JsValue,
     kinds: JsValue,
     amounts: JsValue,
@@ -58,7 +60,7 @@ pub fn calendar_year_ladder_js(
     let kinds = js_string_seq(&kinds, "kinds")?;
     let kind_refs: Vec<&str> = kinds.iter().map(String::as_str).collect();
     to_js_value(
-        &calendar_year_ladder(
+        &rust_calendar_year_ladder(
             &dates,
             &kind_refs,
             &js_f64_seq(&amounts, "amounts")?,

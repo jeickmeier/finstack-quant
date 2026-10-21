@@ -13,7 +13,7 @@
 //! # Quick Start
 //!
 //! ```no_run
-//! use finstack_quant_scenarios::horizon::HorizonAnalysis;
+//! use finstack_quant_scenarios::HorizonAnalysis;
 //! use finstack_quant_scenarios::{OperationSpec, ScenarioSpec, TimeRollMode};
 //! use finstack_quant_core::market_data::context::MarketContext;
 //! use finstack_quant_valuations::instruments::Instrument;
@@ -75,18 +75,6 @@ use finstack_quant_valuations::recalibration::RecalibrationProvider;
 
 use crate::engine::ApplicationReport;
 use crate::{ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec};
-
-fn horizon_unsupported_instrument_operation(scenario: &ScenarioSpec) -> Option<&'static str> {
-    scenario.operations.iter().find_map(|op| match op {
-        OperationSpec::InstrumentPricePctByType { .. } => Some("InstrumentPricePctByType"),
-        OperationSpec::InstrumentPricePctByAttr { .. } => Some("InstrumentPricePctByAttr"),
-        OperationSpec::InstrumentSpreadBpByType { .. } => Some("InstrumentSpreadBpByType"),
-        OperationSpec::InstrumentSpreadBpByAttr { .. } => Some("InstrumentSpreadBpByAttr"),
-        OperationSpec::AssetCorrelationPts { .. } => Some("AssetCorrelationPts"),
-        OperationSpec::PrepayDefaultCorrelationPts { .. } => Some("PrepayDefaultCorrelationPts"),
-        _ => None,
-    })
-}
 
 /// Horizon total return analyzer.
 ///
@@ -266,11 +254,16 @@ impl HorizonAnalysis {
         as_of_t0: Date,
         scenario: &ScenarioSpec,
     ) -> crate::Result<HorizonResult> {
-        if let Some(op_name) = horizon_unsupported_instrument_operation(scenario) {
+        if let Some(op) = scenario
+            .operations
+            .iter()
+            .find(|op| op.mutates_instruments())
+        {
             return Err(crate::Error::Validation(format!(
-                "{op_name} is not supported by HorizonAnalysis because attribution uses one \
+                "{} is not supported by HorizonAnalysis because attribution uses one \
                  instrument instance for both t0 and t1 pricing. Apply instrument-scoped \
-                 shocks before calling horizon analysis or use a market-only horizon scenario."
+                 shocks before calling horizon analysis or use a market-only horizon scenario.",
+                op.kind()
             )));
         }
 
@@ -792,7 +785,7 @@ mod tests {
             .expect_err("instrument-scoped horizon shocks should fail loudly");
 
         assert!(
-            err.to_string().contains("InstrumentPricePctByType")
+            err.to_string().contains("instrument_price_pct_by_type")
                 && err.to_string().contains("not supported by HorizonAnalysis"),
             "unexpected error: {err}"
         );
