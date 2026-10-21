@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Statements: scenario forecast overrides, rollups, capital-structure scenarios
+
+#### Added
+
+- `ScenarioDefinition.forecast_overrides` replaces a node's whole `ForecastSpec` in a scenario: the method and every parameter (growth rates, curves, seeds, volatilities, external series, bounds). Child scenarios replace a parent's spec for the same node, and explicit values still win (`Value > Forecast > Formula`). Python `ScenarioSet` accepts a `ForecastSpec` as an override value.
+- `StatementResult::rollup(&model, &RollupSpec)` rolls results up to a coarser frequency (monthly into quarterly, semi-annual or annual; quarterly into semi-annual or annual; semi-annual into annual; fiscal periods keep their `FY` labels). Nodes sum by default; `period_end` nodes take the last source value and `formula` nodes re-evaluate their formula on the rolled-up values. Every target period must be complete. Python `StatementResult.rollup` / `RollupSpec`; WASM `statements.statementResultRollup`.
+- `ScenarioSet::evaluate_all_with_market(&model, &market, as_of)` evaluates every scenario like `Evaluator::evaluate_with_market`. Python `evaluate_scenario_set_with_market`; WASM `statements_analytics.evaluateScenarioSetWithMarket`.
+
+#### Changed
+
+- `Evaluator::evaluate` (and `ScenarioSet::evaluate_all`, Python `evaluate_scenario_set`, WASM `evaluateScenarioSet`) evaluates a model's capital structure from an empty market as of the first period's start, so fixed-rate debt yields `cs_cashflows` and `cs.*` values. Instruments that need market data (floating coupons, swaps, caps, swaptions) now fail with a missing-data error naming the instrument (Python `KeyError`) instead of being skipped silently; evaluate those with `evaluate_with_market`. `evaluate_prepared` still skips the capital structure.
+- Formula checks report a period whose same-period input is missing or non-finite, or whose formula consumes a non-finite value (a `lag` before the first period), as a `warning` "insufficient data" finding that does not fail the check. Such periods previously failed with the configured severity, or aborted the suite when a value was missing. A division by zero over finite inputs still fails.
+
 ### Valuations: verified pricing and risk fixes
 
 #### Fixed

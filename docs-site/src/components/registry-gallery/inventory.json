@@ -273,7 +273,7 @@
     {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. The schema editor and JSON import are in Advanced. Host owns data ingestion and persistence. Requires FinstackQueryProvider."
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. Host owns data ingestion and persistence. Requires FinstackQueryProvider."
     }
   ],
   "nonvisual": [
@@ -733,7 +733,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "7fcd2bfa0fc95b32a01c2fc3c0e9b13a1f3672170e9b6faf552301a302ba736c"
+      "sha256": "273bb22907d93f44c284c898a2a701352e11d59f12f331800df25d136e4e5605"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",

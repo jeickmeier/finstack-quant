@@ -209,3 +209,107 @@ it("evaluates the complete analyst example, returned ratios, checks and supplied
     expect(evaluated).toEqual(new native.Evaluator().evaluate(updated));
   }
 });
+
+it("routes scenario sets, rollups and data-gap checks to WASM", async () => {
+  const canonical = unwrap(
+    await harness.proxy.validateStatementModel(analystFixture),
+  );
+  const scenarioSetJson = JSON.stringify({
+    scenarios: {
+      base: {},
+      downside: {
+        parent: "base",
+        forecast_overrides: {
+          revenue: { method: "growth_pct", params: { rate: -0.05 } },
+        },
+      },
+    },
+  });
+  const scenarios = unwrap(
+    await harness.proxy.evaluateStatementScenarios({
+      modelJson: canonical,
+      scenarioSetJson,
+    }),
+  );
+  expect(scenarios).toEqual(
+    native.evaluateScenarioSet(canonical, scenarioSetJson),
+  );
+  expect(scenarios.downside.nodes.revenue["2025Q4"]).not.toBe(
+    scenarios.base.nodes.revenue["2025Q4"],
+  );
+  const asOf = "2025-07-01";
+  expect(
+    unwrap(
+      await harness.proxy.evaluateStatementScenarios({
+        modelJson: canonical,
+        scenarioSetJson,
+        marketJson: market,
+        asOf,
+      }),
+    ),
+  ).toEqual(
+    native.evaluateScenarioSetWithMarket(
+      canonical,
+      scenarioSetJson,
+      market,
+      asOf,
+    ),
+  );
+  const incomplete = await harness.proxy.evaluateStatementScenarios({
+    modelJson: canonical,
+    scenarioSetJson,
+    asOf,
+  });
+  expect(incomplete.ok).toBe(false);
+
+  const resultsJson = JSON.stringify(
+    new native.Evaluator().evaluate(canonical),
+  );
+  const specJson = JSON.stringify({
+    frequency: "annual",
+    methods: { debt_closing: "period_end", leverage: "formula" },
+  });
+  const annual = unwrap(
+    await harness.proxy.rollupStatement({
+      modelJson: canonical,
+      resultsJson,
+      specJson,
+    }),
+  );
+  expect(annual).toEqual(
+    native.statementResultRollup(resultsJson, canonical, specJson),
+  );
+  expect(Object.keys(annual.nodes.revenue)).toEqual(["2024", "2025"]);
+
+  const report = unwrap(
+    await harness.proxy.runStatementChecks({
+      modelJson: canonical,
+      resultsJson,
+      kind: "suite",
+      configJson: JSON.stringify({
+        name: "growth",
+        builtin_checks: [],
+        formula_checks: [
+          {
+            id: "yoy",
+            name: "Revenue up year on year",
+            category: "internal_consistency",
+            severity: "error",
+            formula: "revenue > lag(revenue, 4)",
+            message_template: "Revenue fell year on year in {period}",
+          },
+        ],
+      }),
+    }),
+  );
+  const gaps = report.results[0].findings.filter((finding) =>
+    finding.message.includes("insufficient data"),
+  );
+  expect(gaps.map((finding) => finding.period)).toEqual([
+    "2024Q1",
+    "2024Q2",
+    "2024Q3",
+    "2024Q4",
+  ]);
+  expect(gaps.every((finding) => finding.severity === "warning")).toBe(true);
+});

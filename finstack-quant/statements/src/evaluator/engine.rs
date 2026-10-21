@@ -101,6 +101,43 @@ fn formula_fingerprint(model: &FinancialModelSpec) -> u64 {
     hasher.finish()
 }
 
+/// Principal outstanding before the first period: the debt balance, or zero
+/// for a hedge, whose notional sizes coupons but is not borrowing principal.
+fn instrument_opening_balance(
+    instrument: &dyn finstack_quant_valuations::instruments::Instrument,
+    market_ctx: &finstack_quant_core::market_data::context::MarketContext,
+    as_of: finstack_quant_core::dates::Date,
+    period_start: finstack_quant_core::dates::Date,
+) -> Result<finstack_quant_core::money::Money> {
+    if crate::capital_structure::period_flows::is_debt_kind(instrument.key())? {
+        capital_structure_runtime::resolve_opening_balance(
+            instrument,
+            market_ctx,
+            as_of,
+            period_start,
+        )
+    } else {
+        let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
+        Ok(finstack_quant_core::money::Money::from((
+            0_i64,
+            schedule.get_notional().initial.currency(),
+        )))
+    }
+}
+
+/// Name the instrument and the remedy when its cashflows need market data the
+/// evaluation was not given. Other errors pass through unchanged.
+fn missing_market_data(instrument_id: &str, err: Error) -> Error {
+    if err.kind() == finstack_quant_core::ErrorKind::NotFound {
+        Error::missing_data(format!(
+            "capital-structure instrument '{instrument_id}' needs market data to generate its \
+             cashflows ({err}); supply it through Evaluator::evaluate_with_market"
+        ))
+    } else {
+        err
+    }
+}
+
 /// Evaluator for financial models.
 ///
 /// The evaluator compiles formulas, resolves dependencies, and evaluates
@@ -168,9 +205,10 @@ impl Evaluator {
 
     /// Evaluate a financial model over all periods with required market context.
     ///
-    /// Use this method when the model contains capital-structure `cs.*` references
-    /// and you need instrument pricing. For models without capital structure, call
-    /// [`Evaluator::evaluate`] instead.
+    /// Use this method when capital-structure instruments need market data
+    /// (floating coupons, swaps, caps, swaptions) or when explicit values must
+    /// be cut off at an as-of date. [`Evaluator::evaluate`] also evaluates the
+    /// capital structure, but from an empty market with every value visible.
     ///
     /// # As-of visibility
     ///
@@ -212,7 +250,7 @@ impl Evaluator {
         market_ctx: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> Result<StatementResult> {
-        self.evaluate_inner(model, Some(market_ctx), Some(as_of))
+        self.evaluate_inner(model, Some((market_ctx, as_of)), Some(as_of))
             .inspect_err(|err| {
                 tracing::error!(
                     model_id = %model.id,
@@ -228,26 +266,36 @@ impl Evaluator {
 
     /// Internal evaluation implementation shared by [`Evaluator::evaluate`] and
     /// [`Evaluator::evaluate_with_market`].
+    ///
+    /// `capital_structure` is the market and cashflow date the model's
+    /// instruments are generated from (`None` skips the capital structure).
+    /// `visibility_cutoff` independently hides explicit actuals that were not
+    /// yet available.
     fn evaluate_inner(
         &mut self,
         model: &FinancialModelSpec,
-        market_ctx: Option<&finstack_quant_core::market_data::context::MarketContext>,
-        as_of: Option<finstack_quant_core::dates::Date>,
+        capital_structure: Option<(
+            &finstack_quant_core::market_data::context::MarketContext,
+            finstack_quant_core::dates::Date,
+        )>,
+        visibility_cutoff: Option<finstack_quant_core::dates::Date>,
     ) -> Result<StatementResult> {
+        let market_ctx = capital_structure.map(|(market, _)| market);
+        let as_of = capital_structure.map(|(_, as_of)| as_of);
         let _span = tracing::info_span!(
             "statements.evaluate",
             model_id = model.id.as_str(),
             periods = model.periods.len(),
             nodes = model.nodes.len(),
             has_market = market_ctx.is_some(),
-            has_as_of = as_of.is_some()
+            has_as_of = visibility_cutoff.is_some()
         )
         .entered();
         #[cfg(not(target_arch = "wasm32"))]
         let start = Instant::now();
 
         let prepared = self.init_eval_plan(model)?;
-        self.visibility_cutoff = as_of;
+        self.visibility_cutoff = visibility_cutoff;
 
         let mut cs_seed_nodes = HashSet::new();
         for (node_id, spec) in &model.nodes {
@@ -291,22 +339,13 @@ impl Evaluator {
             model.periods.first(),
         ) {
             for (instrument_id, instrument) in insts {
-                let opening_balance =
-                    if crate::capital_structure::period_flows::is_debt_kind(instrument.key())? {
-                        capital_structure_runtime::resolve_opening_balance(
-                            instrument.as_ref(),
-                            market_ctx,
-                            as_of_date,
-                            first_period.start,
-                        )?
-                    } else {
-                        // Hedge notional sizes contractual coupons; it is not borrowing principal.
-                        let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of_date)?;
-                        finstack_quant_core::money::Money::from((
-                            0_i64,
-                            schedule.get_notional().initial.currency(),
-                        ))
-                    };
+                let opening_balance = instrument_opening_balance(
+                    instrument.as_ref(),
+                    market_ctx,
+                    as_of_date,
+                    first_period.start,
+                )
+                .map_err(|err| missing_market_data(instrument_id, err))?;
 
                 state
                     .opening_balances
@@ -414,35 +453,50 @@ impl Evaluator {
 
     /// Evaluate a financial model over all periods without market context.
     ///
-    /// Use this for models that do not reference capital structure (`cs.*`).
-    /// For capital-structure aware evaluation, use
-    /// [`Evaluator::evaluate_with_market`] and provide market data.
+    /// Every explicit value is visible: there is no as-of cutoff.
+    ///
+    /// A model with a capital structure is evaluated with it. Its instruments
+    /// generate their contractual cashflows from an empty market as of the
+    /// first period's start, so fixed-rate debt needs no market data and the
+    /// result carries `cs_cashflows` exactly as
+    /// [`Evaluator::evaluate_with_market`] would give with an empty market on
+    /// that date. Instruments whose cashflows depend on market data (floating
+    /// coupons, swaps, caps, swaptions) need
+    /// [`Evaluator::evaluate_with_market`].
     ///
     /// # Arguments
     ///
     /// * `model` - The financial model specification
     /// # Returns
     ///
-    /// Returns `StatementResult` containing the evaluated values for all nodes and periods.
-    /// Capital-structure references require [`Evaluator::evaluate_with_market`]
-    /// instead; this method has no market context from which to price them.
+    /// Returns `StatementResult` containing the evaluated values for all nodes
+    /// and periods, with capital-structure cashflows when the model defines a
+    /// capital structure.
     ///
     /// # Errors
     ///
     /// Returns an error if formulas cannot be parsed or compiled, the model's
     /// dependency graph is invalid or cyclic, a required input/forecast cannot
-    /// be resolved, a `cs.*` reference is evaluated without market-backed
-    /// cashflows, or final model checks fail.
+    /// be resolved, a capital-structure instrument needs market data to
+    /// generate its cashflows (a missing-data error naming the instrument) or
+    /// otherwise fails, or final model checks fail.
     pub fn evaluate(&mut self, model: &FinancialModelSpec) -> Result<StatementResult> {
-        self.evaluate_inner(model, None, None).inspect_err(|err| {
-            tracing::error!(
-                model_id = %model.id,
-                periods = model.periods.len(),
-                nodes = model.nodes.len(),
-                error = %err,
-                "statement evaluation failed"
-            );
-        })
+        let empty_market = finstack_quant_core::market_data::context::MarketContext::new();
+        let capital_structure = model
+            .capital_structure
+            .as_ref()
+            .zip(model.periods.first())
+            .map(|(_, first)| (&empty_market, first.start));
+        self.evaluate_inner(model, capital_structure, None)
+            .inspect_err(|err| {
+                tracing::error!(
+                    model_id = %model.id,
+                    periods = model.periods.len(),
+                    nodes = model.nodes.len(),
+                    error = %err,
+                    "statement evaluation failed"
+                );
+            })
     }
 
     /// Prepare the evaluator for repeated evaluations of the same model structure.
@@ -474,9 +528,10 @@ impl Evaluator {
     /// passed to [`prepare`](Self::prepare); only node *values* may differ. This
     /// avoids formula recompilation, DAG construction, and cycle detection on every
     /// call — typically saving 30-50 % of total evaluation time. Prepared
-    /// evaluation has no as-of visibility cutoff and does not initialize
-    /// capital-structure market state; use [`evaluate_with_market`](Self::evaluate_with_market)
-    /// for market-aware valuation.
+    /// evaluation has no as-of visibility cutoff and does not evaluate the
+    /// capital structure; use [`evaluate`](Self::evaluate) or
+    /// [`evaluate_with_market`](Self::evaluate_with_market) when `cs.*`
+    /// values are needed.
     ///
     /// # Errors
     ///

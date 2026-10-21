@@ -1329,6 +1329,14 @@ export interface CheckSuiteSpec {
  *
  * Full suite definitions (built-in + formula) can be stored as a single JSON
  * document and resolved directly with [`CheckSuiteSpec::resolve`].
+ *
+ * Each period ends in one of three verdicts: pass, fail (a finding with the
+ * configured `severity`), or insufficient data. A period has insufficient
+ * data when a same-period input is missing or non-finite, or when the
+ * formula consumes a non-finite value, such as a lag or rolling window that
+ * reaches before the first period. It is reported as a `warning` finding
+ * naming the inputs, records no comparison, and never fails the check. A
+ * division by zero over finite inputs is not missing data and still fails.
  */
 export interface FormulaCheckSpec {
   /**
@@ -3970,7 +3978,8 @@ export interface RelativeValueResult {
  * Definition for a single named scenario.
  *
  * Scenarios are attached to a base [`FinancialModelSpec`] and specify an
- * optional parent plus typed scalar or monetary overrides for named nodes.
+ * optional parent plus typed scalar or monetary value overrides and forecast
+ * specification overrides for named nodes.
  *
  * The JSON representation mirrors the design docs example:
  *
@@ -3982,6 +3991,24 @@ export interface RelativeValueResult {
  * ```
  */
 export interface ScenarioDefinition {
+  /**
+   * Forecast overrides for model nodes, keyed by `node_id`.
+   *
+   * Each entry replaces the node's whole [`ForecastSpec`] in this scenario:
+   * the method and every parameter it reads (growth rates, `curve`
+   * paths, `seed`, `std_dev` and other stochastic parameters, external
+   * `series`, `min` / `max` bounds). A node without a forecast gains one.
+   * Across a parent chain the child's spec replaces the parent's for the
+   * same node. Parameters are validated when the scenario is evaluated.
+   *
+   * The forecast fills forecast periods only, and explicit values still
+   * win (`Value > Forecast > Formula`): a value override, a per-period
+   * override or a model value in a forecast period hides the forecast in
+   * that period.
+   */
+  forecast_overrides?: {
+    [k: string]: ForecastSpec;
+  };
   /**
    * Typed overrides for model nodes.
    *

@@ -248,6 +248,16 @@ fn monte_carlo_results_examples() -> finstack_quant_core::Result<Vec<Value>> {
     )
 }
 
+/// Quarterly results rolled up to annual: cash is a balance, margin a ratio.
+fn rollup_spec_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<crate::evaluator::RollupSpec>(
+        serde_json::json!({
+            "frequency": "annual",
+            "methods": {"cash": "period_end", "ebitda_margin": "formula"}
+        }),
+    )
+}
+
 /// One quarter of EBITDA with a single restructuring add-back.
 fn normalization_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
     finstack_quant_core::schema::example_from_json::<crate::adjustments::types::NormalizationResult>(
@@ -342,4 +352,12 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "Per-period normalization outcome: base value, applied adjustments and final value."
     )
     .with_examples(normalization_result_examples),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::evaluator::RollupSpec>(
+        "schemas/statements/1/rollup_spec.schema.json",
+        "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
+        "RollupSpec",
+        "Target frequency and per-node methods for rolling statement results up to coarser periods.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
+    .with_examples(rollup_spec_examples),
 ];

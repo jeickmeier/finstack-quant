@@ -28,6 +28,7 @@ run_sensitivity = _sa.run_sensitivity
 generate_tornado_entries = _sa.generate_tornado_entries
 run_variance = _sa.run_variance
 evaluate_scenario_set = _sa.evaluate_scenario_set
+evaluate_scenario_set_with_market = _sa.evaluate_scenario_set_with_market
 scenario_diff = _sa.scenario_diff
 variance_bridge = _sa.variance_bridge
 backtest_forecast = _sa.backtest_forecast
@@ -220,6 +221,7 @@ __all__: list[str] = [
     "evaluate_dcf",
     "evaluate_lbo",
     "evaluate_scenario_set",
+    "evaluate_scenario_set_with_market",
     "explain_formula",
     "explain_formula_text",
     "generate_tornado_entries",
