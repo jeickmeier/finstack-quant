@@ -358,7 +358,7 @@ fn evaluate_scenario_set_with_market(
     let model = extract_model_ref(model)?;
     let market = crate::bindings::extract::extract_market_ref(py, market)?;
     let scenario_set = extract_scenario_set(scenario_set)?;
-    let model_inner: &finstack_quant_statements::FinancialModelSpec = &model;
+    let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
     let market_inner: &finstack_quant_core::market_data::context::MarketContext = &market;
     let inner = py
         .detach(|| scenario_set.evaluate_all_with_market(model_inner, market_inner, as_of))
@@ -877,7 +877,7 @@ fn goal_seek(
     skip_from_py_object
 )]
 struct PyDependencyTracer {
-    model: finstack_quant_statements::FinancialModelSpec,
+    model: finstack_quant_statements::types::FinancialModelSpec,
     graph: finstack_quant_statements::evaluator::DependencyGraph,
 }
 

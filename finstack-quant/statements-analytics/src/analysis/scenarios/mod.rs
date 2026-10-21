@@ -6,7 +6,7 @@
 //! - [`variance`] — baseline vs comparison variance and bridge decomposition
 //!
 //! This module is intentionally statement-local. [`ScenarioSet`] evaluates named
-//! scalar overrides against a [`finstack_quant_statements::FinancialModelSpec`] and
+//! scalar overrides against a [`finstack_quant_statements::types::FinancialModelSpec`] and
 //! compares the resulting statement outputs. Cross-domain market, instrument,
 //! rate-binding, and time-roll shocks belong to `finstack-quant-scenarios`
 //! (`ScenarioSpec` + `ExecutionContext`), not this module.

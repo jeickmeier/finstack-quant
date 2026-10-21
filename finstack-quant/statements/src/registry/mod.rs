@@ -12,7 +12,8 @@
 //! In formulas, reference them using the qualified form:
 //!
 //! ```no_run
-//! use finstack_quant_statements::prelude::*;
+//! use finstack_quant_statements::builder::ModelBuilder;
+//! use finstack_quant_statements::registry::Registry;
 //!
 //! # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 //! # let mut model: ModelBuilder = unimplemented!("build a ModelBuilder");
@@ -49,7 +50,9 @@
 //! # Example: Safe Custom Metric Definition
 //!
 //! ```no_run
-//! use finstack_quant_statements::prelude::*;
+//! use finstack_quant_core::dates::PeriodId;
+//! use finstack_quant_statements::builder::ModelBuilder;
+//! use finstack_quant_statements::types::AmountOrScalar;
 //!
 //! # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 //! # let mut model: ModelBuilder = unimplemented!("build a ModelBuilder");

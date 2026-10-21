@@ -33,7 +33,12 @@
 //! ## Example
 //! ```
 //! use finstack_quant_core::market_data::{context::MarketContext, term_structures::DiscountCurve};
-//! use finstack_quant_statements::prelude::*;
+//! use finstack_quant_core::currency::Currency;
+//! use finstack_quant_core::dates::PeriodId;
+//! use finstack_quant_core::money::Money;
+//! use finstack_quant_statements::builder::ModelBuilder;
+//! use finstack_quant_statements::evaluator::Evaluator;
+//! use finstack_quant_statements::types::AmountOrScalar;
 //!
 //! use time::macros::date;
 //!

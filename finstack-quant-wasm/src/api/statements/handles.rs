@@ -5,7 +5,7 @@ use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::checks::CheckSuiteSpec;
 use finstack_quant_statements::evaluator::{Evaluator, MonteCarloConfig};
 use finstack_quant_statements::registry::Registry;
-use finstack_quant_statements::FinancialModelSpec;
+use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
 
 /// Evaluator for financial statement models.

@@ -42,7 +42,7 @@ fn test_model_json() -> String {
 
 fn evaluated_results_json() -> String {
     let model_json = test_model_json();
-    let model: finstack_quant_statements::FinancialModelSpec =
+    let model: finstack_quant_statements::types::FinancialModelSpec =
         serde_json::from_str(&model_json).unwrap();
     let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -266,7 +266,7 @@ fn monetary_goal_seek_returns_a_valid_updated_model() {
 
 fn evaluated_results() -> (String, String) {
     let model_json = test_model_json();
-    let model: finstack_quant_statements::FinancialModelSpec =
+    let model: finstack_quant_statements::types::FinancialModelSpec =
         serde_json::from_str(&model_json).expect("parse");
     let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
     let results = evaluator.evaluate(&model).expect("evaluate");

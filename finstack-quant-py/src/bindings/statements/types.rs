@@ -949,11 +949,11 @@ impl PyNodeSpec {
 )]
 #[derive(Clone)]
 pub struct PyFinancialModelSpec {
-    pub(crate) inner: finstack_quant_statements::FinancialModelSpec,
+    pub(crate) inner: finstack_quant_statements::types::FinancialModelSpec,
 }
 
 impl PyFinancialModelSpec {
-    pub(crate) fn from_inner(inner: finstack_quant_statements::FinancialModelSpec) -> Self {
+    pub(crate) fn from_inner(inner: finstack_quant_statements::types::FinancialModelSpec) -> Self {
         Self { inner }
     }
 }
@@ -981,7 +981,7 @@ impl PyFinancialModelSpec {
     #[staticmethod]
     #[pyo3(text_signature = "(json, /)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner = finstack_quant_statements::FinancialModelSpec::from_json(json)
+        let inner = finstack_quant_statements::types::FinancialModelSpec::from_json(json)
             .map_err(statements_to_py)?;
         Ok(Self { inner })
     }

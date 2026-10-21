@@ -4,7 +4,7 @@
 //! predicted values against actual outcomes using standard error metrics.
 
 use finstack_quant_core::math::ZERO_TOLERANCE;
-use finstack_quant_statements::error::{Error, Result};
+use finstack_quant_statements::{Error, Result};
 
 /// Forecast accuracy metrics.
 ///

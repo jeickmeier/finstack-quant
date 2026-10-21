@@ -18,11 +18,15 @@
 //! Run with `cargo bench -p finstack-quant-statements --bench statements_scale`.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use finstack_quant_core::dates::PeriodId;
+use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, FormulaCheckSpec, Severity,
 };
 use finstack_quant_statements::evaluator::{Evaluator, MonteCarloConfig};
-use finstack_quant_statements::prelude::*;
+use finstack_quant_statements::types::{
+    AmountOrScalar, FinancialModelSpec, ForecastMethod, ForecastSpec,
+};
 use indexmap::IndexMap;
 use std::hint::black_box;
 

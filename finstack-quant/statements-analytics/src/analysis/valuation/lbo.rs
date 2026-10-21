@@ -44,9 +44,9 @@ use crate::analysis::valuation::corporate::extract_currency_from_model;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::checks::CheckReport;
-use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::FinancialModelSpec;
+use finstack_quant_statements::{Error, Result};
 
 /// Relative tolerance for the sources-and-uses reconciliation.
 ///

@@ -13,7 +13,13 @@
 //! characteristics and regression over time.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use finstack_quant_statements::prelude::*;
+use finstack_quant_core::dates::PeriodId;
+use finstack_quant_statements::builder::ModelBuilder;
+use finstack_quant_statements::evaluator::Evaluator;
+use finstack_quant_statements::registry::Registry;
+use finstack_quant_statements::types::{
+    AmountOrScalar, FinancialModelSpec, ForecastMethod, ForecastSpec,
+};
 use indexmap::IndexMap;
 use std::hint::black_box;
 

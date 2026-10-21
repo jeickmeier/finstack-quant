@@ -7,8 +7,8 @@ use finstack_quant_core::dates::{BusinessDayConvention, HolidayCalendar, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_statements::evaluator::Evaluator;
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{AmountOrScalar, NodeValueType};
-use finstack_quant_statements::FinancialModelSpec;
 
 fn with_node_values_mut<F>(model: &mut FinancialModelSpec, node_id: &str, mut f: F) -> Result<bool>
 where

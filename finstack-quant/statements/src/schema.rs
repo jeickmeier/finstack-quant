@@ -8,7 +8,7 @@ use crate::adjustments::{NormalizationConfig, NormalizationResult};
 use crate::checks::CheckSuiteSpec;
 use crate::evaluator::{MonteCarloConfig, MonteCarloResults, RollupSpec, StatementResult};
 use crate::registry::MetricRegistry;
-use crate::FinancialModelSpec;
+use crate::types::FinancialModelSpec;
 use crate::{Error, Result};
 
 /// Stable base URI for statements-owned schemas.
@@ -28,7 +28,7 @@ fn parse_schema(
         .map_err(|error| Error::Serde(error.clone()))
 }
 
-/// Return the checked-in schema for [`crate::FinancialModelSpec`].
+/// Return the checked-in schema for [`crate::types::FinancialModelSpec`].
 ///
 /// # Errors
 ///
@@ -108,7 +108,7 @@ fn financial_model_examples() -> finstack_quant_core::Result<Vec<Value>> {
             (2024, time::Month::July, 1),
         )?,
     ];
-    let model = crate::FinancialModelSpec::new("example_model", periods);
+    let model = crate::types::FinancialModelSpec::new("example_model", periods);
 
     let value = serde_json::to_value(&model).map_err(|error| {
         finstack_quant_core::Error::Internal(format!("serialize financial model example: {error}"))

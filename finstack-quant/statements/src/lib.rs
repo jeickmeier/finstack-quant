@@ -36,7 +36,10 @@
 //! ## Quick Start
 //!
 //! ```rust
-//! use finstack_quant_statements::prelude::*;
+//! use finstack_quant_core::dates::PeriodId;
+//! use finstack_quant_statements::Result;
+//! use finstack_quant_statements::builder::ModelBuilder;
+//! use finstack_quant_statements::types::AmountOrScalar;
 //!
 //! # fn main() -> Result<()> {
 //! // Build a simple P&L model
@@ -86,13 +89,11 @@ pub mod checks;
 /// Formula DSL parsing and compilation.
 pub mod dsl;
 /// Error types for statement modeling.
-pub mod error;
+mod error;
 /// Evaluation engine for metric graphs.
 pub mod evaluator;
 /// Forecast methods and time-series drivers.
 pub(crate) mod forecast;
-/// Convenient re-exports for common statement types.
-pub mod prelude;
 /// Metric registry and namespace management.
 pub mod registry;
 /// Checked-in JSON Schemas for persisted statement contracts.
@@ -104,7 +105,6 @@ pub mod types;
 pub(crate) mod utils;
 
 pub use error::{Error, Result};
-pub use types::FinancialModelSpec;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

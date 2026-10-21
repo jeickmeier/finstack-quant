@@ -16,10 +16,10 @@ use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
 use finstack_quant_statements::capital_structure::{
     BondConventionParams, SwapConventions, SwapParams, WaterfallSpec,
 };
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{
     AmountOrScalar, FinancialStatementInstrument, ForecastSpec, NodeSpec,
 };
-use finstack_quant_statements::FinancialModelSpec;
 use indexmap::IndexMap;
 use wasm_bindgen::prelude::*;
 

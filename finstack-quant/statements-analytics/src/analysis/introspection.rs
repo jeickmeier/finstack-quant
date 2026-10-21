@@ -2,9 +2,9 @@
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::dsl::{BinOp, StmtExpr};
-use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::{CellSource, DependencyGraph, StatementResult};
 use finstack_quant_statements::types::{FinancialModelSpec, ForecastSpec, NodeType};
+use finstack_quant_statements::{Error, Result};
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 

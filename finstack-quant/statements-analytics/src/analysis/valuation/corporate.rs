@@ -11,9 +11,9 @@ use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
 use finstack_quant_statements::types::{FinancialModelSpec, NodeValueType};
+use finstack_quant_statements::{Error, Result};
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
     DiscountedCashFlow, EquityBridge, TerminalValueSpec, ValuationDiscounts,
 };
@@ -375,7 +375,7 @@ pub fn evaluate_dcf(
     let results = match (market, as_of) {
         (Some(market), Some(as_of)) => evaluator.evaluate_with_market(model, market, as_of)?,
         (Some(_), None) => {
-            return Err(finstack_quant_statements::error::Error::Eval(
+            return Err(finstack_quant_statements::Error::Eval(
                 "evaluate_dcf requires as_of when a market context is provided; \
                  market is used for statement evaluation, not DCF discounting"
                     .into(),
@@ -772,14 +772,14 @@ pub fn wacc(
         ("tax_rate", tax_rate),
     ] {
         if !value.is_finite() {
-            return Err(finstack_quant_statements::error::Error::Eval(format!(
+            return Err(finstack_quant_statements::Error::Eval(format!(
                 "WACC requires a finite '{name}', got {value}"
             )));
         }
     }
 
     if equity_weight < 0.0 || debt_weight < 0.0 {
-        return Err(finstack_quant_statements::error::Error::Eval(format!(
+        return Err(finstack_quant_statements::Error::Eval(format!(
             "WACC requires non-negative capital weights, got equity_weight={equity_weight:.6} \
              and debt_weight={debt_weight:.6}"
         )));
@@ -787,7 +787,7 @@ pub fn wacc(
 
     let weight_sum = equity_weight + debt_weight;
     if (weight_sum - 1.0).abs() > WACC_WEIGHT_SUM_TOLERANCE {
-        return Err(finstack_quant_statements::error::Error::Eval(format!(
+        return Err(finstack_quant_statements::Error::Eval(format!(
             "WACC requires capital weights summing to 1.0 within {WACC_WEIGHT_SUM_TOLERANCE:e}, \
              got equity_weight={equity_weight:.6} + debt_weight={debt_weight:.6} = \
              {weight_sum:.6}"
@@ -795,7 +795,7 @@ pub fn wacc(
     }
 
     if !(0.0..=1.0).contains(&tax_rate) {
-        return Err(finstack_quant_statements::error::Error::Eval(format!(
+        return Err(finstack_quant_statements::Error::Eval(format!(
             "WACC requires a tax_rate in [0, 1] (decimal form), got {tax_rate:.6}"
         )));
     }
@@ -816,9 +816,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
     let fallback_valuation_date = first_forecast_period
         .or_else(|| model.periods.first())
         .map(|period| period.start)
-        .ok_or_else(|| {
-            finstack_quant_statements::error::Error::Eval("Model has no periods".into())
-        })?;
+        .ok_or_else(|| finstack_quant_statements::Error::Eval("Model has no periods".into()))?;
     let valuation_date = valuation_date.unwrap_or(fallback_valuation_date);
 
     let currency = extract_currency_from_model(model)?;
@@ -829,13 +827,13 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         Some(NodeValueType::Monetary {
             currency: node_currency,
         }) => {
-            return Err(finstack_quant_statements::error::Error::Eval(format!(
+            return Err(finstack_quant_statements::Error::Eval(format!(
                 "UFCF node '{ufcf_node}' uses {node_currency}, but the DCF model currency is \
                  {currency}"
             )));
         }
         _ => {
-            return Err(finstack_quant_statements::error::Error::Eval(format!(
+            return Err(finstack_quant_statements::Error::Eval(format!(
                 "UFCF node '{ufcf_node}' must be monetary in {currency}; scalar statement \
                  nodes cannot be used as DCF cashflows"
             )));
@@ -860,7 +858,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
     }
 
     if flows.is_empty() {
-        return Err(finstack_quant_statements::error::Error::Eval(format!(
+        return Err(finstack_quant_statements::Error::Eval(format!(
             "No UFCF values found for node '{}'",
             ufcf_node
         )));
@@ -877,7 +875,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
     // (negated comparisons) so NaN parameters error instead of silently
     // producing NaN valuations.
     if !context.options.max_stable_growth_rate.is_finite() {
-        return Err(finstack_quant_statements::error::Error::Eval(
+        return Err(finstack_quant_statements::Error::Eval(
             "DcfOptions.max_stable_growth_rate must be finite".into(),
         ));
     }
@@ -887,14 +885,14 @@ pub(crate) fn evaluate_dcf_from_results_impl(
             if stable_growth_rate.partial_cmp(&context.options.max_stable_growth_rate)
                 == Some(Ordering::Greater)
             {
-                return Err(finstack_quant_statements::error::Error::Eval(format!(
+                return Err(finstack_quant_statements::Error::Eval(format!(
                     "Gordon Growth stable_growth_rate ({stable_growth_rate:.4}) exceeds the configured stable-growth \
                      ceiling ({:.4})",
                     context.options.max_stable_growth_rate
                 )));
             }
             if stable_growth_rate.partial_cmp(&wacc) != Some(Ordering::Less) {
-                return Err(finstack_quant_statements::error::Error::Eval(format!(
+                return Err(finstack_quant_statements::Error::Eval(format!(
                     "Gordon Growth terminal value requires stable_growth_rate ({stable_growth_rate:.4}) < \
                      WACC ({wacc:.4}). A growth rate >= WACC produces an infinite terminal value."
                 )));
@@ -908,14 +906,14 @@ pub(crate) fn evaluate_dcf_from_results_impl(
             if stable_growth_rate.partial_cmp(&context.options.max_stable_growth_rate)
                 == Some(Ordering::Greater)
             {
-                return Err(finstack_quant_statements::error::Error::Eval(format!(
+                return Err(finstack_quant_statements::Error::Eval(format!(
                     "H-Model stable growth rate ({stable_growth_rate:.4}) exceeds the configured \
                      stable-growth ceiling ({:.4})",
                     context.options.max_stable_growth_rate
                 )));
             }
             if stable_growth_rate.partial_cmp(&wacc) != Some(Ordering::Less) {
-                return Err(finstack_quant_statements::error::Error::Eval(format!(
+                return Err(finstack_quant_statements::Error::Eval(format!(
                     "H-Model terminal value requires stable_growth_rate ({:.4}) < WACC ({:.4}).",
                     stable_growth_rate, wacc
                 )));
@@ -924,13 +922,13 @@ pub(crate) fn evaluate_dcf_from_results_impl(
                 high_growth_rate.partial_cmp(stable_growth_rate),
                 Some(Ordering::Greater | Ordering::Equal)
             ) {
-                return Err(finstack_quant_statements::error::Error::Eval(format!(
+                return Err(finstack_quant_statements::Error::Eval(format!(
                     "H-Model requires high_growth_rate ({:.4}) >= stable_growth_rate ({:.4}).",
                     high_growth_rate, stable_growth_rate
                 )));
             }
             if half_life_years.partial_cmp(&0.0) != Some(Ordering::Greater) {
-                return Err(finstack_quant_statements::error::Error::Eval(format!(
+                return Err(finstack_quant_statements::Error::Eval(format!(
                     "H-Model requires half_life_years > 0, got {:.4}.",
                     half_life_years
                 )));
@@ -1007,23 +1005,23 @@ pub(crate) fn evaluate_dcf_from_results_impl(
 
     let dcf = builder
         .build()
-        .map_err(|e| finstack_quant_statements::error::Error::Eval(e.to_string()))?;
+        .map_err(|e| finstack_quant_statements::Error::Eval(e.to_string()))?;
 
     let equity_value = dcf
         .value(&MarketContext::default(), valuation_date)
-        .map_err(|e| finstack_quant_statements::error::Error::Eval(e.to_string()))?;
+        .map_err(|e| finstack_quant_statements::Error::Eval(e.to_string()))?;
 
     let pv_explicit = dcf.calculate_pv_explicit_flows();
     let tv = dcf
         .calculate_terminal_value()
-        .map_err(|e| finstack_quant_statements::error::Error::Eval(e.to_string()))?;
+        .map_err(|e| finstack_quant_statements::Error::Eval(e.to_string()))?;
     let pv_terminal = dcf
         .discount_terminal_value(tv)
-        .map_err(|e| finstack_quant_statements::error::Error::Eval(e.to_string()))?;
+        .map_err(|e| finstack_quant_statements::Error::Eval(e.to_string()))?;
     let enterprise_value = pv_explicit + pv_terminal;
     let terminal_discount_years = dcf
         .terminal_discount_years()
-        .map_err(|e| finstack_quant_statements::error::Error::Eval(e.to_string()))?;
+        .map_err(|e| finstack_quant_statements::Error::Eval(e.to_string()))?;
     // Same expression per flow as `calculate_pv_explicit_flows`, so the
     // `present_value` column sums to `pv_explicit`.
     let periods = flow_periods
@@ -1083,18 +1081,18 @@ pub(crate) fn extract_currency_from_model(model: &FinancialModelSpec) -> Result<
     if let Some(currency_meta) = model.meta.get("currency") {
         if let Some(currency_str) = currency_meta.as_str() {
             return currency_str.parse::<Currency>().map_err(|_| {
-                finstack_quant_statements::error::Error::Eval(format!(
+                finstack_quant_statements::Error::Eval(format!(
                     "Invalid currency: {}",
                     currency_str
                 ))
             });
         }
-        return Err(finstack_quant_statements::error::Error::Eval(
+        return Err(finstack_quant_statements::Error::Eval(
             "Model metadata key 'currency' must be a string ISO currency code".into(),
         ));
     }
 
-    Err(finstack_quant_statements::error::Error::Eval(format!(
+    Err(finstack_quant_statements::Error::Eval(format!(
         "Model '{}' is missing required metadata key 'currency'. \
          Set model.meta[\"currency\"] to an ISO currency code such as 'USD'.",
         model.id
@@ -1112,14 +1110,14 @@ fn equity_bridge_from_model(
     balance_sheet_period: Option<finstack_quant_core::dates::PeriodId>,
 ) -> Result<EquityBridge> {
     // A future forecast balance cannot stand in for the opening balance sheet.
-    let selected_period_id = balance_sheet_period.ok_or_else(|| finstack_quant_statements::error::Error::Eval(
+    let selected_period_id = balance_sheet_period.ok_or_else(|| finstack_quant_statements::Error::Eval(
         "No balance-sheet period ends on or before the valuation date; provide an opening balance or net_debt_override".into()
     ))?;
 
     let currency = extract_currency_from_model(model)?;
     let component = |names: [&str; 2]| -> Result<f64> {
         let node = names.into_iter().find(|name| results.get(name, &selected_period_id).is_some())
-            .ok_or_else(|| finstack_quant_statements::error::Error::Eval(format!(
+            .ok_or_else(|| finstack_quant_statements::Error::Eval(format!(
                 "Net debt requires '{}' or '{}' at period {}; provide the balance-sheet node or net_debt_override",
                 names[0], names[1], selected_period_id
             )))?;
@@ -1153,12 +1151,10 @@ fn resolve_exit_multiple_metric(
         } = terminal_value
         {
             if !(terminal_metric.is_finite() && terminal_metric > 0.0) {
-                return Err(finstack_quant_statements::error::Error::InvalidInput(
-                    format!(
-                        "exit-multiple terminal_metric must be positive and finite unless \
+                return Err(finstack_quant_statements::Error::InvalidInput(format!(
+                    "exit-multiple terminal_metric must be positive and finite unless \
                      exit_multiple_metric_node supplies it (got {terminal_metric})"
-                    ),
-                ));
+                )));
             }
         }
         return Ok(terminal_value);
@@ -1168,7 +1164,7 @@ fn resolve_exit_multiple_metric(
     };
     let last_forecast = model.periods.iter().rfind(|period| !period.is_actual);
     let Some(last_forecast) = last_forecast else {
-        return Err(finstack_quant_statements::error::Error::Eval(
+        return Err(finstack_quant_statements::Error::Eval(
             "Exit-multiple metric node requires a forecast period".into(),
         ));
     };
@@ -1191,12 +1187,10 @@ fn trailing_year_metric(
     let start = Date::from_calendar_date(year, end.month(), end.day())
         .or_else(|_| Date::from_calendar_date(year, end.month(), 28))
         .map_err(|_| {
-            finstack_quant_statements::error::Error::Eval(
-                "Trailing-year date is out of range".into(),
-            )
+            finstack_quant_statements::Error::Eval("Trailing-year date is out of range".into())
         })?;
     let incomplete = || {
-        finstack_quant_statements::error::Error::Eval(format!(
+        finstack_quant_statements::Error::Eval(format!(
             "Terminal metric '{node}' requires complete contiguous history from {start} to {end}"
         ))
     };
@@ -1231,12 +1225,12 @@ pub(super) fn monetary_node_value(
     currency: Currency,
 ) -> Result<f64> {
     let amount = results.get_money(node, period).ok_or_else(|| {
-        finstack_quant_statements::error::Error::Eval(format!(
+        finstack_quant_statements::Error::Eval(format!(
             "Node '{node}' at {period} must be monetary in {currency}"
         ))
     })?;
     if amount.currency() != currency || !amount.amount().is_finite() {
-        return Err(finstack_quant_statements::error::Error::Eval(format!(
+        return Err(finstack_quant_statements::Error::Eval(format!(
             "Node '{node}' at {period} must be finite monetary data in {currency}, got {}",
             amount.currency()
         )));

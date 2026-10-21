@@ -236,7 +236,7 @@ pub fn apply_scenario(
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let mut model = model_json
         .as_deref()
-        .map(finstack_quant_statements::FinancialModelSpec::from_json)
+        .map(finstack_quant_statements::types::FinancialModelSpec::from_json)
         .transpose()
         .map_err(to_js_err)?;
     let date = parse_iso_date(as_of)?;

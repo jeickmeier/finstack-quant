@@ -5,9 +5,9 @@ use super::types::{
     TornadoEntry,
 };
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
 use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec, NodeValueType};
+use finstack_quant_statements::{Error, Result};
 use indexmap::IndexMap;
 
 /// Run a sensitivity sweep over a statement model.
@@ -46,7 +46,9 @@ use indexmap::IndexMap;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_statements::prelude::*;
+/// use finstack_quant_statements::{Error, Result};
+/// use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
+/// use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec};
 /// use finstack_quant_statements_analytics::analysis::{run_sensitivity, SensitivityConfig, SensitivityMode, ParameterSpec};
 ///
 /// # fn main() -> Result<()> {

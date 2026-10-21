@@ -10,7 +10,7 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::capital_structure::CapitalStructureCashflows;
 use finstack_quant_statements::checks::{CheckReport, Severity};
 use finstack_quant_statements::evaluator::{RollupSpec, StatementResult};
-use finstack_quant_statements::FinancialModelSpec;
+use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
 
 fn period_id(period: &JsValue) -> Result<PeriodId, JsValue> {

@@ -16,7 +16,9 @@
 //!
 //! ```rust
 //! use finstack_quant_statements_analytics::analysis::{run_variance, VarianceConfig};
-//! use finstack_quant_statements::prelude::*;
+//! use finstack_quant_core::dates::PeriodId;
+//! use finstack_quant_statements::builder::ModelBuilder;
+//! use finstack_quant_statements::evaluator::Evaluator;
 //!
 //! # fn main() -> finstack_quant_statements::Result<()> {
 //! // Build and evaluate a simple model twice (e.g., management vs bank case)
@@ -45,8 +47,8 @@
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::ZERO_TOLERANCE;
-use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::StatementResult;
+use finstack_quant_statements::{Error, Result};
 use serde::{Deserialize, Serialize};
 
 /// Configuration for variance analysis between two `StatementResult`.

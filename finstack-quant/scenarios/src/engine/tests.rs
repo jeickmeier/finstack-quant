@@ -4,7 +4,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::hierarchy::{
     HierarchyTarget, MarketDataHierarchy, ResolutionMode,
 };
-use finstack_quant_statements::FinancialModelSpec;
+use finstack_quant_statements::types::FinancialModelSpec;
 use time::macros::date;
 
 #[test]

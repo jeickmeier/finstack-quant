@@ -255,7 +255,7 @@ impl PyApplicationReport {
 )]
 pub struct PyApplicationResult {
     market: finstack_quant_core::market_data::context::MarketContext,
-    model: Option<finstack_quant_statements::FinancialModelSpec>,
+    model: Option<finstack_quant_statements::types::FinancialModelSpec>,
     report: ApplicationReport,
     instruments: Option<Vec<Box<dyn Instrument>>>,
 }
@@ -342,7 +342,7 @@ impl PyApplicationResult {
         let market: finstack_quant_core::market_data::context::MarketContext =
             serde_json::from_value(market).map_err(display_to_py)?;
         let model = model
-            .map(finstack_quant_statements::FinancialModelSpec::from_value)
+            .map(finstack_quant_statements::types::FinancialModelSpec::from_value)
             .transpose()
             .map_err(crate::errors::statements_to_py)?;
         Ok(Self {

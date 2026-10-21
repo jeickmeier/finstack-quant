@@ -385,7 +385,7 @@ mod tests {
             .row(&[0.22])
             .build()?;
         let mut market = MarketContext::new().insert_surface(surface);
-        let mut model = finstack_quant_statements::FinancialModelSpec::new("test", vec![]);
+        let mut model = finstack_quant_statements::types::FinancialModelSpec::new("test", vec![]);
 
         let scenario = ScenarioSpec {
             id: "vol_parallel".into(),
@@ -489,7 +489,7 @@ mod tests {
             .row(&[0.22])
             .build()?;
         let mut market = MarketContext::new().insert_surface(surface);
-        let mut model = finstack_quant_statements::FinancialModelSpec::new("test", vec![]);
+        let mut model = finstack_quant_statements::types::FinancialModelSpec::new("test", vec![]);
         let ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),
@@ -521,7 +521,7 @@ mod tests {
             .row(&[0.22])
             .build()?;
         let mut market = MarketContext::new().insert_surface(surface);
-        let mut model = finstack_quant_statements::FinancialModelSpec::new("test", vec![]);
+        let mut model = finstack_quant_statements::types::FinancialModelSpec::new("test", vec![]);
         let ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),
@@ -557,7 +557,7 @@ mod tests {
             .row(&[0.22])
             .build()?;
         let mut market = MarketContext::new().insert_surface(surface);
-        let mut model = finstack_quant_statements::FinancialModelSpec::new("test", vec![]);
+        let mut model = finstack_quant_statements::types::FinancialModelSpec::new("test", vec![]);
         let ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),

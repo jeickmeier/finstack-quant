@@ -42,7 +42,7 @@
 //! use finstack_quant_scenarios::{ScenarioSpec, OperationSpec, CurveKind, ScenarioEngine, ExecutionContext};
 //! use finstack_quant_core::market_data::context::MarketContext;
 //! use finstack_quant_core::market_data::term_structures::DiscountCurve;
-//! use finstack_quant_statements::FinancialModelSpec;
+//! use finstack_quant_statements::types::FinancialModelSpec;
 //! use time::macros::date;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {

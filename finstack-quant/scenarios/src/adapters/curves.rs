@@ -1016,7 +1016,7 @@ mod tests {
         DiscountCurve, PriceCurve, PriceCurveKind,
     };
     use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
-    use finstack_quant_statements::FinancialModelSpec;
+    use finstack_quant_statements::types::FinancialModelSpec;
     use time::macros::date;
 
     fn solve_env(provider: &CachedRecalibrationProvider) -> HazardApplyEnv<'_> {

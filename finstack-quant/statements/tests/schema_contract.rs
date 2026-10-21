@@ -20,8 +20,8 @@ use finstack_quant_statements::schema::{
     financial_model_spec_schema, normalization_config_schema, statement_result_schema,
     STATEMENTS_SCHEMA_BASE,
 };
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::NodeValueType;
-use finstack_quant_statements::FinancialModelSpec;
 use indexmap::IndexMap;
 use serde_json::{json, Value};
 use time::Month;
