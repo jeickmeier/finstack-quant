@@ -11,7 +11,7 @@ use finstack_quant_core::{Error, Result};
 
 use super::overnight::{
     OvernightObservationSchedule, OvernightObservationSlice, OvernightRateAccumulator,
-    OvernightRateConstraints, OvernightRateReplay,
+    OvernightRateConstraints,
 };
 use super::rate_helpers::{calculate_floating_rate, FloatingRateParams};
 
@@ -83,11 +83,35 @@ pub struct CompiledFloatingCoupon {
 }
 
 /// Cloneable path state for one compiled floating coupon.
+///
+/// `Default` is the empty state: the term fixing may be locked before the
+/// notional is known, and overnight accumulation starts at notional capture.
 #[derive(Debug, Clone, Default)]
 pub struct FloatingCouponReplayState {
     notional: Option<f64>,
     term_index_rate: Option<f64>,
     overnight: Option<OvernightRateAccumulator>,
+}
+
+impl FloatingCouponReplayState {
+    /// Whether the state carries a locked fixing, captured notional, or
+    /// overnight accumulator.
+    #[must_use]
+    pub fn is_live(&self) -> bool {
+        self.notional.is_some() || self.term_index_rate.is_some() || self.overnight.is_some()
+    }
+
+    /// Captured accrual-start notional, when available.
+    #[must_use]
+    pub fn notional(&self) -> Option<f64> {
+        self.notional
+    }
+
+    /// Locked term-index fixing, when available.
+    #[must_use]
+    pub fn term_index_rate(&self) -> Option<f64> {
+        self.term_index_rate
+    }
 }
 
 /// Coupon amounts produced when a compiled floating coupon settles.
@@ -251,16 +275,6 @@ impl CompiledFloatingCoupon {
         &self.economics
     }
 
-    /// Create empty replay state for this coupon.
-    ///
-    /// The state can lock a term fixing before principal is known. Overnight
-    /// accumulation begins only when [`Self::capture_notional`] is called at
-    /// accrual start, keeping future coupon checkpoints compact.
-    #[must_use]
-    pub fn replay_state(&self) -> FloatingCouponReplayState {
-        FloatingCouponReplayState::default()
-    }
-
     /// Lock the term-index fixing without capturing the accrual notional.
     ///
     /// # Arguments
@@ -344,10 +358,6 @@ impl CompiledFloatingCoupon {
     /// * `rate` - Callback returning each historical, projected, or simulated
     ///   overnight fixing as a decimal rate.
     ///
-    /// # Returns
-    ///
-    /// The accumulated annualized index rate through `end`.
-    ///
     /// # Errors
     ///
     /// Returns [`Error::Validation`] for a term coupon or an overnight coupon
@@ -358,7 +368,7 @@ impl CompiledFloatingCoupon {
         state: &mut FloatingCouponReplayState,
         end: Date,
         rate: F,
-    ) -> Result<OvernightRateReplay>
+    ) -> Result<()>
     where
         F: FnMut(&OvernightObservationSlice) -> Result<f64>,
     {
@@ -372,13 +382,15 @@ impl CompiledFloatingCoupon {
                 "overnight coupon must capture accrual-start notional before replay".to_string(),
             )
         })?;
-        schedule.advance(accumulator, end, rate)
+        schedule.advance(accumulator, end, rate)?;
+        Ok(())
     }
 
-    /// Settle a coupon directly from an observed index rate and notional.
+    /// Settle a coupon (or a constant-balance segment of it) from an observed
+    /// index rate and notional.
     ///
-    /// Deterministic schedule emission and replay state both use this method,
-    /// so floor/cap, gearing, spread, and cash/PIK arithmetic cannot diverge.
+    /// Schedule emission and replay state both settle through this method, so
+    /// floor/cap, gearing, spread, and cash/PIK arithmetic cannot diverge.
     ///
     /// # Arguments
     ///
@@ -387,6 +399,8 @@ impl CompiledFloatingCoupon {
     ///   daily/period index constraints; for term coupons this is the fixing.
     /// * `projected_index_rate` - Decimal index rate recorded as cashflow
     ///   metadata before overnight period constraints.
+    /// * `accrual_factor` - Year fraction accrued on `notional`: the full
+    ///   period's for a whole coupon, a segment's for a balance segment.
     ///
     /// # Returns
     ///
@@ -395,23 +409,8 @@ impl CompiledFloatingCoupon {
     /// # Errors
     ///
     /// Returns [`Error::Validation`] when an input or calculated amount is
-    /// non-finite or when `notional` is negative.
+    /// non-finite or when `notional` or `accrual_factor` is negative.
     pub fn settle_index_rate(
-        &self,
-        notional: f64,
-        constrained_index_rate: f64,
-        projected_index_rate: f64,
-    ) -> Result<FloatingCouponSettlement> {
-        self.settle_index_rate_for_accrual(
-            notional,
-            constrained_index_rate,
-            projected_index_rate,
-            self.period.accrual_factor,
-        )
-    }
-
-    /// Settle a constant-balance segment without cloning the observation schedule.
-    pub(crate) fn settle_index_rate_for_accrual(
         &self,
         notional: f64,
         constrained_index_rate: f64,
@@ -482,7 +481,7 @@ impl CompiledFloatingCoupon {
                 let index_rate = state.term_index_rate.ok_or_else(|| {
                     Error::Validation("floating term coupon settled before fixing".to_string())
                 })?;
-                self.settle_index_rate(notional, index_rate, index_rate)
+                self.settle_index_rate(notional, index_rate, index_rate, self.period.accrual_factor)
             }
             FloatingRateObservation::Overnight { .. } => {
                 let accumulator = state.overnight.as_ref().ok_or_else(|| {
@@ -494,7 +493,12 @@ impl CompiledFloatingCoupon {
                     ));
                 }
                 let replay = accumulator.result()?;
-                self.settle_index_rate(notional, replay.constrained_rate, replay.projected_rate)
+                self.settle_index_rate(
+                    notional,
+                    replay.constrained_rate,
+                    replay.projected_rate,
+                    self.period.accrual_factor,
+                )
             }
         }
     }
@@ -572,25 +576,6 @@ impl CompiledFloatingCoupon {
         }
     }
 
-    /// Return whether replay state currently carries a locked fixing,
-    /// captured notional, or overnight accumulator.
-    #[must_use]
-    pub fn is_live(&self, state: &FloatingCouponReplayState) -> bool {
-        state.notional.is_some() || state.term_index_rate.is_some() || state.overnight.is_some()
-    }
-
-    /// Return the captured accrual-start notional, when available.
-    #[must_use]
-    pub fn captured_notional(&self, state: &FloatingCouponReplayState) -> Option<f64> {
-        state.notional
-    }
-
-    /// Return the locked term-index fixing, when available.
-    #[must_use]
-    pub fn locked_term_index_rate(&self, state: &FloatingCouponReplayState) -> Option<f64> {
-        state.term_index_rate
-    }
-
     fn settlement_rate_params(&self) -> &FloatingRateParams {
         &self.economics.rate_params
     }
@@ -617,7 +602,10 @@ mod tests {
         FloatingCouponEconomics {
             cash_fraction: 0.4,
             pik_fraction: 0.6,
-            rate_params: FloatingRateParams::with_spread(100.0),
+            rate_params: FloatingRateParams {
+                spread_bp: 100.0,
+                ..Default::default()
+            },
         }
     }
 
@@ -639,11 +627,11 @@ mod tests {
             },
         )
         .expect("term coupon compiles");
-        let mut state = coupon.replay_state();
+        let mut state = FloatingCouponReplayState::default();
         coupon
             .observe_term(&mut state, 0.03)
             .expect("reset fixes the index");
-        assert_eq!(coupon.captured_notional(&state), None);
+        assert_eq!(state.notional(), None);
 
         // Principal has changed from 100 to 108 between reset and accrual
         // start. The locked rate remains 3%, while the new balance is used.
@@ -652,7 +640,7 @@ mod tests {
             .expect("accrual start captures balance");
         let replayed = coupon.settle(&state).expect("coupon settles");
         let projected = coupon
-            .settle_index_rate(108.0, 0.03, 0.03)
+            .settle_index_rate(108.0, 0.03, 0.03, coupon.period().accrual_factor)
             .expect("deterministic projection settles");
         assert_eq!(replayed, projected);
         assert!((replayed.all_in_rate - 0.04).abs() < 1.0e-12);
@@ -680,7 +668,7 @@ mod tests {
         )
         .expect("business-day-adjusted payment compiles");
 
-        let mut state = coupon.replay_state();
+        let mut state = FloatingCouponReplayState::default();
         coupon
             .observe_term(&mut state, 0.03)
             .expect("term rate fixes");
@@ -744,7 +732,7 @@ mod tests {
         let one_shot = observations
             .replay(end, 360.0, constraints, observed)
             .expect("one-shot replay");
-        let mut state = coupon.replay_state();
+        let mut state = FloatingCouponReplayState::default();
         coupon
             .capture_notional(&mut state, 108.0)
             .expect("capture notional");
@@ -756,7 +744,12 @@ mod tests {
             .expect("second replay segment");
         let replayed = coupon.settle(&state).expect("coupon settles");
         let projected = coupon
-            .settle_index_rate(108.0, one_shot.constrained_rate, one_shot.projected_rate)
+            .settle_index_rate(
+                108.0,
+                one_shot.constrained_rate,
+                one_shot.projected_rate,
+                coupon.period().accrual_factor,
+            )
             .expect("one-shot coupon settles");
         assert!((replayed.projected_index_rate - projected.projected_index_rate).abs() < 1e-12);
         assert!((replayed.total_amount - projected.total_amount).abs() < 1e-12);
@@ -806,7 +799,7 @@ mod tests {
             ..Default::default()
         };
         let coupon = weekly_coupon(params.clone(), OvernightIndexConstraintApplication::Daily);
-        let mut state = coupon.replay_state();
+        let mut state = FloatingCouponReplayState::default();
         coupon
             .capture_notional(&mut state, 100_000_000.0)
             .expect("notional");
@@ -833,7 +826,7 @@ mod tests {
                 },
                 application,
             );
-            let mut state = coupon.replay_state();
+            let mut state = FloatingCouponReplayState::default();
             coupon
                 .capture_notional(&mut state, 100.0)
                 .expect("notional");
@@ -856,7 +849,7 @@ mod tests {
             },
             OvernightIndexConstraintApplication::Daily,
         );
-        let mut state = coupon.replay_state();
+        let mut state = FloatingCouponReplayState::default();
         coupon
             .capture_notional(&mut state, 100.0)
             .expect("notional");
@@ -874,7 +867,7 @@ mod tests {
             },
             OvernightIndexConstraintApplication::Daily,
         );
-        let mut state = coupon.replay_state();
+        let mut state = FloatingCouponReplayState::default();
         coupon
             .capture_notional(&mut state, 100.0)
             .expect("notional");
@@ -887,10 +880,13 @@ mod tests {
     #[test]
     fn unfinished_overnight_coupons_cannot_settle() {
         let coupon = weekly_coupon(
-            FloatingRateParams::with_spread(100.0),
+            FloatingRateParams {
+                spread_bp: 100.0,
+                ..Default::default()
+            },
             OvernightIndexConstraintApplication::Daily,
         );
-        let mut state = coupon.replay_state();
+        let mut state = FloatingCouponReplayState::default();
         coupon
             .capture_notional(&mut state, 100.0)
             .expect("notional");
@@ -911,7 +907,7 @@ mod tests {
             Default::default(),
             OvernightIndexConstraintApplication::Daily,
         );
-        let mut state = coupon.replay_state();
+        let mut state = FloatingCouponReplayState::default();
         coupon
             .capture_notional(&mut state, 100.0)
             .expect("notional");
@@ -972,7 +968,7 @@ mod tests {
             },
         )
         .expect("coupon");
-        let mut state = coupon.replay_state();
+        let mut state = FloatingCouponReplayState::default();
         coupon.observe_term(&mut state, 0.03).expect("fixing");
         coupon
             .capture_notional(&mut state, 100.0)
@@ -981,8 +977,8 @@ mod tests {
         assert!(coupon.observe_term(&mut state, 0.09).is_err());
         assert!(coupon.capture_notional(&mut state, 200.0).is_err());
         assert_eq!(coupon.settle(&state).expect("settlement"), before);
-        assert_eq!(coupon.locked_term_index_rate(&state), Some(0.03));
-        assert_eq!(coupon.captured_notional(&state), Some(100.0));
+        assert_eq!(state.term_index_rate(), Some(0.03));
+        assert_eq!(state.notional(), Some(100.0));
     }
 
     #[test]
@@ -1012,7 +1008,7 @@ mod tests {
         let coupon =
             CompiledFloatingCoupon::compile(period, economics.clone(), observation.clone())
                 .expect("stored contractual leap denominator");
-        let mut state = coupon.replay_state();
+        let mut state = FloatingCouponReplayState::default();
         coupon.observe_term(&mut state, 0.05).expect("fixing");
         coupon
             .capture_notional(&mut state, 100.0)
@@ -1076,7 +1072,7 @@ mod tests {
                 },
             )
             .expect("coupon");
-            let mut state = coupon.replay_state();
+            let mut state = FloatingCouponReplayState::default();
             coupon.observe_term(&mut state, 0.05).expect("fixing");
             coupon
                 .capture_notional(&mut state, 100_000_000.0)
@@ -1128,7 +1124,7 @@ mod tests {
                 },
             )
             .expect("coupon");
-            let mut state = coupon.replay_state();
+            let mut state = FloatingCouponReplayState::default();
             coupon.observe_term(&mut state, 0.05).expect("fixing");
             coupon
                 .capture_notional(&mut state, 100_000_000.0)

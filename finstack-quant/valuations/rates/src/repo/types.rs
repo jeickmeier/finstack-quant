@@ -670,27 +670,27 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
         let total_repayment = self.total_repayment()?;
         let interest = total_repayment.checked_sub(self.cash_amount)?;
         let flows = vec![
-            finstack_quant_cashflows::primitives::CashFlow::new(
+            finstack_quant_core::cashflow::CashFlow::new(
                 adj_start,
                 None,
                 cash_outflow,
-                finstack_quant_cashflows::primitives::CFKind::Notional,
+                finstack_quant_core::cashflow::CFKind::Notional,
                 0.0,
                 None,
             ),
-            finstack_quant_cashflows::primitives::CashFlow::new(
+            finstack_quant_core::cashflow::CashFlow::new(
                 adj_maturity,
                 None,
                 self.cash_amount,
-                finstack_quant_cashflows::primitives::CFKind::Notional,
+                finstack_quant_core::cashflow::CFKind::Notional,
                 0.0,
                 None,
             ),
-            finstack_quant_cashflows::primitives::CashFlow::new(
+            finstack_quant_core::cashflow::CashFlow::new(
                 adj_maturity,
                 None,
                 interest,
-                finstack_quant_cashflows::primitives::CFKind::Fixed,
+                finstack_quant_core::cashflow::CFKind::Fixed,
                 0.0,
                 None,
             ),
@@ -703,7 +703,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
                 notional_hint: self.notional()?,
                 ..Default::default()
             },
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Contractual,
         ))

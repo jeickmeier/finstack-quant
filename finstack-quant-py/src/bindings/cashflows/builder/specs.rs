@@ -612,7 +612,7 @@ schedule_params_presets! {
     jpy_tona_swap,
 }
 
-wire_methods!(PyScheduleParams, ScheduleParams, "ScheduleParams");
+wire_methods!(PyScheduleParams, ScheduleParams, "ScheduleParams", validate);
 
 #[pymethods]
 impl PyScheduleParams {
@@ -872,14 +872,19 @@ pub struct PyFloatingRateSpec {
     pub(crate) inner: FloatingRateSpec,
 }
 
-wire_methods!(PyFloatingRateSpec, FloatingRateSpec, "FloatingRateSpec");
+wire_methods!(
+    PyFloatingRateSpec,
+    FloatingRateSpec,
+    "FloatingRateSpec",
+    validate
+);
 
 #[pymethods]
 impl PyFloatingRateSpec {
     /// Construct a floating-rate spec; see the class docstring for parameters.
     #[new]
     #[pyo3(
-        signature = (forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=true, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback=None),
+        signature = (forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=FloatingRateSpec::DEFAULT_GEARING_INCLUDES_SPREAD, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=FloatingRateSpec::DEFAULT_RESET_LAG_DAYS, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback=None),
         text_signature = "(forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=True, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback=None)"
     )]
     #[allow(clippy::too_many_arguments)]
@@ -905,21 +910,22 @@ impl PyFloatingRateSpec {
             inner: FloatingRateSpec {
                 forward_curve_id: finstack_quant_core::types::CurveId::from(forward_curve_id),
                 spread_bp: decimal_from_any(spread_bp)?,
-                gearing: gearing.map_or(Ok(Decimal::ONE), decimal_from_any)?,
+                gearing: gearing.map_or(Ok(FloatingRateSpec::DEFAULT_GEARING), decimal_from_any)?,
                 gearing_includes_spread,
                 index_floor_bp: index_floor_bp.map(decimal_from_any).transpose()?,
                 all_in_floor_bp: all_in_floor_bp.map(decimal_from_any).transpose()?,
                 all_in_cap_bp: all_in_cap_bp.map(decimal_from_any).transpose()?,
                 index_cap_bp: index_cap_bp.map(decimal_from_any).transpose()?,
                 overnight_index_constraints: overnight_index_constraints
-                    .map_or(OvernightIndexConstraintApplication::Daily, |c| c.inner),
+                    .map(|c| c.inner)
+                    .unwrap_or_default(),
                 reset_frequency: extract_tenor(reset_frequency)?,
                 index_tenor: index_tenor.map(extract_tenor).transpose()?,
                 reset_lag_days,
                 fixing_calendar_id: fixing_calendar_id.map(Into::into),
                 compounding: compounding.map(|m| m.inner),
                 overnight_basis: overnight_basis.map(|d| d.inner),
-                fallback: fallback.map_or(FloatingRateFallback::Error, |f| f.inner.clone()),
+                fallback: fallback.map(|f| f.inner.clone()).unwrap_or_default(),
             },
         })
     }
@@ -1513,7 +1519,7 @@ impl PyNotional {
     }
 }
 
-wire_methods!(PyNotional, Notional, "Notional");
+wire_methods!(PyNotional, Notional, "Notional", validate);
 
 #[pymethods]
 impl PyNotional {
@@ -1916,7 +1922,8 @@ pub struct PyPrepaymentModelSpec {
 wire_methods!(
     PyPrepaymentModelSpec,
     PrepaymentModelSpec,
-    "PrepaymentModelSpec"
+    "PrepaymentModelSpec",
+    validate
 );
 
 #[pymethods]
@@ -2019,7 +2026,7 @@ impl PyPrepaymentModelSpec {
 /// Examples
 /// --------
 /// >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-/// >>> DefaultModelSpec.cdr_2pct().curve["cdr"]
+/// >>> DefaultModelSpec.constant_cdr(0.02).curve["cdr"]
 /// 0.02
 #[pyclass(
     name = "DefaultModelSpec",
@@ -2033,7 +2040,12 @@ pub struct PyDefaultModelSpec {
     pub(crate) inner: DefaultModelSpec,
 }
 
-wire_methods!(PyDefaultModelSpec, DefaultModelSpec, "DefaultModelSpec");
+wire_methods!(
+    PyDefaultModelSpec,
+    DefaultModelSpec,
+    "DefaultModelSpec",
+    validate
+);
 
 #[pymethods]
 impl PyDefaultModelSpec {
@@ -2052,15 +2064,6 @@ impl PyDefaultModelSpec {
     fn sda(speed_multiplier: f64) -> Self {
         Self {
             inner: DefaultModelSpec::sda(speed_multiplier),
-        }
-    }
-
-    /// 2% CDR baseline.
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn cdr_2pct() -> Self {
-        Self {
-            inner: DefaultModelSpec::cdr_2pct(),
         }
     }
 
@@ -2198,7 +2201,12 @@ pub struct PyRecoveryModelSpec {
     pub(crate) inner: RecoveryModelSpec,
 }
 
-wire_methods!(PyRecoveryModelSpec, RecoveryModelSpec, "RecoveryModelSpec");
+wire_methods!(
+    PyRecoveryModelSpec,
+    RecoveryModelSpec,
+    "RecoveryModelSpec",
+    validate
+);
 
 #[pymethods]
 impl PyRecoveryModelSpec {

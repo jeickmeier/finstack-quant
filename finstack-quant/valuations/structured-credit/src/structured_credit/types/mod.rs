@@ -83,9 +83,7 @@ use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
 };
 
-pub use finstack_quant_cashflows::builder::{
-    DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
-};
+use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 
 use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
 use finstack_quant_core::types::{CurveId, InstrumentId};

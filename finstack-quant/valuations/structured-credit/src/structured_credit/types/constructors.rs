@@ -4,12 +4,12 @@
 //! appropriate defaults for ABS, CLO, CMBS, and RMBS instruments.
 
 use super::{
-    AssetPool, CreditModelConfig, DealType, DefaultModelSpec, MarketConditions, Metadata,
-    PoolAsset, PrepaymentModelSpec, RecoveryModelSpec, StructuredCredit, Tranche, TrancheSeniority,
-    TrancheStructure,
+    AssetPool, CreditModelConfig, DealType, MarketConditions, Metadata, PoolAsset,
+    StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use crate::structured_credit::assumptions::{embedded_registry_or_panic, required_assumption};
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};

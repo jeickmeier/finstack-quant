@@ -1,11 +1,13 @@
-//! Fluent `CashFlowBuilder` methods for coupon, fee, and payment-split legs.
+//! Fluent `CashFlowBuilder` methods: principal and amortization, principal
+//! events, coupon, fee, and payment-split legs.
 //!
-//! This `impl CashFlowBuilder` block accumulates coupon, fee, and
-//! payment-program state on the builder. The build orchestration that
+//! This `impl CashFlowBuilder` block accumulates that state on the builder. The build orchestration that
 //! consumes that state — validation, compilation, date collection, and
 //! projection — lives in [`super::orchestrator`].
 
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
 use super::compiler::{
@@ -13,7 +15,8 @@ use super::compiler::{
 };
 use super::orchestrator::CashFlowBuilder;
 use super::specs::{
-    CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, ScheduleParams, StepUpCouponSpec,
+    AmortizationSpec, CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, PrincipalEventSpec,
+    PrincipalExchange, StepUpCouponSpec,
 };
 
 impl CashFlowBuilder {
@@ -23,20 +26,40 @@ impl CashFlowBuilder {
         }
     }
 
-    fn push_coupon_program(
-        &mut self,
-        window: ProgramWindow,
-        schedule: ScheduleParams,
-        coupon: CouponSpec,
-        split: CouponType,
-    ) -> &mut Self {
-        self.coupon_program.push(CouponProgramPiece {
-            window,
-            schedule,
-            coupon,
-            split,
-        });
+    fn push_coupon_program(&mut self, window: ProgramWindow, coupon: CouponSpec) -> &mut Self {
+        self.coupon_program
+            .push(CouponProgramPiece { window, coupon });
         self
+    }
+
+    /// Windows `[issue, d1), [d1, d2), …, [dn, maturity)` for dated steps.
+    ///
+    /// Returns `None` when an earlier call already failed, or records an error
+    /// and returns `None` when `dates` are not strictly increasing.
+    fn step_windows(&mut self, method: &str, dates: &[Date]) -> Option<Vec<ProgramWindow>> {
+        if self.pending_error.is_some() {
+            return None;
+        }
+        if let Some(w) = dates.windows(2).find(|w| w[0] >= w[1]) {
+            self.record_error(finstack_quant_core::Error::Validation(format!(
+                "{method} dates must be strictly increasing; found {} followed by {}",
+                w[0], w[1]
+            )));
+            return None;
+        }
+        let bounds: Vec<WindowBound> = std::iter::once(WindowBound::Issue)
+            .chain(dates.iter().map(|&date| WindowBound::Date(date)))
+            .chain(std::iter::once(WindowBound::Maturity))
+            .collect();
+        Some(
+            bounds
+                .windows(2)
+                .map(|w| ProgramWindow {
+                    start: w[0],
+                    end: w[1],
+                })
+                .collect(),
+        )
     }
 
     fn push_payment_program(&mut self, window: ProgramWindow, split: CouponType) -> &mut Self {
@@ -57,12 +80,7 @@ impl CashFlowBuilder {
     /// Adds a fixed coupon over the half-open window `[start, end)`.
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn add_fixed_window(&mut self, start: Date, end: Date, spec: FixedCouponSpec) -> &mut Self {
-        self.push_coupon_program(
-            ProgramWindow::explicit(start, end),
-            spec.schedule,
-            CouponSpec::Fixed { rate: spec.rate },
-            spec.coupon_type,
-        )
+        self.push_coupon_program(ProgramWindow::explicit(start, end), CouponSpec::Fixed(spec))
     }
 
     /// Adds a floating coupon over the half-open window `[start, end)`.
@@ -73,14 +91,7 @@ impl CashFlowBuilder {
         end: Date,
         spec: FloatingCouponSpec,
     ) -> &mut Self {
-        self.push_coupon_program(
-            ProgramWindow::explicit(start, end),
-            spec.schedule,
-            CouponSpec::Float {
-                rate_spec: spec.rate_spec,
-            },
-            spec.coupon_type,
-        )
+        self.push_coupon_program(ProgramWindow::explicit(start, end), CouponSpec::Float(spec))
     }
 
     /// Adds a fixed coupon specification.
@@ -131,12 +142,7 @@ impl CashFlowBuilder {
     /// ```
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn fixed_cf(&mut self, spec: FixedCouponSpec) -> &mut Self {
-        self.push_coupon_program(
-            ProgramWindow::full_horizon(),
-            spec.schedule.clone(),
-            CouponSpec::Fixed { rate: spec.rate },
-            spec.coupon_type,
-        )
+        self.push_coupon_program(ProgramWindow::full_horizon(), CouponSpec::Fixed(spec))
     }
 
     /// Adds a floating coupon specification.
@@ -206,14 +212,7 @@ impl CashFlowBuilder {
     /// ```
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn floating_cf(&mut self, spec: FloatingCouponSpec) -> &mut Self {
-        self.push_coupon_program(
-            ProgramWindow::full_horizon(),
-            spec.schedule.clone(),
-            CouponSpec::Float {
-                rate_spec: spec.rate_spec,
-            },
-            spec.coupon_type,
-        )
+        self.push_coupon_program(ProgramWindow::full_horizon(), CouponSpec::Float(spec))
     }
 
     /// Adds a fee specification.
@@ -358,35 +357,18 @@ impl CashFlowBuilder {
     /// - Works with both fixed and floating coupons
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn payment_split_program(&mut self, steps: &[(Date, CouponType)]) -> &mut Self {
-        if self.pending_error.is_some() {
+        let dates: Vec<Date> = steps.iter().map(|&(date, _)| date).collect();
+        let Some(windows) = self.step_windows("payment_split_program", &dates) else {
             return self;
+        };
+        // Each step's split runs up to its date; Cash covers the rest.
+        let splits = steps
+            .iter()
+            .map(|&(_, split)| split)
+            .chain(std::iter::once(CouponType::Cash));
+        for (window, split) in windows.into_iter().zip(splits) {
+            let _ = self.push_payment_program(window, split);
         }
-        if let Some(w) = steps.windows(2).find(|w| w[0].0 >= w[1].0) {
-            self.record_error(finstack_quant_core::Error::Validation(format!(
-                "payment_split_program steps must be strictly increasing by date; found {} \
-                 followed by {}",
-                w[0].0, w[1].0
-            )));
-            return self;
-        }
-        let mut prev = WindowBound::Issue;
-        for &(end, split) in steps {
-            let _ = self.push_payment_program(
-                ProgramWindow {
-                    start: prev,
-                    end: WindowBound::Date(end),
-                },
-                split,
-            );
-            prev = WindowBound::Date(end);
-        }
-        let _ = self.push_payment_program(
-            ProgramWindow {
-                start: prev,
-                end: WindowBound::Maturity,
-            },
-            CouponType::Cash,
-        );
         self
     }
 
@@ -437,15 +419,7 @@ impl CashFlowBuilder {
     /// ```
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn step_up_cf(&mut self, spec: StepUpCouponSpec) -> &mut Self {
-        self.push_coupon_program(
-            ProgramWindow::full_horizon(),
-            spec.schedule.clone(),
-            CouponSpec::StepUp {
-                initial_rate: spec.initial_rate,
-                step_schedule: spec.step_schedule,
-            },
-            spec.coupon_type,
-        )
+        self.push_coupon_program(ProgramWindow::full_horizon(), CouponSpec::StepUp(spec))
     }
 
     /// Floating coupons whose margin changes on dated, effective-from steps.
@@ -523,36 +497,18 @@ impl CashFlowBuilder {
         steps: &[(Date, Decimal)],
         base_spec: FloatingCouponSpec,
     ) -> &mut Self {
-        if self.pending_error.is_some() {
+        let dates: Vec<Date> = steps.iter().map(|&(date, _)| date).collect();
+        let Some(windows) = self.step_windows("float_margin_steps", &dates) else {
             return self;
-        }
-        if let Some(w) = steps.windows(2).find(|w| w[0].0 >= w[1].0) {
-            self.record_error(finstack_quant_core::Error::Validation(format!(
-                "float_margin_steps dates must be strictly increasing; found {} followed by {}",
-                w[0].0, w[1].0
-            )));
-            return self;
-        }
-        let mut start = WindowBound::Issue;
-        let mut spread_bp = base_spec.rate_spec.spread_bp;
-        let bounds = steps
-            .iter()
-            .map(|&(date, next)| (WindowBound::Date(date), Some(next)))
-            .chain(std::iter::once((WindowBound::Maturity, None)));
-        for (end, next_spread_bp) in bounds {
-            let window_spec = Self::floating_spec_with_margin(&base_spec, spread_bp);
+        };
+        // The base spread runs until the first step; each step's spread runs from its date.
+        let spreads = std::iter::once(base_spec.rate_spec.spread_bp)
+            .chain(steps.iter().map(|&(_, spread_bp)| spread_bp));
+        for (window, spread_bp) in windows.into_iter().zip(spreads) {
             let _ = self.push_coupon_program(
-                ProgramWindow { start, end },
-                window_spec.schedule.clone(),
-                CouponSpec::Float {
-                    rate_spec: window_spec.rate_spec,
-                },
-                window_spec.coupon_type,
+                window,
+                CouponSpec::Float(Self::floating_spec_with_margin(&base_spec, spread_bp)),
             );
-            start = end;
-            if let Some(next) = next_spread_bp {
-                spread_bp = next;
-            }
         }
         self
     }
@@ -649,21 +605,186 @@ impl CashFlowBuilder {
                 start: WindowBound::Issue,
                 end: WindowBound::Date(switch),
             },
-            fixed.schedule,
-            CouponSpec::Fixed { rate: fixed.rate },
-            fixed.coupon_type,
+            CouponSpec::Fixed(fixed),
         );
         let _ = self.push_coupon_program(
             ProgramWindow {
                 start: WindowBound::Date(switch),
                 end: WindowBound::Maturity,
             },
-            floating.schedule.clone(),
-            CouponSpec::Float {
-                rate_spec: floating.rate_spec,
-            },
-            floating.coupon_type,
+            CouponSpec::Float(floating),
         );
+        self
+    }
+
+    /// Sets principal details and instrument horizon.
+    ///
+    /// Full-horizon coupons and amortization may be configured before or after
+    /// this method. Their horizon is resolved when the schedule is built.
+    /// Calling this method does not clear a previously recorded builder error.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial` - Initial outstanding principal and currency.
+    /// * `issue_date` - Start date for the instrument.
+    /// * `maturity` - Final maturity date.
+    ///
+    /// # Returns
+    ///
+    /// Mutable builder reference for fluent chaining.
+    #[must_use = "builder methods should be chained or terminated with .build(...)"]
+    pub fn principal(&mut self, initial: Money, issue_date: Date, maturity: Date) -> &mut Self {
+        self.initial_principal = Some(initial);
+        self.issue = Some(issue_date);
+        self.maturity = Some(maturity);
+        self
+    }
+
+    /// Selects whether issue funding and maturity redemption notionals are emitted.
+    ///
+    /// Outstanding still starts at the `principal` initial amount for coupon
+    /// math. Scheduled amortization and explicit principal events still emit.
+    /// The default is [`PrincipalExchange::InitialAndFinal`].
+    ///
+    /// # Arguments
+    ///
+    /// * `exchange` - `InitialAndFinal` emits the issue draw and the
+    ///   redemption balloon on the lagged payment date. `None` tracks
+    ///   outstanding only (vanilla IRS / basis-swap convention).
+    ///
+    /// # Returns
+    ///
+    /// Mutable builder reference for fluent chaining.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_cashflows::builder::{
+    ///     CashFlowSchedule, CouponType, FixedCouponSpec, PrincipalExchange, ScheduleParams,
+    /// };
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::dates::Date;
+    /// use finstack_quant_core::money::Money;
+    /// use rust_decimal_macros::dec;
+    /// use time::Month;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let issue = Date::from_calendar_date(2025, Month::January, 15)?;
+    /// let maturity = Date::from_calendar_date(2026, Month::January, 15)?;
+    /// let schedule = CashFlowSchedule::builder()
+    ///     .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
+    ///     .principal_exchange(PrincipalExchange::None)
+    ///     .fixed_cf(FixedCouponSpec {
+    ///         coupon_type: CouponType::Cash,
+    ///         rate: dec!(0.05),
+    ///         schedule: ScheduleParams::semiannual_30360(),
+    ///     })
+    ///     .build(None)?;
+    /// assert!(schedule.get_flows().iter().all(|cf| {
+    ///     cf.kind != finstack_quant_core::cashflow::CFKind::Notional
+    /// }));
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use = "builder methods should be chained or terminated with .build(...)"]
+    pub fn principal_exchange(&mut self, exchange: PrincipalExchange) -> &mut Self {
+        self.principal_exchange = exchange;
+        self
+    }
+
+    /// Configures amortization for the instrument notional.
+    ///
+    /// This may be called before or after [`principal`](Self::principal).
+    ///
+    /// # Arguments
+    ///
+    /// * `spec` - Contractual repayment rule, with monetary targets in the principal currency.
+    #[must_use = "builder methods should be chained or terminated with .build(...)"]
+    pub fn amortization(&mut self, spec: AmortizationSpec) -> &mut Self {
+        self.amortization = spec;
+        self
+    }
+
+    /// Adds a single principal event.
+    ///
+    /// `delta` controls the outstanding balance change. The emitted cashflow
+    /// sign is derived from `kind`: `CFKind::Amortization` emits `cash` as a
+    /// positive repayment, while all other kinds emit `-cash` as a borrower
+    /// draw/notional cashflow.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Economic date on which the principal delta changes interest accrual.
+    /// * `payment_date` - Cash settlement date; scheduled repayments may pay before
+    ///   or after their contractual balance-effective date.
+    /// * `delta` - Signed principal change in currency units; positive funds a draw.
+    /// * `cash` - Optional settlement amount in the same currency. When absent,
+    ///   repayments use `-delta` and draws use `delta` before cashflow sign handling.
+    /// * `kind` - Principal classification controlling settlement sign and validation.
+    ///
+    /// # Sign conventions
+    ///
+    /// * `CFKind::Amortization` (repayment): `delta` must be `<= 0` (the
+    ///   outstanding balance decreases). When `cash` is `None`, it defaults to
+    ///   `-delta` so the emitted flow is a positive cash repayment.
+    /// * `CFKind::Notional` (draw): `delta` must be `>= 0` (the outstanding
+    ///   balance increases). When `cash` is `None`, it defaults to `delta`,
+    ///   emitting a negative funding outflow.
+    /// * Other kinds: no sign requirement; `cash` defaults to `delta`.
+    ///
+    /// # Errors
+    ///
+    /// Records a pending error — returned by `build(...)` — when:
+    /// * `cash` is provided with a different currency than `delta`, or
+    /// * `delta` violates the sign convention for `kind` (including NaN
+    ///   amounts, which never satisfy either sign requirement).
+    #[must_use = "builder methods should be chained or terminated with .build(...)"]
+    pub fn add_principal_event(
+        &mut self,
+        date: Date,
+        payment_date: Date,
+        delta: Money,
+        cash: Option<Money>,
+        kind: CFKind,
+    ) -> &mut Self {
+        if self.pending_error.is_some() {
+            return self;
+        }
+        match kind {
+            CFKind::Amortization if delta.amount() > 0.0 || delta.amount().is_nan() => {
+                self.record_error(finstack_quant_core::Error::Validation(format!(
+                    "add_principal_event: CFKind::Amortization requires delta <= 0 \
+                     (repayments reduce outstanding), got {} on {date}",
+                    delta.amount()
+                )));
+                return self;
+            }
+            CFKind::Notional if delta.amount() < 0.0 || delta.amount().is_nan() => {
+                self.record_error(finstack_quant_core::Error::Validation(format!(
+                    "add_principal_event: CFKind::Notional requires delta >= 0 \
+                     (draws increase outstanding), got {} on {date}",
+                    delta.amount()
+                )));
+                return self;
+            }
+            _ => {}
+        }
+        let spec = PrincipalEventSpec {
+            date,
+            payment_date,
+            delta,
+            cash,
+            kind,
+        };
+        let cash_leg = spec.resolved_cash();
+        if cash_leg.currency() != delta.currency() {
+            self.record_error(finstack_quant_core::Error::CurrencyMismatch {
+                expected: delta.currency(),
+                actual: cash_leg.currency(),
+            });
+            return self;
+        }
+        self.principal_events.push(spec);
         self
     }
 }

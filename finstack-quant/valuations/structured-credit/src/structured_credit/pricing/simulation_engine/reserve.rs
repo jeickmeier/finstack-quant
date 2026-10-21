@@ -367,9 +367,9 @@ mod tests {
         ])
         .expect("tranches");
         deal.credit_model.prepayment_spec =
-            crate::structured_credit::PrepaymentModelSpec::constant_cpr(0.0);
+            finstack_quant_cashflows::builder::PrepaymentModelSpec::constant_cpr(0.0);
         deal.credit_model.default_spec =
-            crate::structured_credit::DefaultModelSpec::constant_cdr(0.0);
+            finstack_quant_cashflows::builder::DefaultModelSpec::constant_cdr(0.0);
         deal.pool.reserve_account = usd(reserve);
         deal.pool.reserve_account_rate = rate;
         deal

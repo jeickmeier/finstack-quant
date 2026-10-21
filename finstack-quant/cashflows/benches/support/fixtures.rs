@@ -9,8 +9,8 @@ use finstack_quant_cashflows::builder::{
     FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
     FloatingRateSpec, Notional, OvernightIndexConstraintApplication, ScheduleParams,
 };
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, Period, PeriodId, StubKind, Tenor,
@@ -374,6 +374,7 @@ pub fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedul
             },
         },
     )
+    .expect("valid schedule")
 }
 
 pub fn five_year_fixed_json() -> &'static str {

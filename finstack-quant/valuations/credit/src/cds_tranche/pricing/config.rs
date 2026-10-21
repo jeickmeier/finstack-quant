@@ -1,6 +1,6 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
-use finstack_quant_cashflows::primitives::CashFlow;
+use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_models::correlation::copula::{Copula, CopulaSpec};

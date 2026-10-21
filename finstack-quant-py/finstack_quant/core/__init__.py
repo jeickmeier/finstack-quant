@@ -11,6 +11,7 @@ Examples:
 
 from finstack_quant.finstack_quant import core as _core
 
+cashflow = _core.cashflow
 currency = _core.currency
 money = _core.money
 config = _core.config
@@ -31,6 +32,7 @@ schema = _core.schema
 
 __all__: list[str] = [
     "FinstackError",
+    "cashflow",
     "config",
     "currency",
     "dates",

@@ -1,5 +1,6 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{CouponType, FloatingRateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -11,7 +12,7 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_fixed_income::term_loan::{
-    self, LoanCall, LoanCallSchedule, LoanCallType, RateSpec, TermLoan,
+    LoanCall, LoanCallSchedule, LoanCallType, TermLoan,
 };
 use rust_decimal::Decimal;
 use time::macros::date;
@@ -33,7 +34,7 @@ fn build_simple_term_loan(as_of: Date, maturity: Date) -> TermLoan {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate: 0.06 }) // 6%
+        .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.06 }) // 6%
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -42,7 +43,7 @@ fn build_simple_term_loan(as_of: Date, maturity: Date) -> TermLoan {
         .calendar_id_opt(None)
         .stub(finstack_quant_core::dates::StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(term_loan::AmortizationSpec::None)
+        .amortization(finstack_quant_cashflows::builder::AmortizationSpec::None)
         .coupon_type(finstack_quant_cashflows::builder::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(None)
@@ -210,7 +211,7 @@ fn test_floating_rate_term_loan_yield_and_dm() {
         .calendar_id_opt(None)
         .stub(StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(term_loan::AmortizationSpec::None)
+        .amortization(finstack_quant_cashflows::builder::AmortizationSpec::None)
         .coupon_type(CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(None)
