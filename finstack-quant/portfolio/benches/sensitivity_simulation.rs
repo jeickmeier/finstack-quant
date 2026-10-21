@@ -317,8 +317,8 @@ fn bench_delta_based_sensitivities(c: &mut Criterion) {
 // Direct factor stress (only the work consumed by the public workflow is timed).
 
 fn factor_stress_model() -> finstack_quant_portfolio::factor_model::FactorModel {
-    use finstack_quant_factor::matching::{DependencyFilter, MappingRule, MatchingConfig};
     use finstack_quant_factor::{CurveType, DependencyType, FactorModelConfig};
+    use finstack_quant_factor::{DependencyFilter, MappingRule, MatchingConfig};
 
     let factor_id = FactorId::new("rates_stress");
     let covariance = FactorCovarianceMatrix::new(vec![factor_id.clone()], vec![0.04])

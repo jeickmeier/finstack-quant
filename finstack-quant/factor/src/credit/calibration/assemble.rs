@@ -16,7 +16,7 @@ use crate::credit::hierarchy::{
     FactorVolModel, FitQuality, FoldUpRecord, IdiosyncraticVolModel, IssuerBetaMode, IssuerBetaRow,
     IssuerBetas, IssuerTags, LevelAnchor, LevelsAtAnchor, VolState,
 };
-use crate::matching::{CreditHierarchicalConfig, CREDIT_GENERIC_FACTOR_ID};
+use crate::{CreditHierarchicalConfig, CREDIT_GENERIC_FACTOR_ID};
 use crate::{
     FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
     MarketMapping, MatchingConfig,

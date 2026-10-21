@@ -22,12 +22,12 @@ use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criteri
 use finstack_quant_core::types::Attributes;
 use finstack_quant_factor::credit::calibration::CovarianceStrategy;
 use finstack_quant_factor::credit::decomposition::{decompose_levels, decompose_period};
-use finstack_quant_factor::matching::{
-    DependencyFilter, FactorMatcher, FactorNode, HierarchicalConfig, MappingTableMatcher,
-    MatchingConfig,
-};
 use finstack_quant_factor::{
     CurveType, FactorCovarianceMatrix, FactorId, MarketDependency, SensitivityMatrix,
+};
+use finstack_quant_factor::{
+    DependencyFilter, FactorMatcher, FactorNode, HierarchicalConfig, MappingTableMatcher,
+    MatchingConfig,
 };
 use fixtures::{
     credit_dependency, credit_hierarchical_config, factor_ids, known_issuer_attrs, mapping_rules,
@@ -220,7 +220,7 @@ fn bench_hierarchical_matcher(c: &mut Criterion) {
 fn bench_cascade_matcher(c: &mut Criterion) {
     let mut group = c.benchmark_group("cascade_matcher");
 
-    let exact_rules = vec![finstack_quant_factor::matching::MappingRule {
+    let exact_rules = vec![finstack_quant_factor::MappingRule {
         dependency_filter: finstack_quant_factor::DependencyFilter {
             dependency_type: Some(finstack_quant_factor::DependencyType::Credit),
             curve_type: None,
@@ -230,7 +230,7 @@ fn bench_cascade_matcher(c: &mut Criterion) {
         factor_id: FactorId::new("ACME-Specific"),
     }];
 
-    let fallback_rules = vec![finstack_quant_factor::matching::MappingRule {
+    let fallback_rules = vec![finstack_quant_factor::MappingRule {
         dependency_filter: finstack_quant_factor::DependencyFilter {
             dependency_type: Some(finstack_quant_factor::DependencyType::Credit),
             curve_type: None,

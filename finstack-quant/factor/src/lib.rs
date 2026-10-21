@@ -82,7 +82,7 @@ pub mod credit;
 /// Versioned persistence envelope for factor-model configuration.
 mod envelope;
 /// Matching primitives and built-in matcher components.
-pub mod matching;
+mod matching;
 /// Generic factor identifiers, definitions, and market dependencies.
 mod primitives;
 /// Product-independent factor and position risk kernels.
@@ -99,9 +99,10 @@ pub use envelope::{
     FactorModelConfigEnvelope, FactorModelConfigSchema, FACTOR_MODEL_CONFIG_CONTRACT,
 };
 pub use matching::{
-    bucket_factor_id, AttributeFilter, CreditHierarchicalConfig, DependencyFilter,
-    FactorMatchEntry, FactorMatchError, FactorMatcher, FactorNode, HierarchicalConfig, MappingRule,
-    MappingTableMatcher, MatchingConfig, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY,
+    bucket_factor_id, parse_bucket_factor_id, AttributeFilter, CreditHierarchicalConfig,
+    DependencyFilter, FactorMatchEntry, FactorMatchError, FactorMatcher, FactorNode,
+    HierarchicalConfig, MappingRule, MappingTableMatcher, MatchingConfig, CREDIT_GENERIC_FACTOR_ID,
+    ISSUER_ID_META_KEY,
 };
 pub use primitives::{
     CurveType, DependencyType, FactorDefinition, FactorId, FactorType, MarketDependency,

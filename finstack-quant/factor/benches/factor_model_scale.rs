@@ -17,8 +17,8 @@ use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criteri
 use finstack_quant_core::types::Attributes;
 use finstack_quant_factor::credit::calibration::{CovarianceStrategy, CreditCalibrator};
 use finstack_quant_factor::credit::decomposition::decompose_levels;
-use finstack_quant_factor::matching::{FactorMatcher, MappingTableMatcher, MatchingConfig};
 use finstack_quant_factor::{CurveType, FactorCovarianceMatrix, MarketDependency};
+use finstack_quant_factor::{FactorMatcher, MappingTableMatcher, MatchingConfig};
 use fixtures::{
     credit_dependency, credit_hierarchical_config, factor_ids, known_issuer_attrs, mapping_rules,
     psd_matrix, zero_sensitivity_matrix, CreditBook,

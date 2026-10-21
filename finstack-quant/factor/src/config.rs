@@ -665,7 +665,7 @@ mod tests {
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use crate::matching::{CreditHierarchicalConfig, DependencyFilter};
+        use crate::{CreditHierarchicalConfig, DependencyFilter};
         use finstack_quant_core::types::IssuerId;
         use std::collections::BTreeMap;
 
@@ -749,9 +749,9 @@ mod tests {
         let config = FactorModelConfig {
             factors,
             covariance,
-            matching: MatchingConfig::MappingTable(vec![crate::matching::MappingRule {
-                dependency_filter: crate::matching::DependencyFilter::default(),
-                attribute_filter: crate::matching::AttributeFilter::default(),
+            matching: MatchingConfig::MappingTable(vec![crate::MappingRule {
+                dependency_filter: crate::DependencyFilter::default(),
+                attribute_filter: crate::AttributeFilter::default(),
                 factor_id,
             }]),
 
@@ -793,7 +793,7 @@ mod tests {
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use crate::matching::CreditHierarchicalConfig;
+        use crate::CreditHierarchicalConfig;
         use finstack_quant_core::types::IssuerId;
         use std::collections::BTreeMap;
 
@@ -860,7 +860,7 @@ mod tests {
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use crate::matching::CreditHierarchicalConfig;
+        use crate::CreditHierarchicalConfig;
         use finstack_quant_core::types::IssuerId;
         use std::collections::BTreeMap;
 

@@ -110,9 +110,9 @@ fn collect_node_factor_ids(node: &FactorNode, ids: &mut std::collections::BTreeS
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::matching::{AttributeFilter, DependencyFilter};
     use crate::primitives::dependency::{DependencyType, MarketDependency};
     use crate::primitives::factor_types::FactorId;
+    use crate::{AttributeFilter, DependencyFilter};
     use finstack_quant_core::types::{Attributes, CurveId};
 
     fn deepest_match(
