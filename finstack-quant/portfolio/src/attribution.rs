@@ -6,38 +6,26 @@
 use crate::error::{Error, Result};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
-use crate::evaluation::{
-    supported_metrics, EvaluationProfile, PortfolioEvaluationPlan, PositionExecution,
-};
+use crate::evaluation::{EvaluationProfile, PortfolioEvaluationPlan, PositionExecution};
 use crate::portfolio::Portfolio;
 use crate::types::PositionId;
 use crate::valuation::{
     PortfolioValuation, PortfolioValuationOptions, PositionValue, RequestedMetrics,
 };
 use finstack_quant_attribution::{
-    attribute_pnl_metrics_based, default_attribution_metrics, AttributionRequest,
+    attribute_pnl_metrics_based, default_attribution_metrics, translate_to_target_currency,
+    AttributionMethod, AttributionRequest, PnlAttribution,
 };
 use finstack_quant_core::config::FinstackConfig;
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::instrument_json_of;
-use finstack_quant_valuations::instruments::{CompositeInstrument, Instrument, PricingOptions};
+use finstack_quant_valuations::instruments::{CompositeInstrument, Instrument};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-
-/// Re-export attribution types appearing in this module's public API so direct
-/// portfolio consumers do not need a separate, version-sensitive dependency.
-pub use finstack_quant_attribution::{
-    AttributionFactor, AttributionMeta, AttributionMethod, CarryDetail, CorrelationsAttribution,
-    CreditCarryByLevel, CreditCarryDecomposition, CreditCurvesAttribution, CreditFactorAttribution,
-    CrossFactorDetail, ExecutionPolicy, FxAttribution, InflationCurvesAttribution, LevelCarry,
-    LevelPnl, ModelParamsAttribution, PnlAttribution, RatesCurvesAttribution, ScalarsAttribution,
-    SourceLine, TaylorAttributionConfig, VolAttribution,
-};
 
 /// Portfolio-level P&L attribution result.
 ///
@@ -189,142 +177,31 @@ struct PositionAttributionData {
     position_id: PositionId,
     pos_attr: PnlAttribution,
     val_t0_native: Money,
-    inst_currency: Currency,
 }
 
-#[derive(Copy, Clone)]
-enum FactorBucket {
-    TotalPnl = 0,
-    Carry = 1,
-    RatesCurvesPnl = 2,
-    CreditCurvesPnl = 3,
-    InflationCurvesPnl = 4,
-    CorrelationsPnl = 5,
-    FxPnl = 6,
-    FxTranslationPnl = 7,
-    CrossFactorPnl = 8,
-    VolPnl = 9,
-    ModelParamsPnl = 10,
-    MarketScalarsPnl = 11,
-    Residual = 12,
-}
-
-const N_BUCKETS: usize = 13;
-
-/// Private helper that aggregates portfolio-level factor P&L buckets using
-/// Neumaier summation. An enum-keyed array eliminates per-field duplication
-/// and makes the bucket-to-output mapping a single point of truth.
-struct FactorAccumulator {
-    buckets: [NeumaierAccumulator; N_BUCKETS],
-    /// Set once any folded-in position carried `result_invalid = true`.
-    result_invalid: bool,
-}
-
-impl FactorAccumulator {
-    fn new() -> Self {
-        Self {
-            buckets: [NeumaierAccumulator::new(); N_BUCKETS],
-            result_invalid: false,
-        }
-    }
-
-    fn add(&mut self, b: FactorBucket, x: f64) {
-        self.buckets[b as usize].add(x);
-    }
-
-    fn total(&self, b: FactorBucket) -> f64 {
-        self.buckets[b as usize].total()
-    }
-
-    fn add_converted(
-        &mut self,
-        pos_attr: &PnlAttribution,
-        convert: &impl Fn(Money) -> Result<Money>,
-    ) -> Result<()> {
-        // A single invalid constituent makes the whole aggregate untrustworthy.
-        self.result_invalid |= pos_attr.result_invalid;
-        self.add(
-            FactorBucket::TotalPnl,
-            convert(pos_attr.total_pnl)?.amount(),
-        );
-        self.add(FactorBucket::Carry, convert(pos_attr.carry)?.amount());
-        self.add(
-            FactorBucket::RatesCurvesPnl,
-            convert(pos_attr.rates_curves_pnl)?.amount(),
-        );
-        self.add(
-            FactorBucket::CreditCurvesPnl,
-            convert(pos_attr.credit_curves_pnl)?.amount(),
-        );
-        self.add(
-            FactorBucket::InflationCurvesPnl,
-            convert(pos_attr.inflation_curves_pnl)?.amount(),
-        );
-        self.add(
-            FactorBucket::CorrelationsPnl,
-            convert(pos_attr.correlations_pnl)?.amount(),
-        );
-        self.add(FactorBucket::FxPnl, convert(pos_attr.fx_pnl)?.amount());
-        self.add(
-            FactorBucket::CrossFactorPnl,
-            convert(pos_attr.cross_factor_pnl)?.amount(),
-        );
-        self.add(FactorBucket::VolPnl, convert(pos_attr.vol_pnl)?.amount());
-        self.add(
-            FactorBucket::ModelParamsPnl,
-            convert(pos_attr.model_params_pnl)?.amount(),
-        );
-        self.add(
-            FactorBucket::MarketScalarsPnl,
-            convert(pos_attr.market_scalars_pnl)?.amount(),
-        );
-        self.add(FactorBucket::Residual, convert(pos_attr.residual)?.amount());
-        self.add(
-            FactorBucket::FxTranslationPnl,
-            convert(pos_attr.fx_translation_pnl)?.amount(),
-        );
-        Ok(())
-    }
-
-    fn add_fx_translation(&mut self, amount: f64) {
-        self.add(FactorBucket::FxTranslationPnl, amount);
-        self.add(FactorBucket::TotalPnl, amount);
-    }
-
-    fn into_portfolio_attribution(
-        self,
-        base_currency: Currency,
+impl PortfolioAttribution {
+    /// The portfolio result for a base-currency aggregate of its positions.
+    fn from_aggregate(
+        aggregate: PnlAttribution,
         by_position: IndexMap<PositionId, PnlAttribution>,
-    ) -> finstack_quant_core::Result<PortfolioAttribution> {
-        Ok(PortfolioAttribution {
-            total_pnl: Money::new(self.total(FactorBucket::TotalPnl), base_currency)?,
-            carry: Money::new(self.total(FactorBucket::Carry), base_currency)?,
-            rates_curves_pnl: Money::new(self.total(FactorBucket::RatesCurvesPnl), base_currency)?,
-            credit_curves_pnl: Money::new(
-                self.total(FactorBucket::CreditCurvesPnl),
-                base_currency,
-            )?,
-            inflation_curves_pnl: Money::new(
-                self.total(FactorBucket::InflationCurvesPnl),
-                base_currency,
-            )?,
-            correlations_pnl: Money::new(self.total(FactorBucket::CorrelationsPnl), base_currency)?,
-            fx_pnl: Money::new(self.total(FactorBucket::FxPnl), base_currency)?,
-            fx_translation_pnl: Money::new(
-                self.total(FactorBucket::FxTranslationPnl),
-                base_currency,
-            )?,
-            cross_factor_pnl: Money::new(self.total(FactorBucket::CrossFactorPnl), base_currency)?,
-            vol_pnl: Money::new(self.total(FactorBucket::VolPnl), base_currency)?,
-            model_params_pnl: Money::new(self.total(FactorBucket::ModelParamsPnl), base_currency)?,
-            market_scalars_pnl: Money::new(
-                self.total(FactorBucket::MarketScalarsPnl),
-                base_currency,
-            )?,
-            residual: Money::new(self.total(FactorBucket::Residual), base_currency)?,
+    ) -> Self {
+        Self {
+            total_pnl: aggregate.total_pnl,
+            carry: aggregate.carry,
+            rates_curves_pnl: aggregate.rates_curves_pnl,
+            credit_curves_pnl: aggregate.credit_curves_pnl,
+            inflation_curves_pnl: aggregate.inflation_curves_pnl,
+            correlations_pnl: aggregate.correlations_pnl,
+            fx_pnl: aggregate.fx_pnl,
+            fx_translation_pnl: aggregate.fx_translation_pnl,
+            cross_factor_pnl: aggregate.cross_factor_pnl,
+            vol_pnl: aggregate.vol_pnl,
+            model_params_pnl: aggregate.model_params_pnl,
+            market_scalars_pnl: aggregate.market_scalars_pnl,
+            residual: aggregate.residual,
             by_position,
-            result_invalid: self.result_invalid,
-        })
+            result_invalid: aggregate.result_invalid,
+        }
     }
 }
 
@@ -368,62 +245,33 @@ fn attribute_composite_primitives(
             Arc::from(definition.clone().into_boxed().map_err(Error::Core)?);
         let value_t0 = instrument.value(market_t0, as_of_t0).map_err(Error::Core)?;
         let value_t1 = instrument.value(market_t1, as_of_t1).map_err(Error::Core)?;
-        let mut primitive = if matches!(method, AttributionMethod::MetricsBased) {
-            let options = PricingOptions::default().with_config(config);
-            // The attribution metric list is a cross-instrument menu: narrow
-            // it to what this primitive's own instrument type supports so an
-            // unsupported entry is dropped here rather than failing the whole
-            // composite.
-            let metrics = supported_metrics(
-                instrument.as_ref(),
-                &default_attribution_metrics(),
-                &options,
-            );
-            let result_t0 = instrument
-                .price_with_metrics(market_t0, as_of_t0, &metrics, options.clone())
-                .map_err(|error| Error::Core(error.into()))?;
-            let result_t1 = instrument
-                .price_with_metrics(market_t1, as_of_t1, &metrics, options)
-                .map_err(|error| Error::Core(error.into()))?;
-            attribute_pnl_metrics_based(
-                &instrument,
-                market_t0,
-                market_t1,
-                &result_t0,
-                &result_t1,
-                as_of_t0,
-                as_of_t1,
-            )
-            .map_err(Error::Core)?
-        } else {
-            finstack_quant_attribution::attribute_pnl(
-                method,
-                &AttributionRequest {
-                    strict_validation: false,
-                    prepared_endpoints: Some((value_t0, value_t1)),
-                    ..AttributionRequest::new(
-                        &instrument,
-                        market_t0,
-                        market_t1,
-                        as_of_t0,
-                        as_of_t1,
-                        config,
-                    )
-                },
-            )
-            .map_err(Error::Core)?
-        };
+        let mut primitive = finstack_quant_attribution::attribute_pnl(
+            method,
+            &AttributionRequest {
+                strict_validation: false,
+                prepared_endpoints: Some((value_t0, value_t1)),
+                ..AttributionRequest::new(
+                    &instrument,
+                    market_t0,
+                    market_t1,
+                    as_of_t0,
+                    as_of_t1,
+                    config,
+                )
+            },
+        )
+        .map_err(Error::Core)?;
         primitive.scale(exposure.quantity)?;
-        translate_primitive_attribution(
+        translate_to_target_currency(
             &mut primitive,
-            value_t0.amount() * exposure.quantity,
+            value_t0.checked_mul_f64(exposure.quantity)?,
+            reporting_currency,
             market_t0,
             market_t1,
             as_of_t0,
             as_of_t1,
-            reporting_currency,
         )?;
-        add_primitive_attribution(&mut aggregate, primitive)?;
+        aggregate.accumulate(primitive)?;
     }
 
     aggregate.meta.notes.push(
@@ -432,142 +280,6 @@ fn attribute_composite_primitives(
     );
     aggregate.compute_residual().map_err(Error::Core)?;
     Ok(aggregate)
-}
-
-fn translate_primitive_attribution(
-    attribution: &mut PnlAttribution,
-    opening_value: f64,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    as_of_t0: Date,
-    as_of_t1: Date,
-    reporting_currency: Currency,
-) -> Result<()> {
-    let native_currency = attribution.total_pnl.currency();
-    let rate_t0 = crate::fx::convert_to_base(
-        Money::from((1_i64, native_currency)),
-        as_of_t0,
-        market_t0,
-        reporting_currency,
-    )?
-    .amount();
-    let rate_t1 = crate::fx::convert_to_base(
-        Money::from((1_i64, native_currency)),
-        as_of_t1,
-        market_t1,
-        reporting_currency,
-    )?
-    .amount();
-    let principal_translation = opening_value * (rate_t1 - rate_t0);
-    attribution.total_pnl = translated(attribution.total_pnl, rate_t1, reporting_currency)?;
-    attribution.total_pnl = Money::new(
-        attribution.total_pnl.amount() + principal_translation,
-        reporting_currency,
-    )?;
-    attribution.mark_to_market_pnl = attribution
-        .mark_to_market_pnl
-        .map(|value| {
-            Money::new(
-                value.amount() * rate_t1 + principal_translation,
-                reporting_currency,
-            )
-        })
-        .transpose()?;
-    attribution.fx_translation_pnl = Money::new(
-        attribution.fx_translation_pnl.amount() * rate_t1 + principal_translation,
-        reporting_currency,
-    )?;
-    // Endpoints travel at their own date's FX, so their difference stays the
-    // translated mark-to-market P&L above.
-    attribution.pv_t0 = attribution
-        .pv_t0
-        .map(|value| translated(value, rate_t0, reporting_currency))
-        .transpose()?;
-    attribution.pv_t1 = attribution
-        .pv_t1
-        .map(|value| translated(value, rate_t1, reporting_currency))
-        .transpose()?;
-    attribution.residual = translated(attribution.residual, rate_t1, reporting_currency)?;
-    attribution.carry_detail = None;
-    attribution.rates_detail = None;
-    attribution.credit_detail = None;
-    attribution.inflation_detail = None;
-    attribution.correlations_detail = None;
-    attribution.fx_detail = None;
-    attribution.vol_detail = None;
-    attribution.cross_factor_detail = None;
-    attribution.model_params_detail = None;
-    attribution.scalars_detail = None;
-    attribution.credit_factor_detail = None;
-    attribution.credit_carry_decomposition = None;
-    // A composite has no single step sequence; primitive step rows are dropped
-    // with the other per-primitive detail.
-    attribution.waterfall_steps.clear();
-    attribution.sensitivity_steps.clear();
-    attribution.for_each_money_mut(|money| {
-        *money = translated(*money, rate_t1, reporting_currency)?;
-        Ok(())
-    })?;
-    Ok(())
-}
-
-fn translated(value: Money, rate: f64, currency: Currency) -> finstack_quant_core::Result<Money> {
-    Money::new(value.amount() * rate, currency)
-}
-
-fn add_money(target: &mut Money, source: Money) -> finstack_quant_core::Result<()> {
-    *target = Money::new(target.amount() + source.amount(), target.currency())?;
-    Ok(())
-}
-
-fn add_primitive_attribution(
-    aggregate: &mut PnlAttribution,
-    primitive: PnlAttribution,
-) -> finstack_quant_core::Result<()> {
-    add_money(&mut aggregate.total_pnl, primitive.total_pnl)?;
-    match (
-        aggregate.mark_to_market_pnl.as_mut(),
-        primitive.mark_to_market_pnl,
-    ) {
-        (Some(target), Some(source)) => add_money(target, source)?,
-        _ => aggregate.mark_to_market_pnl = None,
-    }
-    for (target, source) in [
-        (&mut aggregate.pv_t0, primitive.pv_t0),
-        (&mut aggregate.pv_t1, primitive.pv_t1),
-    ] {
-        match (target.as_mut(), source) {
-            (Some(target), Some(source)) => add_money(target, source)?,
-            _ => *target = None,
-        }
-    }
-    add_money(&mut aggregate.carry, primitive.carry)?;
-    add_money(&mut aggregate.rates_curves_pnl, primitive.rates_curves_pnl)?;
-    add_money(
-        &mut aggregate.credit_curves_pnl,
-        primitive.credit_curves_pnl,
-    )?;
-    add_money(
-        &mut aggregate.inflation_curves_pnl,
-        primitive.inflation_curves_pnl,
-    )?;
-    add_money(&mut aggregate.correlations_pnl, primitive.correlations_pnl)?;
-    add_money(&mut aggregate.fx_pnl, primitive.fx_pnl)?;
-    add_money(&mut aggregate.vol_pnl, primitive.vol_pnl)?;
-    add_money(&mut aggregate.cross_factor_pnl, primitive.cross_factor_pnl)?;
-    add_money(&mut aggregate.model_params_pnl, primitive.model_params_pnl)?;
-    add_money(
-        &mut aggregate.market_scalars_pnl,
-        primitive.market_scalars_pnl,
-    )?;
-    add_money(
-        &mut aggregate.fx_translation_pnl,
-        primitive.fx_translation_pnl,
-    )?;
-    aggregate.result_invalid |= primitive.result_invalid;
-    aggregate.meta.num_repricings += primitive.meta.num_repricings;
-    aggregate.meta.notes.extend(primitive.meta.notes);
-    Ok(())
 }
 
 /// Exact canonical evaluation profile required by an attribution method.
@@ -800,14 +512,10 @@ pub(crate) fn reduce_prepared(
                     message: format!("Attribution scaling failed: {error}"),
                     kind: error.kind(),
                 })?;
-            // A composite aggregates in its reporting currency, so the total's
-            // currency is the instrument currency for every branch.
-            let inst_currency = pos_attr.total_pnl.currency();
             Ok(PositionAttributionData {
                 position_id: position.position_id.clone(),
                 pos_attr,
                 val_t0_native: position_t0.value_native,
-                inst_currency,
             })
         };
 
@@ -832,6 +540,7 @@ pub(crate) fn reduce_prepared(
 
     aggregate_position_attributions(
         portfolio,
+        method,
         market_t0,
         market_t1,
         as_of_t0,
@@ -844,44 +553,46 @@ pub(crate) fn reduce_prepared(
 /// portfolio base currency and apply opening-principal FX translation.
 fn aggregate_position_attributions(
     portfolio: &Portfolio,
+    method: &AttributionMethod,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
     as_of_t0: Date,
     as_of_t1: Date,
     position_data: Vec<PositionAttributionData>,
 ) -> Result<PortfolioAttribution> {
-    let base_currency = portfolio.base_currency;
-    let mut acc = FactorAccumulator::new();
+    let mut aggregate = PnlAttribution::new(
+        Money::from((0_i64, portfolio.base_currency)),
+        portfolio.id.as_str(),
+        as_of_t0,
+        as_of_t1,
+        method.clone(),
+    );
     let mut by_position: IndexMap<PositionId, PnlAttribution> =
         IndexMap::with_capacity(position_data.len());
 
-    let convert = |money: Money| -> Result<Money> {
-        crate::fx::convert_to_base(money, as_of_t1, market_t1, base_currency)
-    };
-
-    for data in position_data {
-        let PositionAttributionData {
-            position_id,
-            pos_attr,
+    for PositionAttributionData {
+        position_id,
+        pos_attr,
+        val_t0_native,
+    } in position_data
+    {
+        // Factors at T1 FX; the opening principal's FX move lands in
+        // fx_translation_pnl. A base-currency position is unchanged.
+        let mut in_base = pos_attr.clone();
+        translate_to_target_currency(
+            &mut in_base,
             val_t0_native,
-            inst_currency,
-        } = data;
-
-        acc.add_converted(&pos_attr, &convert)?;
-
-        if inst_currency != base_currency {
-            let rate_t0 =
-                crate::fx::spot_rate_to_base(inst_currency, as_of_t0, market_t0, base_currency)?;
-            let rate_t1 =
-                crate::fx::spot_rate_to_base(inst_currency, as_of_t1, market_t1, base_currency)?;
-            let principal_translation = val_t0_native.amount() * (rate_t1 - rate_t0);
-            acc.add_fx_translation(principal_translation);
-        }
-
+            portfolio.base_currency,
+            market_t0,
+            market_t1,
+            as_of_t0,
+            as_of_t1,
+        )?;
+        aggregate.accumulate(in_base)?;
         by_position.insert(position_id, pos_attr);
     }
 
-    Ok(acc.into_portfolio_attribution(base_currency, by_position)?)
+    Ok(PortfolioAttribution::from_aggregate(aggregate, by_position))
 }
 
 fn attribution_endpoint_error(error: Error, endpoint: &str) -> Error {
@@ -1100,6 +811,8 @@ mod tests {
     use super::*;
     use crate::position::{Position, PositionUnit};
     use crate::types::Entity;
+    use finstack_quant_attribution::{ExecutionPolicy, TaylorAttributionConfig};
+    use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_valuations::instruments::composite::{
         CompositeLegSpec, CompositeSpec, RebalanceRule, WeightingMethod,
@@ -1205,6 +918,89 @@ mod tests {
             .notes
             .iter()
             .any(|note| note.contains("frozen primitive")));
+        Ok(())
+    }
+
+    /// Composite legs are attributed exactly like the same instruments on
+    /// their own. Over a multi-day window the metrics-based carry needs theta
+    /// priced over that window; the composite's former private dispatch
+    /// priced the default horizon and failed for coupon-paying legs.
+    #[test]
+    fn composite_metrics_based_carry_matches_the_standalone_legs() -> Result<()> {
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        use finstack_quant_valuations::instruments::{Bond, InstrumentJson};
+
+        let as_of_t0 = date!(2025 - 01 - 01);
+        let as_of_t1 = date!(2025 - 01 - 31);
+        let bond = |id: &str, coupon: f64| -> Result<Bond> {
+            Ok(Bond::fixed(
+                id,
+                Money::from((1_000_000_i64, Currency::USD)),
+                finstack_quant_core::types::Rate::from_decimal(coupon).expect("valid rate"),
+                date!(2024 - 01 - 01),
+                date!(2030 - 01 - 01),
+                finstack_quant_core::dates::StubKind::ShortFront,
+                "USD-OIS",
+            )?)
+        };
+        let legs = [bond("LEG-A", 0.05)?, bond("LEG-B", 0.03)?];
+        let market = |base, rate: f64| -> Result<MarketContext> {
+            let curve = DiscountCurve::builder("USD-OIS")
+                .base_date(base)
+                .knots([(0.0, 1.0), (10.0, (-rate * 10.0_f64).exp())])
+                .build()?;
+            Ok(MarketContext::new().insert(curve))
+        };
+        let market_t0 = market(as_of_t0, 0.04)?;
+        let market_t1 = market(as_of_t1, 0.041)?;
+        let config = FinstackConfig::default();
+
+        let mut standalone_carry = 0.0;
+        for leg in &legs {
+            let instrument: Arc<dyn Instrument> = Arc::new(leg.clone());
+            standalone_carry += finstack_quant_attribution::attribute_pnl(
+                &AttributionMethod::MetricsBased,
+                &AttributionRequest::new(
+                    &instrument,
+                    &market_t0,
+                    &market_t1,
+                    as_of_t0,
+                    as_of_t1,
+                    &config,
+                ),
+            )?
+            .carry
+            .amount();
+        }
+
+        let spec = CompositeSpec::new(
+            "TWO-BONDS",
+            Currency::USD,
+            Money::from((2_000_000_i64, Currency::USD)),
+            legs.iter()
+                .map(|leg| {
+                    CompositeLegSpec::new(leg.id.as_str(), InstrumentJson::Bond(leg.clone()), 1.0)
+                })
+                .collect(),
+            WeightingMethod::FixedQuantity,
+            RebalanceRule::Manual,
+        );
+        let composite = spec.initialize_fixed(as_of_t0)?.instrument;
+        let composite_attribution = attribute_composite_primitives(
+            &composite,
+            &market_t0,
+            &market_t1,
+            as_of_t0,
+            as_of_t1,
+            &config,
+            &AttributionMethod::MetricsBased,
+        )?;
+
+        assert!(
+            (composite_attribution.carry.amount() - standalone_carry).abs() < 1.0e-6,
+            "composite carry {} vs standalone legs {standalone_carry}",
+            composite_attribution.carry,
+        );
         Ok(())
     }
 
@@ -1380,33 +1176,6 @@ mod tests {
                 self.base_value(market, as_of)?,
             ))
         }
-    }
-
-    #[test]
-    fn factor_bucket_indices_are_unique_and_cover_n_buckets() {
-        let buckets = [
-            FactorBucket::TotalPnl,
-            FactorBucket::Carry,
-            FactorBucket::RatesCurvesPnl,
-            FactorBucket::CreditCurvesPnl,
-            FactorBucket::InflationCurvesPnl,
-            FactorBucket::CorrelationsPnl,
-            FactorBucket::FxPnl,
-            FactorBucket::FxTranslationPnl,
-            FactorBucket::CrossFactorPnl,
-            FactorBucket::VolPnl,
-            FactorBucket::ModelParamsPnl,
-            FactorBucket::MarketScalarsPnl,
-            FactorBucket::Residual,
-        ];
-        assert_eq!(buckets.len(), N_BUCKETS);
-        let mut seen = [false; N_BUCKETS];
-        for b in buckets {
-            let idx = b as usize;
-            assert!(!seen[idx], "duplicate index {idx}");
-            seen[idx] = true;
-        }
-        assert!(seen.iter().all(|&v| v), "gap in bucket indices");
     }
 
     fn sample_position_attr(
@@ -1858,11 +1627,9 @@ mod tests {
     fn embedded_fx_translation_is_preserved_once() {
         let mut position = sample_position_attr("COMPOSITE", 10.0, 0.0, 0.0);
         position.fx_translation_pnl = Money::from((10_i64, Currency::USD));
-        let mut acc = FactorAccumulator::new();
-        acc.add_converted(&position, &Ok).expect("convert");
-        let result = acc
-            .into_portfolio_attribution(Currency::USD, IndexMap::new())
-            .expect("aggregate");
+        let mut aggregate = sample_position_attr("PORTFOLIO", 0.0, 0.0, 0.0);
+        aggregate.accumulate(position).expect("same-currency add");
+        let result = PortfolioAttribution::from_aggregate(aggregate, IndexMap::new());
         assert_eq!(result.total_pnl.amount(), 10.0);
         assert_eq!(result.fx_translation_pnl.amount(), 10.0);
     }
@@ -1875,16 +1642,11 @@ mod tests {
         let mut bad = sample_position_attr("BAD", 100.0, 10.0, 5.0);
         bad.result_invalid = true;
 
-        let identity = |m: Money| -> Result<Money> { Ok(m) };
-        let mut acc = FactorAccumulator::new();
-        acc.add_converted(&good, &identity)
-            .expect("same-currency add");
-        acc.add_converted(&bad, &identity)
-            .expect("same-currency add");
+        let mut aggregate = sample_position_attr("PORTFOLIO", 0.0, 0.0, 0.0);
+        aggregate.accumulate(good).expect("same-currency add");
+        aggregate.accumulate(bad).expect("same-currency add");
 
-        let portfolio = acc
-            .into_portfolio_attribution(Currency::USD, IndexMap::new())
-            .expect("valid into_portfolio_attribution fixture");
+        let portfolio = PortfolioAttribution::from_aggregate(aggregate, IndexMap::new());
         assert!(
             portfolio.result_invalid,
             "one invalid position must flag the whole portfolio invalid"

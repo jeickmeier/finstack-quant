@@ -32,13 +32,11 @@
 //! - Residual is minimal by construction (should be within numeric precision)
 //! - Recommended for risk reporting where sum must equal total
 
-use super::credit_cascade::{
-    build_credit_factor_attribution, note_unplanned_cascade, plan_credit_cascade, CreditCascade,
-};
-use super::factors::*;
-use super::helpers::*;
-use super::types::*;
+use crate::credit_cascade::{build_credit_factor_attribution, plan_credit_cascade, CreditCascade};
+use crate::factors::*;
+use crate::helpers::*;
 use crate::AttributionRequest;
+use crate::{AttributionFactor, AttributionMethod, ExecutionPolicy, PnlAttribution, WaterfallStep};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -85,16 +83,11 @@ pub fn default_waterfall_order() -> Vec<AttributionFactor> {
 ///
 /// # Arguments
 ///
-/// * `instrument` - Instrument to attribute
-/// * `market_t0` - Market context at T₀
-/// * `market_t1` - Market context at T₁
-/// * `as_of_t0` - Valuation date at T₀
-/// * `as_of_t1` - Valuation date at T₁
-/// * `config` - Finstack configuration
-/// * `factor_order` - Ordered list of factors to apply
-/// * `strict_validation` - If true, propagate errors instead of soft failures
-/// * `model_params_t0` - Optional opening model-parameter snapshot used to
-///   isolate parameter P&L; `None` omits that source detail.
+/// * `request` - Instrument, T₀ and T₁ markets and dates, configuration and
+///   the optional overrides on [`AttributionRequest`]; `strict_validation`
+///   propagates factor failures instead of recording soft warnings.
+/// * `factor_order` - Ordered list of factors to apply, beginning with
+///   [`AttributionFactor::Carry`].
 ///
 /// # Returns
 ///
@@ -234,7 +227,6 @@ pub(crate) fn attribute_pnl_waterfall(
             }
         }
     }
-    validate_attribution_period(as_of_t0, as_of_t1)?;
 
     let (instrument_t0, val_t0, val_t1) = endpoint_values(request)?;
     let mut attribution = seed_attribution(
@@ -258,12 +250,15 @@ pub(crate) fn attribute_pnl_waterfall(
     // CreditCurves step when planning yields None (no issuer tag, no hazard
     // dependencies, etc.).
     let cascade: Option<CreditCascade> = match credit_factor_model {
-        Some(model) => plan_credit_cascade(model, instrument, market_t0, market_t1)?,
+        Some(model) => plan_credit_cascade(
+            model,
+            instrument,
+            market_t0,
+            market_t1,
+            &mut attribution.meta.notes,
+        )?,
         None => None,
     };
-    if credit_factor_model.is_some() && cascade.is_none() {
-        note_unplanned_cascade(&mut attribution, instrument.id(), "waterfall");
-    }
     let mut credit_step_pnls: Vec<finstack_quant_core::money::Money> = Vec::new();
 
     // Build hybrid market: start with all T₀, progressively apply T₁
@@ -318,30 +313,23 @@ pub(crate) fn attribute_pnl_waterfall(
                 ctx.num_repricings +=
                     apply_total_return_carry(&mut attribution, theta, carry_inputs)?;
             }
-            AttributionFactor::RatesCurves => attribution.rates_curves_pnl = factor_pnl,
-            AttributionFactor::CreditCurves => attribution.credit_curves_pnl = factor_pnl,
-            AttributionFactor::InflationCurves => attribution.inflation_curves_pnl = factor_pnl,
-            AttributionFactor::Correlations => attribution.correlations_pnl = factor_pnl,
-            AttributionFactor::Fx => {
-                attribution.fx_pnl = factor_pnl;
-                let target_currency = attribution.fx_pnl.currency();
-                stamp_fx_policy(
-                    &mut attribution,
-                    target_currency,
-                    "Waterfall FX attribution with full translation",
-                );
-            }
-            AttributionFactor::Volatility => attribution.vol_pnl = factor_pnl,
-            AttributionFactor::ModelParameters => {
-                attribution.model_params_pnl = factor_pnl;
-                if factor_pnl.amount().abs() < 1e-10 {
+            factor => {
+                *attribution.factor_pnl_mut(&factor) = factor_pnl;
+                if factor == AttributionFactor::Fx {
+                    stamp_fx_policy(
+                        &mut attribution,
+                        factor_pnl.currency(),
+                        "Waterfall FX attribution with full translation",
+                    );
+                }
+                if factor == AttributionFactor::ModelParameters && factor_pnl.amount().abs() < 1e-10
+                {
                     attribution
                         .meta
                         .notes
                         .push("Model parameters attribution returned zero".to_string());
                 }
             }
-            AttributionFactor::MarketScalars => attribution.market_scalars_pnl = factor_pnl,
         }
     }
 

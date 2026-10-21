@@ -286,28 +286,17 @@ pub(super) fn measure_per_tenor_rate_shift(
 ///   for the signed mean.
 fn mean_tenor_shift_bp(sample: impl Fn(f64) -> (f64, f64), absolute: bool) -> Option<f64> {
     use finstack_quant_core::market_data::diff::STANDARD_TENORS;
-    let mut total = 0.0;
-    let mut count = 0usize;
-    for &t in STANDARD_TENORS {
-        if t <= 0.0 {
-            continue;
-        }
+    let tenors = STANDARD_TENORS.iter().copied().filter(|&t| t > 0.0);
+    average_over(tenors, |t| {
         let (r0, r1) = sample(t);
-        if r0.is_finite() && r1.is_finite() {
-            let delta = r1 - r0;
-            total += if absolute {
-                delta.abs() * 10_000.0
-            } else {
-                delta * 10_000.0
-            };
-            count += 1;
-        }
-    }
-    if count == 0 {
-        None
-    } else {
-        Some(total / count as f64)
-    }
+        let delta_bp = (r1 - r0) * 10_000.0;
+        (r0.is_finite() && r1.is_finite()).then_some(if absolute {
+            delta_bp.abs()
+        } else {
+            delta_bp
+        })
+    })
+    .0
 }
 
 /// Arithmetic mean of `shift(item)` over the items where it is `Some`.
@@ -320,7 +309,7 @@ fn mean_tenor_shift_bp(sample: impl Fn(f64) -> (f64, f64), absolute: bool) -> Op
 /// Returns `(mean, count)`; the mean is `None` when nothing contributed.
 pub(super) fn average_over<T>(
     items: impl IntoIterator<Item = T>,
-    shift: impl Fn(T) -> Option<f64>,
+    mut shift: impl FnMut(T) -> Option<f64>,
 ) -> (Option<f64>, usize) {
     let mut total = 0.0;
     let mut count = 0usize;

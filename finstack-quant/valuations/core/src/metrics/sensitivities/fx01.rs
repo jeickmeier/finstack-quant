@@ -10,7 +10,7 @@
 //! "$ per 1% relative spot move", matching:
 //!
 //! - `core::market_data::diff::measure_fx_shift`'s output (percentage points)
-//! - `finstack_quant_attribution::metrics_based::attribute_pnl_metrics_based`'s
+//! - `finstack_quant_attribution::attribute_pnl_metrics_based`'s
 //!   consumer (`fx01 × fx_shift_pct` gives the right P&L magnitude).
 //!
 //! When an instrument has no FX exposure (`fx_pairs` empty), FX01 is `0.0`.

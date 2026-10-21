@@ -10,8 +10,13 @@ use finstack_quant_core::money::{fx::FxPolicyMeta, Money};
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
-use super::detail::*;
 use crate::taylor::TaylorAttributionConfig;
+use crate::{
+    CarryDetail, CorrelationsAttribution, CreditCarryDecomposition, CreditCurvesAttribution,
+    CreditFactorAttribution, CrossFactorDetail, FxAttribution, InflationCurvesAttribution,
+    ModelParamsAttribution, RatesCurvesAttribution, ScalarsAttribution, SensitivityStep,
+    VolAttribution, WaterfallStep,
+};
 
 /// Controls where attribution repricing work spends parallelism.
 ///
@@ -773,6 +778,85 @@ impl PnlAttribution {
         Ok(())
     }
 
+    /// Add another attribution's headline amounts into this one.
+    ///
+    /// Sums `total_pnl`, every factor field, `cross_factor_pnl`,
+    /// `fx_translation_pnl` and `residual` with currency-checked `Money`
+    /// arithmetic. `mark_to_market_pnl`, `pv_t0` and `pv_t1` stay present
+    /// only when both sides carry them. `result_invalid`, the repricing count
+    /// and the notes are merged; detail structs and step rows are not, since
+    /// per-instrument breakdowns do not sum into one tree. Use it to aggregate
+    /// positions or composite legs that are already in one reporting currency
+    /// (see [`crate::translate_to_target_currency`]).
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - Attribution to add, in the same currency as `self`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::CurrencyMismatch`] when an amount
+    /// of `other` is in a different currency, or the checked-addition error
+    /// when a sum cannot be represented. `self` may then be partially
+    /// updated, so callers abort the aggregation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_attribution::{AttributionMethod, PnlAttribution};
+    /// use finstack_quant_core::{currency::Currency, money::Money};
+    /// use time::macros::date;
+    ///
+    /// let leg = |carry: i64| {
+    ///     let mut attribution = PnlAttribution::new(
+    ///         Money::from((carry, Currency::USD)),
+    ///         "LEG",
+    ///         date!(2025 - 01 - 15),
+    ///         date!(2025 - 01 - 16),
+    ///         AttributionMethod::Parallel,
+    ///     );
+    ///     attribution.carry = attribution.total_pnl;
+    ///     attribution
+    /// };
+    /// let mut book = leg(10);
+    /// book.accumulate(leg(15))?;
+    /// assert_eq!(book.carry, Money::from((25_i64, Currency::USD)));
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn accumulate(&mut self, other: PnlAttribution) -> Result<()> {
+        self.total_pnl = self.total_pnl.checked_add(other.total_pnl)?;
+        for (target, source) in [
+            (&mut self.mark_to_market_pnl, other.mark_to_market_pnl),
+            (&mut self.pv_t0, other.pv_t0),
+            (&mut self.pv_t1, other.pv_t1),
+        ] {
+            *target = match (*target, source) {
+                (Some(target), Some(source)) => Some(target.checked_add(source)?),
+                _ => None,
+            };
+        }
+        for (target, source) in [
+            (&mut self.carry, other.carry),
+            (&mut self.rates_curves_pnl, other.rates_curves_pnl),
+            (&mut self.credit_curves_pnl, other.credit_curves_pnl),
+            (&mut self.inflation_curves_pnl, other.inflation_curves_pnl),
+            (&mut self.correlations_pnl, other.correlations_pnl),
+            (&mut self.fx_pnl, other.fx_pnl),
+            (&mut self.vol_pnl, other.vol_pnl),
+            (&mut self.cross_factor_pnl, other.cross_factor_pnl),
+            (&mut self.model_params_pnl, other.model_params_pnl),
+            (&mut self.market_scalars_pnl, other.market_scalars_pnl),
+            (&mut self.fx_translation_pnl, other.fx_translation_pnl),
+            (&mut self.residual, other.residual),
+        ] {
+            *target = target.checked_add(source)?;
+        }
+        self.result_invalid |= other.result_invalid;
+        self.meta.num_repricings += other.meta.num_repricings;
+        self.meta.notes.extend(other.meta.notes);
+        Ok(())
+    }
+
     /// Validate that every monetary amount uses `total_pnl`'s currency.
     ///
     /// Includes headline P&L, residual, all nested factor and carry details,
@@ -886,6 +970,67 @@ impl PnlAttribution {
         Ok(())
     }
 
+    /// P&L amount attributed to one factor.
+    ///
+    /// `Carry` reads [`Self::carry`]; every other factor reads its own
+    /// `*_pnl` field (`RatesCurves` → [`Self::rates_curves_pnl`], …).
+    ///
+    /// # Arguments
+    ///
+    /// * `factor` - Attribution factor whose headline amount is returned, in
+    ///   the attribution's reporting currency.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_attribution::{AttributionFactor, AttributionMethod, PnlAttribution};
+    /// use finstack_quant_core::{currency::Currency, money::Money};
+    /// use time::macros::date;
+    ///
+    /// let mut attribution = PnlAttribution::new(
+    ///     Money::from((100_i64, Currency::USD)),
+    ///     "BOND-1",
+    ///     date!(2025 - 01 - 15),
+    ///     date!(2025 - 01 - 16),
+    ///     AttributionMethod::Parallel,
+    /// );
+    /// attribution.rates_curves_pnl = Money::from((60_i64, Currency::USD));
+    /// assert_eq!(
+    ///     attribution.get_factor_pnl(&AttributionFactor::RatesCurves),
+    ///     Money::from((60_i64, Currency::USD)),
+    /// );
+    /// ```
+    #[must_use]
+    pub fn get_factor_pnl(&self, factor: &AttributionFactor) -> Money {
+        match factor {
+            AttributionFactor::Carry => self.carry,
+            AttributionFactor::RatesCurves => self.rates_curves_pnl,
+            AttributionFactor::CreditCurves => self.credit_curves_pnl,
+            AttributionFactor::InflationCurves => self.inflation_curves_pnl,
+            AttributionFactor::Correlations => self.correlations_pnl,
+            AttributionFactor::Fx => self.fx_pnl,
+            AttributionFactor::Volatility => self.vol_pnl,
+            AttributionFactor::ModelParameters => self.model_params_pnl,
+            AttributionFactor::MarketScalars => self.market_scalars_pnl,
+        }
+    }
+
+    /// Mutable twin of [`Self::get_factor_pnl`], used by the engines to land
+    /// a factor's P&L in its field.
+    pub(crate) fn factor_pnl_mut(&mut self, factor: &AttributionFactor) -> &mut Money {
+        match factor {
+            AttributionFactor::Carry => &mut self.carry,
+            AttributionFactor::RatesCurves => &mut self.rates_curves_pnl,
+            AttributionFactor::CreditCurves => &mut self.credit_curves_pnl,
+            AttributionFactor::InflationCurves => &mut self.inflation_curves_pnl,
+            AttributionFactor::Correlations => &mut self.correlations_pnl,
+            AttributionFactor::Fx => &mut self.fx_pnl,
+            AttributionFactor::Volatility => &mut self.vol_pnl,
+            AttributionFactor::ModelParameters => &mut self.model_params_pnl,
+            AttributionFactor::MarketScalars => &mut self.market_scalars_pnl,
+        }
+    }
+
     /// Share of total P&L, in percent, that an amount represents.
     ///
     /// Computes `amount / total_pnl × 100`, the per-factor percentage shown by
@@ -988,8 +1133,12 @@ impl PnlAttribution {
     /// Generate a structured tree explanation of P&L attribution.
     ///
     /// Creates a human-readable tree showing the total P&L broken down by factor.
-    /// Zero-valued factors are omitted for a clean presentation. Use
-    /// [`Self::explain_verbose`] to include all factors regardless of value.
+    ///
+    /// # Arguments
+    ///
+    /// * `show_zeros` - `false` omits zero-valued factors for a clean
+    ///   presentation; `true` lists every factor, which helps verify that
+    ///   all factors were computed.
     ///
     /// # Returns
     ///
@@ -1008,20 +1157,7 @@ impl PnlAttribution {
     ///   ├─ Vol: $2,000 (1.6%)
     ///   └─ Residual: -$1,570 (-1.2%)
     /// ```
-    pub fn explain(&self) -> String {
-        self.explain_impl(false)
-    }
-
-    /// Generate a verbose tree explanation showing all factors including zeros.
-    ///
-    /// Unlike [`Self::explain`], this method shows every attribution factor
-    /// regardless of whether its value is zero. Useful for debugging and
-    /// verifying that all factors are being computed.
-    pub fn explain_verbose(&self) -> String {
-        self.explain_impl(true)
-    }
-
-    fn explain_impl(&self, show_zeros: bool) -> String {
+    pub fn explain(&self, show_zeros: bool) -> String {
         let rc = &self.meta.rounding;
 
         let fmt = |amount: &Money| -> String {
@@ -1188,6 +1324,7 @@ fn add_factor(sum: Money, value: Money, label: &str, notes: &mut Vec<String>) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{LevelPnl, SourceLine};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
     use indexmap::IndexMap;
@@ -1424,7 +1561,7 @@ mod tests {
         );
 
         attribution.carry_detail = Some(detail);
-        let explanation = attribution.explain_verbose();
+        let explanation = attribution.explain(true);
         assert!(explanation.contains("Coupon Income"));
         assert!(explanation.contains("Pull-to-Par"));
         assert!(explanation.contains("Roll-Down"));
@@ -1474,10 +1611,8 @@ mod tests {
             format!("  └─ Residual: {} (10.0%)", usd(10)),
         ]
         .join("\n");
-        assert_eq!(attribution.explain(), expected);
-        assert!(attribution
-            .explain_verbose()
-            .contains("  ├─ Market Scalars: "));
+        assert_eq!(attribution.explain(false), expected);
+        assert!(attribution.explain(true).contains("  ├─ Market Scalars: "));
     }
 
     #[test]

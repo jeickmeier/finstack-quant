@@ -24,14 +24,14 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::diff::{measure_par_spread_shift, TenorSamplingMethod};
-use finstack_quant_core::market_data::scalars::MarketScalar;
+use finstack_quant_core::market_data::diff::{
+    measure_par_spread_shift, measure_scalar_absolute_shift, TenorSamplingMethod,
+};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IssuerId};
 use finstack_quant_core::Result;
-use finstack_quant_factor::credit::hierarchy::{dimension_key, CreditFactorModel, IssuerBetaRow};
+use finstack_quant_factor::credit::hierarchy::{CreditFactorModel, IssuerBetaRow};
 use finstack_quant_factor::matching::{
     bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY,
 };
@@ -41,6 +41,64 @@ use finstack_quant_valuations::recalibration::{
     provider_missing, HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump,
     RecalibrationProvider,
 };
+use serde::{Deserialize, Serialize};
+
+/// Options controlling the credit-factor detail emitted by attribution.
+///
+/// Defaults: per-issuer adder breakdown OFF (large-portfolio payload control);
+/// per-bucket breakdown ON.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields, default)]
+pub struct CreditFactorDetailOptions {
+    /// When true, populate `CreditFactorAttribution.adder_pnl_by_issuer`.
+    /// Defaults to `false` to keep payload small for big portfolios.
+    pub include_per_issuer_adder: bool,
+    /// When true, populate `LevelPnl.by_bucket` for every level. When false,
+    /// only `LevelPnl.total` is populated. Defaults to `true`.
+    pub include_per_bucket_breakdown: bool,
+}
+
+impl CreditFactorDetailOptions {
+    /// The default options: per-issuer adder breakdown off, per-bucket
+    /// breakdown on.
+    pub const DEFAULT: Self = Self {
+        include_per_issuer_adder: false,
+        include_per_bucket_breakdown: true,
+    };
+}
+
+impl Default for CreditFactorDetailOptions {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+/// Stable, deterministic identifier for a [`CreditFactorModel`].
+///
+/// Defined as `"{as_of}/{fnv1a64(serde_json::to_string(model))}"` (16-char
+/// lowercase hex). The model is serialized via `serde_json` (which uses
+/// `BTreeMap`-stable order) so two byte-identical models produce the same id.
+///
+/// FNV-1a is used to avoid a new external crypto dependency; the id is for
+/// traceability, not security.
+///
+/// # Arguments
+///
+/// * `model` - Calibrated credit-factor model whose valuation date and stable
+///   serialized contents determine the traceability identifier.
+#[allow(clippy::expect_used)] // CreditFactorModel has no non-serializable fields
+pub(crate) fn credit_factor_model_id(model: &CreditFactorModel) -> String {
+    const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+    const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+    let json = serde_json::to_string(model).expect("CreditFactorModel is always serializable");
+    let mut hash: u64 = FNV_OFFSET;
+    for b in json.as_bytes() {
+        hash ^= u64::from(*b);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    format!("{}/{:016x}", model.as_of, hash)
+}
 
 /// Threshold above which an adder step's absolute P&L is considered large
 /// enough to warrant a `tracing::warn!`. Expressed as a fraction of the
@@ -63,9 +121,10 @@ pub(crate) const ADDER_MAGNITUDE_WARN_RATIO: f64 = 0.05;
 /// This is a warning, not a hard `Error::Validation`: a genuine idiosyncratic
 /// blowout on a quiet index day (series Δ ≈ 0.2bp while the issuer gaps 25bp)
 /// is numerically indistinguishable from a unit mismatch, so refusing to run
-/// would reject correct attributions. The note lands in the cascade's
-/// `warnings` (routed to `meta.notes` on the linear wire) alongside a
-/// `tracing::warn!`.
+/// would reject correct attributions. The note lands in the attribution's
+/// `meta.notes` on every method, alongside a `tracing::warn!`.
+///
+/// [`MarketScalar::Unitless`]: finstack_quant_core::market_data::scalars::MarketScalar::Unitless
 pub(crate) const FACTOR_UNIT_MISMATCH_RATIO: f64 = 99.0;
 
 /// What kind of cascade step a single bump represents.
@@ -108,6 +167,8 @@ pub(crate) struct CreditCascadeStep {
 pub(crate) struct CreditCascade {
     /// Resolved issuer id (from instrument attributes).
     pub issuer_id: IssuerId,
+    /// The issuer's row in the model's `issuer_betas`.
+    pub issuer_row: IssuerBetaRow,
     /// Hazard curve ids the instrument depends on.
     pub hazard_curve_ids: Vec<CurveId>,
     /// Discount curve id used to re-bootstrap the hazard curves when applying a
@@ -120,10 +181,6 @@ pub(crate) struct CreditCascade {
     /// Level names (one per hierarchy dimension), used to build
     /// `LevelPnl.level_name` and as parallel-factor labels.
     pub level_names: Vec<String>,
-    /// Diagnostics collected while planning (currently the unit-coherence
-    /// guard, [`FACTOR_UNIT_MISMATCH_RATIO`]). Callers on the linear wire
-    /// merge these into `meta.notes`.
-    pub warnings: Vec<String>,
 }
 
 impl CreditCascade {
@@ -179,20 +236,17 @@ impl CreditCascade {
     }
 }
 
-/// Record that a supplied credit-factor model produced no cascade.
-pub(crate) fn note_unplanned_cascade(
-    attribution: &mut super::types::PnlAttribution,
+/// Record why a supplied credit-factor model produced no cascade.
+fn not_planned(
+    notes: &mut Vec<String>,
     instrument_id: &str,
-    method: &str,
-) {
-    tracing::warn!(
-        instrument_id,
-        method,
-        "Credit factor model supplied but credit cascade could not be planned"
-    );
-    attribution.meta.notes.push(format!(
-        "credit_factor_model supplied but no resolvable issuer/hazard cascade for {instrument_id}; credit_factor_detail omitted"
+    reason: &str,
+) -> Result<Option<CreditCascade>> {
+    tracing::warn!(instrument_id, reason, "credit cascade could not be planned");
+    notes.push(format!(
+        "credit_factor_model supplied but {instrument_id} {reason}; credit_factor_detail omitted"
     ));
+    Ok(None)
 }
 
 /// The instrument's `credit::issuer_id` tag with its row in `model`.
@@ -216,16 +270,6 @@ fn cascade_step(kind: CreditStepKind, name: &str, delta_bp: f64) -> CreditCascad
     }
 }
 
-/// Human-readable names for every level in model order.
-pub(crate) fn hierarchy_level_names(model: &CreditFactorModel) -> Vec<String> {
-    model
-        .hierarchy
-        .levels
-        .iter()
-        .map(|dimension| dimension_key(dimension).to_owned())
-        .collect()
-}
-
 /// Single-instrument bucket map for one issuer/level.
 pub(crate) fn single_issuer_by_bucket(
     model: &CreditFactorModel,
@@ -242,15 +286,6 @@ pub(crate) fn single_issuer_by_bucket(
         .bucket_path(&row.tags, level_index)
         .map(|bucket| BTreeMap::from([(bucket, total)]))
         .unwrap_or_default()
-}
-
-/// Optional single-issuer adder map used by single-instrument detail paths.
-pub(crate) fn optional_single_issuer_adder(
-    issuer_id: &IssuerId,
-    adder: Money,
-    include: bool,
-) -> Option<BTreeMap<IssuerId, Money>> {
-    include.then(|| BTreeMap::from([(issuer_id.clone(), adder)]))
 }
 
 /// Fill the `CurveShape` step with the residual needed for exact reconciliation.
@@ -280,7 +315,8 @@ pub(crate) fn apply_curve_shape_residual(
 
 /// Plan a credit cascade for one instrument.
 ///
-/// Returns `Ok(None)` when no cascade can be planned: instrument has no
+/// Returns `Ok(None)`, with the reason in `notes`, when no cascade can be
+/// planned: instrument has no
 /// `credit::issuer_id` attribute, the issuer is not in the model's
 /// `issuer_betas`, the instrument has no hazard curve dependencies, or none of
 /// the hazard curves can be measured (missing curves on either side).
@@ -299,24 +335,24 @@ pub(crate) fn plan_credit_cascade(
     instrument: &Arc<dyn Instrument>,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
+    notes: &mut Vec<String>,
 ) -> Result<Option<CreditCascade>> {
     let Some((issuer_id, issuer_row)) = resolve_issuer(model, instrument.as_ref()) else {
-        return Ok(None);
+        return not_planned(notes, instrument.id(), "carries no credit::issuer_id tag");
     };
     let Some(issuer_row) = issuer_row else {
-        tracing::warn!(
-            instrument_id = %instrument.id(),
-            issuer_id = %issuer_id,
-            "Credit cascade skipped: issuer is not mapped in the credit factor model"
+        return not_planned(
+            notes,
+            instrument.id(),
+            &format!("has issuer {issuer_id}, which is not in CreditFactorModel.issuer_betas"),
         );
-        return Ok(None);
     };
 
     // Resolve hazard + discount curves from the instrument's market dependencies.
     let market_deps = instrument.market_dependencies()?;
     let credit_curves: Vec<CurveId> = market_deps.curves.credit_curves.to_vec();
     if credit_curves.is_empty() {
-        return Ok(None);
+        return not_planned(notes, instrument.id(), "declares no hazard curves");
     }
     let discount_curve_id: Option<CurveId> = market_deps.curves.discount_curves.first().cloned();
 
@@ -340,11 +376,15 @@ pub(crate) fn plan_credit_cascade(
         }
     }
     if count == 0 {
-        return Ok(None);
+        return not_planned(
+            notes,
+            instrument.id(),
+            "has no hazard curve measurable in both markets",
+        );
     }
     let ds_i = total_shift_bp / count as f64;
 
-    let level_names = hierarchy_level_names(model);
+    let level_names = model.level_names();
     let mut scalar_level_moves: Vec<(String, Option<f64>)> =
         Vec::with_capacity(model.hierarchy.levels.len());
     for k in 0..model.hierarchy.levels.len() {
@@ -367,7 +407,6 @@ pub(crate) fn plan_credit_cascade(
     // the nonzero par-spread move it should explain. Surfaced as a loud note
     // + tracing::warn rather than a hard error — see the constant's docs for
     // why refusing outright would reject genuine idiosyncratic blowouts.
-    let mut warnings: Vec<String> = Vec::new();
     {
         let mut check_unit_coherence = |factor_id: &str, move_bp: Option<f64>| {
             let Some(mv) = move_bp else { return };
@@ -387,7 +426,7 @@ pub(crate) fn plan_credit_cascade(
                     threshold = FACTOR_UNIT_MISMATCH_RATIO,
                     "credit cascade factor-series/par-spread unit scale mismatch"
                 );
-                warnings.push(msg);
+                notes.push(msg);
             }
         };
         check_unit_coherence(&model.generic_factor.series_id, generic_move);
@@ -468,29 +507,25 @@ pub(crate) fn plan_credit_cascade(
 
     Ok(Some(CreditCascade {
         issuer_id,
+        issuer_row: issuer_row.clone(),
         hazard_curve_ids: credit_curves,
         discount_curve_id,
         steps,
         level_names,
-        warnings,
     }))
 }
 
-fn scalar_to_bp(scalar: &MarketScalar) -> f64 {
-    match scalar {
-        MarketScalar::Unitless(value) => *value,
-        MarketScalar::Price(money) => money.amount(),
-    }
-}
-
+/// Absolute move of a factor series between the two markets, read as bp.
+///
+/// `None` when the series is absent from either market or the two values
+/// are not comparable (a unitless value against a price, or prices in
+/// different currencies).
 fn factor_move_bp(
     factor_id: &str,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
 ) -> Option<f64> {
-    let t0 = market_t0.get_price(factor_id).ok().map(scalar_to_bp)?;
-    let t1 = market_t1.get_price(factor_id).ok().map(scalar_to_bp)?;
-    Some(t1 - t0)
+    measure_scalar_absolute_shift(factor_id, market_t0, market_t1).ok()
 }
 
 /// Apply a parallel **par CDS spread** shift (in bp) to every hazard curve in
@@ -575,37 +610,22 @@ pub(crate) fn snap_hazard_to_t1(
 pub(crate) fn build_credit_factor_attribution(
     model: &CreditFactorModel,
     cascade: &CreditCascade,
-    options: &super::credit_factor::CreditFactorDetailOptions,
+    options: &CreditFactorDetailOptions,
     step_pnls: &[Money],
-) -> Result<super::types::CreditFactorAttribution> {
-    use super::credit_factor::credit_factor_model_id;
-    use super::types::{CreditFactorAttribution, LevelPnl};
+) -> Result<crate::CreditFactorAttribution> {
+    use crate::{CreditFactorAttribution, LevelPnl};
 
-    if step_pnls.len() != cascade.steps.len() {
-        tracing::warn!(
-            issuer_id = %cascade.issuer_id,
-            step_pnls = step_pnls.len(),
-            steps = cascade.steps.len(),
-            "credit cascade step P&L count does not match planned steps; \
-             the shorter length is used and the detail sum may not reconcile"
-        );
-    }
-    debug_assert_eq!(step_pnls.len(), cascade.steps.len());
-    let ccy = step_pnls
-        .first()
-        .map(|m| m.currency())
-        .unwrap_or(Currency::USD);
-    if step_pnls.is_empty() {
-        tracing::warn!(
-            issuer_id = %cascade.issuer_id,
-            "credit cascade produced no step P&Ls; emitting an all-zero detail (USD)"
-        );
-    }
-
-    let issuer_row = model
-        .issuer_betas
-        .iter()
-        .find(|r| r.issuer_id == cascade.issuer_id);
+    let ccy = match step_pnls.first() {
+        Some(first) if step_pnls.len() == cascade.steps.len() => first.currency(),
+        _ => {
+            return Err(finstack_quant_core::Error::Internal(format!(
+                "credit cascade for issuer '{}' produced {} step P&Ls for {} planned steps",
+                cascade.issuer_id,
+                step_pnls.len(),
+                cascade.steps.len()
+            )))
+        }
+    };
 
     let mut generic_pnl = Money::from((0_i64, ccy));
     let mut adder_pnl = Money::from((0_i64, ccy));
@@ -629,11 +649,13 @@ pub(crate) fn build_credit_factor_attribution(
             .get(&k)
             .copied()
             .unwrap_or_else(|| Money::from((0_i64, ccy)));
-        let by_bucket = issuer_row
-            .map(|row| {
-                single_issuer_by_bucket(model, row, k, total, options.include_per_bucket_breakdown)
-            })
-            .unwrap_or_default();
+        let by_bucket = single_issuer_by_bucket(
+            model,
+            &cascade.issuer_row,
+            k,
+            total,
+            options.include_per_bucket_breakdown,
+        );
         levels.push(LevelPnl {
             level_name: level_name.clone(),
             total,
@@ -641,11 +663,9 @@ pub(crate) fn build_credit_factor_attribution(
         });
     }
 
-    let adder_pnl_by_issuer = optional_single_issuer_adder(
-        &cascade.issuer_id,
-        adder_pnl,
-        options.include_per_issuer_adder,
-    );
+    let adder_pnl_by_issuer = options
+        .include_per_issuer_adder
+        .then(|| BTreeMap::from([(cascade.issuer_id.clone(), adder_pnl)]));
 
     let adder_abs = adder_pnl.amount().abs();
     let curve_shape_abs = curve_shape_pnl.amount().abs();
@@ -861,7 +881,8 @@ mod tests {
                 MarketScalar::Unitless(-2.0),
             );
 
-        let cascade = plan_credit_cascade(&model, &instrument, &market_t0, &market_t1)
+        let mut notes = Vec::new();
+        let cascade = plan_credit_cascade(&model, &instrument, &market_t0, &market_t1, &mut notes)
             .unwrap()
             .expect("cascade");
 
@@ -927,18 +948,16 @@ mod tests {
             .insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
             .insert_price("cdx.hy.5y", MarketScalar::Unitless(3.50));
 
-        let cascade = plan_credit_cascade(&model, &instrument, &market_t0, &market_t1)
+        let mut notes = Vec::new();
+        plan_credit_cascade(&model, &instrument, &market_t0, &market_t1, &mut notes)
             .unwrap()
             .expect("cascade");
 
         assert!(
-            cascade
-                .warnings
-                .iter()
-                .any(|w| w.contains("scale mismatch")),
+            notes.iter().any(|w| w.contains("scale mismatch")),
             "a ≥100× factor-series/spread scale mismatch must produce a loud \
              warning, got warnings = {:?}",
-            cascade.warnings
+            notes
         );
     }
 
@@ -958,16 +977,56 @@ mod tests {
             .insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
             .insert_price("cdx.hy.5y", MarketScalar::Unitless(125.0));
 
-        let cascade = plan_credit_cascade(&model, &instrument, &market_t0, &market_t1)
+        let mut notes = Vec::new();
+        plan_credit_cascade(&model, &instrument, &market_t0, &market_t1, &mut notes)
             .unwrap()
             .expect("cascade");
 
         assert!(
-            cascade.warnings.is_empty(),
+            notes.is_empty(),
             "bp-quoted series of comparable magnitude must not be flagged, \
              got warnings = {:?}",
-            cascade.warnings
+            notes
         );
+    }
+
+    /// A factor series stored unitless at T0 and as a price at T1 has no
+    /// comparable move: it is treated as unobserved, so the whole par-spread
+    /// move lands in the adder instead of a meaningless difference.
+    #[test]
+    fn credit_cascade_ignores_a_factor_series_whose_units_change() {
+        let as_of_t0 = create_date(2025, Month::January, 1).unwrap();
+        let as_of_t1 = create_date(2025, Month::January, 2).unwrap();
+        let curve_id = CurveId::new("ISSUER-B-HAZ");
+        let model = make_model();
+        let instrument = canonical_credit_bond(curve_id.clone());
+        let market_t0 = MarketContext::new()
+            .insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
+            .insert_price("cdx.hy.5y", MarketScalar::Unitless(100.0));
+        let market_t1 = MarketContext::new()
+            .insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
+            .insert_price(
+                "cdx.hy.5y",
+                MarketScalar::Price(Money::from((125_i64, Currency::USD))),
+            );
+
+        let mut notes = Vec::new();
+        let cascade = plan_credit_cascade(&model, &instrument, &market_t0, &market_t1, &mut notes)
+            .unwrap()
+            .expect("cascade");
+
+        let systematic: f64 = cascade
+            .steps
+            .iter()
+            .filter(|step| {
+                !matches!(
+                    step.kind,
+                    CreditStepKind::Adder | CreditStepKind::CurveShape
+                )
+            })
+            .map(|step| step.delta_bp)
+            .sum();
+        assert_eq!(systematic, 0.0, "steps: {:?}", cascade.steps);
     }
 
     #[test]
@@ -1001,7 +1060,8 @@ mod tests {
                 MarketScalar::Unitless(-2.0),
             );
 
-        let cascade = plan_credit_cascade(&model, &instrument, &market_t0, &market_t1)
+        let mut notes = Vec::new();
+        let cascade = plan_credit_cascade(&model, &instrument, &market_t0, &market_t1, &mut notes)
             .unwrap()
             .expect("cascade");
 

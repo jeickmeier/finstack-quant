@@ -12,7 +12,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-use super::result::AttributionFactor;
+use crate::AttributionFactor;
 
 /// Per-(curve, tenor) P&L map: keyed by `(curve_id, tenor_label)`.
 type CurveTenorPnlMap = IndexMap<(CurveId, String), Money>;

@@ -31258,19 +31258,13 @@ export interface AttributionNamespace {
    */
   validateReturnContributionJson(specJson: JsonInput): string;
   /**
-   * Human-readable tree explanation of an attribution, non-zero factors only (twin of Python `PnlAttribution.explain`).
+   * Human-readable tree explanation of an attribution's factor breakdown (twin of Python `PnlAttribution.explain`).
    * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+   * @param showZeros - Optional boolean; `true` lists every factor including zero-valued ones, while omitted or `false` hides zero-valued factors.
    * @returns Multi-line tree text.
-   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`, and kind `invalid_type` if `showZeros` is not a boolean.
    */
-  pnlAttributionExplainText(pnl: PnlAttribution | string): string;
-  /**
-   * Verbose tree explanation of an attribution, including zero-valued factors (twin of Python `PnlAttribution.explain_verbose`).
-   * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
-   * @returns Multi-line tree text.
-   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
-   */
-  pnlAttributionExplainVerboseText(pnl: PnlAttribution | string): string;
+  pnlAttributionExplainText(pnl: PnlAttribution | string, showZeros?: boolean | null): string;
   /**
    * Share of total P&L, in percent, that an amount represents (twin of Python `PnlAttribution.pct_of_total`).
    * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
@@ -35719,7 +35713,7 @@ export interface ScenariosNamespace {
    * @param marketJson - JSON-serialized `MarketContext`.
    * @param asOf - Valuation date (ISO 8601).
    * @param scenarioJson - JSON-serialized `ScenarioSpec`.
-   * @param method - Attribution method: "parallel", "waterfall", "metrics_based", or "taylor". Omit for the Rust default (`AttributionMethod::default()`, currently "parallel"). "metrics_based" calculates the canonical registry's applicable subset of default attribution metrics at the opening snapshot; metrics unsupported by the instrument type are omitted, while failures calculating selected metrics throw.
+   * @param method - `AttributionMethod` wire value: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }` or `{ taylor: {} }`, or the same value as JSON text. Omit for the Rust default (`AttributionMethod::default()`, currently "parallel"). "metrics_based" calculates the canonical registry's applicable subset of default attribution metrics at the opening snapshot; metrics unsupported by the instrument type are omitted, while failures calculating selected metrics throw.
    * @param configJson - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
    * @param calendarId - Optional built-in holiday calendar (e.g. "nyse", "target") used to business-day adjust `time_roll_forward` targets under `business_days` mode. Omit for a weekends-only calendar; unknown identifiers throw.
    * @returns The serde `HorizonResult` (`attribution`, `initial_value` and `terminal_value` as exact-decimal Money objects, `horizon_days`, null without a time roll, and `scenario_report`) plus `summary`: the Rust-computed `total_return`, `annualized_return`, `currency` and `factor_contributions` that Python exposes as `HorizonResult` accessors. Rust computes every derived value. Undefined derived values are null here and NaN in Python: total return and factor contributions require positive initial value and matching P&L currency; annualization also requires a positive horizon and total return at or above -100%.
@@ -35730,7 +35724,7 @@ export interface ScenariosNamespace {
     marketJson: JsonInput,
     asOf: string,
     scenarioJson: JsonInput,
-    method?: 'parallel' | 'waterfall' | 'metrics_based' | 'taylor',
+    method?: JsonInput,
     configJson?: JsonInput,
     calendarId?: string
   ): HorizonReport;

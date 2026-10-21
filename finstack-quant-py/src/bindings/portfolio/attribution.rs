@@ -418,7 +418,7 @@ fn attribute_portfolio_pnl(
         .map(|value| py_to_json_string(py, value, "config"))
         .transpose()?;
     let (method, config): (
-        finstack_quant_portfolio::attribution::AttributionMethod,
+        finstack_quant_attribution::AttributionMethod,
         finstack_quant_core::config::FinstackConfig,
     ) = py.detach(move || {
         let method = serde_json::from_str(&method_json)

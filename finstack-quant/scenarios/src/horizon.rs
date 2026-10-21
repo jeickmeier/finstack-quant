@@ -61,8 +61,8 @@
 use std::sync::Arc;
 
 use finstack_quant_attribution::{
-    attribute_pnl, attribute_pnl_metrics_based, default_attribution_metrics, AttributionRequest,
-    ExecutionPolicy,
+    attribute_pnl, AttributionFactor, AttributionMethod, AttributionRequest, ExecutionPolicy,
+    PnlAttribution,
 };
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::dates::{calendar_by_id_strict, Date, HolidayCalendar};
@@ -75,48 +75,6 @@ use finstack_quant_valuations::recalibration::RecalibrationProvider;
 
 use crate::engine::ApplicationReport;
 use crate::{ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec};
-
-/// Re-export attribution types appearing in horizon-analysis public APIs so
-/// direct scenarios consumers do not need a separate attribution dependency.
-pub use finstack_quant_attribution::{AttributionFactor, AttributionMethod, PnlAttribution};
-
-/// Parse an [`AttributionMethod`] from its binding string form.
-///
-/// This is the single shared parser behind the Python
-/// `compute_horizon_return(method=...)` keyword and the WASM
-/// `computeHorizonReturn` `method` parameter. It cannot be replaced by a
-/// bare serde deserialization: `AttributionMethod` is externally tagged, so
-/// serde only accepts the plain strings `"parallel"` / `"metrics_based"` —
-/// the tuple variants require `{"waterfall": [...]}` / `{"taylor": {...}}`
-/// payloads, whereas the binding contract maps the bare strings
-/// `"waterfall"` and `"taylor"` to their canonical defaults
-/// ([`finstack_quant_attribution::default_waterfall_order`] and
-/// [`finstack_quant_attribution::TaylorAttributionConfig::default`]).
-///
-/// # Arguments
-///
-/// * `method` - One of `"parallel"`, `"waterfall"`, `"metrics_based"`, or
-///   `"taylor"`.
-///
-/// # Errors
-///
-/// Returns [`crate::Error::Validation`] for any other string, naming the
-/// accepted values.
-pub fn attribution_method_from_str(method: &str) -> crate::Result<AttributionMethod> {
-    match method {
-        "parallel" => Ok(AttributionMethod::Parallel),
-        "waterfall" => Ok(AttributionMethod::Waterfall(
-            finstack_quant_attribution::default_waterfall_order(),
-        )),
-        "metrics_based" => Ok(AttributionMethod::MetricsBased),
-        "taylor" => Ok(AttributionMethod::Taylor(
-            finstack_quant_attribution::TaylorAttributionConfig::default(),
-        )),
-        other => Err(crate::Error::Validation(format!(
-            "Unknown attribution method '{other}'. Expected: parallel, waterfall, metrics_based, taylor"
-        ))),
-    }
-}
 
 fn horizon_unsupported_instrument_operation(scenario: &ScenarioSpec) -> Option<&'static str> {
     scenario.operations.iter().find_map(|op| match op {
@@ -372,53 +330,11 @@ impl HorizonAnalysis {
         as_of_t0: Date,
         as_of_t1: Date,
     ) -> crate::Result<(Money, Money, PnlAttribution)> {
-        if matches!(self.attribution_method, AttributionMethod::MetricsBased) {
-            let window_days = (as_of_t1 - as_of_t0).whole_days();
-            let metrics_instrument = if window_days > 0 {
-                let mut producer = instrument.clone_box();
-                if let Some(overrides) = producer.get_metric_pricing_overrides_mut() {
-                    let days = u32::try_from(window_days).map_err(|_| {
-                        crate::Error::Validation(format!(
-                            "horizon of {window_days} days exceeds the theta horizon range"
-                        ))
-                    })?;
-                    overrides.theta_period = Some(finstack_quant_core::dates::Tenor::new(
-                        days,
-                        finstack_quant_core::dates::TenorUnit::Days,
-                    )?);
-                }
-                Arc::from(producer)
-            } else {
-                Arc::clone(instrument)
-            };
-            let metrics = finstack_quant_valuations::metrics::standard_registry()
-                .applicable_subset(&default_attribution_metrics(), instrument.key());
-            let val_t0 = metrics_instrument.price_with_metrics(
-                market_t0,
-                as_of_t0,
-                &metrics,
-                self.pricing_options(),
-            )?;
-            let val_t1 =
-                instrument.price_with_metrics(market_t1, as_of_t1, &[], self.pricing_options())?;
-            let attribution = attribute_pnl_metrics_based(
-                &metrics_instrument,
-                market_t0,
-                market_t1,
-                &val_t0,
-                &val_t1,
-                as_of_t0,
-                as_of_t1,
-            )?;
-            return Ok((val_t0.value, val_t1.value, attribution));
-        }
-
-        let initial_value = instrument.value(market_t0, as_of_t0)?;
-        let terminal_value = instrument.value(market_t1, as_of_t1)?;
+        let pricing_options = self.pricing_options();
         let request = AttributionRequest {
             execution_policy: ExecutionPolicy::Parallel,
             strict_validation: false,
-            prepared_endpoints: Some((initial_value, terminal_value)),
+            pricing_options: Some(&pricing_options),
             ..AttributionRequest::new(
                 instrument,
                 market_t0,
@@ -429,7 +345,15 @@ impl HorizonAnalysis {
             )
         };
         let attribution = attribute_pnl(&self.attribution_method, &request)?;
-        Ok((initial_value, terminal_value, attribution))
+        // Every method stamps the endpoint values it priced.
+        match (attribution.pv_t0, attribution.pv_t1) {
+            (Some(initial_value), Some(terminal_value)) => {
+                Ok((initial_value, terminal_value, attribution))
+            }
+            _ => Err(crate::Error::Internal(
+                "attribution did not stamp its endpoint values".to_string(),
+            )),
+        }
     }
 }
 
@@ -492,17 +416,7 @@ impl HorizonResult {
     /// # Arguments
     /// * `factor` - Attribution component whose P&L is divided by positive initial value.
     pub fn factor_contribution(&self, factor: &AttributionFactor) -> f64 {
-        let factor_money = match factor {
-            AttributionFactor::Carry => &self.attribution.carry,
-            AttributionFactor::RatesCurves => &self.attribution.rates_curves_pnl,
-            AttributionFactor::CreditCurves => &self.attribution.credit_curves_pnl,
-            AttributionFactor::InflationCurves => &self.attribution.inflation_curves_pnl,
-            AttributionFactor::Correlations => &self.attribution.correlations_pnl,
-            AttributionFactor::Fx => &self.attribution.fx_pnl,
-            AttributionFactor::Volatility => &self.attribution.vol_pnl,
-            AttributionFactor::ModelParameters => &self.attribution.model_params_pnl,
-            AttributionFactor::MarketScalars => &self.attribution.market_scalars_pnl,
-        };
+        let factor_money = self.attribution.get_factor_pnl(factor);
         if self.initial_value.currency() != factor_money.currency() {
             return f64::NAN;
         }
@@ -1101,34 +1015,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn attribution_method_from_str_parses_all_binding_forms() {
-        assert!(matches!(
-            attribution_method_from_str("parallel"),
-            Ok(AttributionMethod::Parallel)
-        ));
-        assert!(matches!(
-            attribution_method_from_str("metrics_based"),
-            Ok(AttributionMethod::MetricsBased)
-        ));
-        match attribution_method_from_str("waterfall") {
-            Ok(AttributionMethod::Waterfall(order)) => {
-                assert_eq!(order, finstack_quant_attribution::default_waterfall_order());
-            }
-            other => panic!("expected default waterfall order, got {other:?}"),
-        }
-        assert!(matches!(
-            attribution_method_from_str("taylor"),
-            Ok(AttributionMethod::Taylor(_))
-        ));
-        let err = attribution_method_from_str("brinson").expect_err("unknown method");
-        assert!(
-            err.to_string()
-                .contains("Unknown attribution method 'brinson'"),
-            "unexpected error: {err}"
-        );
-    }
-
     /// Exactly a total loss annualizes to `-100%`; losses beyond initial
     /// capital have no compounded annualized return.
     #[test]
@@ -1242,12 +1128,14 @@ mod tests {
             ScenarioEngine::new().apply(&scenario, &mut ctx)?;
             let expected_value = instrument.value(&expected_market, date!(2025 - 01 - 06))?;
 
-            for method in ["parallel", "waterfall", "metrics_based", "taylor"] {
-                let result = HorizonAnalysis::new(
-                    attribution_method_from_str(method)?,
-                    FinstackConfig::default(),
-                )
-                .compute(&instrument, &market, origin, &scenario)?;
+            for method in [
+                AttributionMethod::Parallel,
+                AttributionMethod::Waterfall(finstack_quant_attribution::default_waterfall_order()),
+                AttributionMethod::MetricsBased,
+                AttributionMethod::Taylor(Default::default()),
+            ] {
+                let result = HorizonAnalysis::new(method.clone(), FinstackConfig::default())
+                    .compute(&instrument, &market, origin, &scenario)?;
                 assert_eq!(result.horizon_days, Some(4), "{method}");
                 assert_eq!(result.terminal_value, expected_value, "{method}");
                 assert!(result.total_return().is_finite(), "{method}");

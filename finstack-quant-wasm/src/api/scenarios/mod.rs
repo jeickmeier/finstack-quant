@@ -275,9 +275,12 @@ pub fn apply_scenario(
 /// * `market_json` - JSON-serialized `MarketContext`.
 /// * `as_of` - Valuation date (ISO 8601).
 /// * `scenario_json` - JSON-serialized `ScenarioSpec`.
-/// * `method` - Attribution method: "parallel", "waterfall", "metrics_based",
-///   or "taylor". Omit for the Rust default (`AttributionMethod::default()`,
-///   currently "parallel"). "metrics_based" calculates the canonical registry's
+/// * `method` - `AttributionMethod` wire value: a unit variant name such as
+///   `"parallel"` or `"metrics_based"`, an object such as
+///   `{ waterfall: ["carry", "rates_curves"] }` or `{ taylor: {} }`, or the
+///   same value as JSON text. Omit for the Rust default
+///   (`AttributionMethod::default()`, currently "parallel"). "metrics_based"
+///   calculates the canonical registry's
 ///   applicable subset of default attribution metrics at the opening snapshot;
 ///   metrics unsupported by the instrument type are omitted, while failures
 ///   calculating selected metrics throw.
@@ -320,7 +323,8 @@ pub fn compute_horizon_return(
     let market_json: &str = &json_text(&market_json, "marketJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let scenario = scenario_spec(&scenario_json, "scenarioJson")?;
-    let method = js_opt_string(method.as_ref(), "method")?;
+    let attribution_method: finstack_quant_attribution::AttributionMethod =
+        crate::utils::wire::js_opt_wire(method.as_ref(), "method")?.unwrap_or_default();
     let config = parse_config(config_json.as_ref())?;
     let calendar_id = js_opt_string(calendar_id.as_ref(), "calendarId")?;
     use std::sync::Arc;
@@ -337,13 +341,6 @@ pub fn compute_horizon_return(
         serde_json::from_str(market_json).map_err(to_js_err)?;
 
     let date = parse_iso_date(as_of)?;
-
-    let attribution_method = method
-        .as_deref()
-        .map(finstack_quant_scenarios::horizon::attribution_method_from_str)
-        .transpose()
-        .map_err(to_js_err)?
-        .unwrap_or_default();
 
     let mut analyzer =
         finstack_quant_scenarios::horizon::HorizonAnalysis::new(attribution_method, config);

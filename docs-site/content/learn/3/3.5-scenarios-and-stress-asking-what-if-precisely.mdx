@@ -97,6 +97,7 @@ import pandas as pd
 from _shared.analyst_book import calibration_envelope, instruments
 from _shared.analyst_history import history_market
 from finstack_quant.calibration import calibrate
+from finstack_quant.attribution import default_waterfall_order
 from finstack_quant.portfolio import Portfolio, replay_portfolio
 from finstack_quant.scenarios import build_from_template, list_builtin_templates, compute_horizon_return
 # Quote-space stress rebuilds discount and hazard curves together. It is not an exact parallel zero shift.
@@ -125,7 +126,7 @@ replay=replay_portfolio(book,snapshots,config={"mode":"pv_and_pnl","valuation_op
 print(replay.to_dataframe().to_string(index=False))
 summary=replay.summary
 horizon=ScenarioSpec("one-month-hold",[OperationSpec.time_roll_forward("1M",roll_mode="calendar_days"),OperationSpec.curve_parallel_bp("discount","USD-OIS",25)])
-horizon_result=compute_horizon_return(json.dumps(instruments("base")["USD-CORP"]),history_market(replay_dates[0]),replay_dates[0],horizon,method="waterfall")
+horizon_result=compute_horizon_return(json.dumps(instruments("base")["USD-CORP"]),history_market(replay_dates[0]),replay_dates[0],horizon,method={"waterfall":default_waterfall_order()})
 print({"horizon_days":horizon_result.horizon_days,"total_return":horizon_result.total_return,"annualized_return":horizon_result.annualized_return,"carry_return":horizon_result.factor_contribution("carry")})
 ```
 {/* /notebook-block */}

@@ -134,9 +134,7 @@ impl PyPnlAttribution {
 
     /// Export the canonical serde-shaped attribution payload as a Python dict.
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let json = serde_json::to_string(&self.inner).map_err(display_to_py)?;
-        let json_mod = py.import("json")?;
-        json_mod.call_method1("loads", (json,))
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
     /// Total P&L amount.
@@ -547,14 +545,10 @@ impl PyPnlAttribution {
             .map_err(crate::errors::core_to_py)
     }
 
-    /// Human-readable tree explanation (non-zero factors only).
-    fn explain(&self) -> String {
-        self.inner.explain()
-    }
-
-    /// Verbose tree explanation including zero-valued factors.
-    fn explain_verbose(&self) -> String {
-        self.inner.explain_verbose()
+    /// Human-readable tree explanation of the factor breakdown.
+    #[pyo3(signature = (show_zeros = false))]
+    fn explain(&self, show_zeros: bool) -> String {
+        self.inner.explain(show_zeros)
     }
 
     /// Export attribution as a single-row pandas ``DataFrame``.

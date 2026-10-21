@@ -731,7 +731,7 @@ test('pnlBridge and attributePnlMany run the Rust attribution entry points', () 
 
   assert.match(attribution.pnlAttributionExplainText(single), /Total P&L/);
   assert.ok(
-    attribution.pnlAttributionExplainVerboseText(single).length >=
+    attribution.pnlAttributionExplainText(single, true).length >=
       attribution.pnlAttributionExplainText(single).length
   );
   assert.equal(

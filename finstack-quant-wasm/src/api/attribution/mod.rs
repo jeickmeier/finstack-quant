@@ -194,7 +194,10 @@ pub fn pnl_bridge(
     as_of_t1: JsValue,
     target_currency: JsValue,
 ) -> Result<crate::api::core::money::JsMoney, JsValue> {
-    let instrument = parse_instrument(&instrument_json, "instrumentJson")?;
+    let instrument = finstack_quant_valuations::pricer::json::parse_instrument_from_json(
+        &json_text(&instrument_json, "instrumentJson")?,
+    )
+    .map_err(to_js_err)?;
     let instrument: std::sync::Arc<dyn finstack_quant_valuations::instruments::Instrument> =
         std::sync::Arc::from(instrument.into_boxed().map_err(to_js_err)?);
     let market_t0: finstack_quant_core::market_data::context::MarketContext =
@@ -215,16 +218,6 @@ pub fn pnl_bridge(
     )
     .map_err(to_js_err)?;
     Ok(crate::api::core::money::JsMoney { inner })
-}
-
-/// Parse a canonical instrument envelope (object or JSON) into its payload.
-fn parse_instrument(
-    value: &JsValue,
-    label: &str,
-) -> Result<finstack_quant_valuations::instruments::InstrumentJson, JsValue> {
-    let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
-        serde_json::from_str(&json_text(value, label)?).map_err(to_js_err)?;
-    Ok(envelope.instrument)
 }
 
 /// Attribute a batch using canonical shared inputs and instrument envelopes.
@@ -253,13 +246,12 @@ pub fn attribute_pnl_many(inputs: JsValue, instruments: JsValue) -> Result<JsVal
     let instruments = instruments
         .into_iter()
         .map(|value| {
-            let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
-                match value {
-                    serde_json::Value::String(json) => serde_json::from_str(&json),
-                    object => serde_json::from_value(object),
-                }
-                .map_err(to_js_err)?;
-            Ok(envelope.instrument)
+            let json = match value {
+                serde_json::Value::String(json) => json,
+                object => object.to_string(),
+            };
+            finstack_quant_valuations::pricer::json::parse_instrument_from_json(&json)
+                .map_err(to_js_err)
         })
         .collect::<Result<Vec<_>, JsValue>>()?;
     let attributions =
@@ -332,34 +324,27 @@ fn parse_pnl(value: &JsValue) -> Result<finstack_quant_attribution::PnlAttributi
     crate::utils::input::from_js_json(value, "pnl")
 }
 
-/// Human-readable tree explanation of an attribution (non-zero factors only).
+/// Human-readable tree explanation of an attribution's factor breakdown.
 ///
 /// Free-function twin of Python `PnlAttribution.explain` (Rust
 /// `PnlAttribution::explain`).
 /// @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+/// @param showZeros - Optional boolean; `true` lists every factor including
+///   zero-valued ones, while omitted or `false` hides zero-valued factors.
 /// @returns Multi-line tree text.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+/// Throws with kind `validation` if `pnl` is not a `PnlAttribution`, and
+/// kind `invalid_type` if `showZeros` is not a boolean.
 #[wasm_bindgen(js_name = pnlAttributionExplainText)]
-pub fn pnl_attribution_explain(pnl: JsValue) -> Result<String, JsValue> {
-    Ok(parse_pnl(&pnl)?.explain())
-}
-
-/// Verbose tree explanation of an attribution, including zero-valued factors.
-///
-/// Free-function twin of Python `PnlAttribution.explain_verbose` (Rust
-/// `PnlAttribution::explain_verbose`).
-/// @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
-/// @returns Multi-line tree text.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
-#[wasm_bindgen(js_name = pnlAttributionExplainVerboseText)]
-pub fn pnl_attribution_explain_verbose(pnl: JsValue) -> Result<String, JsValue> {
-    Ok(parse_pnl(&pnl)?.explain_verbose())
+pub fn pnl_attribution_explain(
+    pnl: JsValue,
+    show_zeros: Option<JsValue>,
+) -> Result<String, JsValue> {
+    let show_zeros =
+        crate::utils::input::js_opt_bool(show_zeros.as_ref(), "showZeros")?.unwrap_or(false);
+    Ok(parse_pnl(&pnl)?.explain(show_zeros))
 }
 
 /// Share of total P&L, in percent, that an amount represents.
