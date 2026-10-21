@@ -358,7 +358,7 @@ impl JsEquityOptionBuilder {
         settlement_date: JsValue,
         exercised: JsValue,
     ) -> Result<JsEquityOptionBuilder, JsValue> {
-        let exercise = finstack_quant_valuations::instruments::equity::EquityOptionExercise::new(
+        let exercise = finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise::new(
             super::arg::date(&date, "date")?,
             super::arg::num(&spot, "spot")?,
             super::arg::date(&settlement_date, "settlementDate")?,

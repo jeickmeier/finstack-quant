@@ -41,7 +41,7 @@ use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instr
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use time::macros::date;
 
-pub use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
+pub(crate) use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
 
 /// Autocallable structured product instrument.
 #[derive(

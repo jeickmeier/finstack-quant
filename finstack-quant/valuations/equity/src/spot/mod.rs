@@ -42,7 +42,7 @@
 //!
 //! # See Also
 //!
-//! - [`Equity`] for instrument struct
+//! - [`Equity`](crate::spot::Equity) for instrument struct
 //! - [`String`] for symbol type
 //! - [`crate::equity_option`] for options on equities
 

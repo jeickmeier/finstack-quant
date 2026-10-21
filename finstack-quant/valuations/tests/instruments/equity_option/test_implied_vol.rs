@@ -367,7 +367,7 @@ fn test_implied_vol_rejects_expired() {
 
     let mut call = create_call(as_of, expiry, strike);
     call.exercise = Some(
-        finstack_quant_valuations::instruments::equity::EquityOptionExercise::new(
+        finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise::new(
             expiry, spot, expiry, true,
         ),
     );

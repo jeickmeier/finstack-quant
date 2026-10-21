@@ -65,7 +65,7 @@
 //!
 //! # See Also
 //!
-//! - [`VarianceSwap`] for instrument struct
+//! - [`VarianceSwap`](crate::variance_swap::VarianceSwap) for instrument struct
 //! - `RealizedVarMethod` for variance calculation methods
 //! - Variance calculation functions in [`finstack_quant_core::math::stats`]
 
@@ -74,4 +74,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-pub use types::{EquityPriceSeriesPolicy, PayReceive, VarianceSwap};
+pub use types::{EquityPriceSeriesPolicy, VarianceSwap};

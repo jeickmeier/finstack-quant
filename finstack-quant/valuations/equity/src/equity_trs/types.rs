@@ -45,9 +45,8 @@ pub enum TrsDividendSettlement {
 /// };
 /// use finstack_quant_cashflows::builder::ScheduleParams;
 /// use finstack_quant_valuations_core::instruments::{Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive};
-/// use finstack_quant_valuations_equity::equity_trs::{
-///     EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec,
-/// };
+/// use finstack_quant_valuations_equity::equity_trs::{EquityTotalReturnSwap, TrsDividendSettlement};
+/// use finstack_quant_valuations_core::instruments::TrsScheduleSpec;
 /// use rust_decimal::Decimal;
 /// use time::macros::date;
 ///

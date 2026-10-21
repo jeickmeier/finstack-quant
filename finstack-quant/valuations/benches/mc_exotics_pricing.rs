@@ -18,8 +18,10 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PayoutTiming;
 use finstack_quant_core::types::{BarrierType, CurveId, InstrumentId, PriceId};
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
-use finstack_quant_valuations::instruments::equity::autocallable::{Autocallable, FinalPayoffType};
-use finstack_quant_valuations::instruments::equity::{CliquetOption, EquityPathModel};
+use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
+use finstack_quant_valuations::instruments::equity::autocallable::Autocallable;
+use finstack_quant_valuations::instruments::equity::cliquet_option::CliquetOption;
+use finstack_quant_valuations::instruments::equity::EquityPathModel;
 use finstack_quant_valuations::instruments::exotics::lookback_option::{
     LookbackOption, LookbackType,
 };

@@ -1,7 +1,7 @@
 //! Tests for edge cases and boundary conditions.
 
 use super::helpers::*;
-use finstack_quant_valuations::instruments::equity::EquityOptionExercise;
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;

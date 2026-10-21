@@ -9,8 +9,9 @@
 
 use super::helpers::*;
 use finstack_quant_core::dates::Date;
+use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_equity::autocallable::{Autocallable, FinalPayoffType};
+use finstack_quant_valuations_equity::autocallable::Autocallable;
 use time::macros::date;
 
 const SPOT: f64 = 100.0;

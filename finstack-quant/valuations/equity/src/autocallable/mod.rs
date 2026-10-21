@@ -43,12 +43,12 @@
 //!
 //! # See Also
 //!
-//! - [`Autocallable`] for instrument struct
-//! - [`FinalPayoffType`] for maturity payoff specification
+//! - [`Autocallable`](crate::autocallable::Autocallable) for instrument struct
+//! - [`FinalPayoffType`](finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType) for maturity payoff specification
 //! - Monte Carlo pricer for path-dependent pricing
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-pub use types::{Autocallable, FinalPayoffType};
+pub use types::Autocallable;

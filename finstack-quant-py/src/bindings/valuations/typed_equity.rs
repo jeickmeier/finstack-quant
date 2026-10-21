@@ -795,7 +795,7 @@ impl PyEquityOptionBuilder {
         settlement_date: &Bound<'_, PyAny>,
         exercised: bool,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let exercise = finstack_quant_valuations::instruments::equity::EquityOptionExercise::new(
+        let exercise = finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise::new(
             py_to_date(date)?,
             spot,
             py_to_date(settlement_date)?,

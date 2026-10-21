@@ -561,7 +561,7 @@ mod tests {
             .observation_calendar_id("USNY".into())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .price_series_policy(
-                finstack_quant_valuations_equity::EquityPriceSeriesPolicy::Adjusted,
+                finstack_quant_valuations_equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
             )
             .side(PayReceive::Receive)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -638,7 +638,7 @@ mod tests {
             .observation_calendar_id("USNY".into())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .price_series_policy(
-                finstack_quant_valuations_equity::EquityPriceSeriesPolicy::Adjusted,
+                finstack_quant_valuations_equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
             )
             .side(PayReceive::Receive)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -787,7 +787,7 @@ mod tests {
             .observation_calendar_id("USNY".into())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .price_series_policy(
-                finstack_quant_valuations_equity::EquityPriceSeriesPolicy::Adjusted,
+                finstack_quant_valuations_equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
             )
             .side(PayReceive::Receive)
             .discount_curve_id(CurveId::new("USD-OIS"))
