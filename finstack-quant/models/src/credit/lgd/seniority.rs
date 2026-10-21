@@ -37,24 +37,6 @@ pub enum SeniorityClass {
     JuniorSubordinated,
 }
 
-impl std::str::FromStr for SeniorityClass {
-    type Err = finstack_quant_core::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "1st_lien_secured" => Ok(Self::FirstLienSecured),
-            "2nd_lien_secured" => Ok(Self::SecondLienSecured),
-            "senior_secured" => Ok(Self::SeniorSecured),
-            "senior_unsecured" => Ok(Self::SeniorUnsecured),
-            "subordinated" => Ok(Self::Subordinated),
-            "junior_subordinated" => Ok(Self::JuniorSubordinated),
-            _ => Err(finstack_quant_core::Error::Validation(format!(
-                "unknown seniority class: '{s}' (expected 1st_lien_secured, 2nd_lien_secured, senior_secured, senior_unsecured, subordinated, junior_subordinated)"
-            ))),
-        }
-    }
-}
-
 /// Beta distribution parameterization for recovery rates.
 ///
 /// The Beta distribution is defined on \[0,1\] and parameterized here by
@@ -339,7 +321,7 @@ mod tests {
     use super::*;
     use finstack_quant_core::math::random::Pcg64Rng;
     use finstack_quant_core::math::random::RandomNumberGenerator;
-    use std::str::FromStr;
+    use finstack_quant_core::wire::serde_parse;
 
     #[test]
     fn beta_recovery_mean_matches_input() {
@@ -349,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn seniority_class_from_str_rejects_noncanonical_spellings() {
+    fn seniority_class_label_rejects_noncanonical_spellings() {
         for rejected in [
             "first-lien secured",
             "first_lien_secured",
@@ -357,9 +339,9 @@ mod tests {
             "sub",
             "SeniorSecured",
         ] {
-            let error = SeniorityClass::from_str(rejected)
+            let error = serde_parse::<SeniorityClass>(rejected)
                 .expect_err("noncanonical seniority should be rejected");
-            assert!(error.to_string().contains("unknown seniority class"));
+            assert!(error.to_string().contains("unknown variant"));
         }
     }
 

@@ -71,26 +71,6 @@ pub enum WorkoutCollateralType {
     Other,
 }
 
-impl std::str::FromStr for WorkoutCollateralType {
-    type Err = finstack_quant_core::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "cash" => Ok(Self::Cash),
-            "securities" => Ok(Self::Securities),
-            "receivables" => Ok(Self::Receivables),
-            "inventory" => Ok(Self::Inventory),
-            "equipment" => Ok(Self::Equipment),
-            "real_estate" => Ok(Self::RealEstate),
-            "intellectual_property" => Ok(Self::IntellectualProperty),
-            "other" => Ok(Self::Other),
-            _ => Err(finstack_quant_core::Error::Validation(format!(
-                "unknown collateral type: '{s}' (expected cash, securities, receivables, inventory, equipment, real_estate, intellectual_property, other)"
-            ))),
-        }
-    }
-}
-
 /// A single piece of collateral in the recovery waterfall.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -477,7 +457,7 @@ impl WorkoutLgdBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
+    use finstack_quant_core::wire::serde_parse;
 
     #[test]
     fn replay_and_builder_reject_invalid_workout_inputs() {
@@ -526,9 +506,9 @@ mod tests {
     }
 
     #[test]
-    fn collateral_type_from_str_rejects_noncanonical_spellings() {
+    fn collateral_type_label_rejects_noncanonical_spellings() {
         assert_eq!(
-            WorkoutCollateralType::from_str("cash").expect("cash"),
+            serde_parse::<WorkoutCollateralType>("cash").expect("cash"),
             WorkoutCollateralType::Cash
         );
 
@@ -540,9 +520,9 @@ mod tests {
             "RealEstate",
             "crypto",
         ] {
-            let error = WorkoutCollateralType::from_str(rejected)
+            let error = serde_parse::<WorkoutCollateralType>(rejected)
                 .expect_err("noncanonical collateral type should be rejected");
-            assert!(error.to_string().contains("unknown collateral type"));
+            assert!(error.to_string().contains("unknown variant"));
         }
     }
 

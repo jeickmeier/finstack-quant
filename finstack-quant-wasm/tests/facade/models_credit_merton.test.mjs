@@ -187,14 +187,14 @@ test('toggle label errors carry the Rust list of accepted labels', () => {
     (e) =>
       e.kind === 'validation' &&
       e.message.endsWith(
-        'unknown credit state variable: bogus (expected one of hazard_rate, distance_to_default, leverage)'
+        'unknown variant `bogus`, expected one of `hazard_rate`, `distance_to_default`, `leverage`'
       )
   );
   assert.throws(
     () => credit.ToggleExerciseModel.threshold('leverage', 1.0, 'sideways'),
     (e) =>
       e.kind === 'validation' &&
-      e.message.endsWith('unknown threshold direction: sideways (expected one of above, below)')
+      e.message.endsWith('unknown variant `sideways`, expected `above` or `below`')
   );
 });
 

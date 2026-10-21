@@ -88,7 +88,7 @@ pub fn liquidity_tier(
         _ => None,
     };
     liquidity::liquidity_tier(days_to_liquidate, thresholds)
-        .map(|tier| tier.as_binding_str().to_string())
+        .and_then(|tier| finstack_quant_core::wire::serde_label(&tier))
         .map_err(to_js_err)
 }
 
