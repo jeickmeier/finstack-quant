@@ -16,11 +16,42 @@ use crate::instruments::common_impl::traits::{
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::Result;
 
-/// Selected-model derivative to parallel decimal curve rates. HW single-curve
-/// products bump the discount curve; multi-curve caps bump their projection
-/// curve while holding discounting fixed. Parameters are held or recalibrated
-/// exactly as in each selected pricer's normal market-input resolution.
-pub fn selected_rate_greek(
+/// Hull-White 1F rate delta or gamma, when the request selected that model.
+///
+/// Returns `None` unless the metric request prices with
+/// [`ModelKey::HullWhite1F`](crate::pricer::ModelKey::HullWhite1F), so the
+/// caller falls through to its closed-form greek. Otherwise returns the
+/// central finite-difference derivative of the selected model's raw PV to a
+/// parallel shift of `curve_id`, in PV per unit decimal rate (first order) or
+/// per unit decimal rate squared (second order). HW single-curve products
+/// bump the discount curve; multi-curve caps bump their projection curve while
+/// holding discounting fixed. Parameters are held or recalibrated exactly as
+/// in the selected pricer's normal market-input resolution.
+///
+/// # Arguments
+///
+/// * `context` - Metric context whose pricing dispatch, market and bump
+///   configuration (`rate_bump_bp`, in basis points) drive the repricing.
+/// * `curve_id` - Curve shifted in parallel by ±`rate_bump_bp`.
+/// * `second` - `false` for delta `(PV₊ − PV₋) / 2h`, `true` for gamma
+///   `(PV₊ − 2·PV + PV₋) / h²`, with `h` the bump as a decimal rate.
+///
+/// # Errors
+///
+/// The inner result fails when the bump configuration cannot be resolved,
+/// the curve cannot be bumped, or a repricing fails.
+pub fn hw1f_rate_greek(
+    context: &MetricContext,
+    curve_id: &finstack_quant_core::types::CurveId,
+    second: bool,
+) -> Option<Result<f64>> {
+    if context.pricing_model() != Some(crate::pricer::ModelKey::HullWhite1F) {
+        return None;
+    }
+    Some(rate_greek(context, curve_id, second))
+}
+
+fn rate_greek(
     context: &MetricContext,
     curve_id: &finstack_quant_core::types::CurveId,
     second: bool,

@@ -20,7 +20,7 @@
 use crate::cms_swap::types::CmsSwap;
 #[cfg(test)]
 use crate::cms_swap::types::FundingLeg;
-use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
@@ -44,7 +44,6 @@ impl CmsSwapPricer {
         as_of: Date,
         convexity_scale: f64,
     ) -> Result<Money> {
-        inst.validate()?;
         let pv_cms = self.pv_cms_leg(inst, market, as_of, convexity_scale)?;
         let pv_funding = self.pv_funding_leg(inst, market, as_of)?;
 
@@ -197,7 +196,6 @@ impl CmsSwapReplicationPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        inst.validate()?;
         let pv_cms = self.pv_cms_leg_replication(inst, market, as_of)?;
         let pv_funding = CmsSwapPricer.pv_funding_leg(inst, market, as_of)?;
 
@@ -416,13 +414,11 @@ pub(super) fn cms_forward_and_ttf(
     as_of: Date,
     fixing_date: Date,
 ) -> Result<(f64, f64)> {
-    let reference_swap = inst.reference_swap();
-    let swap_start = reference_swap.reference_swap_start(fixing_date)?;
     let swap_tenor_months =
         crate::cms_common::cms_tenor_months(inst.cms_tenor, "CmsSwap cms_tenor")?;
-    let swap_end = swap_start.add_months(swap_tenor_months)?;
-    let (forward_swap_rate, _annuity) =
-        reference_swap.forward_rate_and_annuity(market, as_of, swap_start, swap_end)?;
+    let (_, forward_swap_rate) =
+        inst.reference_swap()
+            .forward_at_fixing(market, as_of, fixing_date, swap_tenor_months)?;
 
     // Calendar time for the vol axis: ACT/365F, not the accrual day count.
     let time_to_fixing =

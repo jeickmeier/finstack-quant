@@ -7,19 +7,13 @@
 //! - Breakeven inflation
 //! - Fixed leg PV
 //! - Inflation leg PV
-//! - DV01 (approximate)
-//! - Inflation01 (approximate)
+//! - DV01 and bucketed DV01
+//! - Inflation01 and inflation convexity (central finite differences on the
+//!   inflation curve, see `crate::inflation_fd`)
 
-mod inflation01;
-mod inflation_convexity;
-
+use crate::inflation_fd::{Inflation01Calculator, InflationGammaCalculator};
 use crate::inflation_swap::InflationSwap;
 use crate::inflation_swap::YoYInflationSwap;
-use finstack_quant_core::market_data::bumps::BumpSpec;
-use finstack_quant_core::market_data::bumps::MarketBump;
-use finstack_quant_core::math::units::ONE_BASIS_POINT;
-use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
@@ -39,11 +33,12 @@ pub(crate) fn register_inflation_swap_metrics(
             (ParRate, ParRateCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-            (Inflation01, inflation01::Inflation01Calculator),
-            (InflationConvexity, inflation_convexity::InflationConvexityCalculator),
+            (Inflation01, Inflation01Calculator::<InflationSwap>::new()),
+            (InflationConvexity, InflationGammaCalculator::<InflationSwap>::new()),
         ],
         custom: [
-            ("breakeven", BreakevenCalculator),
+            // Breakeven inflation is the par fixed rate of the zero-coupon swap.
+            ("breakeven", ParRateCalculator),
             ("fixed_leg_pv", FixedLegPvCalculator),
             ("inflation_leg_pv", InflationLegPvCalculator),
         ]
@@ -55,23 +50,10 @@ pub(crate) fn register_inflation_swap_metrics(
         metrics: [
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-            (Inflation01, YoYInflation01Calculator),
+            (Inflation01, Inflation01Calculator::<YoYInflationSwap>::new()),
         ]
     }
     Ok(())
-}
-
-/// Calculates breakeven inflation rate for inflation swaps.
-///
-/// Computes the fixed rate that makes the swap's present value zero.
-/// Formula: K_BE = (E[I(T_mat)]/I(T_start))^(1/τ) - 1
-pub(crate) struct BreakevenCalculator;
-
-impl MetricCalculator for BreakevenCalculator {
-    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let s: &InflationSwap = context.instrument_as()?;
-        s.par_rate(context.curves.as_ref(), context.as_of)
-    }
 }
 
 /// Calculates PV of fixed leg for inflation swaps.
@@ -106,62 +88,13 @@ impl MetricCalculator for ParRateCalculator {
     }
 }
 
-/// Inflation01 calculator for YoY inflation swaps.
-///
-/// Computes the YoY inflation curve sensitivity per 1bp using central finite
-/// differences on the inflation curve.
-///
-/// # Finite-Difference Method
-///
-/// ```text
-/// Inflation01 = (PV(+1bp) − PV(−1bp)) / 2
-/// ```
-///
-/// Dividing by 2 (not by 2 × bump_size_decimal) produces the PV change for a
-/// **1bp move**, consistent with the DV01/CS01/Inflation01 convention throughout
-/// the workspace (see `sensitivity_central_diff` and the zero-coupon
-/// `Inflation01Calculator`).
-pub(crate) struct YoYInflation01Calculator;
-
-impl MetricCalculator for YoYInflation01Calculator {
-    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let swap: &YoYInflationSwap = context.instrument_as()?;
-        let as_of = context.as_of;
-
-        // Bump the inflation curve up by 1bp and reprice.
-        let bump_spec = BumpSpec::inflation_shift_pct(ONE_BASIS_POINT * 100.0);
-        let curves_up = context.curves.as_ref().bump([MarketBump::Curve {
-            id: swap.inflation_index_id.clone(),
-            spec: bump_spec,
-        }])?;
-        let pv_up = swap.value(&curves_up, as_of)?.amount();
-
-        // Bump the inflation curve down by 1bp and reprice.
-        let bump_spec_down = BumpSpec::inflation_shift_pct(-ONE_BASIS_POINT * 100.0);
-        let curves_down = context.curves.as_ref().bump([MarketBump::Curve {
-            id: swap.inflation_index_id.clone(),
-            spec: bump_spec_down,
-        }])?;
-        let pv_down = swap.value(&curves_down, as_of)?.amount();
-
-        // Central difference: Inflation01 = (PV_up - PV_down) / 2.
-        //
-        // The curve was bumped by exactly ±1bp (ONE_BASIS_POINT = 0.0001).
-        // A symmetric ±1bp central difference already produces the PV change
-        // for a 1bp move; no further normalization by the decimal bump value is
-        // needed. Dividing by 2 (not by 2 × ONE_BASIS_POINT) is the correct
-        // per-1bp convention — consistent with DV01 and CS01 in the workspace.
-        Ok((pv_up - pv_down) / 2.0)
-    }
-}
-
 #[cfg(test)]
 mod yoy_inflation01_tests {
-    use super::ONE_BASIS_POINT;
     use crate::inflation_swap::YoYInflationSwap;
     use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
+    use finstack_quant_core::math::units::ONE_BASIS_POINT;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::PricingOptions;

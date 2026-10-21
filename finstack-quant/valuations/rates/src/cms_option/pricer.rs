@@ -34,7 +34,7 @@
 
 use crate::cms_common::annuity_weight;
 use crate::cms_option::types::CmsOption;
-use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
@@ -69,7 +69,6 @@ impl CmsOptionPricer {
         as_of: Date,
         convexity_scale: f64,
     ) -> Result<Money> {
-        inst.validate()?;
         let mut total_pv = 0.0;
         let strike = inst.strike_f64()?;
         let discount_curve = curves.get_discount(inst.discount_curve_id.as_ref())?;
@@ -115,14 +114,10 @@ impl CmsOptionPricer {
 
             // 1. Calculate Forward Swap Rate
             let reference_swap = inst.reference_swap();
-            let swap_start = reference_swap.reference_swap_start(fixing_date)?;
             let swap_tenor_months =
                 crate::cms_common::cms_tenor_months(inst.cms_tenor, "CmsOption cms_tenor")?;
-            let swap_end = swap_start.add_months(swap_tenor_months)?;
-
-            // Calculate annuity and forward rate
-            let (forward_swap_rate, _) =
-                reference_swap.forward_rate_and_annuity(curves, as_of, swap_start, swap_end)?;
+            let (swap_start, forward_swap_rate) =
+                reference_swap.forward_at_fixing(curves, as_of, fixing_date, swap_tenor_months)?;
 
             if forward_swap_rate <= 0.0 || strike <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation("Black CMS option requires positive forward and strike; no normal-volatility conversion is inferred".to_owned()));

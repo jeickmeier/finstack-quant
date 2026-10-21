@@ -529,9 +529,19 @@ impl InterestRateFuture {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
+        let projection = self.rate_projection(context, as_of)?;
+        self.convexity_adjustment_for(context, as_of, &projection)
+    }
+
+    /// Convexity adjustment for the already-computed rate `projection`.
+    fn convexity_adjustment_for(
+        &self,
+        context: &MarketContext,
+        as_of: Date,
+        projection: &RateFutureProjection,
+    ) -> finstack_quant_core::Result<f64> {
         use finstack_quant_core::dates::DayCountContext;
         let (_fixing_date, period_start, period_end) = self.resolve_dates()?;
-        let projection = self.rate_projection(context, as_of)?;
         if projection.parallel_forward_sensitivity == 0.0 {
             return Ok(0.0);
         }
@@ -676,7 +686,7 @@ impl InterestRateFuture {
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
         self.terms
-            .resolve_mark(self.id.as_str(), as_of, || self.fair_price(market, as_of))
+            .resolve_mark(self.id.as_str(), as_of, || self.model_price(market, as_of))
     }
 
     /// Model futures price `100 × (1 − R − CA)` in price points, where `R` is
@@ -693,9 +703,16 @@ impl InterestRateFuture {
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
+        self.model_price(market, as_of)
+    }
+
+    /// [`Self::fair_price`] for an already-validated contract.
+    fn model_price(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+        // The discount curve is a declared market dependency even though the
+        // daily-margined price does not discount.
         let _disc = market.get_discount(&self.discount_curve_id)?;
         let projection = self.rate_projection(market, as_of)?;
-        let effective_adjustment = self.convexity_adjustment(market, as_of)?;
+        let effective_adjustment = self.convexity_adjustment_for(market, as_of, &projection)?;
         Ok(100.0 * (1.0 - projection.rate - effective_adjustment))
     }
 
@@ -729,7 +746,7 @@ impl InterestRateFuture {
     pub fn npv_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
         self.validate()?;
         self.terms
-            .npv_from_model_price(self.id.as_str(), as_of, || self.fair_price(market, as_of))
+            .npv_from_model_price(self.id.as_str(), as_of, || self.model_price(market, as_of))
     }
 
     /// Calculate convexity adjusted rate using volatility surface.

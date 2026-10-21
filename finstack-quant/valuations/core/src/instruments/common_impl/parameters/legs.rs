@@ -125,6 +125,19 @@ pub struct FixedLegSpec {
 }
 
 impl FixedLegSpec {
+    /// Period-generation parameters for this leg's accrual schedule.
+    ///
+    /// Copies the leg's dates, frequency, stub, business-day convention,
+    /// end-of-month flag, day count and payment lag. The calendar is the leg's
+    /// own `calendar_id`, else the weekends-only calendar. Fixed legs have no
+    /// resets (`reset_lag_days: None`) and no roll rule.
+    ///
+    /// # Arguments
+    ///
+    /// * `adjust_accrual_dates` - When `true`, accrual boundaries are moved
+    ///   to business days with the leg's business-day convention; when
+    ///   `false`, accrual uses the unadjusted roll dates and only payment
+    ///   dates are adjusted.
     pub fn schedule_params(
         &self,
         adjust_accrual_dates: bool,
@@ -270,6 +283,55 @@ pub struct FloatLegSpec {
 }
 
 impl FloatLegSpec {
+    /// Period-generation parameters for this leg's accrual schedule.
+    ///
+    /// Copies the leg's dates, frequency, stub, business-day convention,
+    /// end-of-month flag, day count and payment lag, with no roll rule. The
+    /// calendar and reset lag are caller-supplied because instruments resolve
+    /// them differently (a currency default calendar, or resets computed on a
+    /// separate fixing calendar).
+    ///
+    /// # Arguments
+    ///
+    /// * `calendar_id` - Holiday calendar id used for payment-date and (when
+    ///   `adjust_accrual_dates` is `true`) accrual-date adjustment. Pass
+    ///   [`Self::calendar_or_weekends`] for the leg's own calendar with the
+    ///   weekends-only fallback.
+    /// * `reset_lag_days` - Business days between reset and accrual start
+    ///   emitted on each period (`Some(n)`), or `None` when the caller
+    ///   computes resets itself and the periods carry no reset date.
+    /// * `adjust_accrual_dates` - When `true`, accrual boundaries are moved
+    ///   to business days with the leg's business-day convention; when
+    ///   `false`, accrual uses the unadjusted roll dates.
+    pub fn schedule_params<'a>(
+        &self,
+        calendar_id: &'a str,
+        reset_lag_days: Option<i32>,
+        adjust_accrual_dates: bool,
+    ) -> finstack_quant_cashflows::builder::BuildPeriodsParams<'a> {
+        finstack_quant_cashflows::builder::BuildPeriodsParams {
+            start: self.start,
+            end: self.end,
+            frequency: self.frequency,
+            stub: self.stub,
+            business_day_convention: self.business_day_convention,
+            calendar_id,
+            end_of_month: self.end_of_month,
+            day_count: self.day_count,
+            payment_lag_days: self.payment_lag_days,
+            reset_lag_days,
+            adjust_accrual_dates,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+        }
+    }
+
+    /// The leg's own `calendar_id`, else the weekends-only calendar id.
+    pub fn calendar_or_weekends(&self) -> &str {
+        self.calendar_id
+            .as_deref()
+            .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
+    }
+
     /// Validate the structural invariants of this floating-leg specification.
     ///
     /// Enforces that the accrual period is well-formed: `start < end`. A leg

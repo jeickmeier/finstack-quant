@@ -1,7 +1,6 @@
 //! Contractual exercise cashflows shared by European and Bermudan HW trees.
 use crate::swaption::CashSettlementMethod;
-use finstack_quant_cashflows::builder::RollRule;
-use finstack_quant_cashflows::builder::{build_periods, period_accrual, BuildPeriodsParams};
+use finstack_quant_cashflows::builder::{build_periods, period_accrual};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
@@ -56,23 +55,11 @@ impl HwSwaptionCashflows {
                 ))
             })
             .collect::<Result<Vec<_>>>()?;
-        let float_params = BuildPeriodsParams {
-            start: float.start,
-            end: float.end,
-            frequency: float.frequency,
-            stub: float.stub,
-            business_day_convention: float.business_day_convention,
-            calendar_id: float
-                .calendar_id
-                .as_deref()
-                .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
-            end_of_month: float.end_of_month,
-            day_count: float.day_count,
-            payment_lag_days: float.payment_lag_days,
-            reset_lag_days: Some(float.reset_lag_days),
-            adjust_accrual_dates: false,
-            roll_rule: RollRule::None,
-        };
+        let float_params = float.schedule_params(
+            float.calendar_or_weekends(),
+            Some(float.reset_lag_days),
+            false,
+        );
         let spread = float.spread_bp.as_f64() / 10_000.0;
         let float = build_periods(float_params)?
             .iter()

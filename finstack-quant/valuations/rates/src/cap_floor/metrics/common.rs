@@ -4,7 +4,7 @@
 //! contributions for a given functional form (e.g., delta/gamma/vega/theta).
 
 use crate::cap_floor::pricing::pricer::resolve_caplet_volatility;
-use crate::cap_floor::pricing::projection::resolve_optioned_caplet_inputs;
+use crate::cap_floor::pricing::projection::{unpaid_caplets, UnpaidCaplet};
 use crate::cap_floor::CapFloor;
 use finstack_quant_models::volatility::VolatilityConvention;
 use finstack_quant_valuations_core::metrics::MetricContext;
@@ -49,33 +49,22 @@ pub(crate) fn aggregate_over_caplets<FN>(
 where
     FN: FnMut(CapletInputs) -> f64,
 {
-    let strike = option.strike_f64()?;
-
-    let periods = option.pricing_periods()?;
-    if periods.is_empty() {
-        return Ok(0.0);
-    }
-
     let mut sum = 0.0;
-    for period in &periods {
-        if period.payment_date <= context.as_of {
-            continue;
-        }
-        let resolved_inputs =
-            resolve_optioned_caplet_inputs(option, period, context.curves.as_ref(), context.as_of)?;
+    for caplet in unpaid_caplets(option, context.curves.as_ref(), context.as_of)? {
+        let UnpaidCaplet {
+            inputs: resolved_inputs,
+            forward,
+            strike,
+        } = caplet?;
         let projection = &resolved_inputs.coupon;
         if projection.payment_date <= context.as_of {
             continue;
         }
-        let fixing_date = projection.fixing_date;
-        if fixing_date <= context.as_of {
+        if projection.fixing_date <= context.as_of {
             continue;
         }
 
         let time_to_fixing = resolved_inputs.time_to_fixing;
-
-        let forward = projection.forward - projection.additive_spread;
-        let strike = strike - projection.additive_spread;
         let df = resolved_inputs.discount_factor;
         let quote =
             resolve_caplet_volatility(option, context.curves.as_ref(), time_to_fixing, strike)?;

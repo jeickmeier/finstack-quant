@@ -305,50 +305,22 @@ impl BermudanSwaptionPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
-        if swaption.get_forward_curve_id() != swaption.get_discount_curve_id() {
-            return Err(PricingError::model_failure_with_context(
-                "Bermudan tree pricing is currently single-curve only. \
-                 Set forward_curve_id equal to discount_curve_id or use a multi-curve-capable engine."
-                    .to_string(),
-                PricingErrorContext::default(),
-            ));
-        }
-
-        let ttm = swaption.time_to_maturity(as_of)?;
-
-        if ttm <= 0.0 {
-            // Expired - return zero
-            return Ok(ValuationResult::stamped(
-                swaption.id.as_str(),
-                as_of,
-                Money::from((0_i64, swaption.notional.currency())),
-            ));
-        }
-
+        require_single_curve(
+            "Bermudan tree",
+            swaption.get_forward_curve_id(),
+            swaption.get_discount_curve_id(),
+        )?;
         // Once the last exercise date has passed there is no remaining
-        // optionality.  Treat the instrument as settled rather than
-        // calibrating a tree with an empty exercise grid (which previously
-        // produced a misleading model failure and required market data for a
-        // position that had already expired).
-        let exercise_times = swaption.exercise_times(as_of)?;
-        if exercise_times.is_empty() {
-            return Ok(ValuationResult::stamped(
-                swaption.id.as_str(),
-                as_of,
-                Money::from((0_i64, swaption.notional.currency())),
-            ));
-        }
-
-        // Get discount curve only after lifecycle checks so a post-exercise
-        // valuation does not fail because an otherwise unused curve is absent.
-        let disc = market
-            .get_discount(swaption.get_discount_curve_id().as_str())
-            .map_err(|e| {
-                PricingError::missing_market_data_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        // optionality: the instrument is settled rather than calibrating a
+        // tree with an empty exercise grid.
+        let Some(LiveBermudan {
+            disc,
+            time_to_maturity: ttm,
+            exercise_times,
+        }) = live_bermudan(swaption, market, as_of)?
+        else {
+            return Ok(settled_result(swaption, as_of));
+        };
 
         // Use a prepared model if available, otherwise prepare a request-local tree.
         let (pv, used_cached_model) = if let Some(ref cached_tree) = self.config.prepared_model {
@@ -466,43 +438,19 @@ impl BermudanSwaptionPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
-        if swaption.get_forward_curve_id() != swaption.get_discount_curve_id() {
-            return Err(PricingError::model_failure_with_context(
-                "Bermudan Hull-White pricing is currently single-curve only. \
-                 Set forward_curve_id equal to discount_curve_id or use a multi-curve-capable engine."
-                    .to_string(),
-                PricingErrorContext::default(),
-            ));
-        }
-
-        let ttm = swaption.time_to_maturity(as_of)?;
-
-        if ttm <= 0.0 {
-            // Expired - return zero
-            return Ok(ValuationResult::stamped(
-                swaption.id.as_str(),
-                as_of,
-                Money::from((0_i64, swaption.notional.currency())),
-            ));
-        }
-
-        let exercise_times = swaption.exercise_times(as_of)?;
-        if exercise_times.is_empty() {
-            return Ok(ValuationResult::stamped(
-                swaption.id.as_str(),
-                as_of,
-                Money::from((0_i64, swaption.notional.currency())),
-            ));
-        }
-
-        let disc = market
-            .get_discount(swaption.get_discount_curve_id().as_str())
-            .map_err(|e| {
-                PricingError::missing_market_data_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        require_single_curve(
+            "Bermudan Hull-White",
+            swaption.get_forward_curve_id(),
+            swaption.get_discount_curve_id(),
+        )?;
+        let Some(LiveBermudan {
+            disc,
+            time_to_maturity: ttm,
+            exercise_times,
+        }) = live_bermudan(swaption, market, as_of)?
+        else {
+            return Ok(settled_result(swaption, as_of));
+        };
 
         let hw_params = self.effective_hw_params(swaption, market)?;
 
@@ -811,18 +759,91 @@ pub(crate) fn apply_exercise_today(
     {
         return Ok(());
     }
-    let discount = market
-        .get_discount(swaption.get_discount_curve_id().as_str())
-        .map_err(|e| {
-            PricingError::missing_market_data_with_context(
-                e.to_string(),
-                PricingErrorContext::default(),
-            )
-        })?;
+    let discount = require_discount_curve(market, swaption.get_discount_curve_id().as_str())?;
     let value =
         value_with_exercise_today(swaption, discount.as_ref(), as_of, result.value.amount())?;
     result.value = Money::new(value, swaption.notional.currency())?;
     Ok(())
+}
+
+/// Message for a swaption whose forward curve differs from its discount
+/// curve, which the Hull-White engines (`engine` names one) cannot price.
+pub(crate) fn single_curve_only_message(engine: &str) -> String {
+    format!(
+        "{engine} pricing is currently single-curve only. \
+         Set forward_curve_id equal to discount_curve_id or use a multi-curve-capable engine."
+    )
+}
+
+/// Reject a multi-curve swaption in a single-curve Hull-White engine.
+pub(crate) fn require_single_curve(
+    engine: &str,
+    forward_curve_id: &finstack_quant_core::types::CurveId,
+    discount_curve_id: &finstack_quant_core::types::CurveId,
+) -> std::result::Result<(), PricingError> {
+    if forward_curve_id != discount_curve_id {
+        return Err(PricingError::model_failure_with_context(
+            single_curve_only_message(engine),
+            PricingErrorContext::default(),
+        ));
+    }
+    Ok(())
+}
+
+/// Discount curve `id` from `market`, reporting a miss as missing market data.
+pub(crate) fn require_discount_curve(
+    market: &MarketContext,
+    id: &str,
+) -> std::result::Result<Arc<DiscountCurve>, PricingError> {
+    market.get_discount(id).map_err(|e| {
+        PricingError::missing_market_data_with_context(
+            e.to_string(),
+            PricingErrorContext::default(),
+        )
+    })
+}
+
+/// Zero-value result for a Bermudan with no remaining optionality.
+pub(crate) fn settled_result(swaption: &BermudanSwaption, as_of: Date) -> ValuationResult {
+    ValuationResult::stamped(
+        swaption.id.as_str(),
+        as_of,
+        Money::from((0_i64, swaption.notional.currency())),
+    )
+}
+
+/// Inputs of a live Bermudan for the Hull-White tree and LSMC engines.
+struct LiveBermudan {
+    disc: Arc<DiscountCurve>,
+    time_to_maturity: f64,
+    exercise_times: Vec<f64>,
+}
+
+/// Lifecycle preamble of the Hull-White tree and LSMC engines: `None` once
+/// the swap has matured or the last exercise date has passed (the position
+/// is settled at zero and needs no market data), else the discount curve,
+/// time to maturity and remaining exercise times. The discount curve is
+/// read only after the lifecycle checks, so a settled position does not
+/// fail on an absent curve.
+fn live_bermudan(
+    swaption: &BermudanSwaption,
+    market: &MarketContext,
+    as_of: Date,
+) -> std::result::Result<Option<LiveBermudan>, PricingError> {
+    let time_to_maturity = swaption.time_to_maturity(as_of)?;
+    if time_to_maturity <= 0.0 {
+        return Ok(None);
+    }
+    let exercise_times = swaption.exercise_times(as_of)?;
+    if exercise_times.is_empty() {
+        return Ok(None);
+    }
+    let disc = require_discount_curve(market, swaption.get_discount_curve_id().as_str())?;
+    Ok(Some(LiveBermudan {
+        disc,
+        time_to_maturity,
+        exercise_times,
+    }))
 }
 
 #[cfg(test)]

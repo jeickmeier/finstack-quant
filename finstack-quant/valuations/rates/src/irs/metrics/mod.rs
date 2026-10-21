@@ -159,9 +159,10 @@ impl MetricCalculator for FixedLegPvCalculator {
 
 /// Present value calculator for the floating leg of an interest rate swap.
 ///
-/// Projects forward rates and discounts floating coupon payments, dispatching on
-/// the leg's compounding (see `pricer::compute_float_leg_pv`). Seasoned swaps
-/// read past resets from historical fixings.
+/// Projects forward rates and discounts floating coupon payments through the
+/// same signed schedule the cashflow surface emits (see
+/// `pricer::compute_float_leg_pv`). Seasoned swaps read past resets from
+/// historical fixings.
 ///
 /// # Calculation
 ///

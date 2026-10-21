@@ -109,10 +109,7 @@ impl MetricCalculator for ImpliedVolCalculator {
         let discount_factor = resolved_inputs.discount_factor;
 
         let accrual_fraction = projection.accrual_year_fraction;
-        let is_cap = matches!(
-            option.rate_option_type,
-            RateOptionType::Cap | RateOptionType::Caplet
-        );
+        let is_cap = option.rate_option_type.is_cap();
 
         let base_inputs = CapletFloorletInputs {
             is_cap,
