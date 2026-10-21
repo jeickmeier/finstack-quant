@@ -1072,6 +1072,11 @@ fn json_spec_uses_defaults_and_rejects_unknown_fields() {
         ""
     ))
     .is_err());
+    // Heston flattens its model block; the flat raw struct still denies extras.
+    let heston = r#"{"type": "heston", "r": 0.03, "q": 0.0, "v0": 0.04, "kappa": 2.0,
+        "theta": 0.04, "sigma_v": 0.3, "rho": -0.7"#;
+    assert!(parse(json(&format!("{heston}}}"), "")).is_ok());
+    assert!(parse(json(&format!(r#"{heston}, "sigma": 0.3}}"#), "")).is_err());
     assert!(parse(json(
         r#"{"type": "multi_brownian", "mus": [0.0], "sigmas": [0.1], "rho": 0.0}"#,
         ""

@@ -886,3 +886,28 @@ fn heston_rejects_unresolved_grids_and_invalid_origin_tolerances() {
         assert!(heston_call_price_fourier(100.0, bad, 1.0, &params, None).is_err());
     }
 }
+
+#[test]
+fn heston_pricing_params_serde_is_flat_and_strict() {
+    let params = HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+    let json = serde_json::to_value(params).expect("serialize");
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0,
+            "theta": 0.04, "sigma_v": 0.3, "rho": -0.7
+        })
+    );
+    let back: HestonPricingParams = serde_json::from_value(json).expect("round-trip");
+    assert_eq!(back.r, params.r);
+    assert_eq!(back.q, params.q);
+    assert_eq!(back.model, params.model);
+
+    let unknown =
+        r#"{"r":0.05,"q":0.02,"v0":0.04,"kappa":2.0,"theta":0.04,"sigma_v":0.3,"rho":-0.7,"x":1}"#;
+    assert!(serde_json::from_str::<HestonPricingParams>(unknown).is_err());
+
+    let bad_rho =
+        r#"{"r":0.05,"q":0.02,"v0":0.04,"kappa":2.0,"theta":0.04,"sigma_v":0.3,"rho":1.5}"#;
+    assert!(serde_json::from_str::<HestonPricingParams>(bad_rho).is_err());
+}

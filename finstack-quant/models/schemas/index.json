@@ -317,7 +317,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/heston_pricing_params.schema.json",
-      "bytes": 1281,
+      "bytes": 1314,
       "kind": "input",
       "path": "schemas/models/1/heston_pricing_params.schema.json",
       "summary": "Market inputs for closed-form Heston pricing.",
@@ -542,7 +542,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/path_simulation_spec.schema.json",
-      "bytes": 42108,
+      "bytes": 41663,
       "kind": "input",
       "path": "schemas/models/1/path_simulation_spec.schema.json",
       "summary": "Complete, serializable description of one path simulation.",
@@ -614,7 +614,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
-      "bytes": 31579,
+      "bytes": 30966,
       "kind": "input",
       "path": "schemas/models/1/process_spec.schema.json",
       "summary": "Stochastic process to simulate, with its parameters.",
