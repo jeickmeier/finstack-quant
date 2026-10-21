@@ -1098,16 +1098,6 @@ test('models.factor.risk.parametricVarDecomposition returns the canonical Positi
   assert.equal(typeof explicit.var_contributions[0].incremental_var, 'number');
 });
 
-test('models.factor.risk.parametricEsDecomposition returns the canonical PositionRiskDecomposition', () => {
-  const decomposition = assertStructured(
-    models.factor.risk.parametricEsDecomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE),
-    'parametricEsDecomposition result'
-  );
-  assert.deepEqual(Object.keys(decomposition).sort(), DECOMPOSITION_KEYS);
-  assert.equal(decomposition.confidence, 0.95);
-  assert.deepEqual(Object.keys(decomposition.es_contributions[0]).sort(), ES_ROW_KEYS);
-});
-
 test('models.factor.risk.historicalVarDecomposition returns ES rows and takes position-major P&L only', () => {
   // (1 - confidence) * n_scenarios must be at least 1 to resolve the tail, so
   // 0.9 confidence needs >= 10 scenarios per position.
@@ -1171,7 +1161,6 @@ test('factor-risk inputs are arrays, not JSON strings', () => {
 
 test('factor-risk kernels are absent from the portfolio namespace', () => {
   assert.equal('parametricVarDecomposition' in portfolio, false);
-  assert.equal('parametricEsDecomposition' in portfolio, false);
   assert.equal('historicalVarDecomposition' in portfolio, false);
   assert.equal('evaluateRiskBudget' in portfolio, false);
 });

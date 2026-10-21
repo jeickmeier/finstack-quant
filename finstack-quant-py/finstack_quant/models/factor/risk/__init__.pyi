@@ -33,7 +33,6 @@ __all__ = [
     "build_stress_attribution",
     "evaluate_risk_budget",
     "historical_var_decomposition",
-    "parametric_es_decomposition",
     "parametric_var_decomposition",
     "position_component_var",
 ]
@@ -86,48 +85,6 @@ def parametric_var_decomposition(
     >>> result = parametric_var_decomposition(["A", "B"], [1.0, 2.0], [[0.04, 0.0], [0.0, 0.01]])
     >>> round(result.portfolio_var, 6)
     -0.465235
-    """
-    ...
-
-def parametric_es_decomposition(
-    position_ids: list[str] | None,
-    weights: list[float],
-    covariance: list[list[float]] | npt.NDArray[np.float64] | pd.DataFrame,
-    confidence: float | None = None,
-) -> PositionRiskDecomposition:
-    """
-    Decompose portfolio parametric expected shortfall across positions.
-
-    Parameters
-    ----------
-    position_ids : list[str] | None
-        Position identifiers aligned with ``weights``; ``None`` allowed with a
-        ``pandas.DataFrame`` covariance.
-    weights : list[float]
-        Portfolio weights or exposures, one per position.
-    covariance : list[list[float]] | numpy.ndarray | pd.DataFrame
-        Square covariance matrix aligned with ``position_ids``.
-    confidence : float | None
-        ES confidence strictly inside ``(0.5, 1)``. ``None`` uses ``0.95``.
-
-    Returns
-    -------
-    PositionRiskDecomposition
-        ``portfolio_var``, ``portfolio_es`` (losses negative) and per-position
-        VaR and ES rows.
-
-    Raises
-    ------
-    ValueError
-        If dimensions do not match, covariance is malformed, or the
-        confidence level is invalid.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.factor.risk import parametric_es_decomposition
-    >>> result = parametric_es_decomposition(["A", "B"], [1.0, 2.0], [[0.04, 0.0], [0.0, 0.01]])
-    >>> round(result.portfolio_es, 6)
-    -0.583423
     """
     ...
 

@@ -1098,15 +1098,17 @@ impl LsmcPricer {
     /// * `vol` - Annualized GBM volatility (decimal).
     /// * `expiry` - Time to expiry in years.
     /// * `num_steps` - Number of time-grid steps between `0` and `expiry`.
-    /// * `currency` - Currency stamped on the returned estimate.
+    /// * `currency` - Currency stamped on the returned estimate; `None` uses the
+    ///   registry default `convenience.default_currency`.
     /// * `basis` - Regression basis family.
     /// * `basis_degree` - Basis degree; must be positive (`laguerre` also
     ///   requires the degree in `[1, 4]`).
     ///
     /// # Errors
     ///
-    /// Returns an error when the strike, GBM parameters, basis, path count,
-    /// step count, or discounting inputs fail validation, or the run fails.
+    /// Returns an error when the registry default currency cannot be resolved,
+    /// the strike, GBM parameters, basis, path count, step count, or
+    /// discounting inputs fail validation, or the run fails.
     #[allow(clippy::too_many_arguments)]
     pub fn price_american(
         &self,
@@ -1118,10 +1120,11 @@ impl LsmcPricer {
         vol: f64,
         expiry: f64,
         num_steps: usize,
-        currency: Currency,
+        currency: Option<Currency>,
         basis: BasisKind,
         basis_degree: usize,
     ) -> Result<MoneyEstimate> {
+        let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
         let exercise = AmericanExercise::new(option_type, strike)?;
         crate::monte_carlo::require_positive_vol(vol)?;
         let process = GbmProcess::with_params(rate, div_yield, vol)?;
@@ -1146,7 +1149,8 @@ impl LsmcPricer {
     /// * `vol` - Annualized GBM volatility (decimal).
     /// * `expiry` - Time to expiry in years.
     /// * `num_steps` - Number of time-grid steps between `0` and `expiry`.
-    /// * `currency` - Currency stamped on the returned estimate.
+    /// * `currency` - Currency stamped on the returned estimate; `None` uses the
+    ///   registry default `convenience.default_currency`.
     /// * `basis` - Regression basis family.
     /// * `basis_degree` - Basis degree; must be positive (`laguerre` also
     ///   requires the degree in `[1, 4]`).
@@ -1168,11 +1172,12 @@ impl LsmcPricer {
         vol: f64,
         expiry: f64,
         num_steps: usize,
-        currency: Currency,
+        currency: Option<Currency>,
         basis: BasisKind,
         basis_degree: usize,
         pricing_seed: u64,
     ) -> Result<MoneyEstimate> {
+        let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
         let exercise = AmericanExercise::new(option_type, strike)?;
         crate::monte_carlo::require_positive_vol(vol)?;
         let process = GbmProcess::with_params(rate, div_yield, vol)?;
@@ -1625,7 +1630,7 @@ mod tests {
                 0.2,
                 1.0,
                 8,
-                Currency::USD,
+                Some(Currency::USD),
                 BasisKind::Laguerre,
                 3,
             )
@@ -1647,7 +1652,7 @@ mod tests {
                 0.2,
                 1.0,
                 8,
-                Currency::USD,
+                Some(Currency::USD),
                 BasisKind::Laguerre,
                 3,
             )
@@ -1674,7 +1679,7 @@ mod tests {
                 0.2,
                 1.0 / 252.0,
                 2,
-                Currency::USD,
+                Some(Currency::USD),
                 BasisKind::Laguerre,
                 3,
             )
@@ -1734,7 +1739,7 @@ mod tests {
                 vol,
                 expiry,
                 8,
-                Currency::USD,
+                Some(Currency::USD),
                 BasisKind::Laguerre,
                 3,
             )
@@ -1778,7 +1783,7 @@ mod tests {
                 vol,
                 expiry,
                 8,
-                Currency::USD,
+                Some(Currency::USD),
                 BasisKind::Laguerre,
                 3,
             )
@@ -1821,7 +1826,7 @@ mod tests {
                 vol,
                 expiry,
                 num_steps,
-                currency,
+                Some(currency),
                 BasisKind::Laguerre,
                 3,
             ),
@@ -1834,7 +1839,7 @@ mod tests {
                 vol,
                 expiry,
                 num_steps,
-                currency,
+                Some(currency),
                 BasisKind::Polynomial,
                 2,
             ),
@@ -1847,7 +1852,7 @@ mod tests {
                 vol,
                 expiry,
                 num_steps,
-                currency,
+                Some(currency),
                 BasisKind::Laguerre,
                 3,
                 99,
@@ -1861,7 +1866,7 @@ mod tests {
                 vol,
                 expiry,
                 num_steps,
-                currency,
+                Some(currency),
                 BasisKind::Polynomial,
                 2,
                 99,

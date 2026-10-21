@@ -43,7 +43,7 @@
 //! let panel = YieldPanel::new(yields, tenors, None).unwrap();
 //!
 //! // Diebold-Li: extract factors, fit VAR, forecast
-//! let model = DieboldLi::new(lambda)
+//! let model = DieboldLi::new(Some(lambda))
 //!     .unwrap()
 //!     .extract_factors(&panel)
 //!     .unwrap()

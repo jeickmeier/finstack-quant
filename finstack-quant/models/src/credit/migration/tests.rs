@@ -273,7 +273,7 @@ mod generator_tests {
         // Q = [[ln(0.9), -ln(0.9)], [0, 0]]
         let scale = two_state_scale();
         let p = TransitionMatrix::new(scale, &[0.9, 0.1, 0.0, 1.0], 1.0).unwrap();
-        let gen = GeneratorMatrix::from_transition_matrix(&p)
+        let gen = GeneratorMatrix::from_transition_matrix(&p, None)
             .expect("generator extraction should succeed");
         let q_00 = gen.intensity("IG", "IG").unwrap();
         let q_01 = gen.intensity("IG", "D").unwrap();
@@ -299,7 +299,7 @@ mod generator_tests {
             let p = TransitionMatrix::new(scale, &[survival, 1.0 - survival, 0.0, 1.0], horizon)
                 .unwrap();
 
-            let generator = GeneratorMatrix::from_transition_matrix(&p).unwrap();
+            let generator = GeneratorMatrix::from_transition_matrix(&p, None).unwrap();
             assert!(
                 (generator.exit_rate("IG").unwrap() - annual_lambda).abs() < 1e-10,
                 "horizon={horizon}"
@@ -353,7 +353,7 @@ mod generator_tests {
                 1.0,
             )
             .unwrap();
-            let generator = GeneratorMatrix::from_transition_matrix_with_tol(&annual, 1e-11)
+            let generator = GeneratorMatrix::from_transition_matrix(&annual, Some(1e-11))
                 .expect("an exact embeddable chain needs no economic regularization");
             for i in 0..4 {
                 for j in 0..4 {
@@ -413,7 +413,7 @@ mod generator_tests {
                 )
                 .unwrap();
                 let annual = project(&source, 1.0).unwrap();
-                let recovered = GeneratorMatrix::from_transition_matrix_with_tol(&annual, 1e-11)
+                let recovered = GeneratorMatrix::from_transition_matrix(&annual, Some(1e-11))
                     .expect("clustered positive eigenvalues must remain accurate");
                 for i in 0..4 {
                     for j in 0..4 {
@@ -441,7 +441,7 @@ mod generator_tests {
         let matrix = TransitionMatrix::new(two_state_scale(), &[0.9, 0.1, 0.0, 1.0], 1.0).unwrap();
         for tolerance in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -0.1] {
             assert!(matches!(
-                GeneratorMatrix::from_transition_matrix_with_tol(&matrix, tolerance),
+                GeneratorMatrix::from_transition_matrix(&matrix, Some(tolerance)),
                 Err(MigrationError::InvalidTolerance(_))
             ));
         }
@@ -479,7 +479,7 @@ mod generator_tests {
         let scale = two_state_scale();
         let p = TransitionMatrix::new(scale, &[0.9, 0.1, 0.0, 1.0], 1.0).unwrap();
         // Should succeed even if raw log has a tiny negative off-diagonal.
-        GeneratorMatrix::from_transition_matrix(&p)
+        GeneratorMatrix::from_transition_matrix(&p, None)
             .expect("Kreinin-Sidenius should produce valid generator");
     }
 
@@ -500,7 +500,7 @@ mod generator_tests {
         .expect("valid stochastic matrix with absorbing default");
 
         assert!(matches!(
-            GeneratorMatrix::from_transition_matrix(&p),
+            GeneratorMatrix::from_transition_matrix(&p, None),
             Err(MigrationError::NoValidGenerator { .. })
         ));
     }
@@ -526,7 +526,7 @@ mod generator_tests {
         // error (~0.022) exceeds the default 1e-2 tolerance — exactly the
         // distortion the stamps make visible. Use a loosened tolerance to
         // obtain the regularized generator and inspect the stamps.
-        let gen = GeneratorMatrix::from_transition_matrix_with_tol(&p, 5e-2)
+        let gen = GeneratorMatrix::from_transition_matrix(&p, Some(5e-2))
             .expect("generator extraction should succeed");
 
         assert!(
@@ -758,7 +758,7 @@ mod reference_matrix_tests {
     #[test]
     fn generator_extraction_succeeds() {
         let (_scale, p) = reference_matrix();
-        let gen = GeneratorMatrix::from_transition_matrix(&p)
+        let gen = GeneratorMatrix::from_transition_matrix(&p, None)
             .expect("generator extraction of reference matrix should succeed");
         // All diagonal entries should be ≤ 0 and off-diagonal ≥ 0.
         for i in 0..7 {
@@ -781,7 +781,7 @@ mod reference_matrix_tests {
     #[test]
     fn six_month_projection() {
         let (_scale, p) = reference_matrix();
-        let gen = GeneratorMatrix::from_transition_matrix(&p).unwrap();
+        let gen = GeneratorMatrix::from_transition_matrix(&p, None).unwrap();
         let p_half = project(&gen, 0.5).unwrap();
         // Row sums = 1, all entries ≥ 0.
         for i in 0..7 {
@@ -800,7 +800,7 @@ mod reference_matrix_tests {
     #[test]
     fn five_year_projection() {
         let (_scale, p) = reference_matrix();
-        let gen = GeneratorMatrix::from_transition_matrix(&p).unwrap();
+        let gen = GeneratorMatrix::from_transition_matrix(&p, None).unwrap();
         let p5 = project(&gen, 5.0).unwrap();
         // Cumulative default PD for BBB (index 3) over 5y should be material.
         let pd_bbb = p5.probability_by_index(3, 6).unwrap();
@@ -814,7 +814,7 @@ mod reference_matrix_tests {
     #[test]
     fn semi_group_7x7() {
         let (_scale, p) = reference_matrix();
-        let gen = GeneratorMatrix::from_transition_matrix(&p).unwrap();
+        let gen = GeneratorMatrix::from_transition_matrix(&p, None).unwrap();
         let p1 = project(&gen, 1.0).unwrap();
         let p2 = project(&gen, 2.0).unwrap();
         let p3 = project(&gen, 3.0).unwrap();
@@ -878,7 +878,7 @@ mod serde_invariant_tests {
     fn generator_round_trip_retains_diagnostics() {
         let matrix = TransitionMatrix::new(scale(), &[0.9, 0.1, 0.0, 1.0], 1.0).expect("matrix");
         let generator =
-            GeneratorMatrix::from_transition_matrix_with_tol(&matrix, 0.1).expect("generator");
+            GeneratorMatrix::from_transition_matrix(&matrix, Some(0.1)).expect("generator");
         let json = serde_json::to_string(&generator).expect("serialize");
         let restored: GeneratorMatrix = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(

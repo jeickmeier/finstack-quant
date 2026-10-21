@@ -779,34 +779,6 @@ pub fn parametric_var_decomposition(
     })
 }
 
-/// Decompose portfolio Expected Shortfall via parametric Euler allocation.
-///
-/// Runs [`parametric_var_decomposition`] (without incremental VaR) and returns
-/// the full [`PositionRiskDecomposition`], whose [`PositionRiskDecomposition::es_contributions`]
-/// and [`PositionRiskDecomposition::portfolio_es`] provide the Expected Shortfall attribution.
-///
-/// # Arguments
-///
-/// * `position_ids` - Position identifiers aligned with `weights`.
-/// * `weights` - Position weights or exposures (length `n_positions`).
-/// * `covariance` - Position-return covariance matrix (`n x n`, row-major,
-///   symmetric positive semidefinite).
-/// * `confidence` - ES tail confidence as a decimal probability strictly
-///   inside `(0.5, 1)`. `None` defaults to `0.95`.
-///
-/// # Errors
-///
-/// Returns a validation error if dimensions are inconsistent, the covariance
-/// matrix is invalid, or the confidence level is out of bounds.
-pub fn parametric_es_decomposition(
-    position_ids: &[String],
-    weights: &[f64],
-    covariance: &[f64],
-    confidence: Option<f64>,
-) -> finstack_quant_core::Result<PositionRiskDecomposition> {
-    parametric_var_decomposition(position_ids, weights, covariance, confidence, false)
-}
-
 // Historical simulation engine
 
 /// Decompose portfolio VaR and ES from per-position scenario P&Ls via
@@ -1336,7 +1308,8 @@ mod tests {
             ),
         ];
         for (confidence, portfolio_es, components) in es_cases {
-            let view = parametric_es_decomposition(&ids, &weights, &covariance, confidence)?;
+            let view =
+                parametric_var_decomposition(&ids, &weights, &covariance, confidence, false)?;
             assert_eq!(view.portfolio_es.to_bits(), portfolio_es);
             let bits: Vec<u64> = view
                 .es_contributions

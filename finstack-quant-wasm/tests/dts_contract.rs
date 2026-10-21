@@ -790,10 +790,6 @@ fn portfolio_dts_pins_python_parity_optional_parameters() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "parametricEsDecomposition(positionIds: string[], weights: NumericArray, covariance: NumericArray[], confidence?: number | null): PositionRiskDecomposition;",
-    ));
-    assert!(contains_ignoring_ws(
-        &dts,
         "historicalVarDecomposition(positionIds: string[], positionPnls: NumericArray[], confidence?: number | null): PositionRiskDecomposition;",
     ));
     assert!(contains_ignoring_ws(

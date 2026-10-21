@@ -1356,14 +1356,10 @@ fn simulate_portfolio_loss(
     recovery: Option<PyRecoverySpec>,
 ) -> PyResult<PyPortfolioLossResult> {
     let exposures = extract_exposures(exposures)?;
-    py.detach(|| match recovery {
-        Some(recovery) => {
-            corr::simulate_portfolio_loss_with_recovery(&exposures, &config.inner, &recovery.inner)
-        }
-        None => corr::simulate_portfolio_loss(&exposures, &config.inner),
-    })
-    .map(|inner| PyPortfolioLossResult { inner })
-    .map_err(core_to_py)
+    let recovery = recovery.map(|spec| spec.inner);
+    py.detach(|| corr::simulate_portfolio_loss(&exposures, &config.inner, recovery.as_ref()))
+        .map(|inner| PyPortfolioLossResult { inner })
+        .map_err(core_to_py)
 }
 
 /// Read a correlation matrix given flat row-major, or as nested rows / a 2-D

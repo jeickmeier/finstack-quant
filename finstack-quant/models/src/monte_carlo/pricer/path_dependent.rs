@@ -640,14 +640,17 @@ impl PathDependentPricer {
     /// * `div_yield` - Continuous dividend yield (decimal, annualized).
     /// * `vol` - Annualized GBM volatility (decimal).
     /// * `expiry` - Time to expiry in years; also the uniform-grid horizon.
-    /// * `num_steps` - Number of time-grid steps between `0` and `expiry`.
-    /// * `currency` - Currency stamped on the returned estimate.
+    /// * `num_steps` - Number of time-grid steps between `0` and `expiry`;
+    ///   `None` uses the registry default
+    ///   `convenience.path_dependent_pricer.num_steps`.
+    /// * `currency` - Currency stamped on the returned estimate; `None` uses the
+    ///   registry default `convenience.default_currency`.
     ///
     /// # Errors
     ///
-    /// Returns an error when GBM parameters fail validation, the flat discount
-    /// factor is invalid, the uniform grid is invalid, or the underlying engine
-    /// rejects the run.
+    /// Returns an error when the embedded registry defaults cannot be loaded,
+    /// GBM parameters fail validation, the flat discount factor is invalid,
+    /// the uniform grid is invalid, or the underlying engine rejects the run.
     #[allow(clippy::too_many_arguments)]
     pub fn price_asian(
         &self,
@@ -658,9 +661,16 @@ impl PathDependentPricer {
         div_yield: f64,
         vol: f64,
         expiry: f64,
-        num_steps: usize,
-        currency: Currency,
+        num_steps: Option<usize>,
+        currency: Option<Currency>,
     ) -> Result<MoneyEstimate> {
+        let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
+        let num_steps = num_steps.unwrap_or(
+            crate::monte_carlo::registry::embedded_defaults()?
+                .convenience
+                .path_dependent_pricer
+                .num_steps,
+        );
         crate::monte_carlo::require_positive_vol(vol)?;
         let process = GbmProcess::with_params(rate, div_yield, vol)?;
         let discount_factor = flat_discount_factor(rate, expiry)?;
@@ -702,12 +712,18 @@ impl PathDependentPricer {
     /// * `vol` - Annualized GBM volatility (decimal), strictly positive.
     /// * `expiry` - Time to expiry in years; also the uniform-grid horizon.
     /// * `num_steps` - Number of time-grid steps between `0` and `expiry`,
-    ///   each of which is an averaging date.
-    /// * `currency` - Currency stamped on the returned price estimate.
+    ///   each of which is an averaging date. `None` uses the registry default
+    ///   `convenience.greeks.lrm_num_steps`, which is smaller than the
+    ///   [`Self::price_asian`] default because the likelihood-ratio estimator
+    ///   keeps every path in memory (at most four million path points,
+    ///   `num_paths x (num_steps + 1)`).
+    /// * `currency` - Currency stamped on the returned price estimate; `None`
+    ///   uses the registry default `convenience.default_currency`.
     ///
     /// # Errors
     ///
-    /// Returns a validation error when the GBM parameters, discount factor or
+    /// Returns an error when the embedded registry defaults cannot be loaded,
+    /// a validation error when the GBM parameters, discount factor or
     /// grid are invalid, and in every case listed on
     /// [`Self::price_with_lrm_greeks_from_payoff`]: Sobol or antithetic sampling, or more
     /// than four million captured path points.
@@ -721,9 +737,16 @@ impl PathDependentPricer {
         div_yield: f64,
         vol: f64,
         expiry: f64,
-        num_steps: usize,
-        currency: Currency,
+        num_steps: Option<usize>,
+        currency: Option<Currency>,
     ) -> Result<LrmGreeks> {
+        let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
+        let num_steps = num_steps.unwrap_or(
+            crate::monte_carlo::registry::embedded_defaults()?
+                .convenience
+                .greeks
+                .lrm_num_steps,
+        );
         crate::monte_carlo::require_positive_vol(vol)?;
         // Before the fixing schedule, which holds one entry per step.
         self.require_lrm_capture_fits(num_steps)?;
@@ -1630,8 +1653,8 @@ mod tests {
                 0.01,
                 vol,
                 expiry,
-                num_steps,
-                Currency::USD,
+                Some(num_steps),
+                Some(Currency::USD),
             )
         };
         price(100.0, 0.2, 1.0, 12).expect("valid inputs price");
@@ -1685,8 +1708,8 @@ mod tests {
                         div_yield,
                         vol,
                         expiry,
-                        num_steps,
-                        Currency::USD,
+                        Some(num_steps),
+                        Some(Currency::USD),
                     )
                     .expect("plain Asian price")
                     .mean
@@ -1701,8 +1724,8 @@ mod tests {
                     div_yield,
                     vol,
                     expiry,
-                    num_steps,
-                    Currency::USD,
+                    Some(num_steps),
+                    Some(Currency::USD),
                 )
                 .expect("LRM Asian price");
 
@@ -1997,8 +2020,8 @@ mod tests {
                 0.0,
                 0.2,
                 1.0,
-                12,
-                Currency::USD,
+                Some(12),
+                Some(Currency::USD),
             )
             .expect("Asian call pricing should succeed");
         assert!(estimate.mean.amount() > 0.0);
@@ -2020,8 +2043,8 @@ mod tests {
                 0.0,
                 0.2,
                 1.0,
-                12,
-                Currency::USD,
+                Some(12),
+                Some(Currency::USD),
             )
             .expect("Asian put pricing should succeed");
         assert!(estimate.mean.amount() > 0.0);
@@ -2088,8 +2111,8 @@ mod tests {
                         0.02,
                         0.25,
                         1.0,
-                        num_steps,
-                        Currency::USD,
+                        Some(num_steps),
+                        Some(Currency::USD),
                     )
                     .expect("call");
                 let put = pricer
@@ -2101,8 +2124,8 @@ mod tests {
                         0.02,
                         0.25,
                         1.0,
-                        num_steps,
-                        Currency::USD,
+                        Some(num_steps),
+                        Some(Currency::USD),
                     )
                     .expect("put");
                 for estimate in [call, put] {
@@ -2130,8 +2153,8 @@ mod tests {
                     0.02,
                     0.25,
                     1.0,
-                    8,
-                    Currency::USD,
+                    Some(8),
+                    Some(Currency::USD),
                 )
                 .expect("lrm greeks");
             actual.push(greeks.price.mean.amount().to_bits());

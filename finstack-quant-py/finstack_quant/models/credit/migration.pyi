@@ -779,7 +779,10 @@ class GeneratorMatrix:
         ...
 
     @staticmethod
-    def from_transition_matrix(p: TransitionMatrix) -> GeneratorMatrix:
+    def from_transition_matrix(
+        p: TransitionMatrix,
+        round_trip_tol: float | None = None,
+    ) -> GeneratorMatrix:
         """
         Embed a transition matrix as a generator via the matrix logarithm
         (Israel-Rosenthal-Wei with Kreinin-Sidenius regularization).
@@ -788,6 +791,10 @@ class GeneratorMatrix:
         ----------
         p : TransitionMatrix
             Source matrix.
+        round_trip_tol : float, optional
+            Non-negative infinity-norm tolerance on ``exp(Q * h) - P(h)``.
+            ``None`` uses the default ``1e-2``, which suits published annual
+            tables quoted to four digits.
 
         Returns
         -------
@@ -798,8 +805,8 @@ class GeneratorMatrix:
         ------
         RuntimeError
             If no valid generator exists (complex or non-positive
-            eigenvalues) or the round-trip error exceeds the default
-            tolerance.
+            eigenvalues), the round-trip error exceeds the tolerance, or
+            ``round_trip_tol`` is negative or non-finite.
 
         Examples
         --------
@@ -808,41 +815,7 @@ class GeneratorMatrix:
         >>> p = migration.TransitionMatrix(scale, [0.9, 0.1, 0.0, 1.0], 1.0)
         >>> migration.GeneratorMatrix.from_transition_matrix(p).round_trip_error >= 0.0
         True
-        """
-        ...
-
-    @staticmethod
-    def from_transition_matrix_with_tol(
-        p: TransitionMatrix,
-        round_trip_tol: float,
-    ) -> GeneratorMatrix:
-        """
-        Like :meth:`from_transition_matrix` with an explicit round-trip tolerance.
-
-        Parameters
-        ----------
-        p : TransitionMatrix
-            Source matrix.
-        round_trip_tol : float
-            Non-negative infinity-norm tolerance on ``exp(Q * h) - P(h)``.
-
-        Returns
-        -------
-        GeneratorMatrix
-            Annualized generator.
-
-        Raises
-        ------
-        RuntimeError
-            If no valid generator exists or the round-trip error exceeds
-            ``round_trip_tol``.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.credit import migration
-        >>> scale = migration.RatingScale.custom(["A", "D"])
-        >>> p = migration.TransitionMatrix(scale, [0.9, 0.1, 0.0, 1.0], 1.0)
-        >>> migration.GeneratorMatrix.from_transition_matrix_with_tol(p, 1e-6).n_states
+        >>> migration.GeneratorMatrix.from_transition_matrix(p, 1e-6).n_states
         2
         """
         ...

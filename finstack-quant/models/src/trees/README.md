@@ -103,15 +103,16 @@ let params = OptionMarketParams::new(
 let tree = BinomialTree::leisen_reimer(200);
 assert_eq!(tree.steps, 201);
 
-let american = tree.price_american(&params)?;
+let american = tree.price_american(&params, &[])?;
 let european = tree.price_european(&params)?;
 assert!(american >= european - 1e-9); // early exercise never destroys value
 # Ok::<(), finstack_quant_core::Error>(())
 ```
 
 `BinomialTree::leisen_reimer(steps)` rounds positive even requests up to the next odd step count. Additional entry points:
-`price_bermudan(&params, &exercise_times)`,
-`price_american_with_discrete_dividends` and `price_bermudan_with_discrete_dividends`.
+`price_bermudan(&params, &exercise_times, &dividends)`; both `price_american`
+and `price_bermudan` take a cash-dividend schedule `&[(time_in_years, amount)]`
+(empty for none).
 Greeks are finite differences owned by
 the instrument pricers, not the lattice.
 

@@ -105,21 +105,13 @@ fn heston_satisfies_feller(kappa: f64, theta: f64, vol_of_vol: f64) -> bool {
     )
 }
 
-/// Resolve an optional currency argument, defaulting to the registry default.
-pub(super) fn resolve_currency(
-    currency: Option<&Bound<'_, PyAny>>,
-) -> PyResult<finstack_quant_core::currency::Currency> {
-    finstack_quant_models::monte_carlo::convenience::resolve_currency(extract_optional_currency(
-        currency,
-    )?)
-    .map_err(core_to_py)
-}
-
 /// Extract an optional currency argument without applying any default.
 ///
 /// Canonical entry points in the Monte Carlo crate own the registry default;
 /// the binding only marshals an explicitly supplied currency.
-fn extract_optional_currency(currency: Option<&Bound<'_, PyAny>>) -> PyResult<Option<Currency>> {
+pub(super) fn extract_optional_currency(
+    currency: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Option<Currency>> {
     currency.map(extract_currency).transpose()
 }
 

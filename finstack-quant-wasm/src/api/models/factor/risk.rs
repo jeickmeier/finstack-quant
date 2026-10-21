@@ -62,44 +62,6 @@ pub fn parametric_var_decomposition(
     crate::utils::to_js_value(&result)
 }
 
-/// Decompose portfolio Expected Shortfall into position contributions via
-/// parametric Euler allocation.
-///
-/// Returns the canonical `PositionRiskDecomposition` (the object Python's
-/// `parametric_es_decomposition` returns): portfolio VaR/ES (losses
-/// negative), `method`, and per-position `var_contributions` and
-/// `es_contributions` rows.
-/// @param position_ids - Position identifiers, one per weight.
-/// @param weights - Position weights or exposures in portfolio currency.
-/// @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
-/// @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
-///
-/// # Errors
-///
-/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
-/// `validation` error if identifier, weight, or covariance dimensions
-/// disagree; the covariance matrix is not finite, symmetric, and positive
-/// semidefinite; or `confidence` is not finite and in `(0.5, 1)`.
-#[wasm_bindgen(js_name = parametricEsDecomposition)]
-pub fn parametric_es_decomposition(
-    position_ids: JsValue,
-    weights: JsValue,
-    covariance: JsValue,
-    confidence: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
-    use finstack_quant_factor::risk::{flatten_square_matrix, parametric_es_decomposition};
-    let ids = js_string_seq(&position_ids, "positionIds")?;
-    let weights = js_f64_seq(&weights, "weights")?;
-    let covariance = js_f64_matrix(&covariance, "covariance")?;
-
-    let cov_flat =
-        flatten_square_matrix(covariance, weights.len(), "covariance").map_err(to_js_err)?;
-    let view =
-        parametric_es_decomposition(&ids, &weights, &cov_flat, confidence).map_err(to_js_err)?;
-    crate::utils::to_js_value(&view)
-}
-
 /// Decompose portfolio VaR and ES from per-position scenario P&Ls via
 /// historical simulation.
 ///

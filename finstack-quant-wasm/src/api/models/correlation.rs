@@ -1083,14 +1083,11 @@ pub fn simulate_portfolio_loss(
 ) -> Result<JsPortfolioLossResult, JsValue> {
     let exposures: Vec<CreditExposure> = from_js_json(&exposures, "exposures")?;
     let config: PortfolioLossConfig = from_js_json(&config, "config")?;
-    let result = match recovery.filter(|value| !value.is_null() && !value.is_undefined()) {
-        Some(recovery) => {
-            let recovery: corr::RecoverySpec = from_js_json(&recovery, "recovery")?;
-            corr::simulate_portfolio_loss_with_recovery(&exposures, &config, &recovery)
-        }
-        None => corr::simulate_portfolio_loss(&exposures, &config),
-    };
-    result
+    let recovery: Option<corr::RecoverySpec> = recovery
+        .filter(|value| !value.is_null() && !value.is_undefined())
+        .map(|value| from_js_json(&value, "recovery"))
+        .transpose()?;
+    corr::simulate_portfolio_loss(&exposures, &config, recovery.as_ref())
         .map(|inner| JsPortfolioLossResult { inner })
         .map_err(to_js_err)
 }

@@ -2819,7 +2819,7 @@
   },
   "models.credit.migration.GeneratorMatrix": {
     "kind": "class",
-    "statics": ["fromJson", "fromTransitionMatrix", "fromTransitionMatrixWithTol"],
+    "statics": ["fromJson", "fromTransitionMatrix"],
     "methods": ["exitRate", "free", "intensity", "toJson", "toMatrix"],
     "getters": ["nStates", "regularizationL1", "roundTripError", "scale"]
   },
@@ -3028,15 +3028,11 @@
       "defaultUtilizationThreshold",
       "evaluateRiskBudget",
       "historicalVarDecomposition",
-      "parametricEsDecomposition",
       "parametricVarDecomposition",
       "positionComponentVar"
     ]
   },
   "models.factor.risk.parametricVarDecomposition": {
-    "kind": "function"
-  },
-  "models.factor.risk.parametricEsDecomposition": {
     "kind": "function"
   },
   "models.factor.risk.historicalVarDecomposition": {

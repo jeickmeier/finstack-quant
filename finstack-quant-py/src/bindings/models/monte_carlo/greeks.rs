@@ -3,7 +3,7 @@
 //! Thin wrappers around the canonical GBM European finite-difference
 //! convenience entry points in `finstack_quant_models::monte_carlo::greeks::gbm_european`.
 
-use super::engine::resolve_currency;
+use super::engine::extract_optional_currency;
 use super::results::PyEstimate;
 use crate::errors::core_to_py;
 use finstack_quant_models::monte_carlo::greeks::gbm_european::{self, GbmEuropeanFdSpec};
@@ -37,7 +37,7 @@ fn spec_from_args(
         num_steps,
         bump_size,
         option_type: OptionType::from(is_call),
-        currency: Some(resolve_currency(currency)?),
+        currency: extract_optional_currency(currency)?,
     })
 }
 

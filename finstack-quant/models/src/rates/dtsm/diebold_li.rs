@@ -184,13 +184,16 @@ impl DieboldLi {
     ///
     /// * `lambda` - Decay parameter for tenors **in years**. Must be finite
     ///   and strictly positive. Pass a months-scaled lambda only if you also
-    ///   supply tenors in months.
+    ///   supply tenors in months. `None` uses the default `0.7308`, the
+    ///   years-equivalent of Diebold-Li's canonical `0.0609` months value
+    ///   (curvature loading peaks at ≈2.45 years ≈ 30 months).
     ///
     /// # Errors
     ///
     /// Returns [`finstack_quant_core::Error::Validation`] when `lambda` is non-finite or
     /// not strictly positive.
-    pub fn new(lambda: f64) -> finstack_quant_core::Result<Self> {
+    pub fn new(lambda: Option<f64>) -> finstack_quant_core::Result<Self> {
+        let lambda = lambda.unwrap_or(DEFAULT_LAMBDA);
         if !lambda.is_finite() || lambda <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Lambda must be positive and finite, got {lambda}"
@@ -204,22 +207,6 @@ impl DieboldLi {
             q_cov: None,
             tenors: Vec::new(),
         })
-    }
-
-    /// Create a model with the default lambda = 0.7308 (years convention).
-    ///
-    /// `0.7308` is the years-equivalent of Diebold-Li's canonical `0.0609`
-    /// months value (curvature loading peaks at ≈2.45 years ≈ 30 months).
-    #[must_use]
-    pub fn with_default_lambda() -> Self {
-        Self {
-            lambda: DEFAULT_LAMBDA,
-            factors: None,
-            mu: None,
-            phi: None,
-            q_cov: None,
-            tenors: Vec::new(),
-        }
     }
 
     /// Extract time-varying Nelson-Siegel factors from a yield panel via OLS.
@@ -726,22 +713,22 @@ mod tests {
 
     #[test]
     fn new_default_lambda() {
-        let model = DieboldLi::with_default_lambda();
+        let model = DieboldLi::new(None).unwrap();
         // Years-convention default (12 × Diebold-Li's 0.0609 months value).
         assert!((model.lambda() - 0.7308).abs() < 1e-10);
     }
 
     #[test]
     fn new_custom_lambda() {
-        let model = DieboldLi::new(0.05).unwrap();
+        let model = DieboldLi::new(Some(0.05)).unwrap();
         assert!((model.lambda() - 0.05).abs() < 1e-10);
     }
 
     #[test]
     fn new_rejects_invalid_lambda() {
-        assert!(DieboldLi::new(0.0).is_err());
-        assert!(DieboldLi::new(-0.1).is_err());
-        assert!(DieboldLi::new(f64::NAN).is_err());
+        assert!(DieboldLi::new(Some(0.0)).is_err());
+        assert!(DieboldLi::new(Some(-0.1)).is_err());
+        assert!(DieboldLi::new(Some(f64::NAN)).is_err());
     }
 
     fn dated_panel() -> YieldPanel {
@@ -774,8 +761,9 @@ mod tests {
     #[test]
     fn fit_matches_extract_then_fit_var_and_keeps_dates() {
         let panel = dated_panel();
-        let fitted = DieboldLi::with_default_lambda().fit(&panel).unwrap();
-        let stepwise = DieboldLi::with_default_lambda()
+        let fitted = DieboldLi::new(None).unwrap().fit(&panel).unwrap();
+        let stepwise = DieboldLi::new(None)
+            .unwrap()
             .extract_factors(&panel)
             .unwrap()
             .fit_var()
@@ -791,7 +779,7 @@ mod tests {
     #[test]
     fn extracting_new_factors_invalidates_previous_var_fit() {
         let panel = dated_panel();
-        let fitted = DieboldLi::with_default_lambda().fit(&panel).unwrap();
+        let fitted = DieboldLi::new(None).unwrap().fit(&panel).unwrap();
         assert!(fitted.forecast(1).is_ok());
         let extracted = fitted.extract_factors(&panel).unwrap();
         assert!(extracted.factors().is_some());
@@ -816,8 +804,8 @@ mod tests {
 
     #[test]
     fn constructors_validate_lambda_and_default_to_the_years_convention() {
-        assert!(DieboldLi::new(-1.0).is_err());
-        assert!((DieboldLi::with_default_lambda().lambda() - DEFAULT_LAMBDA).abs() < 1e-12);
+        assert!(DieboldLi::new(Some(-1.0)).is_err());
+        assert!((DieboldLi::new(None).unwrap().lambda() - DEFAULT_LAMBDA).abs() < 1e-12);
     }
 
     #[test]
@@ -840,7 +828,7 @@ mod tests {
         }
 
         let panel = YieldPanel::new(data, tenors, None).unwrap();
-        let model = DieboldLi::new(lambda)
+        let model = DieboldLi::new(Some(lambda))
             .unwrap()
             .extract_factors(&panel)
             .unwrap();
@@ -880,13 +868,13 @@ mod tests {
     fn extract_factors_too_few_tenors() {
         let data = DMatrix::from_row_slice(3, 2, &[0.01, 0.02, 0.01, 0.02, 0.01, 0.02]);
         let panel = YieldPanel::new(data, vec![1.0, 2.0], None).unwrap();
-        let model = DieboldLi::with_default_lambda();
+        let model = DieboldLi::new(None).unwrap();
         assert!(model.extract_factors(&panel).is_err());
     }
 
     #[test]
     fn loading_matrix_shape_and_level() {
-        let model = DieboldLi::with_default_lambda();
+        let model = DieboldLi::new(None).unwrap();
         let tenors = standard_tenors();
         let panel = {
             let n = tenors.len();
@@ -927,7 +915,7 @@ mod tests {
         }
 
         let panel = YieldPanel::new(data, tenors.clone(), None).unwrap();
-        let model = DieboldLi::new(lambda)
+        let model = DieboldLi::new(Some(lambda))
             .unwrap()
             .extract_factors(&panel)
             .unwrap()
@@ -980,7 +968,7 @@ mod tests {
             }
         }
         let panel = YieldPanel::new(data, tenors, None).unwrap();
-        let model = DieboldLi::new(lambda)
+        let model = DieboldLi::new(Some(lambda))
             .unwrap()
             .extract_factors(&panel)
             .unwrap()
@@ -995,7 +983,8 @@ mod tests {
         let n = tenors.len();
         let data = DMatrix::from_fn(20, n, |_, j| 0.03 + 0.001 * j as f64);
         let panel = YieldPanel::new(data, tenors, None).unwrap();
-        let model = DieboldLi::with_default_lambda()
+        let model = DieboldLi::new(None)
+            .unwrap()
             .extract_factors(&panel)
             .unwrap();
         // No fit_var called

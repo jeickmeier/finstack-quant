@@ -1,8 +1,8 @@
 //! Behavioral tests for portfolio credit-loss simulation.
 
 use finstack_quant_models::correlation::{
-    simulate_portfolio_loss, simulate_portfolio_loss_with_recovery, CopulaSpec, CreditExposure,
-    PortfolioLossConfig, PortfolioLossResult, RecoverySpec, MAX_PORTFOLIO_LOSS_PATHS,
+    simulate_portfolio_loss, CopulaSpec, CreditExposure, PortfolioLossConfig, PortfolioLossResult,
+    RecoverySpec, MAX_PORTFOLIO_LOSS_PATHS,
 };
 
 fn exposure(
@@ -39,6 +39,7 @@ fn one_name_probability_limits_are_exact_for_gaussian_and_student_t() {
         let never = simulate_portfolio_loss(
             &[exposure("never", 100.0, 0.0, 0.6, vec![0.4])],
             &config(copula.clone()),
+            None,
         )
         .expect("valid simulation");
         assert!(never.losses.iter().all(|loss| *loss == 0.0));
@@ -49,6 +50,7 @@ fn one_name_probability_limits_are_exact_for_gaussian_and_student_t() {
         let certain = simulate_portfolio_loss(
             &[exposure("certain", 100.0, 1.0, 0.6, vec![0.4])],
             &config(copula),
+            None,
         )
         .expect("valid simulation");
         assert!(certain.losses.iter().all(|loss| *loss == 60.0));
@@ -67,8 +69,8 @@ fn path_indexed_streams_make_repeated_results_identical() {
     ];
     let cfg = config(CopulaSpec::student_t(6.0).expect("valid t copula"));
 
-    let first = simulate_portfolio_loss(&exposures, &cfg).expect("parallel simulation");
-    let second = simulate_portfolio_loss(&exposures, &cfg).expect("repeat simulation");
+    let first = simulate_portfolio_loss(&exposures, &cfg, None).expect("parallel simulation");
+    let second = simulate_portfolio_loss(&exposures, &cfg, None).expect("repeat simulation");
 
     assert_eq!(first, second);
 }
@@ -80,9 +82,9 @@ fn constant_recovery_model_matches_equivalent_exposure_lgd_bit_for_bit() {
         exposure("b", 100.0, 0.10, 0.6, vec![0.3]),
     ];
     let cfg = config(CopulaSpec::gaussian());
-    let direct = simulate_portfolio_loss(&exposures, &cfg).expect("direct LGD simulation");
+    let direct = simulate_portfolio_loss(&exposures, &cfg, None).expect("direct LGD simulation");
     let recovery = RecoverySpec::constant(0.4).expect("valid recovery");
-    let modeled = simulate_portfolio_loss_with_recovery(&exposures, &cfg, &recovery)
+    let modeled = simulate_portfolio_loss(&exposures, &cfg, Some(&recovery))
         .expect("recovery-model simulation");
 
     assert_eq!(direct, modeled);
@@ -120,7 +122,8 @@ fn simulation_rejects_path_loss_overflow() {
     let mut cfg = config(CopulaSpec::gaussian());
     cfg.num_paths = 1;
 
-    let error = simulate_portfolio_loss(&exposures, &cfg).expect_err("path sum must overflow");
+    let error =
+        simulate_portfolio_loss(&exposures, &cfg, None).expect_err("path sum must overflow");
     assert!(error.to_string().contains("path loss overflow"));
 }
 
@@ -131,10 +134,10 @@ fn rounded_unit_norm_loadings_are_accepted_but_material_excess_is_rejected() {
     cfg.num_paths = 8;
 
     let accepted = exposure("unit", 100.0, 0.05, 0.6, vec![loading, loading]);
-    simulate_portfolio_loss(&[accepted], &cfg).expect("rounded unit norm should be accepted");
+    simulate_portfolio_loss(&[accepted], &cfg, None).expect("rounded unit norm should be accepted");
 
     let rejected = exposure("over", 100.0, 0.05, 0.6, vec![0.8, 0.8]);
-    assert!(simulate_portfolio_loss(&[rejected], &cfg).is_err());
+    assert!(simulate_portfolio_loss(&[rejected], &cfg, None).is_err());
 }
 
 #[test]
@@ -146,7 +149,8 @@ fn simulation_rejects_duplicate_trimmed_exposure_ids() {
     let mut cfg = config(CopulaSpec::gaussian());
     cfg.num_paths = 1;
 
-    let error = simulate_portfolio_loss(&exposures, &cfg).expect_err("duplicate ids must fail");
+    let error =
+        simulate_portfolio_loss(&exposures, &cfg, None).expect_err("duplicate ids must fail");
     assert_eq!(
         error.to_string(),
         "Validation error: duplicate credit exposure id after trimming: 'duplicate'"
@@ -159,9 +163,9 @@ fn simulation_rejects_invalid_paths_confidence_exposures_and_loadings() {
     let mut cfg = config(CopulaSpec::gaussian());
 
     cfg.num_paths = 0;
-    assert!(simulate_portfolio_loss(std::slice::from_ref(&valid), &cfg).is_err());
+    assert!(simulate_portfolio_loss(std::slice::from_ref(&valid), &cfg, None).is_err());
     cfg.num_paths = MAX_PORTFOLIO_LOSS_PATHS + 1;
-    let error = simulate_portfolio_loss(std::slice::from_ref(&valid), &cfg)
+    let error = simulate_portfolio_loss(std::slice::from_ref(&valid), &cfg, None)
         .expect_err("path maximum must be enforced before allocation");
     assert!(error
         .to_string()
@@ -169,7 +173,7 @@ fn simulation_rejects_invalid_paths_confidence_exposures_and_loadings() {
     cfg.num_paths = 10;
     for confidence in [0.0, 1.0, f64::NAN, f64::INFINITY] {
         cfg.confidence = confidence;
-        assert!(simulate_portfolio_loss(std::slice::from_ref(&valid), &cfg).is_err());
+        assert!(simulate_portfolio_loss(std::slice::from_ref(&valid), &cfg, None).is_err());
     }
 
     let invalid_exposures = [
@@ -184,17 +188,17 @@ fn simulation_rejects_invalid_paths_confidence_exposures_and_loadings() {
     ];
     cfg.confidence = 0.99;
     for invalid in invalid_exposures {
-        assert!(simulate_portfolio_loss(&[invalid], &cfg).is_err());
+        assert!(simulate_portfolio_loss(&[invalid], &cfg, None).is_err());
     }
 
     let mismatched = vec![
         exposure("one", 100.0, 0.05, 0.6, vec![0.3]),
         exposure("two", 100.0, 0.05, 0.6, vec![0.2, 0.1]),
     ];
-    assert!(simulate_portfolio_loss(&mismatched, &cfg).is_err());
+    assert!(simulate_portfolio_loss(&mismatched, &cfg, None).is_err());
 
     cfg.copula = CopulaSpec::random_factor_loading(0.1);
-    assert!(simulate_portfolio_loss(&[valid], &cfg).is_err());
+    assert!(simulate_portfolio_loss(&[valid], &cfg, None).is_err());
 }
 
 // Tranche loss statistics

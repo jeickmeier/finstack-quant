@@ -12,7 +12,6 @@ from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.models.factor.risk import (
     build_stress_attribution,
     historical_var_decomposition,
-    parametric_es_decomposition,
     parametric_var_decomposition,
 )
 from finstack_quant.portfolio import (
@@ -163,9 +162,6 @@ def test_numpy_covariance_matches_nested_lists(covariance: np.ndarray) -> None:
     list_result = parametric_var_decomposition(position_ids, weights, nested)
 
     assert numpy_result.to_json() == list_result.to_json()
-    assert parametric_es_decomposition(position_ids, weights, covariance).to_json() == (
-        parametric_es_decomposition(position_ids, weights, nested).to_json()
-    )
 
 
 def test_numpy_position_pnls_match_nested_lists() -> None:

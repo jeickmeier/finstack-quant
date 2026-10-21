@@ -91,14 +91,10 @@ pub fn price_heston(
     let num_paths: Option<usize> = js_opt_uint(num_paths.as_ref(), "numPaths")?;
     let seed = js_opt_u64(seed.as_ref(), "seed")?;
     let num_steps: Option<usize> = js_opt_uint(num_steps.as_ref(), "numSteps")?;
-    let currency = js_opt_string(currency.as_ref(), "currency")?;
     // The canonical entry point owns the registry defaults for path count,
     // seed, step count, currency, and (wasm-gated) parallelism; the binding
     // only marshals explicitly supplied values.
-    let ccy = currency
-        .as_deref()
-        .map(|code| Currency::from_str(code).map_err(to_js_err))
-        .transpose()?;
+    let ccy = js_opt_currency(currency.as_ref())?;
     let est = canonical::price_heston(
         option_type,
         spot,
@@ -152,10 +148,6 @@ fn js_opt_currency(currency: Option<&JsValue>) -> Result<Option<Currency>, JsVal
     js_opt_string(currency, "currency")?
         .map(|code| Currency::from_str(&code).map_err(to_js_err))
         .transpose()
-}
-
-fn js_currency(currency: Option<&JsValue>) -> Result<Currency, JsValue> {
-    convenience::resolve_currency(js_opt_currency(currency)?).map_err(to_js_err)
 }
 
 /// Whether Heston parameters satisfy the Feller condition `2 * kappa * theta >= volOfVol^2`.
@@ -463,10 +455,8 @@ impl JsEuropeanPricer {
     ) -> Result<JsValue, JsValue> {
         let gbm = gbm_inputs(&spot, &strike, &rate, &div_yield, &vol, &expiry)?;
         let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
-        let num_steps =
-            convenience::european_num_steps(js_opt_uint(num_steps.as_ref(), "numSteps")?)
-                .map_err(to_js_err)?;
-        let currency = js_currency(currency.as_ref())?;
+        let num_steps = js_opt_uint(num_steps.as_ref(), "numSteps")?;
+        let currency = js_opt_currency(currency.as_ref())?;
         let estimate = self
             .inner
             .price_gbm(
@@ -599,10 +589,8 @@ impl JsPathDependentPricer {
     ) -> Result<JsValue, JsValue> {
         let gbm = gbm_inputs(&spot, &strike, &rate, &div_yield, &vol, &expiry)?;
         let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
-        let num_steps =
-            convenience::path_dependent_num_steps(js_opt_uint(num_steps.as_ref(), "numSteps")?)
-                .map_err(to_js_err)?;
-        let currency = js_currency(currency.as_ref())?;
+        let num_steps = js_opt_uint(num_steps.as_ref(), "numSteps")?;
+        let currency = js_opt_currency(currency.as_ref())?;
         let estimate = self
             .inner
             .price_asian(
@@ -671,9 +659,8 @@ impl JsPathDependentPricer {
     ) -> Result<JsValue, JsValue> {
         let gbm = gbm_inputs(&spot, &strike, &rate, &div_yield, &vol, &expiry)?;
         let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
-        let num_steps = convenience::lrm_num_steps(js_opt_uint(num_steps.as_ref(), "numSteps")?)
-            .map_err(to_js_err)?;
-        let currency = js_currency(currency.as_ref())?;
+        let num_steps = js_opt_uint(num_steps.as_ref(), "numSteps")?;
+        let currency = js_opt_currency(currency.as_ref())?;
         let greeks = self
             .inner
             .price_with_lrm_greeks(
@@ -703,7 +690,7 @@ struct LsmcCall {
     pricer: finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer,
     gbm: GbmInputs,
     num_steps: usize,
-    currency: Currency,
+    currency: Option<Currency>,
     basis: finstack_quant_models::monte_carlo::pricer::basis::BasisKind,
     basis_degree: usize,
 }
@@ -724,7 +711,7 @@ impl JsLsmcPricer {
         basis_degree: Option<&JsValue>,
     ) -> Result<LsmcCall, JsValue> {
         let gbm = gbm_inputs(spot, strike, rate, div_yield, vol, expiry)?;
-        let currency = js_currency(currency)?;
+        let currency = js_opt_currency(currency)?;
         let basis = js_opt_string(basis, "basis")?;
         let (pricer, num_steps, basis, basis_degree) = self
             .inner

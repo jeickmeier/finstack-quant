@@ -33,37 +33,22 @@ pub use workout::{
 ///
 /// * `seniority` - Debt-seniority label accepted by [`SeniorityClass`], such as
 ///   `senior_secured`.
-/// * `rating_agency` - Calibration-provider name accepted by
-///   [`SeniorityCalibration::from_agency`].
+/// * `rating_agency` - Optional calibration-provider name accepted by
+///   [`SeniorityCalibration::from_agency`]. `None` uses the registry default
+///   calibration ([`SeniorityCalibration::moodys_historical`]).
 ///
 /// # Errors
-/// Returns an error if the seniority class or rating agency name is unknown.
+/// Returns an error if the seniority class or rating agency name is unknown,
+/// or the class is absent from the selected calibration.
 pub fn seniority_recovery_stats(
     seniority: &str,
-    rating_agency: &str,
+    rating_agency: Option<&str>,
 ) -> finstack_quant_core::Result<BetaRecovery> {
     let class = seniority.parse::<SeniorityClass>()?;
-    let calibration = SeniorityCalibration::from_agency(rating_agency)?;
-    calibration.get(class).copied().ok_or_else(|| {
-        finstack_quant_core::Error::Validation("seniority not in calibration".into())
-    })
-}
-
-/// Return recovery distribution parameters from the registry default seniority calibration.
-///
-/// # Arguments
-///
-/// * `seniority` - Debt-seniority label accepted by [`SeniorityClass`], such as
-///   `senior_secured`.
-///
-/// # Errors
-/// Returns an error if the seniority class is unknown or absent from the
-/// registry default calibration.
-pub fn seniority_recovery_stats_default(
-    seniority: &str,
-) -> finstack_quant_core::Result<BetaRecovery> {
-    let class = seniority.parse::<SeniorityClass>()?;
-    let calibration = SeniorityCalibration::moodys_historical()?;
+    let calibration = match rating_agency {
+        Some(agency) => SeniorityCalibration::from_agency(agency)?,
+        None => SeniorityCalibration::moodys_historical()?,
+    };
     calibration.get(class).copied().ok_or_else(|| {
         finstack_quant_core::Error::Validation("seniority not in calibration".into())
     })
@@ -120,14 +105,14 @@ mod tests {
 
     #[test]
     fn seniority_recovery_stats_accepts_binding_strings() {
-        let stats = seniority_recovery_stats("senior_secured", "s&p").unwrap();
+        let stats = seniority_recovery_stats("senior_secured", Some("s&p")).unwrap();
         assert!((stats.mean() - 0.53).abs() < 1e-12);
     }
 
     #[test]
-    fn seniority_recovery_stats_default_uses_registry_default() {
-        let stats = seniority_recovery_stats_default("senior_secured").unwrap();
-        let explicit = seniority_recovery_stats("senior_secured", "moodys").unwrap();
+    fn seniority_recovery_stats_without_agency_uses_registry_default() {
+        let stats = seniority_recovery_stats("senior_secured", None).unwrap();
+        let explicit = seniority_recovery_stats("senior_secured", Some("moodys")).unwrap();
         assert!((stats.mean() - explicit.mean()).abs() < 1e-12);
         assert!((stats.std_dev() - explicit.std_dev()).abs() < 1e-12);
     }

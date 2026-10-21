@@ -176,12 +176,9 @@ fn seniority_recovery_stats(
     seniority: &str,
     rating_agency: Option<&str>,
 ) -> PyResult<PyBetaRecovery> {
-    match rating_agency {
-        Some(agency) => lgd::seniority_recovery_stats(seniority, agency),
-        None => lgd::seniority_recovery_stats_default(seniority),
-    }
-    .map(|inner| PyBetaRecovery { inner })
-    .map_err(core_to_py)
+    lgd::seniority_recovery_stats(seniority, rating_agency)
+        .map(|inner| PyBetaRecovery { inner })
+        .map_err(core_to_py)
 }
 
 /// One collateral piece in a workout waterfall.

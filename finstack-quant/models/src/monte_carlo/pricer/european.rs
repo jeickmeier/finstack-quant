@@ -204,13 +204,16 @@ impl EuropeanPricer {
     /// * `div_yield` - Continuous dividend yield (decimal, annualized).
     /// * `vol` - Annualized GBM volatility (decimal).
     /// * `expiry` - Time to expiry in years; also the uniform-grid horizon.
-    /// * `num_steps` - Number of time-grid steps between `0` and `expiry`.
-    /// * `currency` - Currency stamped on the returned estimate.
+    /// * `num_steps` - Number of time-grid steps between `0` and `expiry`;
+    ///   `None` uses the registry default `convenience.european_pricer.num_steps`.
+    /// * `currency` - Currency stamped on the returned estimate; `None` uses the
+    ///   registry default `convenience.default_currency`.
     ///
     /// # Errors
     ///
-    /// Returns an error when GBM parameters fail validation, the uniform grid
-    /// is invalid, or the underlying engine rejects the run.
+    /// Returns an error when the embedded registry defaults cannot be loaded,
+    /// GBM parameters fail validation, the uniform grid is invalid, or the
+    /// underlying engine rejects the run.
     #[allow(clippy::too_many_arguments)]
     pub fn price_gbm(
         &self,
@@ -221,9 +224,16 @@ impl EuropeanPricer {
         div_yield: f64,
         vol: f64,
         expiry: f64,
-        num_steps: usize,
-        currency: Currency,
+        num_steps: Option<usize>,
+        currency: Option<Currency>,
     ) -> Result<MoneyEstimate> {
+        let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
+        let num_steps = num_steps.unwrap_or(
+            crate::monte_carlo::registry::embedded_defaults()?
+                .convenience
+                .european_pricer
+                .num_steps,
+        );
         crate::monte_carlo::require_positive_vol(vol)?;
         let process = GbmProcess::with_params(rate, div_yield, vol)?;
         let discount_factor = (-rate * expiry).exp();
@@ -392,8 +402,8 @@ mod tests {
                     case.div_yield,
                     case.vol,
                     case.expiry,
-                    1,
-                    Currency::USD,
+                    Some(1),
+                    Some(Currency::USD),
                 )
                 .expect("pricing should succeed");
             let expected = crate::closed_form::bs_price(

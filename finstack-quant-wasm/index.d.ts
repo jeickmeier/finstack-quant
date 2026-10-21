@@ -10007,27 +10007,6 @@ export interface FactorRiskNamespace {
     computeIncremental?: boolean | null
   ): PositionRiskDecomposition;
   /**
-   * Decompose portfolio Expected Shortfall into position contributions via
-   * parametric Euler allocation.
-   *
-   * Returns the canonical `PositionRiskDecomposition` (the object Python's
-   * `parametric_es_decomposition` returns): portfolio VaR/ES (losses
-   * negative), `method`, and per-position `var_contributions` and
-   * `es_contributions` rows.
-   * @returns The canonical `PositionRiskDecomposition` with VaR and ES contributions.
-   * @param positionIds - Position identifiers, one per weight.
-   * @param weights - Position weights or exposures in portfolio currency.
-   * @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
-   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
-   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; or `confidence` is not finite and in `(0.5, 1)`.
-   */
-  parametricEsDecomposition(
-    positionIds: string[],
-    weights: NumericArray,
-    covariance: NumericArray[],
-    confidence?: number | null
-  ): PositionRiskDecomposition;
-  /**
    * Decompose portfolio VaR and Expected Shortfall from per-position scenario
    * profit-and-loss series using historical simulation.
    *
@@ -25949,18 +25928,11 @@ export interface GeneratorMatrixConstructor {
    * Estimate the generator of a transition matrix by matrix logarithm with
    * regularization (Israel-Rosenthal-Wei).
    * @param p - `TransitionMatrix` whose generator to extract.
+   * @param roundTripTol - Optional largest accepted absolute difference between `exp(Q * horizon)` and `p`; omitted or `null` uses the default `1e-2`.
    * @returns The regularized generator; `roundTripError` reports the fit.
-   * @throws Error - Throws a `computation` error if no valid generator exists or the round trip exceeds the default tolerance.
+   * @throws Error - Throws a `computation` error if no valid generator exists or the round trip exceeds the tolerance, and a `TypeError` if `roundTripTol` is not a number.
    */
-  fromTransitionMatrix(p: TransitionMatrix): GeneratorMatrix;
-  /**
-   * Estimate the generator of a transition matrix with an explicit round-trip tolerance.
-   * @param p - `TransitionMatrix` whose generator to extract.
-   * @param roundTripTol - Largest accepted absolute difference between `exp(Q * horizon)` and `p`.
-   * @returns The regularized generator.
-   * @throws Error - Throws a `computation` error if no valid generator exists or the round trip exceeds `roundTripTol`.
-   */
-  fromTransitionMatrixWithTol(p: TransitionMatrix, roundTripTol: number): GeneratorMatrix;
+  fromTransitionMatrix(p: TransitionMatrix, roundTripTol?: number | null): GeneratorMatrix;
 }
 
 /**

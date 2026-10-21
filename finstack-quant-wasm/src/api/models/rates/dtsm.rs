@@ -166,11 +166,9 @@ impl JsDieboldLi {
     /// Throws a `validation` error if `lambda` is not positive and finite.
     #[wasm_bindgen(constructor)]
     pub fn new(lambda: Option<JsValue>) -> Result<JsDieboldLi, JsValue> {
-        match js_opt_f64(lambda.as_ref(), "lambda")? {
-            Some(lambda) => DieboldLi::new(lambda).map_err(to_js_err),
-            None => Ok(DieboldLi::with_default_lambda()),
-        }
-        .map(|inner| Self { inner })
+        DieboldLi::new(js_opt_f64(lambda.as_ref(), "lambda")?)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
     }
 
     /// Exponential decay parameter (Python `lambda_`).

@@ -422,35 +422,25 @@ impl PyGeneratorMatrix {
     /// Embed a transition matrix as a generator via the matrix logarithm
     /// (Israel-Rosenthal-Wei with Kreinin-Sidenius regularization).
     ///
-    /// Raises ``RuntimeError`` when no valid generator exists (complex or
-    /// non-positive eigenvalues) or the round-trip error exceeds the default
-    /// tolerance.
-    #[staticmethod]
-    #[pyo3(text_signature = "(p)")]
-    fn from_transition_matrix(p: &PyTransitionMatrix) -> PyResult<Self> {
-        GeneratorMatrix::from_transition_matrix(&p.inner)
-            .map(Self::from_inner)
-            .map_err(migration_to_py)
-    }
-
-    /// Like ``from_transition_matrix`` with an explicit round-trip tolerance.
-    ///
     /// Parameters
     /// ----------
     /// p : TransitionMatrix
     ///     Source matrix.
-    /// round_trip_tol : float
+    /// round_trip_tol : float, optional
     ///     Non-negative infinity-norm tolerance on ``exp(Q * h) - P(h)``.
+    ///     ``None`` uses the default ``1e-2``.
     ///
-    /// Raises ``RuntimeError`` when no valid generator exists or the
-    /// round-trip error exceeds ``round_trip_tol``.
+    /// Raises ``RuntimeError`` when no valid generator exists (complex or
+    /// non-positive eigenvalues) or the round-trip error exceeds the
+    /// tolerance.
     #[staticmethod]
-    #[pyo3(text_signature = "(p, round_trip_tol)")]
-    fn from_transition_matrix_with_tol(
+    #[pyo3(signature = (p, round_trip_tol = None))]
+    #[pyo3(text_signature = "(p, round_trip_tol=None)")]
+    fn from_transition_matrix(
         p: &PyTransitionMatrix,
-        round_trip_tol: f64,
+        round_trip_tol: Option<f64>,
     ) -> PyResult<Self> {
-        GeneratorMatrix::from_transition_matrix_with_tol(&p.inner, round_trip_tol)
+        GeneratorMatrix::from_transition_matrix(&p.inner, round_trip_tol)
             .map(Self::from_inner)
             .map_err(migration_to_py)
     }

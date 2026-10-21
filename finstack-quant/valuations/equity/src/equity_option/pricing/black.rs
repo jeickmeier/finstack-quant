@@ -47,11 +47,7 @@ pub(crate) fn compute_pv(
                 .unwrap_or(201);
             let tree = BinomialTree::leisen_reimer(steps);
             let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
-            if dividends.is_empty() {
-                tree.price_american(&params)?
-            } else {
-                tree.price_american_with_discrete_dividends(&params, &dividends)?
-            }
+            tree.price_american(&params, &dividends)?
         }
         ExerciseStyle::Bermudan => {
             let schedule = inst.exercise_dates.as_ref().ok_or_else(|| {
@@ -83,11 +79,7 @@ pub(crate) fn compute_pv(
                         .to_string(),
                 ));
             }
-            if dividends.is_empty() {
-                tree.price_bermudan(&params, &exercise_times)?
-            } else {
-                tree.price_bermudan_with_discrete_dividends(&params, &exercise_times, &dividends)?
-            }
+            tree.price_bermudan(&params, &exercise_times, &dividends)?
         }
     };
 
@@ -347,11 +339,7 @@ pub(crate) fn compute_greeks(
                         (remaining > 0.0).then_some((remaining, *amount))
                     })
                     .collect();
-                if dividends.is_empty() {
-                    tree.price_american(market_params)
-                } else {
-                    tree.price_american_with_discrete_dividends(market_params, &dividends)
-                }
+                tree.price_american(market_params, &dividends)
             };
             tree_finite_difference_greeks(
                 &params,
@@ -406,15 +394,7 @@ pub(crate) fn compute_greeks(
                         (remaining > 0.0).then_some(remaining)
                     })
                     .collect();
-                if dividends.is_empty() {
-                    tree.price_bermudan(market_params, &exercise_times)
-                } else {
-                    tree.price_bermudan_with_discrete_dividends(
-                        market_params,
-                        &exercise_times,
-                        &dividends,
-                    )
-                }
+                tree.price_bermudan(market_params, &exercise_times, &dividends)
             };
             tree_finite_difference_greeks(
                 &params,

@@ -125,12 +125,10 @@ pub fn seniority_recovery_stats(
     rating_agency: Option<JsValue>,
 ) -> Result<JsBetaRecovery, JsValue> {
     let seniority = js_string(&seniority, "seniority")?;
-    match js_opt_string(rating_agency.as_ref(), "ratingAgency")? {
-        Some(agency) => lgd::seniority_recovery_stats(&seniority, &agency),
-        None => lgd::seniority_recovery_stats_default(&seniority),
-    }
-    .map(|inner| JsBetaRecovery { inner })
-    .map_err(to_js_err)
+    let rating_agency = js_opt_string(rating_agency.as_ref(), "ratingAgency")?;
+    lgd::seniority_recovery_stats(&seniority, rating_agency.as_deref())
+        .map(|inner| JsBetaRecovery { inner })
+        .map_err(to_js_err)
 }
 
 /// Direct and indirect workout cost rates, each a fraction of exposure at default.

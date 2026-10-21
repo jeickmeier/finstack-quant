@@ -379,11 +379,9 @@ impl PyDieboldLi {
     #[pyo3(signature = (lambda_ = None))]
     #[pyo3(text_signature = "(lambda_=None)")]
     fn new(lambda_: Option<f64>) -> PyResult<Self> {
-        match lambda_ {
-            Some(lambda) => DieboldLi::new(lambda).map_err(core_to_py),
-            None => Ok(DieboldLi::with_default_lambda()),
-        }
-        .map(Self::from_inner)
+        DieboldLi::new(lambda_)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Decay parameter in the years convention.

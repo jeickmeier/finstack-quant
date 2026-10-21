@@ -1,6 +1,6 @@
 //! Pricer bindings — European, Path-Dependent, LSMC.
 
-use super::engine::resolve_currency;
+use super::engine::extract_optional_currency;
 use super::results::{PyLrmGreeks, PyMoneyEstimate};
 use crate::errors::core_to_py;
 use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
@@ -108,8 +108,7 @@ impl PyEuropeanPricer {
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMoneyEstimate> {
-        let ccy = resolve_currency(currency)?;
-        let num_steps = convenience::european_num_steps(num_steps).map_err(core_to_py)?;
+        let ccy = extract_optional_currency(currency)?;
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_gbm(
@@ -237,8 +236,7 @@ impl PyPathDependentPricer {
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMoneyEstimate> {
-        let ccy = resolve_currency(currency)?;
-        let num_steps = convenience::path_dependent_num_steps(num_steps).map_err(core_to_py)?;
+        let ccy = extract_optional_currency(currency)?;
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_asian(
@@ -308,8 +306,7 @@ impl PyPathDependentPricer {
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyLrmGreeks> {
-        let ccy = resolve_currency(currency)?;
-        let num_steps = convenience::lrm_num_steps(num_steps).map_err(core_to_py)?;
+        let ccy = extract_optional_currency(currency)?;
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_with_lrm_greeks(
@@ -532,7 +529,7 @@ impl PyLsmcPricer {
         basis: Option<&str>,
         basis_degree: Option<usize>,
     ) -> PyResult<PyMoneyEstimate> {
-        let currency = resolve_currency(currency)?;
+        let currency = extract_optional_currency(currency)?;
         let (pricer, num_steps, basis, basis_degree) =
             self.call_config(num_steps, basis, basis_degree)?;
         py.detach(|| {
@@ -591,7 +588,7 @@ impl PyLsmcPricer {
         basis: Option<&str>,
         basis_degree: Option<usize>,
     ) -> PyResult<PyMoneyEstimate> {
-        let currency = resolve_currency(currency)?;
+        let currency = extract_optional_currency(currency)?;
         let (pricer, num_steps, basis, basis_degree) =
             self.call_config(num_steps, basis, basis_degree)?;
         py.detach(|| {

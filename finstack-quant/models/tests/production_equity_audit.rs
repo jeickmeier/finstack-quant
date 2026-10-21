@@ -32,8 +32,8 @@ fn b6_lr_matches_quantlib_for_all_exercise_styles() {
         let tree = BinomialTree::leisen_reimer(steps);
         let price = match case["style"].as_str().expect("style") {
             "european" => tree.price_european(&params),
-            "american" => tree.price_american(&params),
-            "bermudan" => tree.price_bermudan(&params, &exercise_times),
+            "american" => tree.price_american(&params, &[]),
+            "bermudan" => tree.price_bermudan(&params, &exercise_times, &[]),
             style => panic!("unknown fixture style {style}"),
         }
         .expect("LR price");

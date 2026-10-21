@@ -134,7 +134,7 @@ test('migration lookups report the Rust error kind', () => {
   assert.equal(matrix.horizon, 1);
   assert.equal(matrix.nStates, 3);
   assert.equal(matrix.scale.labels().join(), 'A,B,D');
-  const fitted = credit.migration.GeneratorMatrix.fromTransitionMatrixWithTol(matrix, 1e-6);
+  const fitted = credit.migration.GeneratorMatrix.fromTransitionMatrix(matrix, 1e-6);
   assert.ok(fitted.roundTripError < 1e-6);
   assert.ok(fitted.regularizationL1 >= 0);
   assert.equal(fitted.scale.nStates, 3);

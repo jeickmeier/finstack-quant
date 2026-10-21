@@ -32,7 +32,7 @@ fn reference_transition_matrix() -> TransitionMatrix {
 #[test]
 fn credit_workflow_maps_migration_and_loss_modules_together() {
     let annual = reference_transition_matrix();
-    let generator = GeneratorMatrix::from_transition_matrix(&annual).unwrap();
+    let generator = GeneratorMatrix::from_transition_matrix(&annual, None).unwrap();
     let half_year = project(&generator, 0.5).unwrap();
 
     // Propagate all surviving rating states across both half-year periods.

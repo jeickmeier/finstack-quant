@@ -159,45 +159,6 @@ pub(super) fn parametric_var_decomposition(
     Ok(PyPositionRiskDecomposition::from_inner(result))
 }
 
-/// Decompose portfolio expected shortfall through the parametric Euler
-/// allocation, returning a typed ``PositionRiskDecomposition``.
-///
-/// Args:
-///     position_ids: Position identifiers aligned with ``weights``; may be
-///         ``None`` when ``covariance`` is a ``pandas.DataFrame``.
-///     weights: Portfolio weights or exposures, one per position.
-///     covariance: Square covariance matrix — nested list, 2-D NumPy array,
-///         or ``pandas.DataFrame``.
-///     confidence: ES tail confidence as a decimal probability strictly
-///         inside ``(0.5, 1)``. ``None`` uses the default ``0.95``.
-///
-/// Returns:
-///     ``PositionRiskDecomposition`` with ``portfolio_var``,
-///     ``portfolio_es`` (losses negative) and per-position VaR and ES rows.
-///
-/// Raises:
-///     ValueError: If dimensions disagree, the covariance is malformed, or
-///         ``confidence`` is outside ``(0.5, 1)``.
-#[pyfunction]
-#[pyo3(signature = (position_ids, weights, covariance, confidence = None))]
-pub(super) fn parametric_es_decomposition(
-    py: Python<'_>,
-    position_ids: Option<Vec<String>>,
-    weights: Vec<f64>,
-    covariance: &Bound<'_, PyAny>,
-    confidence: Option<f64>,
-) -> PyResult<PyPositionRiskDecomposition> {
-    let n = weights.len();
-    let (position_ids, cov_flat) = extract_covariance_input(py, position_ids, covariance, n)?;
-    let result = py
-        .detach(move || {
-            model_risk::parametric_es_decomposition(&position_ids, &weights, &cov_flat, confidence)
-        })
-        .map_err(core_to_py)?;
-
-    Ok(PyPositionRiskDecomposition::from_inner(result))
-}
-
 /// Decompose portfolio VaR and ES from per-position scenario P&Ls via
 /// historical simulation, returning a typed ``PositionRiskDecomposition``.
 ///

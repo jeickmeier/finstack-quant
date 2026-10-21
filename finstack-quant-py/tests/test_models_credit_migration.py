@@ -90,7 +90,7 @@ def test_matrices_accept_nested_rows_and_export_labelled_frames() -> None:
     assert gen.scale == scale
     assert list(gen.to_dataframe().columns) == ["A", "D"]
     assert pickle.loads(pickle.dumps(gen)).to_matrix() == gen.to_matrix()  # noqa: S301 - trusted in-process round trip
-    tol = migration.GeneratorMatrix.from_transition_matrix_with_tol(nested, 1e-6)
+    tol = migration.GeneratorMatrix.from_transition_matrix(nested, 1e-6)
     assert tol.round_trip_error <= 1e-6
 
     sim = migration.MigrationSimulator(gen, 2.0)

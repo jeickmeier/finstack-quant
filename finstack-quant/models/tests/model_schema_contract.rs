@@ -94,7 +94,7 @@ fn migration_contracts_validate_against_their_schemas() {
     )
     .expect("valid matrix");
     assert_wire_matches_schema("TransitionMatrix", &matrix);
-    let generator = GeneratorMatrix::from_transition_matrix(&matrix).expect("generator");
+    let generator = GeneratorMatrix::from_transition_matrix(&matrix, None).expect("generator");
     assert_wire_matches_schema("GeneratorMatrix", &generator);
     let simulator = MigrationSimulator::new(generator, 1.0).expect("simulator");
     assert_wire_matches_schema("MigrationSimulator", &simulator);
@@ -110,7 +110,7 @@ fn nalgebra_matrices_validate_as_data_rows_cols_tuples() {
     assert_eq!(wire["yields"][2], json!(4));
     assert_wire_matches_schema("YieldPanel", &panel);
     assert_wire_matches_schema("YieldPca", &YieldPca::fit(&panel).expect("pca"));
-    let model = DieboldLi::with_default_lambda().fit(&panel).expect("fit");
+    let model = DieboldLi::new(None).unwrap().fit(&panel).expect("fit");
     assert_wire_matches_schema("DieboldLi", &model);
 }
 

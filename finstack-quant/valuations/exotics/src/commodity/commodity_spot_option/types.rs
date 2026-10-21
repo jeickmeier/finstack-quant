@@ -769,7 +769,7 @@ impl Instrument for CommoditySpotOption {
                     option_type: self.option_type,
                 };
                 params.validate()?;
-                tree.price_american(&params)?
+                tree.price_american(&params, &[])?
             }
             ExerciseStyle::Bermudan => {
                 let schedule = self.exercise_dates.as_ref().ok_or_else(|| {
@@ -813,7 +813,7 @@ impl Instrument for CommoditySpotOption {
                             .to_string(),
                     ));
                 }
-                tree.price_bermudan(&params, &exercise_times)?
+                tree.price_bermudan(&params, &exercise_times, &[])?
             }
         };
 
