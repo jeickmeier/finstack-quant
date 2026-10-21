@@ -37,13 +37,7 @@ struct ExpectedFlow {
 /// freedom and assumes approximately Gaussian estimator means.
 fn path_estimate(values: &[f64], antithetic: bool) -> Result<Estimate> {
     let stats = independent_estimator_stats(values, antithetic)?;
-    Ok(Estimate::new(
-        stats.mean(),
-        stats.stderr(),
-        stats.confidence_interval(0.05),
-        stats.count(),
-    )
-    .with_num_simulated_paths(values.len()))
+    Ok(Estimate::from_stats(&stats).with_num_simulated_paths(values.len()))
 }
 
 impl RevolvingCreditPricer {

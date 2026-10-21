@@ -296,14 +296,8 @@ pub(crate) fn price_bond_lsmc(
             )));
         }
     }
-    let estimate = finstack_quant_models::monte_carlo::estimate::Estimate::new(
-        stats.mean(),
-        stats.stderr(),
-        stats.confidence_interval(0.05),
-        pricing_estimators,
-    )
-    .with_num_simulated_paths(pricing_simulated_paths)
-    .with_std_dev(stats.std_dev());
+    let estimate = finstack_quant_models::monte_carlo::estimate::Estimate::from_stats(&stats)
+        .with_num_simulated_paths(pricing_simulated_paths);
     Ok(BondLsmcResult {
         estimate: MoneyEstimate::from_estimate(estimate, bond.notional.currency())?,
         training_paths: training_estimators,
