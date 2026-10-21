@@ -20,7 +20,7 @@ pub enum TouchType {
     NoTouch,
 }
 
-pub use finstack_quant_core::types::{BarrierDirection, PayoutTiming};
+pub(crate) use finstack_quant_core::types::{BarrierDirection, PayoutTiming};
 
 /// FX touch option (American binary option).
 ///

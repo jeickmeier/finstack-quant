@@ -40,7 +40,8 @@ use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes
 /// # Example
 ///
 /// ```rust
-/// use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
+/// use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource};
+/// use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::money::Money;
@@ -204,7 +205,8 @@ impl std::str::FromStr for NdfFixingSource {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_valuations_fx::ndf::{Ndf, NdfQuoteConvention};
+/// use finstack_quant_valuations_fx::ndf::Ndf;
+/// use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::money::Money;
@@ -463,7 +465,8 @@ impl Ndf {
     /// # Example
     ///
     /// ```rust
-    /// use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
+    /// use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource};
+    /// use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::Date;
     /// use finstack_quant_core::money::Money;

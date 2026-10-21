@@ -39,7 +39,7 @@
 //! ```
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::types::InstrumentId;
-//! use finstack_quant_valuations_fx::FxSpot;
+//! use finstack_quant_valuations_fx::fx_spot::FxSpot;
 //!
 //! // CCY1 (base) is the currency being priced; CCY2 (quote) is the pricing currency.
 //! let mut eur_usd = FxSpot::new(InstrumentId::from("EURUSD"), Currency::EUR, Currency::USD);
@@ -51,7 +51,7 @@
 //! ```
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::types::InstrumentId;
-//! use finstack_quant_valuations_fx::FxSpot;
+//! use finstack_quant_valuations_fx::fx_spot::FxSpot;
 //!
 //! let eur_usd = FxSpot::new(InstrumentId::from("EURUSD"), Currency::EUR, Currency::USD);
 //! // If quoted_spot = 1.10, this means: 1 EUR = 1.10 USD
@@ -372,7 +372,7 @@ impl FxSpot {
     ///
     /// ```rust
     /// use finstack_quant_core::{currency::Currency, types::InstrumentId};
-    /// use finstack_quant_valuations_fx::FxSpot;
+    /// use finstack_quant_valuations_fx::fx_spot::FxSpot;
     ///
     /// let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
     ///     .with_quoted_spot(1.10)
@@ -437,7 +437,7 @@ impl FxSpot {
     ///
     /// ```rust
     /// use finstack_quant_core::{currency::Currency, types::InstrumentId};
-    /// use finstack_quant_valuations_fx::FxSpot;
+    /// use finstack_quant_valuations_fx::fx_spot::FxSpot;
     ///
     /// let eur_usd = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
     ///     .with_base_calendar_id("TARGET")    // ECB TARGET calendar for EUR

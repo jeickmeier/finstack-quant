@@ -9,20 +9,28 @@ use finstack_quant_valuations_core::pricer::{
 pub static FX: Family = Family::new("fx", register_pricers, register_metrics);
 
 fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
-    register_generic!(registry, InstrumentType::FxSpot, crate::FxSpot);
-    register_generic!(registry, InstrumentType::FxForward, crate::FxForward);
-    register_generic!(registry, InstrumentType::FxSwap, crate::FxSwap);
-    register_generic!(registry, InstrumentType::Ndf, crate::Ndf);
-    register_generic!(registry, InstrumentType::FxFuture, crate::FxFuture);
+    register_generic!(registry, InstrumentType::FxSpot, crate::fx_spot::FxSpot);
+    register_generic!(
+        registry,
+        InstrumentType::FxForward,
+        crate::fx_forward::FxForward
+    );
+    register_generic!(registry, InstrumentType::FxSwap, crate::fx_swap::FxSwap);
+    register_generic!(registry, InstrumentType::Ndf, crate::ndf::Ndf);
+    register_generic!(
+        registry,
+        InstrumentType::FxFuture,
+        crate::fx_future::FxFuture
+    );
     register_generic!(
         registry,
         InstrumentType::FxFutureOption,
-        crate::FxFutureOption
+        crate::fx_future_option::FxFutureOption
     );
     register_generic!(
         registry,
         InstrumentType::FxVarianceSwap,
-        crate::FxVarianceSwap
+        crate::fx_variance_swap::FxVarianceSwap
     );
 
     // FX option: registered under the lognormal `Black76` key; the pricer
@@ -31,19 +39,19 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     register_generic!(
         registry,
         InstrumentType::FxOption,
-        crate::FxOption,
+        crate::fx_option::FxOption,
         ModelKey::Black76
     );
     register_generic!(
         registry,
         InstrumentType::FxDigitalOption,
-        crate::FxDigitalOption,
+        crate::fx_digital_option::FxDigitalOption,
         ModelKey::Black76
     );
     register_generic!(
         registry,
         InstrumentType::FxTouchOption,
-        crate::FxTouchOption,
+        crate::fx_touch_option::FxTouchOption,
         ModelKey::Black76
     );
     registry.register(crate::fx_barrier_option::pricer::FxBarrierOptionMcPricer::default())?;
