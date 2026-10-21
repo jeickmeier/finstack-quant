@@ -1595,7 +1595,7 @@ export interface SimmWeightedSensitivity {
   risk_weight: number;
   /**
    * Net input sensitivity for this factor, in the units documented on
-   * [`SimmSensitivities`](crate::SimmSensitivities) (calculation currency
+   * [`SimmSensitivities`](crate::types::SimmSensitivities) (calculation currency
    * per unit move).
    */
   sensitivity: number;
