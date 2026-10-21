@@ -54,16 +54,13 @@
 //! - Longstaff-Schwartz LSMC and Monte Carlo exercise: `docs/REFERENCES.md#glasserman-2004-monte-carlo`
 //! - Hull-White short-rate context: `docs/REFERENCES.md#hull-options-futures`
 
-use crate::monte_carlo::discretization::ExactHullWhite1F;
 use crate::monte_carlo::pricer::lsq::solve_least_squares;
-use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
+use crate::monte_carlo::process::ou::HullWhite1FParams;
 use crate::monte_carlo::results::MoneyEstimate;
-use crate::monte_carlo::rng::philox::PhiloxRng;
-use crate::monte_carlo::traits::{Discretization, PathState, RandomStream, StateKey};
-use crate::rates::hw1f::bank_step_factor;
-use crate::rates::hw1f::ExerciseBoundaryPayoff;
-use crate::rates::hw1f::Hw1fMcConfig;
-use crate::rates::hw1f::{build_event_aligned_grid, money_estimate_from_pairs};
+use crate::rates::hw1f::mc::Hw1fPaths;
+use crate::rates::hw1f::{
+    build_event_aligned_grid, money_estimate_from_pairs, ExerciseBoundaryPayoff, Hw1fMcConfig,
+};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::Result;
@@ -125,20 +122,23 @@ impl Hw1fLsmcPricer {
             self.config.min_steps_between_events,
         )?;
 
-        let process = HullWhite1FProcess::new(self.process_params.clone());
-        let disc = ExactHullWhite1F::new();
-        let num_steps = grid.num_steps();
-        let work_size = disc.work_size(&process);
-        let raw_paths = self.config.num_paths;
         let split = self.config.split();
-        let multiplicity = split.multiplicity;
         let n_paths = self.config.simulated_path_count();
         let n_ex = self.exercise_times.len();
-        let base_rng = PhiloxRng::new(self.config.seed);
         let basis_payoff = payoff_factory();
 
-        // Map exercise-date index -> position within event_step_indices.
-        let exercise_event_pos = exercise_event_indices;
+        // Event index -> exercise index, replaying the in-order exercise
+        // cursor (exact for unsorted or repeated exercise times).
+        let mut event_exercise: Vec<Option<usize>> = vec![None; event_step_indices.len()];
+        let mut next_exercise = 0usize;
+        for (event_idx, slot) in event_exercise.iter_mut().enumerate() {
+            if next_exercise < exercise_event_indices.len()
+                && exercise_event_indices[next_exercise] == event_idx
+            {
+                *slot = Some(next_exercise);
+                next_exercise += 1;
+            }
+        }
 
         let mut deterministic_pv = vec![0.0_f64; n_paths];
         let mut exercise_short_rates = vec![0.0_f64; n_paths * n_ex];
@@ -151,83 +151,39 @@ impl Hw1fLsmcPricer {
         // regression target and re-added after an exercise overwrite.
         let mut pre_exercise_pv = vec![0.0_f64; n_paths * n_ex];
 
-        // Per-path scratch buffers hoisted out of the path loop; the
-        // discretization step fully overwrites `work` and `z` each step,
-        // so reusing them across paths is bit-identical to fresh allocations.
-        let mut work = vec![0.0; work_size];
-        let mut z = [0.0_f64; 1];
-
-        let mut path_cursor: usize = 0;
-        for path_id in 0..raw_paths {
-            for anti in 0..multiplicity {
-                let mut rng = base_rng.substream(path_id as u64);
-                let mut r = self.r0;
-                let mut bank = 1.0_f64;
-                let mut payoff = payoff_factory();
-                payoff.reset();
-                let mut state = PathState::new(0, 0.0);
-                state.set_key(StateKey::ShortRate, r);
-                state.set_key(StateKey::BankAccount, bank);
-
-                let mut next_event = 0usize;
-                let mut next_exercise = 0usize;
-                for step in 0..num_steps {
-                    let t = grid.time(step);
-                    let dt = grid.dt(step);
-                    rng.fill_std_normals(&mut z);
-                    if anti == 1 {
-                        z[0] = -z[0];
-                    }
-                    let r_prev = r;
-                    disc.step(
-                        &process,
-                        t,
-                        dt,
-                        core::slice::from_mut(&mut r),
-                        &z,
-                        &mut work,
-                    );
-                    bank *= bank_step_factor(r_prev, r, dt);
-
-                    let t_next = grid.time(step + 1);
-                    state.set_step_time(step + 1, t_next);
-                    state.set_key(StateKey::ShortRate, r);
-                    state.set_key(StateKey::BankAccount, bank);
-
-                    while next_event < event_step_indices.len()
-                        && event_step_indices[next_event] == step + 1
-                    {
-                        payoff.on_event(&mut state)?;
-
-                        // Record exercise-date state if this event is an exercise date.
-                        if next_exercise < exercise_event_pos.len()
-                            && exercise_event_pos[next_exercise] == next_event
-                        {
-                            let flat = path_cursor * n_ex + next_exercise;
-                            exercise_short_rates[flat] = r;
-                            exercise_values[flat] = payoff
-                                .intrinsic_at(next_exercise, r, self.currency)?
-                                .amount();
-                            exercise_banks[flat] = bank;
-                            exercise_inactive[flat] = payoff.is_path_inactive();
-                            next_exercise += 1;
-                        }
-                        next_event += 1;
-                    }
+        Hw1fPaths {
+            process_params: &self.process_params,
+            r0: self.r0,
+            grid: &grid,
+            event_step_indices: &event_step_indices,
+            config: &self.config,
+        }
+        .simulate(
+            payoff_factory,
+            |path_cursor, event_idx, payoff: &P, r, bank| {
+                // Record exercise-date state if this event is an exercise date.
+                if let Some(ex) = event_exercise[event_idx] {
+                    let flat = path_cursor * n_ex + ex;
+                    exercise_short_rates[flat] = r;
+                    exercise_values[flat] = payoff.intrinsic_at(ex, r, self.currency)?.amount();
+                    exercise_banks[flat] = bank;
+                    exercise_inactive[flat] = payoff.is_path_inactive();
                 }
-
+                Ok(())
+            },
+            |path_cursor, payoff: &P| {
                 let full_value = payoff.value(self.currency)?.amount();
                 deterministic_pv[path_cursor] = full_value;
                 for ex in 0..n_ex {
                     pre_exercise_pv[path_cursor * n_ex + ex] =
                         full_value - payoff.value_after(ex, self.currency)?.amount();
                 }
-                path_cursor += 1;
-            }
-        }
+                Ok(())
+            },
+        )?;
 
         // -- Phase 2: backward LSMC induction ----------------------------------
-        let mut cashflow = deterministic_pv.clone();
+        let mut cashflow = deterministic_pv;
 
         // Split-sample partition (see `Hw1fMcConfig::split`): only
         // train paths feed the continuation regression.
@@ -412,7 +368,7 @@ mod tests {
     use crate::rates::hw1f::ShortRateBasis;
     use finstack_quant_core::money::Money;
 
-    use crate::monte_carlo::traits::StateKey;
+    use crate::monte_carlo::traits::{PathState, StateKey};
 
     /// Zero-coupon-bond payoff: pays `notional` at maturity (the last event),
     /// discounted pathwise via the bank-account numeraire exposed by the

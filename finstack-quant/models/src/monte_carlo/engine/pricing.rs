@@ -91,7 +91,7 @@ pub(super) fn parallel_path_chunks(num_paths: usize, chunk_size: usize) -> Vec<R
     chunks
 }
 
-pub(crate) fn validate_discounted_payoff(
+fn validate_discounted_payoff(
     path_id: usize,
     payoff_value: f64,
     discount_factor: f64,
@@ -699,6 +699,179 @@ impl McEngine {
         )
     }
 
+    /// Prepare the scheme and correlation factor shared by every path of a run.
+    ///
+    /// Hoists per-run, path-independent scheme constants out of the per-step
+    /// hot path (e.g. exp(-κΔt) in exact rate / QE variance schemes). The
+    /// prepared copy is shared read-only by every path (it is `Sync`).
+    pub(crate) fn prepare_run<P, D>(
+        &self,
+        process: &P,
+        disc: &D,
+    ) -> Result<(D, Option<CorrelationFactor>)>
+    where
+        P: StochasticProcess,
+        D: Discretization<P> + Clone,
+    {
+        let mut prepared_disc = disc.clone();
+        prepared_disc.prepare(process, &self.config.time_grid);
+        let correlation = build_correlation_factor(process, &prepared_disc)?;
+        Ok((prepared_disc, correlation))
+    }
+
+    /// Simulate one path (or antithetic pair) and return its discounted value.
+    ///
+    /// Resets the scratch payoffs, then dispatches to the captured, antithetic
+    /// or plain path primitive. A path is captured only when `captured` is
+    /// `Some` and the capture sampler selects `path_id`; `validate_runtime`
+    /// rejects antithetic together with capture, so a captured path is never
+    /// paired.
+    pub(crate) fn simulate_discounted<R, P, D, F>(
+        &self,
+        rng: &mut R,
+        inputs: PathInputs<'_, P, D>,
+        scratch: &mut PathScratch<F>,
+        path_id: usize,
+        captured: Option<&mut Vec<SimulatedPath>>,
+    ) -> Result<f64>
+    where
+        R: RandomStream,
+        P: StochasticProcess,
+        D: Discretization<P>,
+        F: Payoff,
+    {
+        let s = scratch;
+        s.payoff.reset();
+        let captured = captured.filter(|_| {
+            self.config
+                .path_capture
+                .should_capture(path_id, self.config.num_paths)
+        });
+        let payoff_value = if let Some(paths) = captured {
+            let (v, path) = self.simulate_path_with_capture(
+                rng,
+                inputs.process,
+                inputs.disc,
+                inputs.initial_state,
+                &mut s.payoff,
+                &mut s.state,
+                &mut s.z,
+                &mut s.z_raw,
+                &mut s.work,
+                inputs.correlation,
+                path_id,
+                inputs.discount_factor,
+                inputs.currency,
+            )?;
+            paths.push(path);
+            v
+        } else if let Some(payoff_anti) = s.payoff_anti.as_mut() {
+            payoff_anti.reset();
+            self.simulate_antithetic_pair(
+                rng,
+                inputs.process,
+                inputs.disc,
+                inputs.initial_state,
+                &mut s.payoff,
+                payoff_anti,
+                &mut s.state,
+                &mut s.state_anti,
+                &mut s.z,
+                &mut s.z_anti,
+                &mut s.z_raw,
+                &mut s.work,
+                &mut s.work_anti,
+                inputs.correlation,
+                inputs.currency,
+            )?
+        } else {
+            self.simulate_path(
+                rng,
+                inputs.process,
+                inputs.disc,
+                inputs.initial_state,
+                &mut s.payoff,
+                &mut s.state,
+                &mut s.z,
+                &mut s.z_raw,
+                &mut s.work,
+                inputs.correlation,
+                inputs.currency,
+            )?
+        };
+        validate_discounted_payoff(path_id, payoff_value, inputs.discount_factor)
+    }
+
+    /// Accumulate the discounted values of the paths in `range`.
+    ///
+    /// Returns the chunk statistics and whether the serial auto-stop rule
+    /// fired. The rule needs a single-chunk run (`price_serial` arranges
+    /// that); a 5 000-sample warm-up keeps the half-width estimate stable,
+    /// because the standard error of the sample standard error is
+    /// ~1/√(2n), so at n=1 000 the stopping criterion itself has ≈ 2 % noise
+    /// which routinely trips the threshold early.
+    fn run_chunk<R, P, D, F>(
+        &self,
+        range: Range<usize>,
+        rng: &mut RngSource<'_, R>,
+        inputs: PathInputs<'_, P, D>,
+        scratch: &mut PathScratch<F>,
+        mut captured: Option<&mut Vec<SimulatedPath>>,
+    ) -> Result<(OnlineStats, bool)>
+    where
+        R: RandomStream,
+        P: StochasticProcess,
+        D: Discretization<P>,
+        F: Payoff,
+    {
+        let mut stats = OnlineStats::new();
+        for path_id in range {
+            let discounted_value = match rng {
+                RngSource::Split(root) => {
+                    let mut path_rng = root.split(path_id as u64).ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "RandomStream reports splitting support but split() returned None"
+                                .to_string(),
+                        )
+                    })?;
+                    self.simulate_discounted(
+                        &mut path_rng,
+                        inputs,
+                        scratch,
+                        path_id,
+                        captured.as_deref_mut(),
+                    )?
+                }
+                RngSource::Sequential(stream) => self.simulate_discounted(
+                    &mut **stream,
+                    inputs,
+                    scratch,
+                    path_id,
+                    captured.as_deref_mut(),
+                )?,
+            };
+            stats.update(discounted_value);
+
+            if let Some(target) = self.config.target_ci_half_width {
+                if stats.count() >= AUTO_STOP_MIN_SAMPLES && stats.ci_half_width() < target {
+                    return Ok((stats, true));
+                }
+            }
+        }
+        Ok((stats, false))
+    }
+
+    /// Wrap merged run statistics in an [`Estimate`].
+    fn run_estimate(&self, combined: &OnlineStats) -> Estimate {
+        let num_paths = combined.count();
+        let num_simulated_paths = if self.config.antithetic {
+            num_paths.saturating_mul(2)
+        } else {
+            num_paths
+        };
+        Estimate::from_stats(combined).with_num_simulated_paths(num_simulated_paths)
+    }
+
     /// Serial pricing implementation with optional path capture.
     #[allow(clippy::too_many_arguments)]
     fn price_serial<R, P, D, F>(
@@ -718,34 +891,16 @@ impl McEngine {
         D: Discretization<P> + Clone,
         F: Payoff,
     {
-        // Hoist per-run, path-independent scheme constants out of the per-step
-        // hot path (e.g. exp(-κΔt) in exact rate / QE variance schemes). The
-        // prepared copy is shared read-only by every path in this run.
-        let mut prepared_disc = (*disc).clone();
-        prepared_disc.prepare(process, &self.config.time_grid);
-        let disc = &prepared_disc;
-
-        let dim = process.dim();
-        let num_factors = process.num_factors();
-        let work_size = disc.work_size(process);
-        let correlation = build_correlation_factor(process, disc)?;
-
-        let mut state = vec![0.0; dim];
-        let mut z = vec![0.0; num_factors];
-        // `z_raw` holds independent shocks when the engine applies correlation;
-        // otherwise it stays zero-length to avoid an unused allocation.
-        let mut z_raw = vec![
-            0.0;
-            if correlation.is_some() {
-                num_factors
-            } else {
-                0
-            }
-        ];
-        let mut work = vec![0.0; work_size];
-        let mut state_a = vec![0.0; dim];
-        let mut z_anti = vec![0.0; num_factors];
-        let mut work_anti = vec![0.0; work_size];
+        let (disc, correlation) = self.prepare_run(process, disc)?;
+        let inputs = PathInputs {
+            process,
+            disc: &disc,
+            initial_state,
+            correlation: correlation.as_ref(),
+            currency,
+            discount_factor,
+        };
+        let mut scratch = PathScratch::new(inputs, payoff, self.config.antithetic);
 
         let mut captured_paths: Vec<SimulatedPath> = if capture {
             let estimated_capacity = match self.config.path_capture.capture_mode {
@@ -757,14 +912,13 @@ impl McEngine {
             Vec::new()
         };
 
-        // Long-lived clones reused across all paths (reset between iterations).
-        // The antithetic branch needs an independent second payoff for the
-        // mirrored path; we allocate it lazily so non-antithetic runs pay
-        // for exactly one clone rather than two.
-        let mut payoff_local = payoff.clone();
-        let mut payoff_anti: Option<F> = self.config.antithetic.then(|| payoff.clone());
-        let use_split_streams = rng.supports_splitting();
-        let mut sequential_rng = (!use_split_streams).then(|| rng.clone());
+        // A non-splittable stream is consumed sequentially and carries across
+        // chunks.
+        let mut sequential_rng = (!rng.supports_splitting()).then(|| rng.clone());
+        let mut rng_source = match sequential_rng.as_mut() {
+            Some(stream) => RngSource::Sequential(stream),
+            None => RngSource::Split(rng),
+        };
 
         // Reduce via the same chunk -> merge tree as `price_parallel` so that, for
         // a splittable RNG with auto-stopping disabled, serial and parallel results
@@ -782,141 +936,21 @@ impl McEngine {
         };
 
         let mut combined = OnlineStats::new();
-        let mut auto_stopped = false;
-        for range in &chunk_ranges {
-            let mut stats = OnlineStats::new();
-            for path_id in range.clone() {
-                let mut split_rng;
-                let path_rng = if use_split_streams {
-                    split_rng = rng.split(path_id as u64).ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "RandomStream reports splitting support but split() returned None"
-                                .to_string(),
-                        )
-                    })?;
-                    &mut split_rng
-                } else {
-                    sequential_rng.as_mut().ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "serial non-splittable RNG was not initialized".to_string(),
-                        )
-                    })?
-                };
-
-                payoff_local.reset();
-                // Mirror the path-start randomness for the antithetic leg:
-                // both legs read the SAME underlying draws, the anti leg
-                // mirrored (u → 1−u, z → −z). Drawing the anti leg's
-                // path-start values independently would silently destroy the
-                // antithetic coupling for payoff-level randomness.
-                if let Some(p) = payoff_anti.as_mut() {
-                    let mut mirror = crate::monte_carlo::traits::MirroredStream(path_rng.clone());
-                    payoff_local.on_path_start(&mut *path_rng);
-                    p.reset();
-                    p.on_path_start(&mut mirror);
-                } else {
-                    payoff_local.on_path_start(&mut *path_rng);
-                }
-
-                let should_capture = capture
-                    && self
-                        .config
-                        .path_capture
-                        .should_capture(path_id, self.config.num_paths);
-
-                let payoff_value = if should_capture {
-                    // `validate_runtime` rejects antithetic+capture, so this branch
-                    // is only reached with antithetic disabled.
-                    let (v, path) = self.simulate_path_with_capture(
-                        &mut *path_rng,
-                        process,
-                        disc,
-                        initial_state,
-                        &mut payoff_local,
-                        &mut state,
-                        &mut z,
-                        &mut z_raw,
-                        &mut work,
-                        correlation.as_ref(),
-                        path_id,
-                        discount_factor,
-                        currency,
-                    )?;
-                    captured_paths.push(path);
-                    v
-                } else if let Some(payoff_anti_mut) = payoff_anti.as_mut() {
-                    // antithetic = true ⇒ payoff_anti is Some by construction.
-                    self.simulate_antithetic_pair(
-                        &mut *path_rng,
-                        process,
-                        disc,
-                        initial_state,
-                        &mut payoff_local,
-                        payoff_anti_mut,
-                        &mut state,
-                        &mut state_a,
-                        &mut z,
-                        &mut z_anti,
-                        &mut z_raw,
-                        &mut work,
-                        &mut work_anti,
-                        correlation.as_ref(),
-                        currency,
-                    )?
-                } else {
-                    self.simulate_path(
-                        &mut *path_rng,
-                        process,
-                        disc,
-                        initial_state,
-                        &mut payoff_local,
-                        &mut state,
-                        &mut z,
-                        &mut z_raw,
-                        &mut work,
-                        correlation.as_ref(),
-                        currency,
-                    )?
-                };
-
-                let discounted_value =
-                    validate_discounted_payoff(path_id, payoff_value, discount_factor)?;
-                stats.update(discounted_value);
-
-                // A 5 000-sample warm-up keeps the
-                // half-width estimate stable — the standard error of the sample
-                // standard error is ~1/√(2n), so at n=1 000 the stopping criterion
-                // itself has ≈ 2 % noise which routinely trips the threshold
-                // early.
-                if let Some(target) = self.config.target_ci_half_width {
-                    if stats.count() >= AUTO_STOP_MIN_SAMPLES && stats.ci_half_width() < target {
-                        auto_stopped = true;
-                        break;
-                    }
-                }
-            }
+        for range in chunk_ranges {
+            let (stats, auto_stopped) = self.run_chunk(
+                range,
+                &mut rng_source,
+                inputs,
+                &mut scratch,
+                capture.then_some(&mut captured_paths),
+            )?;
             combined.merge(&stats);
             if auto_stopped {
                 break;
             }
         }
 
-        let num_paths = combined.count();
-        let num_simulated_paths = if self.config.antithetic {
-            num_paths.saturating_mul(2)
-        } else {
-            num_paths
-        };
-        let estimate = Estimate::new(
-            combined.mean(),
-            combined.stderr(),
-            combined.confidence_interval(0.05),
-            num_paths,
-        )
-        .with_std_dev(combined.std_dev())
-        .with_num_simulated_paths(num_simulated_paths);
-
-        Ok((estimate, captured_paths))
+        Ok((self.run_estimate(&combined), captured_paths))
     }
 
     /// Parallel pricing implementation with optional path capture.
@@ -941,136 +975,35 @@ impl McEngine {
     {
         use rayon::prelude::*;
 
-        // Hoist per-run, path-independent scheme constants once before fanning
-        // out; the prepared copy is shared read-only across all chunks (it is
-        // `Sync`), so every parallel path sees the same precomputed constants.
-        let mut prepared_disc = (*disc).clone();
-        prepared_disc.prepare(process, &self.config.time_grid);
-        let disc = &prepared_disc;
+        let (disc, correlation) = self.prepare_run(process, disc)?;
+        let inputs = PathInputs {
+            process,
+            disc: &disc,
+            initial_state,
+            correlation: correlation.as_ref(),
+            currency,
+            discount_factor,
+        };
 
         // `None` requests adaptive chunking; `Some(n)` uses exactly `n`.
         let effective_chunk_size = self
             .config
             .chunk_size
             .unwrap_or_else(|| adaptive_chunk_size(self.config.num_paths));
-
         let chunks = parallel_path_chunks(self.config.num_paths, effective_chunk_size);
-        let correlation = build_correlation_factor(process, disc)?;
-        let correlation_ref = correlation.as_ref();
 
         let chunk_results: Vec<Result<(OnlineStats, Vec<SimulatedPath>)>> = chunks
-            .par_iter()
+            .into_par_iter()
             .map(|range| {
-                let mut stats = OnlineStats::new();
-                let dim = process.dim();
-                let num_factors = process.num_factors();
-                let work_size = disc.work_size(process);
-
-                let mut state = vec![0.0; dim];
-                let mut z = vec![0.0; num_factors];
-                let mut z_raw = vec![
-                    0.0;
-                    if correlation_ref.is_some() {
-                        num_factors
-                    } else {
-                        0
-                    }
-                ];
-                let mut work = vec![0.0; work_size];
-                let mut state_a = vec![0.0; dim];
-                let mut z_anti = vec![0.0; num_factors];
-                let mut work_anti = vec![0.0; work_size];
-                let mut chunk_paths: Vec<SimulatedPath> = if capture {
-                    Vec::with_capacity(range.len() / 10 + 1)
-                } else {
-                    Vec::new()
-                };
-                // One per-thread payoff buffer, plus a lazily-allocated second
-                // one reused for antithetic pairs (None when antithetic is off,
-                // so non-antithetic chunks pay for one clone instead of two).
-                let mut payoff_clone = payoff.clone();
-                let mut payoff_anti: Option<F> =
-                    self.config.antithetic.then(|| payoff.clone());
-
-                for path_id in range.clone() {
-                    let mut path_rng = rng.split(path_id as u64).ok_or_else(|| finstack_quant_core::Error::Validation("RandomStream does not support stream splitting; use a splittable generator such as PhiloxRng or run in serial mode without per-path splitting".to_string()))?;
-
-                    payoff_clone.reset();
-                    // Mirror path-start randomness for the antithetic leg —
-                    // see the serial loop for the rationale.
-                    if let Some(p) = payoff_anti.as_mut() {
-                        let mut mirror = crate::monte_carlo::traits::MirroredStream(path_rng.clone());
-                        payoff_clone.on_path_start(&mut path_rng);
-                        p.reset();
-                        p.on_path_start(&mut mirror);
-                    } else {
-                        payoff_clone.on_path_start(&mut path_rng);
-                    }
-
-                    let should_capture = capture
-                        && self
-                            .config
-                            .path_capture
-                            .should_capture(path_id, self.config.num_paths);
-
-                    let payoff_value = if should_capture {
-                        let (v, path) = self.simulate_path_with_capture(
-                            &mut path_rng,
-                            process,
-                            disc,
-                            initial_state,
-                            &mut payoff_clone,
-                            &mut state,
-                            &mut z,
-                            &mut z_raw,
-                            &mut work,
-                            correlation_ref,
-                            path_id,
-                            discount_factor,
-                            currency,
-                        )?;
-                        chunk_paths.push(path);
-                        v
-                    } else if let Some(payoff_anti_mut) = payoff_anti.as_mut() {
-                        // antithetic = true ⇒ payoff_anti is Some by construction.
-                        self.simulate_antithetic_pair(
-                            &mut path_rng,
-                            process,
-                            disc,
-                            initial_state,
-                            &mut payoff_clone,
-                            payoff_anti_mut,
-                            &mut state,
-                            &mut state_a,
-                            &mut z,
-                            &mut z_anti,
-                            &mut z_raw,
-                            &mut work,
-                            &mut work_anti,
-                            correlation_ref,
-                            currency,
-                        )?
-                    } else {
-                        self.simulate_path(
-                            &mut path_rng,
-                            process,
-                            disc,
-                            initial_state,
-                            &mut payoff_clone,
-                            &mut state,
-                            &mut z,
-                            &mut z_raw,
-                            &mut work,
-                            correlation_ref,
-                            currency,
-                        )?
-                    };
-
-                    let discounted_value =
-                        validate_discounted_payoff(path_id, payoff_value, discount_factor)?;
-                    stats.update(discounted_value);
-                }
-
+                let mut scratch = PathScratch::new(inputs, payoff, self.config.antithetic);
+                let mut chunk_paths = Vec::new();
+                let (stats, _) = self.run_chunk(
+                    range,
+                    &mut RngSource::Split(rng),
+                    inputs,
+                    &mut scratch,
+                    capture.then_some(&mut chunk_paths),
+                )?;
                 Ok((stats, chunk_paths))
             })
             .collect();
@@ -1083,21 +1016,87 @@ impl McEngine {
             captured_paths.extend(chunk_paths);
         }
 
-        let num_paths = combined.count();
-        let num_simulated_paths = if self.config.antithetic {
-            num_paths.saturating_mul(2)
-        } else {
-            num_paths
-        };
-        let estimate = Estimate::new(
-            combined.mean(),
-            combined.stderr(),
-            combined.confidence_interval(0.05),
-            num_paths,
-        )
-        .with_std_dev(combined.std_dev())
-        .with_num_simulated_paths(num_simulated_paths);
-
-        Ok((estimate, captured_paths))
+        Ok((self.run_estimate(&combined), captured_paths))
     }
+}
+
+/// Path-invariant inputs shared by every path of one run.
+pub(crate) struct PathInputs<'a, P, D> {
+    /// Process driving the simulated state.
+    pub(crate) process: &'a P,
+    /// Prepared discretization (see [`McEngine::prepare_run`]).
+    pub(crate) disc: &'a D,
+    /// State at time zero; its length equals `process.dim()`.
+    pub(crate) initial_state: &'a [f64],
+    /// Engine-applied shock correlation, if any.
+    pub(crate) correlation: Option<&'a CorrelationFactor>,
+    /// Currency of the payoff amounts.
+    pub(crate) currency: Currency,
+    /// Scalar present-value factor applied to every path.
+    pub(crate) discount_factor: f64,
+}
+
+impl<P, D> Clone for PathInputs<'_, P, D> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<P, D> Copy for PathInputs<'_, P, D> {}
+
+/// Per-path scratch buffers and payoff accumulators reused across paths.
+///
+/// The antithetic buffers and second payoff exist only for antithetic runs.
+pub(crate) struct PathScratch<F> {
+    state: Vec<f64>,
+    z: Vec<f64>,
+    /// Independent shocks when the engine applies correlation; zero-length
+    /// otherwise.
+    z_raw: Vec<f64>,
+    work: Vec<f64>,
+    state_anti: Vec<f64>,
+    z_anti: Vec<f64>,
+    work_anti: Vec<f64>,
+    payoff: F,
+    payoff_anti: Option<F>,
+}
+
+impl<F: Payoff> PathScratch<F> {
+    /// Allocate scratch sized for `inputs.process` and `inputs.disc`.
+    pub(crate) fn new<P, D>(inputs: PathInputs<'_, P, D>, payoff: &F, antithetic: bool) -> Self
+    where
+        P: StochasticProcess,
+        D: Discretization<P>,
+    {
+        let dim = inputs.process.dim();
+        let num_factors = inputs.process.num_factors();
+        let work_size = inputs.disc.work_size(inputs.process);
+        let anti = |n: usize| vec![0.0; if antithetic { n } else { 0 }];
+        Self {
+            state: vec![0.0; dim],
+            z: vec![0.0; num_factors],
+            z_raw: vec![
+                0.0;
+                if inputs.correlation.is_some() {
+                    num_factors
+                } else {
+                    0
+                }
+            ],
+            work: vec![0.0; work_size],
+            state_anti: anti(dim),
+            z_anti: anti(num_factors),
+            work_anti: anti(work_size),
+            payoff: payoff.clone(),
+            payoff_anti: antithetic.then(|| payoff.clone()),
+        }
+    }
+}
+
+/// Where each path's random stream comes from.
+enum RngSource<'a, R> {
+    /// Splittable root: path `i` draws from `root.split(i)`.
+    Split(&'a R),
+    /// One non-splittable stream consumed path after path.
+    Sequential(&'a mut R),
 }

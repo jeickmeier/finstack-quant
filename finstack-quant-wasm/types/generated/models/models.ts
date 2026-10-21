@@ -1242,10 +1242,37 @@ export type ProcessSpec =
       shift_times: number[];
       type: "cir_plus_plus";
     }
-  | (HestonPricingParams & {
+  | {
+      /**
+       * Mean reversion speed.
+       */
+      kappa: number;
+      /**
+       * Continuously compounded dividend or foreign yield as an annual decimal.
+       */
+      q: number;
+      /**
+       * Continuously compounded risk-free rate as an annual decimal.
+       */
+      r: number;
+      /**
+       * Spot-variance correlation.
+       */
+      rho: number;
+      /**
+       * Vol-of-vol.
+       */
+      sigma_v: number;
+      /**
+       * Long-run variance.
+       */
+      theta: number;
       type: "heston";
-      [k: string]: unknown;
-    })
+      /**
+       * Initial variance.
+       */
+      v0: number;
+    }
   | {
       /**
        * Mean reversion speed for short-term deviation (κ_X)
@@ -3659,7 +3686,6 @@ export interface HestonPricingParams {
    * Initial variance.
    */
   v0: number;
-  [k: string]: unknown;
 }
 /**
  * Validated Hull-White one-factor process parameters.

@@ -54,9 +54,7 @@ impl ExactGbmWithDividends {
     ///
     /// Uses exact solution: S(t+dt) = S(t) * exp((r - q - σ²/2)*dt + σ*√dt*Z)
     fn evolve_gbm(&self, spot: f64, r: f64, q: f64, sigma: f64, dt: f64, z: f64) -> f64 {
-        let drift = (r - q - 0.5 * sigma * sigma) * dt;
-        let diffusion = sigma * dt.sqrt() * z;
-        spot * (drift + diffusion).exp()
+        spot * super::exact::gbm_growth((r - q - 0.5 * sigma * sigma) * dt, sigma, dt, z)
     }
 }
 

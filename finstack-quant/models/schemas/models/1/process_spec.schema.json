@@ -172,56 +172,6 @@
       ],
       "type": "object"
     },
-    "HestonPricingParams": {
-      "description": "Market inputs for closed-form Heston pricing.\n\nThe stochastic parameters are stored once in the canonical models-layer\n[`HestonParams`]; this wrapper adds only the continuous carry rates required\nby risk-neutral pricing.\n\n# References\n\n- Heston, S. L. (1993). \"A Closed-Form Solution for Options with Stochastic Volatility\n  with Applications to Bond and Currency Options.\" *Review of Financial Studies*, 6(2), 327-343. `docs/REFERENCES.md#heston-1993`",
-      "properties": {
-        "kappa": {
-          "description": "Mean reversion speed.",
-          "format": "double",
-          "type": "number"
-        },
-        "q": {
-          "description": "Continuously compounded dividend or foreign yield as an annual decimal.",
-          "format": "double",
-          "type": "number"
-        },
-        "r": {
-          "description": "Continuously compounded risk-free rate as an annual decimal.",
-          "format": "double",
-          "type": "number"
-        },
-        "rho": {
-          "description": "Spot-variance correlation.",
-          "format": "double",
-          "type": "number"
-        },
-        "sigma_v": {
-          "description": "Vol-of-vol.",
-          "format": "double",
-          "type": "number"
-        },
-        "theta": {
-          "description": "Long-run variance.",
-          "format": "double",
-          "type": "number"
-        },
-        "v0": {
-          "description": "Initial variance.",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "r",
-        "q",
-        "v0",
-        "kappa",
-        "theta",
-        "sigma_v",
-        "rho"
-      ],
-      "type": "object"
-    },
     "HullWhite1FParams": {
       "description": "Validated Hull-White one-factor process parameters.",
       "properties": {
@@ -652,16 +602,58 @@
       "type": "object"
     },
     {
-      "$ref": "#/$defs/HestonPricingParams",
+      "additionalProperties": false,
       "description": "Heston stochastic volatility.\n\nState: `[spot, variance]`; spot starts strictly positive, and the\nstarting variance `initial_state[1]` must equal the `v0` parameter.",
       "properties": {
+        "kappa": {
+          "description": "Mean reversion speed.",
+          "format": "double",
+          "type": "number"
+        },
+        "q": {
+          "description": "Continuously compounded dividend or foreign yield as an annual decimal.",
+          "format": "double",
+          "type": "number"
+        },
+        "r": {
+          "description": "Continuously compounded risk-free rate as an annual decimal.",
+          "format": "double",
+          "type": "number"
+        },
+        "rho": {
+          "description": "Spot-variance correlation.",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma_v": {
+          "description": "Vol-of-vol.",
+          "format": "double",
+          "type": "number"
+        },
+        "theta": {
+          "description": "Long-run variance.",
+          "format": "double",
+          "type": "number"
+        },
         "type": {
           "const": "heston",
           "type": "string"
+        },
+        "v0": {
+          "description": "Initial variance.",
+          "format": "double",
+          "type": "number"
         }
       },
       "required": [
-        "type"
+        "type",
+        "r",
+        "q",
+        "v0",
+        "kappa",
+        "theta",
+        "sigma_v",
+        "rho"
       ],
       "type": "object"
     },

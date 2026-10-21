@@ -19,6 +19,7 @@
 //! time-0 curve DF, which would drop the payoff/numeraire correlation.
 
 use crate::monte_carlo::discretization::ExactHullWhite1F;
+use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
 use crate::monte_carlo::results::MoneyEstimate;
 use crate::monte_carlo::rng::philox::PhiloxRng;
@@ -106,23 +107,76 @@ impl Hw1fMcPricer {
             self.config.min_steps_between_events,
         )?;
 
+        let mut path_values = Vec::with_capacity(self.config.simulated_path_count());
+        Hw1fPaths {
+            process_params: &self.process_params,
+            r0: self.r0,
+            grid: &grid,
+            event_step_indices: &event_step_indices,
+            config: &self.config,
+        }
+        .simulate(
+            payoff_factory,
+            |_, _, _, _, _| Ok(()),
+            |_, payoff| {
+                path_values.push(payoff.value(self.currency)?.amount());
+                Ok(())
+            },
+        )?;
+
+        money_estimate_from_pairs(&path_values, self.config.split(), 1.0, self.currency)
+    }
+}
+
+/// Shared HW1F short-rate path driver for [`Hw1fMcPricer`] and
+/// [`crate::rates::hw1f::Hw1fLsmcPricer`].
+pub(super) struct Hw1fPaths<'a> {
+    /// HW1F process parameters (κ, σ, θ(t)).
+    pub(super) process_params: &'a HullWhite1FParams,
+    /// Initial short rate r(0).
+    pub(super) r0: f64,
+    /// Event-aligned simulation grid.
+    pub(super) grid: &'a TimeGrid,
+    /// Grid step at which each event fires, in event order.
+    pub(super) event_step_indices: &'a [usize],
+    /// Path count, seed and antithetic setting.
+    pub(super) config: &'a Hw1fMcConfig,
+}
+
+impl Hw1fPaths<'_> {
+    /// Simulate every path and leg with exact HW1F steps.
+    ///
+    /// Each raw path `path_id` draws from a fresh `substream(path_id)` per
+    /// leg; the antithetic leg negates the shocks. The trapezoidal bank
+    /// account and short rate are exposed through `StateKey::BankAccount` and
+    /// `StateKey::ShortRate`. `on_event(path_cursor, event_idx, payoff, r,
+    /// bank)` runs after each `payoff.on_event`; `on_path_end(path_cursor,
+    /// payoff)` runs after the last step. `path_cursor` counts simulated legs
+    /// in order.
+    pub(super) fn simulate<F, P>(
+        &self,
+        payoff_factory: F,
+        mut on_event: impl FnMut(usize, usize, &P, f64, f64) -> Result<()>,
+        mut on_path_end: impl FnMut(usize, &P) -> Result<()>,
+    ) -> Result<()>
+    where
+        F: Fn() -> P,
+        P: Payoff,
+    {
         let process = HullWhite1FProcess::new(self.process_params.clone());
         let disc = ExactHullWhite1F::new();
-        let num_steps = grid.num_steps();
-        let work_size = disc.work_size(&process);
-        let raw_paths = self.config.num_paths;
+        let num_steps = self.grid.num_steps();
         let base_rng = PhiloxRng::new(self.config.seed);
-
-        let mut path_values = Vec::with_capacity(self.config.simulated_path_count());
 
         // Per-path scratch buffers hoisted out of the path loop; the
         // discretization step fully overwrites `work` and `z` each step,
         // so reusing them across paths is bit-identical to fresh allocations.
-        let mut work = vec![0.0; work_size];
+        let mut work = vec![0.0; disc.work_size(&process)];
         let mut z = [0.0_f64; 1];
 
         let multiplicity = self.config.split().multiplicity;
-        for path_id in 0..raw_paths {
+        let mut path_cursor = 0usize;
+        for path_id in 0..self.config.num_paths {
             for anti in 0..multiplicity {
                 let mut rng = base_rng.substream(path_id as u64);
                 let mut r = self.r0;
@@ -135,8 +189,8 @@ impl Hw1fMcPricer {
 
                 let mut next_event = 0usize;
                 for step in 0..num_steps {
-                    let t = grid.time(step);
-                    let dt = grid.dt(step);
+                    let t = self.grid.time(step);
+                    let dt = self.grid.dt(step);
                     rng.fill_std_normals(&mut z);
                     if anti == 1 {
                         z[0] = -z[0];
@@ -152,24 +206,25 @@ impl Hw1fMcPricer {
                     );
                     bank *= bank_step_factor(r_prev, r, dt);
 
-                    let t_next = grid.time(step + 1);
+                    let t_next = self.grid.time(step + 1);
                     state.set_step_time(step + 1, t_next);
                     state.set_key(StateKey::ShortRate, r);
                     state.set_key(StateKey::BankAccount, bank);
 
-                    while next_event < event_step_indices.len()
-                        && event_step_indices[next_event] == step + 1
+                    while next_event < self.event_step_indices.len()
+                        && self.event_step_indices[next_event] == step + 1
                     {
                         payoff.on_event(&mut state)?;
+                        on_event(path_cursor, next_event, &payoff, r, bank)?;
                         next_event += 1;
                     }
                 }
 
-                path_values.push(payoff.value(self.currency)?.amount());
+                on_path_end(path_cursor, &payoff)?;
+                path_cursor += 1;
             }
         }
-
-        money_estimate_from_pairs(&path_values, self.config.split(), 1.0, self.currency)
+        Ok(())
     }
 }
 
@@ -225,25 +280,10 @@ pub fn money_estimate_from_pairs(
             "Monte Carlo estimates require at least 2 independent pricing estimators".into(),
         ));
     }
-    let mean = stats.mean();
-    let stderr = stats.stderr();
-    let (lo, hi) = stats.confidence_interval(0.05);
-    Ok(MoneyEstimate {
-        mean: finstack_quant_core::money::Money::new(mean, currency)?,
-        stderr,
-        ci_95: (
-            finstack_quant_core::money::Money::new(lo, currency)?,
-            finstack_quant_core::money::Money::new(hi, currency)?,
-        ),
-        num_paths: estimators,
-        num_simulated_paths: estimators * multiplicity,
-        std_dev: Some(stats.std_dev()),
-        median: None,
-        percentile_25: None,
-        percentile_75: None,
-        min: None,
-        max: None,
-    })
+    MoneyEstimate::from_estimate(
+        Estimate::from_stats(&stats).with_num_simulated_paths(estimators * multiplicity),
+        currency,
+    )
 }
 
 /// Build a time grid with steps aligned to event dates, returning the step
