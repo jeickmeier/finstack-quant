@@ -98,18 +98,18 @@ a submodule.
 
 | Area | Key exports |
 |------|-------------|
-| Valuation | `CorporateAnalysisBuilder`, `CorporateAnalysis`, `CorporateValuationResult`, `DcfPeriodRow`, `evaluate_dcf_with_market`, `DcfOptions`, `dcf_sensitivity`, `DcfSensitivityResult`, `ExitMultipleBump`, `wacc` |
+| Valuation | `CorporateAnalysisBuilder`, `CorporateAnalysis`, `CorporateValuationResult`, `DcfPeriodRow`, `evaluate_dcf`, `DcfOptions`, `dcf_sensitivity`, `DcfSensitivityResult`, `ExitMultipleBump`, `wacc` |
 | LBO | `evaluate_lbo`, `LboConfig`, `LboResult`, `LboTranche`, `LboCheckMappings` |
 | Scenarios | `ScenarioSet`, `ScenarioDefinition`, `ScenarioResults`, `ScenarioDiff` |
-| Sensitivity | `SensitivityAnalyzer`, `SensitivityConfig`, `SensitivityMode`, `SensitivityResult`, `ParameterSpec`, `TornadoEntry`, `generate_tornado_entries` |
-| Variance | `VarianceAnalyzer`, `VarianceConfig`, `VarianceReport`, `VarianceRow`, `BridgeChart`, `BridgeStep` |
-| Credit | `compute_credit_context`, `CreditContextMetrics`, `forecast_covenant`, `forecast_breaches`, `StatementsAdapter`, `to_table` |
-| Checks (`analysis::checks`) | `three_statement_checks`, `credit_underwriting_checks`, `lbo_model_checks`, `ThreeStatementMapping`, `CreditMapping`, `FormulaCheckSpec`, `CheckReportRenderer`, plus reconciliation / consistency / credit check types |
-| ECL | `EclEngine`, `EclConfig`, `EclConfigBuilder`, `CeclEngine`, `CeclConfig`, `classify_stage`, `compute_ecl`, `compute_ecl_weighted`, `classify_stage_from_curves`, `compute_ecl_from_curve`, `compute_ecl_weighted_from_curves`, `StagingConfig`, `PdTermStructure`, `PortfolioEclResult`, `ProvisionWaterfall`, `compute_waterfall` |
+| Sensitivity | `run_sensitivity`, `SensitivityConfig`, `SensitivityMode`, `SensitivityResult`, `ParameterSpec`, `TornadoEntry`, `generate_tornado_entries` |
+| Variance | `run_variance`, `variance_bridge`, `VarianceConfig`, `VarianceReport`, `VarianceRow`, `BridgeChart`, `BridgeStep` |
+| Credit | `compute_credit_context`, `CreditContextMetrics`, `forecast_breaches`, `StatementsAdapter` |
+| Checks | `three_statement_checks`, `credit_underwriting_checks`, `lbo_model_checks`, `ThreeStatementMapping`, `CreditMapping`, `FormulaCheckSpec`, `render_check_report_text`, `render_check_report_html`, plus reconciliation / consistency / credit check types |
+| ECL | `EclConfig`, `EclConfigBuilder`, `CeclEngine`, `CeclConfig`, `classify_stage`, `compute_ecl`, `compute_ecl_weighted`, `classify_stage_from_curves`, `compute_ecl_from_curve`, `compute_ecl_weighted_from_curves`, `StagingConfig`, `PdTermStructure` |
 | Comps | `PeerSet`, `PeerFilter`, `PeerStats`, `compute_peer_multiples`, `compute_multiple`, `regression_fair_value`, `score_relative_value`, `percentile_rank`, `z_score` |
 | Goal seek | `goal_seek` |
 | Backtesting | `backtest_forecast`, `ForecastMetrics` |
-| Introspection | `DependencyTracer`, `DependencyTree`, `FormulaExplainer`, `Explanation`, `render_tree_ascii`, `render_tree_detailed` |
+| Introspection | `DependencyTracer`, `DependencyTree`, `explain_formula`, `Explanation`, `render_tree_ascii`, `render_tree_detailed` |
 | Reports | `PLSummaryReport`, `CreditAssessmentReport`, `CreditAssessment` |
 | `extensions` | `CorkscrewExtension` + `CorkscrewConfig`/`CorkscrewReport`/`CorkscrewAccount`/`AccountType`/`CorkscrewStatus`; `CreditScorecardExtension` + `ScorecardConfig`/`ScorecardMetric`/`ScorecardReport`/`ScorecardStatus` |
 | `templates` | the `roll_forward`, `vintage`, and `real_estate` modules (free functions over `ModelBuilder`) |
@@ -130,9 +130,9 @@ as_of)` prices market-dependent instruments;
 `diff(&results, baseline, comparison, metrics, periods)` returns a
 `ScenarioDiff`;
 `to_comparison_table` renders the set as a `TableEnvelope`.
-`VarianceAnalyzer::new(&baseline, &comparison)` then `.compute(&config)` yields a
-`VarianceReport`, and `.bridge_decomposition(...)` a `BridgeChart`.
-`SensitivityAnalyzer::new(&model).run(&config)` sweeps `ParameterSpec`s and
+`run_variance(&baseline, &comparison, &config)` yields a
+`VarianceReport`, and `variance_bridge(...)` a `BridgeChart`.
+`run_sensitivity(&model, &config)` sweeps `ParameterSpec`s and
 `generate_tornado_entries` ranks the result. Statement-model Monte Carlo lives in
 `finstack-quant-statements`, not here.
 
@@ -144,7 +144,8 @@ mixed-currency ratios fail. LTV is `debt_t / value_t`; scalar EV references may
 be broadcast across periods. Metrics include cash DSCR, total (PIK) DSCR, and
 fee-inclusive DSCR. `StatementsAdapter` implements the covenants crate's
 `ModelTimeSeries` bridge, so covenant forecasts do not make that crate depend
-on statements. `to_table` renders a `CovenantForecast` as a `TableEnvelope`.
+on statements: pass `StatementsAdapter::new(&results, &model)` to
+`finstack_quant_covenants::forecast_covenant_generic` for a single covenant.
 
 **Checks.** `analysis::checks` extends the structural checks in
 `finstack_quant_statements::checks::builtins` with cross-statement
@@ -161,8 +162,8 @@ chart of accounts: `three_statement_checks(ThreeStatementMapping)`,
 `Evaluator::with_checks`.
 
 **ECL.** IFRS 9 staging (`classify_stage` from scalar PDs, `classify_stage_from_curves` from PD term structures, `StagingConfig`, `StagingTrigger`), measurement (`compute_ecl` / `compute_ecl_weighted` from cumulative-PD schedules, `compute_ecl_from_curve` / `compute_ecl_weighted_from_curves` with an `EclConfig`)
-and CECL (`CeclEngine`, `CeclMethodology`), with single-exposure, weighted, and
-portfolio aggregation paths plus a `ProvisionWaterfall`. Stage 2/3 DPD
+and CECL (`CeclEngine`, `CeclMethodology`), with single-exposure and weighted
+paths. Stage 2/3 DPD
 backstops fire at `days_past_due >= 30` / `>= 90` (bank / CECL alignment);
 the display contract is `dpd_stage2 (dpd=30 >= 30)` /
 `dpd_stage3 (dpd=90 >= 90)`. `Exposure` priced EAD is
@@ -174,9 +175,8 @@ rating is `None`, the PD-delta test is explicitly skipped. `EclConfig`, `Staging
 `classify_stage_from_curves(exposure, current_pd_source, origination_pd_source, elapsed_years, config)`
 compares reporting-date risk with the initial-recognition conditional PD over
 the same remaining window, given survival to finite non-negative
-`elapsed_years`, even when the rating label is unchanged. `EclEngine::new(config, pd_sources)` uses
-the first current source for staging, and `process_exposure(exposure,
-origination_pd_source, elapsed_years)` takes each exposure's own initial-recognition snapshot. Weighted
+`elapsed_years`, even when the rating label is unchanged; supply each exposure's own
+initial-recognition snapshot as `origination_pd_source`. Weighted
 IFRS 9 and CECL calculations define scenario IDs, weights, and LGD overrides
 only in the `MacroScenario` values paired with `pd_sources`; configuration
 objects contain calculation policy and no duplicate scenario list.

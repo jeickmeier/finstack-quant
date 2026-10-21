@@ -60,7 +60,6 @@ __all__ = [
     "StatementResult",
     "WaterfallSpec",
     "normalize",
-    "normalize_json",
     "parse_and_compile",
     "parse_formula",
     "schema",
@@ -1775,40 +1774,6 @@ class FinancialModelSpec:
     """
 
     @staticmethod
-    def builder(id: str) -> ModelBuilder:
-        """
-        Start a staged model build.
-
-        The canonical entry point, mirroring Rust's
-        ``FinancialModelSpec::builder(id)`` and the ``Type.builder()`` form
-        every other builder-backed type uses. Constructing
-        :class:`ModelBuilder` directly is equivalent.
-
-        Parameters
-        ----------
-        id : str
-            Stable model identifier.
-
-        Returns
-        -------
-        ModelBuilder
-            A fresh builder awaiting ``periods(...)``.
-
-        Examples
-        --------
-        >>> from finstack_quant.statements import FinancialModelSpec
-        >>> builder = FinancialModelSpec.builder("demo")
-        >>> _ = builder.periods("2025Q1..Q1")
-        >>> builder.build().id
-        'demo'
-
-        Notes
-        -----
-        This constructor does not raise; validation happens in ``build()``.
-        """
-        ...
-
-    @staticmethod
     def from_json(json: str) -> FinancialModelSpec:
         """
         Deserialize a model specification from JSON text.
@@ -2914,7 +2879,7 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If the builder is not ready, was already consumed, or the model violates its semantic invariants.
+            If the builder was already consumed or the model (including its timeline) violates its semantic invariants.
 
         """
         ...
@@ -4676,7 +4641,7 @@ def merge_into_results(
 ) -> StatementResult:
     """Write normalized values back into statement results as a node.
 
-    Wraps Rust ``NormalizationEngine::merge_into_results``: each period's
+    Wraps Rust ``adjustments::merge_into_results``: each period's
     ``final_value`` becomes node ``output_node_id`` with the shared unit (and
     currency for monetary values), replacing any existing node of that name
     across all periods. The attached check report is cleared because it
@@ -4720,38 +4685,6 @@ def merge_into_results(
     >>> merged = merge_into_results(results, normalize(results, NormalizationConfig("ebitda")), "adj")
     >>> merged.get("adj", "2025Q2")
     110.0
-    """
-    ...
-
-def normalize_json(results: StatementResult, config: NormalizationConfig) -> str:
-    """Run normalization and return compact canonical JSON.
-
-    Parameters
-    ----------
-    results:
-        Evaluated statement output.
-    config:
-        Target node and adjustment definitions.
-
-    Returns
-    -------
-    str
-        JSON array encoding normalization results.
-
-    Raises
-    ------
-    ValueError
-        If normalization or serialization fails.
-
-    Examples
-    --------
-    >>> from finstack_quant.statements import Evaluator, ModelBuilder, NormalizationConfig, normalize_json
-    >>> builder = ModelBuilder("demo")
-    >>> _ = builder.periods("2025Q1..Q1")
-    >>> _ = builder.value("ebitda", [("2025Q1", 25.0)])
-    >>> result = Evaluator().evaluate(builder.build())
-    >>> '"final_value":25.0' in normalize_json(result, NormalizationConfig("ebitda"))
-    True
     """
     ...
 

@@ -108,13 +108,11 @@ __all__ = [
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",
     "explain_formula",
-    "explain_formula_text",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",
     "percentile_rank",
     "pl_summary_report",
-    "pl_summary_report_text",
     "regression_fair_value",
     "render_check_report_html",
     "render_check_report_text",
@@ -126,7 +124,6 @@ __all__ = [
     "run_variance",
     "scenario_diff",
     "score_relative_value",
-    "validate_scorecard_config",
     "variance_bridge",
     "wacc",
     "z_score",
@@ -1076,26 +1073,6 @@ class CreditScorecardExtension:
         """
         ...
 
-def validate_scorecard_config(config: ScorecardConfig) -> None:
-    """
-    Validate a scorecard configuration without executing it.
-
-    Parameters
-    ----------
-    config : ScorecardConfig
-        Rating scale, metrics, thresholds, and period policy to validate.
-
-    Raises
-    ------
-    ValueError
-        If the scorecard configuration is internally inconsistent.
-
-    Examples
-    --------
-    >>> from finstack_quant.statements_analytics import ScorecardConfig, validate_scorecard_config
-    >>> validate_scorecard_config(ScorecardConfig())
-
-    """
     ...
 
 # Corkscrew (balance-sheet roll-forward) extension
@@ -10175,22 +10152,19 @@ class VarianceReport:
         Export the variance rows as a pandas ``DataFrame``.
 
         Columns: ``period``, ``metric``, ``baseline``, ``comparison``,
-        ``abs_var``, ``pct_var``, ``driver_contribution``. One row per
+        ``abs_var``, ``pct_var``. One row per
         (metric, period) pair, in report order; an empty report still carries
         the full column schema.
 
         ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own
         units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is
-        ``NaN`` where the baseline is effectively zero;
-        ``driver_contribution`` is the ``{driver: contribution}`` dict of
-        ``VarianceRow.driver_contribution`` (an object column, empty dict when
-        no drivers were declared). The scenario labels are report metadata
+        ``NaN`` where the baseline is effectively zero. The scenario labels are report metadata
         (``baseline_label`` / ``comparison_label``) and are not repeated per row.
 
         Returns
         -------
         pd.DataFrame
-            Export the variance rows as a pandas ``DataFrame``. Columns: ``period``, ``metric``, ``baseline``, ``comparison``, ``abs_var``, ``pct_var``, ``driver_contribution``. One row per (metric, period) pair, in report order; an empty report still carries the full column schema. ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is ``NaN`` where the baseline is effectively zero; ``driver_contribution`` is the ``{driver: contribution}`` dict of ``VarianceRow.driver_contribution`` (an object column, empty dict when no drivers were declared). The scenario labels are report metadata (``baseline_label`` / ``comparison_label``) and are not repeated per row.
+            Export the variance rows as a pandas ``DataFrame``. Columns: ``period``, ``metric``, ``baseline``, ``comparison``, ``abs_var``, ``pct_var``. One row per (metric, period) pair, in report order; an empty report still carries the full column schema. ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is ``NaN`` where the baseline is effectively zero. The scenario labels are report metadata (``baseline_label`` / ``comparison_label``) and are not repeated per row.
 
         Raises
         ------
@@ -10285,20 +10259,6 @@ class VarianceRow:
                 -------
                 float | None
                     Percentage variance ``abs_var / baseline`` as a decimal fraction (``0.1`` = +10%). ``None`` when the baseline is effectively zero, where a ratio would be undefined rather than zero; fall back to ``abs_var`` in that case.
-        """
-    @property
-    def driver_contribution(self) -> Any:
-        """
-                Driver attribution ``{driver_node: contribution}`` computed by the
-        variance analyzer, in the driver's own units; empty when the config
-        declared no drivers.
-
-                This property does not raise.
-
-                Returns
-                -------
-                Any
-                    Driver attribution ``{driver_node: contribution}`` computed by the variance analyzer, in the driver's own units; empty when the config declared no drivers.
         """
 
 class WeightedEclResult:
@@ -10722,7 +10682,6 @@ def dcf_sensitivity(
     ufcf_node: str = "ufcf",
     net_debt_override: float | None = None,
     options: Mapping[str, Any] | str | None = None,
-    market: Any | None = None,
 ) -> DcfSensitivityResult:
     """Rank the headline DCF assumptions by enterprise-value impact.
 
@@ -10760,11 +10719,9 @@ def dcf_sensitivity(
         ``{"relative": 0.10}``), ``mid_year_convention`` (``False``),
         ``exit_multiple_metric_node`` (statement monetary flow node supplying
         the complete trailing-year terminal metric), ``equity_bridge``,
-        ``shares_outstanding``, ``valuation_discounts`` and
-        ``discount_curve_id``. Typed ``EquityBridge`` / ``ValuationDiscounts``
-        values may sit in place of their dicts. ``None`` uses every default.
-    market : MarketContext | str | None
-        Market context for statement evaluation (not WACC discounting).
+        ``shares_outstanding`` and ``valuation_discounts``. Typed
+        ``EquityBridge`` / ``ValuationDiscounts`` values may sit in place of
+        their dicts. ``None`` uses every default.
 
     Returns
     -------
@@ -10842,8 +10799,7 @@ def evaluate_dcf(
         ``exit_multiple_metric_node`` (statement monetary flow node whose
         complete trailing-year sum replaces ``terminal_metric`` on an
         exit-multiple terminal; actual period boundaries must cover one
-        complete contiguous calendar year), ``discount_curve_id`` and the
-        sensitivity knobs. ``None`` uses every default.
+        complete contiguous calendar year) and the sensitivity knobs. ``None`` uses every default.
     market : MarketContext | str | None
         Market context used for statement evaluation (capital-structure curve
         lookups); DCF discounting stays WACC-only. Requires ``as_of``.
@@ -11090,40 +11046,6 @@ def explain_formula(model: Any, results: Any, node_id: str, period: str) -> Expl
     50.0
     """
 
-def explain_formula_text(model: Any, results: Any, node_id: str, period: str) -> str:
-    """Get a detailed text explanation for a formula.
-
-    Parameters
-    ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string.
-    results : StatementResult | str
-        A ``StatementResult`` object or a JSON string.
-    node_id : str
-        Node whose formula to explain.
-    period : str
-        Period string.
-
-    Returns
-    -------
-    str
-        Human-readable multi-line explanation (``explain_formula(...).to_text()``).
-
-    Raises
-    ------
-    KeyError
-        If ``node_id`` is not in the model or has no value at ``period``.
-    ValueError
-        If ``period`` does not parse or a payload is malformed JSON.
-
-    Examples
-    --------
-    >>> from finstack_quant.statements_analytics import explain_formula_text
-    >>> explain_formula_text("{}", "{}", "ebitda", "2025Q1")
-    Traceback (most recent call last):
-    ValueError: ...
-    """
-
 def generate_tornado_entries(result: Any, metric_node: str, period: str | None = None) -> list[TornadoEntry]:
     """Generate tornado chart entries for a sensitivity result.
 
@@ -11313,40 +11235,6 @@ def pl_summary_report(results: Any, line_items: list[str], periods: list[str]) -
     >>> _ = b.value("revenue", [("2025Q1", 1.0), ("2025Q2", 2.0)])
     >>> pl_summary_report(Evaluator().evaluate(b.build()), ["revenue"], ["2025Q1"]).periods
     ['2025Q1']
-    """
-
-def pl_summary_report_text(results: Any, line_items: list[str], periods: list[str]) -> str:
-    """Generate a P&L summary report as formatted text.
-
-    Parameters
-    ----------
-    results : StatementResult | str
-        A ``StatementResult`` object or a JSON string.
-    line_items : list[str]
-        Node ids to include as rows.
-    periods : list[str]
-        Period-id strings for columns.
-
-    Returns
-    -------
-    str
-        Formatted P&L summary report text (same as
-        ``pl_summary_report(...).to_text()``).
-
-    Raises
-    ------
-    ValueError
-        If a period does not parse or ``results`` is malformed JSON.
-
-    Examples
-    --------
-    >>> from finstack_quant.statements import ModelBuilder, Evaluator
-    >>> from finstack_quant.statements_analytics import pl_summary_report_text
-    >>> b = ModelBuilder("m")
-    >>> _ = b.periods("2025Q1..Q2", None)
-    >>> _ = b.value("revenue", [("2025Q1", 1.0), ("2025Q2", 2.0)])
-    >>> pl_summary_report_text(Evaluator().evaluate(b.build()), ["revenue"], ["2025Q1"]).startswith("P&L Summary")
-    True
     """
 
 def regression_fair_value(
@@ -11697,7 +11585,7 @@ def run_variance(base: Any, comparison: Any, config: Any) -> VarianceReport:
     Returns
     -------
     VarianceReport
-        Per-metric, per-period rows including ``driver_contribution``.
+        Per-metric, per-period variance rows.
 
     Raises
     ------

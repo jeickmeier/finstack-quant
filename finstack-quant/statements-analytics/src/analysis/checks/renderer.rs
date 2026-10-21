@@ -7,160 +7,155 @@
 
 use finstack_quant_statements::checks::{CheckReport, Severity};
 
-/// Stateless renderer for [`CheckReport`].
-pub struct CheckReportRenderer;
+/// Render the report as plain text with severity sections.
+///
+/// Layout:
+/// ```text
+/// ══ Check Report ══
+/// 5 checks: 3 passed, 2 failed | 1 error, 2 warnings, 1 info
+///
+/// ── ERRORS ──
+/// [ERROR] Balance Sheet Articulation — 2025Q1
+///   Balance sheet does not articulate …
+///   Materiality: 50.00 (2.50% of total_assets)
+///   Nodes: total_assets, total_liabilities, total_equity
+/// …
+/// ```
+///
+/// # Arguments
+///
+/// * `report` - Completed check results and summary counts to format.
+pub fn render_check_report_text(report: &CheckReport) -> String {
+    let s = &report.summary;
+    let mut out = String::with_capacity(1024);
 
-impl CheckReportRenderer {
-    /// Render the report as plain text with severity sections.
-    ///
-    /// Layout:
-    /// ```text
-    /// ══ Check Report ══
-    /// 5 checks: 3 passed, 2 failed | 1 error, 2 warnings, 1 info
-    ///
-    /// ── ERRORS ──
-    /// [ERROR] Balance Sheet Articulation — 2025Q1
-    ///   Balance sheet does not articulate …
-    ///   Materiality: 50.00 (2.50% of total_assets)
-    ///   Nodes: total_assets, total_liabilities, total_equity
-    /// …
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `report` - Completed check results and summary counts to format.
-    pub fn render_text(report: &CheckReport) -> String {
-        let s = &report.summary;
-        let mut out = String::with_capacity(1024);
+    out.push_str("══ Check Report ══\n");
+    out.push_str(&format!(
+        "{} checks: {} passed, {} failed | {} errors, {} warnings, {} infos\n",
+        s.total_checks, s.passed, s.failed, s.errors, s.warnings, s.infos,
+    ));
 
-        out.push_str("══ Check Report ══\n");
-        out.push_str(&format!(
-            "{} checks: {} passed, {} failed | {} errors, {} warnings, {} infos\n",
-            s.total_checks, s.passed, s.failed, s.errors, s.warnings, s.infos,
-        ));
-
-        for (severity, header) in &[
-            (Severity::Error, "ERRORS"),
-            (Severity::Warning, "WARNINGS"),
-            (Severity::Info, "INFO"),
-        ] {
-            let findings = report.findings_by_severity(*severity);
-            if findings.is_empty() {
-                continue;
-            }
-
-            out.push_str(&format!("\n── {header} ──\n"));
-            for f in &findings {
-                let badge = match f.severity {
-                    Severity::Error => "[ERROR]",
-                    Severity::Warning => "[WARN] ",
-                    Severity::Info => "[INFO] ",
-                };
-
-                let period_str = f
-                    .period
-                    .as_ref()
-                    .map_or(String::new(), |p| format!(" — {p}"));
-
-                out.push_str(&format!("{badge} {}{period_str}\n", f.check_id));
-                out.push_str(&format!("  {}\n", f.message));
-
-                if let Some(ref m) = f.materiality {
-                    out.push_str(&format!(
-                        "  Materiality: {:.2} ({:.2}% of {})\n",
-                        m.absolute, m.relative_pct, m.reference_label,
-                    ));
-                }
-
-                if !f.nodes.is_empty() {
-                    let node_list: Vec<&str> = f.nodes.iter().map(|n| n.as_str()).collect();
-                    out.push_str(&format!("  Nodes: {}\n", node_list.join(", ")));
-                }
-            }
+    for (severity, header) in &[
+        (Severity::Error, "ERRORS"),
+        (Severity::Warning, "WARNINGS"),
+        (Severity::Info, "INFO"),
+    ] {
+        let findings = report.findings_by_severity(*severity);
+        if findings.is_empty() {
+            continue;
         }
 
-        out
+        out.push_str(&format!("\n── {header} ──\n"));
+        for f in &findings {
+            let badge = match f.severity {
+                Severity::Error => "[ERROR]",
+                Severity::Warning => "[WARN] ",
+                Severity::Info => "[INFO] ",
+            };
+
+            let period_str = f
+                .period
+                .as_ref()
+                .map_or(String::new(), |p| format!(" — {p}"));
+
+            out.push_str(&format!("{badge} {}{period_str}\n", f.check_id));
+            out.push_str(&format!("  {}\n", f.message));
+
+            if let Some(ref m) = f.materiality {
+                out.push_str(&format!(
+                    "  Materiality: {:.2} ({:.2}% of {})\n",
+                    m.absolute, m.relative_pct, m.reference_label,
+                ));
+            }
+
+            if !f.nodes.is_empty() {
+                let node_list: Vec<&str> = f.nodes.iter().map(|n| n.as_str()).collect();
+                out.push_str(&format!("  Nodes: {}\n", node_list.join(", ")));
+            }
+        }
     }
 
-    /// Render the report as basic HTML with inline styles.
-    ///
-    /// Suitable for display in Jupyter notebooks or embedded reports.
-    /// Report text is HTML-escaped; it cannot supply markup.
-    ///
-    /// # Arguments
-    ///
-    /// * `report` - Completed check results whose identifiers, messages, and
-    ///   labels are inserted as escaped HTML text.
-    pub fn render_html(report: &CheckReport) -> String {
-        let s = &report.summary;
-        let mut out = String::with_capacity(2048);
+    out
+}
 
-        out.push_str("<div style=\"font-family:sans-serif;font-size:14px;\">\n");
-        out.push_str("<h2 style=\"border-bottom:2px solid #333;\">Check Report</h2>\n");
+/// Render the report as basic HTML with inline styles.
+///
+/// Suitable for display in Jupyter notebooks or embedded reports.
+/// Report text is HTML-escaped; it cannot supply markup.
+///
+/// # Arguments
+///
+/// * `report` - Completed check results whose identifiers, messages, and
+///   labels are inserted as escaped HTML text.
+pub fn render_check_report_html(report: &CheckReport) -> String {
+    let s = &report.summary;
+    let mut out = String::with_capacity(2048);
+
+    out.push_str("<div style=\"font-family:sans-serif;font-size:14px;\">\n");
+    out.push_str("<h2 style=\"border-bottom:2px solid #333;\">Check Report</h2>\n");
+    out.push_str(&format!(
+        "<p><strong>{}</strong> checks: \
+         <span style=\"color:green\">{} passed</span>, \
+         <span style=\"color:red\">{} failed</span> &mdash; \
+         {} errors, {} warnings, {} infos</p>\n",
+        s.total_checks, s.passed, s.failed, s.errors, s.warnings, s.infos,
+    ));
+
+    for (severity, header, color) in &[
+        (Severity::Error, "Errors", "#d32f2f"),
+        (Severity::Warning, "Warnings", "#f57c00"),
+        (Severity::Info, "Info", "#1976d2"),
+    ] {
+        let findings = report.findings_by_severity(*severity);
+        if findings.is_empty() {
+            continue;
+        }
+
         out.push_str(&format!(
-            "<p><strong>{}</strong> checks: \
-             <span style=\"color:green\">{} passed</span>, \
-             <span style=\"color:red\">{} failed</span> &mdash; \
-             {} errors, {} warnings, {} infos</p>\n",
-            s.total_checks, s.passed, s.failed, s.errors, s.warnings, s.infos,
+            "<h3 style=\"color:{color};\">{header}</h3>\n<ul>\n"
         ));
 
-        for (severity, header, color) in &[
-            (Severity::Error, "Errors", "#d32f2f"),
-            (Severity::Warning, "Warnings", "#f57c00"),
-            (Severity::Info, "Info", "#1976d2"),
-        ] {
-            let findings = report.findings_by_severity(*severity);
-            if findings.is_empty() {
-                continue;
-            }
+        for f in &findings {
+            let period_str = f
+                .period
+                .as_ref()
+                .map_or(String::new(), |p| format!(" &mdash; {p}"));
 
             out.push_str(&format!(
-                "<h3 style=\"color:{color};\">{header}</h3>\n<ul>\n"
+                "<li><strong>{}</strong>{period_str}<br/>{}\n",
+                escape_html_text(&f.check_id),
+                escape_html_text(&f.message),
             ));
 
-            for f in &findings {
-                let period_str = f
-                    .period
-                    .as_ref()
-                    .map_or(String::new(), |p| format!(" &mdash; {p}"));
-
+            if let Some(ref m) = f.materiality {
                 out.push_str(&format!(
-                    "<li><strong>{}</strong>{period_str}<br/>{}\n",
-                    escape_html_text(&f.check_id),
-                    escape_html_text(&f.message),
+                    "<br/><em>Materiality: {:.2} ({:.2}% of {})</em>\n",
+                    m.absolute,
+                    m.relative_pct,
+                    escape_html_text(&m.reference_label),
                 ));
-
-                if let Some(ref m) = f.materiality {
-                    out.push_str(&format!(
-                        "<br/><em>Materiality: {:.2} ({:.2}% of {})</em>\n",
-                        m.absolute,
-                        m.relative_pct,
-                        escape_html_text(&m.reference_label),
-                    ));
-                }
-
-                if !f.nodes.is_empty() {
-                    let node_list: Vec<String> = f
-                        .nodes
-                        .iter()
-                        .map(|n| escape_html_text(n.as_str()))
-                        .collect();
-                    out.push_str(&format!(
-                        "<br/><small>Nodes: {}</small>\n",
-                        node_list.join(", ")
-                    ));
-                }
-
-                out.push_str("</li>\n");
             }
 
-            out.push_str("</ul>\n");
+            if !f.nodes.is_empty() {
+                let node_list: Vec<String> = f
+                    .nodes
+                    .iter()
+                    .map(|n| escape_html_text(n.as_str()))
+                    .collect();
+                out.push_str(&format!(
+                    "<br/><small>Nodes: {}</small>\n",
+                    node_list.join(", ")
+                ));
+            }
+
+            out.push_str("</li>\n");
         }
 
-        out.push_str("</div>\n");
-        out
+        out.push_str("</ul>\n");
     }
+
+    out.push_str("</div>\n");
+    out
 }
 
 fn escape_html_text(text: &str) -> String {

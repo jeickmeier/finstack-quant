@@ -793,7 +793,7 @@ pub(crate) fn monte_carlo_correlated_series(
     } = input;
 
     // This path is called directly from forecast evaluation, bypassing
-    // `apply_forecast_internal`'s dispatch, so it validates its own keys.
+    // `apply_forecast`'s dispatch, so it validates its own keys.
     crate::forecast::validate_params(method, params)?;
 
     if !base_value.is_finite() {

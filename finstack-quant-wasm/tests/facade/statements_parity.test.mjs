@@ -38,7 +38,7 @@ function builtModel() {
   const builder = new statements.ModelBuilder('built');
   builder.periods('2025Q1..Q2', '2025Q1');
   builder.valueScalar('revenue', { [Q1]: 100.0 });
-  builder.forecast('revenue', statements.forecastSpecGrowth(0.05));
+  builder.forecast('revenue', { method: 'growth_pct', params: { rate: 0.05 } });
   builder.compute('profit', 'revenue * 0.5');
   builder.valueMoney('cash', {
     [Q1]: { amount: '100', currency: 'USD' },
@@ -59,14 +59,22 @@ test('statements matches the cross-host golden', () => {
   const builtResult = evaluate(built);
 
   const config = INPUTS.normalization_config;
-  const oneOff = statements.adjustmentFixed('one_off', 'One-off cost', { [Q1]: 5.0 });
-  const synergy = statements.adjustmentPercentage('synergy', 'Synergies', 'revenue', 0.1);
+  const oneOff = {
+    id: 'one_off',
+    name: 'One-off cost',
+    value: { type: 'fixed', amounts: { [Q1]: 5.0 } },
+  };
+  const synergy = {
+    id: 'synergy',
+    name: 'Synergies',
+    value: { type: 'percentage_of_node', node_id: 'revenue', percentage: 0.1 },
+  };
   let extended = { target_node: 'profit', adjustments: [] };
   extended = statements.normalizationConfigAddAdjustment(extended, oneOff);
-  extended = statements.normalizationConfigAddAdjustment(
-    extended,
-    statements.adjustmentWithCap(synergy, 'revenue', 0.05)
-  );
+  extended = statements.normalizationConfigAddAdjustment(extended, {
+    ...synergy,
+    cap: { base_node: 'revenue', value: 0.05 },
+  });
 
   const evaluator = new statements.Evaluator();
   evaluator.withChecks(INPUTS.check_suite);
@@ -108,26 +116,31 @@ test('statements matches the cross-host golden', () => {
       statements.statementResultGet(builtResult, 'capex', Q2),
     ],
     normalize: statements.normalize(result, config),
-    normalize_json: JSON.parse(statements.normalizeJson(result, config)),
     forecast_specs: [
-      statements.forecastSpecForwardFill(),
-      statements.forecastSpecGrowth(0.05),
-      statements.forecastSpecCurve([0.05, 0.04]),
-      statements.forecastSpecNormal(100.0, 10.0, 7),
-      statements.forecastSpecLogNormal(0.0, 0.2, 7),
-      statements.forecastSpecOverride({ [Q2]: 125.0 }),
-      statements.forecastSpecSeasonal([1.0, 2.0, 3.0, 4.0], 4, 'additive'),
-      statements.forecastSpecTimeSeries([1.0, 2.0, 3.0]),
-      statements.forecastSpecFadeToTarget(50.0),
-      statements.forecastSpecMeanReverting(100.0, 0.5, 5.0, 11),
-      statements.forecastSpecBootstrap([1.0, 2.0, 3.0], 13),
+      { method: 'forward_fill' },
+      { method: 'growth_pct', params: { rate: 0.05 } },
+      { method: 'curve_pct', params: { curve: [0.05, 0.04] } },
+      { method: 'normal', params: { mean: 100.0, std_dev: 10.0, seed: 7 } },
+      { method: 'log_normal', params: { mean: 0.0, std_dev: 0.2, seed: 7 } },
+      { method: 'override', params: { overrides: { [Q2]: 125.0 } } },
+      {
+        method: 'seasonal',
+        params: { historical: [1.0, 2.0, 3.0, 4.0], season_length: 4, mode: 'additive' },
+      },
+      { method: 'time_series', params: { historical: [1.0, 2.0, 3.0] } },
+      { method: 'fade_to_target', params: { target: 50.0 } },
+      {
+        method: 'mean_reverting',
+        params: { long_run_mean: 100.0, reversion_speed: 0.5, std_dev: 5.0, seed: 11 },
+      },
+      { method: 'bootstrap', params: { historical: [1.0, 2.0, 3.0], seed: 13 } },
     ],
     adjustments: [
       oneOff,
       synergy,
-      statements.adjustmentWithCap(synergy, 'revenue', 0.05),
-      statements.adjustmentWithCapMode(synergy, null, 3.0, 'progressive'),
-      statements.adjustmentWithCategory(oneOff, 'non_recurring'),
+      { ...synergy, cap: { base_node: 'revenue', value: 0.05 } },
+      { ...synergy, cap: { base_node: null, value: 3.0, base_mode: 'progressive' } },
+      { ...oneOff, category: 'non_recurring' },
     ],
     'normalization_config.add_adjustment': extended,
     check_report: {
@@ -164,14 +177,6 @@ test('statements matches the cross-host golden', () => {
   assertMatches(plain(actual), EXPECTED.statements, 'statements');
 });
 
-test('financialModelBuilder is the ModelBuilder constructor', () => {
-  const builder = statements.financialModelBuilder('twin');
-  assert.ok(builder instanceof statements.ModelBuilder);
-  builder.periods('2025Q1..Q1');
-  builder.value('revenue', { [Q1]: 1.0 });
-  assert.deepEqual(statements.modelNodeIds(builder.build()), ['revenue']);
-});
-
 test('ModelBuilder.fromSpec resumes a model and periodsExplicit takes Period objects', () => {
   const resumed = statements.ModelBuilder.fromSpec(MODEL);
   resumed.compute('double', 'revenue * 2');
@@ -194,11 +199,11 @@ test('ModelBuilder.fromSpec resumes a model and periodsExplicit takes Period obj
 });
 
 test('ModelBuilder reports misuse without discarding the model', () => {
+  // Nodes may be added before `periods`; only `build` needs the timeline.
+  const noTimeline = new statements.ModelBuilder('no-timeline');
+  noTimeline.valueScalar('revenue', { [Q1]: 1.0 });
+  assert.throws(() => noTimeline.build());
   const builder = new statements.ModelBuilder('guard');
-  assert.throws(
-    () => builder.compute('x', 'y'),
-    (e) => e.kind === 'validation' && /periods\(\)/.test(e.message)
-  );
   assert.throws(
     () => builder.periods('not a range'),
     (e) => e.kind === 'validation'
@@ -343,7 +348,7 @@ test('MixedNodeBuilder.valuesMoney and forecast feed the mixed node', () => {
   builder.periods('2025Q1..Q2', '2025Q1');
   const mixed = builder.mixed('cash');
   mixed.valuesMoney({ [Q1]: { amount: '100', currency: 'USD' } });
-  mixed.forecast(statements.forecastSpecGrowth(0.1));
+  mixed.forecast({ method: 'growth_pct', params: { rate: 0.1 } });
   const result = evaluate(mixed.build().build());
   const cash = statements.statementResultGetMoney(result, 'cash', Q2);
   assert.equal(Number(cash.amount), 110);
@@ -413,14 +418,6 @@ test('normalization validation and duplicate adjustments are rejected in Rust', 
         target_node: 'profit',
         adjustments: [config.adjustments[0], config.adjustments[0]],
       }),
-    (e) => e.kind === 'validation'
-  );
-  assert.throws(
-    () => statements.adjustmentWithCapMode(config.adjustments[0], null, 1.0, 'sideways'),
-    (e) => e.kind === 'validation'
-  );
-  assert.throws(
-    () => statements.forecastSpecSeasonal([1, 2], 2, 'sideways'),
     (e) => e.kind === 'validation'
   );
 });

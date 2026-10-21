@@ -82,30 +82,15 @@ fn ensure_capital_structure(cs: &mut Option<CapitalStructureSpec>) -> &mut Capit
     })
 }
 
-/// Add a typed bond payload to the capital structure.
-fn push_bond(
+/// Append a typed debt entry to the capital structure.
+fn push_debt(
     cs: &mut Option<CapitalStructureSpec>,
-    id_str: String,
-    bond: Bond,
-) -> crate::error::Result<()> {
-    let spec = FinancialStatementInstrument::Bond(bond);
+    id: String,
+    spec: FinancialStatementInstrument,
+) {
     ensure_capital_structure(cs)
         .debt_instruments
-        .push(DebtInstrumentSpec { id: id_str, spec });
-    Ok(())
-}
-
-/// Add a typed swap payload to the capital structure.
-fn push_swap(
-    cs: &mut Option<CapitalStructureSpec>,
-    id_str: String,
-    swap: finstack_quant_valuations::instruments::InterestRateSwap,
-) -> crate::error::Result<()> {
-    let spec = FinancialStatementInstrument::InterestRateSwap(swap);
-    ensure_capital_structure(cs)
-        .debt_instruments
-        .push(DebtInstrumentSpec { id: id_str, spec });
-    Ok(())
+        .push(DebtInstrumentSpec { id, spec });
 }
 
 /// Build an `InterestRateSwap` from leg parameters.
@@ -186,7 +171,7 @@ fn build_swap_internal(
         .build()?)
 }
 
-impl<State> ModelBuilder<State> {
+impl ModelBuilder {
     /// Add a bond instrument to the capital structure specification.
     ///
     /// Uses `Bond::fixed()` with default conventions (semi-annual, 30/360).
@@ -300,7 +285,12 @@ impl<State> ModelBuilder<State> {
             crate::error::Error::build(format!("Failed to create bond '{}': {}", id_str, e))
         })?;
 
-        push_bond(&mut self.capital_structure, id_str, bond)
+        push_debt(
+            &mut self.capital_structure,
+            id_str,
+            FinancialStatementInstrument::Bond(bond),
+        );
+        Ok(())
     }
 
     /// Add a bond instrument with a market convention preset.
@@ -412,7 +402,12 @@ impl<State> ModelBuilder<State> {
             crate::error::Error::build(format!("Failed to create bond '{}': {}", id_str, e))
         })?;
 
-        push_bond(&mut self.capital_structure, id_str, bond)
+        push_debt(
+            &mut self.capital_structure,
+            id_str,
+            FinancialStatementInstrument::Bond(bond),
+        );
+        Ok(())
     }
 
     /// Add an interest rate swap to the capital structure.
@@ -643,7 +638,12 @@ impl<State> ModelBuilder<State> {
             float_day_count,
             business_day_convention,
         )?;
-        push_swap(&mut self.capital_structure, id_str, swap)
+        push_debt(
+            &mut self.capital_structure,
+            id_str,
+            FinancialStatementInstrument::InterestRateSwap(swap),
+        );
+        Ok(())
     }
 
     /// Add a typed debt instrument.
@@ -666,13 +666,7 @@ impl<State> ModelBuilder<State> {
     /// * `id` - Unique instrument identifier stored on the capital-structure debt entry
     /// * `spec` - Typed bond, loan, revolver, convertible, swap, cap/floor, or swaption payload
     pub fn add_debt(mut self, id: impl Into<String>, spec: FinancialStatementInstrument) -> Self {
-        ensure_capital_structure(&mut self.capital_structure)
-            .debt_instruments
-            .push(DebtInstrumentSpec {
-                id: id.into(),
-                spec,
-            });
-
+        push_debt(&mut self.capital_structure, id.into(), spec);
         self
     }
 

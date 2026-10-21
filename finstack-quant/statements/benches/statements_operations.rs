@@ -356,16 +356,14 @@ fn bench_dsl_operations(c: &mut Criterion) {
 
     group.bench_function("parse_simple_formula", |b| {
         b.iter(|| {
-            black_box(
-                finstack_quant_statements::dsl::parser::parse_formula("revenue * 0.6").unwrap(),
-            )
+            black_box(finstack_quant_statements::dsl::parse_formula("revenue * 0.6").unwrap())
         })
     });
 
     group.bench_function("parse_complex_formula", |b| {
         b.iter(|| {
             black_box(
-                finstack_quant_statements::dsl::parser::parse_formula(
+                finstack_quant_statements::dsl::parse_formula(
                     "(revenue - cogs) * (1 - tax_rate) + interest_income",
                 )
                 .unwrap(),
@@ -376,7 +374,7 @@ fn bench_dsl_operations(c: &mut Criterion) {
     group.bench_function("parse_timeseries_formula", |b| {
         b.iter(|| {
             black_box(
-                finstack_quant_statements::dsl::parser::parse_formula(
+                finstack_quant_statements::dsl::parse_formula(
                     "rolling_mean(revenue, 4) * pct_change(revenue) + lag(revenue, 1)",
                 )
                 .unwrap(),
@@ -385,21 +383,19 @@ fn bench_dsl_operations(c: &mut Criterion) {
     });
 
     // Compile to core expression
-    let ast = finstack_quant_statements::dsl::parser::parse_formula("revenue * 0.6").unwrap();
+    let ast = finstack_quant_statements::dsl::parse_formula("revenue * 0.6").unwrap();
 
     group.bench_function("compile_simple_ast", |b| {
-        b.iter(|| black_box(finstack_quant_statements::dsl::compiler::compile(&ast).unwrap()))
+        b.iter(|| black_box(finstack_quant_statements::dsl::compile(&ast).unwrap()))
     });
 
-    let complex_ast = finstack_quant_statements::dsl::parser::parse_formula(
+    let complex_ast = finstack_quant_statements::dsl::parse_formula(
         "(revenue - cogs) * (1 - tax_rate) + interest_income",
     )
     .unwrap();
 
     group.bench_function("compile_complex_ast", |b| {
-        b.iter(|| {
-            black_box(finstack_quant_statements::dsl::compiler::compile(&complex_ast).unwrap())
-        })
+        b.iter(|| black_box(finstack_quant_statements::dsl::compile(&complex_ast).unwrap()))
     });
 
     group.finish();

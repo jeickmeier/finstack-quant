@@ -152,12 +152,6 @@ impl PeriodHistory {
         self.rows.len()
     }
 
-    /// Whether no periods have been stored.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.rows.is_empty()
-    }
-
     /// Whether a row exists for `period`.
     ///
     /// # Arguments

@@ -100,16 +100,9 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
         }
         let expected_expense = (-net).max(0.0);
         let expected_income = net.max(0.0);
-        let (flows, closing, funding, _) = calculate_period_flows(
-            &swap,
-            &period,
-            swap.notional,
-            Money::from((0_i64, Currency::USD)),
-            &market,
-            as_of,
-            None,
-        )
-        .expect("declared IRS period flows");
+        let (flows, closing, funding, _) =
+            calculate_period_flows(&swap, &period, swap.notional, &market, as_of, None)
+                .expect("declared IRS period flows");
         assert_eq!(closing.amount(), 0.0);
         assert_eq!(funding.amount(), 0.0);
         assert_eq!(flows.debt_balance.amount(), 0.0);
@@ -129,7 +122,6 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
         let (_, closing, funding, _) = calculate_period_flows(
             &swap,
             &period,
-            Money::from((0_i64, Currency::USD)),
             Money::from((0_i64, Currency::USD)),
             &market,
             as_of,
@@ -254,7 +246,6 @@ fn placeholder_rate_option_schedule_is_rejected_explicitly() {
     let error = calculate_period_flows(
         &option,
         &period,
-        Money::from((0_i64, Currency::USD)),
         Money::from((0_i64, Currency::USD)),
         &MarketContext::new(),
         as_of,
@@ -517,6 +508,25 @@ fn plain_evaluate_generates_fixed_rate_capital_structure_cashflows() {
         );
     }
 
+    // Prepared evaluation (sensitivity, goal seek) sees the same capital
+    // structure as plain evaluation.
+    let mut evaluator = Evaluator::new();
+    let plan = evaluator.prepare(&model).expect("prepare");
+    let prepared = evaluator
+        .evaluate_prepared(&model, &plan)
+        .expect("prepared evaluation");
+    assert_eq!(
+        serde_json::to_value(prepared.cs_cashflows.as_ref().expect("prepared cashflows"))
+            .expect("serialize"),
+        serde_json::to_value(cashflows).expect("serialize"),
+    );
+    for period in [q1, q2] {
+        assert_eq!(
+            prepared.get("interest", &period),
+            plain.get("interest", &period)
+        );
+    }
+
     // No as-of cutoff: an actual is used as given, where evaluating with a
     // market as of the first period's start would hide it until period end.
     model.periods[0].is_actual = true;
@@ -662,7 +672,6 @@ fn oid_funding_preserves_loan_face_and_cash_at_boundaries() {
                 &loan,
                 &periods[0],
                 opening,
-                zero,
                 &market,
                 periods[0].start,
                 None,
@@ -850,7 +859,6 @@ fn oid_funding_rejects_cash_currency_different_from_principal() {
         &instrument,
         &period,
         zero,
-        zero,
         &MarketContext::new(),
         period.start,
         None,
@@ -882,7 +890,6 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
                 &instrument,
                 &periods[0],
                 opening,
-                zero,
                 &market,
                 periods[0].start,
                 None,
@@ -912,7 +919,6 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
             &instrument,
             &periods[1],
             zero,
-            zero,
             &market,
             periods[0].start,
             None,
@@ -935,7 +941,6 @@ fn implicit_issuance_rejects_negative_principal_and_keeps_zero_at_zero() {
         &no_funding_schedule(-100.0, date!(2025 - 01 - 15)),
         &period,
         zero,
-        zero,
         &market,
         period.start,
         None,
@@ -945,7 +950,6 @@ fn implicit_issuance_rejects_negative_principal_and_keeps_zero_at_zero() {
     let (_, closing, funding, _) = calculate_period_flows(
         &no_funding_schedule(0.0, date!(2025 - 01 - 15)),
         &period,
-        zero,
         zero,
         &market,
         period.start,

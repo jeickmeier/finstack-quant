@@ -51,7 +51,8 @@ fn historical_expression_value(
 ) -> Result<f64> {
     match &expr.node {
         ExprNode::Column(name) => Ok(context
-            .get_historical_value(name, &target_period)
+            .history
+            .get_value(name, &target_period)
             .unwrap_or(f64::NAN)),
         ExprNode::CsRef {
             component,
@@ -188,7 +189,7 @@ pub(crate) fn eval_pct_change(
             context.period_id
         );
         if let Some(id) = node_id {
-            context.push_warning(EvalWarning::DivisionByZero {
+            context.warnings.push(EvalWarning::DivisionByZero {
                 node_id: id.to_string(),
                 period: context.period_id,
             });
@@ -260,7 +261,7 @@ pub(crate) fn eval_growth_rate(
             context.period_id
         );
         if let Some(id) = node_id {
-            context.push_warning(EvalWarning::DivisionByZero {
+            context.warnings.push(EvalWarning::DivisionByZero {
                 node_id: id.to_string(),
                 period: context.period_id,
             });

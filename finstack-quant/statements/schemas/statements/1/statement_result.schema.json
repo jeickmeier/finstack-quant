@@ -1623,33 +1623,6 @@
         },
         {
           "additionalProperties": false,
-          "description": "NaN value bubbled up to a node result",
-          "properties": {
-            "nan_propagated": {
-              "properties": {
-                "node_id": {
-                  "description": "Identifier of the node that produced the NaN value.",
-                  "type": "string"
-                },
-                "period": {
-                  "description": "Period in which the warning occurred.",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "node_id",
-                "period"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "nan_propagated"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
           "description": "Non-finite value (NaN, Inf, -Inf) detected when storing a node result.\n\nThis warning is emitted by the finiteness validation pipeline so that\nconsumers can identify which node/period introduced bad values.",
           "properties": {
             "non_finite_value": {

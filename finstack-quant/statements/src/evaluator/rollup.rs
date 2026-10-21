@@ -16,10 +16,10 @@
 
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
-use crate::evaluator::dag::evaluate_order;
 use crate::evaluator::formula::evaluate_formula;
 use crate::evaluator::formula_helpers::is_truthy;
 use crate::evaluator::results::{EvalStats, NumericMode, StatementResult};
+use crate::evaluator::Evaluator;
 use crate::evaluator::PeriodHistory;
 use crate::types::{FinancialModelSpec, NodeId, NodeValueType};
 use finstack_quant_core::dates::{Period, PeriodId, PeriodKind};
@@ -160,16 +160,9 @@ impl StatementResult {
         let buckets = bucket_periods(&model.periods, spec.frequency)?;
         validate_methods(model, spec)?;
 
-        let mut validated = model.clone();
-        let analysis = validated.analyze_semantics()?;
-        let eval_order = evaluate_order(&analysis.graph?)?;
-        let node_to_column: Arc<IndexMap<NodeId, usize>> = Arc::new(
-            eval_order
-                .iter()
-                .enumerate()
-                .map(|(column, node_id)| (node_id.clone(), column))
-                .collect(),
-        );
+        let prepared = Evaluator::new().prepare(model)?;
+        let eval_order = &prepared.eval_order;
+        let node_to_column = Arc::clone(&prepared.node_to_column);
         let target_periods: Vec<Period> = buckets.iter().map(|b| b.period.clone()).collect();
         let mut history = Arc::new(PeriodHistory::with_periods(
             Arc::clone(&node_to_column),
@@ -182,7 +175,7 @@ impl StatementResult {
             let target = bucket.period.id;
             let mut context =
                 EvaluationContext::new_with_history(target, Arc::clone(&history), Arc::default());
-            for node_id in &eval_order {
+            for node_id in eval_order {
                 let node = node_id.as_str();
                 let value = match spec.methods.get(node).copied().unwrap_or(RollupMethod::Sum) {
                     RollupMethod::Sum => bucket
@@ -196,7 +189,7 @@ impl StatementResult {
                         .and_then(|period| self.get(node, period)),
                     RollupMethod::Formula => {
                         let where_key = NodeId::new(format!("__where__{node}"));
-                        let masked = match analysis.compiled.get(&where_key) {
+                        let masked = match prepared.compiled_cache.get(&where_key) {
                             Some(condition) => {
                                 !is_truthy(evaluate_formula(condition, &mut context, Some(node))?)
                             }
@@ -205,9 +198,12 @@ impl StatementResult {
                         if masked {
                             Some(0.0)
                         } else {
-                            let formula = analysis.compiled.get(node_id).ok_or_else(|| {
-                                Error::eval(format!("Formula for node '{node}' was not compiled"))
-                            })?;
+                            let formula =
+                                prepared.compiled_cache.get(node_id).ok_or_else(|| {
+                                    Error::eval(format!(
+                                        "Formula for node '{node}' was not compiled"
+                                    ))
+                                })?;
                             Some(evaluate_formula(formula, &mut context, Some(node))?)
                         }
                     }
@@ -239,7 +235,7 @@ impl StatementResult {
                 self.node_value_types
                     .get(node_id.as_str())
                     .copied()
-                    .or_else(|| validated.get_node(node_id.as_str())?.value_type)
+                    .or_else(|| prepared.node_value_types.get(node_id).copied())
                     .map(|value_type| (node_id.clone(), value_type))
             })
             .collect();

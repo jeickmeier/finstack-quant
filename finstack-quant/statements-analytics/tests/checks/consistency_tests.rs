@@ -7,7 +7,7 @@ use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::checks::{Check, CheckContext, PeriodScope};
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, NodeId};
-use finstack_quant_statements_analytics::analysis::checks::{
+use finstack_quant_statements_analytics::analysis::{
     EffectiveTaxRateCheck, GrowthRateConsistency, WorkingCapitalConsistency,
 };
 

@@ -1489,7 +1489,8 @@ risk calculation with a standard reference.
 ### IFRS 9 Impairment
 
 - IFRS Foundation. *IFRS 9 Financial Instruments*, Section 5.5. Expected-credit-
-  loss staging and measurement used by `EclEngine`.
+  loss staging and measurement used by `classify_stage_from_curves` and
+  `compute_ecl_weighted_from_curves`.
 
 <a id="asc-326-cecl"></a>
 
