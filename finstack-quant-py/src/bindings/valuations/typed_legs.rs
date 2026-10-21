@@ -210,48 +210,6 @@ payment_lag_days=0, end_of_month=False)"
         serde_to_py(py, &self.inner)
     }
 
-    /// Discount curve identifier.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    /// Fixed rate as a decimal (``0.04`` = 4%).
-    #[getter]
-    fn rate(&self) -> f64 {
-        self.inner.rate.to_f64().unwrap_or(f64::NAN)
-    }
-
-    /// Payment frequency.
-    #[getter]
-    fn frequency(&self) -> PyTenor {
-        PyTenor::from_inner(self.inner.frequency)
-    }
-
-    /// Accrual day-count convention.
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    /// Business day convention (serde string, e.g. ``"modified_following"``).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Payment calendar identifier, or ``None``.
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
-    }
-
-    /// Stub rule.
-    #[getter]
-    fn stub(&self) -> PyStubKind {
-        PyStubKind::from_inner(self.inner.stub)
-    }
-
     /// Accrual start date.
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -262,18 +220,6 @@ payment_lag_days=0, end_of_month=False)"
     #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.end)
-    }
-
-    /// Payment lag in business days after period end.
-    #[getter]
-    fn payment_lag_days(&self) -> i32 {
-        self.inner.payment_lag_days
-    }
-
-    /// End-of-month roll convention flag.
-    #[getter]
-    fn end_of_month(&self) -> bool {
-        self.inner.end_of_month
     }
 
     /// Return ``repr(self)``.
@@ -296,6 +242,36 @@ payment_lag_days={}, end_of_month={})",
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyFixedLegSpec |s| {
+    /// Discount curve identifier.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    /// Fixed rate as a decimal (``0.04`` = 4%).
+    rate -> f64 = s.inner.rate.to_f64().unwrap_or(f64::NAN);
+
+    /// Payment frequency.
+    frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
+
+    /// Accrual day-count convention.
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+
+    /// Business day convention (serde string, e.g. ``"modified_following"``).
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    /// Payment calendar identifier, or ``None``.
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+
+    /// Stub rule.
+    stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
+
+    /// Payment lag in business days after period end.
+    payment_lag_days -> i32 = s.inner.payment_lag_days;
+
+    /// End-of-month roll convention flag.
+    end_of_month -> bool = s.inner.end_of_month;
+});
 
 /// Typed wrapper for the Rust `FloatLegSpec` (floating leg of an IRS/swaption).
 ///
@@ -504,69 +480,6 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
         serde_to_py(py, &self.inner)
     }
 
-    /// Discount curve identifier.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    /// Forward (projection) curve identifier.
-    #[getter]
-    fn forward_curve_id(&self) -> String {
-        self.inner.forward_curve_id.to_string()
-    }
-
-    /// Spread over the index in basis points.
-    #[getter]
-    fn spread_bp(&self) -> f64 {
-        self.inner.spread_bp.to_f64().unwrap_or(f64::NAN)
-    }
-
-    /// Payment frequency.
-    #[getter]
-    fn frequency(&self) -> PyTenor {
-        PyTenor::from_inner(self.inner.frequency)
-    }
-
-    /// Accrual day-count convention.
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    /// Business day convention (serde string).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Payment calendar identifier, or ``None``.
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
-    }
-
-    /// Stub rule.
-    #[getter]
-    fn stub(&self) -> PyStubKind {
-        PyStubKind::from_inner(self.inner.stub)
-    }
-
-    /// Reset lag in business days before each accrual start.
-    #[getter]
-    fn reset_lag_days(&self) -> i32 {
-        self.inner.reset_lag_days
-    }
-
-    /// Fixing calendar identifier, or ``None``.
-    #[getter]
-    fn fixing_calendar_id(&self) -> Option<String> {
-        self.inner
-            .fixing_calendar_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
-
     /// Accrual start date.
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -584,18 +497,6 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
     #[getter]
     fn compounding<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.compounding)
-    }
-
-    /// Payment lag in business days after period end.
-    #[getter]
-    fn payment_lag_days(&self) -> i32 {
-        self.inner.payment_lag_days
-    }
-
-    /// End-of-month roll convention flag.
-    #[getter]
-    fn end_of_month(&self) -> bool {
-        self.inner.end_of_month
     }
 
     /// Return ``repr(self)``.
@@ -633,6 +534,46 @@ reset_lag_days={}, fixing_calendar_id={}, compounding={}, payment_lag_days={}, e
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyFloatLegSpec |s| {
+    /// Discount curve identifier.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    /// Forward (projection) curve identifier.
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
+
+    /// Spread over the index in basis points.
+    spread_bp -> f64 = s.inner.spread_bp.to_f64().unwrap_or(f64::NAN);
+
+    /// Payment frequency.
+    frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
+
+    /// Accrual day-count convention.
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+
+    /// Business day convention (serde string).
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    /// Payment calendar identifier, or ``None``.
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+
+    /// Stub rule.
+    stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
+
+    /// Reset lag in business days before each accrual start.
+    reset_lag_days -> i32 = s.inner.reset_lag_days;
+
+    /// Fixing calendar identifier, or ``None``.
+    fixing_calendar_id -> Option<String> =
+        s.inner.fixing_calendar_id.as_ref().map(ToString::to_string);
+
+    /// Payment lag in business days after period end.
+    payment_lag_days -> i32 = s.inner.payment_lag_days;
+
+    /// End-of-month roll convention flag.
+    end_of_month -> bool = s.inner.end_of_month;
+});
 
 /// Typed wrapper for the Rust `PremiumLegSpec` (CDS/CDS-index premium leg).
 ///
@@ -793,14 +734,6 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
         serde_to_py(py, &self.inner)
     }
 
-    /// Premium roll-date grid (``RollRule.CDS_IMM`` or ``RollRule.NONE``).
-    #[getter]
-    fn roll_rule(&self) -> PyRollRule {
-        PyRollRule {
-            inner: self.inner.roll_rule,
-        }
-    }
-
     /// Protection / accrual start date.
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -811,48 +744,6 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
     #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.end)
-    }
-
-    /// Payment frequency.
-    #[getter]
-    fn frequency(&self) -> PyTenor {
-        PyTenor::from_inner(self.inner.frequency)
-    }
-
-    /// Stub rule.
-    #[getter]
-    fn stub(&self) -> PyStubKind {
-        PyStubKind::from_inner(self.inner.stub)
-    }
-
-    /// Business day convention (serde string).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Payment calendar identifier, or ``None``.
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
-    }
-
-    /// Accrual day-count convention.
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    /// Contractual running coupon in basis points.
-    #[getter]
-    fn coupon_bp(&self) -> f64 {
-        self.inner.coupon_bp.to_f64().unwrap_or(f64::NAN)
-    }
-
-    /// Discount curve identifier.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
     }
 
     /// Return ``repr(self)``.
@@ -872,6 +763,33 @@ discount_curve_id={:?}, stub={:?}, business_day_convention={:?}, calendar_id={})
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyPremiumLegSpec |s| {
+    /// Premium roll-date grid (``RollRule.CDS_IMM`` or ``RollRule.NONE``).
+    roll_rule -> PyRollRule = PyRollRule { inner: s.inner.roll_rule };
+
+    /// Payment frequency.
+    frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
+
+    /// Stub rule.
+    stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
+
+    /// Business day convention (serde string).
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    /// Payment calendar identifier, or ``None``.
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+
+    /// Accrual day-count convention.
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+
+    /// Contractual running coupon in basis points.
+    coupon_bp -> f64 = s.inner.coupon_bp.to_f64().unwrap_or(f64::NAN);
+
+    /// Discount curve identifier.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+});
 
 /// Typed wrapper for the Rust `ProtectionLegSpec` (CDS/CDS-index protection leg).
 ///
@@ -986,24 +904,6 @@ impl PyProtectionLegSpec {
         serde_to_py(py, &self.inner)
     }
 
-    /// Hazard / credit curve identifier.
-    #[getter]
-    fn credit_curve_id(&self) -> String {
-        self.inner.credit_curve_id.to_string()
-    }
-
-    /// Recovery rate as a decimal in ``[0.0, 1.0)``.
-    #[getter]
-    fn recovery_rate(&self) -> f64 {
-        self.inner.recovery_rate
-    }
-
-    /// Settlement delay in business days.
-    #[getter]
-    fn settlement_delay(&self) -> u16 {
-        self.inner.settlement_delay
-    }
-
     /// Return ``repr(self)``.
     pub(crate) fn __repr__(&self) -> String {
         format!(
@@ -1014,6 +914,17 @@ impl PyProtectionLegSpec {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyProtectionLegSpec |s| {
+    /// Hazard / credit curve identifier.
+    credit_curve_id -> String = s.inner.credit_curve_id.to_string();
+
+    /// Recovery rate as a decimal in ``[0.0, 1.0)``.
+    recovery_rate -> f64 = s.inner.recovery_rate;
+
+    /// Settlement delay in business days.
+    settlement_delay -> u16 = s.inner.settlement_delay;
+});
 
 /// Register the leg-spec classes on the instruments submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

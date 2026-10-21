@@ -10,6 +10,7 @@ pub(crate) mod market;
 mod merton_mc;
 mod pricing;
 mod schema;
+pub(crate) mod typed_asset_backed_facility;
 pub(crate) mod typed_convertible;
 pub(crate) mod typed_credit;
 pub(crate) mod typed_equity;
@@ -18,11 +19,8 @@ mod typed_legs;
 pub(crate) mod typed_macros;
 pub(crate) mod typed_rates;
 pub(crate) mod typed_revolving_credit;
-mod var;
-#[macro_use]
 pub(crate) mod typed_structured_credit;
-// Declared after `typed_structured_credit` so its `sc_wire_methods!` macro is in scope.
-pub(crate) mod typed_asset_backed_facility;
+mod var;
 
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
@@ -144,34 +142,10 @@ impl PyValuationResult {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Instrument identifier assigned by the pricer.
-    #[getter]
-    fn instrument_id(&self) -> &str {
-        &self.inner.instrument_id
-    }
-
     /// Valuation date (T+0) for the calculation, as ``datetime.date``.
     #[getter]
     fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::date_utils::date_to_py(py, self.inner.as_of)
-    }
-
-    /// Wire-format schema version of the result envelope (currently ``1``).
-    #[getter]
-    fn schema_version(&self) -> u32 {
-        self.inner.schema_version.into()
-    }
-
-    /// Present value amount as a ``float`` in ``currency``.
-    #[getter]
-    fn get_price(&self) -> f64 {
-        self.inner.value.amount()
-    }
-
-    /// Present value as a currency-tagged ``Money`` (exact Decimal amount).
-    #[getter]
-    fn value(&self) -> crate::bindings::core::money::PyMoney {
-        convert::money_to_py(self.inner.value)
     }
 
     /// Return the exact Decimal price as a string, without a float round-trip.
@@ -187,12 +161,6 @@ impl PyValuationResult {
     #[pyo3(text_signature = "($self)")]
     fn price_decimal(&self) -> String {
         self.inner.value.amount_decimal().to_string()
-    }
-
-    /// ISO-4217 code of the present value currency.
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.value.currency().to_string()
     }
 
     /// All computed measures as ``{metric_key: value}`` in computation order.
@@ -474,6 +442,23 @@ impl PyValuationResult {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyValuationResult |s| {
+    /// Instrument identifier assigned by the pricer.
+    instrument_id -> &str = &s.inner.instrument_id;
+
+    /// Wire-format schema version of the result envelope (currently ``1``).
+    schema_version -> u32 = s.inner.schema_version.into();
+
+    /// Present value amount as a ``float`` in ``currency``.
+    get_price -> f64 = s.inner.value.amount();
+
+    /// Present value as a currency-tagged ``Money`` (exact Decimal amount).
+    value -> crate::bindings::core::money::PyMoney = convert::money_to_py(s.inner.value);
+
+    /// ISO-4217 code of the present value currency.
+    currency -> String = s.inner.value.currency().to_string();
+});
 
 /// Validate a tagged instrument JSON payload and return the canonical envelope.
 ///

@@ -11,12 +11,10 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{
-    attributes_from_py, bdc_from_py, builder_repr, day_count_from_py, enum_to_py_string,
-    money_from_py, money_repr, money_to_py, tenor_from_py,
+    attributes_from_py, bdc_from_py, day_count_from_py, enum_to_py_string, money_from_py,
+    money_repr, money_to_py, tenor_from_py,
 };
-use crate::bindings::valuations::instruments::{
-    instrument_expiry, serialize_typed_instrument_json, stub_kind_from_py,
-};
+use crate::bindings::valuations::instruments::{instrument_expiry, stub_kind_from_py};
 use crate::bindings::valuations::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
@@ -27,7 +25,6 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     DrawRepaySpec, RevolvingCredit, RevolvingCreditFees, RevolvingCreditPricer,
 };
-use finstack_quant_valuations::instruments::InstrumentJson;
 
 use super::PyEnhancedMonteCarloResult;
 
@@ -67,22 +64,25 @@ pub struct PyRevolvingCredit {
     pub(crate) inner: RevolvingCredit,
 }
 
-impl PyRevolvingCredit {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(
-            InstrumentJson::RevolvingCredit(self.inner.clone()),
-            "RevolvingCredit",
-        )
-    }
-}
-
 instrument_envelope_methods!(
     PyRevolvingCredit,
     RevolvingCredit,
     "revolving_credit",
-    PyRevolvingCreditBuilder,
-    RevolvingCredit::builder()
+    builder = PyRevolvingCreditBuilder("RevolvingCreditBuilder", fields),
+    seed = RevolvingCredit::builder(),
+    /// Consume the builder and validate the facility.
+    ///
+    /// Returns
+    /// -------
+    /// RevolvingCredit
+    ///     The validated facility.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed, a required field is missing
+    ///     (the message names the field), or the facility fails validation.
+    build
 );
 instrument_pricing_methods!(PyRevolvingCredit);
 
@@ -196,19 +196,6 @@ impl PyRevolvingCredit {
         Ok(PyCashFlowSchedule::from_inner(schedule))
     }
 
-    /// Total committed amount.
-    #[getter]
-    fn commitment(&self) -> PyMoney {
-        money_to_py(self.inner.commitment)
-    }
-
-    /// Drawn balance at the simulation anchor (the later of the commitment
-    /// and valuation dates), in both deterministic and stochastic mode.
-    #[getter]
-    fn drawn(&self) -> PyMoney {
-        money_to_py(self.inner.drawn)
-    }
-
     /// Date the facility becomes available, as ``datetime.date``.
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -226,18 +213,6 @@ impl PyRevolvingCredit {
     #[getter]
     fn rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.rate)
-    }
-
-    /// Interest accrual day count.
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    /// Payment frequency for interest and fees.
-    #[getter]
-    fn frequency(&self) -> PyTenor {
-        PyTenor::from_inner(self.inner.frequency)
     }
 
     /// Fee structure as its serde ``dict`` (including dated ``steps``).
@@ -299,70 +274,6 @@ impl PyRevolvingCredit {
         serde_to_py(py, &self.inner.draw_repay_spec)
     }
 
-    /// ``True`` when utilization is simulated (stochastic ``draw_repay_spec``).
-    #[getter]
-    fn is_stochastic(&self) -> bool {
-        self.inner.is_stochastic()
-    }
-
-    /// Discount curve identifier.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    /// Credit (hazard) curve identifier, or ``None``.
-    #[getter]
-    fn credit_curve_id(&self) -> Option<String> {
-        self.inner.credit_curve_id.as_ref().map(ToString::to_string)
-    }
-
-    /// Recovery rate on default, as a decimal in ``[0, 1]``.
-    #[getter]
-    fn recovery_rate(&self) -> f64 {
-        self.inner.recovery_rate
-    }
-
-    /// Loan-equivalent exposure: fraction of the undrawn commitment drawn at
-    /// default, as a decimal in ``[0, 1]``.
-    #[getter]
-    fn leq(&self) -> f64 {
-        self.inner.leq
-    }
-
-    /// Stub rule for schedule generation.
-    #[getter]
-    fn stub(&self) -> PyStubKind {
-        PyStubKind::from_inner(self.inner.stub)
-    }
-
-    /// Business-day convention applied to payment dates (serde string, e.g.
-    /// ``"modified_following"``).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Holiday calendar identifier used for payment, fixing and settlement
-    /// rolls, or ``None`` for weekends only.
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
-    }
-
-    /// Business days between an accrual end and its payment date.
-    #[getter]
-    fn payment_lag_days(&self) -> u32 {
-        self.inner.payment_lag_days
-    }
-
-    /// Business days from the valuation date to the settlement date used by
-    /// quote metrics.
-    #[getter]
-    fn settlement_days(&self) -> u32 {
-        self.inner.settlement_days
-    }
-
     /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -381,6 +292,56 @@ impl PyRevolvingCredit {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyRevolvingCredit |s| {
+    /// Total committed amount.
+    commitment -> PyMoney = money_to_py(s.inner.commitment);
+
+    /// Drawn balance at the simulation anchor (the later of the commitment
+    /// and valuation dates), in both deterministic and stochastic mode.
+    drawn -> PyMoney = money_to_py(s.inner.drawn);
+
+    /// Interest accrual day count.
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+
+    /// Payment frequency for interest and fees.
+    frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
+
+    /// ``True`` when utilization is simulated (stochastic ``draw_repay_spec``).
+    is_stochastic -> bool = s.inner.is_stochastic();
+
+    /// Discount curve identifier.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    /// Credit (hazard) curve identifier, or ``None``.
+    credit_curve_id -> Option<String> = s.inner.credit_curve_id.as_ref().map(ToString::to_string);
+
+    /// Recovery rate on default, as a decimal in ``[0, 1]``.
+    recovery_rate -> f64 = s.inner.recovery_rate;
+
+    /// Loan-equivalent exposure: fraction of the undrawn commitment drawn at
+    /// default, as a decimal in ``[0, 1]``.
+    leq -> f64 = s.inner.leq;
+
+    /// Stub rule for schedule generation.
+    stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
+
+    /// Business-day convention applied to payment dates (serde string, e.g.
+    /// ``"modified_following"``).
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    /// Holiday calendar identifier used for payment, fixing and settlement
+    /// rolls, or ``None`` for weekends only.
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+
+    /// Business days between an accrual end and its payment date.
+    payment_lag_days -> u32 = s.inner.payment_lag_days;
+
+    /// Business days from the valuation date to the settlement date used by
+    /// quote metrics.
+    settlement_days -> u32 = s.inner.settlement_days;
+});
 
 /// Fluent builder for ``RevolvingCredit``; wraps the Rust
 /// `FinancialBuilder`-generated builder (consuming setters).
@@ -425,13 +386,6 @@ pub struct PyRevolvingCreditBuilder {
     inner: Option<RevolvingCreditBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
-
-crate::bindings::valuations::pricing::pricing_override_methods!(
-    PyRevolvingCredit,
-    PyRevolvingCreditBuilder,
-    "RevolvingCreditBuilder",
-    fields
-);
 
 #[pymethods]
 impl PyRevolvingCreditBuilder {
@@ -1280,29 +1234,5 @@ impl PyRevolvingCreditBuilder {
             "{..}".to_string(),
             |b: RevolvingCreditBuilderInner| b.attributes(attributes)
         )
-    }
-
-    /// Consume the builder and validate the facility.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCredit
-    ///     The validated facility.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing
-    ///     (the message names the field), or the facility fails validation.
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyRevolvingCredit> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PyRevolvingCredit { inner })
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        builder_repr("RevolvingCreditBuilder", &self.fields)
     }
 }

@@ -319,19 +319,25 @@ pub struct PyBond {
     pub(crate) inner: finstack_quant_valuations::instruments::Bond,
 }
 
-impl PyBond {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(InstrumentJson::Bond(self.inner.clone()), "Bond")
-    }
-}
-
 instrument_envelope_methods!(
     PyBond,
     Bond,
     "bond",
-    PyBondBuilder,
-    finstack_quant_valuations::instruments::Bond::builder()
+    builder = PyBondBuilder("BondBuilder", fields),
+    seed = finstack_quant_valuations::instruments::Bond::builder(),
+    /// Build the validated bond.
+    ///
+    /// Returns
+    /// -------
+    /// Bond
+    ///     The validated bond.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed, a required field is missing
+    ///     (the message names the field), or the bond fails validation.
+    build
 );
 instrument_pricing_methods!(
     PyBond,
@@ -946,12 +952,6 @@ impl PyBond {
         })
     }
 
-    /// Principal amount.
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        money_to_py(self.inner.notional)
-    }
-
     /// Issue date.
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -969,24 +969,6 @@ impl PyBond {
     #[getter]
     fn cashflow_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.cashflow_spec)
-    }
-
-    /// Discount curve identifier.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    /// Hazard curve identifier for credit-risky pricing, or ``None``.
-    #[getter]
-    fn credit_curve_id(&self) -> Option<String> {
-        self.inner.credit_curve_id.as_ref().map(ToString::to_string)
-    }
-
-    /// Repo (financing) discount curve identifier, or ``None``.
-    #[getter]
-    fn repo_curve_id(&self) -> Option<String> {
-        self.inner.repo_curve_id.as_ref().map(ToString::to_string)
     }
 
     /// Call/put schedule in serde form (``{"calls": [...], "puts": [...]}``), or ``None``.
@@ -1007,35 +989,11 @@ impl PyBond {
         opt_serde_to_py(py, self.inner.custom_cashflows.as_ref())
     }
 
-    /// Accrual method (serde string, e.g. ``"linear"``).
-    #[getter]
-    fn accrual_method(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.accrual_method)
-    }
-
     /// Settlement convention (``settlement_days`` / ``ex_coupon_days`` /
     /// ``ex_coupon_calendar_id``) as a dict, or ``None`` when unset.
     #[getter]
     fn settlement_convention<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.settlement_convention.as_ref())
-    }
-
-    /// Settlement lag in business days, or ``None`` when no convention is set.
-    #[getter]
-    fn settlement_days(&self) -> Option<u32> {
-        self.inner.settlement_days()
-    }
-
-    /// Ex-coupon period in business days, or ``None`` when no convention is set.
-    #[getter]
-    fn ex_coupon_days(&self) -> Option<u32> {
-        self.inner.ex_coupon_days()
-    }
-
-    /// ``True`` when coupons depend on forward-curve projection (FRNs).
-    #[getter]
-    fn has_floating_coupons(&self) -> bool {
-        self.inner.has_floating_coupons()
     }
 
     /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
@@ -1106,6 +1064,32 @@ impl PyBond {
     }
 }
 
+crate::bindings::macros::py_getters!(PyBond |s| {
+    /// Principal amount.
+    notional -> PyMoney = money_to_py(s.inner.notional);
+
+    /// Discount curve identifier.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    /// Hazard curve identifier for credit-risky pricing, or ``None``.
+    credit_curve_id -> Option<String> = s.inner.credit_curve_id.as_ref().map(ToString::to_string);
+
+    /// Repo (financing) discount curve identifier, or ``None``.
+    repo_curve_id -> Option<String> = s.inner.repo_curve_id.as_ref().map(ToString::to_string);
+
+    /// Accrual method (serde string, e.g. ``"linear"``).
+    accrual_method -> PyResult<String> = enum_to_py_string(&s.inner.accrual_method);
+
+    /// Settlement lag in business days, or ``None`` when no convention is set.
+    settlement_days -> Option<u32> = s.inner.settlement_days();
+
+    /// Ex-coupon period in business days, or ``None`` when no convention is set.
+    ex_coupon_days -> Option<u32> = s.inner.ex_coupon_days();
+
+    /// ``True`` when coupons depend on forward-curve projection (FRNs).
+    has_floating_coupons -> bool = s.inner.has_floating_coupons();
+});
+
 /// Fluent builder for ``Bond``; wraps the Rust `FinancialBuilder`-generated
 /// builder (consuming setters).
 ///
@@ -1122,13 +1106,6 @@ pub struct PyBondBuilder {
     inner: Option<BondBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
-
-crate::bindings::valuations::pricing::pricing_override_methods!(
-    PyBond,
-    PyBondBuilder,
-    "BondBuilder",
-    fields
-);
 
 #[pymethods]
 impl PyBondBuilder {
@@ -1521,30 +1498,6 @@ impl PyBondBuilder {
             |b: BondBuilderInner| b.settlement_convention(convention)
         )
     }
-
-    /// Build the validated bond.
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     The validated bond.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing
-    ///     (the message names the field), or the bond fails validation.
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyBond> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PyBond { inner })
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        crate::bindings::valuations::convert::builder_repr("BondBuilder", &self.fields)
-    }
 }
 
 /// Typed wrapper for the Rust `TermLoan` instrument.
@@ -1565,19 +1518,25 @@ pub struct PyTermLoan {
     pub(crate) inner: finstack_quant_valuations::instruments::TermLoan,
 }
 
-impl PyTermLoan {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(InstrumentJson::TermLoan(self.inner.clone()), "TermLoan")
-    }
-}
-
 instrument_envelope_methods!(
     PyTermLoan,
     TermLoan,
     "term_loan",
-    PyTermLoanBuilder,
-    finstack_quant_valuations::instruments::TermLoan::builder()
+    builder = PyTermLoanBuilder("TermLoanBuilder", fields),
+    seed = finstack_quant_valuations::instruments::TermLoan::builder(),
+    /// Build the validated term loan.
+    ///
+    /// Returns
+    /// -------
+    /// TermLoan
+    ///     The validated loan.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed, a required field is missing
+    ///     (the message names the field), or the loan fails validation.
+    build
 );
 instrument_pricing_methods!(PyTermLoan);
 
@@ -1662,18 +1621,6 @@ impl PyTermLoan {
             .map_err(core_to_py)
     }
 
-    /// Loan currency (ISO-4217 code).
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
-    /// Committed notional (facility limit).
-    #[getter]
-    fn notional_limit(&self) -> PyMoney {
-        money_to_py(self.inner.notional_limit)
-    }
-
     /// Issue / funding date.
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -1693,60 +1640,12 @@ impl PyTermLoan {
         serde_to_py(py, &self.inner.rate)
     }
 
-    /// Payment frequency.
-    #[getter]
-    fn frequency(&self) -> PyTenor {
-        PyTenor::from_inner(self.inner.frequency)
-    }
-
-    /// Accrual day-count convention.
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    /// Business day convention (serde string).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Holiday calendar identifier, or ``None``.
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
-    }
-
-    /// Stub rule.
-    #[getter]
-    fn stub(&self) -> PyStubKind {
-        PyStubKind::from_inner(self.inner.stub)
-    }
-
-    /// Discount curve identifier.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    /// Hazard curve identifier, or ``None``.
-    #[getter]
-    fn credit_curve_id(&self) -> Option<String> {
-        self.inner.credit_curve_id.as_ref().map(ToString::to_string)
-    }
-
     /// Amortization specification in serde form (``"none"``,
     /// ``{"percent_of_remaining_per_period": {"pct": 0.025}}``,
     /// ``{"linear_between": {...}}``, …).
     #[getter]
     fn amortization<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.amortization)
-    }
-
-    /// Coupon type (serde string, e.g. ``"cash"``).
-    #[getter]
-    fn coupon_type(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.coupon_type)
     }
 
     /// Upfront fee in ``UpfrontFee`` serde form (``{"amount": Money-dict}`` or
@@ -1780,12 +1679,6 @@ impl PyTermLoan {
         opt_serde_to_py(py, self.inner.call_schedule.as_ref())
     }
 
-    /// Settlement lag in business days.
-    #[getter]
-    fn settlement_days(&self) -> u32 {
-        self.inner.settlement_days
-    }
-
     /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -1805,6 +1698,42 @@ impl PyTermLoan {
     }
 }
 
+crate::bindings::macros::py_getters!(PyTermLoan |s| {
+    /// Loan currency (ISO-4217 code).
+    currency -> String = s.inner.currency.to_string();
+
+    /// Committed notional (facility limit).
+    notional_limit -> PyMoney = money_to_py(s.inner.notional_limit);
+
+    /// Payment frequency.
+    frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
+
+    /// Accrual day-count convention.
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+
+    /// Business day convention (serde string).
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    /// Holiday calendar identifier, or ``None``.
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+
+    /// Stub rule.
+    stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
+
+    /// Discount curve identifier.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    /// Hazard curve identifier, or ``None``.
+    credit_curve_id -> Option<String> = s.inner.credit_curve_id.as_ref().map(ToString::to_string);
+
+    /// Coupon type (serde string, e.g. ``"cash"``).
+    coupon_type -> PyResult<String> = enum_to_py_string(&s.inner.coupon_type);
+
+    /// Settlement lag in business days.
+    settlement_days -> u32 = s.inner.settlement_days;
+});
+
 /// Fluent builder for ``TermLoan``; wraps the Rust `FinancialBuilder`-generated
 /// builder (consuming setters).
 ///
@@ -1821,13 +1750,6 @@ pub struct PyTermLoanBuilder {
     inner: Option<TermLoanBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
-
-crate::bindings::valuations::pricing::pricing_override_methods!(
-    PyTermLoan,
-    PyTermLoanBuilder,
-    "TermLoanBuilder",
-    fields
-);
 
 #[pymethods]
 impl PyTermLoanBuilder {
@@ -2494,30 +2416,6 @@ impl PyTermLoanBuilder {
             "Attributes(...)".to_string(),
             |b: TermLoanBuilderInner| b.attributes(attrs)
         )
-    }
-
-    /// Build the validated term loan.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoan
-    ///     The validated loan.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing
-    ///     (the message names the field), or the loan fails validation.
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyTermLoan> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PyTermLoan { inner })
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        crate::bindings::valuations::convert::builder_repr("TermLoanBuilder", &self.fields)
     }
 }
 

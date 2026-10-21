@@ -100,3 +100,42 @@ fn double(value: i32) -> i32 {
 
     assert [block.owner for block in _MODULE.public_pyo3_doc_blocks(fixture)] == ["double"]
     assert _MODULE.placeholder_errors(fixture) == []
+
+
+def test_method_generating_macro_entries_are_public(tmp_path: Path) -> None:
+    """Docs forwarded by `py_getters!` / Greek / envelope macros are checked."""
+    fixture = tmp_path / "macros.rs"
+    fixture.write_text(
+        """crate::bindings::macros::py_getters!(PyWidget |s| {
+    /// Widget size.
+    ///
+    /// >>> callable(Widget.size)
+    size -> f64 = s.inner.size;
+});
+
+instrument_greek_methods!(PyOption {
+    /// Delta of the option.
+    delta,
+});
+
+instrument_envelope_methods!(
+    PyOption,
+    OptionVariant,
+    "option",
+    builder = PyOptionBuilder("OptionBuilder", fields),
+    seed = Option::builder(),
+    /// Build the validated option.
+    build
+);
+""",
+        encoding="utf-8",
+    )
+
+    assert [block.owner for block in _MODULE.public_pyo3_doc_blocks(fixture)] == [
+        "size",
+        "delta",
+        "build",
+    ]
+    assert [(error.owner, error.message) for error in _MODULE.placeholder_errors(fixture)] == [
+        ("size", "callability-only doctest"),
+    ]

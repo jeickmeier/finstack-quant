@@ -33,49 +33,10 @@ pub struct PyEquityMetrics {
     pub(crate) inner: EquityMetrics,
 }
 
-sc_wire_methods!(PyEquityMetrics, EquityMetrics, "EquityMetrics");
+crate::bindings::macros::wire_methods!(PyEquityMetrics, EquityMetrics, "EquityMetrics", to_dict);
 
 #[pymethods]
 impl PyEquityMetrics {
-    /// Identifier of the residual class.
-    #[getter]
-    fn tranche_id(&self) -> String {
-        self.inner.tranche_id.clone()
-    }
-
-    /// ISO-4217 code of the currency ``invested`` is denominated in.
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
-    /// Amount invested on the valuation date (balance × purchase price), in
-    /// currency units.
-    #[getter]
-    fn invested(&self) -> f64 {
-        self.inner.invested
-    }
-
-    /// Annualized XIRR of the equity flows as a decimal, or ``None`` when no
-    /// rate solves (for example no positive distribution).
-    #[getter]
-    fn irr(&self) -> Option<f64> {
-        self.inner.irr
-    }
-
-    /// Multiple on invested capital: total distributions over ``invested``.
-    #[getter]
-    fn moic(&self) -> f64 {
-        self.inner.moic
-    }
-
-    /// Discounted value of the distributions as a percent of the invested
-    /// balance.
-    #[getter]
-    fn nav_pct(&self) -> f64 {
-        self.inner.nav_pct
-    }
-
     /// Per-distribution cash-on-cash yield (distribution over ``invested``) as
     /// ``(datetime.date, float)`` pairs.
     #[getter]
@@ -132,3 +93,26 @@ impl PyEquityMetrics {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyEquityMetrics |s| {
+    /// Identifier of the residual class.
+    tranche_id -> String = s.inner.tranche_id.clone();
+
+    /// ISO-4217 code of the currency ``invested`` is denominated in.
+    currency -> String = s.inner.currency.to_string();
+
+    /// Amount invested on the valuation date (balance × purchase price), in
+    /// currency units.
+    invested -> f64 = s.inner.invested;
+
+    /// Annualized XIRR of the equity flows as a decimal, or ``None`` when no
+    /// rate solves (for example no positive distribution).
+    irr -> Option<f64> = s.inner.irr;
+
+    /// Multiple on invested capital: total distributions over ``invested``.
+    moic -> f64 = s.inner.moic;
+
+    /// Discounted value of the distributions as a percent of the invested
+    /// balance.
+    nav_pct -> f64 = s.inner.nav_pct;
+});

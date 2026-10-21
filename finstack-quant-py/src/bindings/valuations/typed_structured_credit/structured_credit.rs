@@ -7,7 +7,7 @@ use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
-use crate::bindings::valuations::convert::{attributes_from_py, bool_repr, enum_to_py_string};
+use crate::bindings::valuations::convert::{attributes_from_py, enum_to_py_string};
 use crate::errors::core_to_py;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::dates::BusinessDayConvention;
@@ -17,11 +17,9 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     DealType, LossAllocationPolicy, LossRecognition, MarketConditions, Metadata, StructuredCredit,
     TrancheDraw, TrancheReadvance, WaterfallRules,
 };
-use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
+use finstack_quant_valuations::instruments::Instrument;
 
-use super::super::instruments::{
-    enum_from_str, instrument_expiry, serialize_typed_instrument_json,
-};
+use super::super::instruments::{enum_from_str, instrument_expiry};
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
@@ -48,23 +46,12 @@ pub struct PyStructuredCredit {
     pub(crate) inner: StructuredCredit,
 }
 
-impl PyStructuredCredit {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(
-            InstrumentJson::StructuredCredit(Box::new(self.inner.clone())),
-            "StructuredCredit",
-        )
-    }
-}
-
 instrument_envelope_methods!(
     PyStructuredCredit,
     StructuredCredit,
     "structured_credit",
-    PyStructuredCreditBuilder,
-    StructuredCredit::builder(),
-    no_fields,
+    builder = PyStructuredCreditBuilder("StructuredCreditBuilder", no_fields),
+    seed = StructuredCredit::builder(),
     builder_doc = [
         " ",
         " Notes",
@@ -77,7 +64,20 @@ instrument_envelope_methods!(
         " strings. Prefer :meth:`new_abs` / :meth:`new_clo` / :meth:`new_cmbs` /",
         " :meth:`new_rmbs` for registry-calibrated deal-type defaults; use this",
         " builder for full manual control.",
-    ]
+    ],
+    /// Build the validated structured-credit deal.
+    ///
+    /// Returns
+    /// -------
+    /// StructuredCredit
+    ///     The validated deal.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed, a required field is missing,
+    ///     or the completed deal fails pricing validation.
+    build
 );
 instrument_pricing_methods!(
     PyStructuredCredit,
@@ -392,28 +392,6 @@ impl PyStructuredCredit {
         })
     }
 
-    /// Deal classification (serde name: ``"abs"``, ``"clo"``, ``"cmbs"``, ``"rmbs"`` ...).
-    #[getter]
-    fn deal_type(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.deal_type)
-    }
-
-    /// Collateral pool.
-    #[getter]
-    fn pool(&self) -> PyAssetPool {
-        PyAssetPool {
-            inner: self.inner.pool.clone(),
-        }
-    }
-
-    /// Capital structure.
-    #[getter]
-    fn tranches(&self) -> PyTrancheStructure {
-        PyTrancheStructure {
-            inner: self.inner.tranches.clone(),
-        }
-    }
-
     /// Deal closing date as ``datetime.date``.
     #[getter]
     fn closing_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -439,12 +417,6 @@ impl PyStructuredCredit {
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
-    }
-
-    /// Discount curve identifier.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
     }
 
     /// Return a copy carrying the deal-type standard fee schedule (mirrors
@@ -582,20 +554,6 @@ impl PyStructuredCredit {
         Ok(PyEquityMetrics { inner })
     }
 
-    /// Payment frequency.
-    #[getter]
-    fn frequency(&self) -> PyTenor {
-        PyTenor {
-            inner: self.inner.frequency,
-        }
-    }
-
-    /// Payment calendar identifier, or ``None``.
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
-    }
-
     /// Payment business-day convention string, or ``None`` for the default.
     #[getter]
     fn business_day_convention(&self) -> PyResult<Option<String>> {
@@ -610,30 +568,6 @@ impl PyStructuredCredit {
     #[getter]
     fn credit_model<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.credit_model)
-    }
-
-    /// Deterministic prepayment model as a typed ``PrepaymentModelSpec``.
-    #[getter]
-    fn prepayment_spec(&self) -> PyPrepaymentModelSpec {
-        PyPrepaymentModelSpec {
-            inner: self.inner.credit_model.prepayment_spec.clone(),
-        }
-    }
-
-    /// Deterministic default model as a typed ``DefaultModelSpec``.
-    #[getter]
-    fn default_spec(&self) -> PyDefaultModelSpec {
-        PyDefaultModelSpec {
-            inner: self.inner.credit_model.default_spec.clone(),
-        }
-    }
-
-    /// Recovery model as a typed ``RecoveryModelSpec``.
-    #[getter]
-    fn recovery_spec(&self) -> PyRecoveryModelSpec {
-        PyRecoveryModelSpec {
-            inner: self.inner.credit_model.recovery_spec.clone(),
-        }
     }
 
     /// Stochastic prepayment specification as its serde ``dict``, or ``None``.
@@ -750,27 +684,6 @@ impl PyStructuredCredit {
         serde_to_py(py, &self.inner.coverage_triggers)
     }
 
-    /// Clean-up call pool-factor threshold (decimal), or ``None``.
-    #[getter]
-    fn cleanup_call_decimal(&self) -> Option<f64> {
-        self.inner.cleanup_call_decimal
-    }
-
-    /// Assumed optional redemption, or ``None``.
-    #[getter]
-    fn call_assumption(&self) -> Option<PyCallAssumption> {
-        self.inner
-            .call_assumption
-            .clone()
-            .map(|inner| PyCallAssumption { inner })
-    }
-
-    /// Collateral liquidation price in percent of par, or ``None`` for par.
-    #[getter]
-    fn liquidation_price_pct(&self) -> Option<f64> {
-        self.inner.liquidation_price_pct
-    }
-
     /// Explicit loss-allocation policy (``"write_down"`` /
     /// ``"par_preserving"``), or ``None`` for the deal-type default.
     #[getter]
@@ -811,22 +724,6 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Explicit principal-covers-senior-interest flag, or ``None`` for the
-    /// deal-type default.
-    #[getter]
-    fn principal_covers_senior_interest(&self) -> Option<bool> {
-        self.inner.principal_covers_senior_interest
-    }
-
-    /// Collateral valuation rules for the coverage tests, or ``None``.
-    #[getter]
-    fn coverage_rules(&self) -> Option<PyCoverageRules> {
-        self.inner
-            .coverage_rules
-            .clone()
-            .map(|inner| PyCoverageRules { inner })
-    }
-
     /// Declarative waterfall rules as their serde ``dict``, or ``None``.
     #[getter]
     fn waterfall_rules<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -835,15 +732,6 @@ impl PyStructuredCredit {
             .as_ref()
             .map(|rules| serde_to_py(py, rules))
             .transpose()
-    }
-
-    /// Custom priority of payments, or ``None`` when the template applies.
-    #[getter]
-    fn waterfall(&self) -> Option<PyWaterfall> {
-        self.inner
-            .waterfall
-            .clone()
-            .map(|inner| PyWaterfall { inner })
     }
 
     /// Canonical example deal: a USD 100M CLO with one 7% fixed-rate
@@ -880,13 +768,6 @@ impl PyStructuredCredit {
         instrument_expiry(py, &self.inner)
     }
 
-    /// ``True`` when a stochastic prepayment, default or correlation spec is set
-    /// (mirrors Rust ``StructuredCredit::is_stochastic``).
-    #[getter]
-    fn is_stochastic(&self) -> bool {
-        self.inner.is_stochastic()
-    }
-
     /// Return a copy with every stochastic specification cleared (mirrors
     /// Rust ``StructuredCredit::disable_stochastic``); the inverse of
     /// ``enable_stochastic``.
@@ -903,31 +784,6 @@ impl PyStructuredCredit {
         Self { inner: deal }
     }
 
-    /// Loss-allocation policy in force for pricing: ``loss_allocation`` when
-    /// set, otherwise the deal-type convention (``"write_down"`` /
-    /// ``"par_preserving"``).
-    #[getter]
-    fn effective_loss_allocation(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.effective_loss_allocation())
-    }
-
-    /// Loss-recognition timing in force: ``loss_recognition`` when set,
-    /// otherwise the deal-type convention (``"at_liquidation"`` for RMBS and
-    /// CMBS, ``"at_default"`` otherwise).
-    #[getter]
-    fn effective_loss_recognition(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.effective_loss_recognition())
-    }
-
-    /// Whether the template waterfall pays senior fees and senior note
-    /// interest from principal when interest proceeds fall short:
-    /// ``principal_covers_senior_interest`` when set, otherwise ``True`` for
-    /// CLO/CBO and ``False`` for every other deal type.
-    #[getter]
-    fn effective_principal_covers_senior_interest(&self) -> bool {
-        self.inner.effective_principal_covers_senior_interest()
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -937,6 +793,82 @@ impl PyStructuredCredit {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyStructuredCredit |s| {
+    /// Deal classification (serde name: ``"abs"``, ``"clo"``, ``"cmbs"``, ``"rmbs"`` ...).
+    deal_type -> PyResult<String> = enum_to_py_string(&s.inner.deal_type);
+
+    /// Collateral pool.
+    pool -> PyAssetPool = PyAssetPool { inner: s.inner.pool.clone() };
+
+    /// Capital structure.
+    tranches -> PyTrancheStructure = PyTrancheStructure { inner: s.inner.tranches.clone() };
+
+    /// Discount curve identifier.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    /// Payment frequency.
+    frequency -> PyTenor = PyTenor { inner: s.inner.frequency };
+
+    /// Payment calendar identifier, or ``None``.
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+
+    /// Deterministic prepayment model as a typed ``PrepaymentModelSpec``.
+    prepayment_spec -> PyPrepaymentModelSpec =
+        PyPrepaymentModelSpec { inner: s.inner.credit_model.prepayment_spec.clone() };
+
+    /// Deterministic default model as a typed ``DefaultModelSpec``.
+    default_spec -> PyDefaultModelSpec =
+        PyDefaultModelSpec { inner: s.inner.credit_model.default_spec.clone() };
+
+    /// Recovery model as a typed ``RecoveryModelSpec``.
+    recovery_spec -> PyRecoveryModelSpec =
+        PyRecoveryModelSpec { inner: s.inner.credit_model.recovery_spec.clone() };
+
+    /// Clean-up call pool-factor threshold (decimal), or ``None``.
+    cleanup_call_decimal -> Option<f64> = s.inner.cleanup_call_decimal;
+
+    /// Assumed optional redemption, or ``None``.
+    call_assumption -> Option<PyCallAssumption> =
+        s.inner.call_assumption.clone().map(|inner| PyCallAssumption { inner });
+
+    /// Collateral liquidation price in percent of par, or ``None`` for par.
+    liquidation_price_pct -> Option<f64> = s.inner.liquidation_price_pct;
+
+    /// Explicit principal-covers-senior-interest flag, or ``None`` for the
+    /// deal-type default.
+    principal_covers_senior_interest -> Option<bool> = s.inner.principal_covers_senior_interest;
+
+    /// Collateral valuation rules for the coverage tests, or ``None``.
+    coverage_rules -> Option<PyCoverageRules> =
+        s.inner.coverage_rules.clone().map(|inner| PyCoverageRules { inner });
+
+    /// Custom priority of payments, or ``None`` when the template applies.
+    waterfall -> Option<PyWaterfall> = s.inner.waterfall.clone().map(|inner| PyWaterfall { inner });
+
+    /// ``True`` when a stochastic prepayment, default or correlation spec is set
+    /// (mirrors Rust ``StructuredCredit::is_stochastic``).
+    is_stochastic -> bool = s.inner.is_stochastic();
+
+    /// Loss-allocation policy in force for pricing: ``loss_allocation`` when
+    /// set, otherwise the deal-type convention (``"write_down"`` /
+    /// ``"par_preserving"``).
+    effective_loss_allocation -> PyResult<String> =
+        enum_to_py_string(&s.inner.effective_loss_allocation());
+
+    /// Loss-recognition timing in force: ``loss_recognition`` when set,
+    /// otherwise the deal-type convention (``"at_liquidation"`` for RMBS and
+    /// CMBS, ``"at_default"`` otherwise).
+    effective_loss_recognition -> PyResult<String> =
+        enum_to_py_string(&s.inner.effective_loss_recognition());
+
+    /// Whether the template waterfall pays senior fees and senior note
+    /// interest from principal when interest proceeds fall short:
+    /// ``principal_covers_senior_interest`` when set, otherwise ``True`` for
+    /// CLO/CBO and ``False`` for every other deal type.
+    effective_principal_covers_senior_interest -> bool =
+        s.inner.effective_principal_covers_senior_interest();
+});
 
 /// Fluent builder for [`PyStructuredCredit`]; wraps the Rust
 /// `FinancialBuilder`-generated builder (consuming setters).
@@ -948,13 +880,6 @@ impl PyStructuredCredit {
 pub struct PyStructuredCreditBuilder {
     inner: Option<StructuredCreditBuilderInner>,
 }
-
-crate::bindings::valuations::pricing::pricing_override_methods!(
-    PyStructuredCredit,
-    PyStructuredCreditBuilder,
-    "StructuredCreditBuilder",
-    no_fields
-);
 
 #[pymethods]
 impl PyStructuredCreditBuilder {
@@ -2113,32 +2038,5 @@ impl PyStructuredCreditBuilder {
         let attributes = attributes_from_py(value)?;
         builder_set!(slf, |b: StructuredCreditBuilderInner| b
             .attributes(attributes))
-    }
-
-    /// Build the validated structured-credit deal.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCredit
-    ///     The validated deal.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed deal fails pricing validation.
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyStructuredCredit> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PyStructuredCredit { inner })
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        format!(
-            "StructuredCreditBuilder(consumed={})",
-            bool_repr(self.inner.is_none())
-        )
     }
 }

@@ -11,19 +11,16 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DilutionEvent, DividendAdjustment,
     PriceTrigger,
 };
-use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
 use super::convert::{
-    attributes_from_py, builder_repr, date_repr, enum_to_py_string, float_repr, money_repr,
-    money_to_py, opt_repr,
+    attributes_from_py, date_repr, enum_to_py_string, float_repr, money_repr, money_to_py, opt_repr,
 };
-use super::instruments::serialize_typed_instrument_json;
 use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
-use crate::bindings::valuations::convert::take_builder;
 
 type ConvertibleBondBuilderInner =
     finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBondBuilder;
@@ -195,34 +192,10 @@ impl PyConversionSpec {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Conversion ratio (shares per bond), if given explicitly.
-    #[getter]
-    fn ratio(&self) -> Option<f64> {
-        self.inner.ratio
-    }
-
-    /// Conversion price per share, if given explicitly.
-    #[getter]
-    fn price(&self) -> Option<f64> {
-        self.inner.price
-    }
-
     /// Conversion policy: ``"voluntary"`` or the tagged dict form.
     #[getter]
     fn policy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.policy)
-    }
-
-    /// Anti-dilution policy (serde name).
-    #[getter]
-    fn anti_dilution(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.anti_dilution)
-    }
-
-    /// Dividend adjustment policy (serde name).
-    #[getter]
-    fn dividend_adjustment(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.dividend_adjustment)
     }
 
     /// Dilution events as dicts.
@@ -244,6 +217,20 @@ impl PyConversionSpec {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyConversionSpec |s| {
+    /// Conversion ratio (shares per bond), if given explicitly.
+    ratio -> Option<f64> = s.inner.ratio;
+
+    /// Conversion price per share, if given explicitly.
+    price -> Option<f64> = s.inner.price;
+
+    /// Anti-dilution policy (serde name).
+    anti_dilution -> PyResult<String> = enum_to_py_string(&s.inner.anti_dilution);
+
+    /// Dividend adjustment policy (serde name).
+    dividend_adjustment -> PyResult<String> = enum_to_py_string(&s.inner.dividend_adjustment);
+});
 
 /// Issuer call and holder put windows (typed wrapper for Rust ``CallPutSchedule``).
 ///
@@ -450,22 +437,29 @@ pub struct PyConvertibleBond {
     pub(crate) inner: finstack_quant_valuations::instruments::ConvertibleBond,
 }
 
-impl PyConvertibleBond {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(
-            InstrumentJson::ConvertibleBond(self.inner.clone()),
-            "ConvertibleBond",
-        )
-    }
-}
-
 instrument_envelope_methods!(
     PyConvertibleBond,
     ConvertibleBond,
     "convertible_bond",
-    PyConvertibleBondBuilder,
-    finstack_quant_valuations::instruments::ConvertibleBond::builder()
+    builder = PyConvertibleBondBuilder("ConvertibleBondBuilder", fields),
+    seed = finstack_quant_valuations::instruments::ConvertibleBond::builder(),
+    /// Build the validated convertible bond.
+    ///
+    /// Validation is the Rust ``ConvertibleBond::builder().build()``
+    /// invariants only; there is no additional binding-side check.
+    ///
+    /// Returns
+    /// -------
+    /// ConvertibleBond
+    ///     The validated convertible bond.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed, a required field is missing,
+    ///     or the completed bond fails validation (for example, conversion
+    ///     terms set neither ``ratio`` nor ``price``).
+    build
 );
 instrument_pricing_methods!(PyConvertibleBond);
 
@@ -625,12 +619,6 @@ impl PyConvertibleBond {
         serde_to_py(py, &greeks)
     }
 
-    /// Principal amount.
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        money_to_py(self.inner.notional)
-    }
-
     /// Issue date.
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -643,64 +631,6 @@ impl PyConvertibleBond {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Discount curve identifier for the debt component.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    /// Issuer hazard curve identifier, or ``None`` (risk-free cash discounting).
-    #[getter]
-    fn credit_curve_id(&self) -> Option<String> {
-        self.inner.credit_curve_id.as_ref().map(|id| id.to_string())
-    }
-
-    /// Conversion terms.
-    #[getter]
-    fn conversion(&self) -> PyConversionSpec {
-        PyConversionSpec {
-            inner: self.inner.conversion.clone(),
-        }
-    }
-
-    /// Base conversion ratio (shares per bond), derived from ratio or price.
-    #[getter]
-    fn conversion_ratio(&self) -> Option<f64> {
-        self.inner.conversion_ratio()
-    }
-
-    /// Conversion ratio after anti-dilution adjustments.
-    #[getter]
-    fn effective_conversion_ratio(&self) -> Option<f64> {
-        self.inner.effective_conversion_ratio()
-    }
-
-    /// Market-scalar id of the underlying share price.
-    #[getter]
-    fn spot_id(&self) -> String {
-        self.inner.spot_id.to_string()
-    }
-
-    /// Equity volatility id: a surface, or a unitless flat-vol scalar.
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
-
-    /// Unitless continuous dividend-yield scalar id, or ``None`` (zero yield).
-    #[getter]
-    fn div_yield_id(&self) -> Option<String> {
-        self.inner.div_yield_id.as_ref().map(|id| id.to_string())
-    }
-
-    /// Call/put schedule, or ``None``.
-    #[getter]
-    fn call_put(&self) -> Option<PyCallPutSchedule> {
-        self.inner.call_put.as_ref().map(|inner| PyCallPutSchedule {
-            inner: inner.clone(),
-        })
-    }
-
     /// Soft-call trigger as ``{"threshold_pct", "observation_days", "required_days_above"}``, or ``None``.
     #[getter]
     fn soft_call_trigger<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -709,18 +639,6 @@ impl PyConvertibleBond {
             .as_ref()
             .map(|t| serde_to_py(py, t))
             .transpose()
-    }
-
-    /// Settlement lag in business days, or ``None`` for same-day.
-    #[getter]
-    fn settlement_days(&self) -> Option<u32> {
-        self.inner.settlement_days
-    }
-
-    /// Assumed recovery rate on default as a fraction, or ``None``.
-    #[getter]
-    fn recovery_rate(&self) -> Option<f64> {
-        self.inner.recovery_rate
     }
 
     /// Recorded exercise and delayed cash/share delivery in canonical serde form, or ``None``.
@@ -764,6 +682,45 @@ impl PyConvertibleBond {
     }
 }
 
+crate::bindings::macros::py_getters!(PyConvertibleBond |s| {
+    /// Principal amount.
+    notional -> PyMoney = money_to_py(s.inner.notional);
+
+    /// Discount curve identifier for the debt component.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    /// Issuer hazard curve identifier, or ``None`` (risk-free cash discounting).
+    credit_curve_id -> Option<String> = s.inner.credit_curve_id.as_ref().map(|id| id.to_string());
+
+    /// Conversion terms.
+    conversion -> PyConversionSpec = PyConversionSpec { inner: s.inner.conversion.clone() };
+
+    /// Base conversion ratio (shares per bond), derived from ratio or price.
+    conversion_ratio -> Option<f64> = s.inner.conversion_ratio();
+
+    /// Conversion ratio after anti-dilution adjustments.
+    effective_conversion_ratio -> Option<f64> = s.inner.effective_conversion_ratio();
+
+    /// Market-scalar id of the underlying share price.
+    spot_id -> String = s.inner.spot_id.to_string();
+
+    /// Equity volatility id: a surface, or a unitless flat-vol scalar.
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+
+    /// Unitless continuous dividend-yield scalar id, or ``None`` (zero yield).
+    div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(|id| id.to_string());
+
+    /// Call/put schedule, or ``None``.
+    call_put -> Option<PyCallPutSchedule> =
+        s.inner.call_put.as_ref().map(|inner| PyCallPutSchedule { inner: inner.clone() });
+
+    /// Settlement lag in business days, or ``None`` for same-day.
+    settlement_days -> Option<u32> = s.inner.settlement_days;
+
+    /// Assumed recovery rate on default as a fraction, or ``None``.
+    recovery_rate -> Option<f64> = s.inner.recovery_rate;
+});
+
 /// Fluent builder for ``ConvertibleBond``; wraps the Rust
 /// ``FinancialBuilder``-generated builder (consuming setters).
 ///
@@ -777,13 +734,6 @@ pub struct PyConvertibleBondBuilder {
     inner: Option<ConvertibleBondBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
-
-crate::bindings::valuations::pricing::pricing_override_methods!(
-    PyConvertibleBond,
-    PyConvertibleBondBuilder,
-    "ConvertibleBondBuilder",
-    fields
-);
 
 #[pymethods]
 impl PyConvertibleBondBuilder {
@@ -1263,34 +1213,6 @@ impl PyConvertibleBondBuilder {
         let shown = value.repr()?.to_string();
         builder_set!(slf, attributes, shown, |b: ConvertibleBondBuilderInner| b
             .attributes(attrs))
-    }
-
-    /// Build the validated convertible bond.
-    ///
-    /// Validation is the Rust ``ConvertibleBond::builder().build()``
-    /// invariants only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBond
-    ///     The validated convertible bond.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed bond fails validation (for example, conversion
-    ///     terms set neither ``ratio`` nor ``price``).
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyConvertibleBond> {
-        let b = take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PyConvertibleBond { inner })
-    }
-
-    /// Return ``repr(self)`` listing the fields set so far.
-    fn __repr__(&self) -> String {
-        builder_repr("ConvertibleBondBuilder", &self.fields)
     }
 }
 

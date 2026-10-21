@@ -45,7 +45,7 @@ pub struct PyBalloonSpec {
     pub(crate) inner: BalloonSpec,
 }
 
-sc_wire_methods!(PyBalloonSpec, BalloonSpec, "BalloonSpec");
+crate::bindings::macros::wire_methods!(PyBalloonSpec, BalloonSpec, "BalloonSpec", to_dict);
 
 #[pymethods]
 impl PyBalloonSpec {
@@ -101,42 +101,6 @@ impl PyBalloonSpec {
         Ok(Self { inner })
     }
 
-    /// Share of the performing balance extended at maturity (decimal).
-    #[getter]
-    fn extension_prob(&self) -> f64 {
-        self.inner.extension_prob
-    }
-
-    /// Length of the extension in months.
-    #[getter]
-    fn extension_months(&self) -> u32 {
-        self.inner.extension_months
-    }
-
-    /// Annual coupon on the extended balance (decimal), or ``None``.
-    #[getter]
-    fn extension_rate(&self) -> Option<f64> {
-        self.inner.extension_rate
-    }
-
-    /// Share of the performing balance that defaults into a workout (decimal).
-    #[getter]
-    fn loss_prob(&self) -> f64 {
-        self.inner.loss_prob
-    }
-
-    /// Loss severity on the workout share in percent.
-    #[getter]
-    fn severity_pct(&self) -> f64 {
-        self.inner.severity_pct
-    }
-
-    /// Months after maturity until the workout recovery is received.
-    #[getter]
-    fn workout_months(&self) -> u32 {
-        self.inner.workout_months
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -148,6 +112,26 @@ impl PyBalloonSpec {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyBalloonSpec |s| {
+    /// Share of the performing balance extended at maturity (decimal).
+    extension_prob -> f64 = s.inner.extension_prob;
+
+    /// Length of the extension in months.
+    extension_months -> u32 = s.inner.extension_months;
+
+    /// Annual coupon on the extended balance (decimal), or ``None``.
+    extension_rate -> Option<f64> = s.inner.extension_rate;
+
+    /// Share of the performing balance that defaults into a workout (decimal).
+    loss_prob -> f64 = s.inner.loss_prob;
+
+    /// Loss severity on the workout share in percent.
+    severity_pct -> f64 = s.inner.severity_pct;
+
+    /// Months after maturity until the workout recovery is received.
+    workout_months -> u32 = s.inner.workout_months;
+});
 
 /// Prepayment protection on a commercial mortgage.
 ///
@@ -177,7 +161,12 @@ pub struct PyPrepaymentPenalty {
     pub(crate) inner: PrepaymentPenalty,
 }
 
-sc_wire_methods!(PyPrepaymentPenalty, PrepaymentPenalty, "PrepaymentPenalty");
+crate::bindings::macros::wire_methods!(
+    PyPrepaymentPenalty,
+    PrepaymentPenalty,
+    "PrepaymentPenalty",
+    to_dict
+);
 
 impl PyPrepaymentPenalty {
     fn build(inner: PrepaymentPenalty) -> PyResult<Self> {
@@ -370,15 +359,6 @@ impl PyPrepaymentPenalty {
         through.map(|date| date_to_py(py, date)).transpose()
     }
 
-    /// Fixed premium percent, or ``None`` for the other kinds.
-    #[getter]
-    fn pct(&self) -> Option<f64> {
-        match self.inner {
-            PrepaymentPenalty::Fixed { pct, .. } => Some(pct),
-            _ => None,
-        }
-    }
-
     /// Step-down schedule as ``(through, pct)`` pairs, or ``None``.
     #[getter]
     fn schedule<'py>(&self, py: Python<'py>) -> PyResult<Option<PenaltySteps<'py>>> {
@@ -414,20 +394,23 @@ impl PyPrepaymentPenalty {
         }
     }
 
-    /// Yield-maintenance floor in percent of the prepaid balance, or ``None``.
-    #[getter]
-    fn floor_pct(&self) -> Option<f64> {
-        match self.inner {
-            PrepaymentPenalty::YieldMaintenance { floor_pct, .. } => floor_pct,
-            _ => None,
-        }
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!("PrepaymentPenalty(kind={:?})", self.kind())
     }
 }
+
+crate::bindings::macros::py_getters!(PyPrepaymentPenalty |s| {
+    /// Fixed premium percent, or ``None`` for the other kinds.
+    pct -> Option<f64> =
+        match s.inner { PrepaymentPenalty::Fixed { pct, .. } => Some(pct), _ => None };
+
+    /// Yield-maintenance floor in percent of the prepaid balance, or ``None``.
+    floor_pct -> Option<f64> = match s.inner {
+        PrepaymentPenalty::YieldMaintenance { floor_pct, .. } => floor_pct,
+        _ => None,
+    };
+});
 
 /// Special-servicing state of a commercial mortgage at closing.
 ///
@@ -453,10 +436,11 @@ pub struct PySpecialServicingSpec {
     pub(crate) inner: SpecialServicingSpec,
 }
 
-sc_wire_methods!(
+crate::bindings::macros::wire_methods!(
     PySpecialServicingSpec,
     SpecialServicingSpec,
-    "SpecialServicingSpec"
+    "SpecialServicingSpec",
+    to_dict
 );
 
 #[pymethods]
@@ -484,12 +468,6 @@ impl PySpecialServicingSpec {
         Ok(Self { inner })
     }
 
-    /// Appraisal reduction in percent of the loan balance.
-    #[getter]
-    fn appraisal_reduction_pct(&self) -> f64 {
-        self.inner.appraisal_reduction_pct
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -498,6 +476,11 @@ impl PySpecialServicingSpec {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PySpecialServicingSpec |s| {
+    /// Appraisal reduction in percent of the loan balance.
+    appraisal_reduction_pct -> f64 = s.inner.appraisal_reduction_pct;
+});
 
 /// Resolution timeline of a non-performing or re-performing loan.
 ///
@@ -524,7 +507,12 @@ pub struct PyLiquidationSpec {
     pub(crate) inner: LiquidationSpec,
 }
 
-sc_wire_methods!(PyLiquidationSpec, LiquidationSpec, "LiquidationSpec");
+crate::bindings::macros::wire_methods!(
+    PyLiquidationSpec,
+    LiquidationSpec,
+    "LiquidationSpec",
+    to_dict
+);
 
 #[pymethods]
 impl PyLiquidationSpec {
@@ -574,43 +562,6 @@ impl PyLiquidationSpec {
         Ok(Self { inner })
     }
 
-    /// Months from origination until the loan resolves.
-    #[getter]
-    fn months_to_resolution(&self) -> u32 {
-        self.inner.months_to_resolution
-    }
-
-    /// Gross liquidation proceeds in percent of the balance.
-    #[getter]
-    fn proceeds_pct(&self) -> f64 {
-        self.inner.proceeds_pct
-    }
-
-    /// Carry and disposition costs in percent of the balance.
-    #[getter]
-    fn carry_cost_pct(&self) -> f64 {
-        self.inner.carry_cost_pct
-    }
-
-    /// Share of the balance that re-performs (decimal).
-    #[getter]
-    fn reperformance_prob(&self) -> f64 {
-        self.inner.reperformance_prob
-    }
-
-    /// Coupon of the re-performing share (decimal), or ``None``.
-    #[getter]
-    fn modified_rate(&self) -> Option<f64> {
-        self.inner.modified_rate
-    }
-
-    /// Net liquidation proceeds as a fraction of the balance
-    /// (``(proceeds_pct − carry_cost_pct) / 100``, floored at zero).
-    #[getter]
-    fn net_proceeds_fraction(&self) -> f64 {
-        self.inner.net_proceeds_fraction()
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -619,3 +570,24 @@ impl PyLiquidationSpec {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyLiquidationSpec |s| {
+    /// Months from origination until the loan resolves.
+    months_to_resolution -> u32 = s.inner.months_to_resolution;
+
+    /// Gross liquidation proceeds in percent of the balance.
+    proceeds_pct -> f64 = s.inner.proceeds_pct;
+
+    /// Carry and disposition costs in percent of the balance.
+    carry_cost_pct -> f64 = s.inner.carry_cost_pct;
+
+    /// Share of the balance that re-performs (decimal).
+    reperformance_prob -> f64 = s.inner.reperformance_prob;
+
+    /// Coupon of the re-performing share (decimal), or ``None``.
+    modified_rate -> Option<f64> = s.inner.modified_rate;
+
+    /// Net liquidation proceeds as a fraction of the balance
+    /// (``(proceeds_pct − carry_cost_pct) / 100``, floored at zero).
+    net_proceeds_fraction -> f64 = s.inner.net_proceeds_fraction();
+});

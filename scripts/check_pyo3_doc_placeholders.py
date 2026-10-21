@@ -100,6 +100,29 @@ def _pymethod_ranges(lines: list[str]) -> list[tuple[int, int]]:
     return ranges
 
 
+# Macro invocations whose `///` entries become public PyO3 methods: each doc
+# block documents the entry that follows it (`name -> Ret = expr;`, a Greek
+# name, or the `build` keyword).
+_METHOD_MACRO = re.compile(
+    r"^(?:crate::bindings::macros::)?(?:py_getters|instrument_greek_methods|instrument_envelope_methods)!\("
+)
+
+
+def _method_macro_ranges(lines: list[str]) -> list[tuple[int, int]]:
+    """Locate invocations of the macros that generate documented PyO3 methods."""
+    ranges: list[tuple[int, int]] = []
+    for start, line in enumerate(lines):
+        if _METHOD_MACRO.match(line) is None:
+            continue
+        end_index = next(
+            (index for index in range(start + 1, len(lines)) if lines[index] in (");", "});")),
+            None,
+        )
+        if end_index is not None:
+            ranges.append((start, end_index))
+    return ranges
+
+
 def _following_item(lines: list[str], block_end: int) -> tuple[str, str]:
     """Return attributes and the item line immediately following a doc block."""
     cursor = block_end
@@ -123,13 +146,17 @@ def _following_item(lines: list[str], block_end: int) -> tuple[str, str]:
 def _owner_name(item: str) -> str:
     """Extract a stable owner name from a Rust function, struct, or enum line."""
     match = re.search(r"\b(?:fn|struct|enum)\s+([A-Za-z_][A-Za-z0-9_]*)", item)
-    return match.group(1) if match is not None else "PyO3 API"
+    if match is not None:
+        return match.group(1)
+    entry = re.match(r"([A-Za-z_][A-Za-z0-9_]*)\b", item)
+    return entry.group(1) if entry is not None else "PyO3 API"
 
 
 def public_pyo3_doc_blocks(path: Path) -> list[PublicDocBlock]:
     """Return doc blocks attached to public PyO3 classes, methods, and functions."""
     lines = path.read_text(encoding="utf-8").splitlines()
     pymethod_ranges = _pymethod_ranges(lines)
+    macro_ranges = _method_macro_ranges(lines)
     blocks: list[PublicDocBlock] = []
     index = 0
     while index < len(lines):
@@ -147,8 +174,10 @@ def public_pyo3_doc_blocks(path: Path) -> list[PublicDocBlock]:
         item_is_function = re.search(r"\bfn\s+[A-Za-z_]", item) is not None
         item_is_type = re.search(r"\b(?:struct|enum)\s+[A-Za-z_]", item) is not None
         inside_pymethods = any(range_start < start < range_end for range_start, range_end in pymethod_ranges)
+        inside_method_macro = any(range_start < start < range_end for range_start, range_end in macro_ranges)
         is_public_owner = (
             (inside_pymethods and item_is_function)
+            or (inside_method_macro and bool(item))
             or ("#[pyfunction" in attributes and item_is_function)
             or ("#[pyclass" in attributes and item_is_type)
         )

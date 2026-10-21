@@ -17,16 +17,15 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::InstrumentJson;
 
 use super::convert::{
     attributes_from_py, enum_to_py_string, money_from_py, money_to_py, rate_decimal_from_py,
 };
 use super::typed_legs::{PyFixedLegSpec, PyFloatLegSpec};
-use crate::bindings::valuations::convert::{builder_repr, money_repr};
+use crate::bindings::valuations::convert::money_repr;
 use crate::bindings::valuations::instruments::{
-    decimal_from_f64, enum_from_str, instrument_expiry, opt_serde_to_py,
-    serialize_typed_instrument_json, spec_from_py, stub_kind_from_py,
+    decimal_from_f64, enum_from_str, instrument_expiry, opt_serde_to_py, spec_from_py,
+    stub_kind_from_py,
 };
 use crate::bindings::valuations::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
@@ -64,22 +63,29 @@ pub struct PyInterestRateSwap {
     pub(crate) inner: finstack_quant_valuations::instruments::InterestRateSwap,
 }
 
-impl PyInterestRateSwap {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(
-            InstrumentJson::InterestRateSwap(self.inner.clone()),
-            "InterestRateSwap",
-        )
-    }
-}
-
 instrument_envelope_methods!(
     PyInterestRateSwap,
     InterestRateSwap,
     "interest_rate_swap",
-    PyInterestRateSwapBuilder,
-    finstack_quant_valuations::instruments::InterestRateSwap::builder()
+    builder = PyInterestRateSwapBuilder("InterestRateSwapBuilder", fields),
+    seed = finstack_quant_valuations::instruments::InterestRateSwap::builder(),
+    /// Build the validated swap.
+    ///
+    /// Runs the same validation as Rust ``InterestRateSwapBuilder::build``
+    /// (structural invariants); pricing-time checks happen in ``price``.
+    ///
+    /// Returns
+    /// -------
+    /// InterestRateSwap
+    ///     The validated swap.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed, a required field is missing
+    ///     (the message names the builder and field), or the swap fails
+    ///     validation.
+    build
 );
 instrument_pricing_methods!(PyInterestRateSwap);
 
@@ -202,42 +208,6 @@ impl PyInterestRateSwap {
             .map_err(core_to_py)
     }
 
-    /// Notional shared by both legs.
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        money_to_py(self.inner.notional)
-    }
-
-    /// Swap direction for the fixed leg: ``"pay"`` or ``"receive"``.
-    #[getter]
-    fn side(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.side)
-    }
-
-    /// Fixed leg specification.
-    #[getter]
-    fn fixed_leg(&self) -> PyFixedLegSpec {
-        PyFixedLegSpec::from_inner(self.inner.fixed_leg.clone())
-    }
-
-    /// Floating leg specification.
-    #[getter]
-    fn float_leg(&self) -> PyFloatLegSpec {
-        PyFloatLegSpec::from_inner(self.inner.float_leg.clone())
-    }
-
-    /// Whether fixed coupon accrual dates use that leg's calendar and business-day convention.
-    #[getter]
-    fn adjust_fixed_accrual_dates(&self) -> bool {
-        self.inner.adjust_fixed_accrual_dates
-    }
-
-    /// Whether floating coupon accrual dates use that leg's calendar and business-day convention.
-    #[getter]
-    fn adjust_float_accrual_dates(&self) -> bool {
-        self.inner.adjust_float_accrual_dates
-    }
-
     /// OTC margin (CSA / initial-margin) specification in serde form, or ``None``.
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -265,6 +235,26 @@ impl PyInterestRateSwap {
     }
 }
 
+crate::bindings::macros::py_getters!(PyInterestRateSwap |s| {
+    /// Notional shared by both legs.
+    notional -> PyMoney = money_to_py(s.inner.notional);
+
+    /// Swap direction for the fixed leg: ``"pay"`` or ``"receive"``.
+    side -> PyResult<String> = enum_to_py_string(&s.inner.side);
+
+    /// Fixed leg specification.
+    fixed_leg -> PyFixedLegSpec = PyFixedLegSpec::from_inner(s.inner.fixed_leg.clone());
+
+    /// Floating leg specification.
+    float_leg -> PyFloatLegSpec = PyFloatLegSpec::from_inner(s.inner.float_leg.clone());
+
+    /// Whether fixed coupon accrual dates use that leg's calendar and business-day convention.
+    adjust_fixed_accrual_dates -> bool = s.inner.adjust_fixed_accrual_dates;
+
+    /// Whether floating coupon accrual dates use that leg's calendar and business-day convention.
+    adjust_float_accrual_dates -> bool = s.inner.adjust_float_accrual_dates;
+});
+
 /// Fluent builder for ``InterestRateSwap``; wraps the Rust
 /// `FinancialBuilder`-generated builder (consuming setters).
 ///
@@ -278,13 +268,6 @@ pub struct PyInterestRateSwapBuilder {
     inner: Option<IrsBuilder>,
     fields: Vec<(&'static str, String)>,
 }
-
-crate::bindings::valuations::pricing::pricing_override_methods!(
-    PyInterestRateSwap,
-    PyInterestRateSwapBuilder,
-    "InterestRateSwapBuilder",
-    fields
-);
 
 #[pymethods]
 impl PyInterestRateSwapBuilder {
@@ -493,34 +476,6 @@ impl PyInterestRateSwapBuilder {
             |b: IrsBuilder| b.attributes(attrs)
         )
     }
-
-    /// Build the validated swap.
-    ///
-    /// Runs the same validation as Rust ``InterestRateSwapBuilder::build``
-    /// (structural invariants); pricing-time checks happen in ``price``.
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwap
-    ///     The validated swap.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing
-    ///     (the message names the builder and field), or the swap fails
-    ///     validation.
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyInterestRateSwap> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PyInterestRateSwap { inner })
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        builder_repr("InterestRateSwapBuilder", &self.fields)
-    }
 }
 
 /// Typed wrapper for the Rust `Swaption` instrument.
@@ -542,19 +497,29 @@ pub struct PySwaption {
     pub(crate) inner: finstack_quant_valuations::instruments::Swaption,
 }
 
-impl PySwaption {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(InstrumentJson::Swaption(self.inner.clone()), "Swaption")
-    }
-}
-
 instrument_envelope_methods!(
     PySwaption,
     Swaption,
     "swaption",
-    PySwaptionBuilder,
-    finstack_quant_valuations::instruments::Swaption::builder()
+    builder = PySwaptionBuilder("SwaptionBuilder", fields),
+    seed = finstack_quant_valuations::instruments::Swaption::builder(),
+    /// Build the validated swaption.
+    ///
+    /// Runs the same validation as Rust ``SwaptionBuilder::build``
+    /// (structural invariants); pricing-time checks happen in ``price``.
+    ///
+    /// Returns
+    /// -------
+    /// Swaption
+    ///     The validated swaption.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed, a required field is missing
+    ///     (the message names the builder and field), or the swaption fails
+    ///     validation.
+    build
 );
 instrument_pricing_methods!(
     PySwaption,
@@ -645,58 +610,10 @@ impl PySwaption {
         date_to_py(py, self.inner.get_underlying_maturity())
     }
 
-    /// Option type: ``"call"`` (payer) or ``"put"`` (receiver).
-    #[getter]
-    fn option_type(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.option_type)
-    }
-
-    /// Notional of the underlying swap.
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        money_to_py(self.inner.notional)
-    }
-
     /// Option expiry date.
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.expiry)
-    }
-
-    /// Settlement method: ``"physical"`` or ``"cash"``.
-    #[getter]
-    fn settlement(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.settlement)
-    }
-
-    /// Cash settlement annuity method (serde string).
-    #[getter]
-    fn cash_settlement_method(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.cash_settlement_method)
-    }
-
-    /// Volatility model: ``"black"`` or ``"normal"``.
-    #[getter]
-    fn vol_model(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.vol_model)
-    }
-
-    /// Volatility surface identifier.
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
-
-    /// Fixed leg of the underlying swap.
-    #[getter]
-    fn underlying_fixed_leg(&self) -> PyFixedLegSpec {
-        PyFixedLegSpec::from_inner(self.inner.underlying_fixed_leg.clone())
-    }
-
-    /// Floating leg of the underlying swap.
-    #[getter]
-    fn underlying_float_leg(&self) -> PyFloatLegSpec {
-        PyFloatLegSpec::from_inner(self.inner.underlying_float_leg.clone())
     }
 
     /// SABR parameters (``alpha``, ``beta``, ``nu``, ``rho``, ``shift``) as a dict, or ``None``.
@@ -721,6 +638,34 @@ impl PySwaption {
     }
 }
 
+crate::bindings::macros::py_getters!(PySwaption |s| {
+    /// Option type: ``"call"`` (payer) or ``"put"`` (receiver).
+    option_type -> PyResult<String> = enum_to_py_string(&s.inner.option_type);
+
+    /// Notional of the underlying swap.
+    notional -> PyMoney = money_to_py(s.inner.notional);
+
+    /// Settlement method: ``"physical"`` or ``"cash"``.
+    settlement -> PyResult<String> = enum_to_py_string(&s.inner.settlement);
+
+    /// Cash settlement annuity method (serde string).
+    cash_settlement_method -> PyResult<String> = enum_to_py_string(&s.inner.cash_settlement_method);
+
+    /// Volatility model: ``"black"`` or ``"normal"``.
+    vol_model -> PyResult<String> = enum_to_py_string(&s.inner.vol_model);
+
+    /// Volatility surface identifier.
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+
+    /// Fixed leg of the underlying swap.
+    underlying_fixed_leg -> PyFixedLegSpec =
+        PyFixedLegSpec::from_inner(s.inner.underlying_fixed_leg.clone());
+
+    /// Floating leg of the underlying swap.
+    underlying_float_leg -> PyFloatLegSpec =
+        PyFloatLegSpec::from_inner(s.inner.underlying_float_leg.clone());
+});
+
 /// Fluent builder for ``Swaption``; wraps the Rust
 /// `FinancialBuilder`-generated builder (consuming setters).
 ///
@@ -734,13 +679,6 @@ pub struct PySwaptionBuilder {
     inner: Option<SwaptionBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
-
-crate::bindings::valuations::pricing::pricing_override_methods!(
-    PySwaption,
-    PySwaptionBuilder,
-    "SwaptionBuilder",
-    fields
-);
 
 #[pymethods]
 impl PySwaptionBuilder {
@@ -1075,34 +1013,6 @@ impl PySwaptionBuilder {
             |b: SwaptionBuilderInner| b.attributes(attrs)
         )
     }
-
-    /// Build the validated swaption.
-    ///
-    /// Runs the same validation as Rust ``SwaptionBuilder::build``
-    /// (structural invariants); pricing-time checks happen in ``price``.
-    ///
-    /// Returns
-    /// -------
-    /// Swaption
-    ///     The validated swaption.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing
-    ///     (the message names the builder and field), or the swaption fails
-    ///     validation.
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PySwaption> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PySwaption { inner })
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        builder_repr("SwaptionBuilder", &self.fields)
-    }
 }
 
 /// Typed wrapper for the Rust `CapFloor` instrument.
@@ -1122,19 +1032,12 @@ pub struct PyCapFloor {
     pub(crate) inner: finstack_quant_valuations::instruments::CapFloor,
 }
 
-impl PyCapFloor {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(InstrumentJson::CapFloor(self.inner.clone()), "CapFloor")
-    }
-}
-
 instrument_envelope_methods!(
     PyCapFloor,
     CapFloor,
     "cap_floor",
-    PyCapFloorBuilder,
-    finstack_quant_valuations::instruments::CapFloor::builder(),
+    builder = PyCapFloorBuilder("CapFloorBuilder", fields),
+    seed = finstack_quant_valuations::instruments::CapFloor::builder(),
     builder_doc = [
         " ",
         " Notes",
@@ -1145,7 +1048,24 @@ instrument_envelope_methods!(
         " are positive; otherwise the lognormal vol is converted to an",
         " equivalent normal vol and priced with Bachelier. A normal-vol",
         " surface must set ``vol_type`` to ``\"normal\"``.",
-    ]
+    ],
+    /// Build the validated cap/floor.
+    ///
+    /// Runs the same validation as Rust ``CapFloorBuilder::build``
+    /// (structural invariants); pricing-time checks happen in ``price``.
+    ///
+    /// Returns
+    /// -------
+    /// CapFloor
+    ///     The validated cap/floor.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed, a required field is missing
+    ///     (the message names the builder and field), or the cap/floor fails
+    ///     validation.
+    build
 );
 instrument_pricing_methods!(
     PyCapFloor,
@@ -1183,30 +1103,6 @@ impl PyCapFloor {
             .map_err(core_to_py)
     }
 
-    /// Option type: ``"cap"``, ``"floor"``, ``"caplet"`` or ``"floorlet"``.
-    #[getter]
-    fn rate_option_type(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.rate_option_type)
-    }
-
-    /// Notional amount.
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        money_to_py(self.inner.notional)
-    }
-
-    /// Strike as a decimal rate.
-    #[getter]
-    fn strike(&self) -> f64 {
-        decimal_f64(self.inner.strike)
-    }
-
-    /// Contractual margin added to the index, in basis points.
-    #[getter]
-    fn spread_bp(&self) -> f64 {
-        decimal_f64(self.inner.spread_bp)
-    }
-
     /// Start date of the underlying period.
     #[getter]
     fn start_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -1217,78 +1113,6 @@ impl PyCapFloor {
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
-    }
-
-    /// Payment frequency.
-    #[getter]
-    fn frequency(&self) -> PyTenor {
-        PyTenor::from_inner(self.inner.frequency)
-    }
-
-    /// Accrual day-count convention.
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    /// Stub rule.
-    #[getter]
-    fn stub(&self) -> PyStubKind {
-        PyStubKind::from_inner(self.inner.stub)
-    }
-
-    /// Business day convention (serde string).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Holiday calendar identifier, or ``None``.
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
-    }
-
-    /// Exercise style (serde string, e.g. ``"european"``).
-    #[getter]
-    fn exercise_style(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.exercise_style)
-    }
-
-    /// Settlement type (serde string, e.g. ``"cash"``).
-    #[getter]
-    fn settlement(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.settlement)
-    }
-
-    /// Discount curve identifier.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    /// Forward curve identifier.
-    #[getter]
-    fn forward_curve_id(&self) -> String {
-        self.inner.forward_curve_id.to_string()
-    }
-
-    /// Volatility surface identifier.
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
-
-    /// Volatility convention: ``"lognormal"``, ``"shifted_lognormal"``, ``"normal"`` or ``"auto"``.
-    #[getter]
-    fn vol_type(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.vol_type)
-    }
-
-    /// Displacement shift for shifted-lognormal pricing.
-    #[getter]
-    fn vol_shift(&self) -> f64 {
-        self.inner.vol_shift
     }
 
     /// Overnight coupon convention in serde form, or ``None``.
@@ -1328,6 +1152,57 @@ impl PyCapFloor {
     }
 }
 
+crate::bindings::macros::py_getters!(PyCapFloor |s| {
+    /// Option type: ``"cap"``, ``"floor"``, ``"caplet"`` or ``"floorlet"``.
+    rate_option_type -> PyResult<String> = enum_to_py_string(&s.inner.rate_option_type);
+
+    /// Notional amount.
+    notional -> PyMoney = money_to_py(s.inner.notional);
+
+    /// Strike as a decimal rate.
+    strike -> f64 = decimal_f64(s.inner.strike);
+
+    /// Contractual margin added to the index, in basis points.
+    spread_bp -> f64 = decimal_f64(s.inner.spread_bp);
+
+    /// Payment frequency.
+    frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
+
+    /// Accrual day-count convention.
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+
+    /// Stub rule.
+    stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
+
+    /// Business day convention (serde string).
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    /// Holiday calendar identifier, or ``None``.
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+
+    /// Exercise style (serde string, e.g. ``"european"``).
+    exercise_style -> PyResult<String> = enum_to_py_string(&s.inner.exercise_style);
+
+    /// Settlement type (serde string, e.g. ``"cash"``).
+    settlement -> PyResult<String> = enum_to_py_string(&s.inner.settlement);
+
+    /// Discount curve identifier.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    /// Forward curve identifier.
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
+
+    /// Volatility surface identifier.
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+
+    /// Volatility convention: ``"lognormal"``, ``"shifted_lognormal"``, ``"normal"`` or ``"auto"``.
+    vol_type -> PyResult<String> = enum_to_py_string(&s.inner.vol_type);
+
+    /// Displacement shift for shifted-lognormal pricing.
+    vol_shift -> f64 = s.inner.vol_shift;
+});
+
 /// Fluent builder for ``CapFloor``; wraps the Rust
 /// `FinancialBuilder`-generated builder (consuming setters).
 ///
@@ -1341,13 +1216,6 @@ pub struct PyCapFloorBuilder {
     inner: Option<CapFloorBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
-
-crate::bindings::valuations::pricing::pricing_override_methods!(
-    PyCapFloor,
-    PyCapFloorBuilder,
-    "CapFloorBuilder",
-    fields
-);
 
 #[pymethods]
 impl PyCapFloorBuilder {
@@ -1986,34 +1854,6 @@ impl PyCapFloorBuilder {
             "Attributes(...)".to_string(),
             |b: CapFloorBuilderInner| b.attributes(attrs)
         )
-    }
-
-    /// Build the validated cap/floor.
-    ///
-    /// Runs the same validation as Rust ``CapFloorBuilder::build``
-    /// (structural invariants); pricing-time checks happen in ``price``.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloor
-    ///     The validated cap/floor.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing
-    ///     (the message names the builder and field), or the cap/floor fails
-    ///     validation.
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyCapFloor> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PyCapFloor { inner })
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        builder_repr("CapFloorBuilder", &self.fields)
     }
 }
 

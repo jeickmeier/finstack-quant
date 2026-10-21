@@ -7,22 +7,21 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::{core_to_py, value_error};
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations::market::conventions::CdsConvention;
 use finstack_quant_valuations::market::conventions::CdsValuationConvention;
 use rust_decimal::prelude::ToPrimitive;
 
 use super::super::convert::{
-    attributes_from_py, builder_repr, date_repr, dated_money_from_py, enum_to_py_string,
-    money_repr, money_to_py, opt_repr,
+    attributes_from_py, date_repr, dated_money_from_py, enum_to_py_string, money_repr, money_to_py,
+    opt_repr,
 };
-use super::super::instruments::{enum_from_str, serialize_typed_instrument_json};
+use super::super::instruments::enum_from_str;
 use super::super::typed_legs::{PyPremiumLegSpec, PyProtectionLegSpec};
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
-use crate::bindings::valuations::convert::take_builder;
 
 type CdsBuilderInner =
     finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwapBuilder;
@@ -73,22 +72,29 @@ pub struct PyCreditDefaultSwap {
     pub(crate) inner: finstack_quant_valuations::instruments::CreditDefaultSwap,
 }
 
-impl PyCreditDefaultSwap {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(
-            InstrumentJson::CreditDefaultSwap(self.inner.clone()),
-            "CreditDefaultSwap",
-        )
-    }
-}
-
 instrument_envelope_methods!(
     PyCreditDefaultSwap,
     CreditDefaultSwap,
     "credit_default_swap",
-    PyCreditDefaultSwapBuilder,
-    finstack_quant_valuations::instruments::CreditDefaultSwap::builder()
+    builder = PyCreditDefaultSwapBuilder("CreditDefaultSwapBuilder", fields),
+    seed = finstack_quant_valuations::instruments::CreditDefaultSwap::builder(),
+    /// Build the validated CDS.
+    ///
+    /// Validation is the Rust ``CreditDefaultSwap::builder().build()``
+    /// invariants only; there is no additional binding-side check.
+    ///
+    /// Returns
+    /// -------
+    /// CreditDefaultSwap
+    ///     The validated CDS.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed, a required field is missing,
+    ///     or the completed CDS fails validation (recovery outside ``[0, 1]``,
+    ///     upfront currency mismatch, protection date outside the premium period).
+    build
 );
 instrument_pricing_methods!(PyCreditDefaultSwap);
 
@@ -155,46 +161,6 @@ impl PyCreditDefaultSwap {
         self.inner.par_spread(&market, as_of).map_err(core_to_py)
     }
 
-    /// Notional amount of protection.
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        money_to_py(self.inner.notional)
-    }
-
-    /// ``"pay"`` (buy protection) or ``"receive"`` (sell protection).
-    #[getter]
-    fn side(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.side)
-    }
-
-    /// ISDA regional convention (``"isda_na"``, ``"isda_eu"``, ``"isda_as"``, ``"custom"``).
-    #[getter]
-    fn convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.convention)
-    }
-
-    /// Premium leg specification.
-    #[getter]
-    fn premium_leg(&self) -> PyPremiumLegSpec {
-        PyPremiumLegSpec {
-            inner: self.inner.premium_leg.clone(),
-        }
-    }
-
-    /// Protection leg specification.
-    #[getter]
-    fn protection_leg(&self) -> PyProtectionLegSpec {
-        PyProtectionLegSpec {
-            inner: self.inner.protection_leg.clone(),
-        }
-    }
-
-    /// Valuation presentation convention (serde name, default ``"bloomberg_cdsw_clean"``).
-    #[getter]
-    fn valuation_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.valuation_convention)
-    }
-
     /// Points-upfront payment as ``(payment_date, amount)``, or ``None``.
     ///
     /// Positive means the protection buyer pays the seller.
@@ -204,24 +170,6 @@ impl PyCreditDefaultSwap {
             .upfront
             .map(|(date, money)| Ok((date_to_py(py, date)?, money_to_py(money))))
             .transpose()
-    }
-
-    /// Explicit ISDA documentation clause, or ``None`` when derived from the convention.
-    #[getter]
-    fn doc_clause(&self) -> PyResult<Option<String>> {
-        self.inner
-            .doc_clause
-            .map(|clause| enum_to_py_string(&clause))
-            .transpose()
-    }
-
-    /// Effective documentation clause after convention-based resolution.
-    ///
-    /// Mirrors Rust ``CreditDefaultSwap::doc_clause_effective``: ``"xr14"``
-    /// for ``isda_na`` / ``isda_as`` / ``custom``, ``"mm14"`` for ``isda_eu``.
-    #[getter]
-    fn doc_clause_effective(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.doc_clause_effective())
     }
 
     /// Protection effective date for a forward-starting CDS, or ``None``.
@@ -275,6 +223,37 @@ impl PyCreditDefaultSwap {
     }
 }
 
+crate::bindings::macros::py_getters!(PyCreditDefaultSwap |s| {
+    /// Notional amount of protection.
+    notional -> PyMoney = money_to_py(s.inner.notional);
+
+    /// ``"pay"`` (buy protection) or ``"receive"`` (sell protection).
+    side -> PyResult<String> = enum_to_py_string(&s.inner.side);
+
+    /// ISDA regional convention (``"isda_na"``, ``"isda_eu"``, ``"isda_as"``, ``"custom"``).
+    convention -> PyResult<String> = enum_to_py_string(&s.inner.convention);
+
+    /// Premium leg specification.
+    premium_leg -> PyPremiumLegSpec = PyPremiumLegSpec { inner: s.inner.premium_leg.clone() };
+
+    /// Protection leg specification.
+    protection_leg -> PyProtectionLegSpec =
+        PyProtectionLegSpec { inner: s.inner.protection_leg.clone() };
+
+    /// Valuation presentation convention (serde name, default ``"bloomberg_cdsw_clean"``).
+    valuation_convention -> PyResult<String> = enum_to_py_string(&s.inner.valuation_convention);
+
+    /// Explicit ISDA documentation clause, or ``None`` when derived from the convention.
+    doc_clause -> PyResult<Option<String>> =
+        s.inner.doc_clause.map(|clause| enum_to_py_string(&clause)).transpose();
+
+    /// Effective documentation clause after convention-based resolution.
+    ///
+    /// Mirrors Rust ``CreditDefaultSwap::doc_clause_effective``: ``"xr14"``
+    /// for ``isda_na`` / ``isda_as`` / ``custom``, ``"mm14"`` for ``isda_eu``.
+    doc_clause_effective -> PyResult<String> = enum_to_py_string(&s.inner.doc_clause_effective());
+});
+
 /// Fluent builder for ``CreditDefaultSwap``; wraps the Rust
 /// ``FinancialBuilder``-generated builder (consuming setters).
 ///
@@ -288,13 +267,6 @@ pub struct PyCreditDefaultSwapBuilder {
     inner: Option<CdsBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
-
-crate::bindings::valuations::pricing::pricing_override_methods!(
-    PyCreditDefaultSwap,
-    PyCreditDefaultSwapBuilder,
-    "CreditDefaultSwapBuilder",
-    fields
-);
 
 #[pymethods]
 impl PyCreditDefaultSwapBuilder {
@@ -622,33 +594,5 @@ impl PyCreditDefaultSwapBuilder {
         let shown = value.repr()?.to_string();
         builder_set!(slf, attributes, shown, |b: CdsBuilderInner| b
             .attributes(attrs))
-    }
-
-    /// Build the validated CDS.
-    ///
-    /// Validation is the Rust ``CreditDefaultSwap::builder().build()``
-    /// invariants only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// CreditDefaultSwap
-    ///     The validated CDS.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed CDS fails validation (recovery outside ``[0, 1]``,
-    ///     upfront currency mismatch, protection date outside the premium period).
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyCreditDefaultSwap> {
-        let b = take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PyCreditDefaultSwap { inner })
-    }
-
-    /// Return ``repr(self)`` listing the fields set so far.
-    fn __repr__(&self) -> String {
-        builder_repr("CreditDefaultSwapBuilder", &self.fields)
     }
 }
