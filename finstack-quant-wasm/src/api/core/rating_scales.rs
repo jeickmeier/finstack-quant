@@ -5,13 +5,12 @@
 //! as plain objects typed by the schema-generated types of the same names.
 
 use crate::api::core::config::JsFinstackConfig;
-use crate::utils::input::{js_string, json_text};
+use crate::utils::input::{from_js_json, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::rating_scales::{
     embedded_registry as rust_embedded_registry, registry_from_config as rust_registry_from_config,
     RatingScaleRegistry, UnknownScalePolicy, RATING_SCALES_EXTENSION_KEY,
 };
-use finstack_quant_core::wire::{serde_label, serde_parse};
 use wasm_bindgen::prelude::*;
 
 /// What a registry does when asked for a rating scale it does not know.
@@ -20,8 +19,8 @@ use wasm_bindgen::prelude::*;
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// core.UnknownScalePolicy.fallbackToDefault().name; // "fallback_to_default"
-/// core.embeddedRegistry().unknownScalePolicy().name;
+/// core.UnknownScalePolicy.fallbackToDefault().toString(); // "fallback_to_default"
+/// core.embeddedRegistry().unknownScalePolicy().toString();
 /// ```
 #[wasm_bindgen(js_name = UnknownScalePolicy)]
 #[derive(Clone, Copy, Debug)]
@@ -30,7 +29,7 @@ pub struct JsUnknownScalePolicy {
 }
 
 impl JsUnknownScalePolicy {
-    const fn wrap(inner: UnknownScalePolicy) -> Self {
+    const fn from_inner(inner: UnknownScalePolicy) -> Self {
         Self { inner }
     }
 }
@@ -42,7 +41,7 @@ impl JsUnknownScalePolicy {
     /// @returns The `error` policy.
     #[wasm_bindgen(js_name = error)]
     pub fn error() -> Self {
-        Self::wrap(UnknownScalePolicy::Error)
+        Self::from_inner(UnknownScalePolicy::Error)
     }
 
     /// Use the registry's default scale for unknown names.
@@ -50,7 +49,7 @@ impl JsUnknownScalePolicy {
     /// @returns The `fallback_to_default` policy.
     #[wasm_bindgen(js_name = fallbackToDefault)]
     pub fn fallback_to_default() -> Self {
-        Self::wrap(UnknownScalePolicy::FallbackToDefault)
+        Self::from_inner(UnknownScalePolicy::FallbackToDefault)
     }
 
     /// Use the default scale for unknown names and let the caller warn.
@@ -58,7 +57,7 @@ impl JsUnknownScalePolicy {
     /// @returns The `warn_and_fallback` policy.
     #[wasm_bindgen(js_name = warnAndFallback)]
     pub fn warn_and_fallback() -> Self {
-        Self::wrap(UnknownScalePolicy::WarnAndFallback)
+        Self::from_inner(UnknownScalePolicy::WarnAndFallback)
     }
 
     /// Parse a policy name (the Rust serde label).
@@ -66,22 +65,17 @@ impl JsUnknownScalePolicy {
     /// # Arguments
     ///
     /// * `name` - Policy name: `"error"`, `"fallback_to_default"` or
-    ///   `"warn_and_fallback"`.
+    ///   `"warn_and_fallback"`, in any ASCII case.
     ///
     /// @returns The matching `UnknownScalePolicy`.
     /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
     /// `FinstackError` (kind `validation`) if no policy matches.
     #[wasm_bindgen(js_name = fromName)]
     pub fn from_name(name: JsValue) -> Result<JsUnknownScalePolicy, JsValue> {
-        serde_parse(&js_string(&name, "name")?)
-            .map(Self::wrap)
+        js_string(&name, "name")?
+            .parse()
+            .map(Self::from_inner)
             .map_err(to_js_err)
-    }
-
-    /// Snake_case name of the policy, such as `"fallback_to_default"`.
-    #[wasm_bindgen(getter, js_name = name)]
-    pub fn name(&self) -> Result<String, JsValue> {
-        serde_label(&self.inner).map_err(to_js_err)
     }
 
     /// Serialize to the canonical JSON wire form (a quoted snake_case name).
@@ -93,7 +87,7 @@ impl JsUnknownScalePolicy {
         serde_json::to_string(&self.inner).map_err(to_js_err)
     }
 
-    /// Deserialize from the canonical JSON wire form (Rust `UnknownScalePolicy::from_json`).
+    /// Deserialize from the canonical JSON wire form (the Rust serde representation).
     ///
     /// # Arguments
     ///
@@ -105,18 +99,16 @@ impl JsUnknownScalePolicy {
     /// `validation`) if it is not a quoted policy name.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsUnknownScalePolicy, JsValue> {
-        UnknownScalePolicy::from_json(&js_string(&json, "json")?)
-            .map(Self::wrap)
-            .map_err(to_js_err)
+        from_js_json::<UnknownScalePolicy>(&json, "json").map(Self::from_inner)
     }
 
-    /// Snake_case name of the policy (same as `name`).
+    /// Snake_case name of the policy, such as `"fallback_to_default"`.
     ///
     /// @returns The name accepted by `fromName`.
-    /// @throws If the label cannot be produced (not expected).
     #[wasm_bindgen(js_name = toString)]
-    pub fn to_string(&self) -> Result<String, JsValue> {
-        serde_label(&self.inner).map_err(to_js_err)
+    #[allow(clippy::inherent_to_string)]
+    pub fn to_string(&self) -> String {
+        self.inner.to_string()
     }
 }
 
@@ -175,7 +167,7 @@ impl JsRatingScaleRegistry {
     /// @returns The registry's `UnknownScalePolicy`.
     #[wasm_bindgen(js_name = unknownScalePolicy)]
     pub fn unknown_scale_policy(&self) -> JsUnknownScalePolicy {
-        JsUnknownScalePolicy::wrap(self.inner.unknown_scale_policy())
+        JsUnknownScalePolicy::from_inner(self.inner.unknown_scale_policy())
     }
 
     /// Whether a name is a registered scale id or alias.

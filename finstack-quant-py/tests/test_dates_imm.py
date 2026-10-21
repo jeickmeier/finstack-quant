@@ -117,4 +117,4 @@ def test_date_boundary_roll_inclusivity_is_preserved() -> None:
 def test_estimated_sifma_rejects_unrepresentable_years(year: int) -> None:
     """Projection estimates share the fallible date boundary."""
     with pytest.raises(ValueError, match=r"(?i)year|date|range"):
-        dates.estimated_sifma_settlement_date_for_class(3, year, dates.SifmaSettlementClass.A)
+        dates.estimated_sifma_settlement_date(3, year, dates.SifmaSettlementClass.A)

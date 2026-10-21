@@ -28,7 +28,7 @@ pub(super) struct PeriodInputs<'a> {
     /// Start of the period (the previous payment date, or closing).
     pub(super) period_start: Date,
     /// Interest claim per tranche as the waterfall spec defines it.
-    pub(super) claim_caps: &'a HashMap<&'a str, Option<f64>>,
+    pub(super) claim_caps: &'a FxHashMap<&'a str, Option<f64>>,
 }
 
 /// Simulate a single payment period.
@@ -565,7 +565,7 @@ pub(super) fn simulate_period(
     } else {
         0.0
     };
-    let trigger_levels: HashMap<&str, f64> = period_waterfall
+    let trigger_levels: FxHashMap<&str, f64> = period_waterfall
         .coverage_tests()
         .map(|spec| (spec.id.as_str(), spec.trigger_level))
         .collect();

@@ -31,10 +31,9 @@ numeric-serde helpers that keep instrument invariants uniform.
 | `dependencies.rs` | `MarketDependencies`, `InstrumentCurves`, `RatesCurveKind`, `FxPair`, `VolatilityDependency` |
 | `margin.rs` | Helpers shared by the instruments' `Marginable` impls: repriced DV01 / CS01 lookups, SIMM tenor buckets, reference-entity parsing, credit-delta classification, netting-set ids |
 | `helpers.rs` | `ValidatedPricingLifecycle`, metric-context construction, `schedule_pv*`, GBM drift schedules, market-scalar lookups, Black-Scholes input collection, inflation-lag resolution |
-| `validation.rs` | Structural invariant checks (`validate_date_range_strict`, `validate_money_gt`, `validate_recovery_rate`, `validate_rate_magnitude`, …) |
+| `validation.rs` | Structural invariant checks (`validate_date_range_strict`, `validate_money_gt`, `validate_recovery_rate`, …) |
 | `numeric.rs` | `decimal_to_f64` plus the serde adapters that reject non-finite / out-of-range `f64` on the wire |
 | `vol_resolution.rs` | `resolve_sigma_at` — the override-then-surface σ lookup precedence |
-| `fx_dates.rs` | `fx_spot_date_for_pair` plus re-exports of the core joint-calendar helpers |
 
 ### `parameters/`
 
@@ -74,7 +73,7 @@ Everything below is re-exported by `instruments/mod.rs`; the module paths under
   `OptionGreeksRequest`; `MarketDependencies`, `InstrumentCurves`,
   `RatesCurveKind`, `FxPair`, `VolatilityDependency`; `TrsEngine`,
   `TrsReturnModel`, `TotalReturnLegParams`; `TrsScheduleSpec`;
-  `fx_spot_date_for_pair`; and the `parameters` subset listed in
+  and the `parameters` subset listed in
   `instruments/mod.rs` (`FixedLegSpec`, `FloatLegSpec`,
   `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`,
   `TotalReturnLegSpec`, `PayReceive`,

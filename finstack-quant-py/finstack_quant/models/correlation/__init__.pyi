@@ -33,7 +33,7 @@ __all__ = [
     "RecoveryModel",
     "RecoverySpec",
     "TrancheLossStatistics",
-    "cholesky_decompose",
+    "cholesky_correlation",
     "correlation_bounds",
     "joint_probabilities",
     "nearest_correlation",
@@ -2852,7 +2852,7 @@ def nearest_correlation(
     """
     ...
 
-def cholesky_decompose(matrix: Sequence[float] | Sequence[Sequence[float]], n: int) -> list[float]:
+def cholesky_correlation(matrix: Sequence[float] | Sequence[Sequence[float]], n: int) -> list[float]:
     """
     Pivoted Cholesky decomposition of a correlation matrix.
 
@@ -2892,8 +2892,8 @@ def cholesky_decompose(matrix: Sequence[float] | Sequence[Sequence[float]], n: i
 
     Examples
     --------
-    >>> from finstack_quant.models.correlation import cholesky_decompose
-    >>> factor = cholesky_decompose([1.0, 0.3, 0.3, 1.0], 2)
+    >>> from finstack_quant.models.correlation import cholesky_correlation
+    >>> factor = cholesky_correlation([1.0, 0.3, 0.3, 1.0], 2)
     >>> (len(factor), round(sum(value * value for value in factor), 2))
     (4, 2.0)
 

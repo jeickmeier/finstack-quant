@@ -60,7 +60,7 @@ impl PdCalibrationError {
     /// default-rate series or master-scale definition, so the kind is always
     /// validation.
     #[must_use]
-    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
-        finstack_quant_core::error::ErrorKind::Validation
+    pub fn kind(&self) -> finstack_quant_core::ErrorKind {
+        finstack_quant_core::ErrorKind::Validation
     }
 }

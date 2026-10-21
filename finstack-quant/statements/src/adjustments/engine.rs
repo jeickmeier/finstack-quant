@@ -8,7 +8,7 @@ use crate::error::{Error, Result};
 use crate::evaluator::StatementResult;
 use crate::types::NodeValueType;
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use indexmap::IndexMap;
 
 /// Engine for calculating normalized metrics.

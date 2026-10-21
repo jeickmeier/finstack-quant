@@ -21,12 +21,11 @@ use finstack_quant_core::market_data::term_structures::{
     DiscountCurve, ForwardCurve, PriceCurve, PriceCurveKind,
 };
 use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::stats::RealizedVarMethod;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
-use finstack_quant_valuations::instruments::equity::variance_swap::{
-    PayReceive, RealizedVarMethod, VarianceSwap,
-};
+use finstack_quant_valuations::instruments::equity::variance_swap::{PayReceive, VarianceSwap};
 use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
 use finstack_quant_valuations::instruments::equity::Equity;
 use finstack_quant_valuations::instruments::Instrument;

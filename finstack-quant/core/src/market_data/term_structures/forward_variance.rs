@@ -256,84 +256,6 @@ impl ForwardVarianceCurve {
         let w = (t - t0) / (t1 - t0);
         v0 + w * (v1 - v0)
     }
-
-    /// Computes the integrated variance ∫₀ᵗ ξ₀(s) ds.
-    ///
-    /// Integrates the constructor's interpolation contract exactly and
-    /// extrapolates flat beyond the curve boundaries.
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Integration end in year fractions. Returns zero for nonpositive
-    ///   times and NaN for nonfinite times.
-    pub fn integrated_variance(&self, t: f64) -> f64 {
-        debug_assert!(!self.times.is_empty());
-        if !t.is_finite() {
-            return f64::NAN;
-        }
-
-        if t <= 0.0 {
-            return 0.0;
-        }
-
-        let n = self.times.len();
-
-        if matches!(self.interpolation, Interpolation::ConstantIntervals) {
-            let mut start = 0.0;
-            let mut integral = 0.0;
-            for (&end, &variance) in self.times.iter().zip(&self.values) {
-                integral += variance * (t.min(end) - start);
-                if t <= end {
-                    return integral;
-                }
-                start = end;
-            }
-            return integral + self.values[n - 1] * (t - start);
-        }
-
-        // If t is at or before the first knot, flat extrapolation from v[0]
-        if t <= self.times[0] {
-            return self.values[0] * t;
-        }
-
-        let mut integral = 0.0;
-
-        // Integrate from 0 to times[0] using flat extrapolation of values[0]
-        integral += self.values[0] * self.times[0];
-
-        // Integrate piecewise linear segments
-        for i in 0..n - 1 {
-            let t0 = self.times[i];
-            let t1 = self.times[i + 1];
-            let v0 = self.values[i];
-            let v1 = self.values[i + 1];
-
-            if t <= t0 {
-                // t is before this segment; we already accounted for it
-                break;
-            }
-
-            let seg_end = t.min(t1);
-            let dt = seg_end - t0;
-
-            // Linear interp value at seg_end
-            let w = (seg_end - t0) / (t1 - t0);
-            let v_end = v0 + w * (v1 - v0);
-
-            // Trapezoidal area for this portion of the segment
-            integral += 0.5 * (v0 + v_end) * dt;
-
-            if t <= t1 {
-                return integral;
-            }
-        }
-
-        // t is beyond the last knot — flat extrapolation from values[n-1]
-        let last_v = self.values[n - 1];
-        integral += last_v * (t - self.times[n - 1]);
-
-        integral
-    }
 }
 
 #[cfg(test)]
@@ -351,30 +273,13 @@ mod tests {
     }
 
     #[test]
-    fn flat_curve_integrated_variance() {
-        let c = ForwardVarianceCurve::flat(0.04).unwrap();
-        for &t in &[0.0, 0.5, 1.0, 5.0, 10.0] {
-            let expected = 0.04 * t;
-            assert!(
-                (c.integrated_variance(t) - expected).abs() < TOL,
-                "integrated_variance({t}) = {}, expected {expected}",
-                c.integrated_variance(t)
-            );
-        }
-    }
-
-    #[test]
-    fn interval_variances_preserve_areas_and_boundary_values() {
+    fn interval_variances_are_right_continuous_step_values() {
         let curve = ForwardVarianceCurve::from_intervals(&[(0.25, 0.04), (1.0, 0.12), (1.5, 0.02)])
             .unwrap();
-        for (time, expected) in [(0.25, 0.01), (1.0, 0.1), (1.5, 0.11), (2.0, 0.12)] {
-            assert!((curve.integrated_variance(time) - expected).abs() < TOL);
-        }
         assert_eq!(curve.value(0.0), 0.04);
         assert_eq!(curve.value(0.25), 0.12);
         assert_eq!(curve.value(1.0), 0.02);
         assert_eq!(curve.value(3.0), 0.02);
-        assert!((curve.integrated_variance(0.5) - 0.04).abs() < TOL);
     }
 
     #[test]
@@ -404,10 +309,6 @@ mod tests {
                 serde_json::from_value(serialized.clone()).unwrap();
             for time in [0.0, 0.25, 0.5, 1.0, 2.0] {
                 assert_eq!(restored.value(time), curve.value(time));
-                assert_eq!(
-                    restored.integrated_variance(time),
-                    curve.integrated_variance(time)
-                );
             }
             let mut unknown = serialized;
             unknown["unknown_field"] = serde_json::json!(true);
@@ -439,27 +340,6 @@ mod tests {
 
         // Flat extrapolation right
         assert!((c.value(5.0) - 0.08).abs() < TOL);
-    }
-
-    #[test]
-    fn integrated_variance_numerical_check() {
-        let c = ForwardVarianceCurve::from_points(&[(1.0, 0.04), (3.0, 0.08)]).unwrap();
-
-        // Numerical integration via fine Riemann sum
-        let t_end = 4.0;
-        let steps = 100_000;
-        let dt = t_end / steps as f64;
-        let mut numerical = 0.0;
-        for i in 0..steps {
-            let s = (i as f64 + 0.5) * dt;
-            numerical += c.value(s) * dt;
-        }
-
-        let analytical = c.integrated_variance(t_end);
-        assert!(
-            (analytical - numerical).abs() < 1e-6,
-            "analytical={analytical}, numerical={numerical}"
-        );
     }
 
     #[test]
@@ -498,6 +378,5 @@ mod tests {
         }
         let curve = ForwardVarianceCurve::flat(0.04).unwrap();
         assert!(curve.value(f64::NAN).is_nan());
-        assert!(curve.integrated_variance(f64::INFINITY).is_nan());
     }
 }

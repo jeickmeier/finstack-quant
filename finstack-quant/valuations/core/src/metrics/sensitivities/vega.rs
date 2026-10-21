@@ -10,7 +10,7 @@ use crate::metrics::core::finite_difference::{
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::MetricCalculator;
 use crate::metrics::{MetricContext, MetricId};
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use std::marker::PhantomData;
 
 /// Key-rate vega calculator: bumps individual (expiry, strike) points.
@@ -92,7 +92,9 @@ where
             *existing
         } else if let Some(volatility) = volatility_override(instrument) {
             let up = bumped_volatility_override(instrument, bump_pct)?.ok_or_else(|| {
-                finstack_quant_core::Error::internal("active volatility override disappeared")
+                finstack_quant_core::Error::Internal(
+                    "active volatility override disappeared".into(),
+                )
             })?;
             let pv_up = context.reprice_instrument_raw(&up, base_ctx, as_of)?;
             if volatility <= bump_pct {
@@ -100,7 +102,9 @@ where
                     / (bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
             } else {
                 let down = bumped_volatility_override(instrument, -bump_pct)?.ok_or_else(|| {
-                    finstack_quant_core::Error::internal("active volatility override disappeared")
+                    finstack_quant_core::Error::Internal(
+                        "active volatility override disappeared".into(),
+                    )
                 })?;
                 (pv_up - context.reprice_instrument_raw(&down, base_ctx, as_of)?)
                     / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
@@ -179,8 +183,8 @@ where
                         let column = columns
                             .binary_search_by(|value| value.total_cmp(&strike))
                             .map_err(|_| {
-                                finstack_quant_core::Error::internal(
-                                    "source strike missing from vega matrix",
+                                finstack_quant_core::Error::Internal(
+                                    "source strike missing from vega matrix".into(),
                                 )
                             })?;
                         let token = scratch.apply_surface_point_absolute_bump_in_place(

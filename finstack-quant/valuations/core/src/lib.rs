@@ -22,7 +22,7 @@
 //! dispatch, metric calculators, market conventions and result envelopes.
 //!
 //! Instruments implement [`crate::instruments::Instrument`], consume market data from
-//! [`finstack_quant_core::market_data::MarketContext`], and dispatch through registered pricing
+//! [`finstack_quant_core::market_data::context::MarketContext`], and dispatch through registered pricing
 //! models. Pricing returns a currency-tagged present value plus requested metrics in
 //! [`crate::results::ValuationResult`]. This crate holds no instrument type: the instrument
 //! families and the closed-world assembly (JSON loading, the standard registries, composite

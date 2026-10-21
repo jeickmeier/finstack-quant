@@ -31,7 +31,11 @@ fn df_from_rate(rate: f64, years: f64) -> f64 {
 
 /// Flat curve with explicit wing pillars: 1M on the short end, 40Y on the
 /// long end (40Y/50Y pillars are routine on EUR/GBP/USD long curves).
-fn build_wing_curve(curve_id: &str, as_of: time::Date, rate: f64) -> DiscountCurve {
+fn build_wing_curve(
+    curve_id: &str,
+    as_of: finstack_quant_core::dates::Date,
+    rate: f64,
+) -> DiscountCurve {
     let tenors = [0.0, 1.0 / 12.0, 0.25, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 40.0];
     let knots: Vec<(f64, f64)> = tenors.iter().map(|&t| (t, df_from_rate(rate, t))).collect();
     DiscountCurve::builder(curve_id)

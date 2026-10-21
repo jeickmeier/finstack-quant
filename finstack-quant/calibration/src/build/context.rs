@@ -1,7 +1,7 @@
 //! Build context for quote-to-instrument construction.
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::{Error, HashMap, InputError, Result};
+use finstack_quant_core::{Error, FxHashMap, InputError, Result};
 
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_valuations_credit::cds::CdsValuationConvention;
@@ -53,7 +53,7 @@ pub(crate) struct BuildCtx {
     ///
     /// Do not assume that a missing role always falls back to a currency-based ID.
     /// Consult the builder-specific docs when the distinction matters.
-    curve_ids: HashMap<String, String>,
+    curve_ids: FxHashMap<String, String>,
     /// Optional CDS valuation convention for instruments built from CDS quotes.
     cds_valuation_convention: Option<CdsValuationConvention>,
     /// Optional override for the OIS floating-leg compounding mode used when
@@ -71,7 +71,7 @@ pub(crate) struct BuildCtx {
 
 impl BuildCtx {
     /// Create a new build context.
-    pub(crate) fn new(as_of: Date, notional: f64, curve_ids: HashMap<String, String>) -> Self {
+    pub(crate) fn new(as_of: Date, notional: f64, curve_ids: FxHashMap<String, String>) -> Self {
         Self {
             as_of,
             notional,

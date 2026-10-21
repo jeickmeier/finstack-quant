@@ -1727,8 +1727,7 @@
         "tolerances": {
           "$ref": "#/$defs/ToleranceConfig",
           "default": {
-            "generic_epsilon": 1e-10,
-            "rate_epsilon": 1e-12
+            "generic_epsilon": 1e-10
           },
           "description": "Tolerance settings snapshot for floating-point comparisons."
         },
@@ -2159,17 +2158,12 @@
     },
     "ToleranceConfig": {
       "additionalProperties": false,
-      "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides configurable epsilon values for zero-checks in rate calculations\nand generic floating-point comparisons. These defaults are chosen to balance\nnumerical stability with practical precision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.rate_epsilon, 1e-12);\n\n// Customize for stricter rate comparisons\ntol.rate_epsilon = 1e-14;\n```",
+      "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides the configurable epsilon for generic floating-point zero-checks.\nThe default is chosen to balance numerical stability with practical\nprecision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.generic_epsilon, 1e-10);\n\n// Customize for stricter comparisons\ntol.generic_epsilon = 1e-12;\n```",
       "properties": {
         "generic_epsilon": {
           "$ref": "#/$defs/PositiveF64Wire",
           "default": 1e-10,
           "description": "Epsilon for generic floating-point comparisons (default: 1e-10).\n\nUsed for general numerical comparisons where higher tolerance is acceptable."
-        },
-        "rate_epsilon": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "default": 1e-12,
-          "description": "Epsilon for rate comparisons (default: 1e-12).\n\nUsed when comparing interest rates, yields, and other small ratios."
         }
       },
       "type": "object"

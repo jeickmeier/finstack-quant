@@ -31,7 +31,7 @@
 //! - Black (1976) and Bachelier (1900) pricing functions inverted here:
 //!   , `docs/REFERENCES.md#black-1976` `docs/REFERENCES.md#bachelier-1900`
 
-use finstack_quant_core::error::InputError;
+use finstack_quant_core::InputError;
 
 use crate::closed_form::volatility::{
     bachelier_call, bachelier_put, bachelier_vega, black_call, black_put, black_vega,

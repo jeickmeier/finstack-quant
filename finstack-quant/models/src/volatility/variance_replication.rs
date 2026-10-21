@@ -164,7 +164,7 @@ pub fn carr_madan_forward_variance(
     // below. (The earlier code used a *full* endpoint cell — an ad-hoc implicit
     // tail; combined with an explicit wing term that would double-count the
     // boundary integrand.)
-    let mut integral = finstack_quant_core::math::NeumaierAccumulator::new();
+    let mut integral = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     for i in 0..strikes.len() {
         // Strike positivity already verified above; index is in range.
         let k = *strikes.get(i)?;
@@ -349,7 +349,7 @@ fn wing_tail_integral(
 
     let n = WING_SUBDIVISIONS;
     let step = (hi - lo) / (n as f64);
-    let mut acc = finstack_quant_core::math::NeumaierAccumulator::new();
+    let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     for j in 0..=n {
         let k = lo + step * (j as f64);
         if k <= 0.0 {

@@ -633,7 +633,7 @@ impl PyCashFlowSchedule {
     fn to_dataframe<'py>(&self, py: Python<'py>, outstanding: bool) -> PyResult<Bound<'py, PyAny>> {
         let flows = self.inner.get_flows();
         let pd = py.import("pandas")?;
-        let dates: Vec<time::Date> = flows.iter().map(|f| f.date).collect();
+        let dates: Vec<finstack_quant_core::dates::Date> = flows.iter().map(|f| f.date).collect();
         let reset_dates: Vec<Option<Bound<'py, PyAny>>> = flows
             .iter()
             .map(|f| f.reset_date.map(|d| date_to_py(py, d)).transpose())

@@ -9,6 +9,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     CreditSpreadProcessSpec, DrawRepayEvent, DrawRepaySpec, McConfig, RevolvingCredit,
@@ -19,9 +20,9 @@ use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
 use time::macros::date;
 
-const COMMITMENT: time::Date = date!(2024 - 01 - 15);
-const AS_OF: time::Date = date!(2025 - 01 - 15);
-const MATURITY: time::Date = date!(2030 - 01 - 15);
+const COMMITMENT: finstack_quant_core::dates::Date = date!(2024 - 01 - 15);
+const AS_OF: finstack_quant_core::dates::Date = date!(2025 - 01 - 15);
+const MATURITY: finstack_quant_core::dates::Date = date!(2030 - 01 - 15);
 
 fn usd(amount: f64) -> Money {
     Money::new(amount, Currency::USD).expect("money")
@@ -173,7 +174,7 @@ fn conventions(
     calendar_id: Option<&str>,
     bdc: finstack_quant_core::dates::BusinessDayConvention,
     payment_lag_days: u32,
-    maturity: time::Date,
+    maturity: finstack_quant_core::dates::Date,
 ) -> finstack_quant_core::Result<RevolvingCredit> {
     RevolvingCredit::builder()
         .id("RC-CAL".into())
@@ -194,7 +195,11 @@ fn conventions(
         .build()
 }
 
-fn payment_dates_in(facility: &RevolvingCredit, year: i32, month: time::Month) -> Vec<time::Date> {
+fn payment_dates_in(
+    facility: &RevolvingCredit,
+    year: i32,
+    month: time::Month,
+) -> Vec<finstack_quant_core::dates::Date> {
     use finstack_quant_cashflows::CashflowScheduleSource;
     let schedule = facility
         .raw_cashflow_schedule(&market(), AS_OF)
@@ -357,7 +362,7 @@ fn stepped(
         .build()
 }
 
-const STEP_DATE: time::Date = date!(2026 - 01 - 15);
+const STEP_DATE: finstack_quant_core::dates::Date = date!(2026 - 01 - 15);
 
 fn step_to_6m() -> Vec<CommitmentStep> {
     vec![CommitmentStep {
@@ -534,7 +539,10 @@ fn with_steps(
         .expect("facility")
 }
 
-fn interest_on(flows: &[finstack_quant_core::cashflow::CashFlow], date: time::Date) -> f64 {
+fn interest_on(
+    flows: &[finstack_quant_core::cashflow::CashFlow],
+    date: finstack_quant_core::dates::Date,
+) -> f64 {
     flows
         .iter()
         .find(|cf| cf.kind == CFKind::Fixed && cf.date == date)
@@ -580,7 +588,8 @@ fn fee_step_changes_only_the_named_fee() {
         }],
     );
     let (a, b) = (flows_of(&base), flows_of(&stepped));
-    let fee = |flows: &[finstack_quant_core::cashflow::CashFlow], d: time::Date| {
+    let fee = |flows: &[finstack_quant_core::cashflow::CashFlow],
+               d: finstack_quant_core::dates::Date| {
         flows
             .iter()
             .find(|cf| cf.kind == CFKind::CommitmentFee && cf.date == d)
@@ -717,7 +726,7 @@ fn with_lc(
 fn flow_amount(
     flows: &[finstack_quant_core::cashflow::CashFlow],
     kind: CFKind,
-    date: time::Date,
+    date: finstack_quant_core::dates::Date,
 ) -> f64 {
     flows
         .iter()

@@ -33,13 +33,13 @@
 
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
 use finstack_quant_models::monte_carlo::process::ou::{
     calibrate_theta_from_curve, HullWhite1FParams, HullWhite1FProcess,
 };
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream};
-use finstack_quant_models::monte_carlo::TimeGrid;
 use finstack_quant_models::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
 use time::Month;
 

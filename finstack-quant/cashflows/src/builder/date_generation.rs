@@ -14,8 +14,8 @@ use super::specs::RollRule;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
     adjust, is_cds_date, is_imm_date, next_cds_date, next_imm, prev_cds_date,
-    BusinessDayConvention, Date, DateExt, DayCount, HolidayCalendar, ScheduleBuilder, StubKind,
-    Tenor, TenorUnit,
+    BusinessDayConvention, Date, DateExt, DayCount, HolidayCalendar, Schedule, StubKind, Tenor,
+    TenorUnit,
 };
 
 /// Resolve conventions overridden by an explicit quarterly roll grid.
@@ -279,8 +279,8 @@ pub(crate) fn compile_periods(
 pub(crate) fn validate_unique_payment_dates(
     periods: &[SchedulePeriod],
 ) -> finstack_quant_core::Result<()> {
-    let mut period_map: finstack_quant_core::HashMap<Date, SchedulePeriod> =
-        finstack_quant_core::HashMap::default();
+    let mut period_map: finstack_quant_core::FxHashMap<Date, SchedulePeriod> =
+        finstack_quant_core::FxHashMap::default();
     period_map.reserve(periods.len());
     for period in periods {
         if let Some(previous) = period_map.insert(period.payment_date, *period) {
@@ -365,7 +365,7 @@ pub(crate) fn generate_periods_with_adjustment(
             "payment_lag_days must be non-negative; got {payment_lag_days}"
         )));
     }
-    let builder = ScheduleBuilder::new(start, end)?
+    let builder = Schedule::builder(start, end)?
         .frequency(frequency)
         .stub_rule(stub)
         .end_of_month(end_of_month);

@@ -6,6 +6,7 @@
 //! Rust types one-for-one; arithmetic and lookup logic stays in Rust.
 
 use super::config::PyFinstackConfig;
+use crate::bindings::macros::{label_enum, wire_methods};
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::rating_scales::{
     embedded_registry, registry_from_config, RatingLevel, RatingScaleRegistry, ScorecardScale,
@@ -13,7 +14,7 @@ use finstack_quant_core::rating_scales::{
 };
 use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::*;
-use pyo3::types::{PyIterator, PyList, PyModule, PyType};
+use pyo3::types::{PyIterator, PyList, PyModule};
 
 /// Policy applied when a scorecard names an unknown rating scale.
 ///
@@ -47,79 +48,20 @@ impl PyUnknownScalePolicy {
     }
 }
 
-#[pymethods]
-impl PyUnknownScalePolicy {
+label_enum!(PyUnknownScalePolicy, UnknownScalePolicy, "UnknownScalePolicy", from_name, {
     /// Reject unknown scale names.
-    #[classattr]
-    const ERROR: PyUnknownScalePolicy = PyUnknownScalePolicy {
-        inner: UnknownScalePolicy::Error,
-    };
+    ERROR => Error,
     /// Fall back to the configured default scale for unknown names.
-    #[classattr]
-    const FALLBACK_TO_DEFAULT: PyUnknownScalePolicy = PyUnknownScalePolicy {
-        inner: UnknownScalePolicy::FallbackToDefault,
-    };
+    FALLBACK_TO_DEFAULT => FallbackToDefault,
     /// Fall back to the default scale and log a warning.
-    #[classattr]
-    const WARN_AND_FALLBACK: PyUnknownScalePolicy = PyUnknownScalePolicy {
-        inner: UnknownScalePolicy::WarnAndFallback,
-    };
-
-    /// Parse a policy from its exact lowercase snake_case name
-    /// (case-sensitive): ``"error"``, ``"fallback_to_default"``,
-    /// ``"warn_and_fallback"``. Raises ``ValueError`` otherwise.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, name)")]
-    fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
-        finstack_quant_core::wire::serde_parse(name)
-            .map(Self::from_inner)
-            .map_err(crate::errors::core_to_py)
-    }
-
-    /// Canonical snake_case name (the serde representation).
-    #[getter]
-    fn name(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_label(&self.inner).map_err(crate::errors::core_to_py)
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        format!(
-            "UnknownScalePolicy({:?})",
-            self.name().unwrap_or_else(|_| "?".to_string())
-        )
-    }
-
-    /// Return ``str(self)``.
-    fn __str__(&self) -> String {
-        self.name().unwrap_or_else(|_| "?".to_string())
-    }
-
-    /// Serialize to a JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "invalid UnknownScalePolicy"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a policy from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        UnknownScalePolicy::from_json(json)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-}
+    WARN_AND_FALLBACK => WarnAndFallback,
+});
+wire_methods!(
+    PyUnknownScalePolicy,
+    UnknownScalePolicy,
+    "UnknownScalePolicy",
+    json_only
+);
 
 /// A single rating threshold row on a scorecard scale.
 ///
@@ -206,32 +148,9 @@ impl PyRatingLevel {
             .map(|rhs| self.inner == rhs.inner)
             .unwrap_or(false)
     }
-
-    /// Serialize to a JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "invalid RatingLevel"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a rating level from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        RatingLevel::from_json(json)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
 }
+
+wire_methods!(PyRatingLevel, RatingLevel, "RatingLevel");
 
 /// A named, ordered (best-to-worst) list of scorecard rating thresholds.
 ///
@@ -367,32 +286,9 @@ impl PyScorecardScale {
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::core::table::envelope_to_pandas(py, &self.inner.to_table())
     }
-
-    /// Serialize to a JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "invalid ScorecardScale"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a scorecard scale from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        ScorecardScale::from_json(json)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
 }
+
+wire_methods!(PyScorecardScale, ScorecardScale, "ScorecardScale");
 
 /// Versioned registry of scorecard rating scales and defaults.
 ///

@@ -207,7 +207,6 @@ const FLAT_MARKET = JSON.stringify({
       allow_non_monotonic: false,
       min_forward_tenor: 1e-6,
       rate_calibration: null,
-      calibration_ois_cutoff_days: null,
       fx_policy: null,
     },
   ],
@@ -220,7 +219,6 @@ const FLAT_MARKET = JSON.stringify({
   credit_indices: [],
   fx_delta_vol_surfaces: [],
   vol_cubes: [],
-  collateral: {},
   hierarchy: null,
 });
 

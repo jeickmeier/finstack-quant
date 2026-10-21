@@ -23,6 +23,7 @@ use finstack_quant_core::dates::{
     calendar_by_id_strict, BusinessDayConvention, Date, DayCount, DayCountContext, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_core::Result;
@@ -93,21 +94,18 @@ pub struct CommoditySwaption {
     /// Option type (call = right to enter pay-fixed swap, put = right to enter receive-fixed swap).
     pub option_type: OptionType,
     /// Option expiry date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub expiry: Date,
     /// Underlying swap start date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub underlying_start_date: Date,
     /// Underlying swap end date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

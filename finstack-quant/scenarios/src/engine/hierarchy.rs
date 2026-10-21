@@ -8,7 +8,7 @@ use finstack_quant_core::market_data::hierarchy::{
     HierarchyTarget, MarketDataHierarchy, ResolutionMode,
 };
 use finstack_quant_core::types::{CurveId, PriceId};
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 
 struct HierarchyExpansion {
     matched_depth: usize,
@@ -203,9 +203,9 @@ pub(super) fn expand_hierarchy_operations<'a>(
         slots.push(Slot::Expanded(expansions));
     }
 
-    let max_depth: HashMap<ScenarioMarketTarget, usize> =
+    let max_depth: FxHashMap<ScenarioMarketTarget, usize> =
         if matches!(mode, ResolutionMode::MostSpecificWins) {
-            let mut md: HashMap<ScenarioMarketTarget, usize> = HashMap::default();
+            let mut md: FxHashMap<ScenarioMarketTarget, usize> = FxHashMap::default();
             for slot in &slots {
                 if let Slot::Expanded(exps) = slot {
                     for exp in exps {
@@ -217,7 +217,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
             }
             md
         } else {
-            HashMap::default()
+            FxHashMap::default()
         };
 
     let mut result = Vec::with_capacity(operations.len());

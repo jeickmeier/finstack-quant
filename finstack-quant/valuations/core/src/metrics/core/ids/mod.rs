@@ -13,7 +13,7 @@
 //! - **Standardized sensitivity metrics**: Dividend01, Inflation01, Prepayment01, Default01, Severity01, Conversion01, CollateralHaircut01, CollateralPrice01, Nav01, Carry01, Hurdle01, Dv01Domestic, Dv01Foreign, Fx01, SpreadDv01, Correlation01, FxVega, ConvexityAdjustmentRisk
 //! - **Custom metrics**: User-defined metrics with dynamic identifiers
 
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::borrow::{Borrow, Cow};
 use std::fmt;
@@ -161,11 +161,11 @@ impl Borrow<str> for MetricId {
 }
 
 // Lazy lookup table for FromStr
-static METRIC_LOOKUP: OnceLock<HashMap<String, MetricId>> = OnceLock::new();
+static METRIC_LOOKUP: OnceLock<FxHashMap<String, MetricId>> = OnceLock::new();
 
-fn metric_lookup() -> &'static HashMap<String, MetricId> {
+fn metric_lookup() -> &'static FxHashMap<String, MetricId> {
     METRIC_LOOKUP.get_or_init(|| {
-        let mut map = HashMap::default();
+        let mut map = FxHashMap::default();
         map.reserve(MetricId::get_standard().len());
         for m in MetricId::get_standard() {
             // Names are already lower snake_case

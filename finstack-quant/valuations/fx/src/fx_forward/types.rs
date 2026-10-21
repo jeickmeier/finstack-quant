@@ -75,7 +75,6 @@ pub struct FxForward {
     /// Quote currency (domestic currency, denominator of the pair, PV currency).
     pub quote_currency: Currency,
     /// Maturity/settlement date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -140,7 +139,6 @@ struct FxForwardUnchecked {
     /// Quote currency (domestic currency, denominator of the pair, PV currency).
     quote_currency: Currency,
     /// Maturity/settlement date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -333,7 +331,7 @@ impl FxForward {
         business_day_convention: Option<finstack_quant_core::dates::BusinessDayConvention>,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
-        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date_for_pair};
+        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date};
         let settlement_days = settlement_days
             .unwrap_or_else(|| Self::standard_settlement_days(base_currency, quote_currency));
         let business_day_convention = business_day_convention
@@ -342,7 +340,7 @@ impl FxForward {
         // CLS-consistent spot roll: a US holiday on an intermediate day does not
         // delay a USD pair's spot date (FX spot convention
         // finding).
-        let spot_date = fx_spot_date_for_pair(
+        let spot_date = fx_spot_date(
             trade_date,
             settlement_days,
             base_currency,

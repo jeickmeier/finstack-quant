@@ -1,5 +1,6 @@
 //! Stochastic structured-credit scenario waterfall pricing engine.
 
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::monte_carlo::estimate::independent_estimator_stats;
 
 use super::config::StochasticPricerConfig;
@@ -16,7 +17,7 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::{HashMap, Result};
+use finstack_quant_core::{FxHashMap, Result};
 use finstack_quant_models::correlation::{CopulaSpec, LatentFactorSpec, RecoverySpec};
 use finstack_quant_models::credit::pool::prepayment::PrepaymentState;
 use finstack_quant_models::credit::pool::{
@@ -450,7 +451,7 @@ impl StochasticPricer {
         // Counterfactual tranche cashflows of the same path with revolver
         // draws accruing at their fair spread; `None` without stochastic
         // revolvers.
-        let mut counterfactual: Option<HashMap<String, TrancheCashflows>> = None;
+        let mut counterfactual: Option<FxHashMap<String, TrancheCashflows>> = None;
         let run = match prepared.instrument_schedules.as_ref() {
             Some(schedules) => {
                 let (rng, negate) = self.instrument_path_rng(path_index, antithetic);

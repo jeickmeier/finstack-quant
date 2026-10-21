@@ -103,8 +103,8 @@ fn run_discount_plan(base_date: Date, quotes: Vec<MarketQuote>) -> DiscountCurve
     let currency = Currency::USD;
     let mut market_data = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: finstack_quant_core::HashMap<String, Vec<QuoteId>> =
-        finstack_quant_core::HashMap::default();
+    let mut quote_sets: finstack_quant_core::FxHashMap<String, Vec<QuoteId>> =
+        finstack_quant_core::FxHashMap::default();
     quote_sets.insert("disc".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let plan = CalibrationPlan {
@@ -155,8 +155,8 @@ fn run_hazard_plan(
     let source_market = MarketContext::new().insert(create_test_discount_curve(base_date));
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: finstack_quant_core::HashMap<String, Vec<QuoteId>> =
-        finstack_quant_core::HashMap::default();
+    let mut quote_sets: finstack_quant_core::FxHashMap<String, Vec<QuoteId>> =
+        finstack_quant_core::FxHashMap::default();
     quote_sets.insert("credit".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let plan = CalibrationPlan {
@@ -274,8 +274,8 @@ fn discount_curve_global_solve_smoke() {
 
     let mut market_data = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: finstack_quant_core::HashMap<String, Vec<QuoteId>> =
-        finstack_quant_core::HashMap::default();
+    let mut quote_sets: finstack_quant_core::FxHashMap<String, Vec<QuoteId>> =
+        finstack_quant_core::FxHashMap::default();
     quote_sets.insert("disc".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let settings = CalibrationConfig {

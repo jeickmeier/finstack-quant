@@ -4,16 +4,18 @@
 //!
 //! Curve dates are ISO-8601 strings (`"YYYY-MM-DD"`), as for `DiscountCurve`.
 
-use crate::api::core::market_data::{
-    flat_pairs, js_time_point, parse_day_count, parse_extrapolation, parse_interp_style,
-    JsHazardCurve, TimePoint,
-};
+use crate::api::core::curve_args::flat_pairs;
+use crate::api::core::curve_args::js_time_point;
+use crate::api::core::curve_args::TimePoint;
+use crate::api::core::market_hazard::JsHazardCurve;
 use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_string, js_uint};
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err};
+use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::term_structures::{
     BaseCorrelationCurve as RustBaseCorrelationCurve, CreditIndexData as RustCreditIndexData,
     InflationCurve as RustInflationCurve, PriceCurve as RustPriceCurve, PriceCurveKind,
 };
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use serde::Deserialize;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -70,16 +72,20 @@ impl JsInflationCurve {
             .base_cpi(options.base_cpi)
             .knots(flat_pairs(&options.knots, "knots")?);
         if let Some(day_count) = options.day_count.as_deref() {
-            builder = builder.day_count(parse_day_count(day_count)?);
+            builder = builder.day_count(day_count.parse::<DayCount>().map_err(to_js_err)?);
         }
         if let Some(months) = options.indexation_lag_months {
             builder = builder.indexation_lag_months(months);
         }
         if let Some(interp) = options.interp.as_deref() {
-            builder = builder.interp(parse_interp_style(interp)?);
+            builder = builder.interp(interp.parse::<InterpStyle>().map_err(to_js_err)?);
         }
         if let Some(extrapolation) = options.extrapolation.as_deref() {
-            builder = builder.extrapolation(parse_extrapolation(extrapolation)?);
+            builder = builder.extrapolation(
+                extrapolation
+                    .parse::<ExtrapolationPolicy>()
+                    .map_err(to_js_err)?,
+            );
         }
         builder
             .build()
@@ -325,13 +331,17 @@ impl JsPriceCurve {
             builder = builder.spot_price(spot_price);
         }
         if let Some(extrapolation) = options.extrapolation.as_deref() {
-            builder = builder.extrapolation(parse_extrapolation(extrapolation)?);
+            builder = builder.extrapolation(
+                extrapolation
+                    .parse::<ExtrapolationPolicy>()
+                    .map_err(to_js_err)?,
+            );
         }
         if let Some(interp) = options.interp.as_deref() {
-            builder = builder.interp(parse_interp_style(interp)?);
+            builder = builder.interp(interp.parse::<InterpStyle>().map_err(to_js_err)?);
         }
         if let Some(day_count) = options.day_count.as_deref() {
-            builder = builder.day_count(parse_day_count(day_count)?);
+            builder = builder.day_count(day_count.parse::<DayCount>().map_err(to_js_err)?);
         }
         builder
             .build()

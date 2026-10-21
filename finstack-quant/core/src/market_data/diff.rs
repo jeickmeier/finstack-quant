@@ -41,6 +41,7 @@
 use super::context::MarketContext;
 use crate::currency::Currency;
 use crate::dates::Date;
+use crate::math::units::BASIS_POINTS_PER_UNIT;
 use crate::Result;
 
 use serde::{Deserialize, Serialize};
@@ -158,6 +159,25 @@ fn measure_average_shift(
     Ok(average)
 }
 
+/// Map each tenor through `shift`, rejecting a non-finite result; `what`
+/// names the measured quantity in the error.
+fn per_tenor_shifts(tenors: &[f64], what: &str, shift: impl Fn(f64) -> f64) -> Result<Vec<f64>> {
+    validate_measurement_grid(tenors)?;
+    tenors
+        .iter()
+        .map(|&t| {
+            let shift = shift(t);
+            if shift.is_finite() {
+                Ok(shift)
+            } else {
+                Err(crate::Error::Validation(format!(
+                    "{what} shift at tenor {t} is not finite"
+                )))
+            }
+        })
+        .collect()
+}
+
 fn values_are_effectively_equal(a: f64, b: f64) -> bool {
     const RELATIVE_EQUALITY_TOLERANCE: f64 = 1.0e-14;
 
@@ -194,7 +214,12 @@ pub fn measure_discount_curve_shift(
     let curve_t1 = market_t1.get_discount(&curve_id)?;
 
     let tenors = method.tenors(Some(curve_t0.knots()));
-    measure_average_shift(tenors, 10_000.0, |t| curve_t0.zero(t), |t| curve_t1.zero(t))
+    measure_average_shift(
+        tenors,
+        BASIS_POINTS_PER_UNIT,
+        |t| curve_t0.zero_rate(t, crate::math::Compounding::Continuous),
+        |t| curve_t1.zero_rate(t, crate::math::Compounding::Continuous),
+    )
 }
 
 /// Measure the average **par CDS spread** shift on a hazard curve (basis points).
@@ -268,7 +293,7 @@ pub fn measure_par_spread_shift(
 /// Returns an error if `curve_id` is absent from either market context, the
 /// selected grid is empty or non-finite, or a curve cannot provide a finite
 /// sample value on that grid.
-pub fn measure_per_tenor_par_spread_shift(
+pub(crate) fn measure_per_tenor_par_spread_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
@@ -278,20 +303,9 @@ pub fn measure_per_tenor_par_spread_shift(
     let curve_t1 = market_t1.get_hazard(&curve_id)?;
     let interp_t0 = curve_t0.par_interp();
     let interp_t1 = curve_t1.par_interp();
-    validate_measurement_grid(tenors)?;
-    tenors
-        .iter()
-        .map(|&t| {
-            let shift = curve_t1.cds_quote_bp(t, interp_t1) - curve_t0.cds_quote_bp(t, interp_t0);
-            if shift.is_finite() {
-                Ok(shift)
-            } else {
-                Err(crate::Error::Validation(format!(
-                    "par spread shift at tenor {t} is not finite"
-                )))
-            }
-        })
-        .collect()
+    per_tenor_shifts(tenors, "par spread", |t| {
+        curve_t1.cds_quote_bp(t, interp_t1) - curve_t0.cds_quote_bp(t, interp_t0)
+    })
 }
 
 /// Measure the average **credit-curve** shift (basis points), accepting either
@@ -345,7 +359,7 @@ pub fn measure_credit_curve_shift(
 ///
 /// The per-tenor counterpart of [`measure_credit_curve_shift`] (see that
 /// function for the hazard / discount duality): tries the par CDS spread
-/// interpretation first ([`measure_per_tenor_par_spread_shift`]); on failure
+/// interpretation first (`measure_per_tenor_par_spread_shift`); on failure
 /// falls back to the per-tenor discount zero-rate shift. Returns one entry per
 /// input tenor, in order, so callers can pair it with a per-tenor (key-rate)
 /// `BucketedCs01`.
@@ -375,20 +389,11 @@ pub fn measure_per_tenor_credit_curve_shift(
     }
     let curve_t0 = market_t0.get_discount(curve_id)?;
     let curve_t1 = market_t1.get_discount(curve_id)?;
-    validate_measurement_grid(tenors)?;
-    tenors
-        .iter()
-        .map(|&t| {
-            let shift = (curve_t1.zero(t) - curve_t0.zero(t)) * 10_000.0;
-            if shift.is_finite() {
-                Ok(shift)
-            } else {
-                Err(crate::Error::Validation(format!(
-                    "zero-rate shift at tenor {t} is not finite"
-                )))
-            }
-        })
-        .collect()
+    per_tenor_shifts(tenors, "zero-rate", |t| {
+        (curve_t1.zero_rate(t, crate::math::Compounding::Continuous)
+            - curve_t0.zero_rate(t, crate::math::Compounding::Continuous))
+            * BASIS_POINTS_PER_UNIT
+    })
 }
 
 /// Measure average inflation rate shift (basis points).
@@ -410,25 +415,15 @@ pub fn measure_inflation_curve_shift(
 ) -> Result<f64> {
     let curve_t0 = market_t0.get_inflation_curve(&curve_id)?;
     let curve_t1 = market_t1.get_inflation_curve(&curve_id)?;
+    // Annualized zero inflation to `t`; `measure_average_shift` skips `t <= 0`.
+    let zero_inflation = |curve: &crate::market_data::term_structures::InflationCurve, t: f64| {
+        (curve.cpi(t) / curve.base_cpi()).powf(1.0 / t) - 1.0
+    };
     measure_average_shift(
         STANDARD_TENORS,
-        10_000.0,
-        |t| {
-            let ratio = curve_t0.cpi(t) / curve_t0.base_cpi();
-            if t == 0.0 {
-                0.0
-            } else {
-                ratio.powf(1.0 / t) - 1.0
-            }
-        },
-        |t| {
-            let ratio = curve_t1.cpi(t) / curve_t1.base_cpi();
-            if t == 0.0 {
-                0.0
-            } else {
-                ratio.powf(1.0 / t) - 1.0
-            }
-        },
+        BASIS_POINTS_PER_UNIT,
+        |t| zero_inflation(&curve_t0, t),
+        |t| zero_inflation(&curve_t1, t),
     )
 }
 
@@ -462,7 +457,7 @@ pub fn measure_inflation_index_shift(
             "inflation index levels must be finite and positive".to_string(),
         ));
     }
-    Ok((level_t1 / level_t0 - 1.0) * 10_000.0)
+    Ok((level_t1 / level_t0 - 1.0) * BASIS_POINTS_PER_UNIT)
 }
 
 /// Measure a declared inflation source using one canonical risk factor.
@@ -565,14 +560,7 @@ pub fn measure_fx_shift(
     let rate_t0 = fx_t0.rate(query_t0)?.rate;
     let rate_t1 = fx_t1.rate(query_t1)?.rate;
 
-    // Guard against division by zero
-    if rate_t0 == 0.0 {
-        return Err(crate::Error::Validation(format!(
-            "Cannot compute FX shift: rate_t0 is zero for {}/{}",
-            base_currency, quote_currency
-        )));
-    }
-
+    // `FxMatrix::rate` returns only finite, strictly positive rates.
     // Percentage change
     let pct_change = (rate_t1 / rate_t0 - 1.0) * 100.0;
 

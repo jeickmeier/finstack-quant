@@ -3,6 +3,7 @@
 use super::helpers::*;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations::instruments::{
     EquityOption, ExerciseStyle, Instrument, PricingOptions,
 };

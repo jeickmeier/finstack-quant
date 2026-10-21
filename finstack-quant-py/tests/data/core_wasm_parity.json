@@ -106,7 +106,6 @@
   "discount_curve": {
     "allow_non_monotonic": false,
     "base": "2025-01-02",
-    "calibration_ois_cutoff_days": null,
     "day_count": "act_365f",
     "extrapolation": "flat_forward",
     "fx_policy": null,
@@ -137,7 +136,6 @@
   "discount_curve_from_dates": {
     "allow_non_monotonic": false,
     "base": "2025-01-02",
-    "calibration_ois_cutoff_days": null,
     "day_count": "act_365f",
     "extrapolation": "flat_forward",
     "fx_policy": null,
@@ -185,7 +183,7 @@
     ]
   ],
   "end_of_month": "2024-02-29",
-  "estimated_sifma_settlement_date_for_class": "2031-03-20",
+  "estimated_sifma_settlement_date": "2031-03-20",
   "finite_count": 2,
   "finstack_config": {
     "extensions": {
@@ -209,8 +207,7 @@
       }
     },
     "tolerances": {
-      "generic_epsilon": 1e-10,
-      "rate_epsilon": 1e-12
+      "generic_epsilon": 1e-10
     }
   },
   "finstack_config_scales": [
@@ -380,9 +377,6 @@
     0.007308193306724622
   ],
   "market_context": {
-    "collateral": {
-      "USD-CSA": "USD-OIS"
-    },
     "credit_indices": [
       {
         "base_correlation_curve_id": "CDX-IG",
@@ -451,7 +445,6 @@
       {
         "allow_non_monotonic": false,
         "base": "2025-01-02",
-        "calibration_ois_cutoff_days": null,
         "day_count": "act_365f",
         "extrapolation": "flat_forward",
         "fx_policy": null,
@@ -605,7 +598,10 @@
     ],
     "converted": [
       110.0,
-      "USD"
+      "USD",
+      1.1,
+      false,
+      true
     ],
     "credit_index": 125,
     "curve_ids": [
@@ -626,7 +622,6 @@
     "round_trip": true,
     "series": 0.0433,
     "stats": {
-      "collateral_mapping_count": 1,
       "credit_index_count": 1,
       "curve_counts": {
         "BaseCorrelation": 1,
@@ -888,7 +883,7 @@
     "2026-01-20"
   ],
   "sifma_settlement_date": "2027-03-11",
-  "sifma_settlement_date_for_class": "2026-01-20",
+  "sifma_settlement_date_class_b": "2026-01-20",
   "sifma_settlement_date_uncovered": null,
   "stats_empty_is_nan": [
     true,

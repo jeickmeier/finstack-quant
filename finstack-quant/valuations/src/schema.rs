@@ -720,155 +720,163 @@ pub fn artifacts_slice() -> &'static [SchemaArtifact] {
 /// entry with [`SchemaArtifact::generate`].
 #[must_use]
 pub fn artifacts() -> Vec<SchemaArtifact> {
+    use crate::instruments::cashflow_export::InstrumentCashflowEnvelope;
+    use crate::instruments::credit_derivatives::cds_index::CdsIndexParams;
+    use crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
+    use crate::instruments::fixed_income::asset_backed_facility::FacilityProjection;
+    use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcResult;
+    use crate::instruments::fixed_income::convertible::ConvertibleGreeks;
+    use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
+    use crate::instruments::fixed_income::structured_credit::{
+        BorrowingBaseReport, EquityMetrics, OasResult, PoolStats, ScenarioTable,
+        SimulationDiagnostics, TrancheCashflows, TrancheMetrics,
+    };
+    use crate::instruments::{
+        CompositeHistoryRow, CompositeRebalanceResult, InstrumentJson, MarketDependencies,
+    };
+    use crate::market::conventions::{
+        CdsConventionSpec, InflationSwapConventions, IrFutureConventions, RateIndexConventions,
+        SwaptionConventions, XccyConventions,
+    };
+    use crate::market::listed::ListedProductCoverage;
+    use crate::metrics::risk::{MarketHistory, VarResult};
+    use crate::pricer::MetricMetadata;
+    use crate::results::ValuationResult;
+    use finstack_quant_core::contract::{Diagnostic, ValidationReport};
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+    use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::{Attributes, InstrumentId};
+    use finstack_quant_core::wire::{DateWire, DecimalWire};
+
     let mut artifacts = vec![
-        SchemaArtifact::new::<finstack_quant_core::types::Attributes>(
-            "schemas/common/1/attributes.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "attributes.schema.json"
-            ),
-            "Attributes",
-            "User-defined tags and key-value metadata for classification.",
+        finstack_quant_core::schema_artifact!(
+            Attributes,
+            "common",
+            "attributes",
+            Component,
+            "User-defined tags and key-value metadata for classification."
         )
         .with_examples(attributes_examples),
-        SchemaArtifact::new::<finstack_quant_core::contract::Diagnostic>(
-            "schemas/common/1/diagnostic.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "diagnostic.schema.json"
-            ),
-            "Diagnostic",
-            "One structured finding emitted while loading a persisted contract.",
+        finstack_quant_core::schema_artifact!(
+            Diagnostic,
+            "common",
+            "diagnostic",
+            Component,
+            "One structured finding emitted while loading a persisted contract."
         )
         .with_examples(diagnostic_examples),
-        SchemaArtifact::new::<finstack_quant_core::contract::ValidationReport>(
-            "schemas/common/1/validation_report.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "validation_report.schema.json"
-            ),
-            "Validation Report",
+        finstack_quant_core::schema_artifact!(
+            ValidationReport,
+            "common",
+            "validation_report",
+            Component,
             "Bounded structured diagnostics emitted by persisted-contract validation.",
+            title = "Validation Report"
         )
         .with_examples(validation_report_examples),
-        SchemaArtifact::new::<finstack_quant_core::dates::BusinessDayConvention>(
-            "schemas/common/1/business_day_convention.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "business_day_convention.schema.json"
-            ),
-            "Business Day Convention",
+        finstack_quant_core::schema_artifact!(
+            BusinessDayConvention,
+            "common",
+            "business_day_convention",
+            Component,
             "Business-day adjustment convention.",
+            title = "Business Day Convention"
         )
         .with_examples(business_day_convention_examples),
-        SchemaArtifact::new::<finstack_quant_core::currency::Currency>(
-            "schemas/common/1/currency.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "currency.schema.json"
-            ),
-            "Currency",
-            "ISO 4217 currency code.",
+        finstack_quant_core::schema_artifact!(
+            Currency,
+            "common",
+            "currency",
+            Component,
+            "ISO 4217 currency code."
         )
         .with_examples(currency_examples),
-        SchemaArtifact::new::<finstack_quant_core::wire::DateWire>(
-            "schemas/common/1/date.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "date.schema.json"
-            ),
-            "Date",
+        finstack_quant_core::schema_artifact!(
+            DateWire,
+            "common",
+            "date",
+            Component,
             "ISO 8601 calendar date string.",
+            title = "Date"
         )
         .with_examples(date_examples),
-        SchemaArtifact::new::<finstack_quant_core::dates::DayCount>(
-            "schemas/common/1/day_count.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "day_count.schema.json"
-            ),
-            "Day Count",
+        finstack_quant_core::schema_artifact!(
+            DayCount,
+            "common",
+            "day_count",
+            Component,
             "Day-count convention.",
+            title = "Day Count"
         )
         .with_examples(day_count_examples),
-        SchemaArtifact::new::<finstack_quant_core::wire::DecimalWire>(
-            "schemas/common/1/decimal.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "decimal.schema.json"
-            ),
-            "Decimal",
+        finstack_quant_core::schema_artifact!(
+            DecimalWire,
+            "common",
+            "decimal",
+            Component,
             "Exact decimal encoded as a JSON string.",
+            title = "Decimal"
         )
         .with_examples(decimal_examples),
-        SchemaArtifact::new::<finstack_quant_core::types::InstrumentId>(
-            "schemas/common/1/id.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "id.schema.json"
-            ),
-            "Id",
+        finstack_quant_core::schema_artifact!(
+            InstrumentId,
+            "common",
+            "id",
+            Component,
             "Opaque string identifier.",
+            title = "Id"
         )
         .with_examples(id_examples),
-        SchemaArtifact::new::<finstack_quant_core::money::Money>(
-            "schemas/common/1/money.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "money.schema.json"
-            ),
-            "Money",
-            "Currency-tagged monetary amount.",
+        finstack_quant_core::schema_artifact!(
+            Money,
+            "common",
+            "money",
+            Component,
+            "Currency-tagged monetary amount."
         )
         .with_examples(money_examples),
-        SchemaArtifact::new::<InstrumentPricingOverrides>(
-            "schemas/common/1/instrument_pricing_overrides.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "instrument_pricing_overrides.schema.json"
-            ),
-            "Instrument Pricing Overrides",
+        finstack_quant_core::schema_artifact!(
+            InstrumentPricingOverrides,
+            "common",
+            "instrument_pricing_overrides",
+            Component,
             "Instrument-owned market quote and model configuration overrides.",
+            title = "Instrument Pricing Overrides"
         )
         .with_examples(empty_override_examples),
-        SchemaArtifact::new::<MetricPricingOverrides>(
-            "schemas/common/1/metric_pricing_overrides.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "metric_pricing_overrides.schema.json"
-            ),
-            "Metric Pricing Overrides",
+        finstack_quant_core::schema_artifact!(
+            MetricPricingOverrides,
+            "common",
+            "metric_pricing_overrides",
+            Component,
             "Metric-time pricing and finite-difference configuration.",
+            title = "Metric Pricing Overrides"
         )
         .with_examples(empty_override_examples),
-        SchemaArtifact::new::<ScenarioPricingOverrides>(
-            "schemas/common/1/scenario_pricing_overrides.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "scenario_pricing_overrides.schema.json"
-            ),
-            "Scenario Pricing Overrides",
+        finstack_quant_core::schema_artifact!(
+            ScenarioPricingOverrides,
+            "common",
+            "scenario_pricing_overrides",
+            Component,
             "Scenario-only price and spread shocks.",
+            title = "Scenario Pricing Overrides"
         )
         .with_examples(scenario_override_examples),
-        SchemaArtifact::new::<finstack_quant_core::dates::Tenor>(
-            "schemas/common/1/tenor.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "tenor.schema.json"
-            ),
-            "Tenor",
-            "Parsed financial tenor.",
+        finstack_quant_core::schema_artifact!(
+            Tenor,
+            "common",
+            "tenor",
+            Component,
+            "Parsed financial tenor."
         )
         .with_examples(tenor_examples),
-        SchemaArtifact::new::<crate::instruments::InstrumentJson>(
-            "schemas/common/1/instrument_json.schema.json",
-            concat!(
-                "https://finstack_quant.dev/schemas/common/1/",
-                "instrument_json.schema.json"
-            ),
-            "InstrumentJson",
-            "Tagged `{type, spec}` payload for one instrument, without the envelope marker.",
+        finstack_quant_core::schema_artifact!(
+            InstrumentJson,
+            "common",
+            "instrument_json",
+            Component,
+            "Tagged `{type, spec}` payload for one instrument, without the envelope marker."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Component)
@@ -876,7 +884,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
             "The instrument union embedded by portfolio positions and candidates; the same \
              branches as the instrument envelope's `instrument` field.",
         )
-    .with_examples(examples::instrument_json),
+        .with_examples(examples::instrument_json),
         SchemaArtifact::new::<InstrumentEnvelope>(
             "schemas/instruments/1/instrument.schema.json",
             concat!(
@@ -893,272 +901,299 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
              beside it: this document is too large to hand to a model.",
         )
         .with_examples(instrument_examples),
-        SchemaArtifact::new::<crate::instruments::cashflow_export::InstrumentCashflowEnvelope>(
-            "schemas/results/1/instrument_cashflow.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
-            "Instrument Cashflow",
+        finstack_quant_core::schema_artifact!(
+            InstrumentCashflowEnvelope,
+            "results",
+            "instrument_cashflow",
+            Component,
             "Native cashflow rows, reporting-currency PV and reconciliation status.",
+            title = "Instrument Cashflow"
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::instrument_cashflow),
-        SchemaArtifact::new::<crate::results::ValuationResult>(
-            "schemas/results/1/valuation_result.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
-            "Valuation Result",
+        .with_examples(examples::instrument_cashflow),
+        finstack_quant_core::schema_artifact!(
+            ValuationResult,
+            "results",
+            "valuation_result",
+            Component,
             "Canonical valuation result containing PV and typed metrics.",
+            title = "Valuation Result"
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_summary("PV plus requested measures, with rounding and FX policy stamps.")
         .with_examples(valuation_result_examples),
-        SchemaArtifact::new::<crate::instruments::CompositeRebalanceResult>(
-            "schemas/results/1/composite_rebalance_result.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-            "CompositeRebalanceResult",
-            "Result of resolving a new composite holdings state.",
+        finstack_quant_core::schema_artifact!(
+            CompositeRebalanceResult,
+            "results",
+            "composite_rebalance_result",
+            Component,
+            "Result of resolving a new composite holdings state."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::composite_rebalance_result),
-        SchemaArtifact::new::<
-            crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult,
-        >(
-            "schemas/results/1/enhanced_monte_carlo_result.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
-            "EnhancedMonteCarloResult",
-            "Revolving-credit Monte Carlo value with per-path details.",
+        .with_examples(examples::composite_rebalance_result),
+        finstack_quant_core::schema_artifact!(
+            EnhancedMonteCarloResult,
+            "results",
+            "enhanced_monte_carlo_result",
+            Component,
+            "Revolving-credit Monte Carlo value with per-path details."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::enhanced_monte_carlo_result),
-        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::OasResult>(
-            "schemas/results/1/oas_result.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/oas_result.schema.json",
-            "OasResult",
-            "Structured-credit option-adjusted spread and its solver diagnostics.",
+        .with_examples(examples::enhanced_monte_carlo_result),
+        finstack_quant_core::schema_artifact!(
+            OasResult,
+            "results",
+            "oas_result",
+            Component,
+            "Structured-credit option-adjusted spread and its solver diagnostics."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::oas_result),
-        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::ScenarioTable>(
-            "schemas/results/1/scenario_table.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
-            "ScenarioTable",
-            "Structured-credit scenario grid results for one tranche.",
+        .with_examples(examples::oas_result),
+        finstack_quant_core::schema_artifact!(
+            ScenarioTable,
+            "results",
+            "scenario_table",
+            Component,
+            "Structured-credit scenario grid results for one tranche."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::scenario_table),
-        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::TrancheMetrics>(
-            "schemas/results/1/tranche_metrics.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/tranche_metrics.schema.json",
-            "TrancheMetrics",
-            "Per-tranche risk and spread metrics from the tranche's own projected cashflows.",
+        .with_examples(examples::scenario_table),
+        finstack_quant_core::schema_artifact!(
+            TrancheMetrics,
+            "results",
+            "tranche_metrics",
+            Component,
+            "Per-tranche risk and spread metrics from the tranche's own projected cashflows."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::tranche_metrics),
-        SchemaArtifact::new::<
-            crate::instruments::fixed_income::structured_credit::BorrowingBaseReport,
-        >(
-            "schemas/results/1/borrowing_base_report.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/borrowing_base_report.schema.json",
-            "BorrowingBaseReport",
-            "Asset-backed facility borrowing base, availability and advance-rate test.",
+        .with_examples(examples::tranche_metrics),
+        finstack_quant_core::schema_artifact!(
+            BorrowingBaseReport,
+            "results",
+            "borrowing_base_report",
+            Component,
+            "Asset-backed facility borrowing base, availability and advance-rate test."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::borrowing_base_report),
-        SchemaArtifact::new::<crate::instruments::CompositeHistoryRow>(
-            "schemas/results/1/composite_history_row.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/composite_history_row.schema.json",
-            "CompositeHistoryRow",
-            "One dated composite holdings state and its accumulated trades.",
+        .with_examples(examples::borrowing_base_report),
+        finstack_quant_core::schema_artifact!(
+            CompositeHistoryRow,
+            "results",
+            "composite_history_row",
+            Component,
+            "One dated composite holdings state and its accumulated trades."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::composite_history_row),
-        SchemaArtifact::new::<crate::metrics::risk::VarResult>(
-            "schemas/results/1/var_result.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/var_result.schema.json",
-            "VarResult",
-            "Historical-simulation portfolio VaR, expected shortfall and P&L distribution.",
+        .with_examples(examples::composite_history_row),
+        finstack_quant_core::schema_artifact!(
+            VarResult,
+            "results",
+            "var_result",
+            Component,
+            "Historical-simulation portfolio VaR, expected shortfall and P&L distribution."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::var_result),
-        SchemaArtifact::new::<crate::market::listed::ListedProductCoverage>(
-            "schemas/results/1/listed_product_coverage.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",
-            "ListedProductCoverage",
-            "Listed-product catalog coverage for one exchange product.",
+        .with_examples(examples::var_result),
+        finstack_quant_core::schema_artifact!(
+            ListedProductCoverage,
+            "results",
+            "listed_product_coverage",
+            Component,
+            "Listed-product catalog coverage for one exchange product."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::listed_product_coverage),
-        SchemaArtifact::new::<crate::pricer::MetricMetadata>(
-            "schemas/results/1/metric_metadata.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
-            "MetricMetadata",
-            "Canonical per-key metric interpretation for host presentation.",
+        .with_examples(examples::listed_product_coverage),
+        finstack_quant_core::schema_artifact!(
+            MetricMetadata,
+            "results",
+            "metric_metadata",
+            Component,
+            "Canonical per-key metric interpretation for host presentation."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::metric_metadata),
-        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::EquityMetrics>(
-            "schemas/results/1/equity_metrics.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/equity_metrics.schema.json",
-            "EquityMetrics",
-            "Equity-tranche return metrics: IRR, MOIC, NAV and cash-on-cash.",
+        .with_examples(examples::metric_metadata),
+        finstack_quant_core::schema_artifact!(
+            EquityMetrics,
+            "results",
+            "equity_metrics",
+            Component,
+            "Equity-tranche return metrics: IRR, MOIC, NAV and cash-on-cash."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::equity_metrics),
-        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::PoolStats>(
-            "schemas/results/1/pool_stats.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
-            "PoolStats",
-            "Collateral-pool statistics: WAC, spread, maturity, diversity and concentration.",
+        .with_examples(examples::equity_metrics),
+        finstack_quant_core::schema_artifact!(
+            PoolStats,
+            "results",
+            "pool_stats",
+            Component,
+            "Collateral-pool statistics: WAC, spread, maturity, diversity and concentration."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::pool_stats),
-        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::TrancheCashflows>(
-            "schemas/results/1/tranche_cashflows.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/tranche_cashflows.schema.json",
-            "TrancheCashflows",
-            "Projected cashflows of one structured-credit tranche, by component.",
+        .with_examples(examples::pool_stats),
+        finstack_quant_core::schema_artifact!(
+            TrancheCashflows,
+            "results",
+            "tranche_cashflows",
+            Component,
+            "Projected cashflows of one structured-credit tranche, by component."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::tranche_cashflows),
-        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::SimulationDiagnostics>(
-            "schemas/results/1/simulation_diagnostics.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
-            "SimulationDiagnostics",
-            "Deal-level accounting produced alongside the tranche cashflows.",
+        .with_examples(examples::tranche_cashflows),
+        finstack_quant_core::schema_artifact!(
+            SimulationDiagnostics,
+            "results",
+            "simulation_diagnostics",
+            Component,
+            "Deal-level accounting produced alongside the tranche cashflows."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::simulation_diagnostics),
-        SchemaArtifact::new::<crate::instruments::MarketDependencies>(
-            "schemas/results/1/market_dependencies.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/market_dependencies.schema.json",
-            "MarketDependencies",
-            "Market data an instrument needs to price: curves, spots, surfaces, FX pairs and fixings.",
+        .with_examples(examples::simulation_diagnostics),
+        finstack_quant_core::schema_artifact!(
+    MarketDependencies,
+    "results",
+    "market_dependencies",
+    Component,
+    "Market data an instrument needs to price: curves, spots, surfaces, FX pairs and fixings."
+)
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::market_dependencies),
+        finstack_quant_core::schema_artifact!(
+            ConvertibleGreeks,
+            "results",
+            "convertible_greeks",
+            Component,
+            "Tree price and Greeks of a convertible bond."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::market_dependencies),
-        SchemaArtifact::new::<crate::instruments::fixed_income::convertible::ConvertibleGreeks>(
-            "schemas/results/1/convertible_greeks.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/convertible_greeks.schema.json",
-            "ConvertibleGreeks",
-            "Tree price and Greeks of a convertible bond.",
+        .with_examples(examples::convertible_greeks),
+        finstack_quant_core::schema_artifact!(
+            FacilityProjection,
+            "results",
+            "facility_projection",
+            Component,
+            "Projected cashflows of an asset-backed facility and its residual."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::convertible_greeks),
-        SchemaArtifact::new::<crate::instruments::fixed_income::asset_backed_facility::FacilityProjection>(
-            "schemas/results/1/facility_projection.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",
-            "FacilityProjection",
-            "Projected cashflows of an asset-backed facility and its residual.",
+        .with_examples(examples::facility_projection),
+        finstack_quant_core::schema_artifact!(
+            MertonMcResult,
+            "results",
+            "merton_mc_result",
+            Component,
+            "Merton Monte Carlo price of a PIK or toggle bond with path statistics."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
-    .with_examples(examples::facility_projection),
-        SchemaArtifact::new::<crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcResult>(
-            "schemas/results/1/merton_mc_result.schema.json",
-            "https://finstack_quant.dev/schemas/results/1/merton_mc_result.schema.json",
-            "MertonMcResult",
-            "Merton Monte Carlo price of a PIK or toggle bond with path statistics.",
-        )
-        .with_packager(package_valuations_schema)
-        .with_kind(SchemaKind::Output)
-    .with_examples(examples::merton_mc_result),
-        SchemaArtifact::new::<crate::instruments::credit_derivatives::cds_index::CdsIndexParams>(
-            "schemas/common/1/cds_index_params.schema.json",
-            "https://finstack_quant.dev/schemas/common/1/cds_index_params.schema.json",
-            "CdsIndexParams",
-            "Preset identity, coupon and convention of a standard CDS index series.",
+        .with_examples(examples::merton_mc_result),
+        finstack_quant_core::schema_artifact!(
+            CdsIndexParams,
+            "common",
+            "cds_index_params",
+            Component,
+            "Preset identity, coupon and convention of a standard CDS index series."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Component)
-    .with_examples(examples::cds_index_params),
-        SchemaArtifact::new::<crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams>(
-            "schemas/common/1/cds_tranche_params.schema.json",
-            "https://finstack_quant.dev/schemas/common/1/cds_tranche_params.schema.json",
-            "CdsTrancheParams",
-            "Attachment, detachment, notional and coupon of a CDS index tranche.",
+        .with_examples(examples::cds_index_params),
+        finstack_quant_core::schema_artifact!(
+            CdsTrancheParams,
+            "common",
+            "cds_tranche_params",
+            Component,
+            "Attachment, detachment, notional and coupon of a CDS index tranche."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Component)
-    .with_examples(examples::cds_tranche_params),
-        SchemaArtifact::new::<crate::metrics::risk::MarketHistory>(
-            "schemas/common/1/market_history.schema.json",
-            "https://finstack_quant.dev/schemas/common/1/market_history.schema.json",
-            "MarketHistory",
-            "Historical market scenarios for historical VaR and expected shortfall.",
+        .with_examples(examples::cds_tranche_params),
+        finstack_quant_core::schema_artifact!(
+            MarketHistory,
+            "common",
+            "market_history",
+            Component,
+            "Historical market scenarios for historical VaR and expected shortfall."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Component)
-    .with_examples(examples::market_history),
-        SchemaArtifact::new::<crate::market::conventions::RateIndexConventions>(
-            "schemas/common/1/rate_index_conventions.schema.json",
-            "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
-            "RateIndexConventions",
-            "Market conventions of one interest-rate index.",
+        .with_examples(examples::market_history),
+        finstack_quant_core::schema_artifact!(
+            RateIndexConventions,
+            "common",
+            "rate_index_conventions",
+            Component,
+            "Market conventions of one interest-rate index."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Component)
-    .with_examples(examples::rate_index_conventions),
-        SchemaArtifact::new::<crate::market::conventions::CdsConventionSpec>(
-            "schemas/common/1/cds_convention_spec.schema.json",
-            "https://finstack_quant.dev/schemas/common/1/cds_convention_spec.schema.json",
-            "CdsConventionSpec",
-            "Market conventions of one CDS currency and documentation clause.",
+        .with_examples(examples::rate_index_conventions),
+        finstack_quant_core::schema_artifact!(
+            CdsConventionSpec,
+            "common",
+            "cds_convention_spec",
+            Component,
+            "Market conventions of one CDS currency and documentation clause."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Component)
-    .with_examples(examples::cds_convention_spec),
-        SchemaArtifact::new::<crate::market::conventions::SwaptionConventions>(
-            "schemas/common/1/swaption_conventions.schema.json",
-            "https://finstack_quant.dev/schemas/common/1/swaption_conventions.schema.json",
-            "SwaptionConventions",
-            "Market conventions of one swaption market.",
+        .with_examples(examples::cds_convention_spec),
+        finstack_quant_core::schema_artifact!(
+            SwaptionConventions,
+            "common",
+            "swaption_conventions",
+            Component,
+            "Market conventions of one swaption market."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Component)
-    .with_examples(examples::swaption_conventions),
-        SchemaArtifact::new::<crate::market::conventions::InflationSwapConventions>(
-            "schemas/common/1/inflation_swap_conventions.schema.json",
-            "https://finstack_quant.dev/schemas/common/1/inflation_swap_conventions.schema.json",
-            "InflationSwapConventions",
-            "Market conventions of one inflation-swap market.",
+        .with_examples(examples::swaption_conventions),
+        finstack_quant_core::schema_artifact!(
+            InflationSwapConventions,
+            "common",
+            "inflation_swap_conventions",
+            Component,
+            "Market conventions of one inflation-swap market."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Component)
-    .with_examples(examples::inflation_swap_conventions),
-        SchemaArtifact::new::<crate::market::conventions::XccyConventions>(
-            "schemas/common/1/xccy_conventions.schema.json",
-            "https://finstack_quant.dev/schemas/common/1/xccy_conventions.schema.json",
-            "XccyConventions",
-            "Market conventions of one cross-currency swap pair.",
+        .with_examples(examples::inflation_swap_conventions),
+        finstack_quant_core::schema_artifact!(
+            XccyConventions,
+            "common",
+            "xccy_conventions",
+            Component,
+            "Market conventions of one cross-currency swap pair."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Component)
-    .with_examples(examples::xccy_conventions),
-        SchemaArtifact::new::<crate::market::conventions::IrFutureConventions>(
-            "schemas/common/1/ir_future_conventions.schema.json",
-            "https://finstack_quant.dev/schemas/common/1/ir_future_conventions.schema.json",
-            "IrFutureConventions",
-            "Contract conventions of one interest-rate future.",
+        .with_examples(examples::xccy_conventions),
+        finstack_quant_core::schema_artifact!(
+            IrFutureConventions,
+            "common",
+            "ir_future_conventions",
+            Component,
+            "Contract conventions of one interest-rate future."
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Component)
-    .with_examples(examples::ir_future_conventions),
+        .with_examples(examples::ir_future_conventions),
     ];
 
     artifacts.extend(
@@ -1449,7 +1484,7 @@ mod tests {
     #[test]
     fn test_instrument_schema_rejects_unknown_discriminator() {
         let err = instrument_schema("not_a_supported_instrument_type").expect_err("unknown type");
-        assert_eq!(err.kind(), finstack_quant_core::error::ErrorKind::NotFound);
+        assert_eq!(err.kind(), finstack_quant_core::ErrorKind::NotFound);
         let msg = err.to_string();
         assert!(
             msg.contains("unknown instrument type"),

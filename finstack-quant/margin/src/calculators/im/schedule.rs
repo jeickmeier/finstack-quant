@@ -17,9 +17,9 @@ use crate::traits::Marginable;
 use crate::types::ImMethodology;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::neumaier_sum;
+use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use std::borrow::Cow;
 
@@ -159,7 +159,7 @@ impl std::str::FromStr for ScheduleAssetClass {
 #[derive(Debug, Clone)]
 pub struct RegulatorySchedule {
     /// IM rates by asset class and maturity bucket
-    pub rates: HashMap<(ScheduleAssetClass, MaturityBucket), f64>,
+    pub rates: FxHashMap<(ScheduleAssetClass, MaturityBucket), f64>,
     /// Short/medium bucket boundary in years.
     pub short_to_medium: f64,
     /// Medium/long bucket boundary in years.
@@ -477,7 +477,7 @@ impl ScheduleImCalculator {
             return Ok(None);
         };
         let currency = first.0.currency();
-        let mut gross_by_class = HashMap::default();
+        let mut gross_by_class = FxHashMap::default();
         let mut gross_notional = 0.0;
         for (mtm, notional, asset_class, maturity) in positions {
             if mtm.currency() != currency
@@ -507,7 +507,7 @@ impl ScheduleImCalculator {
             (signed_mtm.max(0.0) / positive_mtm).clamp(0.0, 1.0)
         };
         let reduction = 0.4 + 0.6 * ngr;
-        let mut breakdown = HashMap::default();
+        let mut breakdown = FxHashMap::default();
         for (key, gross) in gross_by_class {
             breakdown.insert(key, Money::new(gross * reduction, currency)?);
         }
@@ -554,7 +554,7 @@ impl ScheduleImCalculator {
         as_of: Date,
         breakdown_key: impl Into<String>,
     ) -> ImResult {
-        let mut breakdown = HashMap::default();
+        let mut breakdown = FxHashMap::default();
         breakdown.insert(breakdown_key.into(), amount);
         ImResult::with_breakdown(
             amount,

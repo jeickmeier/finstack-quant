@@ -273,7 +273,13 @@ test('ForwardCurve options accept typed arrays', () => {
 });
 
 test('core VolCube is a data-only artifact', () => {
-  const cube = new core.VolCube('NORMAL', [1], [2], [0.01, 0, -0.2, 0.4, Number.NaN], [0.02]);
+  const cube = new core.VolCube(
+    'NORMAL',
+    [1],
+    [2],
+    [{ alpha: 0.01, beta: 0, rho: -0.2, nu: 0.4 }],
+    [0.02]
+  );
   assert.equal(cube.id, 'NORMAL');
   assert.equal(cube.interpolationMode, 'vol');
   for (const name of ['vol', 'volClamped', 'volNormal', 'volNormalClamped']) {
@@ -281,22 +287,16 @@ test('core VolCube is a data-only artifact', () => {
   }
 });
 
-test('core VolCube rejects overflowing grid and flat-parameter dimensions', () => {
-  const axis = Float64Array.from({ length: 65536 }, (_, index) => index + 1);
+test('core VolCube takes SABR node objects only', () => {
   assert.throws(
-    () => new core.VolCube('GRID-OVERFLOW', axis, axis, [], []),
-    /grid dimensions are too large/
-  );
-  const shorter = axis.subarray(0, 32768);
-  assert.throws(
-    () => new core.VolCube('PARAMETER-OVERFLOW', shorter, shorter, [], []),
-    /parameter dimensions are too large/
+    () => new core.VolCube('FLAT', [1], [2], [0.01, 0, -0.2, 0.4, 0], [0.02]),
+    (error) => error.kind === 'validation' && /paramsRowMajor/.test(error.message)
   );
   const cube = new core.VolCube(
     'VALID-AFTER-REJECTION',
     [1],
     [2],
-    [0.01, 0, -0.2, 0.4, NaN],
+    [{ alpha: 0.01, beta: 0, rho: -0.2, nu: 0.4 }],
     [0.02]
   );
   try {
@@ -315,13 +315,13 @@ test('core.FxDeltaVolSurface constructs from 25-delta quotes', () => {
     [0.002, 0.0025, 0.003]
   );
   assert.equal(surface.id, 'EURUSD-VOL');
-  assert.equal(surface.numExpiries, 3);
+  assert.equal(surface.expiries.length, 3);
 });
 
 test('core FX delta surface absent wings use omitted arguments, not empty arrays', () => {
   const surface = new core.FxDeltaVolSurface('EURUSD', [1], [0.1], [0], [0], undefined, undefined);
   try {
-    assert.equal(surface.numExpiries, 1);
+    assert.equal(surface.expiries.length, 1);
   } finally {
     surface.free();
   }

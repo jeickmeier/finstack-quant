@@ -246,11 +246,11 @@ impl CurveStorage {
                 *self = Self::Price(Arc::new(curve));
                 Ok(())
             }
-            Self::BasisSpread(_) => Err(crate::error::InputError::UnsupportedBump {
+            Self::BasisSpread(_) => Err(crate::InputError::UnsupportedBump {
                 reason: "BasisSpreadCurve does not support bumping".to_string(),
             }
             .into()),
-            Self::Parametric(_) => Err(crate::error::InputError::UnsupportedBump {
+            Self::Parametric(_) => Err(crate::InputError::UnsupportedBump {
                 reason: "ParametricCurve does not support bumping".to_string(),
             }
             .into()),

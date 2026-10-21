@@ -51,7 +51,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
     ///
     /// # Arguments
@@ -81,7 +81,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::error::InputError::InvalidReturnSeries`] when a pair
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when a pair
     /// is degenerate, an off-diagonal is non-finite, or Higham repair fails.
     ///
     /// # Returns
@@ -178,7 +178,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `rf.len()` does not equal the active panel date count.
     ///
     /// # Returns
@@ -272,7 +272,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
     pub fn period_stats(
         &self,
@@ -385,8 +385,9 @@ fn finalize_correlation_matrix(
 mod tests {
     use super::*;
     use crate::Performance;
-    use finstack_quant_core::dates::{Month, PeriodKind};
+    use finstack_quant_core::dates::PeriodKind;
     use finstack_quant_core::math::linalg::validate_correlation_matrix;
+    use time::Month;
 
     fn jan(day: u8) -> Date {
         Date::from_calendar_date(2024, Month::January, day).expect("valid date")

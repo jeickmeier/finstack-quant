@@ -1053,12 +1053,10 @@ fn percent_signed_zero_hashes_equal() {
 #[test]
 fn linear_to_decimal_scale_hashes_equal() {
     let pos = AmortizationSpec::LinearTo {
-        final_notional: Money::from_decimal(rust_decimal::Decimal::new(10, 1), Currency::USD)
-            .expect("1.0 is representable"),
+        final_notional: Money::from_decimal(rust_decimal::Decimal::new(10, 1), Currency::USD),
     };
     let neg = AmortizationSpec::LinearTo {
-        final_notional: Money::from_decimal(rust_decimal::Decimal::new(100, 2), Currency::USD)
-            .expect("1.00 is representable"),
+        final_notional: Money::from_decimal(rust_decimal::Decimal::new(100, 2), Currency::USD),
     };
     assert_eq!(pos, neg);
     assert_eq!(hash_of(&pos), hash_of(&neg));

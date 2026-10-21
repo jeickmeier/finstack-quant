@@ -29,6 +29,7 @@ use crate::commodity::commodity_spread_option::CommoditySpreadOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::{black_call, black_put};
 use finstack_quant_valuations_core::instruments::OptionType;
@@ -183,7 +184,11 @@ mod tests {
     }
 
     /// Helper to build a flat price curve at a given level.
-    fn flat_price_curve(id: &str, price: f64, as_of: time::Date) -> PriceCurve {
+    fn flat_price_curve(
+        id: &str,
+        price: f64,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> PriceCurve {
         PriceCurve::builder(id)
             .base_date(as_of)
             .spot_price(price)
@@ -193,7 +198,11 @@ mod tests {
     }
 
     /// Helper to build a flat discount curve.
-    fn flat_discount_curve(id: &str, rate: f64, as_of: time::Date) -> DiscountCurve {
+    fn flat_discount_curve(
+        id: &str,
+        rate: f64,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> DiscountCurve {
         // Build a discount curve from discount factors: DF(t) = exp(-r*t)
         let df_1y = (-rate * 1.0_f64).exp();
         let df_2y = (-rate * 2.0_f64).exp();
@@ -206,7 +215,7 @@ mod tests {
     }
 
     fn make_market(
-        as_of: time::Date,
+        as_of: finstack_quant_core::dates::Date,
         f1: f64,
         f2: f64,
         vol1: f64,
@@ -231,7 +240,7 @@ mod tests {
         option_type: OptionType,
         strike: f64,
         correlation: f64,
-        expiry: time::Date,
+        expiry: finstack_quant_core::dates::Date,
     ) -> CommoditySpreadOption {
         try_make_spread_option(option_type, strike, correlation, expiry)
             .expect("build spread option")
@@ -241,7 +250,7 @@ mod tests {
         option_type: OptionType,
         strike: f64,
         correlation: f64,
-        expiry: time::Date,
+        expiry: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<CommoditySpreadOption> {
         CommoditySpreadOption::builder()
             .id(InstrumentId::new("TEST-SPREAD"))
@@ -263,9 +272,11 @@ mod tests {
     #[test]
     fn kirk_rejects_incompatible_surface_contracts() {
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2026, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::January, 1)
+                .expect("valid date");
         let option = make_spread_option(OptionType::Call, 5.0, 0.5, expiry);
         for id in ["LEG1-VOL", "LEG2-VOL"] {
             let base = flat_vol_surface(id, 0.3);
@@ -282,7 +293,21 @@ mod tests {
                         .expect("shifted surface"),
                     "black_lognormal",
                 ),
-                (base.with_secondary_axis(VolSurfaceAxis::Tenor), "strike"),
+                (
+                    finstack_quant_core::market_data::surfaces::VolSurface::from_grid_opts(
+                        base.id(),
+                        base.expiries(),
+                        base.strikes(),
+                        base.vols(),
+                        finstack_quant_core::market_data::surfaces::VolGridOpts {
+                            secondary_axis: VolSurfaceAxis::Tenor,
+                            ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                        },
+                        None,
+                    )
+                    .expect("tenor surface"),
+                    "strike",
+                ),
             ];
             for (surface, expected) in incompatible {
                 let market =
@@ -301,9 +326,11 @@ mod tests {
         // Same forward for both legs, K=0, rho=1 => spread is always 0,
         // call on max(0, 0) = 0.
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 1)
+                .expect("valid date");
 
         let market = make_market(as_of, 100.0, 100.0, 0.30, 0.30, 0.05);
         let opt = make_spread_option(OptionType::Call, 0.0, 1.0, expiry);
@@ -328,9 +355,11 @@ mod tests {
         // where w = F2/(F2+K)
         // This is strictly less than sigma1 when w > 0
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 1)
+                .expect("valid date");
 
         let f1 = 100.0;
         let f2 = 80.0;
@@ -359,9 +388,11 @@ mod tests {
     fn put_call_parity() {
         // C - P = DF * (F1 - F2 - K)
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 1)
+                .expect("valid date");
 
         let f1 = 100.0;
         let f2 = 80.0;
@@ -418,9 +449,11 @@ mod tests {
         // Negative correlation should increase the effective Kirk vol,
         // resulting in a higher option price compared to positive correlation.
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 1)
+                .expect("valid date");
 
         let market = make_market(as_of, 100.0, 80.0, 0.25, 0.30, 0.05);
 
@@ -448,9 +481,11 @@ mod tests {
     fn zero_vol_returns_intrinsic() {
         // With zero vol, option value should be max(F1 - F2 - K, 0) * DF
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 1)
+                .expect("valid date");
 
         let f1 = 100.0;
         let f2 = 80.0;
@@ -487,9 +522,11 @@ mod tests {
     fn zero_vol_otm_returns_zero() {
         // Zero vol, OTM option: F1 - F2 - K < 0 => max(., 0) = 0
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 1)
+                .expect("valid date");
 
         let f1 = 100.0;
         let f2 = 80.0;
@@ -512,9 +549,11 @@ mod tests {
     #[test]
     fn correlation_validation() {
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 1)
+                .expect("valid date");
 
         let market = make_market(as_of, 100.0, 80.0, 0.25, 0.30, 0.05);
 
@@ -534,9 +573,11 @@ mod tests {
     fn spread_option_is_positive() {
         // Any option with positive vol should have positive price
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 1)
+                .expect("valid date");
 
         let market = make_market(as_of, 100.0, 80.0, 0.25, 0.30, 0.05);
 
@@ -566,9 +607,11 @@ mod tests {
         use std::f64::consts::PI;
 
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2026, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::January, 1)
+                .expect("valid date");
 
         // Near-ATM parameters: spread = F1-F2 = 10, strike K=10
         let f1 = 110.0_f64;
@@ -635,9 +678,11 @@ mod tests {
     #[test]
     fn negative_adjusted_strike_call_is_rejected() {
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 1)
+                .expect("valid date");
 
         // K = -150, F2 = 80 => k_adj = 80 + (-150) = -70 < 0
         // The call is deeply in-the-money: F1 - F2 - K = 100 - 80 - (-150) = 170
@@ -656,9 +701,11 @@ mod tests {
     #[test]
     fn negative_adjusted_strike_put_is_rejected() {
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 1)
+                .expect("valid date");
 
         // K = -150, F2 = 80 => k_adj = -70 < 0
         let f1 = 100.0_f64;
@@ -673,9 +720,12 @@ mod tests {
 
     #[test]
     fn post_expiry_returns_zero() {
-        let as_of = time::Date::from_calendar_date(2025, time::Month::July, 2).expect("valid date");
+        let as_of =
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 2)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 1)
+                .expect("valid date");
 
         let market = make_market(as_of, 100.0, 80.0, 0.25, 0.30, 0.05);
         let opt = make_spread_option(OptionType::Call, 10.0, 0.6, expiry);
@@ -692,9 +742,11 @@ mod tests {
     fn large_positive_spread_deep_itm_call() {
         // Deep ITM call: F1 - F2 - K >> 0, should approach DF * (F1 - F2 - K)
         let as_of =
-            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("valid date");
         let expiry =
-            time::Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::July, 1)
+                .expect("valid date");
 
         let f1 = 200.0;
         let f2 = 80.0;

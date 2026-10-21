@@ -532,19 +532,6 @@ for_all_functions! {
     IsMissing => ("is_missing", true),
 }
 
-/// Result envelope that includes execution metadata.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct EvaluationResult {
-    /// The computed values.
-    pub values: Vec<f64>,
-    /// Execution metadata stamped into result.
-    ///
-    /// This carries the standard [`crate::config::ResultsMeta`] payload used by
-    /// the rest of the crate for provenance, evaluation options, and other
-    /// run-level annotations.
-    pub metadata: crate::config::ResultsMeta,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -10,6 +10,7 @@ pub(crate) use vega::VegaCalculator;
 use crate::variance_swap::VarianceSwap;
 use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::bumps::MarketBump;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
 use finstack_quant_valuations_core::metrics::MetricCalculator;

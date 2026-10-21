@@ -965,12 +965,6 @@ export interface D_719F3377340F012E0Eb2 {
    * Used for general numerical comparisons where higher tolerance is acceptable.
    */
   generic_epsilon?: number;
-  /**
-   * Epsilon for rate comparisons (default: 1e-12).
-   *
-   * Used when comparing interest rates, yields, and other small ratios.
-   */
-  rate_epsilon?: number;
 }
 /**
  * Rich structured details attached to composite valuation results.

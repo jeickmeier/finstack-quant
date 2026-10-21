@@ -201,11 +201,11 @@ fn discount_curve_rebuild_paths_preserve_fx_policy() {
         .build()
         .unwrap();
 
-    let bumped = curve.with_parallel_bump(10.0).unwrap();
+    let bumped = curve.apply_bump(BumpSpec::parallel_bp(10.0)).unwrap();
     assert_eq!(bumped.fx_policy(), Some("triangulate_via_usd"));
 
     let key_rate = curve
-        .with_triangular_key_rate_bump_neighbors(Some(1.0), 2.0, Some(5.0), 10.0)
+        .apply_bump(BumpSpec::triangular_key_rate_bp(1.0, 2.0, 5.0, 10.0))
         .unwrap();
     assert_eq!(key_rate.fx_policy(), Some("triangulate_via_usd"));
 
@@ -225,11 +225,11 @@ fn forward_curve_rebuild_paths_preserve_fx_policy() {
         .build()
         .unwrap();
 
-    let bumped = curve.with_parallel_bump(10.0).unwrap();
+    let bumped = curve.apply_bump(BumpSpec::parallel_bp(10.0)).unwrap();
     assert_eq!(bumped.fx_policy(), Some("triangulate_via_usd"));
 
     let key_rate = curve
-        .with_triangular_key_rate_bump_neighbors(Some(1.0), 2.0, Some(5.0), 10.0)
+        .apply_bump(BumpSpec::triangular_key_rate_bp(1.0, 2.0, 5.0, 10.0))
         .unwrap();
     assert_eq!(key_rate.fx_policy(), Some("triangulate_via_usd"));
 

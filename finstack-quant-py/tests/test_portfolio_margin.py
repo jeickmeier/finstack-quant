@@ -177,7 +177,7 @@ def test_calculate_on_an_unmargined_portfolio_reports_no_netting_sets() -> None:
 def test_calculate_rejects_collateral_for_an_unknown_csa() -> None:
     portfolio = _unmargined_portfolio()
     with pytest.raises(ValueError, match="Unknown IM collateral CSA"):
-        portfolio_margin(portfolio, _market(), AS_OF, current_im_collateral={"NO-SUCH-CSA": Money("1", "USD")})
+        portfolio_margin(portfolio, _market(), AS_OF, current_im_collateral={"NO-SUCH-CSA": Money(1.0, "USD")})
     with pytest.raises(TypeError):
         portfolio_margin(portfolio, _market(), 20250115)
 

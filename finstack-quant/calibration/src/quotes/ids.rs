@@ -1,9 +1,9 @@
 //! Quote identifiers and pillar types.
 
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::Tenor;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use time::Date;
 
 /// A stable identifier for a market quote (e.g., "USD-OIS-SWAP-5Y").
 ///
@@ -152,7 +152,6 @@ pub enum Pillar {
     /// The maturity is fixed to a specific date, regardless of the valuation date. This is
     /// typically used for futures contracts or bespoke instruments with fixed maturities.
     Date(
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")

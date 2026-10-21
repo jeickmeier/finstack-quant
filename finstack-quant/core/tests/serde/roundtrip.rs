@@ -5,8 +5,8 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, DayCount, DayCountContextState, ScheduleBuilder, ScheduleSpec, StubKind,
-    Tenor, TenorUnit,
+    BusinessDayConvention, DayCount, DayCountContextState, Schedule, ScheduleBuilder, ScheduleSpec,
+    StubKind, Tenor, TenorUnit,
 };
 use finstack_quant_core::explain::ExplainOpts;
 use finstack_quant_core::{Error, InputError};
@@ -97,14 +97,14 @@ fn schedule_spec_builds_expected_dates() {
     assert!(!json.contains("\"graceful\""));
     assert!(!json.contains("\"allow_missing_calendar\""));
     let restored: ScheduleSpec = serde_json::from_str(&json).unwrap();
-    let schedule = restored.build().unwrap();
+    let schedule = ScheduleBuilder::from(restored).build().unwrap();
     assert_eq!(schedule.dates.len(), 7);
 
     // Cross-check with builder directly
-    let builder_schedule = ScheduleBuilder::new(start, end)
+    let builder_schedule = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
-        .adjust_with_id(BusinessDayConvention::Following, "target2")
+        .adjust_with(BusinessDayConvention::Following, "target2")
         .build()
         .unwrap();
 
@@ -185,7 +185,7 @@ fn schedule_spec_rejects_dual_imm_modes() {
         payment_lag_days: 0,
         fixing_lag_business_days: None,
     };
-    assert!(spec.build().is_err());
+    assert!(ScheduleBuilder::from(spec).build().is_err());
 }
 
 /// `ScheduleSpec::with_cds_imm` / `with_imm` follow `ScheduleBuilder` setter
@@ -201,14 +201,17 @@ fn schedule_spec_imm_setters_match_builder_semantics() {
     let spec = ScheduleSpec::new(start, end).unwrap().with_cds_imm();
     assert_eq!(spec.frequency, Tenor::quarterly());
     assert_eq!(spec.stub, StubKind::ShortBack);
-    let builder = ScheduleBuilder::new(start, end).unwrap().cds_imm();
-    assert_eq!(spec.build().unwrap().dates, builder.build().unwrap().dates);
+    let builder = Schedule::builder(start, end).unwrap().cds_imm();
+    assert_eq!(
+        ScheduleBuilder::from(spec).build().unwrap().dates,
+        builder.build().unwrap().dates
+    );
 
     // CDS IMM then monthly: the later frequency wins on both paths.
     let mut spec = ScheduleSpec::new(start, end).unwrap().with_cds_imm();
     spec.frequency = Tenor::monthly();
-    let built = spec.build().unwrap().dates;
-    let expected = ScheduleBuilder::new(start, end)
+    let built = ScheduleBuilder::from(spec).build().unwrap().dates;
+    let expected = Schedule::builder(start, end)
         .unwrap()
         .cds_imm()
         .frequency(Tenor::monthly())
@@ -223,8 +226,8 @@ fn schedule_spec_imm_setters_match_builder_semantics() {
     assert!(spec.imm_mode && !spec.cds_imm_mode);
     assert_eq!(spec.frequency, Tenor::quarterly());
     assert_eq!(
-        spec.build().unwrap().dates,
-        ScheduleBuilder::new(start, end)
+        ScheduleBuilder::from(spec).build().unwrap().dates,
+        Schedule::builder(start, end)
             .unwrap()
             .imm()
             .build()

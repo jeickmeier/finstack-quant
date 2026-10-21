@@ -124,7 +124,7 @@ fn make_bond() -> Bond {
     bond
 }
 
-fn flat_discount(base: time::Date) -> DiscountCurve {
+fn flat_discount(base: finstack_quant_core::dates::Date) -> DiscountCurve {
     let r = 0.05_f64;
     DiscountCurve::builder("USD-OIS")
         .base_date(base)
@@ -151,14 +151,13 @@ fn make_market_state(disc: DiscountCurve, haz: HazardCurve) -> MarketContextStat
         inflation_indices: vec![],
         dividends: vec![],
         credit_indices: vec![],
-        collateral: BTreeMap::new(),
         fx_delta_vol_surfaces: vec![],
         hierarchy: None,
         vol_cubes: vec![],
     }
 }
 
-fn flat_market_state(base: time::Date, rate: f64) -> MarketContextState {
+fn flat_market_state(base: finstack_quant_core::dates::Date, rate: f64) -> MarketContextState {
     let discount = flat_discount(base);
     let convention = CdsConventionKey {
         currency: Currency::USD,
@@ -183,7 +182,10 @@ fn flat_market_state(base: time::Date, rate: f64) -> MarketContextState {
     make_market_state(discount, hazard)
 }
 
-fn standard_period() -> (time::Date, time::Date) {
+fn standard_period() -> (
+    finstack_quant_core::dates::Date,
+    finstack_quant_core::dates::Date,
+) {
     (
         create_date(2025, Month::January, 1).unwrap(),
         create_date(2025, Month::January, 2).unwrap(),
@@ -192,7 +194,7 @@ fn standard_period() -> (time::Date, time::Date) {
 
 /// Hazard curve with knots at the standard tenor grid set to the given rates,
 /// used to build a deliberately non-parallel (twisted) hazard move.
-fn twisted_hazard(base: time::Date, rates: &[f64]) -> HazardCurve {
+fn twisted_hazard(base: finstack_quant_core::dates::Date, rates: &[f64]) -> HazardCurve {
     let std_tenors = [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 30.0];
     HazardCurve::builder("ISSUER-A-HAZ")
         .base_date(base)
@@ -717,7 +719,7 @@ fn metrics_based_credit_factor_detail_uses_t1_cs01_baseline() {
     let model = make_model(vec![HierarchyDimension::Rating, HierarchyDimension::Region]);
 
     // Rate drift: 5% → 6% (100 bp parallel).
-    let drift_discount = |base: time::Date, r: f64| {
+    let drift_discount = |base: finstack_quant_core::dates::Date, r: f64| {
         DiscountCurve::builder("USD-OIS")
             .base_date(base)
             .day_count(DayCount::Act365F)

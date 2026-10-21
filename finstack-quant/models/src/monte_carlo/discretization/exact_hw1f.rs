@@ -125,7 +125,11 @@ impl Discretization<HullWhite1FProcess> for ExactHullWhite1F {
         x[0] = mean + consts.std_dev * z[0];
     }
 
-    fn prepare(&mut self, process: &HullWhite1FProcess, time_grid: &crate::monte_carlo::TimeGrid) {
+    fn prepare(
+        &mut self,
+        process: &HullWhite1FProcess,
+        time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
+    ) {
         if time_grid.num_steps() == 0 {
             return;
         }

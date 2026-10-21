@@ -1,18 +1,14 @@
 //! Python bindings for holiday calendars and business-day adjustment.
 
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::{label_enum, typed_or_label};
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
-    adjust, available_calendars, calendar_by_id_strict, resolve_calendar, BusinessDayConvention,
-    CalendarMetadata, HolidayCalendar, WeekendRule,
+    adjust, available_calendars, calendar_by_id_strict, BusinessDayConvention, CalendarMetadata,
+    HolidayCalendar,
 };
 use pyo3::prelude::*;
-use pyo3::types::{PyModule, PyType};
-
-/// Serde name of a [`WeekendRule`] (the stable snake_case wire form).
-fn weekend_rule_str(rule: WeekendRule) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(&rule).map_err(crate::errors::core_to_py)
-}
+use pyo3::types::PyModule;
 
 /// Business-day adjustment convention (ISDA 2006 Definitions §4.12).
 ///
@@ -49,80 +45,27 @@ impl PyBusinessDayConvention {
     }
 }
 
-#[pymethods]
-impl PyBusinessDayConvention {
+label_enum!(PyBusinessDayConvention, BusinessDayConvention, "BusinessDayConvention", from_name, {
     /// No adjustment — use the date as given.
-    #[classattr]
-    const UNADJUSTED: PyBusinessDayConvention = PyBusinessDayConvention {
-        inner: BusinessDayConvention::Unadjusted,
-    };
+    UNADJUSTED => Unadjusted,
     /// Roll forward to the next business day.
-    #[classattr]
-    const FOLLOWING: PyBusinessDayConvention = PyBusinessDayConvention {
-        inner: BusinessDayConvention::Following,
-    };
+    FOLLOWING => Following,
     /// Roll forward unless it crosses a month boundary, then roll backward.
-    #[classattr]
-    const MODIFIED_FOLLOWING: PyBusinessDayConvention = PyBusinessDayConvention {
-        inner: BusinessDayConvention::ModifiedFollowing,
-    };
+    MODIFIED_FOLLOWING => ModifiedFollowing,
     /// Roll backward to the previous business day.
-    #[classattr]
-    const PRECEDING: PyBusinessDayConvention = PyBusinessDayConvention {
-        inner: BusinessDayConvention::Preceding,
-    };
+    PRECEDING => Preceding,
     /// Roll backward unless it crosses a month boundary, then roll forward.
-    #[classattr]
-    const MODIFIED_PRECEDING: PyBusinessDayConvention = PyBusinessDayConvention {
-        inner: BusinessDayConvention::ModifiedPreceding,
-    };
+    MODIFIED_PRECEDING => ModifiedPreceding,
     /// Closer business day; a tie rolls following.
-    #[classattr]
-    const NEAREST: PyBusinessDayConvention = PyBusinessDayConvention {
-        inner: BusinessDayConvention::Nearest,
-    };
+    NEAREST => Nearest,
+});
 
-    /// Parse from the snake_case name (``"modified_following"``) or a short
-    /// code (``"MF"``, ``"F"``, ``"P"``, ``"MP"``, ``"NONE"``), case-insensitively.
-    ///
-    /// Raises ``ValueError`` listing the accepted names when ``name`` is unknown.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, name)")]
-    fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
-        name.parse::<BusinessDayConvention>()
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
-    /// Support ``pickle`` by reconstructing through ``from_name``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_name = py.get_type::<Self>().getattr("from_name")?;
-        Ok((from_name, (self.inner.to_string(),)))
-    }
-
-    fn __repr__(&self) -> String {
-        format!("BusinessDayConvention('{}')", self.inner)
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-}
-
-/// Extract a [`BusinessDayConvention`] from a Python object (wrapper or string).
-pub(crate) fn extract_business_day_convention(
-    obj: &Bound<'_, PyAny>,
-) -> PyResult<BusinessDayConvention> {
-    if let Ok(business_day_convention) = obj.extract::<PyRef<'_, PyBusinessDayConvention>>() {
-        return Ok(business_day_convention.inner);
-    }
-    if let Ok(s) = obj.extract::<String>() {
-        return s.parse::<BusinessDayConvention>().map_err(core_to_py);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(
-        "expected BusinessDayConvention or str",
-    ))
-}
+typed_or_label!(
+    pub(crate) fn extract_business_day_convention -> BusinessDayConvention,
+    PyBusinessDayConvention,
+    "BusinessDayConvention or str",
+    |label| label.parse().map_err(core_to_py)
+);
 
 /// Resolve a calendar from a ``HolidayCalendar`` wrapper or a registry id.
 ///
@@ -134,7 +77,7 @@ pub(crate) fn extract_calendar(obj: &Bound<'_, PyAny>) -> PyResult<&'static dyn 
         return Ok(cal.cal);
     }
     if let Ok(code) = obj.extract::<String>() {
-        return resolve_calendar(Some(&code)).map_err(core_to_py);
+        return calendar_by_id_strict(&code).map_err(core_to_py);
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
         "expected HolidayCalendar or str calendar code",
@@ -147,8 +90,8 @@ pub(crate) fn extract_calendar(obj: &Bound<'_, PyAny>) -> PyResult<&'static dyn 
 /// --------
 /// >>> from finstack_quant.core.dates import HolidayCalendar
 /// >>> meta = HolidayCalendar("usny").metadata
-/// >>> (meta.id, meta.weekend_rule)
-/// ('usny', 'saturday_sunday')
+/// >>> (meta.id, meta.ignore_weekends)
+/// ('usny', False)
 #[pyclass(
     name = "CalendarMetadata",
     module = "finstack_quant.core.dates",
@@ -187,13 +130,6 @@ impl PyCalendarMetadata {
     #[getter]
     fn ignore_weekends(&self) -> bool {
         self.inner.ignore_weekends
-    }
-
-    /// Weekend convention used by this calendar as a snake_case string
-    /// (e.g. ``"saturday_sunday"``, ``"friday_saturday"``, ``"friday_only"``, ``"none"``).
-    #[getter]
-    fn weekend_rule(&self) -> PyResult<String> {
-        weekend_rule_str(self.inner.weekend_rule)
     }
 
     fn __repr__(&self) -> String {
@@ -328,13 +264,6 @@ impl PyHolidayCalendar {
     #[getter]
     fn metadata(&self) -> Option<PyCalendarMetadata> {
         self.cal.metadata().map(PyCalendarMetadata::from_inner)
-    }
-
-    /// Canonical registry id (``"usny"``, ``"target2"``, ``"weekends_only"``),
-    /// or the normalized ``a+b`` form for union calendars.
-    #[getter]
-    fn code(&self) -> &str {
-        &self.code
     }
 
     /// Support ``pickle`` by reconstructing through ``HolidayCalendar(code)``.

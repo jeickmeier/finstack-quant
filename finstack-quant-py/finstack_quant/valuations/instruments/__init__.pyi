@@ -12467,7 +12467,7 @@ class CdsTranche:
         ... )
         >>> tranche = CdsTranche.standard("CDX-42-3X7", params, "USD-OIS", "CDX.NA.IG.HAZARD", "pay")
         >>> (tranche.day_count, tranche.business_day_convention)
-        (DayCount('act_360'), 'following')
+        (DayCount.ACT_360, 'following')
         """
         ...
     def expected_loss(self, market: MarketContext | str) -> float:

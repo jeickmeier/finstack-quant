@@ -63,7 +63,7 @@ fn transpose_row_major(data: &[f64], rows: usize, cols: usize) -> Vec<f64> {
 }
 
 /// Copy a NumPy matrix into logical C/row-major order.
-fn numpy_row_major(array: &PyReadonlyArray2<'_, f64>) -> Vec<f64> {
+pub(crate) fn numpy_row_major(array: &PyReadonlyArray2<'_, f64>) -> Vec<f64> {
     if array.is_c_contiguous() {
         if let Ok(slice) = array.as_slice() {
             return slice.to_vec();

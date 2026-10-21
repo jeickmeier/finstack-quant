@@ -30,7 +30,7 @@
 //!
 //! - **`error/mod.rs`** (directory with submodules): Use when the crate defines
 //!   its own rich error hierarchy with multiple enums and helper logic
-//!   (e.g., `finstack_quant_core::error` has `Error`, `InputError`, suggestions).
+//!   (e.g., `finstack_quant_core` has `Error`, `InputError`, suggestions).
 //! - **`error.rs`** (flat file): Use for re-export facades that aggregate errors
 //!   defined at stable crate boundaries.
 //!
@@ -83,7 +83,7 @@ impl Error {
     /// Classify this error for host-language exception mapping: the wrapped
     /// core or pricing error's kind.
     #[must_use]
-    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+    pub fn kind(&self) -> finstack_quant_core::ErrorKind {
         match self {
             Error::Core(error) => error.kind(),
             Error::Pricing(error) => error.kind(),

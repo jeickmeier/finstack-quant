@@ -1510,10 +1510,13 @@ fn nearest_correlation(
 /// ``usize`` range, and ``TypeError`` if ``n`` is not an integer.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix, n)")]
-fn cholesky_decompose(py: Python<'_>, matrix: &Bound<'_, PyAny>, n: usize) -> PyResult<Vec<f64>> {
+fn cholesky_correlation(py: Python<'_>, matrix: &Bound<'_, PyAny>, n: usize) -> PyResult<Vec<f64>> {
     let matrix = extract_square_matrix(py, matrix, n)?;
-    py.detach(|| corr::cholesky_decompose(&matrix, n).map(|f| f.factor_matrix().to_vec()))
-        .map_err(correlation_to_py)
+    py.detach(|| {
+        finstack_quant_core::math::linalg::cholesky_correlation(&matrix, n)
+            .map(|f| f.factor_matrix().to_vec())
+    })
+    .map_err(|e| correlation_to_py(e.into()))
 }
 
 /// Register the `correlation` submodule on the parent module.
@@ -1543,7 +1546,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(joint_probabilities, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_correlation_matrix, &m)?)?;
     m.add_function(wrap_pyfunction!(nearest_correlation, &m)?)?;
-    m.add_function(wrap_pyfunction!(cholesky_decompose, &m)?)?;
+    m.add_function(wrap_pyfunction!(cholesky_correlation, &m)?)?;
     m.add_function(wrap_pyfunction!(simulate_portfolio_loss, &m)?)?;
 
     let all = PyList::new(
@@ -1564,7 +1567,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "RecoveryModel",
             "RecoverySpec",
             "TrancheLossStatistics",
-            "cholesky_decompose",
+            "cholesky_correlation",
             "correlation_bounds",
             "joint_probabilities",
             "nearest_correlation",

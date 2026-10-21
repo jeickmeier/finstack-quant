@@ -9,7 +9,7 @@
 
 use crate::config::RoundingMode;
 use crate::decimal::f64_to_decimal;
-use crate::error::{Error, InputError};
+use crate::{Error, InputError};
 use rust_decimal::Decimal;
 
 /// Internal numeric representation for `Money` amounts.
@@ -24,17 +24,9 @@ pub(crate) type AmountRepr = Decimal;
 /// can be converted to f64. The `rust_decimal::Decimal` type has a max of ~7.9e28,
 /// which is well within f64's range of ~1.8e308.
 ///
-/// # Panics
-///
-/// Panics if conversion fails (which should never happen for valid monetary amounts).
 #[inline]
-#[allow(clippy::expect_used)] // Invariant documented above; infallible within monetary range.
 pub(crate) fn amount_from_repr(x: AmountRepr) -> f64 {
-    use rust_decimal::prelude::ToPrimitive;
-    // INVARIANT: Decimal values within monetary range always convert to f64.
-    // The rust_decimal::Decimal max (~7.9e28) is well within f64's range (~1.8e308).
-    x.to_f64()
-        .expect("Decimal to f64 conversion failed: monetary-range Decimal must fit in f64")
+    x.as_f64()
 }
 
 #[inline]

@@ -10,6 +10,7 @@
 //! - DV01 (interest rate sensitivity)
 
 use crate::commodity::commodity_forward::CommodityForward;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;

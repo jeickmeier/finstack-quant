@@ -11,7 +11,7 @@ use crate::position::Position;
 use crate::types::{Entity, EntityId, PositionId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -57,7 +57,7 @@ pub struct Portfolio {
     ///
     /// Rebuilt automatically via [`rebuild_index`] when constructing a portfolio
     /// through the builder or `from_spec`.
-    pub(crate) position_index: HashMap<PositionId, usize>,
+    pub(crate) position_index: FxHashMap<PositionId, usize>,
 
     /// Inverted index mapping market factor keys to affected position indices.
     ///
@@ -363,7 +363,7 @@ impl Portfolio {
             as_of: spec.as_of,
             entities: spec.entities,
             positions,
-            position_index: HashMap::default(),
+            position_index: FxHashMap::default(),
             dependency_index: DependencyIndex::default(),
             evaluation_state_id: 0,
             books: spec.books,
@@ -385,8 +385,8 @@ impl Portfolio {
 fn check_position_ids_and_books<'a>(
     positions: &'a [Position],
     books: &IndexMap<BookId, Book>,
-) -> Result<finstack_quant_core::HashSet<&'a PositionId>> {
-    let mut seen_ids = finstack_quant_core::HashSet::default();
+) -> Result<finstack_quant_core::FxHashSet<&'a PositionId>> {
+    let mut seen_ids = finstack_quant_core::FxHashSet::default();
     for position in positions {
         if !seen_ids.insert(&position.position_id) {
             return Err(Error::invalid_input(format!(

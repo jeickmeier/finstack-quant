@@ -24,13 +24,13 @@
 //!
 //! Basic monthly schedule:
 //! ```rust
-//! use finstack_quant_core::dates::{ScheduleBuilder, Tenor};
+//! use finstack_quant_core::dates::{Schedule, Tenor};
 //! use time::{Date, Month};
 //!
 //! let start = Date::from_calendar_date(2025, Month::January, 15)?;
 //! let end = Date::from_calendar_date(2025, Month::April, 15)?;
 //!
-//! let sched = ScheduleBuilder::new(start, end)?
+//! let sched = Schedule::builder(start, end)?
 //!     .frequency(Tenor::monthly())
 //!     .build()?;
 //!
@@ -41,13 +41,13 @@
 //!
 //! CDS IMM schedule (quarterly on 20-Mar/Jun/Sep/Dec):
 //! ```rust
-//! use finstack_quant_core::dates::ScheduleBuilder;
+//! use finstack_quant_core::dates::Schedule;
 //! use time::{Date, Month};
 //!
 //! let start = Date::from_calendar_date(2025, Month::January, 15)?;
 //! let end = Date::from_calendar_date(2025, Month::December, 20)?;
 //!
-//! let sched = ScheduleBuilder::new(start, end)?
+//! let sched = Schedule::builder(start, end)?
 //!     .cds_imm()  // Anchors at the CDS roll preceding start (front accrual)
 //!     .build()?;
 //!
@@ -59,13 +59,13 @@
 //!
 //! Standard IMM schedule (quarterly on third Wednesday):
 //! ```rust
-//! use finstack_quant_core::dates::ScheduleBuilder;
+//! use finstack_quant_core::dates::Schedule;
 //! use time::{Date, Month};
 //!
 //! let start = Date::from_calendar_date(2025, Month::January, 15)?;
 //! let end = Date::from_calendar_date(2025, Month::December, 31)?;
 //!
-//! let sched = ScheduleBuilder::new(start, end)?
+//! let sched = Schedule::builder(start, end)?
 //!     .imm()  // Auto-adjusts start to next IMM date (third Wednesday)
 //!     .build()?;
 //!
@@ -77,22 +77,19 @@
 //!
 //! With business day adjustment:
 //! ```rust
-//! use finstack_quant_core::dates::{calendar_by_id_strict, ScheduleBuilder, Tenor, BusinessDayConvention};
+//! use finstack_quant_core::dates::{BusinessDayConvention, Schedule, Tenor};
 //! use time::{Date, Month};
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
 //! let start = Date::from_calendar_date(2025, Month::June, 15)?;
 //! let end = Date::from_calendar_date(2025, Month::December, 15)?;
-//! let nyse = calendar_by_id_strict("nyse")?;
 //!
-//! let sched = ScheduleBuilder::new(start, end)?
+//! let sched = Schedule::builder(start, end)?
 //!     .frequency(Tenor::monthly())
-//!     .adjust_with(BusinessDayConvention::ModifiedFollowing, nyse)
+//!     .adjust_with(BusinessDayConvention::ModifiedFollowing, "nyse")
 //!     .build()?;
 //!
-//! // Dates are adjusted to business days according to NYSE calendar
-//! # Ok(())
-//! # }
+//! // Payment dates are adjusted to NYSE business days
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! # Stub Conventions
@@ -119,7 +116,7 @@ use smallvec::SmallVec;
 use time::Date;
 
 use super::{adjust, next_imm, prev_cds_date, BusinessDayConvention, DateExt, HolidayCalendar};
-use crate::error::InputError;
+use crate::InputError;
 
 use crate::dates::Tenor;
 
@@ -136,7 +133,7 @@ use crate::dates::Tenor;
 ///   ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide
 ///   evenly by the frequency. Use a stub variant for misaligned schedules.
 ///
-/// [`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor
+/// [`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor
 /// - **`ShortFront`**: Short stub period at the start. Schedule is built
 ///   backward from the end date, creating a short first period.
 /// - **`ShortBack`**: Short stub period at the end. Schedule is built forward
@@ -156,14 +153,14 @@ use crate::dates::Tenor;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};
+/// use finstack_quant_core::dates::{Schedule, StubKind, Tenor};
 /// use time::{Date, Month};
 ///
 /// let start = Date::from_calendar_date(2025, Month::January, 10)?;
 /// let end = Date::from_calendar_date(2025, Month::December, 15)?;
 ///
 /// // Short stub at front
-/// let sched = ScheduleBuilder::new(start, end)?
+/// let sched = Schedule::builder(start, end)?
 ///     .frequency(Tenor::quarterly())
 ///     .stub_rule(StubKind::ShortFront)
 ///     .build()?;
@@ -195,14 +192,9 @@ pub enum StubKind {
 }
 
 impl std::fmt::Display for StubKind {
+    /// Writes the serde label (`none`, `short_front`, ...).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            StubKind::None => write!(f, "none"),
-            StubKind::ShortFront => write!(f, "short_front"),
-            StubKind::ShortBack => write!(f, "short_back"),
-            StubKind::LongFront => write!(f, "long_front"),
-            StubKind::LongBack => write!(f, "long_back"),
-        }
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
@@ -239,15 +231,23 @@ impl std::str::FromStr for StubKind {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::ScheduleBuilder;
+/// use finstack_quant_core::dates::{Schedule, ScheduleErrorPolicy, ScheduleWarning, Tenor};
 /// use time::{Date, Month};
 ///
-/// let start = Date::from_calendar_date(2025, Month::December, 31)?;
-/// let end = Date::from_calendar_date(2025, Month::January, 1)?; // Invalid: end before start
+/// let start = Date::from_calendar_date(2025, Month::January, 1)?;
+/// let end = Date::from_calendar_date(2025, Month::January, 20)?; // not a whole month
 ///
-/// // Invalid date ranges are rejected by new() before any error policy applies.
-/// let result = ScheduleBuilder::new(start, end);
-/// assert!(result.is_err()); // new() validates start <= end
+/// // Without a stub rule the misaligned range fails; GracefulEmpty turns the
+/// // failure into an empty schedule carrying the error as a warning.
+/// let schedule = Schedule::builder(start, end)?
+///     .frequency(Tenor::monthly())
+///     .error_policy(ScheduleErrorPolicy::GracefulEmpty)
+///     .build()?;
+/// assert!(schedule.dates.is_empty());
+/// assert!(matches!(
+///     schedule.warnings.as_slice(),
+///     [ScheduleWarning::GracefulFallback { .. }]
+/// ));
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -289,6 +289,22 @@ pub enum ScheduleErrorPolicy {
     GracefulEmpty,
 }
 
+impl std::fmt::Display for ScheduleErrorPolicy {
+    /// Writes the serde label (`strict`, `missing_calendar_warning`, `graceful_empty`).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
+    }
+}
+
+impl std::str::FromStr for ScheduleErrorPolicy {
+    type Err = crate::Error;
+
+    /// Parses the serde label, ignoring surrounding whitespace and ASCII case.
+    fn from_str(s: &str) -> crate::Result<Self> {
+        crate::wire::serde_parse(&s.trim().to_ascii_lowercase())
+    }
+}
+
 impl std::fmt::Display for ScheduleWarning {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -327,13 +343,13 @@ impl std::fmt::Display for ScheduleWarning {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{ScheduleBuilder, Tenor};
+/// use finstack_quant_core::dates::{Schedule, Tenor};
 /// use time::{Date, Month};
 ///
 /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
 /// let end = Date::from_calendar_date(2025, Month::March, 15)?;
 ///
-/// let schedule = ScheduleBuilder::new(start, end)?
+/// let schedule = Schedule::builder(start, end)?
 ///     .frequency(Tenor::monthly())
 ///     .build()?;
 ///
@@ -357,21 +373,20 @@ pub struct Schedule {
     /// These dates are never business-day adjusted. Payment-date adjustment,
     /// payment lag, and fixing lag live on [`Self::payment_dates`] and
     /// [`Self::fixing_dates`].
-    #[serde(with = "crate::wire::dates")]
     #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
     pub dates: Vec<Date>,
     /// Payment date for each accrual period (one per period end).
     ///
     /// Length is `dates.len().saturating_sub(1)`. Duplicate payment dates are
     /// retained so the series stays 1:1 with period ends.
-    #[serde(default, with = "crate::wire::dates")]
+    #[serde(default)]
     #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
     pub payment_dates: Vec<Date>,
     /// Fixing dates for each accrual period.
     ///
     /// Empty when no fixing lag is configured; otherwise the same length as
     /// [`Self::payment_dates`].
-    #[serde(default, with = "crate::wire::dates")]
+    #[serde(default)]
     #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
     pub fixing_dates: Vec<Date>,
     /// Warnings generated during schedule construction.
@@ -392,13 +407,13 @@ impl Schedule {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_core::dates::{ScheduleBuilder, Tenor};
+    /// use finstack_quant_core::dates::{Schedule, Tenor};
     /// use time::{Date, Month};
     ///
     /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
     /// let end = Date::from_calendar_date(2025, Month::March, 15)?;
     ///
-    /// let schedule = ScheduleBuilder::new(start, end)?
+    /// let schedule = Schedule::builder(start, end)?
     ///     .frequency(Tenor::monthly())
     ///     .build()?;
     ///

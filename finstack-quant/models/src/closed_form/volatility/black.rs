@@ -18,7 +18,7 @@
 //! - Hull, J. C., *Options, Futures, and Other Derivatives*. `docs/REFERENCES.md#hull-options-futures`
 //!
 
-use finstack_quant_core::math::{norm_cdf, norm_pdf};
+use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
 
 #[derive(Clone, Copy, Debug)]
 struct BlackState {

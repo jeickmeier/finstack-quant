@@ -199,7 +199,7 @@ fn test_dm_callable_with_quoted_price_succeeds() {
 // `rate` with quarterly compounding on the Act/360 axis. On this market a
 // loan quoted at par must solve to DM == contractual margin.
 
-fn flat_consistent_market(as_of: time::Date, rate: f64) -> MarketContext {
+fn flat_consistent_market(as_of: finstack_quant_core::dates::Date, rate: f64) -> MarketContext {
     // DF(t) = (1 + rate/4)^(-4t): with log-linear interpolation two knots
     // reproduce the exponential exactly, so the quarterly-compounded zero
     // rate equals `rate` at every t.

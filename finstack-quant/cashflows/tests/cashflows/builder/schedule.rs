@@ -341,8 +341,8 @@ fn ordering_invariants_within_date() {
     let s = b.build(None).unwrap();
 
     // Same-date order: Fixed/Stub -> Amortization -> PIK -> Notional
-    let mut by_date: finstack_quant_core::HashMap<Date, Vec<CFKind>> =
-        finstack_quant_core::HashMap::default();
+    let mut by_date: finstack_quant_core::FxHashMap<Date, Vec<CFKind>> =
+        finstack_quant_core::FxHashMap::default();
     for cf in s.get_flows() {
         by_date.entry(cf.date).or_default().push(cf.kind);
     }

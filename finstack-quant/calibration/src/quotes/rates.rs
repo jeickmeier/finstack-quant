@@ -91,7 +91,6 @@ pub enum RateQuote {
         /// this date. For in-arrears IMM contracts such as `CME:SR3`, pass the
         /// business day before the ending IMM Wednesday, not the named contract
         /// month's starting IMM date.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -498,8 +497,7 @@ mod tests {
         let quote = RateQuote::Futures {
             id: QuoteId::new("TEST-SR3-M6"),
             contract: IrFutureContractId::new("CME:SR3"),
-            expiry: Date::from_calendar_date(2026, finstack_quant_core::dates::Month::June, 17)
-                .expect("valid date"),
+            expiry: Date::from_calendar_date(2026, time::Month::June, 17).expect("valid date"),
             price: 96.00,
             convexity_adjustment: 0.0,
         };

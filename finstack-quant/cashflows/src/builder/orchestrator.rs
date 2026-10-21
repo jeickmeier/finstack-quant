@@ -45,9 +45,9 @@ pub(super) struct BuildState {
 
 #[derive(Debug)]
 pub(super) struct AmortizationSetup {
-    pub(super) amort_dates: finstack_quant_core::HashSet<Date>,
+    pub(super) amort_dates: finstack_quant_core::FxHashSet<Date>,
     pub(super) final_amortization_date: Option<Date>,
-    pub(super) payment_dates: finstack_quant_core::HashMap<Date, Date>,
+    pub(super) payment_dates: finstack_quant_core::FxHashMap<Date, Date>,
     pub(super) rule: PreparedAmortization,
 }
 
@@ -59,7 +59,7 @@ pub(super) enum PreparedAmortization {
         installment: Decimal,
         final_notional: Decimal,
     },
-    StepRemaining(finstack_quant_core::HashMap<Date, Money>),
+    StepRemaining(finstack_quant_core::FxHashMap<Date, Money>),
     OriginalPercent {
         installment: Decimal,
     },
@@ -71,7 +71,7 @@ pub(super) enum PreparedAmortization {
         end: Date,
         count: usize,
     },
-    CustomPrincipal(finstack_quant_core::HashMap<Date, Money>),
+    CustomPrincipal(finstack_quant_core::FxHashMap<Date, Money>),
 }
 
 /// Apply an event's cash leg and checked economic balance movement.
@@ -171,7 +171,7 @@ fn derive_amortization_setup(
     float_schedules: &[FloatSchedule],
 ) -> finstack_quant_core::Result<AmortizationSetup> {
     // Rate groups and fixed/float switches partition coupon windows, not amortization cadence.
-    let mut payment_dates = finstack_quant_core::HashMap::default();
+    let mut payment_dates = finstack_quant_core::FxHashMap::default();
     for period in fixed_schedules
         .iter()
         .flat_map(|s| s.periods.iter().map(|entry| &entry.period))
@@ -211,7 +211,7 @@ fn derive_amortization_setup(
             PreparedAmortization::StepRemaining(schedule.iter().copied().collect())
         }
         AmortizationSpec::CustomPrincipal { items } => {
-            let mut map = finstack_quant_core::HashMap::<Date, Money>::default();
+            let mut map = finstack_quant_core::FxHashMap::<Date, Money>::default();
             for (date, money) in items.iter().filter(|(_, money)| money.amount() > 0.0) {
                 let total = match map.get(date).copied() {
                     Some(existing) => existing.checked_add(*money)?,
@@ -265,7 +265,7 @@ fn derive_amortization_setup(
     };
 
     let final_amortization_date = amort_base.last().copied();
-    let amort_dates: finstack_quant_core::HashSet<Date> = amort_base.into_iter().collect();
+    let amort_dates: finstack_quant_core::FxHashSet<Date> = amort_base.into_iter().collect();
 
     Ok(AmortizationSetup {
         amort_dates,

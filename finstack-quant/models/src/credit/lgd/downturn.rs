@@ -20,8 +20,8 @@
 //!   Default." Journal of Credit Risk, 8(1), 109-140. (Related literature
 //!   only; see Methodology Note above.)
 
-use finstack_quant_core::error::InputError;
 use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
+use finstack_quant_core::InputError;
 use finstack_quant_core::Result;
 
 /// Method for computing downturn LGD from base (through-the-cycle) LGD.

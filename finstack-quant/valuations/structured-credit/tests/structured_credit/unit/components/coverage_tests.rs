@@ -20,7 +20,7 @@ use time::Month;
 /// Every tranche in this file owes its full, uncapped coupon. The engine
 /// always supplies a spec-derived claim map, so the tests state it explicitly.
 static UNCAPPED_CLAIMS: std::sync::LazyLock<
-    finstack_quant_core::HashMap<&'static str, Option<f64>>,
+    finstack_quant_core::FxHashMap<&'static str, Option<f64>>,
 > = std::sync::LazyLock::new(|| {
     ["SENIOR", "EQUITY", "EMPTY", "POOL", "TEST_TRANCHE"]
         .into_iter()
@@ -737,8 +737,8 @@ fn ic_measures_coverage_of_the_capped_claim() {
     let tranches = claim_test_tranches();
 
     // The waterfall caps SENIOR's claim at 2%: due = 100M * 0.02 * 0.25 = 0.5M.
-    let mut caps: finstack_quant_core::HashMap<&str, Option<f64>> =
-        finstack_quant_core::HashMap::default();
+    let mut caps: finstack_quant_core::FxHashMap<&str, Option<f64>> =
+        finstack_quant_core::FxHashMap::default();
     caps.insert("SENIOR", Some(0.02));
 
     let mut context = context_for_tranche(
@@ -769,8 +769,8 @@ fn ic_treats_a_tranche_without_interest_recipient_as_owing_nothing() {
     let tranches = claim_test_tranches();
 
     // The waterfall defines no interest claim for SENIOR at all.
-    let caps: finstack_quant_core::HashMap<&str, Option<f64>> =
-        finstack_quant_core::HashMap::default();
+    let caps: finstack_quant_core::FxHashMap<&str, Option<f64>> =
+        finstack_quant_core::FxHashMap::default();
 
     let mut context = context_for_tranche(
         &pool,

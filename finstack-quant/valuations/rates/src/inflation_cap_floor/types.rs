@@ -46,6 +46,7 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::InflationLag;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::validation;
@@ -101,14 +102,12 @@ pub struct InflationCapFloor {
     )]
     pub strike: Decimal,
     /// Start date of the first inflation period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start_date: Date,
     /// End date of the final inflation period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

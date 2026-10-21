@@ -7,6 +7,7 @@
 
 use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::extract::{label, parse_label};
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_covenants::{
@@ -14,16 +15,6 @@ use finstack_quant_covenants::{
     SpringingCondition, ThresholdSchedule, ThresholdTest,
 };
 use pyo3::prelude::*;
-
-/// Parse a covenant scope label (`"maintenance"` / `"incurrence"`) with its serde name.
-pub(crate) fn parse_scope(scope: &str) -> PyResult<CovenantScope> {
-    finstack_quant_core::wire::serde_parse(scope).map_err(core_to_py)
-}
-
-/// Serde label of a covenant scope or bound kind.
-pub(crate) fn wire_label<T: serde::Serialize>(value: &T) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(value).map_err(core_to_py)
-}
 
 /// Type of financial or operational covenant with its static threshold.
 ///
@@ -202,7 +193,7 @@ impl PyCovenantType {
     /// non-numeric covenants.
     #[getter]
     fn bound_kind(&self) -> PyResult<Option<String>> {
-        self.inner.bound_kind().as_ref().map(wire_label).transpose()
+        self.inner.bound_kind().as_ref().map(label).transpose()
     }
 
     /// Human-readable description, e.g. ``"Debt/EBITDA <= 4.50x"``.
@@ -515,7 +506,9 @@ impl PyCovenant {
     #[pyo3(text_signature = "(scope)")]
     fn with_scope(&self, scope: &str) -> PyResult<Self> {
         Ok(Self::from_inner(
-            self.inner.clone().with_scope(parse_scope(scope)?),
+            self.inner
+                .clone()
+                .with_scope(parse_label::<CovenantScope>(scope)?),
         ))
     }
 
@@ -586,7 +579,7 @@ impl PyCovenant {
     /// ``"maintenance"`` or ``"incurrence"``.
     #[getter]
     fn scope(&self) -> PyResult<String> {
-        wire_label(&self.inner.scope)
+        label(&self.inner.scope)
     }
 
     /// Activation condition, or ``None`` for an always-on covenant.
@@ -619,7 +612,7 @@ impl PyCovenant {
             self.inner
                 .cure_period_days
                 .map_or("None".to_string(), |d| d.to_string()),
-            wire_label(&self.inner.scope)?,
+            label(&self.inner.scope)?,
             if self.inner.is_active { "True" } else { "False" },
         ))
     }

@@ -2,13 +2,6 @@
 //!
 use crate::dates::DayCount;
 
-/// Convention defaults inferred from a forward-curve identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct ForwardConventionDefaults {
-    pub day_count: DayCount,
-    pub reset_lag_business_days: i32,
-}
-
 #[inline]
 fn normalize_curve_id(id: &str) -> String {
     id.trim().to_ascii_uppercase()
@@ -50,21 +43,25 @@ fn inferred_currency_day_count(currency: &str) -> DayCount {
     }
 }
 
-/// Infer a market-standard *index* day-count basis from a forward-curve identifier.
+/// Infer forward-curve `(day_count, reset_lag_business_days)` defaults from an
+/// index identifier.
 ///
-/// Matching is by substring on the normalized (trimmed, upper-cased) ID:
-/// known index names first (e.g. `SOFR` ⇒ Act/360, `SONIA` ⇒ Act/365F), then
-/// a leading currency code (e.g. `USD-...` ⇒ Act/360). The fallback remains
-/// `Act365F` for synthetic IDs that carry no market hint.
+/// The *index* day-count basis is matched by substring on the normalized
+/// (trimmed, upper-cased) ID: known index names first (e.g. `SOFR` ⇒ Act/360,
+/// `SONIA` ⇒ Act/365F), then a leading currency code (e.g. `USD-...` ⇒
+/// Act/360). The fallback remains `Act365F` for synthetic IDs that carry no
+/// market hint.
 ///
 /// Discount curves do **not** use this helper: their default time basis is
 /// always [`DayCount::Act365F`]. Callers that need a money-market Act/360
 /// discount axis must set `day_count(...)` explicitly on the discount builder.
+///
+/// Reset lag is interpreted in business days using positive T-minus semantics.
 #[inline]
-pub(crate) fn infer_index_day_count(id: &str) -> DayCount {
+pub(crate) fn infer_forward_curve_defaults(id: &str) -> (DayCount, i32) {
     let normalized_id = normalize_curve_id(id);
 
-    let inferred = if contains_any(
+    let day_count = if contains_any(
         &normalized_id,
         &["SOFR", "FEDFUNDS", "EFFR", "ESTR", "EURIBOR", "SARON"],
     ) {
@@ -84,20 +81,9 @@ pub(crate) fn infer_index_day_count(id: &str) -> DayCount {
 
     tracing::debug!(
         curve_id = id,
-        day_count = ?inferred,
+        day_count = ?day_count,
         "Inferred day-count basis from curve ID; set day_count explicitly on the builder to override"
     );
-
-    inferred
-}
-
-/// Infer forward-curve day-count and reset-lag defaults from an index identifier.
-///
-/// Reset lag is interpreted in business days using positive T-minus semantics.
-#[inline]
-pub(crate) fn infer_forward_curve_defaults(id: &str) -> ForwardConventionDefaults {
-    let normalized_id = normalize_curve_id(id);
-    let day_count = infer_index_day_count(id);
 
     let is_overnight = normalized_id.contains("OIS")
         || contains_any(
@@ -119,8 +105,5 @@ pub(crate) fn infer_forward_curve_defaults(id: &str) -> ForwardConventionDefault
         0
     };
 
-    ForwardConventionDefaults {
-        day_count,
-        reset_lag_business_days,
-    }
+    (day_count, reset_lag_business_days)
 }

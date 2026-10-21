@@ -9,8 +9,10 @@
 //! - Japanese equinox rules (Vernal, Autumnal)
 //! - Span rules (multi-day holidays)
 
-use finstack_quant_core::dates::{Calendar, Direction, Observed, Rule};
-use finstack_quant_core::dates::{Date, HolidayCalendar};
+use super::algo;
+use super::rule::{Direction, Observed, Rule};
+use super::types::Calendar;
+use crate::dates::{Date, HolidayCalendar};
 use smallvec::SmallVec;
 use time::{Month, Weekday};
 
@@ -470,29 +472,28 @@ fn rule_qing_ming() {
 
 #[test]
 fn rule_buddhas_birthday() {
-    let rule = Rule::BuddhasBirthday;
-
     // Eighth day of fourth lunar month; leap months break a fixed CNY offset.
-    assert!(rule.applies(make_date(2024, 5, 15)));
-    assert!(rule.applies(make_date(2025, 5, 5)));
-    assert!(rule.applies(make_date(2026, 5, 24)));
-    assert!(!rule.applies(make_date(2026, 5, 23)));
+    assert_eq!(
+        algo::buddhas_birthday_date(2024),
+        Some(make_date(2024, 5, 15))
+    );
+    assert_eq!(
+        algo::buddhas_birthday_date(2025),
+        Some(make_date(2025, 5, 5))
+    );
+    assert_eq!(
+        algo::buddhas_birthday_date(2026),
+        Some(make_date(2026, 5, 24))
+    );
 }
 
 // Japanese Equinox Rules
 
 #[test]
 fn rule_vernal_equinox_jp() {
-    let rule = Rule::VernalEquinoxJP;
-
     // Vernal equinox in Japan is typically around March 20-21
-    // Test that it produces a valid date in that range
     for year in 2020..2030 {
-        let mut out = SmallVec::<[Date; 1]>::new();
-        rule.materialize_year(year, &mut out);
-
-        assert_eq!(out.len(), 1);
-        let date = out[0];
+        let date = algo::vernal_equinox_jp_date(year).unwrap();
         assert_eq!(date.month(), Month::March);
         assert!(date.day() >= 19 && date.day() <= 21);
     }
@@ -500,15 +501,11 @@ fn rule_vernal_equinox_jp() {
 
 #[test]
 fn rule_vernal_equinox_jp_applies() {
-    let rule = Rule::VernalEquinoxJP;
-
-    // Test specific known dates for vernal equinox
     // 2024: March 20
-    assert!(rule.applies(make_date(2024, 3, 20)));
-
-    // Non-equinox dates should not match
-    assert!(!rule.applies(make_date(2024, 3, 19)));
-    assert!(!rule.applies(make_date(2024, 3, 22)));
+    assert_eq!(
+        algo::vernal_equinox_jp_date(2024),
+        Some(make_date(2024, 3, 20))
+    );
 }
 
 // Span Rules (Multi-Day Holidays)
@@ -726,4 +723,37 @@ fn rule_nth_weekday_overflow_does_not_spill_into_next_month() {
     let mut out_neg: SmallVec<[Date; 8]> = SmallVec::new();
     rule_neg.materialize_year(2025, &mut out_neg);
     assert!(out_neg.is_empty());
+}
+
+#[test]
+fn japan_public_holidays_match_cabinet_office_1970_through_2027() {
+    // Snapshot of the independent Cabinet Office CSV (accessed 2026-09-30):
+    // https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv
+    let expected: std::collections::HashSet<_> = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/dates/fixtures/japan_public_holidays.csv"
+    ))
+    .lines()
+    .skip(1)
+    .map(|line| {
+        let fields: Vec<_> = line.split(',').collect();
+        make_date(
+            fields[0].parse().unwrap(),
+            fields[1].parse().unwrap(),
+            fields[2].parse().unwrap(),
+        )
+    })
+    .collect();
+    for year in 1970..=2027 {
+        for ordinal in 1..=366 {
+            let Ok(date) = Date::from_ordinal_date(year, ordinal) else {
+                continue;
+            };
+            assert_eq!(
+                Rule::JapanPublicHolidays.applies(date),
+                expected.contains(&date),
+                "national/citizens/substitute holiday {date}"
+            );
+        }
+    }
 }

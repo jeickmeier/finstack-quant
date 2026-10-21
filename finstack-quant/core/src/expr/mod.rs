@@ -21,10 +21,8 @@
 //! [`SimpleContext`](crate::expr::SimpleContext) maps column names to column
 //! positions, [`CompiledExpr`](crate::expr::CompiledExpr) plans the expression
 //! once (structurally identical sub-trees are evaluated exactly once per call)
-//! and evaluation returns an
-//! [`EvaluationResult`](crate::expr::EvaluationResult) containing both values
-//! and metadata describing the run. Results are deterministic for the same
-//! inputs.
+//! and evaluation returns one value per row. Results are deterministic for the
+//! same inputs.
 //!
 //! # Quick example
 //!
@@ -41,7 +39,7 @@
 //! let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
 //! let cols = [data.as_slice()];
 //! let result = compiled.eval(&context, &cols)?;
-//! assert_eq!(result.values, vec![2.0, 1.0, 0.0, 1.0, 2.0]);
+//! assert_eq!(result, vec![2.0, 1.0, 0.0, 1.0, 2.0]);
 //!
 //! // Windowed functions belong to the statements evaluator.
 //! let rolling = Expr::call(
@@ -58,6 +56,6 @@ mod dag;
 mod eval;
 mod eval_functions;
 
-pub use ast::{BinOp, EvaluationResult, Expr, ExprNode, Function, UnaryOp};
+pub use ast::{BinOp, Expr, ExprNode, Function, UnaryOp};
 pub use context::SimpleContext;
 pub use eval::CompiledExpr;

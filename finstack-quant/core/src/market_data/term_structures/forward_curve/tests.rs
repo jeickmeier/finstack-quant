@@ -1,5 +1,5 @@
 use super::*;
-use crate::market_data::bumps::BumpSpec;
+use crate::market_data::bumps::{BumpSpec, Bumpable};
 
 fn sample_forward() -> ForwardCurve {
     ForwardCurve::builder("USD-LIB3M", 0.25)
@@ -16,7 +16,7 @@ fn sparse_key_rate_shocks_preserve_continuous_rates_and_exact_bucket_area() {
     let curve =
         ForwardCurve::flat("SPARSE", 0.25, sample_forward().base_date(), 0.04).expect("flat");
     let bumped = curve
-        .with_triangular_key_rate_bump_neighbors(Some(3.03), 3.05, Some(3.07), 100.0)
+        .apply_bump(BumpSpec::triangular_key_rate_bp(3.03, 3.05, 3.07, 100.0))
         .expect("bucket");
     assert!((bumped.rate(3.05) - 0.05).abs() < 1e-12);
     assert!((bumped.rate(3.04) - 0.045).abs() < 1e-12);
@@ -42,7 +42,7 @@ fn continuous_forward_shocks_survive_roll_scaling_serde_and_rename() {
             .build()
             .expect("source");
         let shocked = source
-            .with_triangular_key_rate_bump_neighbors(Some(0.1), 0.5, Some(2.0), -100.0)
+            .apply_bump(BumpSpec::triangular_key_rate_bp(0.1, 0.5, 2.0, -100.0))
             .expect("shock");
         let rolled = shocked.roll_forward(73).expect("roll");
         let scaled = rolled
@@ -77,7 +77,9 @@ fn transformed_loglinear_forward_can_serialize_negative_shocked_rates() {
         .interp(InterpStyle::LogLinear)
         .build()
         .expect("positive source");
-    let shocked = source.with_parallel_bump(-300.0).expect("negative rates");
+    let shocked = source
+        .apply_bump(BumpSpec::parallel_bp(-300.0))
+        .expect("negative rates");
     let restored: ForwardCurve =
         serde_json::from_str(&serde_json::to_string(&shocked).expect("serialize"))
             .expect("restore");

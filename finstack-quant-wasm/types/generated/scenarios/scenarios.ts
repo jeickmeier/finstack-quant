@@ -300,8 +300,7 @@ export type Currency =
  * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
  *   frequency, take (actual days) / (actual days in coupon period) for each,
  *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
- *   first/last coupons use
- *   [`act_act_isma_year_fraction_with_reference_period`].
+ *   first/last coupons also supply the enclosing regular `coupon_period`.
  * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
  *   **backwards from `end`** until the candidate is before `start`; each
  *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -1345,7 +1344,7 @@ export type RollRule = "none" | "imm" | "cds_imm";
  *   ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide
  *   evenly by the frequency. Use a stub variant for misaligned schedules.
  *
- * [`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor
+ * [`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor
  * - **`ShortFront`**: Short stub period at the start. Schedule is built
  *   backward from the end date, creating a short first period.
  * - **`ShortBack`**: Short stub period at the end. Schedule is built forward
@@ -18918,9 +18917,9 @@ export interface RoundingContext {
 /**
  * Numerical tolerance configuration for floating-point comparisons.
  *
- * Provides configurable epsilon values for zero-checks in rate calculations
- * and generic floating-point comparisons. These defaults are chosen to balance
- * numerical stability with practical precision requirements.
+ * Provides the configurable epsilon for generic floating-point zero-checks.
+ * The default is chosen to balance numerical stability with practical
+ * precision requirements.
  */
 export interface ToleranceConfig {
   /**
@@ -18929,12 +18928,6 @@ export interface ToleranceConfig {
    * Used for general numerical comparisons where higher tolerance is acceptable.
    */
   generic_epsilon?: PositiveF64Wire;
-  /**
-   * Epsilon for rate comparisons (default: 1e-12).
-   *
-   * Used when comparing interest rates, yields, and other small ratios.
-   */
-  rate_epsilon?: PositiveF64Wire;
 }
 /**
  * Report from time roll-forward operation.

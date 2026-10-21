@@ -1,7 +1,7 @@
 //! Shared JSON registry loader helpers.
 
 use finstack_quant_core::Error;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 
 const SUPPORTED_REGISTRY_SCHEMA_MAJOR: u32 = 2;
 
@@ -106,7 +106,7 @@ pub(crate) fn parse_and_rekey<R, Id, V>(
     registry_name: &str,
     make_id: impl Fn(String) -> Id,
     map_record: impl Fn(&R) -> Result<V, Error>,
-) -> Result<HashMap<Id, V>, Error>
+) -> Result<FxHashMap<Id, V>, Error>
 where
     R: for<'de> serde::Deserialize<'de>,
     Id: std::hash::Hash + Eq,
@@ -119,8 +119,8 @@ where
     })?;
     file.validate_metadata(registry_name)?;
 
-    let mut final_map = HashMap::default();
-    let mut seen_ids: HashMap<String, ()> = HashMap::default();
+    let mut final_map = FxHashMap::default();
+    let mut seen_ids: FxHashMap<String, ()> = FxHashMap::default();
     for entry in file.entries {
         let value = map_record(&entry.record)?;
         for id in entry.ids {

@@ -13,7 +13,7 @@ use super::types::{
     CorrelationScenario, FrtbRiskClass, FrtbSbaResult, FrtbScenarioCharges, FrtbSensitivities,
 };
 use super::vega::vega_charge;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 
 /// FRTB Sensitivity-Based Approach engine.
@@ -113,20 +113,20 @@ impl FrtbSbaEngine {
     /// correlation scenario, takes the maximum, then adds DRC and RRAO.
     pub fn calculate(&self, sensitivities: &FrtbSensitivities) -> Result<FrtbSbaResult> {
         sensitivities.validate()?;
-        let mut scenario_charges: HashMap<CorrelationScenario, f64> = HashMap::default();
+        let mut scenario_charges: FxHashMap<CorrelationScenario, f64> = FxHashMap::default();
         let mut scenario_breakdown = std::collections::BTreeMap::new();
         let mut best_scenario = CorrelationScenario::Medium;
         let mut max_sba_charge = f64::NEG_INFINITY;
 
         // Charges from the binding (max) scenario are stored for the result.
-        let mut best_delta: HashMap<FrtbRiskClass, f64> = HashMap::default();
-        let mut best_vega: HashMap<FrtbRiskClass, f64> = HashMap::default();
-        let mut best_curvature: HashMap<FrtbRiskClass, f64> = HashMap::default();
+        let mut best_delta: FxHashMap<FrtbRiskClass, f64> = FxHashMap::default();
+        let mut best_vega: FxHashMap<FrtbRiskClass, f64> = FxHashMap::default();
+        let mut best_curvature: FxHashMap<FrtbRiskClass, f64> = FxHashMap::default();
 
         for &scenario in &self.scenarios {
-            let mut delta_charges = HashMap::default();
-            let mut vega_charges = HashMap::default();
-            let mut curvature_charges = HashMap::default();
+            let mut delta_charges = FxHashMap::default();
+            let mut vega_charges = FxHashMap::default();
+            let mut curvature_charges = FxHashMap::default();
 
             for &rc in &self.risk_classes {
                 let d = delta_charge(rc, sensitivities, scenario);

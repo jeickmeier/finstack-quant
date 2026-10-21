@@ -117,7 +117,7 @@ impl AnalyticalParityTestCase {
 /// Compute DV01 and convexity using a 1bp central bump.
 fn compute_bumped_sensitivities(
     instrument: &dyn Instrument,
-    as_of: time::Date,
+    as_of: finstack_quant_core::dates::Date,
     curve_id: &str,
     base_rate: f64,
 ) -> (f64, f64, f64) {
@@ -141,7 +141,11 @@ fn compute_bumped_sensitivities(
 }
 
 /// Build a flat discount curve at the given rate.
-fn build_flat_curve(curve_id: &str, as_of: time::Date, rate: f64) -> DiscountCurve {
+fn build_flat_curve(
+    curve_id: &str,
+    as_of: finstack_quant_core::dates::Date,
+    rate: f64,
+) -> DiscountCurve {
     let tenors = [0.0, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 20.0, 30.0];
     let knots: Vec<(f64, f64)> = tenors.iter().map(|&t| (t, df_from_rate(rate, t))).collect();
 

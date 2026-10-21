@@ -14,7 +14,11 @@ use finstack_quant_valuations_fixed_income::bond::Bond;
 use time::macros::date;
 
 /// Helper: Create a flat discount curve
-fn create_flat_curve(base_date: time::Date, rate: f64, curve_id: &str) -> DiscountCurve {
+fn create_flat_curve(
+    base_date: finstack_quant_core::dates::Date,
+    rate: f64,
+    curve_id: &str,
+) -> DiscountCurve {
     let times = [0.0, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0];
     let dfs: Vec<_> = times.iter().map(|&t| (t, (-rate * t).exp())).collect();
 

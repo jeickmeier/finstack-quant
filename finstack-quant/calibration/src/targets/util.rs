@@ -325,7 +325,7 @@ pub(crate) struct PreparedRateQuotes {
 pub(crate) fn prepare_rate_calibration_quotes(
     quotes: &[MarketQuote],
     base_date: Date,
-    curve_ids: finstack_quant_core::HashMap<String, String>,
+    curve_ids: finstack_quant_core::FxHashMap<String, String>,
     explicit_curve_day_count: Option<DayCount>,
     residual_notional: f64,
     ois_compounding_override: Option<FloatingLegCompounding>,
@@ -367,8 +367,8 @@ pub(crate) fn prepare_rate_calibration_quotes(
 pub(crate) fn discount_and_forward_curve_ids(
     discount_id: &str,
     forward_id: &str,
-) -> finstack_quant_core::HashMap<String, String> {
-    let mut m = finstack_quant_core::HashMap::default();
+) -> finstack_quant_core::FxHashMap<String, String> {
+    let mut m = finstack_quant_core::FxHashMap::default();
     m.insert("discount".to_string(), discount_id.to_string());
     m.insert("forward".to_string(), forward_id.to_string());
     m

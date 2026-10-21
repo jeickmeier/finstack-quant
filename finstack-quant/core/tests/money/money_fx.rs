@@ -456,9 +456,15 @@ fn explicit_convert_and_add() {
     let d = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 
     // Convert EUR to USD, then add
-    let eur_in_usd = eur
-        .convert(Currency::USD, d, &prov, FxConversionPolicy::CashflowDate)
+    let rate = prov
+        .rate(
+            Currency::EUR,
+            Currency::USD,
+            d,
+            FxConversionPolicy::CashflowDate,
+        )
         .unwrap();
+    let eur_in_usd = eur.convert_at_rate(Currency::USD, rate).unwrap();
     let sum = usd.checked_add(eur_in_usd).unwrap();
     // Expected: 100 + 90*1.2 = 208
     assert!((sum.amount() - 208.0).abs() < 1e-9);

@@ -239,7 +239,6 @@ pub struct DiscountedCashFlow {
     /// Currency for all cashflows.
     pub currency: Currency,
     /// Explicit period free cash flows (date, amount pairs).
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -250,7 +249,6 @@ pub struct DiscountedCashFlow {
     /// Terminal value specification.
     pub terminal_value: TerminalValueSpec,
     /// Valuation date (as-of date for the DCF).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -333,7 +331,6 @@ struct DiscountedCashFlowUnchecked {
     /// Currency for all cashflows.
     currency: Currency,
     /// Explicit period free cash flows (date, amount pairs).
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -344,7 +341,6 @@ struct DiscountedCashFlowUnchecked {
     /// Terminal value specification.
     terminal_value: TerminalValueSpec,
     /// Valuation date (as-of date for the DCF).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

@@ -4,7 +4,7 @@ use crate::types::{
     f64_param, finite, mean, op_from_str, population_std, quantile_cont, reject_unknown_params,
     scaled_centered, usize_param, validate_lengths, validate_output,
 };
-use finstack_quant_core::math::standard_normal_inv_cdf;
+use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

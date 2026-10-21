@@ -47,7 +47,7 @@ pub(crate) fn decimal_from_any(obj: &Bound<'_, PyAny>) -> PyResult<Decimal> {
     let value: f64 = obj.extract().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err("expected decimal.Decimal, float, int, or str")
     })?;
-    Decimal::try_from(value).map_err(|e| {
+    finstack_quant_core::decimal::f64_to_decimal(value).map_err(|e| {
         crate::errors::value_error(format!(
             "value {value} is not representable as Decimal: {e}"
         ))

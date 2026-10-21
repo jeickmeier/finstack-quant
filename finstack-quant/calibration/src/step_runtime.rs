@@ -713,6 +713,7 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::{
         BaseCorrelationCurve, CreditIndexData, DiscountCurve, HazardCurve,
     };
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::types::{CurveId, UnderlyingId};
     use finstack_quant_models::rates::hull_white::HullWhiteParams;
     use finstack_quant_valuations_core::instruments::OptionType;
@@ -888,7 +889,7 @@ mod tests {
         let base_date = Date::from_calendar_date(2025, Month::March, 20).expect("valid date");
         let market = build_student_t_market(base_date, 0.3);
         let quote = build_student_t_quote(STUDENT_T_FIXTURE_UPFRONT_PCT);
-        let mut curve_ids = finstack_quant_core::HashMap::default();
+        let mut curve_ids = finstack_quant_core::FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "CDX.NA.IG".to_string());
         let build_context = crate::build::BuildCtx::new(base_date, 1.0 / (0.07 - 0.03), curve_ids);

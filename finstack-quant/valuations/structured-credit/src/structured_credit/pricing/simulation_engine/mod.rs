@@ -24,7 +24,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use finstack_quant_models::credit::pool::{PerNameCopulaDefault, PoolGranularity};
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;

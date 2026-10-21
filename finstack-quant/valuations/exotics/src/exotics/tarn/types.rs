@@ -58,7 +58,6 @@ pub struct Tarn {
     pub notional: Money,
     /// Accrual start of the first coupon period; also the first in-advance
     /// fixing date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -67,7 +66,6 @@ pub struct Tarn {
     /// Coupon payment dates, one per period, strictly ascending and after
     /// `start_date`. Period `i` accrues from the previous payment date (or
     /// `start_date`) to `payment_dates[i]` and fixes in advance at its start.
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")

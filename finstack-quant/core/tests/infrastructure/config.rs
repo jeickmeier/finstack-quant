@@ -124,66 +124,49 @@ fn config_extensions_serde_roundtrip() {
     assert_eq!(cfg.rounding.mode, RoundingMode::Bankers);
     assert!(cfg.extensions.is_empty());
     // Tolerances should use defaults
-    assert_eq!(cfg.tolerances.rate_epsilon, 1e-12);
     assert_eq!(cfg.tolerances.generic_epsilon, 1e-10);
 }
 
 #[test]
 fn tolerance_config_defaults() {
     let cfg = FinstackConfig::default();
-
-    assert_eq!(cfg.tolerances.rate_epsilon, 1e-12);
     assert_eq!(cfg.tolerances.generic_epsilon, 1e-10);
 }
 
 #[test]
 fn tolerance_config_custom_values() {
     let mut cfg = FinstackConfig::default();
-    cfg.tolerances.rate_epsilon = 1e-14;
     cfg.tolerances.generic_epsilon = 1e-8;
-
-    assert_eq!(cfg.tolerances.rate_epsilon, 1e-14);
     assert_eq!(cfg.tolerances.generic_epsilon, 1e-8);
 }
 
 #[test]
 fn tolerance_config_roundtrip_serialization() {
     let original = ToleranceConfig {
-        rate_epsilon: 1e-14,
         generic_epsilon: 1e-8,
     };
 
     let json = serde_json::to_string(&original).expect("serialize");
     let deserialized: ToleranceConfig = serde_json::from_str(&json).expect("deserialize");
-
-    assert_eq!(deserialized.rate_epsilon, original.rate_epsilon);
     assert_eq!(deserialized.generic_epsilon, original.generic_epsilon);
 }
 
 #[test]
 fn finstack_config_with_tolerances_roundtrip() {
     let mut cfg = FinstackConfig::default();
-    cfg.tolerances.rate_epsilon = 1e-15;
     cfg.tolerances.generic_epsilon = 1e-9;
 
     let json = serde_json::to_string(&cfg).expect("serialize");
     let decoded: FinstackConfig = serde_json::from_str(&json).expect("deserialize");
-
-    assert_eq!(decoded.tolerances.rate_epsilon, 1e-15);
     assert_eq!(decoded.tolerances.generic_epsilon, 1e-9);
 }
 
 #[test]
 fn rounding_context_uses_configured_tolerances() {
     let mut cfg = FinstackConfig::default();
-    cfg.tolerances.rate_epsilon = 1e-10;
     cfg.tolerances.generic_epsilon = 1e-8;
 
     let ctx = RoundingContext::from(&cfg);
-
-    // Test rate zero check with custom tolerance
-    assert!(ctx.is_effectively_zero(5e-11, ZeroKind::Rate)); // Below 1e-10
-    assert!(!ctx.is_effectively_zero(5e-9, ZeroKind::Rate)); // Above 1e-10
 
     // Test generic zero check with custom tolerance
     assert!(ctx.is_effectively_zero(5e-9, ZeroKind::Generic)); // Below 1e-8
@@ -195,12 +178,9 @@ fn rounding_context_uses_configured_tolerances() {
 }
 
 #[test]
-fn tolerance_config_partial_deserialize_uses_defaults() {
-    // Only specify one field, the other should use default
-    let json = r#"{ "rate_epsilon": 1e-14 }"#;
-    let tol: ToleranceConfig = serde_json::from_str(json).expect("deserialize");
+fn tolerance_config_empty_deserialize_uses_defaults() {
+    let tol: ToleranceConfig = serde_json::from_str("{}").expect("deserialize");
 
-    assert_eq!(tol.rate_epsilon, 1e-14);
     assert_eq!(tol.generic_epsilon, 1e-10); // default
 }
 
@@ -246,11 +226,11 @@ fn tolerance_config_rejects_unknown_field() {
             "ingest_scale": {"overrides": {}},
             "output_scale": {"overrides": {}}
         },
-        "tolerances": {"rate_epsilon": 1e-12, "rate_epsilonn": 1e-9}
+        "tolerances": {"generic_epsilon": 1e-10, "generic_epsilonn": 1e-9}
     }"#;
     let error = serde_json::from_str::<FinstackConfig>(json)
         .expect_err("a misspelled tolerance key must be rejected");
-    assert!(error.to_string().contains("rate_epsilonn"));
+    assert!(error.to_string().contains("generic_epsilonn"));
 }
 
 #[test]

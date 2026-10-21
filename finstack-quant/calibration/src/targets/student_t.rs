@@ -207,7 +207,7 @@ impl StudentTTarget {
                 "Student-t calibration tranche width must be positive; attachment={attachment}, detachment={detachment}"
             )));
         }
-        let mut curve_ids = finstack_quant_core::HashMap::default();
+        let mut curve_ids = finstack_quant_core::FxHashMap::default();
         curve_ids.insert("discount".to_string(), discount_curve_id.to_string());
         curve_ids.insert("credit".to_string(), index_id);
         let build_context = BuildCtx::new(as_of, 1.0 / tranche_width, curve_ids);
@@ -376,7 +376,8 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::{
         BaseCorrelationCurve, CreditIndexData, DiscountCurve, HazardCurve,
     };
-    use finstack_quant_core::HashMap;
+    use finstack_quant_core::market_data::traits::Discounting;
+    use finstack_quant_core::FxHashMap;
     use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause,
     };
@@ -440,7 +441,7 @@ mod tests {
     }
 
     fn quoted_tranche(quote: &CdsTrancheQuote, base_date: Date) -> CdsTranche {
-        let curve_ids = HashMap::from_iter([
+        let curve_ids = FxHashMap::from_iter([
             ("discount".to_string(), "USD-OIS".to_string()),
             ("credit".to_string(), "CDX.NA.IG".to_string()),
         ]);

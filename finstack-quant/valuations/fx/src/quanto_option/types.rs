@@ -32,7 +32,6 @@ pub struct QuantoOption {
     /// Option type (call or put)
     pub option_type: OptionType,
     /// Option expiry date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -135,7 +134,6 @@ struct QuantoOptionUnchecked {
     /// Option type (call or put).
     option_type: OptionType,
     /// Option expiry date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

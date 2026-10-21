@@ -9,9 +9,10 @@ use pyo3::types::PyType;
 
 use super::helpers::{
     extract_attrs, extract_curve_kind, extract_hierarchy_target, extract_tenor_match_mode,
-    extract_time_roll_mode, parse_currency, parse_instrument_types,
+    extract_time_roll_mode, parse_instrument_types,
 };
 use super::rate_binding::PyRateBindingSpec;
+use crate::bindings::module_utils::parse_currency;
 
 /// One shock, time roll, or binding inside a ``ScenarioSpec``.
 ///

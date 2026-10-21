@@ -365,8 +365,8 @@ impl DecompositionError {
     /// inconsistent model a computation error, and every other variant
     /// rejects the input (validation).
     #[must_use]
-    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
-        use finstack_quant_core::error::ErrorKind;
+    pub fn kind(&self) -> finstack_quant_core::ErrorKind {
+        use finstack_quant_core::ErrorKind;
         match self {
             Self::UnknownIssuer { .. } => ErrorKind::NotFound,
             Self::ModelInconsistent { .. } => ErrorKind::Computation,

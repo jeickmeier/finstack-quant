@@ -1,6 +1,7 @@
 //! Independent accrued-interest, quote, yield and effective-assumption checks.
 
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::DiscountCurve};
 use finstack_quant_valuations::{
     instruments::PricingOptions,

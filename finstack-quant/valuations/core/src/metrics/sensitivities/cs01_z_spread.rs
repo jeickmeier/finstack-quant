@@ -43,14 +43,15 @@
 //! [canonical]: crate::metrics::sensitivities::cs01
 //! [`z_spread_discount_factor`]: finstack_quant_core::math::z_spread_discount_factor
 
+use finstack_quant_core::market_data::traits::Discounting;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::math::z_spread_discount_factor;
-use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 
@@ -187,8 +188,8 @@ fn solve_anchor_spread(
         }
     };
     let solver = BrentSolver::new()
-        .tolerance(1e-10)
-        .initial_bracket_size(Some(0.05)); // ±500 bp
+        .with_tolerance(1e-10)
+        .with_initial_bracket_size(Some(0.05)); // ±500 bp
     let spread = solver.solve(objective, 0.0)?;
     let pv = price_at_spread(cached, spread, compounds_per_year)?;
     if !pv.is_finite() || (pv - target).abs() > target.abs().max(1.0) * 1e-8 {

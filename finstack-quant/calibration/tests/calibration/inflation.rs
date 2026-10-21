@@ -17,7 +17,7 @@ use finstack_quant_core::market_data::scalars::{
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId;
 use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
@@ -92,7 +92,7 @@ fn calibrated_market(index: Option<InflationIndex>, base_cpi: f64) -> (MarketCon
     }
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("infl".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let plan = CalibrationPlan {
@@ -201,7 +201,7 @@ fn inflation_preflight_rejects_base_cpi_mismatch_with_fixings() {
         .insert_inflation_index(create_us_cpi_fixings_with_seasonality());
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("infl".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let plan = CalibrationPlan {

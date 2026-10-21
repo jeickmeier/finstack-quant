@@ -39,14 +39,12 @@ use finstack_quant_core::dates::{Date, DateExt, Schedule};
 #[serde(deny_unknown_fields)]
 pub struct TrsScheduleSpec {
     /// Start date for the TRS leg.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start: Date,
     /// End date for the TRS leg.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

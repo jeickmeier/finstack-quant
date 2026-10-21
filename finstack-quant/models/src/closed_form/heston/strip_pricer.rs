@@ -2,7 +2,7 @@ use super::fourier_prices::validate_heston_inputs;
 use super::params::HESTON_TAIL_DIAGNOSTIC_THRESHOLD;
 use super::{HestonFourierSettings, HestonPricingParams};
 use crate::volatility::heston::HestonCfStatus;
-use finstack_quant_core::math::gauss_legendre_grid;
+use finstack_quant_core::math::integration::gauss_legendre_grid;
 use finstack_quant_core::{Error, Result};
 use num_complex::Complex;
 use std::f64::consts::PI;

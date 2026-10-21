@@ -31,7 +31,9 @@ fn vector_values(vector: &DVector<f64>) -> Vec<f64> {
     vector.iter().copied().collect()
 }
 
-fn extract_dates(dates: Option<&Bound<'_, PyAny>>) -> PyResult<Option<Vec<time::Date>>> {
+fn extract_dates(
+    dates: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Option<Vec<finstack_quant_core::dates::Date>>> {
     match dates {
         None => Ok(None),
         Some(obj) if obj.is_none() => Ok(None),
@@ -45,7 +47,7 @@ fn extract_dates(dates: Option<&Bound<'_, PyAny>>) -> PyResult<Option<Vec<time::
 
 fn dates_to_py<'py>(
     py: Python<'py>,
-    dates: Option<&[time::Date]>,
+    dates: Option<&[finstack_quant_core::dates::Date]>,
 ) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
     dates
         .map(|values| values.iter().map(|&d| date_to_py(py, d)).collect())

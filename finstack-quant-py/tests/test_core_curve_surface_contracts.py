@@ -31,7 +31,7 @@ def test_base_correlation_stress_and_zero_survive_wire_roundtrip() -> None:
 
 
 def test_sabr_zero_vol_of_vol_preserves_exact_black_cube() -> None:
-    node = SabrParameterData(0.2, 1.0, -0.5, 0.0)
+    node = SabrParameterData(0.2, 1.0, 0.0, -0.5)
     cube = VolCube("BLACK", [1.0, 5.0], [2.0, 10.0], [node] * 4, [0.03] * 4)
     restored = VolCube.from_json(cube.to_json())
     assert restored.params_at(0, 0).nu == 0.0

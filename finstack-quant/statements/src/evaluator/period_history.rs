@@ -4,11 +4,11 @@
 //! columns. Lookups use column indices — no per-period `String` maps.
 
 use crate::types::NodeId;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::{Period, PeriodId, PeriodKind};
 use indexmap::IndexMap;
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use time::Date;
 
 /// Columnar history of evaluated node values, one row per period.
 #[derive(Debug, Clone, Default)]

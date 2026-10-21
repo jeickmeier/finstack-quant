@@ -119,7 +119,7 @@ pub(crate) fn scheduled_cap_floor_implied_normal_vol(
         hi *= 2.0;
     }
     BrentSolver::new()
-        .tolerance(1e-14)
+        .with_tolerance(1e-14)
         .solve_in_bracket(residual, 0.0, hi)
 }
 

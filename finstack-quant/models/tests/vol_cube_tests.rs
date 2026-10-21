@@ -5,17 +5,16 @@ use finstack_quant_core::market_data::surfaces::{VolCube, VolInterpolationMode};
 use finstack_quant_models::volatility::SabrParameters;
 
 #[test]
-fn test_vol_cube_builder_basic() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
-    let cube = VolCube::builder("USD-SWAPTION")
-        .expiries(&[1.0, 5.0])
-        .tenors(&[2.0, 10.0])
-        .node(p, 0.03)
-        .node(p, 0.035)
-        .node(p, 0.04)
-        .node(p, 0.045)
-        .build()
-        .unwrap();
+fn test_vol_cube_from_grid_axes() {
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
+    let cube = VolCube::from_grid(
+        "USD-SWAPTION",
+        &[1.0, 5.0],
+        &[2.0, 10.0],
+        &[p; 4],
+        &[0.03, 0.035, 0.04, 0.045],
+    )
+    .unwrap();
 
     assert_eq!(cube.id().as_str(), "USD-SWAPTION");
     assert_eq!(cube.expiries(), &[1.0, 5.0]);
@@ -25,7 +24,7 @@ fn test_vol_cube_builder_basic() {
 
 #[test]
 fn test_vol_cube_from_grid() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let params = vec![p; 4];
     let forwards = vec![0.03, 0.035, 0.04, 0.045];
     let cube = VolCube::from_grid("TEST", &[1.0, 5.0], &[2.0, 10.0], &params, &forwards).unwrap();
@@ -34,7 +33,7 @@ fn test_vol_cube_from_grid() {
 
 #[test]
 fn test_vol_cube_validation_rejects_bad_input() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     // Wrong number of params
     let result = VolCube::from_grid("BAD", &[1.0, 5.0], &[2.0, 10.0], &[p; 3], &[0.03; 3]);
     assert!(result.is_err());
@@ -45,8 +44,8 @@ fn test_vol_cube_validation_rejects_bad_input() {
 
 #[test]
 fn test_vol_cube_serde_roundtrips_interpolation_mode_and_grid_state() {
-    let p0 = SabrParameterData::new(0.030, 0.5, -0.2, 0.4).unwrap();
-    let p1 = SabrParameterData::new(0.040, 0.5, -0.1, 0.5).unwrap();
+    let p0 = SabrParameterData::new(0.030, 0.5, 0.4, -0.2).unwrap();
+    let p1 = SabrParameterData::new(0.040, 0.5, 0.5, -0.1).unwrap();
     let cube = VolCube::from_grid(
         "USD-SWAPTION",
         &[1.0, 5.0],
@@ -93,8 +92,8 @@ fn test_vol_cube_serde_roundtrips_interpolation_mode_and_grid_state() {
 
 #[test]
 fn total_variance_mode_changes_off_expiry_interpolation() {
-    let p0 = SabrParameterData::new(0.02, 0.5, -0.2, 0.3).unwrap();
-    let p1 = SabrParameterData::new(0.10, 0.5, -0.2, 0.3).unwrap();
+    let p0 = SabrParameterData::new(0.02, 0.5, 0.3, -0.2).unwrap();
+    let p1 = SabrParameterData::new(0.10, 0.5, 0.3, -0.2).unwrap();
     let base = VolCube::from_grid("MODE", &[1.0, 5.0], &[5.0], &[p0, p1], &[0.03, 0.03]).unwrap();
     let total_variance = base
         .clone()
@@ -118,8 +117,8 @@ fn total_variance_mode_changes_off_expiry_interpolation() {
 
 #[test]
 fn total_variance_materialized_slice_matches_canonical_cube_query() {
-    let p0 = SabrParameterData::new(0.02, 0.5, -0.2, 0.3).unwrap();
-    let p1 = SabrParameterData::new(0.10, 0.5, -0.2, 0.3).unwrap();
+    let p0 = SabrParameterData::new(0.02, 0.5, 0.3, -0.2).unwrap();
+    let p1 = SabrParameterData::new(0.10, 0.5, 0.3, -0.2).unwrap();
     let cube = VolCube::from_grid("MODE", &[1.0, 5.0], &[2.0], &[p0, p1], &[0.03, 0.03])
         .unwrap()
         .with_interpolation_mode(VolInterpolationMode::TotalVariance);
@@ -154,12 +153,12 @@ fn total_variance_materialized_slice_matches_canonical_cube_query() {
 
 #[test]
 fn vol_cube_and_sabr_parameter_data_reject_invalid_inputs() {
-    assert!(SabrParameterData::new_with_shift(0.03, 0.5, -0.2, 0.4, Some(f64::NAN)).is_err());
+    assert!(SabrParameterData::new_with_shift(0.03, 0.5, 0.4, -0.2, Some(f64::NAN)).is_err());
     assert!(VolCube::from_grid(
         "BAD-EXPIRY",
         &[0.0],
         &[5.0],
-        &[SabrParameterData::new(0.03, 0.5, -0.2, 0.4).unwrap()],
+        &[SabrParameterData::new(0.03, 0.5, 0.4, -0.2).unwrap()],
         &[0.03],
     )
     .is_err());
@@ -167,7 +166,7 @@ fn vol_cube_and_sabr_parameter_data_reject_invalid_inputs() {
 
 #[test]
 fn vol_cube_clamped_queries_propagate_non_finite_coordinates() {
-    let p = SabrParameterData::new(0.03, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.03, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid("FINITE", &[1.0], &[5.0], &[p], &[0.03]).unwrap();
     assert!(
         finstack_quant_models::volatility::get_cube_vol_clamped(&cube, f64::NAN, 5.0, 0.03)
@@ -215,7 +214,7 @@ fn test_vol_cube_serde_rejects_unknown_fields() {
 
 #[test]
 fn test_vol_cube_vol_at_grid_node() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let fwd = 0.03;
     let cube = VolCube::from_grid("TEST", &[1.0], &[5.0], &[p], &[fwd]).unwrap();
     let strike = 0.03;
@@ -237,8 +236,8 @@ fn test_vol_cube_vol_at_grid_node() {
 
 #[test]
 fn test_vol_cube_vol_interpolated() {
-    let p_lo = SabrParameterData::new(0.020, 0.5, -0.2, 0.3).unwrap();
-    let p_hi = SabrParameterData::new(0.050, 0.5, -0.2, 0.5).unwrap();
+    let p_lo = SabrParameterData::new(0.020, 0.5, 0.3, -0.2).unwrap();
+    let p_hi = SabrParameterData::new(0.050, 0.5, 0.5, -0.2).unwrap();
     let cube = VolCube::from_grid(
         "TEST",
         &[1.0, 5.0],
@@ -254,7 +253,7 @@ fn test_vol_cube_vol_interpolated() {
 
 #[test]
 fn test_vol_cube_vol_clamped_extrapolation() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid("TEST", &[1.0, 5.0], &[5.0, 10.0], &[p; 4], &[0.03; 4]).unwrap();
     let vol = finstack_quant_models::volatility::get_cube_vol_clamped(&cube, 0.1, 2.0, 0.03);
     assert!(vol.is_finite() && vol > 0.0);
@@ -262,7 +261,7 @@ fn test_vol_cube_vol_clamped_extrapolation() {
 
 #[test]
 fn test_vol_cube_vol_checked_out_of_bounds() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid("TEST", &[1.0, 5.0], &[5.0, 10.0], &[p; 4], &[0.03; 4]).unwrap();
     assert!(finstack_quant_models::volatility::get_cube_vol(&cube, 0.1, 7.0, 0.03).is_err());
     assert!(finstack_quant_models::volatility::get_cube_vol(&cube, 3.0, 2.0, 0.03).is_err());
@@ -270,7 +269,7 @@ fn test_vol_cube_vol_checked_out_of_bounds() {
 
 #[test]
 fn test_vol_cube_materialize_tenor_slice() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid(
         "TEST",
         &[1.0, 5.0],
@@ -295,7 +294,7 @@ fn test_vol_cube_materialize_tenor_slice() {
 
 #[test]
 fn test_vol_cube_materialize_expiry_slice() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid(
         "TEST",
         &[1.0, 5.0],
@@ -375,7 +374,7 @@ fn shifted_materialization_preserves_convention_and_displacement_rows() {
 
 #[test]
 fn materialized_expiry_slice_interpolates_direct_vol_along_tenor() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid("TEST", &[1.0], &[1.0, 4.0], &[p; 2], &[0.02, 0.05])
         .unwrap()
         .with_interpolation_mode(
@@ -415,14 +414,14 @@ fn materialized_expiry_slice_interpolates_direct_vol_along_tenor() {
 
 #[test]
 fn normal_sabr_clamped_path_rejects_nonpositive_shifted_levels() {
-    let cev = SabrParameterData::new(0.01, 0.5, -0.2, 0.4).unwrap();
+    let cev = SabrParameterData::new(0.01, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid("CEV", &[1.0], &[2.0], &[cev], &[-0.01]).unwrap();
     assert!(
         finstack_quant_models::volatility::get_cube_normal_vol_clamped(&cube, 1.0, 2.0, -0.01)
             .is_nan()
     );
 
-    let normal = SabrParameterData::new(0.01, 0.0, -0.2, 0.4).unwrap();
+    let normal = SabrParameterData::new(0.01, 0.0, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid("NORMAL", &[1.0], &[2.0], &[normal], &[-0.01]).unwrap();
     assert!(
         finstack_quant_models::volatility::get_cube_normal_vol_clamped(&cube, 1.0, 2.0, -0.02)
@@ -437,7 +436,7 @@ use std::sync::Arc;
 
 #[test]
 fn test_vol_source_cube() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid("TEST", &[1.0, 5.0], &[5.0, 10.0], &[p; 4], &[0.03; 4]).unwrap();
     let provider = VolSource::Cube(Arc::new(cube));
     let vol = provider.get_vol(1.0, 5.0, 0.03).unwrap();
@@ -466,7 +465,7 @@ fn test_vol_source_surface_ignores_tenor() {
 
 #[test]
 fn test_market_context_vol_cube_insert_and_get() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid("USD-SWPT", &[1.0], &[5.0], &[p], &[0.03]).unwrap();
     let ctx = MarketContext::new().insert_vol_cube(cube);
     let retrieved = ctx.get_vol_cube("USD-SWPT").unwrap();
@@ -475,7 +474,7 @@ fn test_market_context_vol_cube_insert_and_get() {
 
 #[test]
 fn test_market_context_cube_builds_vol_source() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid("USD-SWPT", &[1.0], &[5.0], &[p], &[0.03]).unwrap();
     let ctx = MarketContext::new().insert_vol_cube(cube);
     let provider = VolSource::Cube(ctx.get_vol_cube("USD-SWPT").unwrap());
@@ -502,7 +501,7 @@ fn test_market_context_surface_builds_vol_source() {
 
 #[test]
 fn test_market_context_stats_includes_vol_cubes() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid("TEST", &[1.0], &[5.0], &[p], &[0.03]).unwrap();
     let ctx = MarketContext::new().insert_vol_cube(cube);
     assert_eq!(ctx.stats().vol_cube_count, 1);
@@ -522,7 +521,7 @@ use finstack_quant_models::volatility::implied_vol_bachelier;
 /// tolerance comfortably covers it for moderate vols/expiries.
 #[test]
 fn test_vol_cube_vol_normal_price_consistency_positive_rates() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let fwd = 0.03;
     let cube = VolCube::from_grid("TEST", &[1.0], &[5.0], &[p], &[fwd]).unwrap();
     let t = 1.0;
@@ -555,7 +554,7 @@ fn test_vol_cube_vol_normal_price_consistency_positive_rates() {
 #[test]
 fn test_vol_cube_vol_normal_negative_rates_with_shift() {
     let shift = 0.02;
-    let p = SabrParameterData::new_with_shift(0.035, 0.5, -0.2, 0.4, Some(shift)).unwrap();
+    let p = SabrParameterData::new_with_shift(0.035, 0.5, 0.4, -0.2, Some(shift)).unwrap();
     let fwd = -0.005;
     let cube = VolCube::from_grid("EUR-SWPT", &[1.0], &[5.0], &[p], &[fwd]).unwrap();
     let t = 1.0;
@@ -583,7 +582,7 @@ fn test_vol_cube_vol_normal_negative_rates_with_shift() {
 /// a 1% relative tolerance is ample).
 #[test]
 fn test_vol_cube_vol_normal_atm_approximation() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let fwd = 0.03;
     let cube = VolCube::from_grid("TEST", &[1.0], &[5.0], &[p], &[fwd]).unwrap();
 
@@ -603,7 +602,7 @@ fn test_vol_cube_vol_normal_atm_approximation() {
 /// strike) quote and no shift is refused by both checked and clamped paths.
 #[test]
 fn test_vol_cube_vol_normal_rejects_degenerate_point() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let fwd = -0.01; // cross-zero vs positive strike, beta = 0.5, no shift
     let cube = VolCube::from_grid("BAD", &[1.0], &[5.0], &[p], &[fwd]).unwrap();
 
@@ -617,7 +616,7 @@ fn test_vol_cube_vol_normal_rejects_degenerate_point() {
 
 #[test]
 fn test_vol_cube_materialize_tenor_slice_normal() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid(
         "TEST",
         &[1.0, 5.0],
@@ -645,7 +644,7 @@ fn test_vol_cube_materialize_tenor_slice_normal() {
 
 #[test]
 fn test_vol_cube_materialize_expiry_slice_normal() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let p = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
     let cube = VolCube::from_grid(
         "TEST",
         &[1.0, 5.0],
@@ -668,7 +667,7 @@ fn test_vol_cube_materialize_expiry_slice_normal() {
 fn zero_vol_of_vol_cube_preserves_the_exact_black_limit() {
     use finstack_quant_models::volatility::get_cube_vol;
 
-    let node = SabrParameterData::new(0.2, 1.0, -0.5, 0.0).unwrap();
+    let node = SabrParameterData::new(0.2, 1.0, 0.0, -0.5).unwrap();
     for mode in [
         VolInterpolationMode::Vol,
         VolInterpolationMode::TotalVariance,
@@ -719,7 +718,7 @@ fn cube_convention_and_vol_lookups_are_bit_stable() {
         .into_iter()
         .map(|(alpha, rho, nu)| {
             let alpha = if beta == 0.0 { alpha * 0.2 } else { alpha };
-            SabrParameterData::new_with_shift(alpha, beta, rho, nu, shift).unwrap()
+            SabrParameterData::new_with_shift(alpha, beta, nu, rho, shift).unwrap()
         })
         .collect()
     };

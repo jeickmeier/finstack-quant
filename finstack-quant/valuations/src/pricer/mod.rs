@@ -136,7 +136,7 @@ mod tests {
         fn price_dyn(
             &self,
             _instrument: &dyn crate::instruments::Instrument,
-            _market: &finstack_quant_core::market_data::MarketContext,
+            _market: &finstack_quant_core::market_data::context::MarketContext,
             as_of: finstack_quant_core::dates::Date,
         ) -> std::result::Result<ValuationResult, PricingError> {
             Ok(ValuationResult::stamped(

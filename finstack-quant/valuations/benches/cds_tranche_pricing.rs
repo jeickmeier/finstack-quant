@@ -171,7 +171,7 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
         .unwrap();
 
     // Create issuer-specific curves with slight variations
-    let mut issuer_curves = finstack_quant_core::HashMap::default();
+    let mut issuer_curves = finstack_quant_core::FxHashMap::default();
     for i in 0..num_issuers {
         let id = format!("ISSUER-{:03}", i + 1);
         let bump = (i as f64 / num_issuers as f64) * 0.003; // Small heterogeneity

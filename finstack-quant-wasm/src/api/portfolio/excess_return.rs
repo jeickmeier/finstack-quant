@@ -2,7 +2,7 @@
 
 use crate::utils::input::{js_f64, js_string};
 
-use crate::api::core::market_data::JsDiscountCurve;
+use crate::api::core::market_discount::JsDiscountCurve;
 use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;

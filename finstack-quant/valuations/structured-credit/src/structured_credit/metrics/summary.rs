@@ -21,6 +21,7 @@ use finstack_quant_core::market_data::bumps::{
     BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
 };
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;

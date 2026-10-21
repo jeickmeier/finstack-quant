@@ -324,7 +324,7 @@ impl InflationIndex {
         currency: Currency,
     ) -> Result<Self> {
         if observations.is_empty() {
-            return Err(Error::Input(crate::error::InputError::TooFewPoints));
+            return Err(Error::Input(crate::InputError::TooFewPoints));
         }
 
         // Use a placeholder internal id; external id is stored separately.
@@ -519,7 +519,7 @@ impl InflationIndex {
     /// exceeds the signed month-offset range, or an anchor falls outside the calendar.
     pub fn ref_cpi_months_lag(&self, date: Date, lag_months: u32) -> Result<f64> {
         let first_of_month = Date::from_calendar_date(date.year(), date.month(), 1)
-            .map_err(|_| Error::Input(crate::error::InputError::InvalidDateRange))?;
+            .map_err(|_| Error::Input(crate::InputError::InvalidDateRange))?;
         let lag_months = i32::try_from(lag_months)
             .map_err(|_| Error::Validation("CPI lag months exceed supported range".into()))?;
         let anchor0 = first_of_month.add_months(-lag_months)?;
@@ -553,7 +553,7 @@ impl InflationIndex {
         let settle_value = self.value_on(settle_date)?;
 
         if base_value == 0.0 {
-            return Err(Error::Input(crate::error::InputError::NonPositiveValue));
+            return Err(Error::Input(crate::InputError::NonPositiveValue));
         }
 
         Ok(settle_value / base_value)
@@ -573,14 +573,12 @@ impl InflationIndex {
         // O(1) endpoint reads. This is called once per coupon period during
         // inflation-linked bond pricing, so it must not materialize the whole
         // observation history (a 40-year monthly CPI series is ~480 prints).
-        let start_date = self
-            .series
-            .first_date()
-            .ok_or_else(|| Error::internal("inflation index observations missing first date"))?;
-        let end_date = self
-            .series
-            .last_date()
-            .ok_or_else(|| Error::internal("inflation index observations missing last date"))?;
+        let start_date = self.series.first_date().ok_or_else(|| {
+            Error::Internal("inflation index observations missing first date".into())
+        })?;
+        let end_date = self.series.last_date().ok_or_else(|| {
+            Error::Internal("inflation index observations missing last date".into())
+        })?;
 
         Ok((start_date, end_date))
     }
@@ -594,10 +592,9 @@ impl InflationIndex {
 
     /// Retrieve the latest stored observation without lag or seasonality.
     pub(crate) fn get_latest_observation(&self) -> Result<(Date, f64)> {
-        let date = self
-            .series
-            .last_date()
-            .ok_or_else(|| Error::internal("inflation index observations missing last date"))?;
+        let date = self.series.last_date().ok_or_else(|| {
+            Error::Internal("inflation index observations missing last date".into())
+        })?;
         Ok((date, self.series.value_on_exact(date)?))
     }
 
@@ -630,7 +627,7 @@ impl InflationIndex {
             InflationLag::None => Ok(date),
             InflationLag::Days(days) => date
                 .checked_sub(time::Duration::days(days as i64))
-                .ok_or(Error::Input(crate::error::InputError::InvalidDateRange)),
+                .ok_or(Error::Input(crate::InputError::InvalidDateRange)),
             InflationLag::Months(months) => {
                 // Proper month arithmetic using shared helper
                 date.add_months(-(months as i32))
@@ -658,7 +655,6 @@ struct InflationIndexWire {
     /// Currency
     pub currency: Currency,
     /// Observations as (date, value) pairs
-    #[serde(with = "crate::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(crate::wire::DateWire, f64)>")
@@ -680,11 +676,9 @@ struct InflationIndexWire {
 #[serde(deny_unknown_fields)]
 struct InflationPublicationWire {
     /// First calendar day of the reference month.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     reference_month: Date,
     /// Inclusive date on which the observation must be available.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     publication_date: Date,
 }
@@ -939,7 +933,7 @@ mod tests {
                     .with_interpolation(interpolation);
                 assert!(matches!(
                     index.ref_cpi_months_lag(make_date(2025, 5, 15), 3),
-                    Err(Error::Input(crate::error::InputError::NotFound { .. }))
+                    Err(Error::Input(crate::InputError::NotFound { .. }))
                 ));
             }
             let index = InflationIndex::new(

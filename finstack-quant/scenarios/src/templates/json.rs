@@ -4,7 +4,7 @@
 //! the single source of the template's identity and component order.
 
 use crate::{Error, Result, ScenarioSpec, TemplateMetadata};
-use finstack_quant_core::HashSet;
+use finstack_quant_core::FxHashSet;
 use serde::{Deserialize, Serialize};
 
 /// Embedded built-in template documents as `(file name, JSON)`, in registry
@@ -110,7 +110,7 @@ impl JsonTemplateDocument {
             )));
         }
 
-        let mut seen = HashSet::default();
+        let mut seen = FxHashSet::default();
         for spec in &self.components {
             if !seen.insert(spec.id.as_str()) {
                 return Err(Error::validation(format!(

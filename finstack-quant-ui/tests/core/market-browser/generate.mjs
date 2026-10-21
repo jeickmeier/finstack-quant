@@ -40,7 +40,7 @@ const discount = {
 const supplemental = {
   ...calibrated,
   curves: [...curves, discount],
-  collateral: { "USD/CSA": "NEG-RATES" },
+  prices: { ...calibrated.prices, "USD/CSA": { unitless: 1.25 } },
   hierarchy: {
     roots: {
       Rates: {
