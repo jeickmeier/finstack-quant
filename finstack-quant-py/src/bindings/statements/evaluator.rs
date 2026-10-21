@@ -200,7 +200,7 @@ impl PyStatementResult {
     ) -> PyResult<Self> {
         let model = extract_model_ref(model)?;
         let spec = super::rollup::extract_rollup_spec(spec)?;
-        let model_inner: &finstack_quant_statements::FinancialModelSpec = &model;
+        let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
         let result = &self.inner;
         let inner = py
             .detach(|| result.rollup(model_inner, &spec))
@@ -640,7 +640,7 @@ impl PyEvaluator {
         model: &Bound<'_, PyAny>,
     ) -> PyResult<PyStatementResult> {
         let model = extract_model_ref(model)?;
-        let model_inner: &finstack_quant_statements::FinancialModelSpec = &model;
+        let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
         let evaluator = &mut self.inner;
         let result = py
             .detach(|| evaluator.evaluate(model_inner))
@@ -685,7 +685,7 @@ impl PyEvaluator {
         let as_of = py_to_date(as_of)?;
         let model = extract_model_ref(model)?;
         let market = extract_market_ref(py, market)?;
-        let model_inner: &finstack_quant_statements::FinancialModelSpec = &model;
+        let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
         let market_inner: &finstack_quant_core::market_data::context::MarketContext = &market;
         let evaluator = &mut self.inner;
         let result = py
@@ -735,7 +735,7 @@ impl PyEvaluator {
     ) -> PyResult<PyMonteCarloResults> {
         let model = extract_model_ref(model)?;
         let config = extract_config(config)?;
-        let model_inner: &finstack_quant_statements::FinancialModelSpec = &model;
+        let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
         let evaluator = &mut self.inner;
         let inner = py
             .detach(|| evaluator.evaluate_monte_carlo(model_inner, &config))

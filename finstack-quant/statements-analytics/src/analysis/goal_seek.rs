@@ -7,7 +7,9 @@
 //! # Examples
 //!
 //! ```rust
-//! use finstack_quant_statements::prelude::*;
+//! use finstack_quant_statements::Result;
+//! use finstack_quant_statements::builder::ModelBuilder;
+//! use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec};
 //! use finstack_quant_statements_analytics::analysis::goal_seek;
 //! use finstack_quant_core::dates::PeriodId;
 //!
@@ -44,11 +46,11 @@
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::solver::BrentSolver;
-use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{
     AmountOrScalar, FinancialModelSpec, NodeSpec, NodeValueType,
 };
+use finstack_quant_statements::{Error, Result};
 use std::cell::{Cell, RefCell};
 
 /// Outcome of a [`goal_seek`] solve.
@@ -190,7 +192,10 @@ impl GoalSeekResult {
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_statements::prelude::*;
+/// use finstack_quant_statements::Result;
+/// use finstack_quant_statements::builder::ModelBuilder;
+/// use finstack_quant_statements::evaluator::Evaluator;
+/// use finstack_quant_statements::types::AmountOrScalar;
 /// use finstack_quant_statements_analytics::analysis::goal_seek;
 /// use finstack_quant_core::dates::PeriodId;
 ///

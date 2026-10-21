@@ -9,9 +9,9 @@ use crate::analysis::valuation::corporate::{CorporateValuationResult, DcfOptions
 use finstack_quant_core::dates::{Date, Period, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_statements::checks::{CheckSuite, CheckSuiteSpec};
-use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
+use finstack_quant_statements::{Error, Result};
 use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 use indexmap::IndexMap;
 
@@ -409,7 +409,7 @@ impl CorporateAnalysisBuilder {
                     self.as_of,
                 )
                 .map_err(|e| {
-                    finstack_quant_statements::error::Error::Eval(format!(
+                    finstack_quant_statements::Error::Eval(format!(
                         "DCF equity valuation failed in corporate analysis pipeline: {e}"
                     ))
                 })?;

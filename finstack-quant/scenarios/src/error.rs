@@ -32,7 +32,7 @@ pub enum Error {
         id: String,
     },
 
-    /// Statement/model node not found (matches [`finstack_quant_statements::error::Error::NodeNotFound`] wording).
+    /// Statement/model node not found (matches [`finstack_quant_statements::Error::NodeNotFound`] wording).
     #[error("Node not found: {node_id}")]
     NodeNotFound {
         /// Identifier of the missing statement node.
@@ -52,7 +52,7 @@ pub enum Error {
 
     /// Statements library error.
     #[error(transparent)]
-    Statements(#[from] finstack_quant_statements::error::Error),
+    Statements(#[from] finstack_quant_statements::Error),
 
     /// Valuations library error.
     #[error(transparent)]

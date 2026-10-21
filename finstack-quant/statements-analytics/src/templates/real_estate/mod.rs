@@ -28,8 +28,8 @@
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::types::AmountOrScalar;
+use finstack_quant_statements::{Error, Result};
 
 fn sum_expr(nodes: &[&str]) -> Result<String> {
     if nodes.is_empty() {

@@ -1,6 +1,10 @@
 //! Tests for FinancialModelSpec operations and methods.
 
-use finstack_quant_statements::prelude::*;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::PeriodId;
+use finstack_quant_statements::builder::ModelBuilder;
+use finstack_quant_statements::evaluator::Evaluator;
+use finstack_quant_statements::types::{AmountOrScalar, NodeType};
 
 #[test]
 fn test_model_spec_add_node() {
@@ -346,7 +350,7 @@ fn test_where_clause_with_complex_condition() {
 
 #[test]
 fn test_error_constructors() {
-    use finstack_quant_statements::error::Error;
+    use finstack_quant_statements::Error;
 
     let build_err = Error::build("test build error");
     assert!(build_err.to_string().contains("build error"));

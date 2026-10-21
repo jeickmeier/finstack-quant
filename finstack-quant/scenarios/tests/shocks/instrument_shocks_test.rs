@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_scenarios::{ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec};
-use finstack_quant_statements::FinancialModelSpec;
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::{Attributes, Bond, Instrument};
 use finstack_quant_valuations::pricer::InstrumentType;

@@ -1,8 +1,13 @@
 //! Regression coverage for validated execution plans and result diagnostics.
 
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
+use finstack_quant_statements::builder::ModelBuilder;
+use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::evaluator::{EvalWarning, MonteCarloConfig};
-use finstack_quant_statements::prelude::*;
+use finstack_quant_statements::types::{FinancialModelSpec, NodeId};
 
 fn quarter() -> PeriodId {
     PeriodId::quarter(2025, 1).expect("valid fixture period")

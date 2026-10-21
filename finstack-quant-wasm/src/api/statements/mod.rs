@@ -22,7 +22,7 @@ pub use handles::{JsEvaluator, JsRegistry};
 
 use crate::utils::input::{js_opt_string, js_string, json_text};
 use crate::utils::to_js_err;
-use finstack_quant_statements::FinancialModelSpec;
+use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
 
 /// Parse `json` (object or JSON text) as `T`, run `validate`, and return the

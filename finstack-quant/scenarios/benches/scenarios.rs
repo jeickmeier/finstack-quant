@@ -25,8 +25,8 @@ use finstack_quant_scenarios::{
     CurveKind, ExecutionContext, HazardBumpMode, OperationSpec, RateBindingSpec, ScenarioEngine,
     ScenarioSpec, TenorMatchMode,
 };
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
-use finstack_quant_statements::FinancialModelSpec;
 use indexmap::{indexmap, IndexMap};
 use std::hint::black_box;
 use std::sync::Arc;

@@ -546,7 +546,7 @@ pub(crate) fn extract_check_report(
 
 fn run_check_suite(
     py: Python<'_>,
-    model: finstack_quant_statements::FinancialModelSpec,
+    model: finstack_quant_statements::types::FinancialModelSpec,
     suite: CheckSuite,
     results: Option<finstack_quant_statements::evaluator::StatementResult>,
 ) -> PyResult<PyCheckReport> {

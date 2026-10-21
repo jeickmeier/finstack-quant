@@ -9,7 +9,7 @@ use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_scenarios::{
     CurveKind, ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec, TenorMatchMode,
 };
-use finstack_quant_statements::FinancialModelSpec;
+use finstack_quant_statements::types::FinancialModelSpec;
 use time::Month;
 
 #[test]

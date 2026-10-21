@@ -370,7 +370,7 @@ fn scenario_validate_accepts_mixed_valid_operations() {
 fn engine_apply_rejects_invalid_spec() {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_scenarios::{ExecutionContext, ScenarioEngine};
-    use finstack_quant_statements::FinancialModelSpec;
+    use finstack_quant_statements::types::FinancialModelSpec;
     use time::macros::date;
 
     let spec = ScenarioSpec {

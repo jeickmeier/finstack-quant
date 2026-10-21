@@ -27,8 +27,8 @@ use finstack_quant_scenarios::{
     ApplicationReport, ExecutionContext, HazardBumpMode, OperationSpec, RateBindingSpec,
     ScenarioEngine, ScenarioSpec,
 };
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
-use finstack_quant_statements::FinancialModelSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
 use finstack_quant_valuations::instruments::{Bond, Instrument};
 use indexmap::{indexmap, IndexMap};

@@ -10,7 +10,7 @@ use finstack_quant_scenarios::{
     CurveKind, ExecutionContext, HazardBumpMode, OperationSpec, ScenarioEngine, ScenarioSpec,
     TenorMatchMode,
 };
-use finstack_quant_statements::FinancialModelSpec;
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_valuations::instruments::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use time::Month;

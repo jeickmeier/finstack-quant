@@ -37,7 +37,7 @@ impl Check for FcfSignCheck {
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         if self.consecutive_negative_warning == 0 || self.consecutive_negative_error == 0 {
-            return Err(finstack_quant_statements::error::Error::eval(
+            return Err(finstack_quant_statements::Error::eval(
                 "FcfSignCheck thresholds must be positive".to_string(),
             ));
         }

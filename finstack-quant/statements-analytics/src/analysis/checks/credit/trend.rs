@@ -50,7 +50,7 @@ impl Check for TrendCheck {
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         if self.lookback_periods == 0 {
-            return Err(finstack_quant_statements::error::Error::eval(
+            return Err(finstack_quant_statements::Error::eval(
                 "TrendCheck lookback_periods must be positive".to_string(),
             ));
         }

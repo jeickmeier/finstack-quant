@@ -1,7 +1,13 @@
 //! Builder tests for Phase 1.
 
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::build_periods;
-use finstack_quant_statements::prelude::*;
+use finstack_quant_core::dates::PeriodId;
+use finstack_quant_statements::builder::ModelBuilder;
+use finstack_quant_statements::types::{
+    AmountOrScalar, FinancialModelSpec, ForecastMethod, NodeType,
+};
+use finstack_quant_statements::Error;
 
 // Period Integration Tests
 

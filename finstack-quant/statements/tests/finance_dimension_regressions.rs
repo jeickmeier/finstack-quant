@@ -1,13 +1,14 @@
 //! Financial dimension regressions at the canonical model-build boundary.
 
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::Money;
-use finstack_quant_statements::prelude::*;
+use finstack_quant_statements::builder::ModelBuilder;
+use finstack_quant_statements::evaluator::Evaluator;
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::NodeValueType;
 
-fn model_with_formula(
-    formula: &str,
-) -> finstack_quant_statements::error::Result<FinancialModelSpec> {
+fn model_with_formula(formula: &str) -> finstack_quant_statements::Result<FinancialModelSpec> {
     let q1 = PeriodId::quarter(2025, 1).expect("valid period");
     let q2 = PeriodId::quarter(2025, 2).expect("valid period");
     ModelBuilder::new("dimension-regression")

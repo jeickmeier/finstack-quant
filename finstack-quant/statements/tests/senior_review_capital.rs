@@ -7,17 +7,22 @@ use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::cashflow::CashFlow;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::dates::{build_periods, Date, DayCount, StubKind};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{
     calculate_period_flows, execute_waterfall, CapitalStructureState, CashflowBreakdown,
     EcfSweepSpec, PaymentPriority, PikToggleSpec, WaterfallSpec,
 };
 use finstack_quant_statements::evaluator::EvaluationContext;
-use finstack_quant_statements::prelude::*;
+use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::FinancialStatementInstrument;
+use finstack_quant_statements::types::{AmountOrScalar, NodeId};
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
     CommitmentFeeBase, DdtlSpec, DrawEvent, OidPolicy, TermLoan,

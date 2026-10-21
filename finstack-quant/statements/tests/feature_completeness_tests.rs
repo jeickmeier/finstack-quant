@@ -1,7 +1,9 @@
 //! Forecast-path completeness: linear trend continuation and seasonal shape.
 
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_statements::prelude::*;
+use finstack_quant_statements::builder::ModelBuilder;
+use finstack_quant_statements::evaluator::Evaluator;
+use finstack_quant_statements::types::{AmountOrScalar, ForecastMethod, ForecastSpec};
 use indexmap::indexmap;
 
 #[test]

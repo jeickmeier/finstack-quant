@@ -7,7 +7,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_scenarios::{
     ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec, TimeRollMode,
 };
-use finstack_quant_statements::FinancialModelSpec;
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::{Attributes, Bond, Instrument};
 use time::Month;

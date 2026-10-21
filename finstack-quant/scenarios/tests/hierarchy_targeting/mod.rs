@@ -144,7 +144,7 @@ fn hierarchy_curve_parallel_bp_resolves_to_individual_bumps() {
     use finstack_quant_core::market_data::hierarchy::ResolutionMode;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_scenarios::{CurveKind, ExecutionContext, ScenarioEngine};
-    use finstack_quant_statements::FinancialModelSpec;
+    use finstack_quant_statements::types::FinancialModelSpec;
     use time::macros::date;
 
     let h = MarketDataHierarchy::builder()
@@ -228,7 +228,7 @@ fn cumulative_mode_stacks_shocks_down_tree() {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_scenarios::ScenarioMarketTarget;
     use finstack_quant_scenarios::{CurveKind, ExecutionContext, ScenarioEngine};
-    use finstack_quant_statements::FinancialModelSpec;
+    use finstack_quant_statements::types::FinancialModelSpec;
     use time::macros::date;
 
     let h = MarketDataHierarchy::builder()
@@ -341,7 +341,7 @@ fn most_specific_wins_keeps_only_deepest_shock() {
     use finstack_quant_core::market_data::hierarchy::ResolutionMode;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_scenarios::{CurveKind, ExecutionContext, ScenarioEngine};
-    use finstack_quant_statements::FinancialModelSpec;
+    use finstack_quant_statements::types::FinancialModelSpec;
     use time::macros::date;
 
     let h = MarketDataHierarchy::builder()
@@ -435,7 +435,7 @@ fn engine_works_with_resolution_mode_field() {
     use finstack_quant_core::market_data::hierarchy::ResolutionMode;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_scenarios::{CurveKind, ExecutionContext, ScenarioEngine};
-    use finstack_quant_statements::FinancialModelSpec;
+    use finstack_quant_statements::types::FinancialModelSpec;
     use time::macros::date;
 
     let h = MarketDataHierarchy::builder()
@@ -681,7 +681,7 @@ fn most_specific_wins_uses_matched_node_depth_not_target_path_depth() {
     };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_scenarios::{CurveKind, ExecutionContext, ScenarioEngine};
-    use finstack_quant_statements::FinancialModelSpec;
+    use finstack_quant_statements::types::FinancialModelSpec;
     use time::macros::date;
 
     let hierarchy = MarketDataHierarchy::builder()
@@ -795,7 +795,7 @@ fn most_specific_wins_deduplicates_per_operation_family_not_raw_identifier() {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_scenarios::{ExecutionContext, ScenarioEngine};
-    use finstack_quant_statements::FinancialModelSpec;
+    use finstack_quant_statements::types::FinancialModelSpec;
     use time::macros::date;
 
     let hierarchy = MarketDataHierarchy::builder()

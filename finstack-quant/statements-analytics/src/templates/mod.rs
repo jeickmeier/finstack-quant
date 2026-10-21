@@ -44,7 +44,9 @@
 //! # Example
 //!
 //! ```
-//! use finstack_quant_statements::prelude::*;
+//! use finstack_quant_core::dates::PeriodId;
+//! use finstack_quant_statements::builder::ModelBuilder;
+//! use finstack_quant_statements::types::AmountOrScalar;
 //! use finstack_quant_statements_analytics::templates::roll_forward::add_roll_forward;
 //!
 //! # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {

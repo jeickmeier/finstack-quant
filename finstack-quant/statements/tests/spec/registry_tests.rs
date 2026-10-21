@@ -1,7 +1,10 @@
 //! Integration tests for the dynamic metric registry.
 
-use finstack_quant_statements::prelude::*;
+use finstack_quant_core::dates::PeriodId;
+use finstack_quant_statements::builder::ModelBuilder;
+use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::registry::{MetricDefinition, MetricRegistry, Registry, UnitType};
+use finstack_quant_statements::types::AmountOrScalar;
 use indexmap::IndexMap;
 
 #[test]
