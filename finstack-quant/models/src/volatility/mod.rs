@@ -62,12 +62,11 @@
 //!
 //! # See Also
 //!
-//! - [`SabrParameters`] for SABR smile interpolation
+//! - [`sabr::SabrParameters`] for SABR smile interpolation
 //! - [`FxVolSurfaceBuilder`] for FX delta-quoted smile materialization
 //! - [`crate::closed_form`] for analytical formulas
 
 pub mod arbitrage;
-mod conventions;
 mod convert;
 mod dupire;
 mod fx;
@@ -81,10 +80,8 @@ pub mod svi;
 /// Carr-Madan discrete variance replication for variance swaps.
 pub mod variance_replication;
 
-pub use conventions::VolatilityConvention;
-pub use convert::convert_atm_volatility;
+pub use convert::{convert_atm_volatility, VolatilityConvention};
 pub use implied::{implied_vol_bachelier, implied_vol_black};
-pub use sabr::{SabrCalibrationOutcome, SabrCalibrator, SabrParameters, SabrShift, SabrSmile};
 pub use source::{
     get_cube_expiry_slice_vol, get_cube_expiry_slice_vol_clamped, get_cube_normal_vol,
     get_cube_normal_vol_clamped, get_cube_vol, get_cube_vol_clamped, get_surface_vol,

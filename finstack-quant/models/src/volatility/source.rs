@@ -13,7 +13,7 @@ use finstack_quant_core::{
     Error, Result,
 };
 
-use super::conventions::VolatilityConvention;
+use super::convert::VolatilityConvention;
 use super::fx::get_fx_delta_vol;
 use super::sabr::SabrParameters;
 

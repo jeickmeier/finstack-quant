@@ -1032,7 +1032,7 @@ impl PySwaptionBuilder {
         py: Python<'py>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let sabr_params: finstack_quant_models::volatility::SabrParameters =
+        let sabr_params: finstack_quant_models::volatility::sabr::SabrParameters =
             spec_from_py(py, value, "sabr_params")?;
         builder_set!(
             slf,

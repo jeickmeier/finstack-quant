@@ -3,7 +3,7 @@
 use crate::instruments::swaption::common::*;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_models::SabrParameters;
+use finstack_quant_models::volatility::sabr::SabrParameters;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::ModelKey;

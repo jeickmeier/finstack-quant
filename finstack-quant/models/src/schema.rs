@@ -51,9 +51,9 @@ use crate::{
     volatility::arbitrage::ArbitrageCheckConfig, volatility::arbitrage::ArbitrageReport,
     volatility::heston::HestonParams, volatility::local_vol::LocalVolSurface,
     volatility::rough_heston::RoughHestonFourierParams,
-    volatility::sabr::ArbitrageValidationResult, volatility::svi::SviParams,
-    volatility::VolatilityConvention, BsGreeks, ExerciseStyle, ForwardGreeks, HestonPricingParams,
-    OptionType, SabrParameters,
+    volatility::sabr::ArbitrageValidationResult, volatility::sabr::SabrParameters,
+    volatility::svi::SviParams, volatility::VolatilityConvention, BsGreeks, ExerciseStyle,
+    ForwardGreeks, HestonPricingParams, OptionType,
 };
 
 /// The crate's complete schema registry.

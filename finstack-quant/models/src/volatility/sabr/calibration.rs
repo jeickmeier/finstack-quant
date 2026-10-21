@@ -1,6 +1,6 @@
 //! SABR model, smile, parameter, and calibration support.
 //!
-use super::model::BETA_SNAP_TOL;
+use super::expansion::BETA_SNAP_TOL;
 use super::parameters::SabrParameters;
 use crate::closed_form::{bachelier_vega, black_vega};
 use finstack_quant_core::math::solver_multi::{

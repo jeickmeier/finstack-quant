@@ -1,14 +1,62 @@
-//! ATM volatility conversion utilities across quoting conventions.
+//! Volatility quoting conventions and ATM conversion across them.
 //!
-//! The functions in this submodule convert volatility quotes by equating model
-//! prices under normal, lognormal, and shifted-lognormal conventions, with
+//! Defines the supported quoting regimes for rate and option volatility
+//! inputs, the forward-rate validation each regime requires, and the
+//! conversion of ATM quotes between regimes by equating model prices, with
 //! explicit validation and deterministic solver behavior.
 
-use super::conventions::{validate_forward_for_convention, VolatilityConvention};
 use crate::closed_form::{bachelier_call, black_call};
 use finstack_quant_core::error::InputError;
 use finstack_quant_core::math::BrentSolver;
 use finstack_quant_core::Result;
+
+/// Volatility quoting convention.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum VolatilityConvention {
+    /// Normal absolute volatility in decimal rate units per square-root year
+    Normal,
+    /// Lognormal (Black) relative volatility as a decimal per square-root year
+    Lognormal,
+    /// Shifted lognormal for negative rates
+    ShiftedLognormal {
+        /// Additive displacement in the same decimal rate or price units as forward and strike
+        shift: f64,
+    },
+}
+
+/// Validate that forward rate is valid for the given convention.
+fn validate_forward_for_convention(
+    forward_rate: f64,
+    convention: VolatilityConvention,
+) -> Result<()> {
+    match convention {
+        VolatilityConvention::Normal => Ok(()),
+        VolatilityConvention::Lognormal => {
+            if forward_rate <= 0.0 {
+                return Err(InputError::NonPositiveForwardForLognormal {
+                    forward: forward_rate,
+                    required_shift: (-forward_rate).max(0.0) + 1e-4,
+                }
+                .into());
+            }
+            Ok(())
+        }
+        VolatilityConvention::ShiftedLognormal { shift } => {
+            let shifted = forward_rate + shift;
+            if shifted <= 0.0 {
+                return Err(InputError::NonPositiveShiftedForward {
+                    forward: forward_rate,
+                    shift,
+                    shifted,
+                }
+                .into());
+            }
+            Ok(())
+        }
+    }
+}
 
 /// ATM-only conversion (strike = forward) by equating model prices.
 ///

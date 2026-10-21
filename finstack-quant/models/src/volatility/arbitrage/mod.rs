@@ -6,11 +6,11 @@
 //!
 //! # Architecture
 //!
-//! - **Types** ([`types`]): Violation
-//!   taxonomy, severity model, and report
-//! - **Checks** ([`checks`]):
-//!   [`ButterflyCheck`], [`CalendarSpreadCheck`] and [`LocalVolDensityCheck`],
-//!   each with a `check(&self, surface)` method
+//! - **Types**: violation taxonomy ([`ArbitrageType`], [`ViolationLocation`]),
+//!   severity model ([`ArbitrageSeverity`]) and report ([`ArbitrageViolation`],
+//!   [`ArbitrageReport`])
+//! - **Checks**: [`ButterflyCheck`], [`CalendarSpreadCheck`] and
+//!   [`LocalVolDensityCheck`], each with a `check(&self, surface)` method
 //! - **Orchestrator**
 //!   ([`check_surface`]): Runs all
 //!   enabled checks and aggregates results into an
@@ -46,8 +46,8 @@
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 
-pub mod checks;
-pub mod types;
+mod checks;
+mod types;
 
 pub use checks::{ButterflyCheck, CalendarSpreadCheck, LocalVolDensityCheck};
 pub use types::{

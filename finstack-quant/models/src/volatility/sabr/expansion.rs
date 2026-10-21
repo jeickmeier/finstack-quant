@@ -57,7 +57,7 @@
 //!   *Applied Mathematical Finance*, 12(4), 371-385. `docs/REFERENCES.md#hagan-2002-sabr`
 //! - QuantLib SABR implementation: `ql/termstructures/volatility/sabr.cpp` `docs/REFERENCES.md#hagan-2002-sabr`
 use super::parameters::SabrParameters;
-use crate::volatility::conventions::VolatilityConvention;
+use crate::volatility::VolatilityConvention;
 use finstack_quant_core::{Error, Result};
 
 /// Snap β to the exact endpoints 0 or 1 when it is within this tolerance.
@@ -494,7 +494,7 @@ impl SabrParameters {
     /// expiry, a χ(z) breakdown, or cross-zero inputs (`f·k ≤ 0` after any
     /// configured shift) with `beta > 0` — the CEV backbone is not
     /// shift-invariant, so such quotes require an explicit
-    /// [`with_shift`](Self::with_shift). β = 0 (normal SABR) is shift-invariant
+    /// [`new_with_shift`](Self::new_with_shift). β = 0 (normal SABR) is shift-invariant
     /// and prices cross-zero quotes directly. Guard with `is_finite()` or use
     /// the checked [`implied_vol_normal`](Self::implied_vol_normal)
     /// on pricing paths.

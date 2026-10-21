@@ -244,7 +244,7 @@ impl SabrSmile {
         let std_dev = atm_vol * self.time_to_expiry.sqrt();
         let z = finstack_quant_core::math::standard_normal_inv_cdf(delta);
         let signed_z = if is_call { z } else { -z };
-        if self.params.beta < super::model::BETA_SNAP_TOL {
+        if self.params.beta < super::expansion::BETA_SNAP_TOL {
             return Ok(self.forward - std_dev * signed_z);
         }
         let shift = self.params.shift.unwrap_or(0.0);
@@ -506,7 +506,7 @@ impl SabrSmile {
     #[inline]
     fn call_price(&self, strike: f64, r: f64, vol: f64) -> f64 {
         let df = (-r * self.time_to_expiry).exp();
-        if self.params.beta < super::model::BETA_SNAP_TOL {
+        if self.params.beta < super::expansion::BETA_SNAP_TOL {
             df * crate::closed_form::bachelier_call(self.forward, strike, vol, self.time_to_expiry)
         } else {
             let (f, k) = self.params.effective_rates(self.forward, strike);
@@ -522,7 +522,7 @@ impl SabrSmile {
             ));
         }
         let undiscounted = target_price / df;
-        let inverted = if self.params.beta < super::model::BETA_SNAP_TOL {
+        let inverted = if self.params.beta < super::expansion::BETA_SNAP_TOL {
             crate::volatility::implied_vol_bachelier(
                 undiscounted,
                 self.forward,

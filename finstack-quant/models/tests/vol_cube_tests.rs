@@ -2,7 +2,7 @@
 //!
 use finstack_quant_core::market_data::surfaces::SabrParameterData;
 use finstack_quant_core::market_data::surfaces::{VolCube, VolInterpolationMode};
-use finstack_quant_models::volatility::SabrParameters;
+use finstack_quant_models::volatility::sabr::SabrParameters;
 
 #[test]
 fn test_vol_cube_builder_basic() {
