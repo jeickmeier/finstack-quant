@@ -17,7 +17,7 @@ use crate::bindings::date_utils::py_to_date;
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_object_to_single_row_dataframe, serde_to_py, values_to_series,
 };
-use crate::errors::{core_to_py, value_error};
+use crate::errors::core_to_py;
 use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::credit::dynamic_recovery::DynamicRecoverySpec;
 use finstack_quant_models::credit::endogenous_hazard::EndogenousHazardSpec;

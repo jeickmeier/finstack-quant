@@ -205,7 +205,7 @@ impl PortfolioLossResult {
         let expected_loss = scaled_mean(&losses, "expected loss")?;
         let mut sorted = Vec::new();
         sorted.try_reserve_exact(losses.len()).map_err(|error| {
-            Error::internal(format!(
+            Error::Internal(format!(
                 "could not reserve {} losses for tail-statistic sorting: {error}",
                 losses.len()
             ))
@@ -326,7 +326,7 @@ impl PortfolioLossResult {
         fractions
             .try_reserve_exact(self.losses.len())
             .map_err(|error| {
-                Error::internal(format!(
+                Error::Internal(format!(
                     "could not reserve {} tranche loss fractions: {error}",
                     self.losses.len()
                 ))
@@ -503,7 +503,7 @@ impl ValidatedSimulation {
         thresholds
             .try_reserve_exact(exposures.len())
             .map_err(|error| {
-                Error::internal(format!(
+                Error::Internal(format!(
                     "could not reserve {} portfolio default thresholds: {error}",
                     exposures.len()
                 ))
@@ -541,7 +541,7 @@ impl ValidatedSimulation {
         factors
             .try_reserve_exact(self.factor_count)
             .map_err(|error| {
-                Error::internal(format!(
+                Error::Internal(format!(
                     "could not reserve {} systematic factors: {error}",
                     self.factor_count
                 ))
@@ -603,14 +603,14 @@ fn validate_exposures(exposures: &[CreditExposure]) -> Result<Vec<f64>> {
     loading_norms
         .try_reserve_exact(exposures.len())
         .map_err(|error| {
-            Error::internal(format!(
+            Error::Internal(format!(
                 "could not reserve {} factor-loading norms: {error}",
                 exposures.len()
             ))
         })?;
     let mut seen_ids = HashSet::new();
     seen_ids.try_reserve(exposures.len()).map_err(|error| {
-        Error::internal(format!(
+        Error::Internal(format!(
             "could not reserve {} credit exposure identifiers: {error}",
             exposures.len()
         ))
@@ -701,7 +701,7 @@ fn scaled_mean(values: &[f64], statistic: &str) -> Result<f64> {
 fn allocate_loss_buffer(num_paths: usize) -> Result<Vec<f64>> {
     let mut losses = Vec::new();
     losses.try_reserve_exact(num_paths).map_err(|error| {
-        Error::internal(format!(
+        Error::Internal(format!(
             "could not reserve {num_paths} portfolio loss paths: {error}"
         ))
     })?;
