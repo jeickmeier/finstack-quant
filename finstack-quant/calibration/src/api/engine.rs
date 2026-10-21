@@ -497,6 +497,9 @@ fn aggregate_plan_report(
     if let Some(timestamp) = config.market_freshness.snapshot_timestamp.as_ref() {
         report.update_metadata("market_snapshot_timestamp", timestamp);
     }
+    if let Some(timestamp) = config.market_freshness.as_of_timestamp.as_ref() {
+        report.update_metadata("market_as_of_timestamp", timestamp);
+    }
     report.update_metadata("type", "plan_execution");
     report.update_metadata(
         "solver_tolerance",

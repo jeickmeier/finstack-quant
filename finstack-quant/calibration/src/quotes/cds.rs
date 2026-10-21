@@ -155,17 +155,29 @@ impl CdsQuote {
         }
     }
 
-    /// Bump by spread in basis points (e.g., `1.0` = 1bp).
+    /// Return a copy of this par-spread quote with its spread shifted by `bump_bp`.
     ///
     /// # Arguments
-    /// * `bump_bp` - Additive shift in basis points applied to `spread_bp` (par spread) or `coupon_bp` (upfront).
-    pub fn bump_spread_bp(&self, bump_bp: f64) -> Self {
+    /// * `bump_bp` - Additive shift in basis points applied to `spread_bp`
+    ///   (`1.0` = 1bp).
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for [`CdsQuote::CdsUpfront`]: its running
+    /// coupon is contractual (25/100/500/1000bp), so it carries no quoted spread
+    /// to bump. Convert upfront quotes to par-spread quotes before bumping.
+    pub fn bump_spread_bp(&self, bump_bp: f64) -> finstack_quant_core::Result<Self> {
         let mut quote = self.clone();
         match &mut quote {
             Self::CdsParSpread { spread_bp, .. } => *spread_bp += bump_bp,
-            Self::CdsUpfront { coupon_bp, .. } => *coupon_bp += bump_bp,
+            Self::CdsUpfront { id, .. } => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CDS quote '{id}' is an upfront quote: its contractual coupon cannot be \
+                     spread-bumped; convert it to a par-spread quote first"
+                )));
+            }
         }
-        quote
+        Ok(quote)
     }
 
     /// Return a copy of this quote with `recovery_rate` replaced.

@@ -806,10 +806,11 @@ pub struct ForwardCurveParams {
     pub discount_curve_id: CurveId,
     /// Calibration method to use.
     ///
-    /// Forward curves require [`CalibrationMethod::GlobalSolve`]. Sequential
-    /// bootstrap is rejected because contractual off-grid reset intervals
-    /// couple adjacent rates through projection discount factors.
-    #[serde(default)]
+    /// Forward curves require [`CalibrationMethod::GlobalSolve`], which is the
+    /// default (finite-difference Jacobian). Sequential bootstrap is rejected
+    /// because contractual off-grid reset intervals couple adjacent rates
+    /// through projection discount factors.
+    #[serde(default = "default_forward_method")]
     pub method: CalibrationMethod,
     /// Interpolation style for the constructed forward curve.
     ///
@@ -1105,7 +1106,9 @@ pub struct BaseCorrelationParams {
     /// Optional calendar identifier for schedule generation and date adjustments.
     #[serde(default)]
     pub calendar_id: Option<String>,
-    /// Detachment points (as percentages) for the tranches.
+    /// Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`
+    /// for 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,
+    /// every quote must match one point and every point must be quoted.
     #[serde(default)]
     pub detachment_points: Vec<f64>,
     /// Coupon roll-date grid for the synthetic tranches: `cds_imm` for the
@@ -1320,6 +1323,12 @@ pub enum SwaptionVolConvention {
         /// both forwards and strikes and retained in calibrated artifacts.
         shift: f64,
     },
+}
+
+fn default_forward_method() -> CalibrationMethod {
+    CalibrationMethod::GlobalSolve {
+        use_analytical_jacobian: false,
+    }
 }
 
 fn default_interp_linear() -> InterpStyle {
