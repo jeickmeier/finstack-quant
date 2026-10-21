@@ -56,8 +56,8 @@ pub(crate) fn compute_pv(
 
     let t = inst.time_to_expiry(as_of)?;
 
-    let f1 = inst.leg1_forward(market)?;
-    let f2 = inst.leg2_forward(market)?;
+    let f1 = inst.leg_forward(market, &inst.leg1_forward_curve_id)?;
+    let f2 = inst.leg_forward(market, &inst.leg2_forward_curve_id)?;
 
     let disc = market.get_discount(inst.discount_curve_id.as_str())?;
     let df = disc.df_between_dates(as_of, inst.expiry)?;
@@ -104,13 +104,6 @@ fn kirk_price(
     let sigma2 = finstack_quant_models::volatility::get_surface_vol_clamped(&surface2, t, f2);
 
     let rho = inst.correlation;
-
-    if !f1.is_finite() || f1 <= 0.0 || !f2.is_finite() || f2 <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "CommoditySpreadOption '{}' requires positive finite forwards for Kirk pricing; got F1={f1}, F2={f2}",
-            inst.id
-        )));
-    }
 
     // Kirk's adjusted strike
     let k_adj = f2 + inst.strike;
@@ -393,8 +386,12 @@ mod tests {
 
         // The parity relation: C - P should be proportional to (F1-F2-K)/(F1-F2) * fwd_spread_pv
         // More practically: verify C - P and DF*(F1-F2-K) agree to 0.1% relative
-        let actual_f1 = call.leg1_forward(&market).expect("leg1 fwd");
-        let actual_f2 = call.leg2_forward(&market).expect("leg2 fwd");
+        let actual_f1 = call
+            .leg_forward(&market, &call.leg1_forward_curve_id)
+            .expect("leg1 fwd");
+        let actual_f2 = call
+            .leg_forward(&market, &call.leg2_forward_curve_id)
+            .expect("leg2 fwd");
         let disc = market.get_discount("USD-OIS").expect("discount curve");
         let df = disc
             .df_between_dates(as_of, expiry)
@@ -465,8 +462,12 @@ mod tests {
         // With zero vol, the option value should closely approximate the
         // discounted intrinsic. Small deviations can arise from curve
         // interpolation between knot points.
-        let actual_f1 = opt.leg1_forward(&market).expect("leg1 fwd");
-        let actual_f2 = opt.leg2_forward(&market).expect("leg2 fwd");
+        let actual_f1 = opt
+            .leg_forward(&market, &opt.leg1_forward_curve_id)
+            .expect("leg1 fwd");
+        let actual_f2 = opt
+            .leg_forward(&market, &opt.leg2_forward_curve_id)
+            .expect("leg2 fwd");
         let disc = market.get_discount("USD-OIS").expect("discount curve");
         let df = disc
             .df_between_dates(as_of, expiry)

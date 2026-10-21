@@ -303,59 +303,61 @@ impl CommodityForward {
             .build()
     }
 
-    /// Calculate the net present value of this commodity forward.
+    /// Get the market forward price for this contract at `maturity`.
     ///
-    /// # Formula
+    /// # Resolution Order
     ///
-    /// ```text
-    /// NPV = sign(position) × (F - K) × Q × M × DF(T)
-    /// ```
-    ///
-    /// where:
-    /// - sign = +1.0 for Long, -1.0 for Short
-    /// - F = Market forward price from `quoted_forward` or `PriceCurve`
-    /// - K = Contract price (`contract_price`). If `None`, K = F (at-market)
-    /// - Q = Quantity
-    /// - M = Contract multiplier
-    /// - DF(T) = Discount factor to settlement date
+    /// 1. `quoted_forward`, when set.
+    /// 2. The `PriceCurve` `forward_curve_id`: its spot once `maturity <= as_of`,
+    ///    otherwise `price_on_date(maturity)` (on the curve's own day count).
+    /// 3. Cost of carry from `spot_id`: the spot once delivered, otherwise
+    ///    `spot / DF(as_of, maturity)` on `discount_curve_id`.
     ///
     /// # Arguments
     ///
-    /// * `market` - Market context with curves and prices
-    /// * `as_of` - Valuation date
-    ///
-    /// # Returns
-    ///
-    /// Present value in the instrument's currency.
-    ///
-    /// Get the market forward price for this contract.
-    ///
-    /// Uses `quoted_forward` if provided, otherwise interpolates from the
-    /// `PriceCurve` referenced by `forward_curve_id`.
-    ///
-    /// # Curve Lookup Order
-    ///
-    /// 1. If `quoted_forward` is set, return it directly
-    /// 2. Look up `PriceCurve` by `forward_curve_id`
-    /// 3. If `spot_id` is set and PriceCurve not found, use cost-of-carry model
+    /// * `market` - Market context supplying the price curve, or the spot
+    ///   scalar and discount curve for the cost-of-carry fallback.
+    /// * `as_of` - Valuation date; decides whether the contract has delivered
+    ///   and anchors the carry discount factor.
     ///
     /// # Errors
     ///
-    /// Returns an error if neither `quoted_forward` nor `PriceCurve` is available.
-    ///
+    /// Returns a validation error for an invalid instrument,
+    /// `InputError::NotFound` when neither `quoted_forward`, the price curve
+    /// nor a `spot_id` is available, and propagates spot or discount-curve
+    /// lookup failures of the carry fallback.
     pub fn forward_price(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         self.validate()?;
-        super::super::forward_price::resolve_forward_price(
-            super::super::forward_price::ForwardPriceRequest {
-                market,
-                as_of,
-                delivery: self.maturity,
-                quoted: self.quoted_forward,
-                forward_curve_id: &self.forward_curve_id,
-                spot_id: self.spot_id.as_deref(),
-                discount_curve_id: &self.discount_curve_id,
+        if let Some(price) = self.quoted_forward {
+            return Ok(price);
+        }
+        let delivered = self.maturity <= as_of;
+        if let Ok(price_curve) = market.get_price_curve(self.forward_curve_id.as_str()) {
+            if delivered {
+                return Ok(price_curve.spot_price());
+            }
+            return price_curve.price_on_date(self.maturity);
+        }
+        if let Some(spot_id) = self.spot_id.as_deref() {
+            let spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(
+                market.get_price(spot_id)?,
+            );
+            if delivered {
+                return Ok(spot);
+            }
+            let disc = market.get_discount(self.discount_curve_id.as_str())?;
+            let df = disc.df_between_dates(as_of, self.maturity)?;
+            return Ok(spot / df);
+        }
+        Err(finstack_quant_core::Error::Input(
+            finstack_quant_core::error::InputError::NotFound {
+                id: format!(
+                    "PriceCurve '{}' not found. \
+                     Use MarketContext::insert_price_curve() to add a commodity forward price curve.",
+                    self.forward_curve_id
+                ),
             },
-        )
+        ))
     }
 
     /// Get the effective notional value at settlement.

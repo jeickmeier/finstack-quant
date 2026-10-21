@@ -250,82 +250,36 @@ impl AsianOption {
             .price_internal(self, market, as_of)
     }
 
-    /// Get the accumulated state (sum, log_sum_product, count) for seasoned options.
-    /// Only considers fixings that are in the fixing schedule and before or on as_of.
+    /// Get the accumulated state `(sum, log_product, count)` of the realized
+    /// fixings on scheduled dates on or before `as_of`.
     ///
-    /// # Non-positive fixings
+    /// Fixings are validated positive by [`Self::validate_past_fixings`], so
+    /// the log-product is always well defined.
     ///
-    /// Non-positive fixings (zero or negative prices) are included in the arithmetic
-    /// sum and count but excluded from the geometric log-product, which would produce
-    /// `-inf` or `NaN`. If any non-positive fixings are encountered, the geometric
-    /// log-product is set to `NEG_INFINITY` to signal that the geometric average is
-    /// undefined, rather than silently computing an incorrect partial product.
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date; only fixings dated on or before it count.
     pub fn accumulated_state(&self, as_of: Date) -> (f64, f64, usize) {
-        let mut sum = 0.0;
-        let mut product_log = 0.0;
-        let mut count = 0;
-        let mut has_non_positive = false;
-
-        for (d, v) in &self.past_fixings {
-            if *d <= as_of && self.fixing_dates.contains(d) {
-                sum += v;
-                if *v > 0.0 {
-                    product_log += v.ln();
-                } else {
-                    has_non_positive = true;
-                }
-                count += 1;
-            }
-        }
-
-        // If any fixing was non-positive, the geometric average is undefined.
-        // Set product_log to NEG_INFINITY so callers using geometric averaging
-        // get a clear signal rather than a silently wrong result.
-        if has_non_positive {
-            product_log = f64::NEG_INFINITY;
-        }
-
-        (sum, product_log, count)
+        accumulated_state(&self.past_fixings, &self.fixing_dates, as_of)
     }
 
     /// Validate that past fixing history exactly covers every scheduled
     /// observation on or before the valuation date.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date; every scheduled fixing on or before it must
+    ///   have a recorded value in `past_fixings`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the instrument structure is invalid
+    /// (see `validate_invariants`) or a scheduled fixing on or before `as_of`
+    /// has no recorded value.
     pub fn validate_past_fixings(&self, as_of: Date) -> finstack_quant_core::Result<()> {
         self.validate_structure()?;
-        let mut scheduled = std::collections::BTreeSet::new();
         for date in &self.fixing_dates {
-            if !scheduled.insert(*date) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "AsianOption '{}' has duplicate scheduled fixing date {}",
-                    self.id, date
-                )));
-            }
-        }
-
-        let mut observed = std::collections::BTreeSet::new();
-        for (date, value) in &self.past_fixings {
-            if !scheduled.contains(date) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "AsianOption '{}' has a past fixing for {}, which is not a scheduled fixing date",
-                    self.id, date
-                )));
-            }
-            if !observed.insert(*date) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "AsianOption '{}' has duplicate past fixing for {}",
-                    self.id, date
-                )));
-            }
-            if !value.is_finite() || *value <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "AsianOption '{}' fixing on {} must be positive and finite, got {}",
-                    self.id, date, value
-                )));
-            }
-        }
-
-        for date in &self.fixing_dates {
-            if *date <= as_of && !observed.contains(date) {
+            if *date <= as_of && !self.past_fixings.iter().any(|(d, _)| d == date) {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "AsianOption '{}' is missing a past fixing for {} as of {}",
                     self.id, date, as_of
@@ -333,6 +287,72 @@ impl AsianOption {
             }
         }
         Ok(())
+    }
+}
+
+/// Sum, log-product and count of the realized fixings that fall on a
+/// scheduled fixing date on or before `as_of`.
+///
+/// Non-positive fixings (allowed for arithmetic commodity averages) enter the
+/// sum and count but not the log-product.
+///
+/// # Arguments
+///
+/// * `past_fixings` - Realized `(date, value)` observations.
+/// * `fixing_dates` - Scheduled fixing dates; fixings on other dates are ignored.
+/// * `as_of` - Valuation date; later fixings are ignored.
+pub(crate) fn accumulated_state(
+    past_fixings: &[(Date, f64)],
+    fixing_dates: &[Date],
+    as_of: Date,
+) -> (f64, f64, usize) {
+    let mut sum = 0.0;
+    let mut product_log = 0.0;
+    let mut count = 0;
+    for (d, v) in past_fixings {
+        if *d <= as_of && fixing_dates.contains(d) {
+            sum += v;
+            if *v > 0.0 {
+                product_log += v.ln();
+            }
+            count += 1;
+        }
+    }
+    (sum, product_log, count)
+}
+
+/// Average of `count` realized fixings under `averaging`, or `None` when no
+/// fixing has been observed.
+///
+/// # Arguments
+///
+/// * `averaging` - Arithmetic (`sum / count`) or geometric (`exp(log_product / count)`).
+/// * `sum` - Sum of the realized fixings.
+/// * `log_product` - Sum of the logs of the realized fixings.
+/// * `count` - Number of fixings the average divides by.
+pub(crate) fn realized_average(
+    averaging: AveragingMethod,
+    sum: f64,
+    log_product: f64,
+    count: usize,
+) -> Option<f64> {
+    (count > 0).then(|| match averaging {
+        AveragingMethod::Arithmetic => sum / count as f64,
+        AveragingMethod::Geometric => (log_product / count as f64).exp(),
+    })
+}
+
+/// Per-unit intrinsic value `max(±(average − strike), 0)` of an average-price option.
+///
+/// # Arguments
+///
+/// * `option_type` - Call pays `average − strike`, put pays `strike − average`.
+/// * `average` - Realized or expected average price.
+/// * `strike` - Strike price in the same units as `average`.
+pub(crate) fn average_intrinsic(option_type: OptionType, average: f64, strike: f64) -> f64 {
+    match option_type {
+        OptionType::Call => (average - strike).max(0.0),
+        OptionType::Put => (strike - average).max(0.0),
     }
 }
 
@@ -382,7 +402,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for AsianOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        self.validate_past_fixings(as_of)?;
         use crate::exotics::asian_option::pricer::{
             AsianOptionAnalyticalGeometricPricer, AsianOptionSemiAnalyticalTwPricer,
         };

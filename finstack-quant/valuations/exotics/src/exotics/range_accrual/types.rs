@@ -277,6 +277,58 @@ impl RangeAccrual {
 }
 
 impl RangeAccrualTerms {
+    /// Check that the supplied historical fixing counts cover every
+    /// observation dated on or before `as_of`.
+    ///
+    /// # Arguments
+    ///
+    /// * `label` - Instrument type named in error messages.
+    /// * `id` - Instrument identifier named in error messages.
+    /// * `as_of` - Valuation date; observations on or before it are historical.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when historical observations exist and
+    /// `past_observations_in_range` or `total_past_observations` is missing,
+    /// the total does not match the historical observation count, or the
+    /// in-range count exceeds the total.
+    pub(crate) fn validate_historical_observations(
+        &self,
+        label: &str,
+        id: &InstrumentId,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<()> {
+        let expected = self
+            .observation_dates
+            .iter()
+            .filter(|&&date| date <= as_of)
+            .count();
+        if expected == 0 {
+            return Ok(());
+        }
+        let in_range = self.past_observations_in_range.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "{label} '{id}' requires past_observations_in_range for {expected} historical observations"
+            ))
+        })?;
+        let total = self.total_past_observations.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "{label} '{id}' requires total_past_observations for {expected} historical observations"
+            ))
+        })?;
+        if total != expected {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{label} '{id}' historical observation count mismatch: supplied {total}, expected {expected}"
+            )));
+        }
+        if in_range > total {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{label} '{id}' past_observations_in_range ({in_range}) exceeds total historical observations ({total})"
+            )));
+        }
+        Ok(())
+    }
+
     /// Return the contractual accrual factor applied to the annual coupon.
     pub fn accrual_year_fraction(&self) -> finstack_quant_core::Result<f64> {
         let accrual_end = self.observation_dates.last().copied().ok_or_else(|| {

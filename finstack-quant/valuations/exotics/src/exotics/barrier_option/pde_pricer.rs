@@ -202,22 +202,19 @@ impl BarrierOptionPdePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<Money, PricingError> {
-        inst.validate_monitoring_state(as_of).map_err(|error| {
-            PricingError::from_core(error, PricingErrorContext::from_instrument(inst))
-        })?;
-        if as_of >= inst.expiry {
-            return super::pricer::price_expired_barrier(inst, market, as_of).map_err(|error| {
-                PricingError::from_core(error, PricingErrorContext::from_instrument(inst))
-            });
-        }
+        let wrap =
+            |error| PricingError::from_core(error, PricingErrorContext::from_instrument(inst));
         if let Some(value) =
-            super::pricer::known_knock_out_value(inst, market, as_of).map_err(|error| {
-                PricingError::from_core(error, PricingErrorContext::from_instrument(inst))
-            })?
+            super::pricer::settled_barrier_value(inst, market, as_of).map_err(wrap)?
         {
             return Ok(value);
         }
         let bs_inputs = super::pricer::collect_barrier_inputs(inst, market, as_of)?;
+        if let Some(value) =
+            super::pricer::knocked_in_vanilla_value(inst, &bs_inputs).map_err(wrap)?
+        {
+            return Ok(value);
+        }
 
         let spot = bs_inputs.spot;
         let q = bs_inputs.q;
@@ -226,26 +223,6 @@ impl BarrierOptionPdePricer {
         let ccy = inst.currency;
 
         let r = bs_inputs.r_eff();
-
-        if inst.observed_barrier_breached == Some(true) {
-            let unit = finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
-                spot,
-                inst.strike,
-                r,
-                q,
-                sigma,
-                t,
-                inst.option_type,
-            );
-            return Money::new(unit * inst.quantity, ccy).map_err(|error| {
-                finstack_quant_valuations_core::pricer::PricingError::from_core(
-                    error,
-                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                        inst,
-                    ),
-                )
-            });
-        }
 
         let barrier_level = inst.barrier;
         let is_call = matches!(

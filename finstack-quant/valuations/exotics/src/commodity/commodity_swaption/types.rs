@@ -19,9 +19,7 @@
 //! - d2 = d1 - sigma*sqrt(T)
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{
-    calendar_by_id_strict, BusinessDayConvention, Date, DayCount, DayCountContext, Tenor,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
@@ -319,21 +317,8 @@ impl CommoditySwaption {
         // Business-day filter consistent with the underlying swap's
         // averaging: weekends out, plus exchange holidays when a calendar
         // is configured.
-        let calendar = self
-            .calendar_id
-            .as_deref()
-            .map(calendar_by_id_strict)
-            .transpose()?;
-        let is_business_day = |date: Date| -> bool {
-            let wd = date.weekday();
-            if wd == time::Weekday::Saturday || wd == time::Weekday::Sunday {
-                return false;
-            }
-            if let Some(cal) = &calendar {
-                return cal.is_business_day(date);
-            }
-            true
-        };
+        let is_business_day =
+            crate::commodity::averaging::business_day_filter(self.calendar_id.as_deref())?;
         // The swap underlying a swaption is forward-starting (underlying_start_date ≥
         // expiry ≥ as_of), so every observation projects from the curve;
         // coverage failures propagate (W-11).
@@ -346,7 +331,7 @@ impl CommoditySwaption {
             let include_end = period.accrual_end == self.underlying_maturity;
             let fwd = crate::commodity::averaging::business_day_average_price(
                 get_price,
-                is_business_day,
+                &is_business_day,
                 period.accrual_start,
                 period.accrual_end,
                 include_end,
@@ -638,9 +623,6 @@ impl CommoditySwaption {
         as_of: Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_core::market_data::bumps::{
-            BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
-        };
         use finstack_quant_valuations_core::instruments::Instrument;
 
         if as_of > self.expiry {
@@ -656,27 +638,18 @@ impl CommoditySwaption {
 
         let pv_base = self.value(market, as_of)?.amount();
 
-        let curve_id = CurveId::new(self.forward_curve_id.as_str());
-        let up = market.bump([MarketBump::Curve {
-            id: curve_id.clone(),
-            spec: BumpSpec {
-                bump_type: BumpType::Parallel,
-                mode: BumpMode::Additive,
-                units: BumpUnits::Percent,
-                value: bump_pct * 100.0,
-            },
-        }])?;
+        let up = crate::commodity::bump_price_curve_pct(
+            market,
+            self.forward_curve_id.as_str(),
+            bump_pct,
+        )?;
         let pv_up = self.value(&up, as_of)?.amount();
 
-        let down = market.bump([MarketBump::Curve {
-            id: curve_id,
-            spec: BumpSpec {
-                bump_type: BumpType::Parallel,
-                mode: BumpMode::Additive,
-                units: BumpUnits::Percent,
-                value: -bump_pct * 100.0,
-            },
-        }])?;
+        let down = crate::commodity::bump_price_curve_pct(
+            market,
+            self.forward_curve_id.as_str(),
+            -bump_pct,
+        )?;
         let pv_down = self.value(&down, as_of)?.amount();
 
         Ok(Some(

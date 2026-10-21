@@ -265,9 +265,7 @@ impl Snowball {
     /// Period `i` accrues over `[boundaries[i], boundaries[i + 1]]`, fixes in
     /// advance at `boundaries[i]` and pays at `boundaries[i + 1]`.
     pub(crate) fn period_boundaries(&self) -> Vec<Date> {
-        std::iter::once(self.start_date)
-            .chain(self.payment_dates.iter().copied())
-            .collect()
+        crate::exotics::hw1f_note::period_boundaries(self.start_date, &self.payment_dates)
     }
 
     /// Compute the coupon for a given period based on the variant.

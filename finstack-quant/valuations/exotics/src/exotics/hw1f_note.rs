@@ -210,3 +210,40 @@ impl<N: Hw1fNote> Pricer for Hw1fNotePricer<N> {
             })
     }
 }
+
+/// Zero-dispersion estimate of a value known exactly (no Monte Carlo
+/// component), reporting the path counts the configured run would have used.
+pub(crate) fn exact_estimate(
+    pv: Money,
+    num_paths: usize,
+    num_simulated_paths: usize,
+) -> MoneyEstimate {
+    MoneyEstimate {
+        mean: pv,
+        stderr: 0.0,
+        ci_95: (pv, pv),
+        num_paths,
+        num_simulated_paths,
+        std_dev: Some(0.0),
+        median: None,
+        percentile_25: None,
+        percentile_75: None,
+        min: Some(pv.amount()),
+        max: Some(pv.amount()),
+    }
+}
+
+/// Exact zero estimate of a note with no remaining cashflows.
+pub(crate) fn zero_estimate(currency: finstack_quant_core::currency::Currency) -> MoneyEstimate {
+    exact_estimate(Money::from((0_i64, currency)), 0, 0)
+}
+
+/// Coupon period boundaries: `start_date` followed by every payment date.
+///
+/// Period `i` accrues over `[boundaries[i], boundaries[i + 1]]`, fixes in
+/// advance at `boundaries[i]` and pays at `boundaries[i + 1]`.
+pub(crate) fn period_boundaries(start_date: Date, payment_dates: &[Date]) -> Vec<Date> {
+    std::iter::once(start_date)
+        .chain(payment_dates.iter().copied())
+        .collect()
+}

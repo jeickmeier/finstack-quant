@@ -58,29 +58,9 @@ impl AsianOptionHestonMcPricer {
         let (hist_sum, hist_prod_log, hist_count) = inst.accumulated_state(as_of);
 
         if t <= 0.0 {
-            // Expired: use realized average
-            let average = if hist_count > 0 {
-                match inst.averaging_method {
-                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic => {
-                        hist_sum / hist_count as f64
-                    }
-                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric => {
-                        (hist_prod_log / hist_count as f64).exp()
-                    }
-                }
-            } else {
-                super::pricer::resolve_spot(inst, market)?
-            };
-
-            let intrinsic = match inst.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (average - inst.strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (inst.strike - average).max(0.0)
-                }
-            };
-            return Ok((Money::new(intrinsic * inst.quantity, inst.currency)?, 0.0));
+            let pv =
+                super::pricer::expired_value(inst, market, hist_sum, hist_prod_log, hist_count)?;
+            return Ok((pv, 0.0));
         }
 
         let disc_curve = market.get_discount(inst.discount_curve_id.as_str())?;
