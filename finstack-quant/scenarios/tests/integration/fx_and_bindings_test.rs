@@ -4,11 +4,11 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{build_periods, Date};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::fx::FxMatrix;
 use finstack_quant_core::money::fx::SimpleFxProvider;
 use finstack_quant_scenarios::{
-    Compounding, CurveKind, ExecutionContext, OperationSpec, RateBindingSpec, ScenarioEngine,
-    ScenarioSpec,
+    CurveKind, ExecutionContext, OperationSpec, RateBindingSpec, ScenarioEngine, ScenarioSpec,
 };
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
 use finstack_quant_statements::FinancialModelSpec;

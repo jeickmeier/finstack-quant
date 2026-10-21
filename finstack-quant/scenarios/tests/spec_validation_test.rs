@@ -1,11 +1,13 @@
 //! Spec validation test tests for scenarios.
 
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::market_data::hierarchy::HierarchyTarget;
 use finstack_quant_core::market_data::hierarchy::ResolutionMode;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_scenarios::{
-    Compounding, CurveKind, HierarchyTarget, InstrumentType, OperationSpec, RateBindingSpec,
-    ScenarioSpec, TenorMatchMode, TimeRollMode,
+    CurveKind, OperationSpec, RateBindingSpec, ScenarioSpec, TenorMatchMode, TimeRollMode,
 };
+use finstack_quant_valuations::pricer::InstrumentType;
 #[test]
 fn scenario_validate_rejects_empty_id() {
     let scenario = ScenarioSpec {

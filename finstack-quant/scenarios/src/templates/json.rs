@@ -1,85 +1,63 @@
-//! JSON document types and loader for stress templates.
+//! JSON document type and loader for the embedded stress templates.
 //!
-//! Defines the serde-facing [`JsonTemplateDocument`] and parsing helpers used
-//! by both the embedded built-in registry and runtime JSON registration paths.
+//! Each built-in template is one [`JsonTemplateDocument`]. Its `metadata` is
+//! the single source of the template's identity and component order.
 
 use crate::{Error, Result, ScenarioSpec, TemplateMetadata};
-use indexmap::{IndexMap, IndexSet};
+use finstack_quant_core::HashSet;
 use serde::{Deserialize, Serialize};
 
+/// Embedded built-in template documents as `(file name, JSON)`, in registry
+/// order. The file name is used only in error messages.
 const EMBEDDED_TEMPLATE_JSONS: [(&str, &str); 5] = [
     (
-        "gfc_2008",
+        "gfc_2008.json",
         include_str!("../../data/templates/gfc_2008.json"),
     ),
     (
-        "covid_2020",
+        "covid_2020.json",
         include_str!("../../data/templates/covid_2020.json"),
     ),
     (
-        "rate_shock_2022",
+        "rate_shock_2022.json",
         include_str!("../../data/templates/rate_shock_2022.json"),
     ),
     (
-        "svb_2023",
+        "svb_2023.json",
         include_str!("../../data/templates/svb_2023.json"),
     ),
     (
-        "ltcm_1998",
+        "ltcm_1998.json",
         include_str!("../../data/templates/ltcm_1998.json"),
     ),
 ];
 
 /// Exact persistence marker for scenario-template documents.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub(crate) enum ScenarioTemplateSchema {
     /// The sole supported scenario-template contract.
     #[serde(rename = "finstack_quant.scenario_template/1")]
     ScenarioTemplate,
 }
 
-/// Return the embedded built-in template JSON payloads.
-pub(crate) fn embedded_template_jsons() -> &'static [(&'static str, &'static str)] {
-    &EMBEDDED_TEMPLATE_JSONS
-}
-
-/// Load and validate all embedded built-in template documents.
+/// Parse and validate every embedded built-in template document.
 pub(crate) fn load_embedded_documents() -> Result<Vec<JsonTemplateDocument>> {
-    embedded_template_jsons()
+    EMBEDDED_TEMPLATE_JSONS
         .iter()
-        .map(|(name, json)| parse_embedded_document(name, json))
+        .map(|(file, json)| parse_embedded_document(file, json))
         .collect()
 }
 
-/// Load and validate a single embedded built-in template document by name.
-#[cfg(test)]
-pub(crate) fn load_embedded_document(name: &str) -> Result<JsonTemplateDocument> {
-    let (_, json) = embedded_template_jsons()
-        .iter()
-        .find(|(candidate_name, _)| *candidate_name == name)
-        .ok_or_else(|| Error::validation(format!("unknown embedded template '{name}'")))?;
-
-    parse_embedded_document(name, json)
-}
-
-fn parse_embedded_document(name: &str, json: &str) -> Result<JsonTemplateDocument> {
+fn parse_embedded_document(file: &str, json: &str) -> Result<JsonTemplateDocument> {
     let document: JsonTemplateDocument = serde_json::from_str(json).map_err(|error| {
         Error::validation(format!(
-            "failed to parse embedded template '{name}': {error}"
+            "failed to parse embedded template '{file}': {error}"
         ))
     })?;
 
-    if document.metadata.id != name {
-        return Err(Error::validation(format!(
-            "embedded template lookup name '{name}' must match metadata.id '{}'",
-            document.metadata.id
-        )));
-    }
-
     document.validate().map_err(|error| match error {
         Error::Validation(message) => Error::validation(format!(
-            "embedded template '{name}' failed validation: {message}"
+            "embedded template '{file}' failed validation: {message}"
         )),
         other => other,
     })?;
@@ -89,191 +67,110 @@ fn parse_embedded_document(name: &str, json: &str) -> Result<JsonTemplateDocumen
 
 /// Serde-facing JSON document for a composable stress template.
 ///
-/// Drives both the embedded built-in loader and runtime JSON registration paths.
+/// `components` holds the component scenarios in `metadata.components`
+/// order; the composite scenario takes its id and name from `metadata` and
+/// its operations from the components in that order.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub(crate) struct JsonTemplateDocument {
     /// Scenario-template schema marker.
     pub(crate) schema: ScenarioTemplateSchema,
-    /// Template metadata shared with the runtime registry layer.
+    /// Template metadata: identity, discovery fields and component order.
     pub(crate) metadata: TemplateMetadata,
-    /// Component scenarios keyed by deterministic component identifier.
-    pub(crate) components: IndexMap<String, ScenarioSpec>,
-    /// Composite scenario identity and ordered component references.
+    /// Component scenarios, in `metadata.components` order.
+    pub(crate) components: Vec<ScenarioSpec>,
+    /// Composite-scenario fields that are not carried by `metadata`.
     pub(crate) composite: JsonCompositeTemplate,
 }
 
 impl JsonTemplateDocument {
-    /// Validate document-level consistency across metadata, components, and composite.
+    /// Check that `components` are exactly the scenarios `metadata.components`
+    /// names, in that order, without duplicates, and that each one is valid.
     pub(crate) fn validate(&self) -> Result<()> {
-        self.composite.validate()?;
-
-        if self.metadata.id != self.composite.id {
-            return Err(Error::validation("metadata.id must match composite.id"));
+        let id = &self.metadata.id;
+        if id.trim().is_empty() {
+            return Err(Error::validation("template metadata.id cannot be empty"));
+        }
+        if self.components.is_empty() {
+            return Err(Error::validation(format!(
+                "template '{id}' has no components"
+            )));
         }
 
-        if self.metadata.components != self.composite.component_ids {
-            return Err(Error::validation(
-                "metadata.components must match component IDs".to_string(),
-            ));
-        }
-
-        let composite_component_ids: IndexSet<&str> = self
-            .composite
-            .component_ids
+        let component_ids: Vec<&str> = self
+            .components
             .iter()
-            .map(String::as_str)
+            .map(|spec| spec.id.as_str())
             .collect();
-
-        for component_id in &self.composite.component_ids {
-            if !self.components.contains_key(component_id) {
-                return Err(Error::validation(format!(
-                    "composite references missing component '{component_id}'"
-                )));
-            }
+        if component_ids != self.metadata.components {
+            return Err(Error::validation(format!(
+                "template '{id}' components {component_ids:?} must match metadata.components \
+                 {:?} in order",
+                self.metadata.components
+            )));
         }
 
-        for (component_key, spec) in &self.components {
-            if component_key != &spec.id {
+        let mut seen = HashSet::default();
+        for spec in &self.components {
+            if !seen.insert(spec.id.as_str()) {
                 return Err(Error::validation(format!(
-                    "component key '{component_key}' must match ScenarioSpec.id '{}'",
+                    "template '{id}' has duplicate component '{}'",
                     spec.id
                 )));
             }
-
-            if !composite_component_ids.contains(component_key.as_str()) {
-                return Err(Error::validation(format!(
-                    "component '{component_key}' is not referenced by composite.component_ids"
-                )));
-            }
-
             spec.validate().map_err(|error| {
                 Error::validation(format!(
-                    "component '{component_key}' failed validation: {error}"
+                    "component '{}' failed validation: {error}",
+                    spec.id
                 ))
             })?;
         }
 
-        if self.components.len() != self.composite.component_ids.len() {
-            return Err(Error::validation(
-                "component map must match composite.component_ids membership".to_string(),
-            ));
-        }
-
         Ok(())
     }
 }
 
-/// Composite scenario identity plus ordered component references.
+/// Composite-scenario fields that differ from the template metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub(crate) struct JsonCompositeTemplate {
-    pub(crate) id: String,
-    #[serde(default)]
-    pub(crate) name: Option<String>,
+    /// Description of the composite scenario.
     #[serde(default)]
     pub(crate) description: Option<String>,
+    /// Composition priority of the composite scenario.
     #[serde(default)]
     pub(crate) priority: i32,
-    pub(crate) component_ids: Vec<String>,
-}
-
-impl JsonCompositeTemplate {
-    /// Create a composite template from top-level identity fields and ordered references.
-    ///
-    /// Only used by tests; production paths construct `JsonCompositeTemplate` via serde.
-    #[cfg(test)]
-    pub(crate) fn new(
-        id: impl Into<String>,
-        name: Option<&str>,
-        description: Option<&str>,
-        priority: i32,
-        component_ids: Vec<String>,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            name: name.map(str::to_string),
-            description: description.map(str::to_string),
-            priority,
-            component_ids,
-        }
-    }
-
-    /// Validate the composite identity and ordered component references.
-    pub(crate) fn validate(&self) -> Result<()> {
-        if self.id.trim().is_empty() {
-            return Err(Error::validation("Scenario ID cannot be empty"));
-        }
-
-        if self.component_ids.is_empty() {
-            return Err(Error::validation("component_ids cannot be empty"));
-        }
-
-        let mut seen = IndexSet::new();
-        for component_id in &self.component_ids {
-            if component_id.trim().is_empty() {
-                return Err(Error::validation("component_ids cannot contain empty IDs"));
-            }
-            if !seen.insert(component_id) {
-                return Err(Error::validation(format!(
-                    "duplicate component_id '{component_id}'"
-                )));
-            }
-        }
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod loader_tests {
     #![allow(clippy::expect_used, clippy::panic)]
 
-    use super::{
-        embedded_template_jsons, load_embedded_document, load_embedded_documents,
-        parse_embedded_document, JsonTemplateDocument,
-    };
-    use crate::OperationSpec;
+    use super::{load_embedded_documents, JsonTemplateDocument, EMBEDDED_TEMPLATE_JSONS};
+    use crate::{OperationSpec, ScenarioSpec};
     use finstack_quant_core::currency::Currency;
 
-    fn composite_component_ids(document: &JsonTemplateDocument) -> Vec<String> {
-        serde_json::to_value(&document.composite).expect("serialize composite")["component_ids"]
-            .as_array()
-            .expect("component_ids should be an array")
-            .iter()
-            .map(|value| {
-                value
-                    .as_str()
-                    .expect("component_id should be a string")
-                    .to_string()
-            })
-            .collect()
+    fn embedded_document(id: &str) -> JsonTemplateDocument {
+        load_embedded_documents()
+            .expect("embedded documents should load")
+            .into_iter()
+            .find(|document| document.metadata.id == id)
+            .unwrap_or_else(|| panic!("embedded template {id} should exist"))
     }
 
-    fn assert_component_order(document: &JsonTemplateDocument, component_ids: &[&str]) {
-        assert_eq!(
-            document.metadata.components,
-            component_ids
-                .iter()
-                .map(|component_id| (*component_id).to_string())
-                .collect::<Vec<_>>()
-        );
-        assert_eq!(
-            composite_component_ids(document),
-            document.metadata.components
-        );
-        let loaded_component_ids: Vec<_> = document.components.keys().cloned().collect();
-        assert_eq!(loaded_component_ids, document.metadata.components);
+    fn component<'a>(document: &'a JsonTemplateDocument, id: &str) -> &'a ScenarioSpec {
+        document
+            .components
+            .iter()
+            .find(|spec| spec.id == id)
+            .unwrap_or_else(|| panic!("component {id} should exist"))
     }
 
     #[test]
-    fn loads_all_embedded_documents() {
+    fn loads_all_embedded_documents_in_registry_order() {
         let documents = load_embedded_documents().expect("embedded documents should load");
 
-        assert_eq!(documents.len(), embedded_template_jsons().len());
-        assert_eq!(documents.len(), 5);
+        assert_eq!(documents.len(), EMBEDDED_TEMPLATE_JSONS.len());
         assert_eq!(
             documents
                 .iter()
@@ -290,142 +187,39 @@ mod loader_tests {
     }
 
     #[test]
-    fn loaded_documents_validate_successfully() {
-        let documents = load_embedded_documents().expect("embedded documents should load");
-
-        for document in documents {
-            document
-                .validate()
-                .expect("embedded document should validate");
+    fn embedded_components_follow_metadata_order() {
+        for document in load_embedded_documents().expect("embedded documents should load") {
+            let id = &document.metadata.id;
+            let expected: Vec<String> = ["rates", "credit", "equity", "vol", "fx"]
+                .iter()
+                .map(|suffix| format!("{id}_{suffix}"))
+                .collect();
+            assert_eq!(document.metadata.components, expected);
+            assert_eq!(
+                document
+                    .components
+                    .iter()
+                    .map(|spec| spec.id.clone())
+                    .collect::<Vec<_>>(),
+                expected
+            );
         }
     }
 
     #[test]
-    fn can_load_named_builtins() {
-        let gfc = load_embedded_document("gfc_2008").expect("gfc document should load");
-        let covid = load_embedded_document("covid_2020").expect("covid document should load");
-        let rate_shock =
-            load_embedded_document("rate_shock_2022").expect("rate shock document should load");
-        let svb = load_embedded_document("svb_2023").expect("svb document should load");
-        let ltcm = load_embedded_document("ltcm_1998").expect("ltcm document should load");
-
-        assert_eq!(gfc.metadata.id, "gfc_2008");
-        assert_eq!(covid.metadata.id, "covid_2020");
-        assert_eq!(rate_shock.metadata.id, "rate_shock_2022");
-        assert_eq!(svb.metadata.id, "svb_2023");
-        assert_eq!(ltcm.metadata.id, "ltcm_1998");
-    }
-
-    #[test]
-    fn missing_embedded_name_errors_cleanly() {
-        let error = load_embedded_document("does_not_exist").expect_err("missing name should fail");
-
-        assert!(matches!(error, crate::Error::Validation(_)));
-        assert!(error
-            .to_string()
-            .contains("unknown embedded template 'does_not_exist'"));
-    }
-
-    #[test]
-    fn rejects_embedded_document_when_lookup_name_does_not_match_metadata_id() {
-        let raw_json = embedded_template_jsons()
-            .iter()
-            .find_map(|(name, json)| (*name == "gfc_2008").then_some(*json))
-            .expect("gfc fixture should exist");
-        let mut value: serde_json::Value = serde_json::from_str(raw_json).expect("parse fixture");
-
-        value["metadata"]["id"] = serde_json::Value::String("other_template".into());
-
-        let error = parse_embedded_document(
-            "gfc_2008",
-            &serde_json::to_string(&value).expect("serialize modified fixture"),
-        )
-        .expect_err("mismatched lookup name should fail");
-
-        assert!(matches!(error, crate::Error::Validation(_)));
-        assert!(error.to_string().contains(
-            "embedded template lookup name 'gfc_2008' must match metadata.id 'other_template'"
-        ));
-    }
-
-    #[test]
-    fn parsed_content_matches_expected_ids_and_component_order() {
-        let gfc = load_embedded_document("gfc_2008").expect("gfc document should load");
-        let covid = load_embedded_document("covid_2020").expect("covid document should load");
-        let rate_shock =
-            load_embedded_document("rate_shock_2022").expect("rate shock document should load");
-        let svb = load_embedded_document("svb_2023").expect("svb document should load");
-        let ltcm = load_embedded_document("ltcm_1998").expect("ltcm document should load");
-
-        assert_component_order(
-            &gfc,
-            &[
-                "gfc_2008_rates",
-                "gfc_2008_credit",
-                "gfc_2008_equity",
-                "gfc_2008_vol",
-                "gfc_2008_fx",
-            ],
-        );
-        assert_component_order(
-            &covid,
-            &[
-                "covid_2020_rates",
-                "covid_2020_credit",
-                "covid_2020_equity",
-                "covid_2020_vol",
-                "covid_2020_fx",
-            ],
-        );
-        assert_component_order(
-            &rate_shock,
-            &[
-                "rate_shock_2022_rates",
-                "rate_shock_2022_credit",
-                "rate_shock_2022_equity",
-                "rate_shock_2022_vol",
-                "rate_shock_2022_fx",
-            ],
-        );
-        assert_component_order(
-            &svb,
-            &[
-                "svb_2023_rates",
-                "svb_2023_credit",
-                "svb_2023_equity",
-                "svb_2023_vol",
-                "svb_2023_fx",
-            ],
-        );
-        assert_component_order(
-            &ltcm,
-            &[
-                "ltcm_1998_rates",
-                "ltcm_1998_credit",
-                "ltcm_1998_equity",
-                "ltcm_1998_vol",
-                "ltcm_1998_fx",
-            ],
-        );
-    }
-
-    #[test]
     fn new_builtins_have_expected_focused_content() {
-        let rate_shock =
-            load_embedded_document("rate_shock_2022").expect("rate shock document should load");
-        let svb = load_embedded_document("svb_2023").expect("svb document should load");
-        let ltcm = load_embedded_document("ltcm_1998").expect("ltcm document should load");
+        let rate_shock = embedded_document("rate_shock_2022");
+        let svb = embedded_document("svb_2023");
+        let ltcm = embedded_document("ltcm_1998");
 
-        let rate_credit = rate_shock
-            .components
-            .get("rate_shock_2022_credit")
-            .expect("rate shock credit component should exist");
-        assert_eq!(rate_credit.operations.len(), 2);
+        assert_eq!(
+            component(&rate_shock, "rate_shock_2022_credit")
+                .operations
+                .len(),
+            2
+        );
 
-        let svb_credit = svb
-            .components
-            .get("svb_2023_credit")
-            .expect("svb credit component should exist");
+        let svb_credit = component(&svb, "svb_2023_credit");
         assert!(svb_credit.operations.iter().any(|operation| {
             matches!(
                 operation,
@@ -435,10 +229,7 @@ mod loader_tests {
             )
         }));
 
-        let ltcm_fx = ltcm
-            .components
-            .get("ltcm_1998_fx")
-            .expect("ltcm fx component should exist");
+        let ltcm_fx = component(&ltcm, "ltcm_1998_fx");
         assert!(ltcm_fx.operations.iter().any(|operation| {
             matches!(
                 operation,
@@ -464,9 +255,8 @@ mod loader_tests {
 mod tests {
     #![allow(clippy::expect_used, clippy::panic)]
 
-    use super::{JsonCompositeTemplate, JsonTemplateDocument};
+    use super::{JsonCompositeTemplate, JsonTemplateDocument, ScenarioTemplateSchema};
     use crate::{CurveKind, OperationSpec, ScenarioSpec, TemplateMetadata};
-    use indexmap::{indexmap, IndexMap};
     use time::macros::date;
 
     fn component_spec(id: &str) -> ScenarioSpec {
@@ -486,220 +276,95 @@ mod tests {
         }
     }
 
-    fn metadata(components: Vec<&str>) -> TemplateMetadata {
-        TemplateMetadata {
-            id: "gfc_2008".into(),
-            name: "Global Financial Crisis 2008".into(),
-            description: "Lehman collapse scenario".into(),
-            event_date: date!(2008 - 09 - 15),
-            asset_classes: vec![crate::AssetClass::Rates, crate::AssetClass::Credit],
-            tags: vec!["systemic".into()],
-            severity: crate::TemplateSeverity::Severe,
-            components: components.into_iter().map(str::to_string).collect(),
-        }
-    }
-
-    fn composite(component_ids: Vec<&str>) -> JsonCompositeTemplate {
-        JsonCompositeTemplate::new(
-            "gfc_2008",
-            Some("Global Financial Crisis 2008"),
-            Some("Composite scenario"),
-            10,
-            component_ids.into_iter().map(str::to_string).collect(),
-        )
-    }
-
-    fn valid_document() -> JsonTemplateDocument {
+    fn document(order: &[&str], components: Vec<ScenarioSpec>) -> JsonTemplateDocument {
         JsonTemplateDocument {
-            schema: crate::templates::json::ScenarioTemplateSchema::ScenarioTemplate,
-            metadata: metadata(vec!["rates", "credit"]),
-            components: indexmap! {
-                "rates".into() => component_spec("rates"),
-                "credit".into() => component_spec("credit"),
+            schema: ScenarioTemplateSchema::ScenarioTemplate,
+            metadata: TemplateMetadata {
+                id: "gfc_2008".into(),
+                name: "Global Financial Crisis 2008".into(),
+                description: "Lehman collapse scenario".into(),
+                event_date: date!(2008 - 09 - 15),
+                asset_classes: vec![crate::AssetClass::Rates, crate::AssetClass::Credit],
+                tags: vec!["systemic".into()],
+                severity: crate::TemplateSeverity::Severe,
+                components: order.iter().map(|id| (*id).to_string()).collect(),
             },
-            composite: composite(vec!["rates", "credit"]),
+            components,
+            composite: JsonCompositeTemplate {
+                description: Some("Composite scenario".into()),
+                priority: 10,
+            },
         }
+    }
+
+    fn validation_message(document: &JsonTemplateDocument) -> String {
+        let error = document.validate().expect_err("validation should fail");
+        assert!(matches!(error, crate::Error::Validation(_)));
+        error.to_string()
     }
 
     #[test]
     fn valid_document_passes_validation() {
-        valid_document()
-            .validate()
-            .expect("document should validate");
+        document(
+            &["rates", "credit"],
+            vec![component_spec("rates"), component_spec("credit")],
+        )
+        .validate()
+        .expect("document should validate");
     }
 
     #[test]
-    fn rejects_mismatched_metadata_and_composite_id() {
-        let mut document = valid_document();
-        document.composite.id = "other_id".into();
-
-        let error = document.validate().expect_err("validation should fail");
-
-        assert!(matches!(error, crate::Error::Validation(_)));
-        assert!(error
-            .to_string()
-            .contains("metadata.id must match composite.id"));
+    fn rejects_components_out_of_metadata_order() {
+        let message = validation_message(&document(
+            &["rates", "credit"],
+            vec![component_spec("credit"), component_spec("rates")],
+        ));
+        assert!(
+            message.contains("must match metadata.components"),
+            "{message}"
+        );
     }
 
     #[test]
-    fn rejects_missing_referenced_component() {
-        let document = JsonTemplateDocument {
-            schema: crate::templates::json::ScenarioTemplateSchema::ScenarioTemplate,
-            metadata: metadata(vec!["rates", "credit"]),
-            components: indexmap! {
-                "rates".into() => component_spec("rates"),
-            },
-            composite: composite(vec!["rates", "credit"]),
-        };
-
-        let error = document.validate().expect_err("validation should fail");
-
-        assert!(matches!(error, crate::Error::Validation(_)));
-        assert!(error.to_string().contains("missing component 'credit'"));
+    fn rejects_component_missing_from_metadata() {
+        let message = validation_message(&document(
+            &["rates", "vol"],
+            vec![component_spec("rates"), component_spec("credit")],
+        ));
+        assert!(
+            message.contains("must match metadata.components"),
+            "{message}"
+        );
     }
 
     #[test]
-    fn rejects_mismatched_metadata_components() {
-        let document = JsonTemplateDocument {
-            schema: crate::templates::json::ScenarioTemplateSchema::ScenarioTemplate,
-            metadata: metadata(vec!["rates", "vol"]),
-            components: indexmap! {
-                "rates".into() => component_spec("rates"),
-                "credit".into() => component_spec("credit"),
-            },
-            composite: composite(vec!["rates", "credit"]),
-        };
-
-        let error = document.validate().expect_err("validation should fail");
-
-        assert!(matches!(error, crate::Error::Validation(_)));
-        assert!(error
-            .to_string()
-            .contains("metadata.components must match component IDs"));
-    }
-
-    #[test]
-    fn rejects_empty_composite_component_ids() {
-        let document = JsonTemplateDocument {
-            schema: crate::templates::json::ScenarioTemplateSchema::ScenarioTemplate,
-            metadata: metadata(vec![]),
-            components: IndexMap::new(),
-            composite: composite(vec![]),
-        };
-
-        let error = document.validate().expect_err("validation should fail");
-
-        assert!(matches!(error, crate::Error::Validation(_)));
-        assert!(error.to_string().contains("component_ids cannot be empty"));
+    fn rejects_empty_components() {
+        let message = validation_message(&document(&[], Vec::new()));
+        assert!(message.contains("has no components"), "{message}");
     }
 
     #[test]
     fn rejects_duplicate_component_ids() {
-        let document = JsonTemplateDocument {
-            schema: crate::templates::json::ScenarioTemplateSchema::ScenarioTemplate,
-            metadata: metadata(vec!["rates", "rates"]),
-            components: indexmap! {
-                "rates".into() => component_spec("rates"),
-            },
-            composite: composite(vec!["rates", "rates"]),
-        };
-
-        let error = document.validate().expect_err("validation should fail");
-
-        assert!(matches!(error, crate::Error::Validation(_)));
-        assert!(error.to_string().contains("duplicate component_id 'rates'"));
+        let message = validation_message(&document(
+            &["rates", "rates"],
+            vec![component_spec("rates"), component_spec("rates")],
+        ));
+        assert!(message.contains("duplicate component 'rates'"), "{message}");
     }
 
     #[test]
     fn validates_component_specs() {
-        let document = JsonTemplateDocument {
-            schema: crate::templates::json::ScenarioTemplateSchema::ScenarioTemplate,
-            metadata: metadata(vec!["rates"]),
-            components: indexmap! {
-                "rates".into() => ScenarioSpec {
-                    id: "rates".into(),
-                    name: Some("Broken component".into()),
-                    description: None,
-                    operations: vec![OperationSpec::CurveParallelBp {
-                        curve_kind: CurveKind::Discount,
-                        curve_id: "".into(),
-                        discount_curve_id: None,
-                        bp: 25.0,
-                    }],
-                    priority: 0,
-                    resolution_mode: Default::default(),
-                    hazard_bump_mode: Default::default(),
-                },
-            },
-            composite: composite(vec!["rates"]),
-        };
-
-        let error = document.validate().expect_err("validation should fail");
-
-        assert!(matches!(error, crate::Error::Validation(_)));
-        assert!(error
-            .to_string()
-            .contains("component 'rates' failed validation"));
-    }
-
-    #[test]
-    fn rejects_component_key_spec_id_mismatch() {
-        let document = JsonTemplateDocument {
-            schema: crate::templates::json::ScenarioTemplateSchema::ScenarioTemplate,
-            metadata: metadata(vec!["rates"]),
-            components: indexmap! {
-                "rates".into() => component_spec("other_rates"),
-            },
-            composite: composite(vec!["rates"]),
-        };
-
-        let error = document.validate().expect_err("validation should fail");
-
-        assert!(matches!(error, crate::Error::Validation(_)));
-        assert!(error
-            .to_string()
-            .contains("component key 'rates' must match ScenarioSpec.id 'other_rates'"));
-    }
-
-    #[test]
-    fn component_membership_validation_is_independent_of_map_insertion_order() {
-        let document = JsonTemplateDocument {
-            schema: crate::templates::json::ScenarioTemplateSchema::ScenarioTemplate,
-            metadata: metadata(vec!["rates", "credit"]),
-            components: indexmap! {
-                "credit".into() => component_spec("credit"),
-                "rates".into() => component_spec("rates"),
-            },
-            composite: composite(vec!["rates", "credit"]),
-        };
-
-        document
-            .validate()
-            .expect("validation should use composite.component_ids ordering");
-    }
-
-    #[test]
-    fn serde_roundtrip_for_document_shape() {
-        let document = valid_document();
-
-        let json = serde_json::to_string(&document).expect("serialize");
-        let value: serde_json::Value = serde_json::from_str(&json).expect("parse serialized json");
-        assert_eq!(value["metadata"]["id"], "gfc_2008");
-        assert_eq!(value["components"]["rates"]["id"], "rates");
-        assert_eq!(value["composite"]["id"], "gfc_2008");
-        assert_eq!(
-            value["composite"]["component_ids"],
-            serde_json::json!(["rates", "credit"])
-        );
-        assert!(value["composite"].get("operations").is_none());
-
-        let roundtrip: JsonTemplateDocument = serde_json::from_str(&json).expect("deserialize");
-        roundtrip.validate().expect("roundtrip should validate");
-
-        let component_ids: Vec<_> = roundtrip.components.keys().cloned().collect();
-        assert_eq!(
-            component_ids,
-            vec!["rates".to_string(), "credit".to_string()]
+        let mut broken = component_spec("rates");
+        broken.operations = vec![OperationSpec::CurveParallelBp {
+            curve_kind: CurveKind::Discount,
+            curve_id: "".into(),
+            discount_curve_id: None,
+            bp: 25.0,
+        }];
+        let message = validation_message(&document(&["rates"], vec![broken]));
+        assert!(
+            message.contains("component 'rates' failed validation"),
+            "{message}"
         );
     }
 }

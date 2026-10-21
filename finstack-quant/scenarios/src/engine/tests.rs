@@ -218,7 +218,7 @@ fn apply_emits_warning_when_hierarchy_target_matches_no_curves() {
     assert!(
         report.warnings.iter().any(|w| matches!(
             w,
-            Warning::HierarchyNoMatch { op_kind, .. } if op_kind == "HierarchyEquityPricePct"
+            Warning::HierarchyNoMatch { op_kind, .. } if op_kind == "hierarchy_equity_price_pct"
         )),
         "expected HierarchyNoMatch warning, got {:?}",
         report.warnings

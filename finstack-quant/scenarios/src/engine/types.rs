@@ -403,7 +403,7 @@ pub struct RollForwardReport {
 ///
 /// # Examples
 /// ```rust
-/// use finstack_quant_scenarios::engine::ApplicationReport;
+/// use finstack_quant_scenarios::ApplicationReport;
 ///
 /// let report = ApplicationReport {
 ///     operations_applied: 3,

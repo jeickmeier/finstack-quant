@@ -325,6 +325,13 @@ fn delivered_inflation_curve_preserves_lag_and_reprices_without_an_override() {
             )
             .expect("calibrate inflation curve");
             assert!(report.success, "{method:?}, {lag}: {report:?}");
+            // Residuals carry the quote id under both methods, never the
+            // hard-coded calibration instrument id.
+            assert_eq!(
+                report.residuals.keys().collect::<Vec<_>>(),
+                vec!["step-0:UK-RPI-ZCIS-5Y:tolerance_ratio"],
+                "{method:?}, {lag}"
+            );
 
             let curve = market.get_inflation_curve("UK-RPI").expect("curve");
             assert_eq!(curve.indexation_lag_months(), expected_months);

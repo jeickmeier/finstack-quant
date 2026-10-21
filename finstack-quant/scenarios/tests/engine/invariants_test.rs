@@ -12,7 +12,7 @@ use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_scenarios::{
-    CurveKind, ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec,
+    CurveKind, ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec, Warning,
 };
 use finstack_quant_statements::FinancialModelSpec;
 use time::macros::date;
@@ -351,6 +351,52 @@ fn test_base_correlation_bounds_after_parallel_shock() {
             corr
         );
     }
+}
+
+#[test]
+fn parallel_base_correlation_clamp_warning_names_the_parallel_op() {
+    let curve = BaseCorrelationCurve::builder("CDX_IG")
+        .knots(vec![(0.03, 0.20), (0.30, 0.70)])
+        .build()
+        .unwrap();
+    let mut market = MarketContext::new().insert(curve);
+    let scenario = ScenarioSpec {
+        id: "parallel_clamp".into(),
+        name: None,
+        description: None,
+        operations: vec![OperationSpec::BaseCorrParallelPts {
+            surface_id: "CDX_IG".into(),
+            points: 0.40,
+        }],
+        priority: 0,
+        resolution_mode: Default::default(),
+        hazard_bump_mode: Default::default(),
+    };
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: None,
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of: date!(2025 - 01 - 01),
+    };
+
+    let report = ScenarioEngine::new().apply(&scenario, &mut ctx).unwrap();
+
+    let details: Vec<&str> = report
+        .warnings
+        .iter()
+        .filter_map(|warning| match warning {
+            Warning::CorrelationClamped { detail, .. } => Some(detail.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(details.len(), 1, "{:?}", report.warnings);
+    assert!(
+        details[0].starts_with("BaseCorrParallelPts on CDX_IG detachment 0.3"),
+        "{}",
+        details[0]
+    );
 }
 
 #[test]
