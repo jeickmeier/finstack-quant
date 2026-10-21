@@ -19,7 +19,6 @@ use std::sync::Arc;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::Result;
-use rust_decimal::prelude::ToPrimitive;
 
 use crate::loan_quotes::{
     all_in_rate_from_schedule, pv_with_discount_margin, solve_discount_margin,
@@ -32,43 +31,9 @@ use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// The facility's settlement schedule, built once per metric context.
 fn cached_schedule(context: &mut MetricContext) -> Result<Arc<CashFlowSchedule>> {
-    if context.internal_schedule.is_none() {
-        let inst = Arc::clone(&context.instrument);
-        let facility = inst
-            .as_any()
-            .downcast_ref::<RevolvingCredit>()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "metric context instrument is not a RevolvingCredit".to_string(),
-                )
-            })?;
-        let schedule = facility.raw_cashflow_schedule(&context.curves, context.as_of)?;
-        context.internal_schedule = Some(Arc::new(schedule));
-    }
-    context
-        .internal_schedule
-        .as_ref()
-        .map(Arc::clone)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "revolving credit schedule was not cached".to_string(),
-            )
-        })
-}
-
-/// Drawn balance on `date`: the deterministic replay after the anchor, or
-/// the anchor balance of a stochastic facility.
-fn drawn_at(facility: &RevolvingCredit, as_of: Date, date: Date) -> Result<f64> {
-    if facility.is_deterministic() {
-        Ok(
-            crate::revolving_credit::cashflow_engine::calculate_drawn_balance_at_date(
-                facility, as_of, date,
-            )?
-            .amount(),
-        )
-    } else {
-        Ok(facility.drawn.amount())
-    }
+    crate::loan_quotes::cached_schedule(context, |facility: &RevolvingCredit, market, as_of| {
+        facility.raw_cashflow_schedule(market, as_of)
+    })
 }
 
 /// Cash interest accrued from the start of the accrual period containing
@@ -138,7 +103,7 @@ fn target_price(
         .market_quotes
         .quoted_clean_price_pct
     {
-        let drawn = drawn_at(facility, as_of, settlement)?;
+        let drawn = super::drawn_at(facility, as_of, settlement)?.amount();
         return Ok(px / 100.0 * drawn + accrued_interest(facility, schedule, settlement)?);
     }
     let disc = context
@@ -168,12 +133,10 @@ fn target_price(
 /// floating-only guard.
 fn contractual_margin(facility: &RevolvingCredit, as_of: Date) -> Result<f64> {
     match &facility.rate {
-        RateSpec::Floating(spec) => Ok(spec.spread_bp.to_f64().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "floating spread_bp is not representable as f64".to_string(),
-            )
-        })? * 1e-4
-            + facility.margin_delta_bp_at(as_of) * 1e-4),
+        RateSpec::Floating(spec) => {
+            Ok(crate::loan_quotes::floating_margin(spec)?
+                + facility.margin_delta_bp_at(as_of) * 1e-4)
+        }
         RateSpec::Fixed { .. } => Err(finstack_quant_core::Error::Validation(format!(
             "RevolvingCredit {}: discount margin is defined for floating-rate facilities only",
             facility.id
@@ -233,7 +196,7 @@ impl MetricCalculator for PriceFromDmCalculator {
                 ))
             })?;
         let settlement = facility.settlement_date(as_of)?;
-        let drawn = drawn_at(facility, as_of, settlement)?;
+        let drawn = super::drawn_at(facility, as_of, settlement)?.amount();
         if drawn <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "RevolvingCredit {}: price_from_dm needs a positive drawn balance at settlement \
@@ -269,9 +232,7 @@ impl MetricCalculator for YtmCalculator {
         let as_of = context.as_of;
         let settlement = facility.settlement_date(as_of)?;
         let target = target_price(facility, &schedule, context, settlement)?;
-        let mut flows = vec![(settlement, -target)];
-        flows.extend(holder_flows(&schedule, settlement));
-        finstack_quant_core::cashflow::xirr_with_daycount(&flows, facility.day_count, None)
+        crate::loan_quotes::ytm_from_schedule(&schedule, settlement, -target, facility.day_count)
     }
 }
 

@@ -1,4 +1,5 @@
-use super::calibration::calibrate_parameter_to_market;
+use super::calibration::{calibrate_parameter_to_market, MertonMcCalibrationOutput};
+use super::MertonMcResult;
 use crate::bond::pricing::time_basis::{
     bond_cashflow_dfs_on_model_grid, bond_model_schedule, implied_flat_discount_rate_from_curve,
     BondModelSchedule,
@@ -65,6 +66,84 @@ fn populate_cashflow_dfs_if_needed(
 /// see the module-level docs for configuration details and metric outputs.
 pub(crate) struct SimpleBondMertonMcPricer;
 
+impl SimpleBondMertonMcPricer {
+    /// Validate, optionally calibrate, and run the Merton MC simulation.
+    ///
+    /// Returns the simulation result and, when the bond's Merton MC config
+    /// requests calibration, the calibration output whose Merton parameters
+    /// the simulation used.
+    fn run(
+        bond: &Bond,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        ctx: &PricingErrorContext,
+    ) -> std::result::Result<(MertonMcResult, Option<MertonMcCalibrationOutput>), PricingError>
+    {
+        bond.validate_merton_mc_embedded_rights()
+            .map_err(|error| PricingError::from_core(error, ctx.clone()))?;
+
+        let base_config = &bond
+            .instrument_pricing_overrides
+            .model_config
+            .merton_mc_config
+            .as_ref()
+            .ok_or_else(|| {
+                PricingError::invalid_input_with_context(
+                    "MertonMc pricer requires instrument_pricing_overrides.model_config.merton_mc_config",
+                    ctx.clone(),
+                )
+            })?
+            .0;
+
+        let disc = market
+            .get_discount(bond.discount_curve_id.as_str())
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+
+        let MertonMcTimeBasis {
+            schedule,
+            discount_rate,
+        } = merton_mc_time_basis(bond, &disc, as_of, ctx)?;
+
+        // ---- Calibration pass (opt-in) ---------------------------------
+        let mut effective_config = base_config.clone();
+        let calibration = if let Some(ref cal_spec) = base_config.calibration {
+            let cal_output = calibrate_parameter_to_market(
+                bond,
+                market,
+                as_of,
+                discount_rate,
+                base_config,
+                cal_spec,
+            )
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+            effective_config.merton = cal_output.calibrated_merton.clone();
+            effective_config.calibration = None;
+            Some(cal_output)
+        } else {
+            None
+        };
+
+        // Build term-structure discount factors from the curve for cashflow
+        // discounting. The flat `discount_rate` is still used for the Merton
+        // risk-neutral drift.
+        populate_cashflow_dfs_if_needed(&mut effective_config, &disc, as_of, &schedule, ctx)?;
+
+        // ---- Full pricing pass -----------------------------------------
+        let mc_result = bond
+            .price_merton_mc(&effective_config, discount_rate, as_of)
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+        Ok((mc_result, calibration))
+    }
+
+    fn error_context(bond: &Bond) -> PricingErrorContext {
+        PricingErrorContext::new()
+            .instrument_id(bond.id())
+            .instrument_type(InstrumentType::Bond)
+            .model(ModelKey::MertonMc)
+            .curve_id(bond.discount_curve_id.as_str())
+    }
+}
+
 impl Pricer for SimpleBondMertonMcPricer {
     fn key(&self) -> PricerKey {
         PricerKey::new(InstrumentType::Bond, ModelKey::MertonMc)
@@ -76,102 +155,11 @@ impl Pricer for SimpleBondMertonMcPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
+        use finstack_quant_valuations_core::metrics::MetricId;
+
         let bond = expect_inst::<Bond>(instrument, InstrumentType::Bond)?;
-
-        let ctx = PricingErrorContext::new()
-            .instrument_id(bond.id())
-            .instrument_type(InstrumentType::Bond)
-            .model(ModelKey::MertonMc)
-            .curve_id(bond.discount_curve_id.as_str());
-
-        bond.validate_merton_mc_embedded_rights()
-            .map_err(|error| PricingError::from_core(error, ctx.clone()))?;
-
-        let mc_override = bond
-            .instrument_pricing_overrides
-            .model_config
-            .merton_mc_config
-            .as_ref()
-            .ok_or_else(|| {
-                PricingError::invalid_input_with_context(
-                    "MertonMc pricer requires instrument_pricing_overrides.model_config.merton_mc_config",
-                    ctx.clone(),
-                )
-            })?;
-
-        let disc = market
-            .get_discount(bond.discount_curve_id.as_str())
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
-
-        let MertonMcTimeBasis {
-            schedule,
-            discount_rate,
-        } = merton_mc_time_basis(bond, &disc, as_of, &ctx)?;
-
-        // ---- Calibration pass (opt-in) ---------------------------------
-        let mut calibration_measures: IndexMap<
-            finstack_quant_valuations_core::metrics::MetricId,
-            f64,
-        > = IndexMap::new();
-        let mut effective_config = if let Some(ref cal_spec) = mc_override.0.calibration {
-            let cal_output = calibrate_parameter_to_market(
-                bond,
-                market,
-                as_of,
-                discount_rate,
-                &mc_override.0,
-                cal_spec,
-            )
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
-
-            calibration_measures.insert(
-                finstack_quant_valuations_core::metrics::MetricId::custom(
-                    "calibrated_debt_barrier",
-                ),
-                cal_output.calibrated_merton.debt_barrier(),
-            );
-            calibration_measures.insert(
-                finstack_quant_valuations_core::metrics::MetricId::custom("calibrated_asset_vol"),
-                cal_output.calibrated_merton.asset_vol(),
-            );
-            calibration_measures.insert(
-                finstack_quant_valuations_core::metrics::MetricId::custom(
-                    "calibration_residual_pv",
-                ),
-                cal_output.residual_pv,
-            );
-            calibration_measures.insert(
-                finstack_quant_valuations_core::metrics::MetricId::custom("calibration_iterations"),
-                cal_output.iterations as f64,
-            );
-            calibration_measures.insert(
-                finstack_quant_valuations_core::metrics::MetricId::custom("calibration_target_pv"),
-                cal_output.target_pv,
-            );
-            calibration_measures.insert(
-                finstack_quant_valuations_core::metrics::MetricId::custom(
-                    "calibration_solved_parameter",
-                ),
-                cal_output.solved_parameter,
-            );
-
-            let mut cfg = mc_override.0.clone();
-            cfg.merton = cal_output.calibrated_merton;
-            cfg.calibration = None;
-            cfg
-        } else {
-            mc_override.0.clone()
-        };
-
-        // Build term-structure discount factors from the curve for cashflow
-        // discounting. The flat `discount_rate` is still used for the Merton
-        // risk-neutral drift.
-        populate_cashflow_dfs_if_needed(&mut effective_config, &disc, as_of, &schedule, &ctx)?;
-
-        // ---- Full pricing pass -----------------------------------------
-        let mc_result = bond
-            .price_merton_mc(&effective_config, discount_rate, as_of)
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+        let ctx = Self::error_context(bond);
+        let (mc_result, calibration) = Self::run(bond, market, as_of, &ctx)?;
 
         let mc_dirty_pct = mc_result.dirty_price_pct;
         let pv_amount = mc_dirty_pct / 100.0 * bond.notional.amount();
@@ -179,37 +167,54 @@ impl Pricer for SimpleBondMertonMcPricer {
             .map_err(|error| PricingError::from_core(error, ctx.clone()))?;
 
         let mut measures = IndexMap::new();
+        measures.insert(MetricId::ExpectedLoss, mc_result.expected_loss);
         measures.insert(
-            finstack_quant_valuations_core::metrics::MetricId::custom("expected_loss"),
-            mc_result.expected_loss,
-        );
-        measures.insert(
-            finstack_quant_valuations_core::metrics::MetricId::custom("default_rate"),
+            MetricId::custom("default_rate"),
             mc_result.path_statistics.default_rate,
         );
         measures.insert(
-            finstack_quant_valuations_core::metrics::MetricId::custom("avg_terminal_notional"),
+            MetricId::custom("avg_terminal_notional"),
             mc_result.path_statistics.avg_terminal_notional,
         );
         measures.insert(
-            finstack_quant_valuations_core::metrics::MetricId::custom("pik_fraction"),
+            MetricId::custom("pik_fraction"),
             mc_result.average_pik_fraction,
         );
+        measures.insert(MetricId::custom("mc_stderr"), mc_result.standard_error);
         measures.insert(
-            finstack_quant_valuations_core::metrics::MetricId::custom("mc_stderr"),
-            mc_result.standard_error,
-        );
-        measures.insert(
-            finstack_quant_valuations_core::metrics::MetricId::custom("unexpected_loss"),
+            MetricId::custom("unexpected_loss"),
             mc_result.unexpected_loss,
         );
         measures.insert(
-            finstack_quant_valuations_core::metrics::MetricId::custom("expected_shortfall_95"),
+            MetricId::custom("expected_shortfall_95"),
             mc_result.expected_shortfall_95,
         );
 
-        for (k, v) in calibration_measures {
-            measures.insert(k, v);
+        if let Some(cal_output) = calibration {
+            measures.insert(
+                MetricId::custom("calibrated_debt_barrier"),
+                cal_output.calibrated_merton.debt_barrier(),
+            );
+            measures.insert(
+                MetricId::custom("calibrated_asset_vol"),
+                cal_output.calibrated_merton.asset_vol(),
+            );
+            measures.insert(
+                MetricId::custom("calibration_residual_pv"),
+                cal_output.residual_pv,
+            );
+            measures.insert(
+                MetricId::custom("calibration_iterations"),
+                cal_output.iterations as f64,
+            );
+            measures.insert(
+                MetricId::custom("calibration_target_pv"),
+                cal_output.target_pv,
+            );
+            measures.insert(
+                MetricId::custom("calibration_solved_parameter"),
+                cal_output.solved_parameter,
+            );
         }
 
         let result = ValuationResult::stamped(bond.id(), as_of, pv);
@@ -223,62 +228,7 @@ impl Pricer for SimpleBondMertonMcPricer {
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<f64, PricingError> {
         let bond = expect_inst::<Bond>(instrument, InstrumentType::Bond)?;
-
-        let ctx = PricingErrorContext::new()
-            .instrument_id(bond.id())
-            .instrument_type(InstrumentType::Bond)
-            .model(ModelKey::MertonMc)
-            .curve_id(bond.discount_curve_id.as_str());
-
-        bond.validate_merton_mc_embedded_rights()
-            .map_err(|error| PricingError::from_core(error, ctx.clone()))?;
-
-        let mc_override = bond
-            .instrument_pricing_overrides
-            .model_config
-            .merton_mc_config
-            .as_ref()
-            .ok_or_else(|| {
-                PricingError::invalid_input_with_context(
-                    "MertonMc pricer requires instrument_pricing_overrides.model_config.merton_mc_config",
-                    ctx.clone(),
-                )
-            })?;
-
-        let disc = market
-            .get_discount(bond.discount_curve_id.as_str())
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
-
-        let MertonMcTimeBasis {
-            schedule,
-            discount_rate,
-        } = merton_mc_time_basis(bond, &disc, as_of, &ctx)?;
-
-        let mut effective_config = if let Some(ref cal_spec) = mc_override.0.calibration {
-            let cal_output = calibrate_parameter_to_market(
-                bond,
-                market,
-                as_of,
-                discount_rate,
-                &mc_override.0,
-                cal_spec,
-            )
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
-
-            let mut cfg = mc_override.0.clone();
-            cfg.merton = cal_output.calibrated_merton;
-            cfg.calibration = None;
-            cfg
-        } else {
-            mc_override.0.clone()
-        };
-
-        populate_cashflow_dfs_if_needed(&mut effective_config, &disc, as_of, &schedule, &ctx)?;
-
-        let mc_result = bond
-            .price_merton_mc(&effective_config, discount_rate, as_of)
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
-
+        let (mc_result, _) = Self::run(bond, market, as_of, &Self::error_context(bond))?;
         Ok(mc_result.dirty_price_pct / 100.0 * bond.notional.amount())
     }
 }

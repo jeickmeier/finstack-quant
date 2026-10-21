@@ -30,12 +30,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         &self,
         model: finstack_quant_valuations_core::pricer::ModelKey,
     ) -> finstack_quant_core::Result<()> {
-        let has_embedded_options = self
-            .call_put
-            .as_ref()
-            .is_some_and(crate::bond::CallPutSchedule::has_options)
-            || self.return_floor.is_some();
-        if has_embedded_options {
+        if self.has_exercise_rights() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "instrument_cashflows: static cashflow rows cannot decompose the \
                  exercise-contingent value of bond '{}' under model '{}'; request the model \
@@ -98,24 +93,11 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         if let Some(credit_curve_id) = &self.credit_curve_id {
             deps.add_credit_curve(credit_curve_id.clone());
         }
-        match &self.cashflow_spec {
-            CashflowSpec::Floating(spec) => {
-                deps.add_forward_curve(spec.rate_spec.forward_curve_id.clone());
-                deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-                    spec.rate_spec.forward_curve_id.as_str(),
-                ));
-            }
-            CashflowSpec::Amortizing { base, .. } => {
-                if let CashflowSpec::Floating(spec) = base.as_ref() {
-                    deps.add_forward_curve(spec.rate_spec.forward_curve_id.clone());
-                    deps.add_series_id(
-                        finstack_quant_core::market_data::fixings::fixing_series_id(
-                            spec.rate_spec.forward_curve_id.as_str(),
-                        ),
-                    );
-                }
-            }
-            _ => {}
+        if let Some(rate_spec) = self.cashflow_spec.floating_rate_spec() {
+            deps.add_forward_curve(rate_spec.forward_curve_id.clone());
+            deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                rate_spec.forward_curve_id.as_str(),
+            ));
         }
         if let Some(call_put) = &self.call_put {
             for option in call_put.calls.iter().chain(&call_put.puts) {
@@ -147,11 +129,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         // Mirrors the guards in `base_value`: the shock is exact only for
         // bonds without embedded options, without an assigned credit curve,
         // and without a price-pinning quote other than `quoted_z_spread`.
-        self.return_floor.is_none()
-            && !self
-                .call_put
-                .as_ref()
-                .is_some_and(super::definitions::CallPutSchedule::has_options)
+        !self.has_exercise_rights()
             && self.credit_curve_id.is_none()
             && !self
                 .instrument_pricing_overrides
@@ -216,11 +194,7 @@ impl Bond {
     /// Reject embedded bondholder or issuer rights that the Merton MC payoff
     /// kernel does not model.
     pub(crate) fn validate_merton_mc_embedded_rights(&self) -> finstack_quant_core::Result<()> {
-        let has_call_put = self
-            .call_put
-            .as_ref()
-            .is_some_and(super::definitions::CallPutSchedule::has_options);
-        if has_call_put || self.return_floor.is_some() {
+        if self.has_exercise_rights() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Merton MC pricing does not support embedded call, put, or return-floor rights for bond '{}'; select model 'tree' for rates-only optionality or 'rates_credit' for joint rates-credit optionality",
                 self.id

@@ -1,6 +1,14 @@
-use finstack_quant_core::dates::{Date, DayCountContext};
+use crate::bond::Bond;
+use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DayCount, DayCountContext, HolidayCalendar, ScheduleBuilder,
+    StubKind, Tenor,
+};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::market_data::term_structures::{
+    DiscountCurve, ForwardCurve, RateCalibrationPillar, RateCalibrationQuote,
+};
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 
 /// Fixed-leg annuity for a bond-style schedule using discount-curve discount factors.
 ///
@@ -258,6 +266,272 @@ fn asset_swap_projection_rate(
     } else {
         fwd.rate_between_dates(start, end, accrual_year_fraction)
     }
+}
+
+/// Swap par rate from `quote_date` to `horizon` used as the I-spread benchmark,
+/// expressed on the bond's yield compounding frequency.
+///
+/// Interpolates the curve's swap calibration quotes when the discount curve
+/// carries them; otherwise builds a proxy fixed leg on the bond's coupon
+/// frequency and day count (annual ACT/ACT for non-fixed coupons) and returns
+/// `(DF(start) − DF(end)) / annuity` on the bond's discount curve.
+///
+/// A swap quote compounds at its own fixed-leg frequency (annual for SOFR
+/// OIS), while the yield it is subtracted from compounds at the bond's coupon
+/// frequency. Each quote is therefore restated before interpolation:
+///
+/// ```text
+/// r_bond = m × ((1 + r_swap / n)^(n / m) − 1)
+/// ```
+///
+/// with `n` the swap's fixed-leg payments per year and `m` the bond's coupon
+/// payments per year. The proxy leg already pays on the bond's frequency.
+///
+/// # Arguments
+///
+/// * `bond` - Bond supplying the yield compounding frequency and the proxy
+///   fixed-leg conventions.
+/// * `disc` - The bond's discount curve, used as the swap curve proxy.
+/// * `quote_date` - Settlement/quote date where the proxy leg starts.
+/// * `horizon` - Workout or maturity date where the proxy leg ends.
+///
+/// # Errors
+///
+/// Returns an error when a swap calibration quote references a rate index
+/// with no registered fixed-leg conventions, or when the proxy fixed leg has
+/// fewer than two schedule dates or a near-zero annuity.
+pub(crate) fn i_spread_par_rate(
+    bond: &Bond,
+    disc: &DiscountCurve,
+    quote_date: Date,
+    horizon: Date,
+) -> finstack_quant_core::Result<f64> {
+    let (day_count, frequency) = match &bond.cashflow_spec {
+        crate::bond::CashflowSpec::Fixed(spec) => {
+            (spec.schedule.day_count, spec.schedule.frequency)
+        }
+        _ => (DayCount::ActAct, Tenor::annual()),
+    };
+    if let Some(par_swap_rate) = interpolated_swap_quote_rate(disc, quote_date, horizon, frequency)?
+    {
+        return Ok(par_swap_rate);
+    }
+    let dates: Vec<Date> = finstack_quant_core::dates::ScheduleBuilder::new(quote_date, horizon)?
+        .frequency(frequency)
+        .stub_rule(StubKind::ShortFront)
+        .build()?
+        .into_iter()
+        .collect();
+    if dates.len() < 2 {
+        return Err(finstack_quant_core::Error::Validation(
+            "I-spread calculation requires at least two fixed-leg schedule dates".to_string(),
+        ));
+    }
+    let (par_swap_rate, annuity) =
+        crate::bond::pricing::quote_conversions::par_rate_and_annuity_from_discount(
+            disc,
+            day_count,
+            Some(frequency),
+            &dates,
+        )?;
+    if annuity.abs() < 1e-12 {
+        return Err(finstack_quant_core::Error::Validation(
+            "I-spread calculation is undefined for near-zero fixed-leg annuity".to_string(),
+        ));
+    }
+    Ok(par_swap_rate)
+}
+
+/// Interpolate the curve's swap calibration quotes at `maturity`, restating
+/// each quote from its fixed-leg frequency to `yield_frequency` first.
+fn interpolated_swap_quote_rate(
+    disc: &DiscountCurve,
+    quote_date: Date,
+    maturity: Date,
+    yield_frequency: Tenor,
+) -> finstack_quant_core::Result<Option<f64>> {
+    let Some(calibration) = disc.rate_calibration() else {
+        return Ok(None);
+    };
+    let yield_periods = yield_frequency.payments_per_year();
+    let mut swap_quotes = Vec::new();
+    for quote in &calibration.quotes {
+        let RateCalibrationQuote::Swap {
+            index_id,
+            pillar,
+            rate,
+            ..
+        } = quote
+        else {
+            continue;
+        };
+        let time = match pillar {
+            RateCalibrationPillar::Tenor(tenor) => tenor.to_years(),
+            RateCalibrationPillar::Date(date) => disc.day_count().year_fraction(
+                disc.base_date(),
+                *date,
+                DayCountContext::default(),
+            )?,
+        };
+        let swap_periods = ConventionRegistry::try_global()?
+            .require_rate_index(index_id)?
+            .default_fixed_leg_frequency
+            .payments_per_year();
+        let restated =
+            yield_periods * ((1.0 + rate / swap_periods).powf(swap_periods / yield_periods) - 1.0);
+        swap_quotes.push((time, restated));
+    }
+    if swap_quotes.len() < 2 {
+        return Ok(None);
+    }
+    swap_quotes.sort_by(|left, right| left.0.total_cmp(&right.0));
+
+    let target = disc.day_count().year_fraction(
+        quote_date,
+        maturity,
+        finstack_quant_core::dates::DayCountContext::default(),
+    )?;
+    if target <= swap_quotes[0].0 {
+        return Ok(Some(swap_quotes[0].1));
+    }
+    for pair in swap_quotes.windows(2) {
+        let (t0, r0) = pair[0];
+        let (t1, r1) = pair[1];
+        if target <= t1 {
+            let weight = (target - t0) / (t1 - t0);
+            return Ok(Some(r0 + weight * (r1 - r0)));
+        }
+    }
+    Ok(swap_quotes.last().map(|(_, rate)| *rate))
+}
+
+/// Coupon PV and independent floating-leg PV/annuity, all per original face
+/// and discounted to the settlement date. Coupon entitlement retains the
+/// original bond accrual periods, including interest earned before settlement.
+pub(crate) fn settlement_asw_components(
+    bond: &Bond,
+    market: &MarketContext,
+    settlement: Date,
+) -> finstack_quant_core::Result<(f64, f64, f64)> {
+    let params = bond.cashflow_spec.schedule();
+    let disc = market.get_discount(&bond.discount_curve_id)?;
+    if settlement >= bond.maturity || bond.notional.amount() <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "ASW requires positive face and remaining payments after settlement".into(),
+        ));
+    }
+    let df_settlement = disc.df_on_date(settlement)?;
+    let schedule = bond.full_cashflow_schedule(market)?;
+    let ex_coupon = bond.accrual_config().ex_coupon;
+    let mut coupon_pv = 0.0;
+    for flow in schedule.get_flows().iter().filter(|flow| {
+        flow.date > settlement && flow.kind.is_interest_like() && flow.kind != CFKind::Pik
+    }) {
+        if let Some(rule) = &ex_coupon {
+            if rule.is_ex_coupon(flow.date, settlement)? {
+                continue;
+            }
+        }
+        coupon_pv += flow.amount.amount() * disc.df_on_date(flow.date)?
+            / df_settlement
+            / bond.notional.amount();
+    }
+    // Forward curve for the asset-swap floating leg; `None` selects the
+    // discount-ratio fallback.
+    let forward = bond
+        .instrument_pricing_overrides
+        .model_config
+        .asw_forward_curve_id
+        .clone()
+        .map(|id| market.get_forward(&id))
+        .transpose()?;
+    let frequency = if let Some(curve) = &forward {
+        Tenor::from_years(curve.tenor(), curve.day_count())?
+    } else {
+        params.frequency
+    };
+    let calendar = finstack_quant_core::dates::calendar_by_id_strict(&params.calendar_id)?;
+    let float_schedule = asw_leg_schedule(
+        settlement,
+        bond.maturity,
+        frequency,
+        StubKind::ShortBack,
+        Some((params.business_day_convention, calendar)),
+    )?;
+    let (float_pv, float_annuity) = if let Some(forward) = forward {
+        floating_leg_pv_and_annuity(
+            disc.as_ref(),
+            forward.as_ref(),
+            forward.day_count(),
+            &float_schedule,
+            0.0,
+            None,
+        )?
+    } else {
+        let annuity = fixed_leg_annuity(
+            disc.as_ref(),
+            disc.day_count(),
+            Some(frequency),
+            &float_schedule,
+        )?;
+        let end = *float_schedule.last().ok_or_else(|| {
+            finstack_quant_core::Error::Validation("ASW has no floating payments".into())
+        })?;
+        (
+            disc.df_on_date(float_schedule[0])? - disc.df_on_date(end)?,
+            annuity,
+        )
+    };
+    let float_annuity = float_annuity / df_settlement;
+    if float_annuity.abs() < 1e-12 {
+        return Err(finstack_quant_core::Error::Validation(
+            "ASW floating-leg annuity is near zero".into(),
+        ));
+    }
+    Ok((coupon_pv, float_pv / df_settlement, float_annuity))
+}
+
+/// Asset-swap leg boundary dates from `start` to `end` on `frequency` rolls.
+///
+/// Dates are generated by [`ScheduleBuilder`] under `stub` and left on the
+/// unadjusted roll grid unless `adjustment` supplies a business-day
+/// convention and calendar, in which case every boundary (start and end
+/// included) is rolled onto a business day.
+///
+/// # Arguments
+///
+/// * `start` - First boundary (quote date or swap effective date).
+/// * `end` - Last boundary (maturity or workout date); must be after `start`.
+/// * `frequency` - Roll frequency of the leg.
+/// * `stub` - Stub rule when `start..end` is not a whole number of periods.
+/// * `adjustment` - Optional business-day convention and calendar applied to
+///   every boundary.
+pub(crate) fn asw_leg_schedule(
+    start: Date,
+    end: Date,
+    frequency: Tenor,
+    stub: StubKind,
+    adjustment: Option<(BusinessDayConvention, &dyn HolidayCalendar)>,
+) -> finstack_quant_core::Result<Vec<Date>> {
+    if start >= end {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "ASW schedule requires start before end: start={start}, end={end}"
+        )));
+    }
+    let dates = ScheduleBuilder::new(start, end)?
+        .frequency(frequency)
+        .stub_rule(stub)
+        .build()?
+        .into_iter();
+    let Some((convention, calendar)) = adjustment else {
+        return Ok(dates.collect());
+    };
+    let mut adjusted = dates
+        .map(|date| finstack_quant_core::dates::adjust(date, convention, calendar))
+        .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+    adjusted.sort();
+    adjusted.dedup();
+    Ok(adjusted)
 }
 
 #[cfg(test)]

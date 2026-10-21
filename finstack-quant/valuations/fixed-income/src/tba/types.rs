@@ -289,28 +289,51 @@ impl AgencyTba {
         if let Some(date) = self.settlement_date {
             return Ok(date);
         }
-        let month = time::Month::try_from(self.settlement_month)
-            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
-        let class = self.effective_settlement_class();
-        finstack_quant_core::dates::sifma_settlement_date_for_class(
-            month,
+        sifma_settlement(
             self.settlement_year,
-            class,
+            self.settlement_month,
+            self.effective_settlement_class(),
         )
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "No published SIFMA settlement date for {:02}/{} and class {:?}",
-                self.settlement_month, self.settlement_year, class
-            ))
-        })
     }
 
     /// Effective settlement class (explicit or inferred from agency + term).
     pub fn effective_settlement_class(&self) -> SifmaSettlementClass {
-        self.settlement_class.unwrap_or_else(|| {
-            SifmaSettlementClass::from_agency_term(self.agency.as_str(), self.term.years())
-        })
+        settlement_class(self.settlement_class, self.agency, self.term)
     }
+}
+
+/// Settlement class `explicit` when set, else inferred from `agency` and
+/// `term`.
+pub(crate) fn settlement_class(
+    explicit: Option<SifmaSettlementClass>,
+    agency: AgencyProgram,
+    term: TbaTerm,
+) -> SifmaSettlementClass {
+    explicit
+        .unwrap_or_else(|| SifmaSettlementClass::from_agency_term(agency.as_str(), term.years()))
+}
+
+/// Published SIFMA settlement date of `class` for the `year`/`month` TBA
+/// settlement month.
+///
+/// # Errors
+///
+/// Returns a validation error for an invalid month or when SIFMA has no
+/// published date for that month and class.
+pub(crate) fn sifma_settlement(
+    year: i32,
+    month: u8,
+    class: SifmaSettlementClass,
+) -> finstack_quant_core::Result<Date> {
+    let calendar_month = time::Month::try_from(month)
+        .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+    finstack_quant_core::dates::sifma_settlement_date_for_class(calendar_month, year, class)
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "No published SIFMA settlement date for {:02}/{} and class {:?}",
+                month, year, class
+            ))
+        })
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for AgencyTba {

@@ -1,10 +1,8 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
 use finstack_quant_valuations_core::constants::numerical::ZERO_TOLERANCE;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
-use std::borrow::Cow;
 
 /// Calculates Macaulay duration for bonds.
 ///
@@ -31,35 +29,14 @@ impl MetricCalculator for MacaulayDurationCalculator {
     }
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let workout = super::context_workout_path(context)?;
         let ytm = context.computed_metric(&MetricId::Ytm)?;
-
         // YTM dependency ensures cashflows are already built and cached
-        let flows = context.require_cashflows()?;
-
-        let bond: &Bond = context.instrument_as()?;
-
-        // Compute quote-date context (settlement date) for yield-based duration
-        let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
-        let (yield_rate, risk_flows, quote_date) =
-            if let Some((workout_yield, workout_flows, workout_quote_date)) = workout {
-                (workout_yield, Cow::Owned(workout_flows), workout_quote_date)
-            } else {
-                (ytm, Cow::Borrowed(flows), quote_ctx.quote_date)
-            };
-
-        // Calculate price from flows using quote_date to ensure consistency with YTM
-        let timed = crate::bond::pricing::quote_conversions::bond_flow_times(
-            bond,
-            risk_flows.as_ref(),
-            quote_date,
-        )?;
-        let price = crate::bond::pricing::quote_conversions::price_from_ytm_timed(
-            &timed,
-            bond.cashflow_spec.frequency(),
+        let super::YieldRiskBasis {
             yield_rate,
-            crate::bond::pricing::quote_conversions::YieldCompounding::Street,
-        )?;
+            timed,
+            price,
+        } = super::yield_risk_basis(context, ytm)?;
+        let bond: &Bond = context.instrument_as()?;
         if price.abs() < ZERO_TOLERANCE {
             return Ok(0.0);
         }

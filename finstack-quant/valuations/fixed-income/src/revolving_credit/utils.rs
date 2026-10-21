@@ -8,6 +8,7 @@ use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, Tenor};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
@@ -18,6 +19,22 @@ use finstack_quant_valuations_core::instruments::pricing::overnight::{
     OvernightProjectionCurve,
 };
 use finstack_quant_valuations_core::instruments::pricing::overnight_conventions;
+
+/// Historical fixing series of a floating-rate facility's index, when the
+/// market carries one; `None` for fixed-rate facilities or a missing series.
+pub(super) fn resolve_fixings<'a>(
+    facility: &RevolvingCredit,
+    market: &'a MarketContext,
+) -> Option<&'a ScalarTimeSeries> {
+    match &facility.rate {
+        RateSpec::Floating(spec) => finstack_quant_core::market_data::fixings::get_fixing_series(
+            market,
+            spec.forward_curve_id.as_ref(),
+        )
+        .ok(),
+        RateSpec::Fixed { .. } => None,
+    }
+}
 
 /// Build the canonical accrual/payment periods for a revolving credit facility.
 ///

@@ -35,8 +35,7 @@ pub(super) fn active_model_consumes_credit(context: &MetricContext, bond: &Bond)
 }
 
 pub(super) fn plain_rate_quote_requires_z_spread(context: &MetricContext, bond: &Bond) -> bool {
-    let has_options =
-        bond.return_floor.is_some() || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+    let has_options = bond.has_exercise_rights();
     bond.instrument_pricing_overrides
         .market_quotes
         .has_price_driver()
@@ -57,8 +56,7 @@ fn bond_risk_view(context: &mut MetricContext) -> finstack_quant_core::Result<Op
         {
             return Ok(None);
         }
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
         let has_credit_curve = active_model_consumes_credit(context, bond)
             && !bond.market_dependencies()?.curves.credit_curves.is_empty();
         (bond.clone(), has_options || has_credit_curve)

@@ -12,7 +12,7 @@
 //!
 //! Returned as a decimal fraction (e.g., 0.25 = 25% volatility).
 
-use crate::convertible::pricing::{calculate_accrued_interest, settlement_dirty_price};
+use crate::convertible::pricing::settlement_dirty_price;
 use crate::convertible::ConvertibleBond;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::{Error, Result};
@@ -24,21 +24,9 @@ impl MetricCalculator for ImpliedVolCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bond: &ConvertibleBond = context.instrument_as()?;
         let as_of = context.as_of;
-        if as_of >= bond.maturity {
+        let Some(target_dirty) = super::quoted_dirty_target(bond, &context.curves, as_of)? else {
             return Ok(0.0);
-        }
-        let quoted_clean_price_pct = bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_clean_price_pct
-            .ok_or_else(|| {
-                Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
-                        .to_string(),
-                })
-            })?;
-        let accrued = calculate_accrued_interest(bond, &context.curves, as_of)?;
-        let target_dirty = quoted_clean_price_pct * bond.notional.amount() / 100.0 + accrued;
+        };
         if !target_dirty.is_finite() || target_dirty <= 0.0 {
             return Err(Error::Validation(
                 "convertible implied volatility requires a finite positive dirty-price target"

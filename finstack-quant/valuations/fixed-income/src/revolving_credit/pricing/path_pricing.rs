@@ -6,10 +6,8 @@ use crate::revolving_credit::cashflow_engine::{
     CashflowEngine, PathAwareCashflowSchedule, ThreeFactorPathData,
 };
 use crate::revolving_credit::types::{DrawRepaySpec, RevolvingCredit};
-use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
@@ -28,20 +26,6 @@ fn has_constant_spread(facility: &RevolvingCredit) -> bool {
             CreditSpreadProcessSpec::Constant(_)
         ),
         None => facility.credit_curve_id.is_none(),
-    }
-}
-
-pub(super) fn resolve_fixings<'a>(
-    facility: &RevolvingCredit,
-    market: &'a MarketContext,
-) -> Option<&'a ScalarTimeSeries> {
-    match &facility.rate {
-        RateSpec::Floating(spec) => finstack_quant_core::market_data::fixings::get_fixing_series(
-            market,
-            spec.forward_curve_id.as_ref(),
-        )
-        .ok(),
-        RateSpec::Fixed { .. } => None,
     }
 }
 
@@ -388,9 +372,7 @@ impl RevolvingCreditPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        let fixings = resolve_fixings(facility, market);
-        let engine = CashflowEngine::new(facility, Some(market), as_of, fixings)?;
-        let schedule = engine.generate_deterministic()?;
+        let schedule = CashflowEngine::deterministic(facility, market, as_of)?;
         let result = Self::price_single_path(facility, market, as_of, schedule)?;
         Ok(result.pv)
     }

@@ -177,12 +177,7 @@ pub(crate) fn price_bond_lsmc(
     config: &BondLsmcConfig,
 ) -> Result<BondLsmcResult> {
     config.validate()?;
-    let has_embedded_options = bond.return_floor.is_some()
-        || bond
-            .call_put
-            .as_ref()
-            .is_some_and(|schedule| schedule.has_options());
-    if has_embedded_options && bond.custom_cashflows.is_some() {
+    if bond.has_exercise_rights() && bond.custom_cashflows.is_some() {
         return Err(Error::Validation(format!(
             "Bond '{}' cannot use custom cashflows with rates-credit LSMC options because the custom schedule does not preserve the contractual reset, accrual, PIK, and exercise-state decomposition",
             bond.id.as_str()

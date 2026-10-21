@@ -351,6 +351,13 @@ impl Bond {
         )
     }
 
+    /// Whether a schedule row is cash the holder receives: excludes non-cash
+    /// PIK capitalization and the negative initial `Notional` funding draw.
+    pub(crate) fn is_holder_cashflow(cf: &finstack_quant_core::cashflow::CashFlow) -> bool {
+        use finstack_quant_core::cashflow::CFKind;
+        cf.kind != CFKind::Pik && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0)
+    }
+
     fn pricing_dated_cashflows_from_schedule_with_boundary(
         &self,
         schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
@@ -363,16 +370,11 @@ impl Bond {
             finstack_quant_core::money::Money,
         )>,
     > {
-        use finstack_quant_core::cashflow::CFKind;
-
         let ex_coupon = self.accrual_config().ex_coupon;
         let mut flows = Vec::with_capacity(schedule.get_flows().len());
         for cf in schedule.get_flows() {
             let after_boundary = cf.date > as_of || (include_as_of && cf.date == as_of);
-            let keep = after_boundary
-                && cf.kind != CFKind::Pik
-                && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0);
-            if !keep {
+            if !(after_boundary && Self::is_holder_cashflow(cf)) {
                 continue;
             }
             if cf.kind.is_interest_like() {
@@ -450,13 +452,7 @@ impl Bond {
     /// True for [`CashflowSpec::Floating`] and for [`CashflowSpec::Amortizing`] when the
     /// base specification is floating.
     pub fn has_floating_coupons(&self) -> bool {
-        match &self.cashflow_spec {
-            CashflowSpec::Floating(_) => true,
-            CashflowSpec::Amortizing { base, .. } => {
-                matches!(base.as_ref(), CashflowSpec::Floating(_))
-            }
-            _ => false,
-        }
+        self.cashflow_spec.floating_rate_spec().is_some()
     }
 
     /// Recursively validate that fixed coupon rates are non-negative.
@@ -493,6 +489,11 @@ impl Bond {
                 }
             }
             CashflowSpec::Amortizing { base, .. } => {
+                if matches!(**base, CashflowSpec::Amortizing { .. }) {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "amortizing cashflow spec cannot nest another amortizing spec".to_string(),
+                    ));
+                }
                 Self::validate_coupon_rate(base)?;
             }
             CashflowSpec::Floating(_) => {

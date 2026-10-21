@@ -114,8 +114,7 @@ impl MetricCalculator for EmbeddedOptionValueCalculator {
         let bond: Bond = context.instrument_as::<Bond>()?.clone();
 
         // If bond has no embedded options, return 0
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
 
         if !has_options {
             return Ok(0.0);

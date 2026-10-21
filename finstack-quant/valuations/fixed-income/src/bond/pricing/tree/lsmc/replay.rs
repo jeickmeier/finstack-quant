@@ -591,7 +591,7 @@ impl ReplayTemplate {
         } = *inputs;
         let grid_day_count = DayCount::Act365F;
         let terminal_step = times.len() - 1;
-        let floating_spec = floating_coupon_spec(bond);
+        let floating_spec = bond.cashflow_spec.floating_coupon_spec();
         let mut dynamic_groups = BTreeMap::<(Date, Date, Date), FloatingBuild>::new();
         let mut dynamic_flow_indices = BTreeSet::new();
         if let Some(spec) = floating_spec {

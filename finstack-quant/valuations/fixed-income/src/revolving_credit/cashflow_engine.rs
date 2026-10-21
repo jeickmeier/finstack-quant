@@ -202,6 +202,17 @@ impl<'a> CashflowEngine<'a> {
         })
     }
 
+    /// Deterministic schedule of `facility` on `market`, with the index's
+    /// historical fixings applied to resets before `as_of`.
+    pub(crate) fn deterministic(
+        facility: &'a RevolvingCredit,
+        market: &'a MarketContext,
+        as_of: Date,
+    ) -> Result<PathAwareCashflowSchedule> {
+        let fixings = super::utils::resolve_fixings(facility, market);
+        Self::new(facility, Some(market), as_of, fixings)?.generate_deterministic()
+    }
+
     /// Generate deterministic cashflows (no path data).
     ///
     /// Uses the facility's `DrawRepaySpec::Deterministic` events to construct
@@ -386,21 +397,12 @@ impl<'a> CashflowEngine<'a> {
 
             // Accumulators for aggregated accruals
             let mut total_interest = Money::from((0_i64, ccy));
-            let mut total_commitment_fee = Money::from((0_i64, ccy));
-            let mut total_usage_fee = Money::from((0_i64, ccy));
-            let mut total_facility_fee = Money::from((0_i64, ccy));
-            let mut total_lc_fee = Money::from((0_i64, ccy));
-            let mut total_fronting_fee = Money::from((0_i64, ccy));
-            let mut weighted_lc_fee_rate = 0.0;
-            let mut weighted_fronting_fee_rate = 0.0;
+            let mut fees = FeeAccrual::new(ccy);
             let mut total_accrual = 0.0;
             let mut reset_date_opt: Option<Date> = None;
 
             // Track weighted average rates for this period
             let mut weighted_interest_rate = 0.0;
-            let mut weighted_commitment_fee_rate = 0.0;
-            let mut weighted_usage_fee_rate = 0.0;
-            let mut weighted_facility_fee_rate = 0.0;
 
             for window in timeline.windows(2) {
                 let sub_start = window[0];
@@ -553,46 +555,18 @@ impl<'a> CashflowEngine<'a> {
                 };
                 weighted_interest_rate += interest_rate * dt;
 
-                let commitment_fee_bp = self
-                    .facility
-                    .fees
-                    .commitment_fee_bp_at(utilization, sub_start)?;
-                if commitment_fee_bp > 0.0 {
-                    let commitment_fee =
-                        current_undrawn.checked_mul_f64(commitment_fee_bp * 1e-4 * dt)?;
-                    total_commitment_fee = total_commitment_fee.checked_add(commitment_fee)?;
-                    weighted_commitment_fee_rate += (commitment_fee_bp * 1e-4) * dt;
-                }
-
-                let usage_fee_bp = self.facility.fees.usage_fee_bp_at(utilization, sub_start)?;
-                if usage_fee_bp > 0.0 {
-                    let usage_fee = current_balance.checked_mul_f64(usage_fee_bp * 1e-4 * dt)?;
-                    total_usage_fee = total_usage_fee.checked_add(usage_fee)?;
-                    weighted_usage_fee_rate += (usage_fee_bp * 1e-4) * dt;
-                }
-
-                let facility_fee_bp = self.facility.fees.facility_fee_bp_at(sub_start);
-                if facility_fee_bp > 0.0 {
-                    let facility_fee = commitment.checked_mul_f64(facility_fee_bp * 1e-4 * dt)?;
-                    total_facility_fee = total_facility_fee.checked_add(facility_fee)?;
-                    weighted_facility_fee_rate += (facility_fee_bp * 1e-4) * dt;
-                }
-
-                if lc_outstanding.amount() > 0.0 {
-                    let lc_fee_bp = self.facility.lc_fee_bp_at(sub_start);
-                    if lc_fee_bp > 0.0 {
-                        total_lc_fee = total_lc_fee
-                            .checked_add(lc_outstanding.checked_mul_f64(lc_fee_bp * 1e-4 * dt)?)?;
-                        weighted_lc_fee_rate += lc_fee_bp * 1e-4 * dt;
-                    }
-                    let fronting_bp = self.facility.fronting_fee_bp();
-                    if fronting_bp > 0.0 {
-                        total_fronting_fee = total_fronting_fee.checked_add(
-                            lc_outstanding.checked_mul_f64(fronting_bp * 1e-4 * dt)?,
-                        )?;
-                        weighted_fronting_fee_rate += fronting_bp * 1e-4 * dt;
-                    }
-                }
+                fees.accrue(
+                    self.facility,
+                    utilization,
+                    sub_start,
+                    &FeeBalances {
+                        drawn: current_balance,
+                        undrawn: current_undrawn,
+                        commitment,
+                        lc_outstanding,
+                    },
+                    dt,
+                )?;
 
                 // Apply events at sub_end (but not at period_end - those happen after interest)
                 if sub_end != period_end {
@@ -617,23 +591,6 @@ impl<'a> CashflowEngine<'a> {
             } else {
                 None
             };
-            let avg_commitment_fee_rate =
-                if total_accrual > 0.0 && weighted_commitment_fee_rate > 0.0 {
-                    Some(weighted_commitment_fee_rate / total_accrual)
-                } else {
-                    None
-                };
-            let avg_usage_fee_rate = if total_accrual > 0.0 && weighted_usage_fee_rate > 0.0 {
-                Some(weighted_usage_fee_rate / total_accrual)
-            } else {
-                None
-            };
-            let avg_facility_fee_rate = if total_accrual > 0.0 && weighted_facility_fee_rate > 0.0 {
-                Some(weighted_facility_fee_rate / total_accrual)
-            } else {
-                None
-            };
-
             let money_zero = finstack_quant_core::config::ZeroKind::Money(ccy);
             if !rc.is_effectively_zero(total_interest.amount(), money_zero) {
                 flows.push(CashFlow::new(
@@ -649,59 +606,7 @@ impl<'a> CashflowEngine<'a> {
                 ));
             }
 
-            if !rc.is_effectively_zero(total_commitment_fee.amount(), money_zero) {
-                flows.push(CashFlow::new(
-                    payment_date,
-                    None,
-                    total_commitment_fee,
-                    CFKind::CommitmentFee,
-                    total_accrual,
-                    avg_commitment_fee_rate,
-                ));
-            }
-
-            if !rc.is_effectively_zero(total_usage_fee.amount(), money_zero) {
-                flows.push(CashFlow::new(
-                    payment_date,
-                    None,
-                    total_usage_fee,
-                    CFKind::UsageFee,
-                    total_accrual,
-                    avg_usage_fee_rate,
-                ));
-            }
-
-            if !rc.is_effectively_zero(total_facility_fee.amount(), money_zero) {
-                flows.push(CashFlow::new(
-                    payment_date,
-                    None,
-                    total_facility_fee,
-                    CFKind::FacilityFee,
-                    total_accrual,
-                    avg_facility_fee_rate,
-                ));
-            }
-
-            for (amount, kind, weighted) in [
-                (total_lc_fee, CFKind::LcFee, weighted_lc_fee_rate),
-                (
-                    total_fronting_fee,
-                    CFKind::FrontingFee,
-                    weighted_fronting_fee_rate,
-                ),
-            ] {
-                if !rc.is_effectively_zero(amount.amount(), money_zero) {
-                    let rate = (total_accrual > 0.0).then(|| weighted / total_accrual);
-                    flows.push(CashFlow::new(
-                        payment_date,
-                        None,
-                        amount,
-                        kind,
-                        total_accrual,
-                        rate,
-                    ));
-                }
-            }
+            fees.emit(&mut flows, payment_date, total_accrual, &rc);
         }
 
         // Add principal flows from draw/repay events
@@ -722,14 +627,7 @@ impl<'a> CashflowEngine<'a> {
             }
         }
 
-        // Commitment reduction fees on step-downs and scheduled fixed fees
-        // (amendment, waiver, extension) after the valuation date.
-        for (date, fee) in self.facility.commitment_step_fees(self.as_of)? {
-            flows.push(CashFlow::new(date, None, fee, CFKind::Fee, 0.0, None));
-        }
-        for (date, fee) in self.facility.scheduled_fees_after(self.as_of) {
-            flows.push(CashFlow::new(date, None, fee, CFKind::Fee, 0.0, None));
-        }
+        self.push_scheduled_fees(&mut flows)?;
 
         // Add terminal repayment. Same validated replay as the period
         // balances — maturity-dated events are boundary events too.
@@ -927,18 +825,9 @@ impl<'a> CashflowEngine<'a> {
             let idx_end = observation_index(period_end)?;
 
             let mut interest = Money::from((0_i64, ccy));
-            let mut commitment_fee = Money::from((0_i64, ccy));
-            let mut usage_fee = Money::from((0_i64, ccy));
-            let mut facility_fee = Money::from((0_i64, ccy));
-            let mut lc_fee = Money::from((0_i64, ccy));
-            let mut fronting_fee = Money::from((0_i64, ccy));
+            let mut fees = FeeAccrual::new(ccy);
             let mut accrual = 0.0;
             let mut weighted_rate = 0.0;
-            let mut weighted_commitment_bp = 0.0;
-            let mut weighted_usage_bp = 0.0;
-            let mut weighted_facility_bp = 0.0;
-            let mut weighted_lc_bp = 0.0;
-            let mut weighted_fronting_bp = 0.0;
             let mut first_fixing: Option<Date> = None;
             // Overnight all-in rate for the period and the margin it was
             // projected with.
@@ -1101,49 +990,19 @@ impl<'a> CashflowEngine<'a> {
                 // Fees on the same average balances; tiers evaluated on the
                 // sub-interval's average utilization to avoid boundary
                 // artifacts.
-                let commitment_bp = self
-                    .facility
-                    .fees
-                    .commitment_fee_bp_at(tier_utilization, sub_start)?;
-                if commitment_bp > 0.0 {
-                    commitment_fee = commitment_fee.checked_add(
-                        undrawn_balance.checked_mul_f64(commitment_bp * 1e-4 * sub_dt)?,
-                    )?;
-                    weighted_commitment_bp += commitment_bp * 1e-4 * sub_dt;
-                }
-                let usage_bp = self
-                    .facility
-                    .fees
-                    .usage_fee_bp_at(tier_utilization, sub_start)?;
-                if usage_bp > 0.0 {
-                    usage_fee = usage_fee
-                        .checked_add(drawn_balance.checked_mul_f64(usage_bp * 1e-4 * sub_dt)?)?;
-                    weighted_usage_bp += usage_bp * 1e-4 * sub_dt;
-                }
-                let facility_bp = self.facility.fees.facility_fee_bp_at(sub_start);
-                if facility_bp > 0.0 {
-                    facility_fee = facility_fee
-                        .checked_add(commitment.checked_mul_f64(facility_bp * 1e-4 * sub_dt)?)?;
-                    weighted_facility_bp += facility_bp * 1e-4 * sub_dt;
-                }
-                if lc_outstanding.amount() > 0.0 {
-                    let lc_bp = self.facility.lc_fee_bp_at(sub_start);
-                    if lc_bp > 0.0 {
-                        lc_fee = lc_fee
-                            .checked_add(lc_outstanding.checked_mul_f64(lc_bp * 1e-4 * sub_dt)?)?;
-                        weighted_lc_bp += lc_bp * 1e-4 * sub_dt;
-                    }
-                    let fronting_bp = self.facility.fronting_fee_bp();
-                    if fronting_bp > 0.0 {
-                        fronting_fee = fronting_fee.checked_add(
-                            lc_outstanding.checked_mul_f64(fronting_bp * 1e-4 * sub_dt)?,
-                        )?;
-                        weighted_fronting_bp += fronting_bp * 1e-4 * sub_dt;
-                    }
-                }
+                fees.accrue(
+                    self.facility,
+                    tier_utilization,
+                    sub_start,
+                    &FeeBalances {
+                        drawn: drawn_balance,
+                        undrawn: undrawn_balance,
+                        commitment,
+                        lc_outstanding,
+                    },
+                    sub_dt,
+                )?;
             }
-
-            let avg = |weighted: f64| (accrual > 0.0 && weighted > 0.0).then(|| weighted / accrual);
 
             if payment_date > self.as_of {
                 if !rc.is_effectively_zero(interest.amount(), ZeroKind::Money(ccy)) {
@@ -1159,28 +1018,7 @@ impl<'a> CashflowEngine<'a> {
                         (accrual > 0.0).then(|| weighted_rate / accrual),
                     ));
                 }
-                for (amount, kind, rate) in [
-                    (
-                        commitment_fee,
-                        CFKind::CommitmentFee,
-                        avg(weighted_commitment_bp),
-                    ),
-                    (usage_fee, CFKind::UsageFee, avg(weighted_usage_bp)),
-                    (facility_fee, CFKind::FacilityFee, avg(weighted_facility_bp)),
-                    (lc_fee, CFKind::LcFee, avg(weighted_lc_bp)),
-                    (fronting_fee, CFKind::FrontingFee, avg(weighted_fronting_bp)),
-                ] {
-                    if !rc.is_effectively_zero(amount.amount(), ZeroKind::Money(ccy)) {
-                        flows.push(CashFlow::new(
-                            payment_date,
-                            None,
-                            amount,
-                            kind,
-                            accrual,
-                            rate,
-                        ));
-                    }
-                }
+                fees.emit(&mut flows, payment_date, accrual, &rc);
             }
 
             // Principal leg: the change of the drawn balance `C(t) · u(t)`
@@ -1223,14 +1061,7 @@ impl<'a> CashflowEngine<'a> {
             }
         }
 
-        // Commitment reduction fees on step-downs and scheduled fixed fees
-        // (amendment, waiver, extension) after the valuation date.
-        for (date, fee) in self.facility.commitment_step_fees(self.as_of)? {
-            flows.push(CashFlow::new(date, None, fee, CFKind::Fee, 0.0, None));
-        }
-        for (date, fee) in self.facility.scheduled_fees_after(self.as_of) {
-            flows.push(CashFlow::new(date, None, fee, CFKind::Fee, 0.0, None));
-        }
+        self.push_scheduled_fees(&mut flows)?;
 
         // Terminal repayment of outstanding balance
         let final_balance = Money::new(prev_balance, ccy)?;
@@ -1261,6 +1092,162 @@ impl<'a> CashflowEngine<'a> {
                 meta: self.schedule_meta(),
             },
         ))
+    }
+
+    /// Append the commitment-reduction fees on step-downs and the scheduled
+    /// fixed fees (amendment, waiver, extension) dated after `as_of`.
+    fn push_scheduled_fees(&self, flows: &mut Vec<CashFlow>) -> Result<()> {
+        for (date, fee) in self.facility.commitment_step_fees(self.as_of)? {
+            flows.push(CashFlow::new(date, None, fee, CFKind::Fee, 0.0, None));
+        }
+        for (date, fee) in self.facility.scheduled_fees_after(self.as_of) {
+            flows.push(CashFlow::new(date, None, fee, CFKind::Fee, 0.0, None));
+        }
+        Ok(())
+    }
+}
+
+/// Balances a sub-interval's fees accrue on.
+struct FeeBalances {
+    /// Drawn balance (usage-fee base).
+    drawn: Money,
+    /// Undrawn availability net of letters of credit (commitment-fee base).
+    undrawn: Money,
+    /// Commitment in force (facility-fee base).
+    commitment: Money,
+    /// Letters of credit outstanding (LC and fronting fee base).
+    lc_outstanding: Money,
+}
+
+/// Per-period fee accrual shared by the deterministic and path engines:
+/// accrued amounts and `rate × dt` sums for the commitment, usage, facility,
+/// LC and fronting fees.
+struct FeeAccrual {
+    commitment: Money,
+    usage: Money,
+    facility: Money,
+    lc: Money,
+    fronting: Money,
+    weighted_commitment: f64,
+    weighted_usage: f64,
+    weighted_facility: f64,
+    weighted_lc: f64,
+    weighted_fronting: f64,
+}
+
+impl FeeAccrual {
+    fn new(ccy: finstack_quant_core::currency::Currency) -> Self {
+        let zero = Money::from((0_i64, ccy));
+        Self {
+            commitment: zero,
+            usage: zero,
+            facility: zero,
+            lc: zero,
+            fronting: zero,
+            weighted_commitment: 0.0,
+            weighted_usage: 0.0,
+            weighted_facility: 0.0,
+            weighted_lc: 0.0,
+            weighted_fronting: 0.0,
+        }
+    }
+
+    /// Accrue every fee over a sub-interval of year fraction `dt` starting on
+    /// `sub_start`, with tiers evaluated at `utilization`.
+    fn accrue(
+        &mut self,
+        facility: &RevolvingCredit,
+        utilization: f64,
+        sub_start: Date,
+        balances: &FeeBalances,
+        dt: f64,
+    ) -> Result<()> {
+        let commitment_bp = facility.fees.commitment_fee_bp_at(utilization, sub_start)?;
+        if commitment_bp > 0.0 {
+            self.commitment = self.commitment.checked_add(
+                balances
+                    .undrawn
+                    .checked_mul_f64(commitment_bp * 1e-4 * dt)?,
+            )?;
+            self.weighted_commitment += commitment_bp * 1e-4 * dt;
+        }
+        let usage_bp = facility.fees.usage_fee_bp_at(utilization, sub_start)?;
+        if usage_bp > 0.0 {
+            self.usage = self
+                .usage
+                .checked_add(balances.drawn.checked_mul_f64(usage_bp * 1e-4 * dt)?)?;
+            self.weighted_usage += usage_bp * 1e-4 * dt;
+        }
+        let facility_bp = facility.fees.facility_fee_bp_at(sub_start);
+        if facility_bp > 0.0 {
+            self.facility = self.facility.checked_add(
+                balances
+                    .commitment
+                    .checked_mul_f64(facility_bp * 1e-4 * dt)?,
+            )?;
+            self.weighted_facility += facility_bp * 1e-4 * dt;
+        }
+        if balances.lc_outstanding.amount() > 0.0 {
+            let lc_bp = facility.lc_fee_bp_at(sub_start);
+            if lc_bp > 0.0 {
+                self.lc = self
+                    .lc
+                    .checked_add(balances.lc_outstanding.checked_mul_f64(lc_bp * 1e-4 * dt)?)?;
+                self.weighted_lc += lc_bp * 1e-4 * dt;
+            }
+            let fronting_bp = facility.fronting_fee_bp();
+            if fronting_bp > 0.0 {
+                self.fronting = self.fronting.checked_add(
+                    balances
+                        .lc_outstanding
+                        .checked_mul_f64(fronting_bp * 1e-4 * dt)?,
+                )?;
+                self.weighted_fronting += fronting_bp * 1e-4 * dt;
+            }
+        }
+        Ok(())
+    }
+
+    /// Append one non-zero flow per fee, paid on `payment_date` over `accrual`
+    /// years, with its time-weighted average rate.
+    fn emit(
+        self,
+        flows: &mut Vec<CashFlow>,
+        payment_date: Date,
+        accrual: f64,
+        rc: &RoundingContext,
+    ) {
+        let avg = |weighted: f64| (accrual > 0.0 && weighted > 0.0).then(|| weighted / accrual);
+        for (amount, kind, rate) in [
+            (
+                self.commitment,
+                CFKind::CommitmentFee,
+                avg(self.weighted_commitment),
+            ),
+            (self.usage, CFKind::UsageFee, avg(self.weighted_usage)),
+            (
+                self.facility,
+                CFKind::FacilityFee,
+                avg(self.weighted_facility),
+            ),
+            (self.lc, CFKind::LcFee, avg(self.weighted_lc)),
+            (
+                self.fronting,
+                CFKind::FrontingFee,
+                avg(self.weighted_fronting),
+            ),
+        ] {
+            if !rc.is_effectively_zero(amount.amount(), ZeroKind::Money(amount.currency())) {
+                flows.push(CashFlow::new(
+                    payment_date,
+                    None,
+                    amount,
+                    kind,
+                    accrual,
+                    rate,
+                ));
+            }
+        }
     }
 }
 

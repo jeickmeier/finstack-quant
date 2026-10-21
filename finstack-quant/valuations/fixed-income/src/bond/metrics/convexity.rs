@@ -1,6 +1,5 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
 use finstack_quant_valuations_core::constants::numerical::ZERO_TOLERANCE;
 use finstack_quant_valuations_core::instruments::BondRiskBasis;
@@ -40,8 +39,7 @@ impl MetricCalculator for ConvexityCalculator {
         let Ok(bond) = context.instrument_as::<Bond>() else {
             return Cow::Borrowed(self.dependencies());
         };
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
             Cow::Borrowed(&[])
         } else {
@@ -54,43 +52,23 @@ impl MetricCalculator for ConvexityCalculator {
 
         // Callable/OAS model risk is opt-in. The default matches Bloomberg YAS
         // Workout risk: quoted-yield convexity on maturity/workout cashflows.
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
             return Ok(
                 super::effective::effective_duration_convexity(bond, context, None)?.convexity
                     / 100.0,
             );
         }
-        let workout = super::context_workout_path(context)?;
-        let bond: &Bond = context.instrument_as()?;
-
         let ytm = context.computed_metric(&MetricId::Ytm)?;
-
         // YTM dependency ensures cashflows are already built and cached
-        let flows = context.require_cashflows()?;
-
+        let super::YieldRiskBasis {
+            yield_rate,
+            timed,
+            price,
+        } = super::yield_risk_basis(context, ytm)?;
+        let bond: &Bond = context.instrument_as()?;
         let comp = crate::bond::pricing::quote_conversions::YieldCompounding::Street;
         let frequency = bond.cashflow_spec.frequency();
-
-        // Compute quote-date context (settlement date) for yield-based convexity
-        let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
-        let (yield_rate, risk_flows, quote_date) =
-            if let Some((workout_yield, workout_flows, workout_quote_date)) = workout {
-                (workout_yield, Cow::Owned(workout_flows), workout_quote_date)
-            } else {
-                (ytm, Cow::Borrowed(flows), quote_ctx.quote_date)
-            };
-
-        // Calculate price from flows using quote_date to ensure consistency with YTM
-        let timed = crate::bond::pricing::quote_conversions::bond_flow_times(
-            bond,
-            risk_flows.as_ref(),
-            quote_date,
-        )?;
-        let price = crate::bond::pricing::quote_conversions::price_from_ytm_timed(
-            &timed, frequency, yield_rate, comp,
-        )?;
         if price.abs() < ZERO_TOLERANCE {
             return Ok(0.0);
         }

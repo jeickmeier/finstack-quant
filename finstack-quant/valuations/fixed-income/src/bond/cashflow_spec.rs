@@ -467,6 +467,19 @@ impl CashflowSpec {
         }
     }
 
+    /// Mutable schedule conventions of the coupon leg (the base leg for
+    /// amortizing specs).
+    pub(crate) fn schedule_mut(
+        &mut self,
+    ) -> &mut finstack_quant_cashflows::builder::ScheduleParams {
+        match self {
+            Self::Fixed(spec) => &mut spec.schedule,
+            Self::Floating(spec) => &mut spec.schedule,
+            Self::StepUp(spec) => &mut spec.schedule,
+            Self::Amortizing { base, .. } => base.schedule_mut(),
+        }
+    }
+
     /// Convert the coupon leg to pay entirely in cash.
     ///
     /// Sets `coupon_type` to [`CouponType::Cash`] on the fixed, floating or
@@ -485,16 +498,20 @@ impl CashflowSpec {
         }
     }
 
-    /// Floating-rate terms of the coupon leg, when it is floating (directly or
-    /// as the base of an amortizing spec).
-    pub(crate) fn floating_rate_spec(
-        &self,
-    ) -> Option<&finstack_quant_cashflows::builder::FloatingRateSpec> {
+    /// Floating coupon leg, when the coupon leg is floating (directly or as
+    /// the base of an amortizing spec).
+    pub(crate) fn floating_coupon_spec(&self) -> Option<&FloatingCouponSpec> {
         match self {
-            Self::Floating(spec) => Some(&spec.rate_spec),
-            Self::Amortizing { base, .. } => base.floating_rate_spec(),
+            Self::Floating(spec) => Some(spec),
+            Self::Amortizing { base, .. } => base.floating_coupon_spec(),
             Self::Fixed(_) | Self::StepUp(_) => None,
         }
+    }
+
+    /// Floating-rate terms of the coupon leg, when it is floating (directly or
+    /// as the base of an amortizing spec).
+    pub(crate) fn floating_rate_spec(&self) -> Option<&FloatingRateSpec> {
+        self.floating_coupon_spec().map(|spec| &spec.rate_spec)
     }
 
     /// Add this coupon leg (and any amortization) to a cashflow builder whose
