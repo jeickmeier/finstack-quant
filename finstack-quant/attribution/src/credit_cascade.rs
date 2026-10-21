@@ -32,9 +32,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IssuerId};
 use finstack_quant_core::Result;
 use finstack_quant_factor::credit::hierarchy::{CreditFactorModel, IssuerBetaRow};
-use finstack_quant_factor::matching::{
-    bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY,
-};
+use finstack_quant_factor::{bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY};
 
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::recalibration::{

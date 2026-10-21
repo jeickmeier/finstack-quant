@@ -34,12 +34,12 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
-use finstack_quant_factor::matching::ISSUER_ID_META_KEY;
 use finstack_quant_factor::risk::{
     apply_residual_contributions, decompose_factors, PositionResidualContribution,
     ResidualContributionSource, RiskDecomposition,
 };
 use finstack_quant_factor::SensitivityMatrix;
+use finstack_quant_factor::ISSUER_ID_META_KEY;
 use finstack_quant_factor::{
     BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorModelConfig, MarketDependency,
     MatchingConfig, RiskMeasure, UnmatchedPolicy,
@@ -872,12 +872,12 @@ pub(super) mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{Attributes, CurveId};
-    use finstack_quant_factor::matching::{DependencyFilter, MappingRule};
     use finstack_quant_factor::SensitivityMatrix;
     use finstack_quant_factor::{
         BumpSizeConfig, CurveType, DependencyType, FactorCovarianceMatrix, FactorDefinition,
         FactorId, FactorModelConfig, FactorType, MarketMapping, RiskMeasure, UnmatchedPolicy,
     };
+    use finstack_quant_factor::{DependencyFilter, MappingRule};
     use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::MarketDependencies;
     use finstack_quant_valuations::pricer::InstrumentType;
@@ -1590,7 +1590,7 @@ pub(super) mod tests {
     }
 
     fn canonical_credit_bond(curve_id: CurveId) -> finstack_quant_valuations::instruments::Bond {
-        use finstack_quant_factor::matching::ISSUER_ID_META_KEY;
+        use finstack_quant_factor::ISSUER_ID_META_KEY;
         let mut bond = finstack_quant_valuations::instruments::Bond::fixed(
             "BOND-ISSUER-B",
             Money::from((1_000_000_i64, Currency::USD)),
@@ -1786,7 +1786,7 @@ pub(super) mod tests {
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use finstack_quant_factor::matching::CreditHierarchicalConfig;
+        use finstack_quant_factor::CreditHierarchicalConfig;
         use std::collections::BTreeMap;
 
         let as_of = date!(2024 - 01 - 01);
@@ -1896,7 +1896,7 @@ pub(super) mod tests {
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use finstack_quant_factor::matching::{CreditHierarchicalConfig, ISSUER_ID_META_KEY};
+        use finstack_quant_factor::{CreditHierarchicalConfig, ISSUER_ID_META_KEY};
         use std::collections::BTreeMap;
 
         let as_of = date!(2024 - 01 - 01);
@@ -1970,13 +1970,11 @@ pub(super) mod tests {
                         issuer_betas: vec![issuer_row.clone()],
                         require_issuer_id: false,
                     }),
-                    MatchingConfig::MappingTable(vec![
-                        finstack_quant_factor::matching::MappingRule {
-                            dependency_filter: Default::default(),
-                            attribute_filter: Default::default(),
-                            factor_id: FactorId::new("rates::usd"),
-                        },
-                    ]),
+                    MatchingConfig::MappingTable(vec![finstack_quant_factor::MappingRule {
+                        dependency_filter: Default::default(),
+                        attribute_filter: Default::default(),
+                        factor_id: FactorId::new("rates::usd"),
+                    }]),
                 ]),
 
                 risk_measure: RiskMeasure::Variance,
@@ -2028,7 +2026,7 @@ pub(super) mod tests {
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use finstack_quant_factor::matching::CreditHierarchicalConfig;
+        use finstack_quant_factor::CreditHierarchicalConfig;
         use std::collections::BTreeMap;
 
         let as_of = date!(2024 - 01 - 01);
@@ -2146,7 +2144,7 @@ pub(super) mod tests {
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use finstack_quant_factor::matching::CreditHierarchicalConfig;
+        use finstack_quant_factor::CreditHierarchicalConfig;
         use std::collections::BTreeMap;
 
         let mut tags = BTreeMap::new();

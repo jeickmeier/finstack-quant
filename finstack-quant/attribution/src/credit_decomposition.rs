@@ -393,7 +393,7 @@ mod tests {
         HierarchyDimension, IssuerBetaMode, IssuerBetaPolicy, IssuerBetaRow, IssuerBetas,
         IssuerTags, LevelsAtAnchor, VolState,
     };
-    use finstack_quant_factor::matching::ISSUER_ID_META_KEY;
+    use finstack_quant_factor::ISSUER_ID_META_KEY;
     use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
     use finstack_quant_valuations::instruments::{Attributes, Bond, Instrument};
     use std::sync::Arc;

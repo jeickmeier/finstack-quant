@@ -20,7 +20,7 @@ use finstack_quant_factor::credit::hierarchy::{
     AdderVolSource, CreditFactorModel, CreditHierarchySpec, GenericFactorSpec, HierarchyDimension,
     IssuerBetaMode, IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags,
 };
-use finstack_quant_factor::matching::{
+use finstack_quant_factor::{
     AttributeFilter, CreditHierarchicalConfig, DependencyFilter, MappingRule, ISSUER_ID_META_KEY,
 };
 use finstack_quant_factor::{
