@@ -12,7 +12,6 @@ use crate::api::schema::{CalibrationStep, StepParams};
 use crate::config::CalibrationConfig;
 use crate::quotes::cds_tranche::CdsTrancheQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
-use crate::targets::util::curve_day_count_from_quotes;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 
@@ -39,7 +38,7 @@ pub(crate) fn preflight_step(
     global_config: &CalibrationConfig,
 ) -> Result<()> {
     match &step.params {
-        StepParams::Discount(_p) => validate_discount_step(quotes),
+        StepParams::Discount(_) => require_rate_quotes(quotes),
         StepParams::Forward(p) => validate_forward_step(p, quotes, context),
         StepParams::Hazard(p) => validate_hazard_step(p, quotes, context, global_config),
         StepParams::Inflation(p) => validate_inflation_step(p, quotes, context),
@@ -155,15 +154,14 @@ fn validate_xccy_basis_step(
     Ok(())
 }
 
-/// Validate discount curve calibration step.
-fn validate_discount_step(quotes: &[MarketQuote]) -> Result<()> {
+/// Require at least one rate quote for a discount or forward curve step.
+fn require_rate_quotes(quotes: &[MarketQuote]) -> Result<()> {
     let rates_quotes: Vec<crate::quotes::rates::RateQuote> = quotes.extract_quotes();
     if rates_quotes.is_empty() {
         return Err(finstack_quant_core::Error::Input(
             finstack_quant_core::InputError::TooFewPoints,
         ));
     }
-    let _curve_day_count = curve_day_count_from_quotes(&rates_quotes)?;
     Ok(())
 }
 
@@ -175,15 +173,7 @@ fn validate_forward_step(
 ) -> Result<()> {
     // Ensure referenced discount curve exists (forward curve depends on it for pricing).
     let _ = context.get_discount(&p.discount_curve_id)?;
-
-    let rates_quotes: Vec<crate::quotes::rates::RateQuote> = quotes.extract_quotes();
-    if rates_quotes.is_empty() {
-        return Err(finstack_quant_core::Error::Input(
-            finstack_quant_core::InputError::TooFewPoints,
-        ));
-    }
-    let _curve_day_count = curve_day_count_from_quotes(&rates_quotes)?;
-    Ok(())
+    require_rate_quotes(quotes)
 }
 
 /// Validate hazard curve calibration step.
@@ -270,17 +260,8 @@ fn validate_inflation_step(
         )));
     }
 
-    // Validate observation lag string (used when no InflationIndex fixings are provided).
-    let lag = p.observation_lag.trim();
-    if !lag.is_empty() {
-        lag.parse::<finstack_quant_core::market_data::scalars::InflationLag>()
-            .map_err(|_| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Invalid observation_lag '{}': expected like '3M' or '90D'",
-                    p.observation_lag
-                ))
-            })?;
-    }
+    // The lag must be one the inflation curve can carry: a month lag or none.
+    let lag = crate::targets::inflation::parse_observation_lag(&p.observation_lag)?;
 
     // If an InflationIndex fixings series is provided, enforce consistency:
     // - currency match
@@ -294,19 +275,7 @@ fn validate_inflation_step(
             )));
         }
 
-        // Parse observation lag and require it to match the index lag.
-        let parsed_lag = p
-            .observation_lag
-            .trim()
-            .parse::<finstack_quant_core::market_data::scalars::InflationLag>()
-            .map_err(|_| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Invalid observation_lag '{}': expected like '3M' or '90D'",
-                    p.observation_lag
-                ))
-            })?;
-
-        if parsed_lag != index.lag() {
+        if lag != index.lag() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Inflation step lag mismatch: params.observation_lag='{}' but InflationIndex.lag={:?}",
                 p.observation_lag,

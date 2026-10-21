@@ -69,11 +69,7 @@ impl AsianOptionHestonMcPricer {
                     }
                 }
             } else {
-                let spot_scalar = market.get_price(&inst.spot_id)?;
-                match spot_scalar {
-                    finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-                    finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-                }
+                super::pricer::resolve_spot(inst, market)?
             };
 
             let intrinsic = match inst.option_type {
@@ -96,11 +92,7 @@ impl AsianOptionHestonMcPricer {
                 "AsianOption Heston MC discount curve",
             )?;
 
-        let spot_scalar = market.get_price(&inst.spot_id)?;
-        let spot = match spot_scalar {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-        };
+        let spot = super::pricer::resolve_spot(inst, market)?;
 
         let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
             market,

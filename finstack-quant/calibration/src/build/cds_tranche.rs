@@ -21,16 +21,6 @@ use finstack_quant_valuations_credit::cds_tranche::{CdsTranche, CdsTrancheParams
 ///
 /// The typed quote owns index identity and series. Overrides are limited to
 /// schedule construction and default to the convention registry.
-///
-/// # Examples
-///
-/// ```text
-/// use finstack_quant_calibration::build::cds_tranche::CdsTrancheBuildOverrides;
-///
-/// let mut overrides = CdsTrancheBuildOverrides::default();
-/// overrides.frequency = Some("3M".parse().unwrap());
-/// overrides.day_count = Some(finstack_quant_core::dates::DayCount::Act360);
-/// ```
 #[derive(Debug, Clone)]
 pub(crate) struct CdsTrancheBuildOverrides {
     /// Optional payment frequency override.

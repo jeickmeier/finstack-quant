@@ -116,6 +116,40 @@ impl From<&RateQuote> for RateCalibrationQuote {
     }
 }
 
+/// Build the replay recipe stored on a calibrated discount or projection curve.
+///
+/// # Arguments
+///
+/// * `currency` - Curve currency recorded on the recipe.
+/// * `method` - Calibration method the curve was solved with.
+/// * `curve_day_count` - Day count of the curve's time axis.
+/// * `ois_compounding` - Step-level OIS compounding override, when set.
+/// * `role` - Discount (with its projection curve) or projection (with its
+///   discount curve) role of the curve.
+/// * `quotes` - Rate quotes the curve was calibrated to.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` if the OIS compounding override cannot be
+/// replayed.
+pub(crate) fn rate_calibration_recipe(
+    currency: finstack_quant_core::currency::Currency,
+    method: &CalibrationMethod,
+    curve_day_count: finstack_quant_core::dates::DayCount,
+    ois_compounding: Option<&FloatingLegCompounding>,
+    role: finstack_quant_core::market_data::term_structures::RateCalibrationCurveRole,
+    quotes: &[RateQuote],
+) -> Result<RateCalibrationRecipe> {
+    Ok(RateCalibrationRecipe {
+        currency,
+        method: method.into(),
+        curve_day_count,
+        ois_compounding: ois_compounding.map(recipe_ois_compounding).transpose()?,
+        role,
+        quotes: quotes.iter().map(Into::into).collect(),
+    })
+}
+
 /// Map a floating-leg compounding convention onto its recipe representation.
 ///
 /// # Arguments

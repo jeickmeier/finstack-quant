@@ -630,49 +630,30 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
         Ok(Some(self.notional))
     }
 
+    /// Net dated flows of both legs, from the same engine as pricing: the
+    /// total-return leg, the financing leg under its `compounding`, signed by
+    /// `side`. The financing-index fixings they project ride in the schedule
+    /// metadata, so a horizon roll (theta) can hold crossed resets.
     fn raw_cashflow_schedule(
         &self,
         context: &MarketContext,
-        _as_of: Date,
+        as_of: Date,
     ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        let mut builder = finstack_quant_cashflows::builder::CashFlowSchedule::builder();
-        let _ = builder
-            .principal(self.notional, self.schedule.start, self.schedule.end)
-            .floating_cf(finstack_quant_cashflows::builder::FloatingCouponSpec {
-                rate_spec: finstack_quant_cashflows::builder::FloatingRateSpec {
-                    forward_curve_id: self.financing_leg.forward_curve_id.clone(),
-                    spread_bp: self.financing_leg.spread_bp,
-                    gearing: Decimal::ONE,
-                    gearing_includes_spread: true,
-                    index_floor_bp: None,
-                    all_in_cap_bp: None,
-                    all_in_floor_bp: None,
-                    index_cap_bp: None,
-                    overnight_index_constraints: Default::default(),
-                    reset_frequency: self.schedule.params.frequency,
-                    index_tenor: None,
-                    reset_lag_days: 0,
-                    fixing_calendar_id: None,
-                    compounding: None,
-                    overnight_basis: None,
-                    fallback: finstack_quant_cashflows::builder::FloatingRateFallback::Error,
+        let (flows, projected_fixings) =
+            crate::equity_trs::pricer::net_cashflows(self, context, as_of)?;
+        Ok(finstack_quant_cashflows::schedule_from_dated_flows(
+            flows,
+            finstack_quant_cashflows::primitives::CFKind::Fixed,
+            self.financing_leg.day_count,
+            finstack_quant_cashflows::ScheduleBuildOpts {
+                notional_hint: Some(self.notional),
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+                    projected_fixings,
+                    ..Default::default()
                 },
-                coupon_type: finstack_quant_cashflows::builder::CouponType::Cash,
-                schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                    frequency: self.schedule.params.frequency,
-                    day_count: self.financing_leg.day_count,
-                    business_day_convention: self.schedule.params.business_day_convention,
-                    calendar_id: self.schedule.params.calendar_id.clone(),
-                    stub: self.schedule.params.stub,
-                    end_of_month: self.schedule.params.end_of_month,
-                    payment_lag_days: self.schedule.params.payment_lag_days,
-                    adjust_accrual_dates: false,
-                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
-                },
-            });
-        let schedule = builder.build(Some(context))?;
-        Ok(schedule.with_representation(
-            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+            },
         ))
     }
 }

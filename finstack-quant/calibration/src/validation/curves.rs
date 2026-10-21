@@ -390,7 +390,7 @@ impl CurveValidator for HazardCurve {
         Ok(())
     }
 
-    fn validate_bounds(&self, config: &ValidationConfig) -> Result<()> {
+    fn validate_bounds(&self, _config: &ValidationConfig) -> Result<()> {
         // Check that survival probabilities are in [0, 1]
         for &t in HAZARD_BOUNDS_POINTS {
             let sp = self.sp(t);
@@ -422,9 +422,6 @@ impl CurveValidator for HazardCurve {
                 self.id().as_str()
             )));
         }
-
-        // (extra) bounds: keep behavior consistent with previous module
-        let _ = config;
         Ok(())
     }
 }

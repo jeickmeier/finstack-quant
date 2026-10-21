@@ -114,7 +114,6 @@
       "defaultAttributionMetrics",
       "defaultWaterfallOrder",
       "pnlAttributionExplainText",
-      "pnlAttributionExplainVerboseText",
       "pnlAttributionPctOfTotal",
       "pnlAttributionRequiredMetrics",
       "pnlAttributionResidualWithinTolerance",
@@ -164,9 +163,6 @@
   "attribution.pnlAttributionExplainText": {
     "kind": "function"
   },
-  "attribution.pnlAttributionExplainVerboseText": {
-    "kind": "function"
-  },
   "attribution.pnlAttributionPctOfTotal": {
     "kind": "function"
   },
@@ -204,7 +200,6 @@
       "calibrationResultContentHash",
       "calibrationResultResiduals",
       "calibrationResultStepReport",
-      "calibrationResultStepReportJson",
       "calibrationStepBaseCorrelation",
       "calibrationStepCapFloorHullWhite",
       "calibrationStepDiscount",
@@ -222,7 +217,6 @@
       "cdsQuoteUpfront",
       "dryRun",
       "dryRunJson",
-      "hullWhiteParamsSigmaAt",
       "inflationQuoteInflationSwap",
       "inflationQuoteYoyInflationSwap",
       "rateBoundsEmergingMarkets",
@@ -271,9 +265,6 @@
     "kind": "function"
   },
   "calibration.calibrationResultStepReport": {
-    "kind": "function"
-  },
-  "calibration.calibrationResultStepReportJson": {
     "kind": "function"
   },
   "calibration.calibrationResultResiduals": {
@@ -364,9 +355,6 @@
     "kind": "function"
   },
   "calibration.bootstrapHullWhiteSigmaScheduleToCapFloors": {
-    "kind": "function"
-  },
-  "calibration.hullWhiteParamsSigmaAt": {
     "kind": "function"
   },
   "calibration.validateSurface": {

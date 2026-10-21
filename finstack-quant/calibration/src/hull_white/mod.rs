@@ -86,14 +86,9 @@ pub(crate) use swaption::{
 #[cfg(test)]
 pub(crate) use contractual_swaption::price as contractual_swaption_price;
 #[cfg(test)]
-pub(crate) use pricing::{
-    bachelier_cap_floor_price, hw1f_cap_floor_price, scheduled_cap_floor_implied_normal_vol,
-    scheduled_cap_floor_price, CapFloorPriceSpec,
-};
+pub(crate) use pricing::{scheduled_cap_floor_implied_normal_vol, scheduled_cap_floor_price};
 #[cfg(test)]
-pub(crate) use pricing::{hw1f_cap_floor_implied_normal_vol, hw1f_cap_floor_price_with_model};
-#[cfg(test)]
-pub(crate) use swaption::{compute_swap_annuity_and_rate, hw1f_swaption_price};
+use swaption::{compute_swap_annuity_and_rate, hw1f_swaption_price};
 
 #[cfg(test)]
 mod tests;

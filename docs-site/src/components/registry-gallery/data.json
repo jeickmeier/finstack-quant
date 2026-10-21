@@ -720,7 +720,6 @@
                 "df_hard_min": 1e-12,
                 "jacobian_step_size": 0.000001,
                 "min_scan_grid_points": 20,
-                "min_t_spot": 0.000001,
                 "scan_grid_points": 48,
                 "scan_grid_step": 0.0001,
                 "validation_tolerance": 1e-8,
@@ -779,7 +778,6 @@
                 "tolerance": 1e-10
               },
               "validation_mode": "error",
-              "verbose": false,
               "vol_surface": {
                 "validation_tolerance": 0.001
               }
@@ -1207,7 +1205,6 @@
                 "df_hard_min": 1e-12,
                 "jacobian_step_size": 0.000001,
                 "min_scan_grid_points": 20,
-                "min_t_spot": 0.000001,
                 "scan_grid_points": 48,
                 "scan_grid_step": 0.0001,
                 "validation_tolerance": 1e-8,
@@ -1266,7 +1263,6 @@
                 "tolerance": 1e-10
               },
               "validation_mode": "error",
-              "verbose": false,
               "vol_surface": {
                 "validation_tolerance": 0.001
               }
@@ -1599,7 +1595,7 @@
   },
   "cubes": {
     "source": "finstack-quant/calibration/examples/market_bootstrap/07_swaption_vol_surface.json",
-    "sha256": "f428ab74458aaa5c49113a7ef71c755dad2d63fc5814bb4f665235d135364241",
+    "sha256": "66e28910a393f349396c22471da88e84ff8749c05c16b530788759525e6be977",
     "market": {
       "schema_version": 1,
       "curves": [
@@ -1977,7 +1973,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -2011,7 +2006,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -2453,7 +2447,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -2487,7 +2480,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -3154,7 +3146,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -3188,7 +3179,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -3663,7 +3653,6 @@
                       "df_hard_min": 1e-12,
                       "jacobian_step_size": 0.000001,
                       "min_scan_grid_points": 20,
-                      "min_t_spot": 0.000001,
                       "scan_grid_points": 48,
                       "scan_grid_step": 0.0001,
                       "validation_tolerance": 1e-8,
@@ -3722,7 +3711,6 @@
                       "tolerance": 1e-10
                     },
                     "validation_mode": "error",
-                    "verbose": false,
                     "vol_surface": {
                       "validation_tolerance": 0.001
                     }
@@ -4097,7 +4085,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -4131,7 +4118,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -4606,7 +4592,6 @@
                       "df_hard_min": 1e-12,
                       "jacobian_step_size": 0.000001,
                       "min_scan_grid_points": 20,
-                      "min_t_spot": 0.000001,
                       "scan_grid_points": 48,
                       "scan_grid_step": 0.0001,
                       "validation_tolerance": 1e-8,
@@ -4665,7 +4650,6 @@
                       "tolerance": 1e-10
                     },
                     "validation_mode": "error",
-                    "verbose": false,
                     "vol_surface": {
                       "validation_tolerance": 0.001
                     }
@@ -5065,7 +5049,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -5099,7 +5082,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -5687,7 +5669,6 @@
                       "df_hard_min": 1e-12,
                       "jacobian_step_size": 0.000001,
                       "min_scan_grid_points": 20,
-                      "min_t_spot": 0.000001,
                       "scan_grid_points": 48,
                       "scan_grid_step": 0.0001,
                       "validation_tolerance": 1e-8,
@@ -5746,7 +5727,6 @@
                       "tolerance": 1e-10
                     },
                     "validation_mode": "error",
-                    "verbose": false,
                     "vol_surface": {
                       "validation_tolerance": 0.001
                     }
@@ -5759,8 +5739,8 @@
                 "id": "CDX-NA-IG-46_CORR",
                 "detachment_points": [3, 7.000000000000001, 10, 15, 30],
                 "correlations": [
-                  0.20076534864903078, 0.21122024752165264, 0.21975819415940825,
-                  0.23189023557546265, 0.24987910069372618
+                  0.20066202918105408, 0.21114989424558556, 0.21967934116464416,
+                  0.2317704160688706, 0.24896498928161678
                 ]
               },
               {
@@ -5901,11 +5881,11 @@
           "report": {
             "success": true,
             "residuals": {
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 6.110852564707634e-10,
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 6.09091770076286e-10,
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 7.87697453559962e-10,
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-3-7:tolerance_ratio": 8.643693399923424e-10,
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 1.7428188521980336e-10,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 5.316349212710267e-10,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 2.58200578973078e-10,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 6.0458004343585e-10,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-3-7:tolerance_ratio": 7.709978488978924e-10,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 7.892269014246166e-10,
               "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 0.00007844035750798062,
               "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 0.000001680350737026659,
               "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.000045876822306334386,
@@ -5918,12 +5898,12 @@
               "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 0.00002261867848574184,
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.00004894227458862588
             },
-            "iterations": 862,
-            "objective_value": 0.00003554575986605044,
-            "max_residual": 8.643693399923424e-13,
-            "rmse": 5.10146759260488e-13,
+            "iterations": 863,
+            "objective_value": 0.000035545759865865595,
+            "max_residual": 7.965718396008014e-13,
+            "rmse": 4.971002610935804e-13,
             "max_residual_ratio": 0.00007965718396008015,
-            "rmse_ratio": 0.00003554575986605044,
+            "rmse_ratio": 0.000035545759865865595,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -6013,18 +5993,18 @@
             "CDX-NA-IG-46-BASE-CORR-STEP": {
               "success": true,
               "residuals": {
-                "CDX-IG-46-0-3": -6.110852564707634e-13,
-                "CDX-IG-46-10-15": -6.090917700762861e-13,
-                "CDX-IG-46-15-30": -7.87697453559962e-13,
-                "CDX-IG-46-3-7": 8.643693399923424e-13,
-                "CDX-IG-46-7-10": -1.7428188521980335e-13
+                "CDX-IG-46-0-3": -5.316349212710266e-13,
+                "CDX-IG-46-10-15": 2.58200578973078e-13,
+                "CDX-IG-46-15-30": 6.045800434358501e-13,
+                "CDX-IG-46-3-7": 7.709978488978924e-13,
+                "CDX-IG-46-7-10": -7.892269014246166e-13
               },
-              "iterations": 176,
-              "objective_value": 6.545828877735832e-13,
-              "max_residual": 8.643693399923424e-13,
-              "rmse": 6.545828877735832e-13,
+              "iterations": 177,
+              "objective_value": 6.216328566533878e-13,
+              "max_residual": 7.892269014246166e-13,
+              "rmse": 6.216328566533878e-13,
               "validation_passed": true,
-              "convergence_reason": "generic bootstrap calibration converged: max_residual (8.64e-13) within tolerance (1.00e-3)",
+              "convergence_reason": "generic bootstrap calibration converged: max_residual (7.89e-13) within tolerance (1.00e-3)",
               "metadata": {
                 "residual_units": "discounted_upfront_fraction",
                 "solver_max_iterations": "100",
@@ -6050,8 +6030,8 @@
                 "fx_policy_applied": null,
                 "version": "0.11.0"
               },
-              "worst_quote_id": "CDX-IG-46-3-7",
-              "worst_quote_residual": 8.643693399923424e-13,
+              "worst_quote_id": "CDX-IG-46-7-10",
+              "worst_quote_residual": -7.892269014246166e-13,
               "success_tolerance": 0.001,
               "solver_method": "sequential_bootstrap",
               "residual_units": "discounted_upfront_fraction"
@@ -6220,7 +6200,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -6254,7 +6233,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -6828,7 +6806,6 @@
                       "df_hard_min": 1e-12,
                       "jacobian_step_size": 0.000001,
                       "min_scan_grid_points": 20,
-                      "min_t_spot": 0.000001,
                       "scan_grid_points": 48,
                       "scan_grid_step": 0.0001,
                       "validation_tolerance": 1e-8,
@@ -6887,7 +6864,6 @@
                       "tolerance": 1e-10
                     },
                     "validation_mode": "error",
-                    "verbose": false,
                     "vol_surface": {
                       "validation_tolerance": 0.001
                     }
@@ -7202,16 +7178,6 @@
                 "fx_policy_applied": null,
                 "version": "0.11.0"
               },
-              "explanation": {
-                "type": "vol_surface",
-                "entries": [
-                  {
-                    "kind": "computation_step",
-                    "name": "surface_built",
-                    "description": "Vol surface constructed"
-                  }
-                ]
-              },
               "worst_quote_id": "CDX-NA-IG-46-VOL-20260617-0.004",
               "worst_quote_residual": 4.829536888739661e-7,
               "success_tolerance": 0.001,
@@ -7331,7 +7297,7 @@
     },
     {
       "source": "finstack-quant/calibration/examples/market_bootstrap/07_swaption_vol_surface.json",
-      "sha256": "f428ab74458aaa5c49113a7ef71c755dad2d63fc5814bb4f665235d135364241",
+      "sha256": "66e28910a393f349396c22471da88e84ff8749c05c16b530788759525e6be977",
       "input": {
         "$schema": "../../schemas/calibration/1/calibration.schema.json",
         "schema": "finstack_quant.calibration/1",
@@ -7435,7 +7401,6 @@
               "sabr_beta": 0,
               "target_expiries": [1, 2, 5],
               "target_tenors": [2, 5, 10],
-              "sabr_interpolation": "bilinear",
               "calendar_id": "weekends_only",
               "fixed_day_count": null,
               "swap_index": "USD-SOFR-3M",
@@ -7450,7 +7415,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -7484,7 +7448,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -8224,10 +8187,10 @@
                 "tenors": [2, 5, 10],
                 "params": [
                   {
-                    "alpha": 0.0067231399046543665,
+                    "alpha": 0.006723139967310844,
                     "beta": 0,
-                    "rho": 0.4793626929513042,
-                    "nu": 1.092819199647211
+                    "rho": 0.4793626551753536,
+                    "nu": 1.0928190711751329
                   },
                   {
                     "alpha": 0.0066107798139045295,
@@ -8242,10 +8205,10 @@
                     "nu": 0.034512472936540285
                   },
                   {
-                    "alpha": 0.006990422769287483,
+                    "alpha": 0.0069904243735239265,
                     "beta": 0,
-                    "rho": 0.39496186155784146,
-                    "nu": 0.6770963977375238
+                    "rho": 0.39496148667319836,
+                    "nu": 0.6770947953045241
                   },
                   {
                     "alpha": 0.006793413854226229,
@@ -8260,10 +8223,10 @@
                     "nu": 0.034724632751183426
                   },
                   {
-                    "alpha": 0.007756567369121743,
+                    "alpha": 0.007756567398446069,
                     "beta": 0,
-                    "rho": 0.2955214864489562,
-                    "nu": 0.2940783089963684
+                    "rho": 0.2955215329100774,
+                    "nu": 0.29407829807191527
                   },
                   {
                     "alpha": 0.007300463942612639,
@@ -8303,27 +8266,27 @@
               "USD-SOFR-3M:FRA-SOFR-3M-3X6:tolerance_ratio": 1.7088872182083668e-10,
               "USD-SOFR-3M:FRA-SOFR-3M-6X9:tolerance_ratio": 3.375262698809081e-10,
               "USD-SOFR-3M:FRA-SOFR-3M-9X12:tolerance_ratio": 6.666502761828351e-10,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.045:tolerance_ratio": 0.0033764886993246,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.055:tolerance_ratio": 0.02897998803412805,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.05:tolerance_ratio": 0.003841166752052936,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.045:tolerance_ratio": 0.0033765388191218013,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.055:tolerance_ratio": 0.028979976854293214,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.05:tolerance_ratio": 0.0038412372780598455,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.045:tolerance_ratio": 0.21609031443078733,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.055:tolerance_ratio": 0.15065553076828475,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.05:tolerance_ratio": 0.18865169341658605,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.045:tolerance_ratio": 0.20363927706323545,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.055:tolerance_ratio": 0.08708781105321087,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.05:tolerance_ratio": 0.3215806260034078,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.045:tolerance_ratio": 0.0760286002037235,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.055:tolerance_ratio": 0.15070747907780513,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.05:tolerance_ratio": 0.10349400264829157,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.045:tolerance_ratio": 0.07602974842240683,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.055:tolerance_ratio": 0.15070697580326445,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.05:tolerance_ratio": 0.103494455472927,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.045:tolerance_ratio": 0.15587875921554684,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.055:tolerance_ratio": 0.14132422365252933,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.05:tolerance_ratio": 0.2036342672342359,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.045:tolerance_ratio": 0.22652000739596204,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.055:tolerance_ratio": 0.10894110110412115,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.05:tolerance_ratio": 0.29921078729152245,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.045:tolerance_ratio": 0.1287105442086504,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.055:tolerance_ratio": 0.1615441787446766,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.05:tolerance_ratio": 0.22318308509642823,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.045:tolerance_ratio": 0.12871064056519815,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.055:tolerance_ratio": 0.16154421480519693,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.05:tolerance_ratio": 0.2231830196647051,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.045:tolerance_ratio": 0.14755606358607917,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.055:tolerance_ratio": 0.1417308984539376,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.05:tolerance_ratio": 0.24060142607778243,
@@ -8331,12 +8294,12 @@
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.055:tolerance_ratio": 0.10910534831939933,
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.05:tolerance_ratio": 0.260089284947829
             },
-            "iterations": 1187,
-            "objective_value": 0.14833447721072818,
+            "iterations": 1173,
+            "objective_value": 0.1483344882200064,
             "max_residual": 0.0004823709390051117,
-            "rmse": 0.00022250171427923299,
+            "rmse": 0.0002225017307931504,
             "max_residual_ratio": 0.3215806260034078,
-            "rmse_ratio": 0.14833447721072818,
+            "rmse_ratio": 0.1483344882200064,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -8488,27 +8451,27 @@
             "USD-SWAPTION-NORMAL-VOL-STEP": {
               "success": true,
               "residuals": {
-                "USD-SWPTN-VOL-20270508-20290511-0.045": -0.0000050647330489869,
-                "USD-SWPTN-VOL-20270508-20290511-0.05": 0.000005761750128079404,
-                "USD-SWPTN-VOL-20270508-20290511-0.055": 0.000043469982051192076,
+                "USD-SWPTN-VOL-20270508-20290511-0.045": -0.000005064808228682702,
+                "USD-SWPTN-VOL-20270508-20290511-0.05": 0.0000057618559170897685,
+                "USD-SWPTN-VOL-20270508-20290511-0.055": 0.00004346996528143982,
                 "USD-SWPTN-VOL-20270508-20320511-0.045": -0.000324135471646181,
                 "USD-SWPTN-VOL-20270508-20320511-0.05": 0.0002829775401248791,
                 "USD-SWPTN-VOL-20270508-20320511-0.055": -0.00022598329615242715,
                 "USD-SWPTN-VOL-20270508-20370511-0.045": -0.0003054589155948532,
                 "USD-SWPTN-VOL-20270508-20370511-0.05": 0.0004823709390051117,
                 "USD-SWPTN-VOL-20270508-20370511-0.055": -0.0001306317165798163,
-                "USD-SWPTN-VOL-20280508-20300510-0.045": -0.00011404290030558525,
-                "USD-SWPTN-VOL-20280508-20300510-0.05": 0.00015524100397243737,
-                "USD-SWPTN-VOL-20280508-20300510-0.055": -0.0002260612186167077,
+                "USD-SWPTN-VOL-20280508-20300510-0.045": -0.00011404462263361025,
+                "USD-SWPTN-VOL-20280508-20300510-0.05": 0.0001552416832093905,
+                "USD-SWPTN-VOL-20280508-20300510-0.055": -0.00022606046370489668,
                 "USD-SWPTN-VOL-20280508-20330510-0.045": -0.00023381813882332025,
                 "USD-SWPTN-VOL-20280508-20330510-0.05": 0.00030545140085135383,
                 "USD-SWPTN-VOL-20280508-20330510-0.055": -0.000211986335478794,
                 "USD-SWPTN-VOL-20280508-20380510-0.045": -0.00033978001109394307,
                 "USD-SWPTN-VOL-20280508-20380510-0.05": 0.0004488161809372837,
                 "USD-SWPTN-VOL-20280508-20380510-0.055": -0.00016341165165618173,
-                "USD-SWPTN-VOL-20310508-20330512-0.045": -0.00019306581631297563,
-                "USD-SWPTN-VOL-20310508-20330512-0.05": 0.00033477462764464234,
-                "USD-SWPTN-VOL-20310508-20330512-0.055": -0.00024231626811701493,
+                "USD-SWPTN-VOL-20310508-20330512-0.045": -0.00019306596084779724,
+                "USD-SWPTN-VOL-20310508-20330512-0.05": 0.00033477452949705767,
+                "USD-SWPTN-VOL-20310508-20330512-0.055": -0.0002423163222077954,
                 "USD-SWPTN-VOL-20310508-20360512-0.045": -0.00022133409537911878,
                 "USD-SWPTN-VOL-20310508-20360512-0.05": 0.00036090213911667366,
                 "USD-SWPTN-VOL-20310508-20360512-0.055": -0.00021259634768090643,
@@ -8516,10 +8479,10 @@
                 "USD-SWPTN-VOL-20310508-20410512-0.05": 0.00039013392742174354,
                 "USD-SWPTN-VOL-20310508-20410512-0.055": -0.000163658022479099
               },
-              "iterations": 981,
-              "objective_value": 0.0002639631349522759,
+              "iterations": 967,
+              "objective_value": 0.00026396315454343017,
               "max_residual": 0.0004823709390051117,
-              "rmse": 0.0002639631349522759,
+              "rmse": 0.00026396315454343017,
               "validation_passed": true,
               "convergence_reason": "swaption vol calibration converged: max_residual (4.82e-4) within tolerance (1.50e-3)",
               "metadata": {
@@ -8531,9 +8494,9 @@
                 "residual_units": "quoted_volatility",
                 "sabr_extrapolation_policy": "clamp",
                 "sabr_parameters_at_bounds": "T=1.000000,tenor=10.000000:rho;T=2.002740,tenor=10.000000:rho",
-                "sabr_residual_evaluations": "T=1.000000,tenor=2.000000:130;T=1.000000,tenor=5.000000:210;T=1.000000,tenor=10.000000:160;T=2.002740,tenor=2.000000:175;T=2.002740,tenor=5.000000:165;T=2.002740,tenor=10.000000:160;T=5.002740,tenor=2.000000:180;T=5.002740,tenor=5.000000:140;T=5.002740,tenor=10.000000:140",
-                "sabr_winning_iterations": "T=1.000000,tenor=2.000000:8;T=1.000000,tenor=5.000000:16;T=1.000000,tenor=10.000000:11;T=2.002740,tenor=2.000000:12;T=2.002740,tenor=5.000000:11;T=2.002740,tenor=10.000000:11;T=5.002740,tenor=2.000000:13;T=5.002740,tenor=5.000000:9;T=5.002740,tenor=10.000000:10",
-                "sabr_winning_starts": "T=1.000000,tenor=2.000000:alpha=0.00716161,nu=0.40000000,rho=0.00000000;T=1.000000,tenor=5.000000:alpha=0.00670000,nu=0.40000000,rho=-0.60000000;T=1.000000,tenor=10.000000:alpha=0.00620000,nu=0.15000000,rho=0.60000000;T=2.002740,tenor=2.000000:alpha=0.00740000,nu=0.40000000,rho=-0.60000000;T=2.002740,tenor=5.000000:alpha=0.00690000,nu=0.15000000,rho=0.60000000;T=2.002740,tenor=10.000000:alpha=0.00640000,nu=0.90000000,rho=-0.60000000;T=5.002740,tenor=2.000000:alpha=0.00800000,nu=0.90000000,rho=-0.60000000;T=5.002740,tenor=5.000000:alpha=0.00740000,nu=0.40000000,rho=0.00000000;T=5.002740,tenor=10.000000:alpha=0.00670000,nu=0.40000000,rho=0.00000000",
+                "sabr_residual_evaluations": "T=1.000000,tenor=2.000000:85;T=1.000000,tenor=5.000000:210;T=1.000000,tenor=10.000000:160;T=2.002740,tenor=2.000000:125;T=2.002740,tenor=5.000000:165;T=2.002740,tenor=10.000000:160;T=5.002740,tenor=2.000000:160;T=5.002740,tenor=5.000000:140;T=5.002740,tenor=10.000000:140",
+                "sabr_winning_iterations": "T=1.000000,tenor=2.000000:5;T=1.000000,tenor=5.000000:16;T=1.000000,tenor=10.000000:11;T=2.002740,tenor=2.000000:7;T=2.002740,tenor=5.000000:11;T=2.002740,tenor=10.000000:11;T=5.002740,tenor=2.000000:11;T=5.002740,tenor=5.000000:9;T=5.002740,tenor=10.000000:10",
+                "sabr_winning_starts": "T=1.000000,tenor=2.000000:alpha=0.00716161,nu=0.90000000,rho=0.00000000;T=1.000000,tenor=5.000000:alpha=0.00670000,nu=0.40000000,rho=-0.60000000;T=1.000000,tenor=10.000000:alpha=0.00620000,nu=0.15000000,rho=0.60000000;T=2.002740,tenor=2.000000:alpha=0.00740000,nu=0.90000000,rho=0.60000000;T=2.002740,tenor=5.000000:alpha=0.00690000,nu=0.15000000,rho=0.60000000;T=2.002740,tenor=10.000000:alpha=0.00640000,nu=0.90000000,rho=-0.60000000;T=5.002740,tenor=2.000000:alpha=0.00800000,nu=0.15000000,rho=0.00000000;T=5.002740,tenor=5.000000:alpha=0.00740000,nu=0.40000000,rho=0.00000000;T=5.002740,tenor=10.000000:alpha=0.00670000,nu=0.40000000,rho=0.00000000",
                 "solver_max_iterations": "100",
                 "solver_tolerance": "1.00e-12",
                 "type": "swaption_vol"
@@ -8652,7 +8615,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -8686,7 +8648,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -9267,16 +9228,6 @@
                 "fx_policy_applied": null,
                 "version": "0.11.0"
               },
-              "explanation": {
-                "type": "vol_surface",
-                "entries": [
-                  {
-                    "kind": "computation_step",
-                    "name": "surface_built",
-                    "description": "Vol surface constructed"
-                  }
-                ]
-              },
               "worst_quote_id": "AAPL-VOL-20261108-175.0",
               "worst_quote_residual": -0.0006446119164336128,
               "success_tolerance": 0.001,
@@ -9411,7 +9362,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -9445,7 +9395,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -9613,7 +9562,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -9647,7 +9595,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -9829,7 +9776,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -9863,7 +9809,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -10193,7 +10138,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -10227,7 +10171,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -10836,7 +10779,6 @@
                       "df_hard_min": 1e-12,
                       "jacobian_step_size": 0.000001,
                       "min_scan_grid_points": 20,
-                      "min_t_spot": 0.000001,
                       "scan_grid_points": 48,
                       "scan_grid_step": 0.0001,
                       "validation_tolerance": 1e-8,
@@ -10895,7 +10837,6 @@
                       "tolerance": 1e-10
                     },
                     "validation_mode": "error",
-                    "verbose": false,
                     "vol_surface": {
                       "validation_tolerance": 0.001
                     }
@@ -10908,8 +10849,8 @@
                 "id": "CDX-NA-IG-46_CORR",
                 "detachment_points": [3, 7.000000000000001, 10, 15, 30],
                 "correlations": [
-                  0, 0.16623408340313467, 0.16623408340313467,
-                  0.24864321056636615, 0.24864321056636615
+                  0, 0.16623408332560208, 0.16623408332560208,
+                  0.24864321049650606, 0.24864321049650606
                 ]
               },
               {
@@ -11064,11 +11005,11 @@
           "report": {
             "success": true,
             "residuals": {
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 0.08155947437864128,
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 0.09439214600477121,
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 0.09439544866398501,
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-3-7:tolerance_ratio": 0.09439232005250814,
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 0.09438744550279136,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 0.07938758779392774,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 0.0920952226787266,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 0.09209852527834393,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-3-7:tolerance_ratio": 0.0920953914079845,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 0.09209052211715603,
               "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 0.00008897298621869752,
               "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 0.00006845897497001271,
               "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.00009808402725205979,
@@ -11082,11 +11023,11 @@
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.00004894227458862588
             },
             "iterations": 951,
-            "objective_value": 0.05141209964881013,
-            "max_residual": 0.00009439544866398501,
-            "rmse": 0.00005141207650580434,
-            "max_residual_ratio": 0.09439544866398501,
-            "rmse_ratio": 0.05141209964881013,
+            "objective_value": 0.05014249753913647,
+            "max_residual": 0.00009209852527834393,
+            "rmse": 0.00005014247381015223,
+            "max_residual_ratio": 0.09209852527834393,
+            "rmse_ratio": 0.05014249753913647,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -11118,7 +11059,7 @@
               "version": "0.11.0"
             },
             "worst_quote_id": "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio",
-            "worst_quote_residual": 0.09439544866398501,
+            "worst_quote_residual": 0.09209852527834393,
             "solver_method": "plan_execution",
             "residual_units": "absolute_residual_over_step_tolerance"
           },
@@ -11176,18 +11117,18 @@
             "CDX-NA-IG-46-BASE-CORR-STEP": {
               "success": true,
               "residuals": {
-                "CDX-IG-46-0-3": -0.00008155947437864128,
-                "CDX-IG-46-10-15": -0.00009439214600477121,
-                "CDX-IG-46-15-30": -0.00009439544866398501,
-                "CDX-IG-46-3-7": -0.00009439232005250814,
-                "CDX-IG-46-7-10": -0.00009438744550279137
+                "CDX-IG-46-0-3": -0.00007938758779392774,
+                "CDX-IG-46-10-15": -0.00009209522267872659,
+                "CDX-IG-46-15-30": -0.00009209852527834393,
+                "CDX-IG-46-3-7": -0.0000920953914079845,
+                "CDX-IG-46-7-10": -0.00009209052211715604
               },
               "iterations": 305,
-              "objective_value": 0.0000919687183451187,
-              "max_residual": 0.00009439544866398501,
-              "rmse": 0.0000919687183451187,
+              "objective_value": 0.00008969758399960262,
+              "max_residual": 0.00009209852527834393,
+              "rmse": 0.00008969758399960262,
               "validation_passed": true,
-              "convergence_reason": "generic bootstrap calibration converged: max_residual (9.44e-5) within tolerance (1.00e-3)",
+              "convergence_reason": "generic bootstrap calibration converged: max_residual (9.21e-5) within tolerance (1.00e-3)",
               "metadata": {
                 "approximate_knots": "3.000000,7.000000,10.000000,15.000000,30.000000",
                 "residual_units": "discounted_upfront_fraction",
@@ -11215,7 +11156,7 @@
                 "version": "0.11.0"
               },
               "worst_quote_id": "CDX-IG-46-15-30",
-              "worst_quote_residual": -0.00009439544866398501,
+              "worst_quote_residual": -0.00009209852527834393,
               "success_tolerance": 0.001,
               "solver_method": "sequential_bootstrap",
               "residual_units": "discounted_upfront_fraction"
@@ -11335,7 +11276,6 @@
               "max_iterations": 100
             },
             "use_parallel": false,
-            "verbose": false,
             "validation_mode": "error",
             "validation": {
               "check_forward_positivity": true,
@@ -11369,7 +11309,6 @@
               "scan_grid_step": 0.0001,
               "df_hard_min": 1e-12,
               "df_hard_max": 1000000,
-              "min_t_spot": 0.000001,
               "bootstrap_seed_global_solve": true,
               "allow_non_monotonic_final": null,
               "weighting_scheme": "sqrt_time",
@@ -12421,7 +12360,7 @@
       },
       {
         "path": "finstack-quant-wasm/index.d.ts",
-        "sha256": "9cd00d4932b0c3704d7b09797279ec438d60fca8bf5c2f4a555723398b6bbe93"
+        "sha256": "839e32d167b3dbba73a9522f5c147051193608c7bc97d026ff912ca81f8c07b0"
       },
       {
         "path": "finstack-quant-wasm/src/utils/mod.rs",

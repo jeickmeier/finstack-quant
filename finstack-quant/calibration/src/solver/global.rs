@@ -280,13 +280,11 @@ impl GlobalFitOptimizer {
 
         // Multi-start: run additional solves from perturbed starting points.
         if let Some(ms) = multi_start {
-            if config.verbose {
-                tracing::info!(
-                    "GlobalFitOptimizer: running {} multi-start restarts (perturbation_scale={:.3})",
-                    ms.num_restarts,
-                    ms.perturbation_scale,
-                );
-            }
+            tracing::debug!(
+                "GlobalFitOptimizer: running {} multi-start restarts (perturbation_scale={:.3})",
+                ms.num_restarts,
+                ms.perturbation_scale,
+            );
 
             // Restarts are independent solves; fold them in index order so the
             // first strictly-better restart wins exactly as it would serially.
@@ -296,14 +294,12 @@ impl GlobalFitOptimizer {
                     Ok((result, wl2)) => {
                         let improved = best.as_ref().is_none_or(|(_, prev)| wl2 < *prev);
                         if improved {
-                            if config.verbose {
-                                tracing::info!(
-                                    "GlobalFitOptimizer: restart {} improved weighted L2: {:?} -> {:.4e}",
-                                    restart_idx,
-                                    best.as_ref().map(|(_, l)| *l),
-                                    wl2,
-                                );
-                            }
+                            tracing::debug!(
+                                "GlobalFitOptimizer: restart {} improved weighted L2: {:?} -> {:.4e}",
+                                restart_idx,
+                                best.as_ref().map(|(_, l)| *l),
+                                wl2,
+                            );
                             best = Some((result, wl2));
                             winning_start = Some(restart_idx);
                         }
