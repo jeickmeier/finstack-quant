@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { delimiter, dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -43,9 +43,20 @@ function materializationSampleCount() {
 const MATERIALIZATION_SAMPLES = materializationSampleCount();
 const MATERIALIZATION_ONLY = process.argv.includes('--materialization-only');
 
+function resolveCargo() {
+  const executable = process.platform === 'win32' ? 'cargo.exe' : 'cargo';
+  for (const directory of (process.env.PATH ?? '').split(delimiter)) {
+    const candidate = join(directory, executable);
+    if (directory && isAbsolute(directory) && existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  throw new Error('cargo is required to regenerate materialization fixtures');
+}
+
 function loadMaterializationFixtures() {
   const generated = spawnSync(
-    'cargo',
+    resolveCargo(),
     [
       'run',
       '--release',

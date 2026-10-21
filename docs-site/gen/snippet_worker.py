@@ -151,8 +151,12 @@ def compile_block(block: dict, lesson_id: str, locations: list[dict] | None) -> 
 
 
 def restrict_notebook_access(allowed_root: Path) -> set[str]:
-    """Reject notebook opens that resolve outside the run's declared projection."""
-    allowed_root = allowed_root.resolve()
+    """Reject notebook opens that resolve outside the run's declared projection.
+
+    ``allowed_root`` must already be resolved by the runner; it is compared, not re-resolved.
+    """
+    if not allowed_root.is_absolute():
+        raise RuntimeError(f"Allowed notebook root must be an absolute resolved path: {allowed_root}")
     violations: set[str] = set()
 
     def audit(event: str, args: tuple) -> None:
