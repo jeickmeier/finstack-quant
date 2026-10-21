@@ -542,7 +542,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/path_simulation_spec.schema.json",
-      "bytes": 42112,
+      "bytes": 42108,
       "kind": "input",
       "path": "schemas/models/1/path_simulation_spec.schema.json",
       "summary": "Complete, serializable description of one path simulation.",
@@ -614,7 +614,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
-      "bytes": 31583,
+      "bytes": 31579,
       "kind": "input",
       "path": "schemas/models/1/process_spec.schema.json",
       "summary": "Stochastic process to simulate, with its parameters.",
@@ -695,7 +695,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_fourier_params.schema.json",
-      "bytes": 1134,
+      "bytes": 1138,
       "kind": "input",
       "path": "schemas/models/1/rough_heston_fourier_params.schema.json",
       "summary": "Rough Heston model parameters for Fourier-based European option pricing.",
@@ -704,7 +704,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_params.schema.json",
-      "bytes": 2070,
+      "bytes": 2066,
       "kind": "input",
       "path": "schemas/models/1/rough_heston_params.schema.json",
       "summary": "Rough Heston model parameters.",

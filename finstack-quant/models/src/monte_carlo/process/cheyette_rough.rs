@@ -173,6 +173,36 @@ impl CheyetteRoughVolParams {
         rho: f64,
         phi_points: &[(f64, f64)],
     ) -> finstack_quant_core::Result<Self> {
+        let (phi_times, phi_values): (Vec<f64>, Vec<f64>) = phi_points.iter().copied().unzip();
+        let params = Self {
+            kappa,
+            sigma_base,
+            hurst,
+            eta,
+            rho,
+            phi_times,
+            phi_values,
+        };
+        params.validate()?;
+        Ok(params)
+    }
+
+    /// Check the parameter domains that [`Self::new`] enforces, for a value
+    /// whose public fields may have been edited after construction; logs the
+    /// non-rough Hurst warning as [`Self::new`] does.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when any parameter is
+    /// out of range.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        let Self {
+            kappa,
+            hurst,
+            eta,
+            rho,
+            ..
+        } = *self;
         if kappa <= 0.0 || !kappa.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CheyetteRoughVol parameter kappa must be positive and finite, got {kappa}"
@@ -188,10 +218,9 @@ impl CheyetteRoughVolParams {
                 "CheyetteRoughVol parameter rho must be in [-1, 1], got {rho}"
             )));
         }
-        let (phi_times, phi_values): (Vec<f64>, Vec<f64>) = phi_points.iter().copied().unzip();
         super::validate_piecewise_knots(
-            &phi_times,
-            &phi_values,
+            &self.phi_times,
+            &self.phi_values,
             true,
             "CheyetteRoughVol phi_points",
         )?;
@@ -206,34 +235,7 @@ impl CheyetteRoughVolParams {
             );
         }
 
-        Ok(Self {
-            kappa,
-            sigma_base,
-            hurst,
-            eta,
-            rho,
-            phi_times,
-            phi_values,
-        })
-    }
-
-    /// Re-run the constructor's validation on a parameter set whose public
-    /// fields may have been edited after construction.
-    pub(crate) fn revalidated(&self) -> finstack_quant_core::Result<Self> {
-        let phi_points: Vec<_> = self
-            .phi_times
-            .iter()
-            .copied()
-            .zip(self.phi_values.iter().copied())
-            .collect();
-        Self::new(
-            self.kappa,
-            self.sigma_base.clone(),
-            self.hurst,
-            self.eta,
-            self.rho,
-            &phi_points,
-        )
+        Ok(())
     }
 
     /// Interpolate the initial forward rate φ(t) = f(0, t) at time `t`.

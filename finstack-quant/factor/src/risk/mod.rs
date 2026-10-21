@@ -26,6 +26,21 @@ pub use types::{
     ResidualContributionSource, RiskDecomposition,
 };
 
+/// Absolute tolerance below which a computed variance is numerical noise:
+/// variances in `[-VARIANCE_TOLERANCE, 0)` clamp to zero, lower ones are
+/// rejected.
+pub(crate) const VARIANCE_TOLERANCE: f64 = 1e-12;
+
+/// Normal-tail multipliers at `confidence`: the quantile `z = Φ⁻¹(c)` and the
+/// expected-shortfall multiplier `φ(z) / (1 − c)`.
+pub(crate) fn tail_multipliers(confidence: f64) -> (f64, f64) {
+    let z = finstack_quant_core::math::standard_normal_inv_cdf(confidence);
+    (
+        z,
+        finstack_quant_core::math::norm_pdf(z) / (1.0 - confidence),
+    )
+}
+
 /// Snap tolerance used when deciding whether a floating-point tail-size
 /// product represents an integer.
 pub(crate) const TAIL_COUNT_SNAP_TOLERANCE: f64 = 1e-9;

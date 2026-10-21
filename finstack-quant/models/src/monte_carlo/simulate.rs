@@ -616,20 +616,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
         ProcessSpec::Heston(p) => {
             let process =
                 HestonProcess::with_params(p.r, p.q, p.kappa, p.theta, p.sigma_v, p.rho, p.v0)?;
-            if let [spot, variance] = *x0 {
-                if spot.is_nan() || spot <= 0.0 {
-                    return Err(Error::Validation(format!(
-                        "process 'heston' needs a strictly positive initial spot, got {spot}"
-                    )));
-                }
-                if variance.to_bits() != p.v0.to_bits() {
-                    return Err(Error::Validation(format!(
-                        "process 'heston' needs initial_state[1] to equal the v0 parameter \
-                         {}, got {variance}",
-                        p.v0
-                    )));
-                }
-            }
+            require_spot_and_v0(spec, x0, p.v0)?;
             match spec.scheme {
                 SchemeSpec::Default => simulate(&process, &QeHeston::new(), spec, x0, parallel),
                 SchemeSpec::Euler => simulate(&process, &EulerMaruyama, spec, x0, parallel),
@@ -666,7 +653,8 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             }
         }
         ProcessSpec::Lmm(p) => {
-            let process = LmmProcess::new(p.clone().validate()?);
+            p.validate()?;
+            let process = LmmProcess::new(p.clone());
             if x0.len() == p.initial_forwards.len()
                 && x0
                     .iter()
@@ -703,21 +691,9 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             }
         }
         ProcessSpec::RoughHeston(p) => {
-            let process = RoughHestonProcess::new(p.clone().validate()?);
-            if let [spot, variance] = *x0 {
-                if spot.is_nan() || spot <= 0.0 {
-                    return Err(Error::Validation(format!(
-                        "process 'rough_heston' needs a strictly positive initial spot, got {spot}"
-                    )));
-                }
-                if variance.to_bits() != p.v0.to_bits() {
-                    return Err(Error::Validation(format!(
-                        "process 'rough_heston' needs initial_state[1] to equal the v0 \
-                         parameter {}, got {variance}",
-                        p.v0
-                    )));
-                }
-            }
+            p.validate()?;
+            let process = RoughHestonProcess::new(p.clone());
+            require_spot_and_v0(spec, x0, p.v0)?;
             if spec.scheme != SchemeSpec::Default {
                 return unsupported();
             }
@@ -743,7 +719,8 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             simulate(&process, &scheme, spec, x0, parallel)
         }
         ProcessSpec::CheyetteRough(p) => {
-            let process = CheyetteRoughVolProcess::new(p.revalidated()?);
+            p.validate()?;
+            let process = CheyetteRoughVolProcess::new(p.clone());
             let mut summary = match spec.scheme {
                 SchemeSpec::Default => simulate_with_noise(
                     &process,
@@ -761,6 +738,26 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             Ok(summary)
         }
     }
+}
+
+/// A two-factor `[spot, variance]` start must have a strictly positive spot
+/// and a variance equal to the process `v0` parameter (bit for bit).
+fn require_spot_and_v0(spec: &PathSimulationSpec, x0: &[f64], v0: f64) -> Result<()> {
+    if let [spot, variance] = *x0 {
+        let tag = spec.process.tag();
+        if spot.is_nan() || spot <= 0.0 {
+            return Err(Error::Validation(format!(
+                "process '{tag}' needs a strictly positive initial spot, got {spot}"
+            )));
+        }
+        if variance.to_bits() != v0.to_bits() {
+            return Err(Error::Validation(format!(
+                "process '{tag}' needs initial_state[1] to equal the v0 parameter {v0}, \
+                 got {variance}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Serialized tag of a scheme, used in error messages.

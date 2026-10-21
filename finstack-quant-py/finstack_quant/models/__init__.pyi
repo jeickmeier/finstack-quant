@@ -1080,7 +1080,7 @@ def asian_option_price(
     vol: float,
     expiry: float,
     num_fixings: int,
-    averaging: str = "arithmetic",
+    averaging: str | None = None,
     is_call: bool = True,
 ) -> float:
     """
@@ -1102,8 +1102,9 @@ def asian_option_price(
         Time to expiry in years.
     num_fixings : int
         Positive number of equally spaced averaging fixings.
-    averaging : str, default "arithmetic"
-        ``"arithmetic"`` (Turnbull-Wakeman) or ``"geometric"`` (Kemna-Vorst).
+    averaging : str or None, default None
+        ``"arithmetic"`` (Turnbull-Wakeman) or ``"geometric"`` (Kemna-Vorst);
+        ``None`` selects arithmetic.
     is_call : bool, default True
         ``True`` for a call, ``False`` for a put.
 

@@ -22,6 +22,16 @@ fn py_opt(value: Option<f64>) -> String {
     value.map_or_else(|| "None".to_owned(), |v| v.to_string())
 }
 
+/// Source kind label and issuer id of a residual contribution.
+fn residual_source_parts(source: &ResidualContributionSource) -> (&'static str, Option<&str>) {
+    match source {
+        ResidualContributionSource::FromCreditModel { issuer_id } => {
+            ("from_credit_model", Some(issuer_id.as_str()))
+        }
+        ResidualContributionSource::Other => ("other", None),
+    }
+}
+
 /// Aggregate contribution of a single factor to portfolio risk.
 #[pyclass(
     name = "FactorContribution",
@@ -244,21 +254,15 @@ impl PyPositionResidualContribution {
     /// Source kind: ``"from_credit_model"`` or ``"other"``.
     #[getter]
     fn source_kind(&self) -> &'static str {
-        match &self.inner.source {
-            ResidualContributionSource::FromCreditModel { .. } => "from_credit_model",
-            ResidualContributionSource::Other => "other",
-        }
+        residual_source_parts(&self.inner.source).0
     }
 
     /// Issuer ID when ``source_kind == "from_credit_model"``, ``None`` otherwise.
     #[getter]
     fn source_issuer_id(&self) -> Option<String> {
-        match &self.inner.source {
-            ResidualContributionSource::FromCreditModel { issuer_id } => {
-                Some(issuer_id.as_str().to_owned())
-            }
-            ResidualContributionSource::Other => None,
-        }
+        residual_source_parts(&self.inner.source)
+            .1
+            .map(str::to_owned)
     }
 
     /// Export this contribution as a single-row pandas ``DataFrame``.
@@ -460,22 +464,10 @@ impl PyRiskDecomposition {
         let rows = &self.inner.position_residual_contributions;
         let position_ids: Vec<&str> = rows.iter().map(|c| c.position_id.as_str()).collect();
         let residual_variances: Vec<f64> = rows.iter().map(|c| c.residual_variance).collect();
-        let source_kinds: Vec<&str> = rows
+        let (source_kinds, source_issuer_ids): (Vec<&str>, Vec<Option<&str>>) = rows
             .iter()
-            .map(|c| match &c.source {
-                ResidualContributionSource::FromCreditModel { .. } => "from_credit_model",
-                ResidualContributionSource::Other => "other",
-            })
-            .collect();
-        let source_issuer_ids: Vec<Option<&str>> = rows
-            .iter()
-            .map(|c| match &c.source {
-                ResidualContributionSource::FromCreditModel { issuer_id } => {
-                    Some(issuer_id.as_str())
-                }
-                ResidualContributionSource::Other => None,
-            })
-            .collect();
+            .map(|c| residual_source_parts(&c.source))
+            .unzip();
         let data = PyDict::new(py);
         data.set_item("position_id", position_ids)?;
         data.set_item("residual_variance", residual_variances)?;

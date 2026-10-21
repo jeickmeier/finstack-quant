@@ -10,10 +10,10 @@
 use crate::bindings::macros::wire_methods;
 use finstack_quant_core::wire::serde_label;
 use finstack_quant_models::volatility::arbitrage::{
-    self as model_arbitrage, ArbitrageReport, ArbitrageSeverity, ArbitrageType, ArbitrageViolation,
+    self as model_arbitrage, ArbitrageReport, ArbitrageViolation,
 };
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyModule};
+use pyo3::types::PyModule;
 
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe, serde_to_py};
 use crate::errors::core_to_py;
@@ -97,46 +97,16 @@ impl PyArbitrageReport {
         violations_to_pylist(py, &self.inner.violations)
     }
 
-    /// Violation counts keyed by severity name, every severity present.
+    /// Violation counts keyed by severity name; only severities that occur.
     #[getter]
-    fn by_severity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let by_sev = PyDict::new(py);
-        for sev in [
-            ArbitrageSeverity::Negligible,
-            ArbitrageSeverity::Minor,
-            ArbitrageSeverity::Major,
-            ArbitrageSeverity::Critical,
-        ] {
-            by_sev.set_item(
-                serde_label(&sev).map_err(core_to_py)?,
-                self.inner
-                    .counts_by_severity
-                    .get(&sev)
-                    .copied()
-                    .unwrap_or(0),
-            )?;
-        }
-        Ok(by_sev)
+    fn by_severity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.counts_by_severity)
     }
 
-    /// Violation counts keyed by check type, every ``ArbitrageType`` present.
+    /// Violation counts keyed by check type; only check types that occur.
     #[getter]
-    fn by_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let by_type = PyDict::new(py);
-        for t in [
-            ArbitrageType::Butterfly,
-            ArbitrageType::CalendarSpread,
-            ArbitrageType::LocalVolDensity,
-            ArbitrageType::SviMomentBound,
-            ArbitrageType::SviButterflyCondition,
-            ArbitrageType::SviCalendarSpread,
-        ] {
-            by_type.set_item(
-                serde_label(&t).map_err(core_to_py)?,
-                self.inner.counts_by_type.get(&t).copied().unwrap_or(0),
-            )?;
-        }
-        Ok(by_type)
+    fn by_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.counts_by_type)
     }
 
     /// One row per violation as a ``pandas.DataFrame``.

@@ -159,6 +159,51 @@ impl HestonParams {
         sigma_v: f64,
         rho: f64,
     ) -> finstack_quant_core::Result<Self> {
+        let params = Self {
+            v0,
+            kappa,
+            theta,
+            sigma_v,
+            rho,
+        };
+        params.validate()?;
+
+        if !params.satisfies_feller() {
+            tracing::warn!(
+                v0 = v0,
+                kappa = kappa,
+                theta = theta,
+                sigma_v = sigma_v,
+                rho = rho,
+                feller_lhs = 2.0 * kappa * theta,
+                feller_rhs = sigma_v * sigma_v,
+                "Heston Feller condition violated (2*kappa*theta <= sigma_v^2). \
+                 Variance process can reach zero. This is acceptable for Fourier pricing \
+                 but may cause issues in Monte Carlo simulation.",
+            );
+        }
+
+        Ok(params)
+    }
+
+    /// Check the parameter domains that [`Self::new`] enforces.
+    ///
+    /// The fields are public, so a value built as a struct literal skips
+    /// [`Self::new`]; callers that accept such values run this before use.
+    /// Unlike [`Self::new`] it logs no Feller warning.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] under the conditions
+    /// listed on [`Self::new`].
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        let Self {
+            v0,
+            kappa,
+            theta,
+            sigma_v,
+            rho,
+        } = *self;
         if v0 <= 0.0 || !v0.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Heston v0 (initial variance) must be positive, got {v0}"
@@ -185,30 +230,7 @@ impl HestonParams {
             )));
         }
 
-        let params = Self {
-            v0,
-            kappa,
-            theta,
-            sigma_v,
-            rho,
-        };
-
-        if !params.satisfies_feller() {
-            tracing::warn!(
-                v0 = v0,
-                kappa = kappa,
-                theta = theta,
-                sigma_v = sigma_v,
-                rho = rho,
-                feller_lhs = 2.0 * kappa * theta,
-                feller_rhs = sigma_v * sigma_v,
-                "Heston Feller condition violated (2*kappa*theta <= sigma_v^2). \
-                 Variance process can reach zero. This is acceptable for Fourier pricing \
-                 but may cause issues in Monte Carlo simulation.",
-            );
-        }
-
-        Ok(params)
+        Ok(())
     }
 
     /// Check whether the inclusive Feller condition (2κθ ≥ σ²) is satisfied.
@@ -218,7 +240,11 @@ impl HestonParams {
     /// issues in Monte Carlo simulation (though Fourier pricing remains valid).
     #[must_use]
     pub fn satisfies_feller(&self) -> bool {
-        2.0 * self.kappa * self.theta >= self.sigma_v * self.sigma_v
+        crate::monte_carlo::process::heston::heston_satisfies_feller(
+            self.kappa,
+            self.theta,
+            self.sigma_v,
+        )
     }
 
     /// Return deterministic average variance over `[0, t]`.

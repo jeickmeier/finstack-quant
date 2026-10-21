@@ -12,8 +12,8 @@ use crate::utils::input::{
     from_js_json, js_bool, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_opt_u64, js_opt_uint,
     js_u64,
 };
-use std::str::FromStr;
 
+use crate::utils::wire::js_opt_parse;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
@@ -94,7 +94,7 @@ pub fn price_heston(
     // The canonical entry point owns the registry defaults for path count,
     // seed, step count, currency, and (wasm-gated) parallelism; the binding
     // only marshals explicitly supplied values.
-    let ccy = js_opt_currency(currency.as_ref())?;
+    let currency = js_opt_currency(currency.as_ref())?;
     let est = canonical::price_heston(
         option_type,
         spot,
@@ -110,7 +110,7 @@ pub fn price_heston(
         num_paths,
         seed,
         num_steps,
-        ccy,
+        currency,
     )
     .map_err(to_js_err)?;
     crate::utils::to_js_value(&est)
@@ -144,10 +144,10 @@ fn gbm_inputs(
     })
 }
 
+/// `FromStr`, not `js_opt_wire`: currency codes parse case-insensitively,
+/// which the strict serde names would not.
 fn js_opt_currency(currency: Option<&JsValue>) -> Result<Option<Currency>, JsValue> {
-    js_opt_string(currency, "currency")?
-        .map(|code| Currency::from_str(&code).map_err(to_js_err))
-        .transpose()
+    js_opt_parse(currency, "currency")
 }
 
 /// Whether Heston parameters satisfy the Feller condition `2 * kappa * theta >= volOfVol^2`.

@@ -8,6 +8,7 @@ use crate::monte_carlo::engine::simulate_path_fractional;
 use crate::monte_carlo::rng::fbm::FractionalNoiseGenerator;
 use crate::monte_carlo::rng::volterra::RiemannLiouvilleVolterra;
 use crate::monte_carlo::traits::{PathState, Payoff};
+use crate::volatility::heston::HestonParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::term_structures::ForwardVarianceCurve;
 use finstack_quant_core::math::fractional::HurstExponent;
@@ -60,11 +61,13 @@ fn rough_heston_params() -> RoughHestonParams {
         r: 0.03,
         q: 0.01,
         hurst: hurst(),
-        kappa: 2.0,
-        theta: 0.04,
-        sigma_v: 0.3,
-        rho: -0.7,
-        v0: 0.04,
+        model: HestonParams {
+            v0: 0.04,
+            kappa: 2.0,
+            theta: 0.04,
+            sigma_v: 0.3,
+            rho: -0.7,
+        },
     }
 }
 
@@ -408,7 +411,7 @@ fn lmm_streams_match_the_pricer_loop() {
     s.num_paths = 5;
     let out = simulate_paths(&s).unwrap();
 
-    let process = LmmProcess::new(params.clone().validate().unwrap());
+    let process = LmmProcess::new(params.clone());
     let disc = LmmPredictorCorrector::new();
     let time_grid = TimeGrid::uniform(1.0, STEPS).unwrap();
     let root = PhiloxRng::new(s.seed);
@@ -445,7 +448,7 @@ fn rough_heston_streams_match_the_engine() {
         6,
     );
     s.num_paths = 8;
-    let process = RoughHestonProcess::new(rough_heston_params().validate().unwrap());
+    let process = RoughHestonProcess::new(rough_heston_params());
     let times: Vec<f64> = (0..=6).map(|i| 1.0 * i as f64 / 6.0).collect();
     let scheme = RoughHestonHybrid::new(&times, 0.1).unwrap();
     assert_eq!(
@@ -686,7 +689,7 @@ fn out_of_range_parameters_and_grids_are_errors() {
     assert!(run(ProcessSpec::RoughBergomi(bergomi), &[100.0]).contains("eta"));
 
     let mut heston = rough_heston_params();
-    heston.kappa = 0.0;
+    heston.model.kappa = 0.0;
     assert!(run(ProcessSpec::RoughHeston(heston), &[100.0, 0.04]).contains("kappa"));
     // The hybrid kernel is defined for rough exponents only.
     let mut heston = rough_heston_params();

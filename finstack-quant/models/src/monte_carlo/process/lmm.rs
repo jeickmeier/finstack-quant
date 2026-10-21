@@ -85,8 +85,7 @@ impl LmmParams {
     ///
     /// Returns an error if dimensions are inconsistent, factor count is out of
     /// range, or any input is non-finite.
-    #[must_use = "validation returns the validated parameter set"]
-    pub fn validate(self) -> finstack_quant_core::Result<Self> {
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
         let Self {
             num_forwards,
             num_factors,
@@ -97,6 +96,7 @@ impl LmmParams {
             vol_values,
             initial_forwards,
         } = self;
+        let (num_forwards, num_factors) = (*num_forwards, *num_factors);
         if num_forwards == 0 {
             return Err(finstack_quant_core::Error::Validation(
                 "LMM requires at least one forward rate".to_string(),
@@ -195,16 +195,7 @@ impl LmmParams {
             ));
         }
 
-        Ok(Self {
-            num_forwards,
-            num_factors,
-            tenors,
-            accrual_factors,
-            displacements,
-            vol_times,
-            vol_values,
-            initial_forwards,
-        })
+        Ok(())
     }
 
     /// Return the vol period index for time t.
@@ -342,7 +333,7 @@ impl StochasticProcess for LmmProcess {
         &self,
         time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
     ) -> finstack_quant_core::Result<()> {
-        self.params.clone().validate()?;
+        self.params.validate()?;
         // Require exact nodes: accepting a near-knot start while selecting
         // loadings at the unadjusted time would use the previous volatility
         // regime for the entire following interval.
@@ -467,8 +458,6 @@ mod tests {
             ]],
             initial_forwards: vec![0.03, 0.03, 0.03],
         }
-        .validate()
-        .expect("valid params")
     }
 
     #[test]
@@ -632,9 +621,7 @@ mod tests {
                 vec![[0.15, 0.04, 0.0], [0.13, 0.05, 0.0]], // period 1: [0.5, ∞)
             ],
             initial_forwards: vec![0.03, 0.03],
-        }
-        .validate()
-        .expect("valid");
+        };
         assert_eq!(p.vol_period(0.25), 0);
         assert_eq!(p.vol_period(0.5), 1);
         assert_eq!(p.vol_period(0.75), 1);

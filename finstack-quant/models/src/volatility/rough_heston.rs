@@ -54,6 +54,9 @@ use num_complex::Complex64;
 use std::f64::consts::PI;
 
 use finstack_quant_core::math::special_functions::ln_gamma;
+use std::ops::Deref;
+
+use super::heston::HestonParams;
 
 /// Maximum real part of exponents to avoid overflow in `exp()`.
 const EXPONENT_REAL_LIMIT: f64 = 700.0;
@@ -260,7 +263,7 @@ impl FractionalRiccatiSolver {
 /// | v0 | v₀ | > 0 | Initial variance |
 /// | kappa | κ | > 0 | Mean reversion speed |
 /// | theta | θ | > 0 | Long-run variance |
-/// | sigma | σ | > 0 | Vol-of-vol |
+/// | sigma_v | σᵥ | > 0 | Vol-of-vol |
 /// | rho | ρ | (−1, 1) | Spot-vol correlation |
 /// | hurst | H | (0, 0.5) | Roughness (Hurst exponent) |
 ///
@@ -277,31 +280,29 @@ impl FractionalRiccatiSolver {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawRoughHestonFourierParams")]
 pub struct RoughHestonFourierParams {
-    /// Initial variance (v₀ > 0).
-    pub v0: f64,
-    /// Mean reversion speed (κ > 0).
-    pub kappa: f64,
-    /// Long-run variance (θ > 0).
-    pub theta: f64,
-    /// Vol-of-vol (σ > 0).
-    pub sigma: f64,
-    /// Spot-vol correlation (−1 < ρ < 1).
-    ///
-    /// Strict inequality is required for the Fourier pricer because ρ = ±1
-    /// makes the correlation matrix singular, causing numerical instability
-    /// in the characteristic function. The MC process `RoughHestonParams` in
-    /// `finstack_quant_models::monte_carlo::process::rough_heston` allows ρ ∈ \[−1, 1\]
-    /// because QE-style schemes can handle degenerate correlation.
-    pub rho: f64,
+    /// Variance-process parameters (v₀, κ, θ, σᵥ, ρ), the canonical Heston
+    /// block shared with the Monte Carlo `RoughHestonParams`; ρ ∈ (−1, 1)
+    /// keeps the correlation matrix non-singular for the characteristic
+    /// function.
+    #[serde(flatten)]
+    pub model: HestonParams,
     /// Hurst exponent (0 < H < 0.5 for rough regime).
     pub hurst: f64,
 }
 
+impl Deref for RoughHestonFourierParams {
+    type Target = HestonParams;
+
+    fn deref(&self) -> &Self::Target {
+        &self.model
+    }
+}
+
 /// Raw deserialization state of [`RoughHestonFourierParams`].
 ///
-/// Mirrors the serialized field layout exactly so the wire format is
-/// unchanged; conversion runs [`RoughHestonFourierParams::new`] validation
-/// and rejects unknown fields.
+/// Mirrors the serialized (flat) field layout exactly; conversion runs
+/// [`RoughHestonFourierParams::new`] validation. Flat rather than a flattened
+/// [`HestonParams`] because serde's `flatten` ignores unknown fields.
 #[derive(Debug, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -313,7 +314,7 @@ struct RawRoughHestonFourierParams {
     /// Long-run variance.
     theta: f64,
     /// Vol-of-vol.
-    sigma: f64,
+    sigma_v: f64,
     /// Spot-vol correlation.
     rho: f64,
     /// Hurst exponent.
@@ -324,7 +325,14 @@ impl TryFrom<RawRoughHestonFourierParams> for RoughHestonFourierParams {
     type Error = finstack_quant_core::Error;
 
     fn try_from(raw: RawRoughHestonFourierParams) -> finstack_quant_core::Result<Self> {
-        Self::new(raw.v0, raw.kappa, raw.theta, raw.sigma, raw.rho, raw.hurst)
+        Self::new(
+            raw.v0,
+            raw.kappa,
+            raw.theta,
+            raw.sigma_v,
+            raw.rho,
+            raw.hurst,
+        )
     }
 }
 
@@ -353,62 +361,39 @@ const GL_ORDER: usize = 16;
 impl RoughHestonFourierParams {
     /// Construct validated rough Heston parameters.
     ///
+    /// # Arguments
+    ///
+    /// * `v0` - Positive initial variance level.
+    /// * `kappa` - Positive annual mean-reversion speed of variance.
+    /// * `theta` - Positive long-run variance level.
+    /// * `sigma_v` - Positive annualized volatility of variance.
+    /// * `rho` - Spot-variance correlation in the open interval `(-1, 1)`.
+    /// * `hurst` - Hurst exponent in the open interval `(0, 0.5)`.
+    ///
     /// # Errors
     ///
     /// Returns an error if:
     /// - `v0 <= 0` or non-finite
     /// - `kappa <= 0` or non-finite
     /// - `theta <= 0` or non-finite
-    /// - `sigma <= 0` or non-finite
+    /// - `sigma_v <= 0` or non-finite
     /// - `rho` not in `(-1, 1)` or non-finite
     /// - `hurst` not in `(0, 0.5)` or non-finite
     pub fn new(
         v0: f64,
         kappa: f64,
         theta: f64,
-        sigma: f64,
+        sigma_v: f64,
         rho: f64,
         hurst: f64,
     ) -> finstack_quant_core::Result<Self> {
-        if v0 <= 0.0 || !v0.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "RoughHeston v0 (initial variance) must be positive, got {v0}"
-            )));
-        }
-        if kappa <= 0.0 || !kappa.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "RoughHeston kappa (mean reversion) must be positive, got {kappa}"
-            )));
-        }
-        if theta <= 0.0 || !theta.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "RoughHeston theta (long-run variance) must be positive, got {theta}"
-            )));
-        }
-        if sigma <= 0.0 || !sigma.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "RoughHeston sigma (vol-of-vol) must be positive, got {sigma}"
-            )));
-        }
-        if rho <= -1.0 || rho >= 1.0 || !rho.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "RoughHeston rho (correlation) must be in (-1, 1), got {rho}"
-            )));
-        }
+        let model = HestonParams::new(v0, kappa, theta, sigma_v, rho)?;
         if hurst <= 0.0 || hurst >= 0.5 || !hurst.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "RoughHeston hurst must be in (0, 0.5), got {hurst}"
             )));
         }
-
-        Ok(Self {
-            v0,
-            kappa,
-            theta,
-            sigma,
-            rho,
-            hurst,
-        })
+        Ok(Self { model, hurst })
     }
 
     /// Compute the risk-neutral characteristic function φ(u, T).
@@ -466,7 +451,7 @@ impl RoughHestonFourierParams {
         solver: &FractionalRiccatiSolver,
         u: Complex64,
     ) -> Option<Complex64> {
-        let trajectory = solver.solve_d(u, self.kappa, self.sigma, self.rho);
+        let trajectory = solver.solve_d(u, self.kappa, self.sigma_v, self.rho);
         let exponent = solver.solve_c(&trajectory, self.kappa, self.theta)
             + solver.fractional_integral_d(&trajectory) * self.v0;
         if !exponent.is_finite() || exponent.re > EXPONENT_REAL_LIMIT {
@@ -698,10 +683,14 @@ mod tests {
 
     #[test]
     fn failed_rough_heston_nodes_remain_visible() {
+        let base = RoughHestonFourierParams::new(0.04, 2.0, 0.04, 0.3, -0.7, 0.1)
+            .expect("valid base parameters");
         let params = RoughHestonFourierParams {
-            sigma: f64::INFINITY,
-            ..RoughHestonFourierParams::new(0.04, 2.0, 0.04, 0.3, -0.7, 0.1)
-                .expect("valid base parameters")
+            model: HestonParams {
+                sigma_v: f64::INFINITY,
+                ..base.model
+            },
+            ..base
         };
         assert!(params
             .price_european(100.0, 100.0, 0.0, 0.0, 1.0, true)

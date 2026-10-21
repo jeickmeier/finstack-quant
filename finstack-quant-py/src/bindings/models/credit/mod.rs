@@ -17,7 +17,8 @@ use crate::bindings::extract::extract_credit_rating;
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_object_to_single_row_dataframe, serde_to_py, values_to_series,
 };
-use crate::errors::{core_to_py, value_error};
+use crate::errors::core_to_py;
+use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::credit::{
     moodys_warf_factor as rust_moodys_warf_factor, AssetDynamics, CreditState, CreditStateVariable,
     DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel, RatingFactorTable,
@@ -1383,12 +1384,8 @@ impl PyToggleExerciseModel {
     #[staticmethod]
     #[pyo3(text_signature = "(variable, threshold, direction)")]
     fn threshold(variable: &str, threshold: f64, direction: &str) -> PyResult<Self> {
-        let variable = variable
-            .parse::<CreditStateVariable>()
-            .map_err(value_error)?;
-        let direction = direction
-            .parse::<ThresholdDirection>()
-            .map_err(value_error)?;
+        let variable = serde_parse::<CreditStateVariable>(variable).map_err(core_to_py)?;
+        let direction = serde_parse::<ThresholdDirection>(direction).map_err(core_to_py)?;
         ToggleExerciseModel::threshold(variable, threshold, direction)
             .map(|inner| Self { inner })
             .map_err(core_to_py)
@@ -1411,9 +1408,7 @@ impl PyToggleExerciseModel {
     #[staticmethod]
     #[pyo3(text_signature = "(variable, intercept, sensitivity)")]
     fn stochastic(variable: &str, intercept: f64, sensitivity: f64) -> PyResult<Self> {
-        let variable = variable
-            .parse::<CreditStateVariable>()
-            .map_err(value_error)?;
+        let variable = serde_parse::<CreditStateVariable>(variable).map_err(core_to_py)?;
         ToggleExerciseModel::stochastic(variable, intercept, sensitivity)
             .map(|inner| Self { inner })
             .map_err(core_to_py)
@@ -1482,12 +1477,8 @@ impl PyToggleExerciseModel {
     /// the canonical serde tag, so it also names the single key in the
     /// ``to_json`` payload.
     #[getter]
-    fn kind(&self) -> &'static str {
-        match &self.inner {
-            ToggleExerciseModel::Threshold(_) => "threshold",
-            ToggleExerciseModel::Stochastic(_) => "stochastic",
-            ToggleExerciseModel::OptimalExercise(_) => "optimal_exercise",
-        }
+    fn kind(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
     /// Parameters of the active rule, as a mapping in canonical JSON form.

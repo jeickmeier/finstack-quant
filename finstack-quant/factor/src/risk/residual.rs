@@ -1,9 +1,10 @@
 //! Residual-risk overlays for additive factor decompositions.
 
 use super::parametric::scale_for_measure;
+use super::tail_multipliers;
 use super::types::{PositionResidualContribution, RiskDecomposition};
 use crate::RiskMeasure;
-use finstack_quant_core::math::{norm_pdf, standard_normal_inv_cdf};
+use finstack_quant_core::math::standard_normal_inv_cdf;
 
 /// Add one residual-risk overlay to a factor-only decomposition.
 ///
@@ -126,8 +127,7 @@ fn variance_from_measure(
             }
         }
         RiskMeasure::ExpectedShortfall { confidence } => {
-            let z = standard_normal_inv_cdf(confidence);
-            let es_multiplier = norm_pdf(z) / (1.0 - confidence);
+            let (_, es_multiplier) = tail_multipliers(confidence);
             if es_multiplier > 0.0 {
                 (total_risk / -es_multiplier).powi(2)
             } else {

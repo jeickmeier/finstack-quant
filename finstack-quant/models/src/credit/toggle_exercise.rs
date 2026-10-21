@@ -29,7 +29,6 @@
 use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 /// Observable credit state at a point in time.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -127,22 +126,6 @@ pub enum CreditStateVariable {
     Leverage,
 }
 
-impl FromStr for CreditStateVariable {
-    type Err = String;
-
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
-        match value {
-            "hazard_rate" => Ok(Self::HazardRate),
-            "distance_to_default" => Ok(Self::DistanceToDefault),
-            "leverage" => Ok(Self::Leverage),
-            other => Err(format!(
-                "unknown credit state variable: {other} \
-                 (expected one of hazard_rate, distance_to_default, leverage)"
-            )),
-        }
-    }
-}
-
 /// Direction for threshold comparison.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -152,20 +135,6 @@ pub enum ThresholdDirection {
     Above,
     /// PIK when state < threshold (e.g., distance-to-default below limit).
     Below,
-}
-
-impl FromStr for ThresholdDirection {
-    type Err = String;
-
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
-        match value {
-            "above" => Ok(Self::Above),
-            "below" => Ok(Self::Below),
-            other => Err(format!(
-                "unknown threshold direction: {other} (expected one of above, below)"
-            )),
-        }
-    }
 }
 
 /// Toggle exercise model for PIK/cash decision.
@@ -598,40 +567,30 @@ mod tests {
     use finstack_quant_core::math::random::Pcg64Rng;
 
     #[test]
-    fn parses_credit_state_variable_names() {
-        assert!(matches!(
-            "hazard_rate".parse::<CreditStateVariable>(),
-            Ok(CreditStateVariable::HazardRate)
-        ));
-        assert!(matches!(
-            "distance_to_default".parse::<CreditStateVariable>(),
-            Ok(CreditStateVariable::DistanceToDefault)
-        ));
-        assert!(matches!(
-            "leverage".parse::<CreditStateVariable>(),
-            Ok(CreditStateVariable::Leverage)
-        ));
+    fn credit_state_labels_are_the_serde_names() {
+        use finstack_quant_core::wire::serde_parse;
         assert_eq!(
-            "spread".parse::<CreditStateVariable>().unwrap_err(),
-            "unknown credit state variable: spread \
-             (expected one of hazard_rate, distance_to_default, leverage)"
+            serde_parse::<CreditStateVariable>("hazard_rate").unwrap(),
+            CreditStateVariable::HazardRate
         );
-    }
-
-    #[test]
-    fn parses_threshold_direction_names() {
-        assert!(matches!(
-            "above".parse::<ThresholdDirection>(),
-            Ok(ThresholdDirection::Above)
-        ));
-        assert!(matches!(
-            "below".parse::<ThresholdDirection>(),
-            Ok(ThresholdDirection::Below)
-        ));
         assert_eq!(
-            "crossed".parse::<ThresholdDirection>().unwrap_err(),
-            "unknown threshold direction: crossed (expected one of above, below)"
+            serde_parse::<CreditStateVariable>("distance_to_default").unwrap(),
+            CreditStateVariable::DistanceToDefault
         );
+        assert_eq!(
+            serde_parse::<CreditStateVariable>("leverage").unwrap(),
+            CreditStateVariable::Leverage
+        );
+        assert!(serde_parse::<CreditStateVariable>("spread").is_err());
+        assert_eq!(
+            serde_parse::<ThresholdDirection>("above").unwrap(),
+            ThresholdDirection::Above
+        );
+        assert_eq!(
+            serde_parse::<ThresholdDirection>("below").unwrap(),
+            ThresholdDirection::Below
+        );
+        assert!(serde_parse::<ThresholdDirection>("crossed").is_err());
     }
 
     /// The constructors reject non-finite parameters, which JSON cannot

@@ -109,12 +109,14 @@ impl RiskMeasure {
     }
 }
 
-fn validate_confidence(confidence: f64) -> finstack_quant_core::Result<()> {
+/// Tail confidence check shared by [`RiskMeasure`] and the risk decomposers:
+/// finite and in the open interval `(0.5, 1)`.
+pub(crate) fn validate_confidence(confidence: f64) -> finstack_quant_core::Result<()> {
     if confidence.is_finite() && confidence > 0.5 && confidence < 1.0 {
         Ok(())
     } else {
         Err(finstack_quant_core::Error::Validation(format!(
-            "RiskMeasure confidence must be in the open interval (0.5, 1), got {confidence}"
+            "confidence must be finite and in the open interval (0.5, 1), got {confidence}"
         )))
     }
 }

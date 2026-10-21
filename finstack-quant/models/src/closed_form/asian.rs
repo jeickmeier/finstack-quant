@@ -166,6 +166,7 @@
 //!
 //! - Monte Carlo pricing for exact arithmetic average pricing
 
+use super::vanilla::{require_finite, require_finite_non_negative, require_finite_positive};
 use super::{black_call, black_put};
 use crate::types::OptionType;
 use finstack_quant_core::math::NeumaierAccumulator;
@@ -418,29 +419,12 @@ fn validate_asian_times_inputs(
     div_yield: f64,
     vol: f64,
 ) -> Result<()> {
-    for (name, value) in [("spot", spot), ("strike", strike)] {
-        if !value.is_finite() || value <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Asian {name} must be finite and positive, got {value}"
-            )));
-        }
-    }
-    if !t_expiry.is_finite() || t_expiry < 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Asian t_expiry must be finite and non-negative, got {t_expiry}"
-        )));
-    }
-    if !div_yield.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Asian div_yield must be finite, got {div_yield}"
-        )));
-    }
-    if !vol.is_finite() || vol < 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Asian vol must be finite and non-negative, got {vol}"
-        )));
-    }
-    Ok(())
+    const MODEL: &str = "Asian";
+    require_finite_positive(MODEL, "spot", spot)?;
+    require_finite_positive(MODEL, "strike", strike)?;
+    require_finite_non_negative(MODEL, "t_expiry", t_expiry)?;
+    require_finite(MODEL, "div_yield", div_yield)?;
+    require_finite_non_negative(MODEL, "vol", vol)
 }
 
 /// Validate a general fixing-time schedule: non-empty, finite, strictly

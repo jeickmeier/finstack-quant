@@ -52,20 +52,17 @@
 //!     RoughHestonProcess, RoughHestonParams,
 //! };
 //! use finstack_quant_models::monte_carlo::traits::StochasticProcess;
+//! use finstack_quant_models::volatility::heston::HestonParams;
 //! use finstack_quant_core::math::fractional::HurstExponent;
 //!
 //! let params = RoughHestonParams {
 //!     r: 0.05,                                  // r = 5%
 //!     q: 0.02,                                  // q = 2%
 //!     hurst: HurstExponent::new(0.1).unwrap(),  // H = 0.1 (rough)
-//!     kappa: 2.0,                               // κ = mean reversion
-//!     theta: 0.04,                              // θ = long-run variance
-//!     sigma_v: 0.3,                             // σᵥ = vol-of-vol
-//!     rho: -0.7,                                // ρ = spot-vol correlation
-//!     v0: 0.04,                                 // v₀ = initial variance
-//! }
-//! .validate()
-//! .unwrap();
+//!     // v₀, κ, θ, σᵥ, ρ
+//!     model: HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.7).unwrap(),
+//! };
+//! params.validate().unwrap();
 //!
 //! let process = RoughHestonProcess::new(params);
 //! assert_eq!(process.dim(), 2);
@@ -75,16 +72,20 @@
 use super::super::paths::ProcessParams;
 use super::super::traits::{PathState, StateKey, StochasticProcess};
 use crate::monte_carlo::traits::ProcessMetadata;
+use crate::volatility::heston::HestonParams;
 use finstack_quant_core::math::fractional::HurstExponent;
+use std::ops::Deref;
 
 /// Rough Heston model parameters.
 ///
-/// All parameters must be finite.  Positivity constraints apply to `kappa`,
-/// `theta`, `sigma_v`, and `v0`.  The Hurst exponent is validated by
-/// [`HurstExponent`]; a warning is logged when `H ≥ 0.5` (non-rough regime).
+/// The variance block (v₀, κ, θ, σᵥ, ρ) is the canonical [`HestonParams`],
+/// flattened on the wire, so rough Heston shares the classical Heston domain
+/// checks: positive v₀, κ, θ, σᵥ and ρ ∈ (−1, 1). `r` and `q` must be finite.
+/// The Hurst exponent is validated by [`HurstExponent`]; a warning is logged
+/// when `H ≥ 0.5` (non-rough regime).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(from = "RawRoughHestonParams")]
 pub struct RoughHestonParams {
     /// Risk-free rate (annual, continuously compounded).
     pub r: f64,
@@ -92,37 +93,72 @@ pub struct RoughHestonParams {
     pub q: f64,
     /// Hurst exponent H ∈ (0, 0.5) — controls the roughness of the variance.
     pub hurst: HurstExponent,
+    /// Variance-process parameters (v₀, κ, θ, σᵥ, ρ).
+    #[serde(flatten)]
+    pub model: HestonParams,
+}
+
+/// Raw deserialization state of [`RoughHestonParams`]: the flat wire layout.
+///
+/// Flat rather than a flattened [`HestonParams`] because serde's `flatten`
+/// ignores unknown fields. Like a struct literal, it does not validate;
+/// [`RoughHestonParams::validate`] runs before use.
+#[derive(Debug, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct RawRoughHestonParams {
+    /// Risk-free rate (annual, continuously compounded).
+    r: f64,
+    /// Dividend yield (annual, continuously compounded).
+    q: f64,
+    /// Hurst exponent H ∈ (0, 0.5) — controls the roughness of the variance.
+    hurst: HurstExponent,
     /// Mean reversion speed (κ > 0).
-    pub kappa: f64,
+    kappa: f64,
     /// Long-run variance level (θ > 0).
-    pub theta: f64,
+    theta: f64,
     /// Volatility of variance — vol-of-vol (σᵥ > 0).
-    pub sigma_v: f64,
-    /// Spot–variance correlation ρ ∈ \[−1, 1\].
-    pub rho: f64,
+    sigma_v: f64,
+    /// Spot–variance correlation ρ ∈ (−1, 1).
+    rho: f64,
     /// Initial variance (v₀ > 0).
-    pub v0: f64,
+    v0: f64,
+}
+
+impl From<RawRoughHestonParams> for RoughHestonParams {
+    fn from(raw: RawRoughHestonParams) -> Self {
+        Self {
+            r: raw.r,
+            q: raw.q,
+            hurst: raw.hurst,
+            model: HestonParams {
+                v0: raw.v0,
+                kappa: raw.kappa,
+                theta: raw.theta,
+                sigma_v: raw.sigma_v,
+                rho: raw.rho,
+            },
+        }
+    }
+}
+
+impl Deref for RoughHestonParams {
+    type Target = HestonParams;
+
+    fn deref(&self) -> &Self::Target {
+        &self.model
+    }
 }
 
 impl RoughHestonParams {
-    /// Validate a cohesive rough Heston parameter set.
+    /// Validate a rough Heston parameter set built from its public fields.
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::Error::Validation`] when any parameter is out
-    /// of range.
-    #[must_use = "validation returns the validated parameter set"]
-    pub fn validate(self) -> finstack_quant_core::Result<Self> {
-        let Self {
-            r,
-            q,
-            hurst,
-            kappa,
-            theta,
-            sigma_v,
-            rho,
-            v0,
-        } = self;
+    /// Returns [`finstack_quant_core::Error::Validation`] when `r` or `q` is
+    /// not finite or the variance block fails [`HestonParams::validate`].
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        let Self { r, q, hurst, model } = self;
         if !r.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Rough Heston parameter r must be finite, got {r}"
@@ -133,31 +169,7 @@ impl RoughHestonParams {
                 "Rough Heston parameter q must be finite, got {q}"
             )));
         }
-        if kappa <= 0.0 || !kappa.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Rough Heston parameter kappa must be positive, got {kappa}"
-            )));
-        }
-        if theta <= 0.0 || !theta.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Rough Heston parameter theta must be positive, got {theta}"
-            )));
-        }
-        if sigma_v <= 0.0 || !sigma_v.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Rough Heston parameter sigma_v must be positive, got {sigma_v}"
-            )));
-        }
-        if !(-1.0..=1.0).contains(&rho) || !rho.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Rough Heston parameter rho must be in [-1, 1], got {rho}"
-            )));
-        }
-        if v0 <= 0.0 || !v0.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Rough Heston parameter v0 must be positive, got {v0}"
-            )));
-        }
+        model.validate()?;
 
         if !hurst.is_rough() {
             tracing::warn!(
@@ -168,17 +180,7 @@ impl RoughHestonParams {
                 hurst.value()
             );
         }
-
-        Ok(Self {
-            r,
-            q,
-            hurst,
-            kappa,
-            theta,
-            sigma_v,
-            rho,
-            v0,
-        })
+        Ok(())
     }
 }
 
@@ -285,11 +287,13 @@ mod tests {
             r: 0.05,
             q: 0.02,
             hurst: make_hurst(0.1),
-            kappa: 2.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: -0.7,
-            v0: 0.04,
+            model: HestonParams {
+                v0: 0.04,
+                kappa: 2.0,
+                theta: 0.04,
+                sigma_v: 0.3,
+                rho: -0.7,
+            },
         }
         .validate();
         assert!(params.is_ok());
@@ -301,11 +305,13 @@ mod tests {
             r: 0.05,
             q: 0.02,
             hurst: make_hurst(0.1),
-            kappa: 2.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: -0.7,
-            v0: 0.04,
+            model: HestonParams {
+                v0: 0.04,
+                kappa: 2.0,
+                theta: 0.04,
+                sigma_v: 0.3,
+                rho: -0.7,
+            },
         };
         let mut json = serde_json::to_value(&params).expect("serialize parameters");
         let restored: RoughHestonParams =
@@ -323,11 +329,13 @@ mod tests {
             r: f64::INFINITY,
             q: 0.02,
             hurst: make_hurst(0.1),
-            kappa: 2.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: -0.7,
-            v0: 0.04,
+            model: HestonParams {
+                v0: 0.04,
+                kappa: 2.0,
+                theta: 0.04,
+                sigma_v: 0.3,
+                rho: -0.7,
+            },
         }
         .validate();
         assert!(res.is_err());
@@ -339,11 +347,13 @@ mod tests {
             r: 0.05,
             q: f64::NAN,
             hurst: make_hurst(0.1),
-            kappa: 2.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: -0.7,
-            v0: 0.04,
+            model: HestonParams {
+                v0: 0.04,
+                kappa: 2.0,
+                theta: 0.04,
+                sigma_v: 0.3,
+                rho: -0.7,
+            },
         }
         .validate();
         assert!(res.is_err());
@@ -355,11 +365,13 @@ mod tests {
             r: 0.05,
             q: 0.02,
             hurst: make_hurst(0.1),
-            kappa: 0.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: -0.7,
-            v0: 0.04,
+            model: HestonParams {
+                v0: 0.04,
+                kappa: 0.0,
+                theta: 0.04,
+                sigma_v: 0.3,
+                rho: -0.7,
+            },
         }
         .validate();
         assert!(res.is_err());
@@ -367,11 +379,13 @@ mod tests {
             r: 0.05,
             q: 0.02,
             hurst: make_hurst(0.1),
-            kappa: -1.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: -0.7,
-            v0: 0.04,
+            model: HestonParams {
+                v0: 0.04,
+                kappa: -1.0,
+                theta: 0.04,
+                sigma_v: 0.3,
+                rho: -0.7,
+            },
         }
         .validate();
         assert!(res.is_err());
@@ -383,11 +397,13 @@ mod tests {
             r: 0.05,
             q: 0.02,
             hurst: make_hurst(0.1),
-            kappa: 2.0,
-            theta: 0.0,
-            sigma_v: 0.3,
-            rho: -0.7,
-            v0: 0.04,
+            model: HestonParams {
+                v0: 0.04,
+                kappa: 2.0,
+                theta: 0.0,
+                sigma_v: 0.3,
+                rho: -0.7,
+            },
         }
         .validate();
         assert!(res.is_err());
@@ -399,11 +415,13 @@ mod tests {
             r: 0.05,
             q: 0.02,
             hurst: make_hurst(0.1),
-            kappa: 2.0,
-            theta: 0.04,
-            sigma_v: 0.0,
-            rho: -0.7,
-            v0: 0.04,
+            model: HestonParams {
+                v0: 0.04,
+                kappa: 2.0,
+                theta: 0.04,
+                sigma_v: 0.0,
+                rho: -0.7,
+            },
         }
         .validate();
         assert!(res.is_err());
@@ -415,11 +433,13 @@ mod tests {
             r: 0.05,
             q: 0.02,
             hurst: make_hurst(0.1),
-            kappa: 2.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: 1.5,
-            v0: 0.04,
+            model: HestonParams {
+                v0: 0.04,
+                kappa: 2.0,
+                theta: 0.04,
+                sigma_v: 0.3,
+                rho: 1.5,
+            },
         }
         .validate();
         assert!(res.is_err());
@@ -427,11 +447,13 @@ mod tests {
             r: 0.05,
             q: 0.02,
             hurst: make_hurst(0.1),
-            kappa: 2.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: -1.5,
-            v0: 0.04,
+            model: HestonParams {
+                v0: 0.04,
+                kappa: 2.0,
+                theta: 0.04,
+                sigma_v: 0.3,
+                rho: -1.5,
+            },
         }
         .validate();
         assert!(res.is_err());
@@ -443,61 +465,53 @@ mod tests {
             r: 0.05,
             q: 0.02,
             hurst: make_hurst(0.1),
-            kappa: 2.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: -0.7,
-            v0: 0.0,
+            model: HestonParams {
+                v0: 0.0,
+                kappa: 2.0,
+                theta: 0.04,
+                sigma_v: 0.3,
+                rho: -0.7,
+            },
         }
         .validate();
         assert!(res.is_err());
     }
 
     #[test]
-    fn test_rho_boundary_values() {
-        // rho = -1 and rho = 1 are valid
-        assert!(RoughHestonParams {
-            r: 0.05,
-            q: 0.02,
-            hurst: make_hurst(0.1),
-            kappa: 2.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: -1.0,
-            v0: 0.04
+    fn test_rho_boundary_values_are_rejected() {
+        // The shared Heston block uses the open interval ρ ∈ (−1, 1).
+        for rho in [-1.0, 1.0] {
+            assert!(RoughHestonParams {
+                r: 0.05,
+                q: 0.02,
+                hurst: make_hurst(0.1),
+                model: HestonParams {
+                    v0: 0.04,
+                    kappa: 2.0,
+                    theta: 0.04,
+                    sigma_v: 0.3,
+                    rho,
+                },
+            }
+            .validate()
+            .is_err());
         }
-        .validate()
-        .is_ok());
-        assert!(RoughHestonParams {
-            r: 0.05,
-            q: 0.02,
-            hurst: make_hurst(0.1),
-            kappa: 2.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: 1.0,
-            v0: 0.04
-        }
-        .validate()
-        .is_ok());
     }
 
     #[test]
     fn test_dim_and_factors() {
-        let process = RoughHestonProcess::new(
-            RoughHestonParams {
-                r: 0.05,
-                q: 0.02,
-                hurst: make_hurst(0.1),
+        let process = RoughHestonProcess::new(RoughHestonParams {
+            r: 0.05,
+            q: 0.02,
+            hurst: make_hurst(0.1),
+            model: HestonParams {
+                v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
                 sigma_v: 0.3,
                 rho: -0.7,
-                v0: 0.04,
-            }
-            .validate()
-            .expect("valid"),
-        );
+            },
+        });
 
         assert_eq!(process.dim(), 2);
         assert_eq!(process.num_factors(), 3);
@@ -505,20 +519,18 @@ mod tests {
 
     #[test]
     fn test_formal_drift_diffusion() {
-        let process = RoughHestonProcess::new(
-            RoughHestonParams {
-                r: 0.05,
-                q: 0.02,
-                hurst: make_hurst(0.1),
+        let process = RoughHestonProcess::new(RoughHestonParams {
+            r: 0.05,
+            q: 0.02,
+            hurst: make_hurst(0.1),
+            model: HestonParams {
+                v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
                 sigma_v: 0.3,
                 rho: -0.7,
-                v0: 0.04,
-            }
-            .validate()
-            .expect("valid"),
-        );
+            },
+        });
 
         let x = vec![100.0_f64, 0.04_f64];
         let mut drift = vec![0.0_f64; 2];
@@ -540,20 +552,18 @@ mod tests {
 
     #[test]
     fn test_metadata_name() {
-        let process = RoughHestonProcess::new(
-            RoughHestonParams {
-                r: 0.05,
-                q: 0.02,
-                hurst: make_hurst(0.1),
+        let process = RoughHestonProcess::new(RoughHestonParams {
+            r: 0.05,
+            q: 0.02,
+            hurst: make_hurst(0.1),
+            model: HestonParams {
+                v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
                 sigma_v: 0.3,
                 rho: -0.7,
-                v0: 0.04,
-            }
-            .validate()
-            .expect("valid"),
-        );
+            },
+        });
 
         let meta = process.metadata();
         assert_eq!(meta.process_type, "RoughHeston");

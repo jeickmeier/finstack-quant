@@ -1852,12 +1852,12 @@ class ArbitrageReport:
     @property
     def by_severity(self) -> dict[Literal["negligible", "minor", "major", "critical"], int]:
         """
-        Violation counts keyed by severity name, every severity present.
+        Violation counts keyed by severity name; only severities that occur.
 
         Returns
         -------
         dict[Literal["negligible", "minor", "major", "critical"], int]
-            Counts per severity label; all four keys are always present, with ``0`` where no violation of that severity occurred.
+            Counts per severity label (the Rust ``counts_by_severity`` map); a severity with no violation is absent, so a clean surface gives ``{}``.
 
         Notes
         -----
@@ -1868,12 +1868,12 @@ class ArbitrageReport:
     @property
     def by_type(self) -> dict[_ArbitrageTypeName, int]:
         """
-        Violation counts keyed by check type, every ``ArbitrageType`` present.
+        Violation counts keyed by check type; only check types that occur.
 
         Returns
         -------
         dict[_ArbitrageTypeName, int]
-            Counts per ``ArbitrageType`` name (butterfly, calendar, and so on); every check type is present, with ``0`` where clean.
+            Counts per ``ArbitrageType`` name (the Rust ``counts_by_type`` map); a clean check type is absent, so a clean surface gives ``{}``.
 
         Notes
         -----
