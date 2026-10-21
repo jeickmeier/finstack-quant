@@ -8,7 +8,7 @@ use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierType;
-use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_exotics::exotics::barrier_option::BarrierOption;
 
 /// Standard curve IDs

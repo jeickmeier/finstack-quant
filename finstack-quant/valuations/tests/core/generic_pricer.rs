@@ -1,6 +1,6 @@
 //! The generic instrument pricer over built-in instruments.
 
-use finstack_quant_valuations::instruments::pricing::GenericInstrumentPricer;
+use finstack_quant_valuations::instruments::common_impl::pricing::GenericInstrumentPricer;
 use finstack_quant_valuations::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };

@@ -12,7 +12,7 @@ use finstack_quant_core::market_data::bumps::{
 };
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::{
     MetricCalculator, MetricContext, MetricRegistry, VOL_POINTS_PER_ABSOLUTE_VOL,
@@ -144,8 +144,8 @@ pub(crate) fn register_commodity_spread_option_metrics(
         metrics: [
             (Delta, SpreadDeltaCalculator { leg: 1 }),
             (Vega, SpreadVegaCalculator { leg: None }),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ],
         custom: [
             ("delta::leg1", SpreadDeltaCalculator { leg: 1 }),

@@ -4,7 +4,7 @@
 //!
 //! The engine that consumes [`MertonMcConfig`] lives with the bond; this
 //! module holds only the serializable vocabulary embedded in
-//! [`ModelConfig`](crate::instruments::ModelConfig).
+//! [`ModelConfig`](crate::instruments::pricing_overrides::ModelConfig).
 
 use finstack_quant_models::credit::dynamic_recovery::DynamicRecoverySpec;
 use finstack_quant_models::credit::endogenous_hazard::EndogenousHazardSpec;
@@ -110,7 +110,7 @@ pub enum PikMode {
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};
+/// use finstack_quant_valuations_core::instruments::{PikMode, PikSchedule};
 ///
 /// // All coupons PIK
 /// let uniform = PikSchedule::Uniform(PikMode::Pik);

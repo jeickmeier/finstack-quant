@@ -244,7 +244,7 @@ mod tests {
     use super::*;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_valuations_core::instruments::OptionType;
+    use finstack_quant_models::types::OptionType;
 
     #[test]
     fn validate_hw_greek_params_accepts_typical_values() {

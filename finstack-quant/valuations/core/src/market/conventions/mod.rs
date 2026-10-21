@@ -30,7 +30,7 @@
 
 /// Data structures for conventions.
 #[doc(hidden)]
-pub mod defs;
+pub(crate) mod defs;
 /// Stable identifiers (typed keys).
 pub mod ids;
 

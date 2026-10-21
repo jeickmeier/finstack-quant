@@ -271,7 +271,7 @@ pub struct XccyConventions {
     /// notional in current FX. Pair conventions registered the other way around (USD
     /// as base) must invert this to `Leg2`. Registry entries must state it
     /// explicitly.
-    pub notional_exchange: crate::instruments::common_impl::parameters::NotionalExchange,
+    pub notional_exchange: crate::instruments::NotionalExchange,
 }
 
 /// Rule for deriving an interest-rate future's reference period from its expiry.

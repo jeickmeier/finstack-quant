@@ -10,12 +10,12 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::BarrierType;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::Monitoring;
-use finstack_quant_valuations_core::instruments::{
-    Attributes, Instrument, OptionType, PricingOptions,
-};
+use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_fx::fx_barrier_option::FxBarrierOption;
 use finstack_quant_valuations_test_support::date::date;

@@ -9,9 +9,9 @@ use finstack_quant_core::market_data::scalars::{
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 pub use finstack_quant_test_utils::assert::relative_eq;
-use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_fixed_income::inflation_linked_bond::{
     DeflationProtection, IndexationMethod, InflationLinkedBond,
 };

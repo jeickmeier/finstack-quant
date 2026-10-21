@@ -3,7 +3,7 @@
 use crate::swaption::Swaption;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::VolatilityModel;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
@@ -162,9 +162,10 @@ mod tests {
     use date_support::date;
     use discount_forward_curve_support::flat_discount_with_tenor;
     use finstack_quant_models::volatility::sabr::SabrParameters;
-    use finstack_quant_valuations_core::instruments::{
-        Instrument, InstrumentPricingOverrides, PricingOptions, ScenarioPricingOverrides,
+    use finstack_quant_valuations_core::instruments::pricing_overrides::{
+        InstrumentPricingOverrides, ScenarioPricingOverrides,
     };
+    use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 
     #[test]
     fn swaption_default_matches_declared_volatility_model_for_pv_and_raw() {

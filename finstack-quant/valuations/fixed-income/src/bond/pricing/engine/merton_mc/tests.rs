@@ -966,7 +966,7 @@ fn antithetic_bridge_uses_complementary_uniform() {
 #[test]
 fn merton_mc_config_roundtrips_via_pricing_overrides_json() {
     // Ensures the canonical nested model configuration can deserialize.
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     let cfg = MertonMcConfig::new(test_merton(), 0.40)
         .expect("0.40 recovery should be valid")
         .pik_schedule(PikSchedule::Uniform(PikMode::Cash))

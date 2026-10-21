@@ -56,11 +56,11 @@ macro_rules! impl_instrument_base {
             self
         }
 
-        fn attributes(&self) -> &$crate::instruments::common_impl::traits::Attributes {
+        fn attributes(&self) -> &::finstack_quant_core::types::Attributes {
             &self.attributes
         }
 
-        fn attributes_mut(&mut self) -> &mut $crate::instruments::common_impl::traits::Attributes {
+        fn attributes_mut(&mut self) -> &mut ::finstack_quant_core::types::Attributes {
             &mut self.attributes
         }
 
@@ -77,37 +77,37 @@ macro_rules! impl_focused_pricing_overrides {
     () => {
         fn get_instrument_pricing_overrides(
             &self,
-        ) -> Option<&$crate::instruments::InstrumentPricingOverrides> {
+        ) -> Option<&$crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
             Some(&self.instrument_pricing_overrides)
         }
 
         fn get_instrument_pricing_overrides_mut(
             &mut self,
-        ) -> Option<&mut $crate::instruments::InstrumentPricingOverrides> {
+        ) -> Option<&mut $crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
             Some(&mut self.instrument_pricing_overrides)
         }
 
         fn get_metric_pricing_overrides(
             &self,
-        ) -> Option<&$crate::instruments::MetricPricingOverrides> {
+        ) -> Option<&$crate::instruments::pricing_overrides::MetricPricingOverrides> {
             Some(&self.metric_pricing_overrides)
         }
 
         fn get_metric_pricing_overrides_mut(
             &mut self,
-        ) -> Option<&mut $crate::instruments::MetricPricingOverrides> {
+        ) -> Option<&mut $crate::instruments::pricing_overrides::MetricPricingOverrides> {
             Some(&mut self.metric_pricing_overrides)
         }
 
         fn get_scenario_pricing_overrides(
             &self,
-        ) -> Option<&$crate::instruments::ScenarioPricingOverrides> {
+        ) -> Option<&$crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
             Some(&self.scenario_pricing_overrides)
         }
 
         fn get_scenario_pricing_overrides_mut(
             &mut self,
-        ) -> Option<&mut $crate::instruments::ScenarioPricingOverrides> {
+        ) -> Option<&mut $crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
             Some(&mut self.scenario_pricing_overrides)
         }
     };
@@ -155,5 +155,3 @@ macro_rules! impl_empty_cashflow_provider {
         }
     };
 }
-
-pub use crate::{impl_focused_pricing_overrides, impl_instrument_base};

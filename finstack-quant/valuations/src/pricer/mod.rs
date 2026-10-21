@@ -11,6 +11,7 @@
 //! umbrella family and its registries, and the JSON pricing entry points in
 //! this module ([`price_instrument`](crate::pricer::price_instrument) and its siblings).
 
+use crate::register_generic;
 pub use finstack_quant_valuations_core::pricer::*;
 
 mod json;

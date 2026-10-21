@@ -3,13 +3,13 @@
 use super::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::types::ExerciseStyle;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;
 use finstack_quant_valuations::instruments::CreditParams;
-use finstack_quant_valuations::instruments::ExerciseStyle;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::OptionType;
 use finstack_quant_valuations::instruments::SettlementType;
 use rust_decimal::Decimal;
 use time::macros::date;

@@ -6,14 +6,14 @@
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::contract_specs::{
     repo_annualization_denominator, BondFutureSpecs,
 };
-use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
-use finstack_quant_valuations_core::instruments::common_impl::listed::ListedFutureTerms;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::ListedFutureTerms;
+use finstack_quant_valuations_core::instruments::MarketDependencies;
 
 mod deliverable_basket_wire {
     use super::DeliverableBond;
@@ -91,7 +91,8 @@ pub struct DeliverableBond {
 /// use finstack_quant_core::types::{CurveId, InstrumentId};
 /// use finstack_quant_valuations_fixed_income::bond_future::{BondFuture, DeliverableBond};
 /// use finstack_quant_valuations_core::contract_specs::BondFutureSpecs;
-/// use finstack_quant_valuations_core::instruments::{Attributes, ListedFutureTerms, Position};
+/// use finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};
+/// use finstack_quant_core::types::Attributes;
 /// use time::macros::date;
 ///
 /// # fn main() -> finstack_quant_core::Result<()> {
@@ -195,26 +196,26 @@ pub struct BondFuture {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -1158,7 +1159,7 @@ mod tests {
 }
 
 // Implement Instrument trait for BondFuture
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for BondFuture {
+impl finstack_quant_valuations_core::instruments::Instrument for BondFuture {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::BondFuture,
         crate::FIXED_INCOME
@@ -1183,7 +1184,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         }
         if let Some(ctd_bond) = &self.ctd_bond {
             deps.merge(
-                finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::market_dependencies(ctd_bond)?,
+                finstack_quant_valuations_core::instruments::Instrument::market_dependencies(
+                    ctd_bond,
+                )?,
             );
         }
         Ok(deps)
@@ -1208,7 +1211,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.terms.settlement_date)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for DV01 calculators.
@@ -1237,7 +1240,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for BondFuture {
 mod instrument_trait_tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::Position;
     use time::Month;
 
@@ -1271,7 +1274,7 @@ mod instrument_trait_tests {
             .build()
             .expect("Valid bond future");
 
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let instrument: &dyn Instrument = &future;
         let concrete_future: Option<&BondFuture> = instrument.as_any().downcast_ref::<BondFuture>();
@@ -1312,7 +1315,7 @@ mod instrument_trait_tests {
             .build()
             .expect("Valid bond future");
 
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let curves = future
             .market_dependencies()

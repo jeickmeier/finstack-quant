@@ -9,7 +9,7 @@ use super::spec_support::{
     WeightingMethod, MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS, MIN_ABS_INPUT,
 };
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-use crate::instruments::{Attributes, PricingOptions};
+use crate::instruments::PricingOptions;
 use crate::metrics::{is_additive_metric, MetricId};
 use crate::results::composite::ResolvedCompositeLeg;
 use finstack_quant_core::currency::Currency;
@@ -17,6 +17,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::expr::{CompiledExpr, Expr, SimpleContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::{Error, Result};
 use indexmap::IndexMap;

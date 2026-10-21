@@ -24,12 +24,10 @@ use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FloatLegSpec;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-    NotionalExchange, ResettingSide,
-};
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::FloatLegSpec;
 use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::{NotionalExchange, ResettingSide};
 use rust_decimal::Decimal;
 
 /// Threshold for extremely negative forward rates that warrant a warning.
@@ -156,28 +154,28 @@ pub struct XccySwap {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for instrument selection and tagging.
-    pub attributes: finstack_quant_valuations_core::instruments::common_impl::traits::Attributes,
+    pub attributes: finstack_quant_core::types::Attributes,
 }
 
 impl XccySwap {
@@ -200,7 +198,7 @@ impl XccySwap {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            attributes: finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::default(),
+            attributes: finstack_quant_core::types::Attributes::default(),
         }
     }
 
@@ -319,11 +317,11 @@ impl XccySwap {
 
         // MtM notional exchanges require aligned contractual start/end dates;
         // coupon schedules remain leg-specific.
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
+        finstack_quant_valuations_core::instruments::pricing::overnight_conventions::reject_simple_overnight(
             self.leg1.leg.forward_curve_id.as_str(),
             &self.leg1.leg.compounding,
         )?;
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
+        finstack_quant_valuations_core::instruments::pricing::overnight_conventions::reject_simple_overnight(
             self.leg2.leg.forward_curve_id.as_str(),
             &self.leg2.leg.compounding,
         )?;
@@ -873,7 +871,7 @@ impl XccySwap {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for XccySwap {
+impl finstack_quant_valuations_core::instruments::Instrument for XccySwap {
     fn cashflow_export_terms(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -931,10 +929,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.leg1.leg.discount_curve_id.clone());
         deps.add_discount_curve(self.leg2.leg.discount_curve_id.clone());
         deps.add_forward_curve(self.leg1.leg.forward_curve_id.clone());
@@ -992,7 +989,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         pv1_rep.checked_add(pv2_rep)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
@@ -1048,7 +1045,7 @@ mod tests {
     use super::*;
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 
     fn no_fallback_swap() -> XccySwap {

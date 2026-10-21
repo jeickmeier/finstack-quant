@@ -112,7 +112,8 @@
 //! ## Example 3: Computing Theta (Time Decay) for an Option
 //!
 //! ```
-//! use finstack_quant_valuations::instruments::{Instrument, OptionType, PricingOptions};
+//! use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+//! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 //! use finstack_quant_valuations::metrics::MetricId;
 //! use finstack_quant_core::currency::Currency;
@@ -176,7 +177,8 @@
 //! ## Example 4: Computing Multiple Greeks for an Option
 //!
 //! ```
-//! use finstack_quant_valuations::instruments::{Instrument, OptionType, PricingOptions};
+//! use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+//! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 //! use finstack_quant_valuations::metrics::MetricId;
 //! use finstack_quant_core::currency::Currency;

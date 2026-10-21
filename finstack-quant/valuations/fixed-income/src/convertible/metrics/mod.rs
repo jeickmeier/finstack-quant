@@ -30,7 +30,7 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 pub(crate) fn register_convertible_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::{
+    use finstack_quant_valuations_core::metrics::sensitivities::cross_factor::{
         make_credit_bumper, make_rates_bumper, make_spot_bumper, make_vol_bumper,
         CrossFactorCalculator,
     };
@@ -47,9 +47,9 @@ pub(crate) fn register_convertible_metrics(
             (Rho, greeks::RhoCalculator),
             (Cs01, cs01::Cs01Calculator),
             (BucketedCs01, cs01::BucketedCs01Calculator),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             // Theta is now registered universally in crate::FIXED_INCOME.metrics()
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (Accrued, accrued_interest::AccruedInterestCalculator),
             (CleanPrice, accrued_interest::CleanPriceCalculator),
             (Dividend01, dividend_risk::DividendRiskCalculator),

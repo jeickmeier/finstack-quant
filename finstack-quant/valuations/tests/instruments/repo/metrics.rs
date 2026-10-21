@@ -474,9 +474,9 @@ fn test_metrics_applicable_to_repo() {
 #[test]
 fn test_metric_date_handling_uses_adjusted_dates() {
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations::instruments::rates::repo::RepoType;
-    use finstack_quant_valuations::instruments::Attributes;
 
     // Create a repo with WEEKEND dates (Saturday -> Monday adjustment expected)
     // Saturday Jan 4, 2025 -> Monday Jan 6, 2025 (Following BDC with TARGET2 calendar)

@@ -10,11 +10,11 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_margin::types::OtcMarginSpec;
-use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::CreditParams;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::CreditParams;
+use finstack_quant_valuations_core::instruments::MarketDependencies;
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -25,7 +25,7 @@ use finstack_quant_valuations_core::market::conventions::CdsConvention;
 
 use super::parameters::CdsIndexParams;
 use super::pricer::CdsIndexPricer;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 
 /// Pricing mode for CDS indices.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -185,26 +185,26 @@ pub struct CdsIndex {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Optional OTC margin specification for VM/IM.
     ///
     /// CDS indices are typically cleared through ICE Clear Credit. Use
@@ -546,7 +546,7 @@ impl CdsIndex {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for CdsIndex {
+impl finstack_quant_valuations_core::instruments::Instrument for CdsIndex {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CdsIndex,
         crate::CREDIT
@@ -590,7 +590,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.premium_leg.end)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CdsIndex {

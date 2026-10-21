@@ -12,9 +12,11 @@ use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::risk::var_calculator::relevant_taylor_scenario;
+use finstack_quant_valuations::metrics::risk::var_calculator::{
+    calculate_var, VarConfig, VarMethod,
+};
 use finstack_quant_valuations::metrics::risk::{
-    calculate_var, MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType, VarConfig,
-    VarMethod,
+    MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType,
 };
 use finstack_quant_valuations::pricer::PricingDispatch;
 use std::sync::Arc;
@@ -223,7 +225,7 @@ fn historical_vol_point_revaluation_matches_manual_surface() -> Result<()> {
             date!(2025 - 01 - 01),
             1.0,
             Currency::USD,
-            finstack_quant_valuations::instruments::OptionType::Call,
+            finstack_quant_models::types::OptionType::Call,
         )?;
     let base_surface = VolSurface::builder("EQUITY-VOL")
         .expiries(&[0.5, 1.5])

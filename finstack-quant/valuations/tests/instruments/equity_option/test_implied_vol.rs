@@ -3,8 +3,8 @@
 use super::helpers::*;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::math::special_functions::norm_cdf;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::OptionType;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 

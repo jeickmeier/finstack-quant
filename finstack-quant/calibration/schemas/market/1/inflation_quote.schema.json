@@ -1,7 +1,7 @@
 {
   "$defs": {
     "InflationSwapConventionId": {
-      "description": "Identifier for Inflation Swap market conventions (e.g., \"USD-CPI\", \"UK-RPI\").\n\nUsed to look up [`InflationSwapConventions`](crate::market::conventions::defs::InflationSwapConventions)\nfrom the convention registry.",
+      "description": "Identifier for Inflation Swap market conventions (e.g., \"USD-CPI\", \"UK-RPI\").\n\nUsed to look up [`InflationSwapConventions`](crate::market::conventions::InflationSwapConventions)\nfrom the convention registry.",
       "type": "string"
     },
     "QuoteId": {

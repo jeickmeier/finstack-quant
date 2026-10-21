@@ -586,9 +586,8 @@ pub struct BucketedCs01Calculator;
 
 impl MetricCalculator for BucketedCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        use finstack_quant_valuations_core::metrics::sensitivities::config::{
-            format_bucket_label_cow, STANDARD_BUCKETS_YEARS,
-        };
+        use finstack_quant_valuations_core::metrics::sensitivities::config::format_bucket_label_cow;
+        use finstack_quant_valuations_core::metrics::STANDARD_BUCKETS_YEARS;
 
         let base_spread = context
             .computed
@@ -673,7 +672,7 @@ mod zspread_quote_tests {
     use crate::structured_credit::types::DealAccruals;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_valuations_core::instruments::MarketQuoteOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::MarketQuoteOverrides;
     use std::sync::Arc;
     use time::Month;
 

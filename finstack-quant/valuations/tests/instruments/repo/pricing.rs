@@ -4,8 +4,9 @@ use super::fixtures::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations::instruments::rates::repo::{Repo, RepoType};
-use finstack_quant_valuations::instruments::{Attributes, Instrument};
+use finstack_quant_valuations::instruments::Instrument;
 use rust_decimal::Decimal;
 
 #[test]

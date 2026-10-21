@@ -22,12 +22,10 @@ pub mod overnight_conventions;
 pub mod rates_credit;
 pub mod swap_legs;
 pub mod term_fixings;
-mod trs;
+pub(crate) mod trs;
 pub mod variance_observations;
 
 #[doc(hidden)]
 pub use generic::GenericInstrumentPricer;
 
-pub use trs::{
-    FinancingLegFlows, PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
-};
+pub use trs::{FinancingLegFlows, PeriodReturnInputs};

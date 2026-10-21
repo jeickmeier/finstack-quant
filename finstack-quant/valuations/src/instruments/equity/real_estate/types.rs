@@ -1,13 +1,14 @@
 //! Real estate asset valuation types.
 
 use super::pricer;
-use crate::instruments::common_impl::traits::impl_instrument_base;
-use crate::instruments::common_impl::traits::{Attributes, Instrument};
+use crate::impl_instrument_base;
+use crate::instruments::Instrument;
 use crate::pricer::InstrumentType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
 
 /// Broad property classification for reporting / tagging.
@@ -149,23 +150,24 @@ pub struct RealEstateAsset {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "crate::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
-    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    pub instrument_pricing_overrides:
+        crate::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "crate::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "crate::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
-    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    pub metric_pricing_overrides: crate::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "crate::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "crate::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
-    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
+    pub scenario_pricing_overrides: crate::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     #[serde(default)]
     #[builder(default)]
@@ -258,13 +260,13 @@ struct RealEstateAssetUnchecked {
     day_count: DayCount,
     /// Instrument-owned pricing inputs.
     #[serde(default)]
-    instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    instrument_pricing_overrides: crate::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[serde(default)]
-    metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    metric_pricing_overrides: crate::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[serde(default)]
-    scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
+    scenario_pricing_overrides: crate::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     #[serde(default)]
     attributes: Attributes,
@@ -583,10 +585,8 @@ impl Instrument for RealEstateAsset {
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        crate::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+        let deps = crate::instruments::MarketDependencies::new();
         Ok(deps)
     }
 
@@ -599,7 +599,7 @@ impl Instrument for RealEstateAsset {
         pricer::compute_pv(self, as_of)
     }
 
-    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    crate::impl_focused_pricing_overrides!();
 }
 impl finstack_quant_cashflows::CashflowScheduleSource for RealEstateAsset {
     fn raw_cashflow_schedule(

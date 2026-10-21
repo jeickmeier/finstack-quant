@@ -10,10 +10,10 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefau
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex;
 use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
 use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
+use finstack_quant_valuations::instruments::pricing_overrides::ModelConfig;
 use finstack_quant_valuations::instruments::rates::ir_future::InterestRateFuture;
 use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
 use finstack_quant_valuations::instruments::rates::xccy_swap::XccySwap;
-use finstack_quant_valuations::instruments::ModelConfig;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;

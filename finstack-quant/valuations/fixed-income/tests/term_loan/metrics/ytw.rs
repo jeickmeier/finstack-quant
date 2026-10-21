@@ -8,7 +8,8 @@ use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::instruments::{Instrument, InstrumentPricingOverrides};
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_fixed_income::loan_terms::DrawEvent;
 use finstack_quant_valuations_fixed_income::term_loan::{

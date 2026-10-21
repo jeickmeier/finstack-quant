@@ -127,7 +127,7 @@ impl CarryDecompositionCalculator {
 impl MetricCalculator for CarryDecompositionCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let expiry_date = theta_termination_date(context)?;
-        let period = crate::metrics::theta_period(context);
+        let period = crate::metrics::sensitivities::theta::theta_period(context);
 
         let rolled_date = calculate_theta_date(context.as_of, period, expiry_date)?;
 

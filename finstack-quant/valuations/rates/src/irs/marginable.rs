@@ -15,7 +15,7 @@ use finstack_quant_margin::Marginable;
 use finstack_quant_valuations_core::instruments::common_impl::margin::assign_ir_tenor_bucket;
 use finstack_quant_valuations_core::instruments::common_impl::margin::netting_set_id_from_spec;
 use finstack_quant_valuations_core::instruments::common_impl::margin::repriced_bucketed_dv01;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 
 impl Marginable for InterestRateSwap {
     fn id(&self) -> &str {

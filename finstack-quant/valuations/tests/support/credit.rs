@@ -9,6 +9,7 @@ use finstack_quant_calibration::quotes::cds::CdsQuote;
 use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod};
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::{
     currency::Currency,
     dates::Date,
@@ -21,9 +22,8 @@ use finstack_quant_core::{
 };
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
-use finstack_quant_valuations::instruments::{
-    Attributes, InstrumentPricingOverrides, PricingOptions,
-};
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations::market::conventions::{CdsConvention, CdsValuationConvention};

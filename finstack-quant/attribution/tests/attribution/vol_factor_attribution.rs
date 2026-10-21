@@ -13,9 +13,11 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
-use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType, SettlementType};
-use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides};
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::SettlementType;
 use std::sync::Arc;
 use time::macros::date;
 

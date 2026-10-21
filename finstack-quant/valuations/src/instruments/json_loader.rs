@@ -846,6 +846,7 @@ impl InstrumentEnvelope {
 
 #[cfg(test)]
 mod tests {
+    use finstack_quant_core::types::Attributes;
     use rust_decimal::Decimal;
 
     use super::*;

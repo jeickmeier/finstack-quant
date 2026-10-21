@@ -9,12 +9,12 @@ use super::spec_support::{
     convert_amount, validate_history, CompositeLegSpec, CompositeMarketObservation, CompositeState,
     RebalanceRule, WeightingMethod, MIN_ABS_INPUT,
 };
-use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-use crate::instruments::{
-    Attributes, Instrument, InstrumentPricingOverrides, MetricPricingOverrides, PricingOptions,
-    ScenarioPricingOverrides,
+use crate::instruments::pricing_overrides::{
+    InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,
 };
+use crate::instruments::MarketDependencies;
+use crate::instruments::{Instrument, PricingOptions};
 use crate::metrics::{is_additive_metric, MetricId};
 use crate::results::composite::{
     CompositeExposureReport, CompositeLegValuation, CompositeValuationDetails, PrimitiveExposure,
@@ -24,6 +24,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::{Error, Result};
 use indexmap::IndexMap;
@@ -691,7 +692,7 @@ impl Instrument for CompositeInstrument {
         Ok(dependencies)
     }
 
-    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

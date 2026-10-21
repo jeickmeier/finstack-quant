@@ -31,7 +31,10 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::common_impl::pricing::{
-    FinancingLegFlows, PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
+    FinancingLegFlows, PeriodReturnInputs,
+};
+use finstack_quant_valuations_core::instruments::{
+    TotalReturnLegParams, TrsEngine, TrsReturnModel,
 };
 
 /// Extracts index yield from market data.
@@ -269,8 +272,7 @@ pub(crate) fn net_cashflows(
         initial_level: trs.initial_level,
     };
     let mut flows = std::collections::BTreeMap::<Date, f64>::new();
-    let sign = if trs.side == finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive
-    {
+    let sign = if trs.side == finstack_quant_valuations_core::instruments::PayReceive::Receive {
         1.0
     } else {
         -1.0

@@ -25,9 +25,8 @@ use finstack_quant_valuations::instruments::exotics::callable_range_accrual::Cal
 use finstack_quant_valuations::instruments::exotics::range_accrual::RangeAccrual;
 use finstack_quant_valuations::instruments::exotics::snowball::Snowball;
 use finstack_quant_valuations::instruments::exotics::tarn::Tarn;
-use finstack_quant_valuations::instruments::{
-    Instrument, InstrumentPricingOverrides, PricingOptions, QuantoSpec,
-};
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions, QuantoSpec};
 use finstack_quant_valuations::pricer::{
     standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
 };

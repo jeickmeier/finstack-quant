@@ -47,7 +47,7 @@ pub(crate) fn register_revolving_credit_metrics(
         registry: registry,
         instrument: InstrumentType::RevolvingCredit,
         metrics: [
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             // CS01: with a replayable credit curve, rebootstrap it after
             // bumping its par spreads; with an analyst-built (knot) curve,
             // bump the hazard rates directly. With no credit curve, survival
@@ -60,7 +60,7 @@ pub(crate) fn register_revolving_credit_metrics(
                 crate::revolving_credit::RevolvingCredit,
             >::hazard_when_credit_curve()),
             // Theta is now registered universally in crate::FIXED_INCOME.metrics()
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             // Quote metrics on the settlement schedule (LSTA convention: a
             // quote applies to the drawn balance plus accrued).
             (DiscountMargin, quotes::DiscountMarginCalculator),

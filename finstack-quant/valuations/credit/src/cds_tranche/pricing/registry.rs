@@ -2,7 +2,7 @@
 //!
 use super::config::CdsTranchePricer;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::expect_inst;
 
 /// Registry pricer for CDS Tranche using Gaussian Copula model
@@ -25,7 +25,7 @@ impl finstack_quant_valuations_core::pricer::Pricer for SimpleCdsTrancheHazardPr
         finstack_quant_valuations_core::results::ValuationResult,
         finstack_quant_valuations_core::pricer::PricingError,
     > {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         // Type-safe downcasting
         let cds_tranche = expect_inst::<crate::cds_tranche::CdsTranche>(

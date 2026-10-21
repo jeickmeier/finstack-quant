@@ -8,6 +8,7 @@ use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::equity::real_estate::RealEstateFinancing;
 use finstack_quant_valuations::instruments::equity::real_estate::{
@@ -15,7 +16,7 @@ use finstack_quant_valuations::instruments::equity::real_estate::{
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
-use finstack_quant_valuations::instruments::{Attributes, Instrument};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations_test_support::date::date;
 
 fn build_flat_discount_curve(

@@ -39,7 +39,7 @@ pub use keys::{parse_model_key, InstrumentType, ModelKey, PricerKey};
 pub use registry::stamp_results_meta;
 pub use registry::{expect_inst, Pricer, PricerRegistry, PricingDispatch};
 
-/// Register a [`GenericInstrumentPricer`](crate::instruments::common_impl::GenericInstrumentPricer)
+/// Register a [`GenericInstrumentPricer`](crate::instruments::common_impl::pricing::GenericInstrumentPricer)
 /// for an instrument type, collapsing the repetitive registration boilerplate
 /// shared by every family table.
 ///
@@ -56,15 +56,17 @@ pub use registry::{expect_inst, Pricer, PricerRegistry, PricingDispatch};
 #[macro_export]
 macro_rules! register_generic {
     ($registry:expr, $inst:expr, $ty:ty $(,)?) => {
-        $registry.register($crate::instruments::common_impl::GenericInstrumentPricer::<
-            $ty,
-        >::discounting($inst))?
+        $registry.register(
+            $crate::instruments::common_impl::pricing::GenericInstrumentPricer::<$ty>::discounting(
+                $inst,
+            ),
+        )?
     };
     ($registry:expr, $inst:expr, $ty:ty, $model:expr $(,)?) => {
-        $registry.register($crate::instruments::common_impl::GenericInstrumentPricer::<
-            $ty,
-        >::new($inst, $model))?
+        $registry.register(
+            $crate::instruments::common_impl::pricing::GenericInstrumentPricer::<$ty>::new(
+                $inst, $model,
+            ),
+        )?
     };
 }
-
-pub use register_generic;

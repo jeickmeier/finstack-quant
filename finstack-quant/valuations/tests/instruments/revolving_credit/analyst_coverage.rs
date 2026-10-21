@@ -15,7 +15,8 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     CreditSpreadProcessSpec, DrawRepayEvent, DrawRepaySpec, McConfig, RevolvingCredit,
     RevolvingCreditFees, StochasticUtilizationSpec, UtilizationProcess,
 };
-use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides};
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
 use time::macros::date;
@@ -221,7 +222,7 @@ fn payment_dates_in(
 #[test]
 fn calendar_id_is_the_only_way_to_adjust_for_holidays() {
     use finstack_quant_core::dates::BusinessDayConvention;
-    use finstack_quant_valuations::instruments::Attributes;
+    use finstack_quant_core::types::Attributes;
 
     let weekends =
         conventions(None, BusinessDayConvention::ModifiedFollowing, 0, MATURITY).expect("facility");

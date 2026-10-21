@@ -32,10 +32,10 @@ use finstack_quant_cashflows::builder::{
     FloatingRateFallback, FloatingRateSpec, Notional, PrincipalExchange,
 };
 use finstack_quant_core::validation;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 use rust_decimal::Decimal;
 
-use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FloatLegSpec;
+use finstack_quant_valuations_core::instruments::FloatLegSpec;
 
 /// Basis swap instrument that exchanges two floating rate payments with different tenors.
 ///
@@ -144,28 +144,28 @@ pub struct BasisSwap {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for instrument selection and tagging.
-    pub attributes: finstack_quant_valuations_core::instruments::common_impl::traits::Attributes,
+    pub attributes: finstack_quant_core::types::Attributes,
 }
 
 impl BasisSwap {
@@ -209,7 +209,7 @@ impl BasisSwap {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            attributes: finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::default(),
+            attributes: finstack_quant_core::types::Attributes::default(),
         };
         swap.validate()?;
         Ok(swap)
@@ -253,11 +253,11 @@ impl BasisSwap {
         Self::validate_leg_lags(self.id.as_str(), "reference", &self.reference_leg)?;
         self.resolve_leg_calendar("primary", &self.primary_leg)?;
         self.resolve_leg_calendar("reference", &self.reference_leg)?;
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
+        finstack_quant_valuations_core::instruments::pricing::overnight_conventions::reject_simple_overnight(
             self.primary_leg.forward_curve_id.as_str(),
             &self.primary_leg.compounding,
         )?;
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
+        finstack_quant_valuations_core::instruments::pricing::overnight_conventions::reject_simple_overnight(
             self.reference_leg.forward_curve_id.as_str(),
             &self.reference_leg.compounding,
         )?;
@@ -791,7 +791,7 @@ impl BasisSwap {
 // Attributable implementation is provided by the impl_instrument! macro
 
 // Use the macro to implement Instrument with pricing
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for BasisSwap {
+impl finstack_quant_valuations_core::instruments::Instrument for BasisSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::BasisSwap,
         crate::RATES
@@ -803,10 +803,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.primary_leg.discount_curve_id.clone());
         deps.add_discount_curve(self.reference_leg.discount_curve_id.clone());
         deps.add_forward_curve(self.primary_leg.forward_curve_id.clone());
@@ -838,7 +837,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.primary_leg.end)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for BasisSwap {
@@ -873,7 +872,7 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 
     // Helper function for tests
@@ -1317,7 +1316,7 @@ mod tests {
 
     #[test]
     fn test_par_spread_zeroes_npv() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         use finstack_quant_valuations_core::metrics::MetricId;
 
         let base_date = date(2024, 1, 1);

@@ -386,6 +386,7 @@ mod tests {
     };
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, IssuerId};
     use finstack_quant_factor::credit::hierarchy::{
         AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditFactorModelSchema,
@@ -396,7 +397,7 @@ mod tests {
     use finstack_quant_factor::ISSUER_ID_META_KEY;
     use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
     use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-    use finstack_quant_valuations::instruments::{Attributes, Instrument};
+    use finstack_quant_valuations::instruments::Instrument;
     use std::sync::Arc;
     use time::Month;
 

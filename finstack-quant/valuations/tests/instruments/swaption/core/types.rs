@@ -2,17 +2,18 @@
 
 #![allow(clippy::unwrap_used)]
 
-use finstack_quant_valuations::instruments::OptionType;
+use finstack_quant_models::types::OptionType;
 
 use crate::instruments::swaption::common::*;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::dates::{Tenor, TenorUnit};
+use finstack_quant_models::types::ExerciseStyle;
 use finstack_quant_models::volatility::sabr::SabrParameters;
 use finstack_quant_valuations::instruments::pricing_overrides::VolSurfaceExtrapolation;
 use finstack_quant_valuations::instruments::rates::swaption::{
     BermudanSchedule, BermudanSwaption, CashSettlementMethod, Swaption,
 };
-use finstack_quant_valuations::instruments::{ExerciseStyle, SettlementType, VolatilityModel};
+use finstack_quant_valuations::instruments::{SettlementType, VolatilityModel};
 use time::macros::date;
 
 #[test]
@@ -194,13 +195,13 @@ fn test_swaption_example_and_builder_helpers() {
 
     let updated = example
         .with_settlement(SettlementType::Cash)
-        .with_option_type(finstack_quant_valuations::instruments::OptionType::Put)
+        .with_option_type(finstack_quant_models::types::OptionType::Put)
         .with_cash_settlement_method(CashSettlementMethod::ZeroCoupon)
         .with_calendar("nyse");
     assert_eq!(updated.settlement, SettlementType::Cash);
     assert_eq!(
         updated.option_type,
-        finstack_quant_valuations::instruments::OptionType::Put
+        finstack_quant_models::types::OptionType::Put
     );
     assert_eq!(
         updated.cash_settlement_method,

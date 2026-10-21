@@ -5,7 +5,7 @@
 //! concrete market dependencies at runtime from `MetricContext`, then applies
 //! a four-corner central mixed difference.
 
-use crate::instruments::common_impl::dependencies::FxPair;
+use crate::instruments::FxPair;
 use crate::metrics::core::finite_difference::{
     bump_scalar_price, central_mixed, min_grid_vol, volatility_override,
 };

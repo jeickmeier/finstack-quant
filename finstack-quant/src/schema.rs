@@ -282,7 +282,7 @@ pub fn render_profile(artifact: &SchemaArtifact, profile: &str) -> Result<Value>
     }
 }
 
-pub use finstack_quant_core::schema::diagnostics::Failure;
+use finstack_quant_core::schema::diagnostics::Failure;
 
 /// Render a slice of failures as a JSON array.
 ///

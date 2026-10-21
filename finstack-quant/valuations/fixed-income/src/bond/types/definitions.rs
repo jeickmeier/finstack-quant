@@ -3,8 +3,8 @@
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 
 use super::CashflowSpec;
 
@@ -81,26 +81,26 @@ pub struct Bond {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Optional call/put schedule (dates and redemption prices as % of par amount).
     pub call_put: Option<CallPutSchedule>,
     /// Optional guaranteed minimum-return ("return floor") call protection.
@@ -155,13 +155,13 @@ impl<'de> serde::Deserialize<'de> for Bond {
             repo_curve_id: Option<CurveId>,
             #[serde(default)]
             instrument_pricing_overrides:
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
             #[serde(default)]
             metric_pricing_overrides:
-                finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+                finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
             #[serde(default)]
             scenario_pricing_overrides:
-                finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+                finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
             call_put: Option<CallPutSchedule>,
             #[serde(default)]
             return_floor: Option<super::return_floor::ReturnFloorSpec>,

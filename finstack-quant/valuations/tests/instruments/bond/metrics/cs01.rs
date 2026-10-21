@@ -80,7 +80,7 @@ fn test_cs01_zspread_fallback_uses_settlement_anchored_basis() {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread;
     use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
-    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 06);
     let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");

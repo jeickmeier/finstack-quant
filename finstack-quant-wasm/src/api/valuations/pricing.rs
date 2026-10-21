@@ -15,7 +15,7 @@
 //! wrappers: when an instrument's `instrument_pricing_overrides.model_config.mc_seed_scenario`
 //! is `None`, the core MC pricers derive a **stable** seed deterministically
 //! from the instrument ID (see
-//! `finstack_quant_valuations::instruments::InstrumentPricingOverrides`). Repricing the same
+//! `finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides`). Repricing the same
 //! instrument JSON on the same build target therefore yields bit-identical
 //! results without the caller supplying a seed. The wasm32 build and the
 //! native (Python) build can differ at the `f64` rounding level, because their
@@ -888,7 +888,7 @@ pub(super) mod tests {
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use finstack_quant_valuations::instruments::exotics::tarn::Tarn;
         use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
-        use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
+        use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
         use time::Month;
 
         let mut instrument_pricing_overrides = InstrumentPricingOverrides::default();
@@ -932,7 +932,7 @@ pub(super) mod tests {
             Snowball, SnowballVariant,
         };
         use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
-        use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
+        use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
         use time::Month;
 
         let mut instrument_pricing_overrides = InstrumentPricingOverrides::default();
@@ -980,7 +980,7 @@ pub(super) mod tests {
             Snowball, SnowballVariant,
         };
         use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
-        use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
+        use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
         use time::Month;
 
         let inverse_floater = Snowball {
@@ -1022,8 +1022,8 @@ pub(super) mod tests {
             BoundsType, RangeAccrualTerms,
         };
         use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+        use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
         use finstack_quant_valuations::instruments::BermudanCallProvision;
-        use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
         use time::Month;
 
         let mut instrument_pricing_overrides = InstrumentPricingOverrides::default();
@@ -1089,10 +1089,10 @@ pub(super) mod tests {
         use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
+        use finstack_quant_models::types::OptionType;
         use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+        use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
         use finstack_quant_valuations::instruments::rates::cms_spread_option::CmsSpreadOption;
-        use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
-        use finstack_quant_valuations::instruments::OptionType;
         use time::Month;
 
         let option = CmsSpreadOption {

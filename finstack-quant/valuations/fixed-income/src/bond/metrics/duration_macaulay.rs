@@ -123,7 +123,7 @@ mod tests {
         )
         .expect("bond");
         bond.instrument_pricing_overrides =
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_quoted_clean_price_pct(100.0);
 
         let curve = DiscountCurve::builder("USD-OIS")

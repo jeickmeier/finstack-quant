@@ -91,7 +91,7 @@ mod tests {
     use super::*;
     use crate::pe_fund::{FundEvent, PeFundWaterfallSpec};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::macros::date;
 
     fn fully_realized_fund() -> PrivateMarketsFund {

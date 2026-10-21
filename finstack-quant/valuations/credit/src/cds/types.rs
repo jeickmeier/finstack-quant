@@ -52,11 +52,11 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::validation;
 use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_valuations_core::constants::isda::STANDARD_RECOVERY_SENIOR;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations_core::market::conventions::CdsConvention;
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
@@ -65,7 +65,7 @@ use rust_decimal::Decimal;
 use time::macros::date;
 
 use crate::cds::pricing::CdsPricer;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 
 use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
 
@@ -148,26 +148,26 @@ pub struct CreditDefaultSwap {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Valuation presentation convention.
     ///
     /// Defaults to Bloomberg CDSW clean. Set `IsdaDirty` only when
@@ -257,7 +257,7 @@ impl CreditDefaultSwap {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
+        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         let discount = market.get_discount(self.premium_leg.discount_curve_id.as_str())?;
         let hazard = market.get_hazard(self.protection_leg.credit_curve_id.as_str())?;
         super::pricing::CdsPricer::with_config(super::pricing::CdsPricerConfig::from_cds(self))
@@ -397,7 +397,9 @@ impl CreditDefaultSwap {
     /// use finstack_quant_valuations_core::constants::isda::STANDARD_RECOVERY_SENIOR;
     /// use finstack_quant_valuations_core::market::conventions::CdsConvention;
     /// use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
-    /// use finstack_quant_valuations_core::instruments::{Attributes, InstrumentPricingOverrides, PayReceive, PremiumLegSpec, ProtectionLegSpec};
+    /// use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
+    /// use finstack_quant_core::types::Attributes;
+    /// use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     /// use rust_decimal::Decimal;
     /// use time::macros::date;
     ///
@@ -613,9 +615,7 @@ impl CreditDefaultSwap {
     // (no public/raw-NPV helper; use `Instrument::value_raw()` instead)
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for CreditDefaultSwap
-{
+impl finstack_quant_valuations_core::instruments::Instrument for CreditDefaultSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Cds,
         crate::CREDIT
@@ -631,10 +631,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.premium_leg.discount_curve_id.clone());
         deps.add_credit_curve(self.protection_leg.credit_curve_id.clone());
         Ok(deps)
@@ -674,7 +673,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.premium_leg.end)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CreditDefaultSwap {

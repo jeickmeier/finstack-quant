@@ -5,7 +5,7 @@
 //! instrument input directly and is therefore registered under `wacc01` or
 //! `discount_rate01`, never under curve `dv01`.
 
-use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::Instrument;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::dates::Date;

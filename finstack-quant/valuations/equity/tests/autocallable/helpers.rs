@@ -10,10 +10,10 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
-use finstack_quant_valuations_core::instruments::Attributes;
-use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_equity::autocallable::Autocallable;
 
 /// Standard curve IDs

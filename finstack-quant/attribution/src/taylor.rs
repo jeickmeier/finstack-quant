@@ -1615,14 +1615,13 @@ mod tests {
             self
         }
 
-        fn attributes(&self) -> &finstack_quant_valuations::instruments::Attributes {
+        fn attributes(&self) -> &finstack_quant_core::types::Attributes {
             use std::sync::OnceLock;
-            static ATTRS: OnceLock<finstack_quant_valuations::instruments::Attributes> =
-                OnceLock::new();
-            ATTRS.get_or_init(finstack_quant_valuations::instruments::Attributes::default)
+            static ATTRS: OnceLock<finstack_quant_core::types::Attributes> = OnceLock::new();
+            ATTRS.get_or_init(finstack_quant_core::types::Attributes::default)
         }
 
-        fn attributes_mut(&mut self) -> &mut finstack_quant_valuations::instruments::Attributes {
+        fn attributes_mut(&mut self) -> &mut finstack_quant_core::types::Attributes {
             unreachable!("FxLinkedInstrument::attributes_mut should not be called")
         }
 
@@ -1991,14 +1990,13 @@ mod tests {
             self
         }
 
-        fn attributes(&self) -> &finstack_quant_valuations::instruments::Attributes {
+        fn attributes(&self) -> &finstack_quant_core::types::Attributes {
             use std::sync::OnceLock;
-            static ATTRS: OnceLock<finstack_quant_valuations::instruments::Attributes> =
-                OnceLock::new();
-            ATTRS.get_or_init(finstack_quant_valuations::instruments::Attributes::default)
+            static ATTRS: OnceLock<finstack_quant_core::types::Attributes> = OnceLock::new();
+            ATTRS.get_or_init(finstack_quant_core::types::Attributes::default)
         }
 
-        fn attributes_mut(&mut self) -> &mut finstack_quant_valuations::instruments::Attributes {
+        fn attributes_mut(&mut self) -> &mut finstack_quant_core::types::Attributes {
             unreachable!("MockInstrument::attributes_mut should not be called")
         }
 

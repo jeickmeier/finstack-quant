@@ -726,9 +726,9 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_models::trees::short_rate_tree::TreeCalibrationResult;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 
     #[test]
     fn bdt_calibration_quality_rejects_fallbacks_and_large_error() {
@@ -765,7 +765,7 @@ mod tests {
             )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_hw1f_sigma(0.01)
                     .with_hw1f_mean_reversion(0.03),
             )
@@ -844,12 +844,13 @@ mod tests {
             .instrument_pricing_overrides
             .market_quotes
             .quoted_clean_price_pct = Some(clean_pct);
-        let implied = finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::price_with_metrics(
+        let implied = finstack_quant_valuations_core::instruments::Instrument::price_with_metrics(
             &quoted,
             &market,
             as_of,
             &[finstack_quant_valuations_core::metrics::MetricId::Oas],
-            finstack_quant_valuations_core::instruments::PricingOptions::default().with_model(finstack_quant_valuations_core::pricer::ModelKey::Tree),
+            finstack_quant_valuations_core::instruments::PricingOptions::default()
+                .with_model(finstack_quant_valuations_core::pricer::ModelKey::Tree),
         )
         .expect("rolled-maturity OAS")
         .measures["oas"]

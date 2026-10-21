@@ -40,7 +40,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{black_call, black_put};
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };
@@ -105,12 +105,8 @@ impl CmsOptionPricer {
                     fixing_date,
                 )?;
                 let option_val = match inst.option_type {
-                    finstack_quant_valuations_core::instruments::OptionType::Call => {
-                        (observed - strike).max(0.0)
-                    }
-                    finstack_quant_valuations_core::instruments::OptionType::Put => {
-                        (strike - observed).max(0.0)
-                    }
+                    finstack_quant_models::types::OptionType::Call => (observed - strike).max(0.0),
+                    finstack_quant_models::types::OptionType::Put => (strike - observed).max(0.0),
                 };
                 let df_pay = discount_curve
                     .as_ref()
@@ -194,19 +190,19 @@ impl CmsOptionPricer {
             //    the smile is captured at the option strike.
             let option_val = if time_to_fixing <= 0.0 {
                 match inst.option_type {
-                    finstack_quant_valuations_core::instruments::OptionType::Call => {
+                    finstack_quant_models::types::OptionType::Call => {
                         (forward_swap_rate - strike).max(0.0)
                     }
-                    finstack_quant_valuations_core::instruments::OptionType::Put => {
+                    finstack_quant_models::types::OptionType::Put => {
                         (strike - forward_swap_rate).max(0.0)
                     }
                 }
             } else {
                 match inst.option_type {
-                    finstack_quant_valuations_core::instruments::OptionType::Call => {
+                    finstack_quant_models::types::OptionType::Call => {
                         black_call(adjusted_rate, strike, strike_vol, time_to_fixing)
                     }
-                    finstack_quant_valuations_core::instruments::OptionType::Put => {
+                    finstack_quant_models::types::OptionType::Put => {
                         black_put(adjusted_rate, strike, strike_vol, time_to_fixing)
                     }
                 }
@@ -384,7 +380,7 @@ mod tests {
     use super::*;
     use crate::cms_option::replication_pricer::{replicated_cms_optionlet, CmsOptionletInputs};
     use finstack_quant_core::market_data::surfaces::VolSurface;
-    use finstack_quant_valuations_core::instruments::OptionType;
+    use finstack_quant_models::types::OptionType;
 
     #[test]
     fn payment_delay_coefficient_matches_measure_change() {

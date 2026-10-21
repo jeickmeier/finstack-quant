@@ -18,7 +18,9 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::commodity::commodity_asian_option::CommodityAsianOption;
 use finstack_quant_valuations::instruments::commodity::commodity_future::CommodityFuture;
 use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
@@ -31,10 +33,9 @@ use finstack_quant_valuations::instruments::exotics::range_accrual::RangeAccrual
 use finstack_quant_valuations::instruments::fx::fx_barrier_option::FxBarrierOption;
 use finstack_quant_valuations::instruments::fx::fx_touch_option::FxTouchOption;
 use finstack_quant_valuations::instruments::fx::ndf::Ndf;
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::rates::cms_spread_option::CmsSpreadOption;
-use finstack_quant_valuations::instruments::{
-    Attributes, Instrument, InstrumentPricingOverrides, Monitoring, OptionType, PricingOptions,
-};
+use finstack_quant_valuations::instruments::{Instrument, Monitoring, PricingOptions};
 use finstack_quant_valuations::pricer::ModelKey;
 use serde::de::DeserializeOwned;
 use serde::Serialize;

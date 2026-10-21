@@ -137,7 +137,7 @@
 //! # See Also
 //!
 //! - [`crate::instruments::Instrument`] for the core instrument trait
-//! - [`crate::instruments::Attributes`] for tagging and scenario selection
+//! - [`finstack_quant_core::types::Attributes`] for tagging and scenario selection
 //! - [`crate::pricer`] for pricing registry and dispatch
 //! - [`crate::metrics`] for risk metric calculations
 //!

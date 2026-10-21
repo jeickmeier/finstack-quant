@@ -17,7 +17,7 @@ use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight
     adjust_overnight_accrual_boundaries, project_overnight_coupon, OvernightCouponProjectionInput,
     OvernightProjectionCurve,
 };
-use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions;
+use finstack_quant_valuations_core::instruments::pricing::overnight_conventions;
 
 /// Build the canonical accrual/payment periods for a revolving credit facility.
 ///
@@ -503,7 +503,7 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+    use finstack_quant_core::types::Attributes;
     use time::Month;
 
     fn create_test_facility(

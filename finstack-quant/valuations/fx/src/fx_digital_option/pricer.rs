@@ -6,8 +6,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::d1_d2;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
 
 /// FX digital option calculator.
 #[derive(Debug, Clone, Default)]
@@ -472,11 +472,10 @@ mod tests {
     use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::{
-        Attributes, Instrument,
-    };
-    use finstack_quant_valuations_core::instruments::OptionType;
+    use finstack_quant_models::types::OptionType;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use std::sync::Arc;
     use time::macros::date;
 
@@ -543,7 +542,7 @@ mod tests {
         let calendar = build_option(date!(2025 - 07 - 02));
         let mut trading = calendar.clone();
         trading.metric_pricing_overrides.theta_day_basis =
-            Some(finstack_quant_valuations_core::instruments::ThetaDayBasis::Trading252);
+            Some(finstack_quant_valuations_core::instruments::pricing_overrides::ThetaDayBasis::Trading252);
 
         let calendar_theta = compute_greeks(&calendar, &market, as_of)
             .expect("calendar greeks")

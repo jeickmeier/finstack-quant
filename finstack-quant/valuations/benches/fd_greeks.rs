@@ -17,9 +17,10 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{BarrierType, CurveId, InstrumentId, PriceId};
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
 use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
-use finstack_quant_valuations::instruments::{Instrument, OptionType, PricingOptions};
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
 #[path = "../tests/support/equity_fx_options.rs"]
 mod option_support;
@@ -116,7 +117,7 @@ fn create_asian_option() -> AsianOption {
         .collect();
     // Cap MC paths: each FD greek reprices the full simulation, so the
     // production default (10k paths) would make one iteration take seconds.
-    let overrides = finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+    let overrides = finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default()
         .with_mc_paths(200);
     AsianOption::builder()
         .id(InstrumentId::new("GREEKS-ASIAN"))

@@ -7,13 +7,12 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{BreakevenConfig, BreakevenMode, BreakevenTarget};
 use finstack_quant_valuations::metrics::sensitivities::breakeven::BreakevenCalculator;
-use finstack_quant_valuations::metrics::{
-    calculate_theta_date, MetricCalculator, MetricContext, MetricId,
-};
+use finstack_quant_valuations::metrics::sensitivities::theta::calculate_theta_date;
+use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::sync::Arc;
 use time::macros::date;
 
@@ -69,7 +68,9 @@ fn context_with_carry_and_sensitivity(
     ctx.computed
         .insert(target.sensitivity_metric(), sensitivity);
 
-    let overrides = finstack_quant_valuations::instruments::MetricPricingOverrides::default()
+    let overrides =
+        finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides::default(
+        )
         .with_breakeven_config(BreakevenConfig { target, mode });
     ctx.set_metric_pricing_overrides(Some(overrides));
     ctx
@@ -136,7 +137,9 @@ fn test_missing_sensitivity_returns_error() {
         Arc::new(FinstackConfig::default()),
     );
     ctx.computed.insert(MetricId::CarryTotal, 0.50);
-    let overrides = finstack_quant_valuations::instruments::MetricPricingOverrides::default()
+    let overrides =
+        finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides::default(
+        )
         .with_breakeven_config(BreakevenConfig {
             target: BreakevenTarget::ZSpread,
             mode: BreakevenMode::Linear,
@@ -227,8 +230,8 @@ fn test_iterative_breakeven_base_correlation_is_explicitly_unsupported() {
 
 #[test]
 fn test_breakeven_via_standard_registry() {
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
-    use finstack_quant_valuations::instruments::MetricPricingOverrides;
+    use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
+    use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::PricingOptions;
 
     let as_of = date!(2025 - 01 - 15);
@@ -287,7 +290,7 @@ fn test_breakeven_via_standard_registry() {
 
 /// Build a bond configured for breakeven, priced off a flat 4% curve.
 fn breakeven_bond(id: &str, target: BreakevenTarget, mode: BreakevenMode) -> Bond {
-    use finstack_quant_valuations::instruments::MetricPricingOverrides;
+    use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
     let as_of = date!(2025 - 01 - 15);
     let mut bond = Bond::fixed(
         id,
@@ -313,7 +316,7 @@ fn breakeven_bond(id: &str, target: BreakevenTarget, mode: BreakevenMode) -> Bon
 /// bare `[Breakeven]` both failed with "compute cs01 alongside Breakeven".
 #[test]
 fn test_breakeven_is_independent_of_request_order() {
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::PricingOptions;
 
     let as_of = date!(2025 - 01 - 15);
@@ -345,7 +348,7 @@ fn test_breakeven_is_independent_of_request_order() {
 /// must follow the configured target.
 #[test]
 fn test_breakeven_ytm_target_resolves_dv01_dependency_alone() {
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::PricingOptions;
 
     let as_of = date!(2025 - 01 - 15);
@@ -404,7 +407,7 @@ fn test_breakeven_ytm_target_resolves_dv01_dependency_alone() {
 /// estimate and verify it actually zeroes the P&L objective.
 #[test]
 fn test_iterative_breakeven_zeroes_the_horizon_pnl() {
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::PricingOptions;
 
     let as_of = date!(2025 - 01 - 15);
@@ -482,8 +485,8 @@ fn test_iterative_breakeven_zeroes_the_horizon_pnl() {
 fn test_iterative_zspread_rejected_for_credit_curve_instrument() {
     use finstack_quant_core::market_data::term_structures::HazardCurve;
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
-    use finstack_quant_valuations::instruments::MetricPricingOverrides;
+    use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
+    use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::PricingOptions;
 
     let as_of = date!(2025 - 01 - 15);
@@ -552,8 +555,8 @@ fn test_zero_sensitivity_error_names_the_metric_and_value() {
 
 #[test]
 fn test_breakeven_horizon_matches_carry_horizon() {
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
-    use finstack_quant_valuations::instruments::MetricPricingOverrides;
+    use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
+    use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::PricingOptions;
 
     let as_of = date!(2025 - 01 - 15);

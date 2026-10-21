@@ -14,8 +14,8 @@ use crate::convertible::{
     market_inputs::resolve_dividend_yield, ConvertibleBond, ConvertibleGreeks,
 };
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_valuations_core::instruments::common_impl::traits::{GreekBumps, Instrument};
 use finstack_quant_valuations_core::instruments::{ConversionEvent, ConversionPolicy};
+use finstack_quant_valuations_core::instruments::{GreekBumps, Instrument};
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
 
 use super::credit_tree::{terminal_payoff, CreditTreeEngine, CreditTreeMarketInputs};

@@ -265,10 +265,8 @@ fn production_barrier_ndf_all_engines_keep_known_rebate_units_and_lifecycle() {
 
 #[test]
 fn production_barrier_ndf_discrete_gbm_and_heston_do_not_observe_between_dates() {
-    use finstack_quant_valuations::{
-        instruments::{Monitoring, OptionType},
-        pricer::ModelKey,
-    };
+    use finstack_quant_models::types::OptionType;
+    use finstack_quant_valuations::{instruments::Monitoring, pricer::ModelKey};
     let as_of = date!(2024 - 01 - 02);
     let expiry = date!(2025 - 01 - 02);
     let t = DayCount::Act365F

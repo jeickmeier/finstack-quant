@@ -8,7 +8,8 @@
 use super::{parse_model_key, shared_standard_registry, ModelKey};
 use crate::instruments::json_loader::{instrument_load_error, MAX_JSON_BYTES};
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-use crate::instruments::{Instrument, MetricPricingOverrides};
+use crate::instruments::pricing_overrides::MetricPricingOverrides;
+use crate::instruments::Instrument;
 use crate::metrics::MetricId;
 use crate::results::ValuationResult;
 use finstack_quant_core::contract::{parse_json_value, LoadLimits};
@@ -1226,7 +1227,7 @@ mod tests {
     #[test]
     fn validate_instrument_json_rejects_credit_and_convertible_invariants() {
         let mut cds_option = CdsOption::example().expect("CDS option");
-        cds_option.exercise_style = crate::instruments::ExerciseStyle::American;
+        cds_option.exercise_style = finstack_quant_models::types::ExerciseStyle::American;
         let json = envelope_json(InstrumentJson::CdsOption(cds_option));
         assert!(validate_instrument_json(&json, None)
             .expect_err("unsupported exercise style must fail")

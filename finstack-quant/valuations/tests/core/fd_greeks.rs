@@ -2,7 +2,9 @@
 
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{GenericFdVanna, GenericFdVega, GenericFdVolga};
+use finstack_quant_valuations::metrics::sensitivities::fd_greeks::{
+    GenericFdVanna, GenericFdVega, GenericFdVolga,
+};
 use std::sync::Arc;
 use time::macros::date;
 

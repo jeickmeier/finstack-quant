@@ -88,7 +88,8 @@ kernel; it never triggers this inference.
 
 ```rust
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
-use finstack_quant_valuations::instruments::{Attributes, InstrumentPricingOverrides};
+use finstack_quant_core::types::Attributes;
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
@@ -187,7 +188,8 @@ rate index; construct `FloatingCouponSpec` directly for floors, caps or gearing.
 use finstack_quant_valuations::instruments::fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, CashflowSpec,
 };
-use finstack_quant_valuations::instruments::{Attributes, InstrumentPricingOverrides};
+use finstack_quant_core::types::Attributes;
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::money::Money;

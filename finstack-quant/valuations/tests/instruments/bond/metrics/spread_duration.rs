@@ -16,7 +16,8 @@ use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_c
 use finstack_quant_valuations::instruments::fixed_income::bond::{
     Bond, BondSettlementConvention, CallPut, CallPutSchedule, CashflowSpec,
 };
-use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides};
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 

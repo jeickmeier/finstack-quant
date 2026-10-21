@@ -58,7 +58,7 @@ use super::super::super::types::Bond;
 /// # }
 /// ```
 ///
-/// [`Instrument`]: finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
+/// [`Instrument`]: finstack_quant_valuations_core::instruments::Instrument
 pub struct BondEngine;
 
 impl BondEngine {

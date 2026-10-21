@@ -59,8 +59,7 @@
 //!
 //! - [`crate::constants`]: shared numerical constants.
 //! - [`crate::schema`]: JSON Schema generation for API contracts.
-//! - [`crate::error`]: valuation error types; [`crate::Error`] and [`crate::Result`] are also
-//!   available at the crate root.
+//! - [`crate::Error`] and [`crate::Result`]: valuation error types, at the crate root.
 //!
 //! # Example
 //!
@@ -102,7 +101,7 @@ pub use finstack_quant_valuations_core::{
 
 #[doc(hidden)]
 pub use finstack_quant_valuations_core::serde_defaults;
-pub use finstack_quant_valuations_core::{constants, contract_specs, error, market, recalibration};
+pub use finstack_quant_valuations_core::{constants, contract_specs, market, recalibration};
 /// Pricing dispatch and registry infrastructure.
 pub mod pricer;
 /// Valuation result envelopes and metadata.
@@ -115,7 +114,7 @@ pub mod instruments;
 /// Risk metric calculators and registries.
 pub mod metrics;
 
-pub use error::{Error, Result};
+pub use finstack_quant_valuations_core::{Error, Result};
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

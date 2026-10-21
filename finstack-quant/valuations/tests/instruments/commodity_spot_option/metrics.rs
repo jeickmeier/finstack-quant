@@ -7,14 +7,14 @@ use finstack_quant_core::market_data::bumps::{
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
-use finstack_quant_valuations::instruments::Attributes;
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::{
-    ExerciseStyle, InstrumentPricingOverrides, OptionType, SettlementType,
-};
+use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
 use finstack_quant_valuations_test_support::commodity_curves::flat_price_curve;
 use finstack_quant_valuations_test_support::date::date;
