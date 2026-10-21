@@ -192,7 +192,7 @@ AS_OF = date(2025, 1, 15)
 market=build_market('foundations').insert(DiscountCurve('USD-OIS',AS_OF,[(0,1)]+[(t,math.exp(-.04*t)) for t in (2,5,10,30)],interp='log_linear'))
 contract=instruments('foundations')['USD-CORP'];contract['instrument']['spec']['maturity']='2032-01-15'
 r=price_instrument(json.dumps(contract),market,AS_OF,metrics=['dv01','bucketed_dv01'])
-buckets={key:r.get_metric(key) for key in r.metric_keys() if key.startswith('bucketed_dv01::USD-OIS::')}
+buckets={key:r.get_metric(key) for key in r.metrics if key.startswith('bucketed_dv01::USD-OIS::')}
 print({'curve_pillars_years':[2,5,10,30],'parallel_DV01_USD_per_bp':r.get_metric('dv01'),'native_key_rate_buckets':buckets})
 ```
 {/* /notebook-block */}

@@ -250,6 +250,6 @@ test("structured-credit scenario prices use the completed native request", async
     name: "CLONOTES-A scenario prices",
   });
   await expect(scenario.getByRole("grid")).toContainText("126.336");
-  await expect(scenario).toContainText("structuredCreditTrancheScenarioTable");
+  await expect(scenario).toContainText("trancheScenarioTable");
   expect(errors).toEqual([]);
 });

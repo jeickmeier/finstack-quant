@@ -108,11 +108,11 @@ list_standard_metrics_grouped = _valuations.instruments.list_standard_metrics_gr
 metric_metadata = _valuations.instruments.metric_metadata
 pretty_instrument_json = _valuations.instruments.pretty_instrument_json
 price_instrument = _valuations.instruments.price_instrument
-structured_credit_tranche_breakeven_cdr = _valuations.instruments.structured_credit_tranche_breakeven_cdr
-structured_credit_tranche_discount_margin = _valuations.instruments.structured_credit_tranche_discount_margin
-structured_credit_tranche_metrics = _valuations.instruments.structured_credit_tranche_metrics
-structured_credit_tranche_oas = _valuations.instruments.structured_credit_tranche_oas
-structured_credit_tranche_scenario_table = _valuations.instruments.structured_credit_tranche_scenario_table
+tranche_breakeven_cdr = _valuations.instruments.tranche_breakeven_cdr
+tranche_discount_margin = _valuations.instruments.tranche_discount_margin
+tranche_metrics = _valuations.instruments.tranche_metrics
+tranche_oas = _valuations.instruments.tranche_oas
+tranche_scenario_table = _valuations.instruments.tranche_scenario_table
 validate_instrument_json = _valuations.instruments.validate_instrument_json
 validate_typed_instrument_json = _valuations.instruments.validate_typed_instrument_json
 
@@ -211,11 +211,11 @@ __all__: list[str] = [
     "metric_metadata",
     "pretty_instrument_json",
     "price_instrument",
-    "structured_credit_tranche_breakeven_cdr",
-    "structured_credit_tranche_discount_margin",
-    "structured_credit_tranche_metrics",
-    "structured_credit_tranche_oas",
-    "structured_credit_tranche_scenario_table",
+    "tranche_breakeven_cdr",
+    "tranche_discount_margin",
+    "tranche_metrics",
+    "tranche_oas",
+    "tranche_scenario_table",
     "validate_instrument_json",
     "validate_typed_instrument_json",
 ]

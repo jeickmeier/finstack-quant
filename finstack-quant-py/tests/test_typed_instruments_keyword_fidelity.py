@@ -46,7 +46,7 @@ from finstack_quant.valuations.instruments import (
     Tranche,
     TrancheMetrics,
     TrancheStructure,
-    structured_credit_tranche_breakeven_cdr,
+    tranche_breakeven_cdr,
 )
 from tests.tests_typed_helpers import canonical_structured_credit_json
 
@@ -394,7 +394,7 @@ def test_structured_credit_analytics_function_accepts_keyword_arguments() -> Non
     )
     market.insert_series(ScalarTimeSeries("FIXING:SOFR-3M", [(datetime.date(2023, 12, 28), 0.04)]))
 
-    result = structured_credit_tranche_breakeven_cdr(
+    result = tranche_breakeven_cdr(
         instrument=deal,
         tranche_id="CLONOTES-A",
         market=market,

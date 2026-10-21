@@ -30,7 +30,7 @@ const grid = {
   trancheId = "CLONOTES-A";
 const cases = [instrument, factor].map((input, index) => {
   const instrumentJson = native.validateInstrumentJson(JSON.stringify(input));
-  const table = native.structuredCreditTrancheScenarioTable(
+  const table = native.trancheScenarioTable(
     instrumentJson,
     trancheId,
     marketJson,

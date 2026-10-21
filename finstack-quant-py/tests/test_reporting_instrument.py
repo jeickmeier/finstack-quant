@@ -33,8 +33,9 @@ class _FakeResult:
     def price(self) -> float:
         return float(self._p["value"]["amount"])
 
-    def metric_keys(self) -> list[str]:
-        return list(self._p["measures"].keys())
+    @property
+    def metrics(self) -> dict[str, float]:
+        return dict(self._p["measures"])
 
     def get_metric(self, key: str) -> float | None:
         return self._p["measures"].get(key)

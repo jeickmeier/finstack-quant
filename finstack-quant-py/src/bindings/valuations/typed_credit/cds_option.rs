@@ -61,7 +61,6 @@ instrument_envelope_methods!(
     "cds_option",
     builder = PyCdsOptionBuilder("CdsOptionBuilder", fields),
     seed = finstack_quant_valuations::instruments::CdsOption::builder(),
-    pricing_overrides = none,
     /// Build the validated CDS option.
     ///
     /// Validation is the Rust ``CdsOption::builder().build()`` invariants

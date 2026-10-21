@@ -16,18 +16,6 @@ fn parse(result: &JsValue) -> Result<ValuationResult, JsValue> {
     from_js_json(result, "result")
 }
 
-/// Present value as an exact decimal string.
-///
-/// Twin of Python `ValuationResult.price_decimal`: the `Money` amount without
-/// the binary rounding a JavaScript number would add.
-/// @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
-/// @returns The present value amount as a decimal string, e.g. `"1042315.67"`.
-/// @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
-#[wasm_bindgen(js_name = valuationResultPriceDecimal)]
-pub fn valuation_result_price_decimal(result: JsValue) -> Result<String, JsValue> {
-    Ok(parse(&result)?.value.amount_decimal().to_string())
-}
-
 /// One measure of a valuation result by its metric key.
 ///
 /// Twin of Python `ValuationResult.get_metric` (Rust `ValuationResult::metric_str`).
@@ -38,32 +26,6 @@ pub fn valuation_result_price_decimal(result: JsValue) -> Result<String, JsValue
 #[wasm_bindgen(js_name = valuationResultGetMetric)]
 pub fn valuation_result_get_metric(result: JsValue, key: JsValue) -> Result<Option<f64>, JsValue> {
     Ok(parse(&result)?.metric_str(&js_string(&key, "key")?))
-}
-
-/// Metric keys of a valuation result, in measure order.
-///
-/// Twin of Python `ValuationResult.metric_keys`.
-/// @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
-/// @returns Fully qualified metric keys in the order the measures were computed.
-/// @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
-#[wasm_bindgen(js_name = valuationResultMetricKeys)]
-pub fn valuation_result_metric_keys(result: JsValue) -> Result<Vec<String>, JsValue> {
-    Ok(parse(&result)?
-        .measures
-        .keys()
-        .map(ToString::to_string)
-        .collect())
-}
-
-/// Number of measures in a valuation result.
-///
-/// Twin of Python `ValuationResult.metric_count`.
-/// @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
-/// @returns Count of measure keys.
-/// @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
-#[wasm_bindgen(js_name = valuationResultMetricCount)]
-pub fn valuation_result_metric_count(result: JsValue) -> Result<usize, JsValue> {
-    Ok(parse(&result)?.measures.len())
 }
 
 /// Unit of every measure in a valuation result.

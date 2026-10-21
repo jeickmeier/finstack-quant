@@ -14,6 +14,23 @@ export function stripCommentDelimiters(documentationText) {
   return body;
 }
 
+/**
+ * Undo the raw-string spelling wasm-bindgen gives macro-forwarded doc lines.
+ *
+ * A `///` line forwarded through a `macro_rules!` macro reaches wasm-bindgen
+ * as `#[doc = r" text"]` (or `r#" text"#` when the text holds a quote), and
+ * the generated declaration keeps the literal: ` * r" text` and
+ * ` * r#" text"#`. Rewrite those comment lines to ` * text`.
+ *
+ * @param {string} declarationText - Generated `.d.ts` text.
+ * @returns {string}
+ */
+export function stripRawStringDocPrefixes(declarationText) {
+  return declarationText
+    .replace(/^(\s*\*) r#" ?(.*)"#$/gm, (_, star, text) => (text ? `${star} ${text}` : star))
+    .replace(/^(\s*\*) r" ?(.*)$/gm, (_, star, text) => (text ? `${star} ${text}` : star));
+}
+
 export function documentationBlocks(documentationText) {
   if (!documentationText) return [];
   const lines = stripCommentDelimiters(documentationText)

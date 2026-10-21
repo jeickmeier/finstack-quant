@@ -86,7 +86,7 @@ pub struct ScenarioTable {
 ///
 /// Returns an error if the tranche is missing, a cell fails to reprice, or a
 /// cell field is non-finite.
-pub fn scenario_table(
+pub fn tranche_scenario_table(
     deal: &StructuredCredit,
     tranche_id: &str,
     market: &MarketContext,
@@ -195,7 +195,7 @@ mod scenario_guard_tests {
             severities: vec![0.4; 100],
             recovery_lag: None,
         };
-        let err = scenario_table(&deal, "CLONOTES-A", &market, as_of, &grid)
+        let err = tranche_scenario_table(&deal, "CLONOTES-A", &market, as_of, &grid)
             .expect_err("a 1,000,000-cell grid must be rejected");
         let msg = err.to_string();
         assert!(

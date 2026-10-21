@@ -89,7 +89,7 @@ test('typed FX price returns the same lossless valuation as priceInstrument', ()
     'monte_carlo_gbm',
     []
   );
-  const typed = valuations.fx.FxBarrierOption.fromJson(json).price(
+  const typed = valuations.instruments.FxBarrierOption.fromJson(json).price(
     MARKET,
     AS_OF,
     'monte_carlo_gbm'

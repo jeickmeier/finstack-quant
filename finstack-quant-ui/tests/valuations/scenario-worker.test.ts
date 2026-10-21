@@ -34,7 +34,7 @@ it("preserves every native scenario cell and failure through the real worker", a
       gridJson: JSON.stringify(fixture.grid),
     };
     expect(unwrap(await worker.proxy.scenarioTable(request))).toEqual(
-      native.structuredCreditTrancheScenarioTable(
+      native.trancheScenarioTable(
         request.instrumentJson,
         request.trancheId,
         request.marketJson,
@@ -44,7 +44,7 @@ it("preserves every native scenario cell and failure through the real worker", a
     );
     let error;
     try {
-      native.structuredCreditTrancheScenarioTable(
+      native.trancheScenarioTable(
         request.instrumentJson,
         "missing",
         request.marketJson,

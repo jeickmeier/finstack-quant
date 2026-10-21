@@ -2531,7 +2531,7 @@ export interface D_482Fa346C77E25F26A51 {
    * computed here (the same constraint documented on the accrued
    * calculator). It is reported unadjusted rather than fabricated: the
    * error is at most one period's accrued interest, in a known direction.
-   * Use `calculate_tranche_metrics` when an accrued-adjusted clean price is
+   * Use `tranche_metrics` when an accrued-adjusted clean price is
    * required.
    */
   clean_price: number;

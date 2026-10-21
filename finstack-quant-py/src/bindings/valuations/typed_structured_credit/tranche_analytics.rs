@@ -15,9 +15,7 @@ use crate::bindings::pandas_utils::{
 };
 use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
-    calculate_tranche_oas, scenario_table, OasConfig, OasResult, ScenarioGrid, ScenarioTable,
-    StructuredCredit, TrancheMetrics,
+    self as sc, OasConfig, OasResult, ScenarioGrid, ScenarioTable, StructuredCredit, TrancheMetrics,
 };
 use finstack_quant_valuations::metrics::MetricId;
 use pyo3::prelude::*;
@@ -85,10 +83,10 @@ fn extract_structured_credit(
 ///     is unavailable, or the spread solve fails or exceeds ±5000 bp.
 #[pyfunction]
 #[pyo3(
-    name = "structured_credit_tranche_discount_margin",
+    name = "tranche_discount_margin",
     text_signature = "(instrument, tranche_id, market, as_of, market_price_pct)"
 )]
-fn structured_credit_tranche_discount_margin(
+fn tranche_discount_margin(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
     tranche_id: &str,
@@ -101,7 +99,7 @@ fn structured_credit_tranche_discount_margin(
     let tranche_id = tranche_id.to_owned();
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     py.detach(move || {
-        calculate_tranche_discount_margin(&deal, &tranche_id, &market, as_of, market_price_pct)
+        sc::tranche_discount_margin(&deal, &tranche_id, &market, as_of, market_price_pct)
     })
     .map_err(core_to_py)
 }
@@ -127,10 +125,10 @@ fn structured_credit_tranche_discount_margin(
 ///     Break-even annual CDR in decimal.
 #[pyfunction]
 #[pyo3(
-    name = "structured_credit_tranche_breakeven_cdr",
+    name = "tranche_breakeven_cdr",
     text_signature = "(instrument, tranche_id, market, as_of)"
 )]
-fn structured_credit_tranche_breakeven_cdr(
+fn tranche_breakeven_cdr(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
     tranche_id: &str,
@@ -141,7 +139,7 @@ fn structured_credit_tranche_breakeven_cdr(
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
-    py.detach(move || calculate_tranche_breakeven_cdr(&deal, &tranche_id, &market, as_of))
+    py.detach(move || sc::tranche_breakeven_cdr(&deal, &tranche_id, &market, as_of))
         .map_err(core_to_py)
 }
 
@@ -173,11 +171,11 @@ fn structured_credit_tranche_breakeven_cdr(
 ///     Typed OAS result. Call ``to_json`` on it for the wire payload.
 #[pyfunction]
 #[pyo3(
-    name = "structured_credit_tranche_oas",
+    name = "tranche_oas",
     signature = (instrument, tranche_id, market, as_of, market_price_pct, config=None),
     text_signature = "(instrument, tranche_id, market, as_of, market_price_pct, config=None)"
 )]
-fn structured_credit_tranche_oas(
+fn tranche_oas(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
     tranche_id: &str,
@@ -200,7 +198,7 @@ fn structured_credit_tranche_oas(
     };
     let inner = py
         .detach(move || {
-            calculate_tranche_oas(
+            sc::tranche_oas(
                 &deal,
                 &tranche_id,
                 &market,
@@ -255,11 +253,11 @@ fn structured_credit_tranche_oas(
 ///     If a required curve is missing from ``market``.
 #[pyfunction]
 #[pyo3(
-    name = "structured_credit_tranche_metrics",
+    name = "tranche_metrics",
     signature = (instrument, tranche_id, market, as_of, market_price_pct=None, metrics=None),
     text_signature = "(instrument, tranche_id, market, as_of, market_price_pct=None, metrics=None)"
 )]
-fn structured_credit_tranche_metrics(
+fn tranche_metrics(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
     tranche_id: &str,
@@ -280,7 +278,7 @@ fn structured_credit_tranche_metrics(
         .map_err(core_to_py)?;
     let inner = py
         .detach(move || {
-            calculate_tranche_metrics(
+            sc::tranche_metrics(
                 &deal,
                 &tranche_id,
                 &market,
@@ -317,10 +315,10 @@ fn structured_credit_tranche_metrics(
 ///     Typed scenario table. Call ``to_json`` on it for the wire payload.
 #[pyfunction]
 #[pyo3(
-    name = "structured_credit_tranche_scenario_table",
+    name = "tranche_scenario_table",
     text_signature = "(instrument, tranche_id, market, as_of, grid)"
 )]
-fn structured_credit_tranche_scenario_table(
+fn tranche_scenario_table(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
     tranche_id: &str,
@@ -336,13 +334,13 @@ fn structured_credit_tranche_scenario_table(
     let grid: ScenarioGrid = serde_json::from_str(&grid_json)
         .map_err(|e| serde_json_to_py(e, "invalid scenario grid JSON"))?;
     let inner = py
-        .detach(move || scenario_table(&deal, &tranche_id, &market, as_of, &grid))
+        .detach(move || sc::tranche_scenario_table(&deal, &tranche_id, &market, as_of, &grid))
         .map_err(core_to_py)?;
     Ok(PyScenarioTable { inner })
 }
 
 /// Result of an option-adjusted-spread calculation for a structured-credit
-/// tranche ([`structured_credit_tranche_oas`]'s return value).
+/// tranche ([`tranche_oas`]'s return value).
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "OasResult",
@@ -468,7 +466,7 @@ crate::bindings::macros::py_getters!(PyOasResult |s| {
 });
 
 /// Summary risk/pricing metrics for a structured-credit tranche
-/// ([`structured_credit_tranche_metrics`]'s return value).
+/// ([`tranche_metrics`]'s return value).
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "TrancheMetrics",
@@ -692,7 +690,7 @@ crate::bindings::macros::py_getters!(PyTrancheMetrics |s| {
 });
 
 /// Scenario/yield table for a single structured-credit tranche
-/// ([`structured_credit_tranche_scenario_table`]'s return value).
+/// ([`tranche_scenario_table`]'s return value).
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "ScenarioTable",
@@ -850,29 +848,20 @@ pub(crate) const EXPORTS: &[&str] = &[
     "OasResult",
     "ScenarioTable",
     "TrancheMetrics",
-    "structured_credit_tranche_breakeven_cdr",
-    "structured_credit_tranche_discount_margin",
-    "structured_credit_tranche_metrics",
-    "structured_credit_tranche_oas",
-    "structured_credit_tranche_scenario_table",
+    "tranche_breakeven_cdr",
+    "tranche_discount_margin",
+    "tranche_metrics",
+    "tranche_oas",
+    "tranche_scenario_table",
 ];
 
 /// Register the structured-credit tranche analytics on the instruments module.
 pub(crate) fn register(parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    parent.add_function(wrap_pyfunction!(
-        structured_credit_tranche_discount_margin,
-        parent
-    )?)?;
-    parent.add_function(wrap_pyfunction!(
-        structured_credit_tranche_breakeven_cdr,
-        parent
-    )?)?;
-    parent.add_function(wrap_pyfunction!(structured_credit_tranche_oas, parent)?)?;
-    parent.add_function(wrap_pyfunction!(structured_credit_tranche_metrics, parent)?)?;
-    parent.add_function(wrap_pyfunction!(
-        structured_credit_tranche_scenario_table,
-        parent
-    )?)?;
+    parent.add_function(wrap_pyfunction!(tranche_discount_margin, parent)?)?;
+    parent.add_function(wrap_pyfunction!(tranche_breakeven_cdr, parent)?)?;
+    parent.add_function(wrap_pyfunction!(tranche_oas, parent)?)?;
+    parent.add_function(wrap_pyfunction!(tranche_metrics, parent)?)?;
+    parent.add_function(wrap_pyfunction!(tranche_scenario_table, parent)?)?;
     parent.add_class::<PyOasResult>()?;
     parent.add_class::<PyTrancheMetrics>()?;
     parent.add_class::<PyScenarioTable>()?;

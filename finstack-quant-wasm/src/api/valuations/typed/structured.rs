@@ -22,9 +22,8 @@ use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
-    calculate_tranche_oas, scenario_table, AssetPool, DealType, OasConfig, ScenarioGrid,
-    StandardDealParams, StructuredCredit, TrancheStructure,
+    self as sc, AssetPool, DealType, OasConfig, ScenarioGrid, StandardDealParams, StructuredCredit,
+    TrancheStructure,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
@@ -58,8 +57,8 @@ fn parse_json_arg<T: serde::de::DeserializeOwned>(json: &str, label: &str) -> Re
 /// @param market_price_pct - Clean settlement price as a percentage of the tranche's CURRENT balance (100.0 = par); accrued interest is added once at the deal's quote_settlement_date or the valuation date.
 /// @returns The z-spread-equivalent discount margin in decimal units.
 /// @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, market_price_pct is not finite and positive, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
-#[wasm_bindgen(js_name = structuredCreditTrancheDiscountMargin)]
-pub fn structured_credit_tranche_discount_margin(
+#[wasm_bindgen(js_name = trancheDiscountMargin)]
+pub fn tranche_discount_margin(
     instrument_json: JsValue,
     tranche_id: JsValue,
     market_json: JsValue,
@@ -72,7 +71,7 @@ pub fn structured_credit_tranche_discount_margin(
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
-    calculate_tranche_discount_margin(&deal, tranche_id, &market, as_of, market_price_pct)
+    sc::tranche_discount_margin(&deal, tranche_id, &market, as_of, market_price_pct)
         .map_err(to_js_err)
 }
 
@@ -89,8 +88,8 @@ pub fn structured_credit_tranche_discount_margin(
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-#[wasm_bindgen(js_name = structuredCreditTrancheBreakevenCdr)]
-pub fn structured_credit_tranche_breakeven_cdr(
+#[wasm_bindgen(js_name = trancheBreakevenCdr)]
+pub fn tranche_breakeven_cdr(
     instrument_json: JsValue,
     tranche_id: JsValue,
     market_json: JsValue,
@@ -101,7 +100,7 @@ pub fn structured_credit_tranche_breakeven_cdr(
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
-    calculate_tranche_breakeven_cdr(&deal, tranche_id, &market, as_of).map_err(to_js_err)
+    sc::tranche_breakeven_cdr(&deal, tranche_id, &market, as_of).map_err(to_js_err)
 }
 
 /// Option-adjusted spread for a tranche; returns a typed `OasResult` object.
@@ -130,8 +129,8 @@ pub fn structured_credit_tranche_breakeven_cdr(
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param market_price_pct - Clean settlement quote as a percentage of CURRENT balance; accrued interest is added once.
 /// @param config_json - Optional OasConfig JSON; omit to use the default OAS solver configuration.
-#[wasm_bindgen(js_name = structuredCreditTrancheOas)]
-pub fn structured_credit_tranche_oas(
+#[wasm_bindgen(js_name = trancheOas)]
+pub fn tranche_oas(
     instrument_json: JsValue,
     tranche_id: JsValue,
     market_json: JsValue,
@@ -150,9 +149,8 @@ pub fn structured_credit_tranche_oas(
         Some(json) => parse_json_arg(json, "OAS config")?,
         None => OasConfig::default(),
     };
-    let result =
-        calculate_tranche_oas(&deal, tranche_id, &market, as_of, market_price_pct, &config)
-            .map_err(to_js_err)?;
+    let result = sc::tranche_oas(&deal, tranche_id, &market, as_of, market_price_pct, &config)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -178,8 +176,8 @@ pub fn structured_credit_tranche_oas(
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param grid_json - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.
-#[wasm_bindgen(js_name = structuredCreditTrancheScenarioTable)]
-pub fn structured_credit_tranche_scenario_table(
+#[wasm_bindgen(js_name = trancheScenarioTable)]
+pub fn tranche_scenario_table(
     instrument_json: JsValue,
     tranche_id: JsValue,
     market_json: JsValue,
@@ -193,7 +191,8 @@ pub fn structured_credit_tranche_scenario_table(
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
     let grid: ScenarioGrid = parse_json_arg(grid_json, "scenario grid")?;
-    let result = scenario_table(&deal, tranche_id, &market, as_of, &grid).map_err(to_js_err)?;
+    let result =
+        sc::tranche_scenario_table(&deal, tranche_id, &market, as_of, &grid).map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -227,8 +226,8 @@ pub fn structured_credit_tranche_scenario_table(
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param market_price_pct - Optional clean settlement quote as a percentage of CURRENT balance; omit to use the deal quote, or its model clean price when no quote is supplied.
 /// @param metrics - Optional registry metric ids to value on this note; omit or pass an empty array for none.
-#[wasm_bindgen(js_name = structuredCreditTrancheMetrics)]
-pub fn structured_credit_tranche_metrics(
+#[wasm_bindgen(js_name = trancheMetrics)]
+pub fn tranche_metrics(
     instrument_json: JsValue,
     tranche_id: JsValue,
     market_json: JsValue,
@@ -248,7 +247,7 @@ pub fn structured_credit_tranche_metrics(
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
-    let result = calculate_tranche_metrics(
+    let result = sc::tranche_metrics(
         &deal,
         tranche_id,
         &market,

@@ -1,8 +1,8 @@
 //! Finite-output guards for the tranche analytics calculators.
 //!
-//! [`calculate_tranche_metrics`](super::calculate_tranche_metrics),
-//! [`calculate_tranche_oas`](super::calculate_tranche_oas) and
-//! [`scenario_table`](super::scenario_table) reject a non-finite field
+//! [`tranche_metrics`](super::tranche_metrics),
+//! [`tranche_oas`](super::tranche_oas) and
+//! [`tranche_scenario_table`](super::tranche_scenario_table) reject a non-finite field
 //! rather than return it: `serde_json` serializes NaN and infinity as JSON
 //! `null`, which downstream consumers coerce to 0, so a failed computation
 //! would otherwise read as a valid result.

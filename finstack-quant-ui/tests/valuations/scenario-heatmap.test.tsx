@@ -51,7 +51,7 @@ it("matches direct native cells for original and factor-adjusted tranches on cur
   const market = readFileSync(resolve(root, fixture.marketSource), "utf8");
   for (const c of fixture.cases)
     expect(
-      native.structuredCreditTrancheScenarioTable(
+      native.trancheScenarioTable(
         JSON.stringify(c.instrument),
         fixture.trancheId,
         market,

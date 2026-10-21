@@ -12,10 +12,9 @@ use finstack_quant_models::credit::pool::{
 };
 use finstack_quant_valuations_core::instruments::{Instrument, ScenarioPricingOverrides};
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
-    calculate_tranche_oas, run_simulation, scenario_table, AssetPool, DealType, HedgeSwap,
-    OasConfig, PoolAsset, ScenarioGrid, StructuredCredit, StructuredCreditPricingMode, Tranche,
-    TrancheSeniority, TrancheStructure,
+    run_simulation, tranche_breakeven_cdr, tranche_discount_margin, tranche_metrics, tranche_oas,
+    tranche_scenario_table, AssetPool, DealType, HedgeSwap, OasConfig, PoolAsset, ScenarioGrid,
+    StructuredCredit, StructuredCreditPricingMode, Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -392,16 +391,16 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         sc.value_tranche("missing", &market, closing_date())
             .expect_err("invalid tranche value")
             .to_string(),
-        calculate_tranche_metrics(&sc, "missing", &market, closing_date(), None, &[])
+        tranche_metrics(&sc, "missing", &market, closing_date(), None, &[])
             .expect_err("invalid tranche metrics")
             .to_string(),
-        calculate_tranche_breakeven_cdr(&sc, "missing", &market, closing_date())
+        tranche_breakeven_cdr(&sc, "missing", &market, closing_date())
             .expect_err("invalid breakeven cdr")
             .to_string(),
-        calculate_tranche_discount_margin(&sc, "missing", &market, closing_date(), 99.0)
+        tranche_discount_margin(&sc, "missing", &market, closing_date(), 99.0)
             .expect_err("invalid discount margin")
             .to_string(),
-        calculate_tranche_oas(
+        tranche_oas(
             &sc,
             "missing",
             &market,
@@ -411,7 +410,7 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         )
         .expect_err("invalid oas")
         .to_string(),
-        scenario_table(&sc, "missing", &market, closing_date(), &grid)
+        tranche_scenario_table(&sc, "missing", &market, closing_date(), &grid)
             .expect_err("invalid scenario table")
             .to_string(),
         sc.price_with_metrics(&market, closing_date(), &[], Default::default())

@@ -198,18 +198,9 @@ fn computation_results_are_structured_not_strings() {
         ("CalibrationNamespace", "dryRun"),
         ("AttributionNamespace", "attributePnl"),
         ("AttributionNamespace", "attributePnlEnvelope"),
-        (
-            "ValuationInstrumentsNamespace",
-            "structuredCreditTrancheOas",
-        ),
-        (
-            "ValuationInstrumentsNamespace",
-            "structuredCreditTrancheMetrics",
-        ),
-        (
-            "ValuationInstrumentsNamespace",
-            "structuredCreditTrancheScenarioTable",
-        ),
+        ("ValuationInstrumentsNamespace", "trancheOas"),
+        ("ValuationInstrumentsNamespace", "trancheMetrics"),
+        ("ValuationInstrumentsNamespace", "trancheScenarioTable"),
         ("StatementsAnalyticsNamespace", "runChecks"),
         ("StatementsAnalyticsNamespace", "runThreeStatementChecks"),
         (
@@ -303,8 +294,6 @@ fn bare_string_returns_are_named_or_allowlisted() {
         // Rating label of a simulated path at a time / of a WARF factor.
         ("RatingPath", "labelAt"),
         ("RatingScale", "ratingFromWarf"),
-        // Exact decimal text of the present value.
-        ("ValuationsNamespace", "valuationResultPriceDecimal"),
         // ISO-8601 dates of the underlying swap.
         ("Swaption", "getUnderlyingStartDate"),
         ("Swaption", "getUnderlyingMaturity"),

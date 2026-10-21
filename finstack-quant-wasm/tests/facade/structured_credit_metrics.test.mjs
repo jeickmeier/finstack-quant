@@ -73,7 +73,7 @@ test('a deal call adds the to-call twins next to the to-maturity metrics', () =>
   const spec = f.instrument.instrument.spec;
   const asOf = '2024-02-15';
   const id = spec.tranches.tranches[0].id;
-  const toMaturity = valuations.instruments.structuredCreditTrancheMetrics(
+  const toMaturity = valuations.instruments.trancheMetrics(
     JSON.stringify(f.instrument),
     id,
     JSON.stringify(f.market),
@@ -83,7 +83,7 @@ test('a deal call adds the to-call twins next to the to-maturity metrics', () =>
   assert.equal(toMaturity.z_spread_to_call_bp, undefined);
 
   spec.call_assumption = { date: '2026-02-15', price_pct: 100.0, scope: 'deal' };
-  const toCall = valuations.instruments.structuredCreditTrancheMetrics(
+  const toCall = valuations.instruments.trancheMetrics(
     JSON.stringify(f.instrument),
     id,
     JSON.stringify(f.market),
@@ -115,7 +115,7 @@ test('clean and dirty targets share coupon-crossing settlement', () => {
   const dirty = result.measures.dirty_price * 1_000_000;
   assert.ok(Math.abs(clean * 1_000_000 + accrued - dirty) < 1e-6);
   const id = spec.tranches.tranches[0].id;
-  const metrics = valuations.instruments.structuredCreditTrancheMetrics(
+  const metrics = valuations.instruments.trancheMetrics(
     JSON.stringify(f.instrument),
     id,
     JSON.stringify(f.market),
@@ -127,7 +127,7 @@ test('clean and dirty targets share coupon-crossing settlement', () => {
   assert.ok(Math.abs(metrics.accrued - accrued) < 1e-6);
   assert.equal(typeof metrics.ytm, 'number');
   assert.equal(metrics.metrics, undefined);
-  const withRegistry = valuations.instruments.structuredCreditTrancheMetrics(
+  const withRegistry = valuations.instruments.trancheMetrics(
     JSON.stringify(f.instrument),
     id,
     JSON.stringify(f.market),
@@ -148,7 +148,7 @@ test('clean and dirty targets share coupon-crossing settlement', () => {
     seed: 42,
     tolerance: 1e-10,
   };
-  const oas = valuations.instruments.structuredCreditTrancheOas(
+  const oas = valuations.instruments.trancheOas(
     JSON.stringify(f.instrument),
     id,
     JSON.stringify(f.market),
@@ -185,19 +185,12 @@ test('structured credit errors preserve typed classification', () => {
     return true;
   };
   assert.throws(
-    () =>
-      valuations.instruments.structuredCreditTrancheScenarioTable(
-        '{',
-        tranche,
-        '{}',
-        f.as_of,
-        grid
-      ),
+    () => valuations.instruments.trancheScenarioTable('{', tranche, '{}', f.as_of, grid),
     check('validation')
   );
   assert.throws(
     () =>
-      valuations.instruments.structuredCreditTrancheScenarioTable(
+      valuations.instruments.trancheScenarioTable(
         JSON.stringify(f.instrument),
         tranche,
         JSON.stringify({ ...f.market, curves: [] }),
