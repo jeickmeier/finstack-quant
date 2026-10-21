@@ -425,7 +425,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/weighted_ecl_result.schema.json",
-      "bytes": 12469,
+      "bytes": 12062,
       "kind": "output",
       "path": "schemas/statements_analytics/1/weighted_ecl_result.schema.json",
       "summary": "Probability-weighted ECL across macro scenarios with the per-scenario audit trail.",
