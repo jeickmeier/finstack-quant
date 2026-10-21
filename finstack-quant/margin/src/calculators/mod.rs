@@ -5,21 +5,17 @@
 //!
 //! # Available Calculators
 //!
-//! - [`VmCalculator`]: Variation margin calculation per ISDA CSA rules
-//! - [`HaircutImCalculator`]: Haircut-based IM for repos
-//! - [`SimmCalculator`]: ISDA SIMM for OTC derivatives
-//! - [`ScheduleImCalculator`]: BCBS-IOSCO regulatory schedule
-//! - [`ClearingHouseImCalculator`]: CCP-specific IM calculation
+//! - [`VmCalculator`](crate::calculators::VmCalculator): Variation margin calculation per ISDA CSA rules
+//! - [`HaircutImCalculator`](crate::calculators::im::HaircutImCalculator): Haircut-based IM for repos
+//! - [`SimmCalculator`](crate::calculators::im::SimmCalculator): ISDA SIMM for OTC derivatives
+//! - [`ScheduleImCalculator`](crate::calculators::im::schedule::ScheduleImCalculator): BCBS-IOSCO regulatory schedule
+//! - [`ClearingHouseImCalculator`](crate::calculators::im::ClearingHouseImCalculator): CCP-specific IM calculation
 
 /// Initial-margin calculators and methodology-specific helpers.
 pub mod im;
 mod traits;
 mod vm;
 
-pub use im::{
-    CcpMethodology, ClearingHouseImCalculator, ExternalImSource, HaircutImCalculator,
-    ScheduleImCalculator, SimmCalculator,
-};
 pub use traits::{
     ImCalculator, ImResult, SimmBucketDetail, SimmComponentDetail, SimmDetail,
     SimmWeightedSensitivity,

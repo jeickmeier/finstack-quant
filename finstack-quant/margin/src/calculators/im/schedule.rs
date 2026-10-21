@@ -13,8 +13,8 @@
 
 use crate::calculators::traits::{ImCalculator, ImResult};
 use crate::registry::{embedded_registry, margin_registry_from_config};
-use crate::traits::Marginable;
 use crate::types::ImMethodology;
+use crate::Marginable;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::neumaier_sum;
@@ -294,7 +294,9 @@ impl RegulatorySchedule {
 /// # Example
 ///
 /// ```no_run
-/// use finstack_quant_margin::{ImCalculator, Marginable, ScheduleImCalculator};
+/// use finstack_quant_margin::Marginable;
+/// use finstack_quant_margin::calculators::ImCalculator;
+/// use finstack_quant_margin::calculators::im::schedule::ScheduleImCalculator;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use time::macros::date;
@@ -696,11 +698,11 @@ mod tests {
                 &self.id
             }
 
-            fn margin_spec(&self) -> Option<&crate::OtcMarginSpec> {
+            fn margin_spec(&self) -> Option<&crate::types::OtcMarginSpec> {
                 None
             }
 
-            fn netting_set_id(&self) -> Option<crate::NettingSetId> {
+            fn netting_set_id(&self) -> Option<crate::types::NettingSetId> {
                 None
             }
 
@@ -708,8 +710,8 @@ mod tests {
                 &self,
                 _market: &MarketContext,
                 _as_of: Date,
-            ) -> Result<crate::SimmSensitivities> {
-                Ok(crate::SimmSensitivities::new(self.value.currency()))
+            ) -> Result<crate::types::SimmSensitivities> {
+                Ok(crate::types::SimmSensitivities::new(self.value.currency()))
             }
 
             fn mtm_for_vm(&self, _market: &MarketContext, _as_of: Date) -> Result<Money> {

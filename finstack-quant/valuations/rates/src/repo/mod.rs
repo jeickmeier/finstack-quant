@@ -11,7 +11,7 @@
 //! # Margining boundary
 //!
 //! [`Repo`](crate::repo::Repo) implements [`finstack_quant_margin::Marginable`] and can carry an
-//! optional [`finstack_quant_margin::RepoMarginSpec`]. Variation-margin MTM
+//! optional [`finstack_quant_margin::types::RepoMarginSpec`]. Variation-margin MTM
 //! delegates to repo PV, while SIMM returns a simple 3M/6M interest-rate-delta
 //! approximation.
 //!

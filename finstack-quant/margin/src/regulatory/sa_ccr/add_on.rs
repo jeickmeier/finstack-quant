@@ -247,7 +247,7 @@ mod tests {
 
     mod per_trade_mf {
         use super::*;
-        use crate::regulatory::sa_ccr::types::{SaCcrNettingSetConfig, SaCcrTrade};
+        use crate::regulatory::sa_ccr::{SaCcrNettingSetConfig, SaCcrTrade};
         use crate::types::NettingSetId;
         use finstack_quant_core::dates::Date;
 

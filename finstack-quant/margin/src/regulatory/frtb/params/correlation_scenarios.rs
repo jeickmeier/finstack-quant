@@ -27,8 +27,7 @@
 //! within that scenario.
 //!
 //! These scaling operations are implemented directly on the
-//! `CorrelationScenario` enum in
-//! [`types`](crate::regulatory::frtb::types), and pinned by
+//! [`CorrelationScenario`](crate::regulatory::frtb::CorrelationScenario) enum, and pinned by
 //! `correlation_scenario_tests` there.
 //!
 //! # Known deviations from MAR21

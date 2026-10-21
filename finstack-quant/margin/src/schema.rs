@@ -4,18 +4,20 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "json-schema")]
 use serde_json::Value;
 
+use crate::calculators::im::schedule::ScheduleAssetClass;
+use crate::calculators::im::CcpMethodology;
+use crate::calculators::{ImResult, VmResult};
+use crate::regulatory::frtb::{FrtbRiskClass, FrtbSbaResult, FrtbSensitivities};
+use crate::regulatory::sa_ccr::{EadResult, SaCcrNettingSetConfig, SaCcrTrade};
+use crate::types::{ConcentrationBreach, ImCollateralResult, RepoMarginSpec};
+use crate::types::{CsaSpec, MarginCall, OtcMarginSpec};
 #[cfg(feature = "json-schema")]
 use crate::{
-    calculators::CcpMethodology, constants::MarginConstants, metrics::ExcessCollateral,
-    metrics::Haircut01, metrics::MarginFundingCost, metrics::MarginUtilization,
-    regulatory::EadResult, regulatory::FrtbRiskClass, regulatory::FrtbSbaResult,
-    regulatory::FrtbSensitivities, regulatory::SaCcrNettingSetConfig, regulatory::SaCcrTrade,
-    types::SimmSensitivitiesJson, xva::mva::ImDecayProfile, xva::mva::MvaResult,
-    xva::types::ExposureProfile, xva::types::FundingConfig, xva::types::XvaResult,
-    ConcentrationBreach, ImCollateralResult, ImResult, RepoMarginSpec, ScheduleAssetClass,
-    SimmVersion, VmResult,
+    constants::MarginConstants, metrics::ExcessCollateral, metrics::Haircut01,
+    metrics::MarginFundingCost, metrics::MarginUtilization, types::SimmSensitivitiesJson,
+    xva::mva::ImDecayProfile, xva::mva::MvaResult, xva::types::ExposureProfile,
+    xva::types::FundingConfig, xva::types::XvaResult, SimmVersion,
 };
-use crate::{CsaSpec, MarginCall, OtcMarginSpec};
 
 /// Stable base URI for margin-owned schemas.
 pub const MARGIN_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/margin/1/";
@@ -175,11 +177,11 @@ mod examples {
     }
 
     pub(super) fn ccp_methodology() -> Result<Vec<Value>> {
-        example(&crate::calculators::CcpMethodology::LchSwapClear)
+        example(&crate::calculators::im::CcpMethodology::LchSwapClear)
     }
 
     pub(super) fn concentration_breach() -> Result<Vec<Value>> {
-        example_from_json::<crate::ConcentrationBreach>(json!({
+        example_from_json::<crate::types::ConcentrationBreach>(json!({
             "asset_class": "corporate_bonds",
             "fraction": 0.35,
             "limit": 0.25,
@@ -187,7 +189,7 @@ mod examples {
         }))
     }
 
-    fn sa_ccr_trade_value() -> Result<crate::regulatory::SaCcrTrade> {
+    fn sa_ccr_trade_value() -> Result<crate::regulatory::sa_ccr::SaCcrTrade> {
         serde_json::from_value(json!({
             "trade_id": "IRS-USD-5Y",
             "asset_class": "interest_rate",
@@ -209,7 +211,7 @@ mod examples {
         })
     }
 
-    fn sa_ccr_config_value() -> Result<crate::regulatory::SaCcrNettingSetConfig> {
+    fn sa_ccr_config_value() -> Result<crate::regulatory::sa_ccr::SaCcrNettingSetConfig> {
         serde_json::from_value(json!({
             "as_of": "2025-01-15",
             "netting_set_id": {"kind": "bilateral", "counterparty_id": "ACME-BANK", "csa_id": "CSA-ACME-2024"},
@@ -237,7 +239,7 @@ mod examples {
 
     /// The EAD of [`sa_ccr_trade`] under [`sa_ccr_netting_set_config`].
     pub(super) fn ead_result() -> Result<Vec<Value>> {
-        example(&crate::regulatory::saccr_ead(
+        example(&crate::regulatory::sa_ccr::saccr_ead(
             &[sa_ccr_trade_value()?],
             &sa_ccr_config_value()?,
             None,
@@ -261,11 +263,11 @@ mod examples {
     }
 
     pub(super) fn frtb_risk_class() -> Result<Vec<Value>> {
-        example(&crate::regulatory::FrtbRiskClass::Girr)
+        example(&crate::regulatory::frtb::FrtbRiskClass::Girr)
     }
 
-    fn frtb_sensitivities_value() -> crate::regulatory::FrtbSensitivities {
-        let mut sensitivities = crate::regulatory::FrtbSensitivities::new(Currency::USD);
+    fn frtb_sensitivities_value() -> crate::regulatory::frtb::FrtbSensitivities {
+        let mut sensitivities = crate::regulatory::frtb::FrtbSensitivities::new(Currency::USD);
         sensitivities.add_girr_delta(Currency::USD, "5Y", 12_500.0);
         sensitivities.add_girr_delta(Currency::USD, "10Y", -8_000.0);
         // Equity and FX deltas are P&L per one percent move.
@@ -280,7 +282,7 @@ mod examples {
 
     /// The SBA charge of [`frtb_sensitivities`] across all three scenarios.
     pub(super) fn frtb_sba_result() -> Result<Vec<Value>> {
-        example(&crate::regulatory::frtb_sba_charge(
+        example(&crate::regulatory::frtb::frtb_sba_charge(
             &frtb_sensitivities_value(),
             None,
         )?)
@@ -300,7 +302,7 @@ mod examples {
     }
 
     pub(super) fn im_collateral_result() -> Result<Vec<Value>> {
-        example_from_json::<crate::ImCollateralResult>(json!({
+        example_from_json::<crate::types::ImCollateralResult>(json!({
             "gross_initial_margin": {"amount": "2500000", "currency": "USD"},
             "required_collateral": {"amount": "2500000", "currency": "USD"},
             "current_collateral": {"amount": "2000000", "currency": "USD"},
@@ -316,7 +318,7 @@ mod examples {
     }
 
     pub(super) fn im_result() -> Result<Vec<Value>> {
-        example_from_json::<crate::ImResult>(json!({
+        example_from_json::<crate::calculators::ImResult>(json!({
             "amount": {"amount": "2500000", "currency": "USD"},
             "methodology": "simm",
             "as_of": "2025-01-15",
@@ -357,7 +359,7 @@ mod examples {
     }
 
     pub(super) fn repo_margin_spec() -> Result<Vec<Value>> {
-        example_from_json::<crate::RepoMarginSpec>(json!({
+        example_from_json::<crate::types::RepoMarginSpec>(json!({
             "margin_type": "mark_to_market",
             "margin_ratio": 1.02,
             "margin_call_threshold": 0.01,
@@ -370,11 +372,11 @@ mod examples {
     }
 
     pub(super) fn schedule_asset_class() -> Result<Vec<Value>> {
-        example(&crate::ScheduleAssetClass::InterestRate)
+        example(&crate::calculators::im::schedule::ScheduleAssetClass::InterestRate)
     }
 
     pub(super) fn simm_sensitivities_json() -> Result<Vec<Value>> {
-        let mut sensitivities = crate::SimmSensitivities::new(Currency::USD);
+        let mut sensitivities = crate::types::SimmSensitivities::new(Currency::USD);
         sensitivities.add_ir_delta(Currency::USD, "5Y", 12_500.0);
         sensitivities.add_ir_delta(Currency::USD, "10Y", -8_000.0);
         sensitivities.add_equity_delta("AAPL", 250_000.0);
@@ -387,7 +389,7 @@ mod examples {
     }
 
     pub(super) fn vm_result() -> Result<Vec<Value>> {
-        example_from_json::<crate::VmResult>(json!({
+        example_from_json::<crate::calculators::VmResult>(json!({
             "date": "2025-01-15",
             "gross_exposure": {"amount": "1750000", "currency": "USD"},
             "net_exposure": {"amount": "1250000", "currency": "USD"},

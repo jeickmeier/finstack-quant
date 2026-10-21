@@ -10,11 +10,11 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 use finstack_quant_margin::constants;
-use finstack_quant_margin::ClearingStatus;
-use finstack_quant_margin::NettingSetId;
-use finstack_quant_margin::OtcMarginSpec;
-use finstack_quant_margin::SimmCreditClassification;
-use finstack_quant_margin::SimmSensitivities;
+use finstack_quant_margin::types::ClearingStatus;
+use finstack_quant_margin::types::NettingSetId;
+use finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_margin::types::SimmCreditClassification;
+use finstack_quant_margin::types::SimmSensitivities;
 
 /// Reprice an instrument and return a single scalar metric from its measures.
 ///
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn explicit_qualifying_classification_routes_credit_delta_to_sector_bucket() {
-        use finstack_quant_margin::{SimmCreditClassification, SimmCreditSector};
+        use finstack_quant_margin::types::{SimmCreditClassification, SimmCreditSector};
 
         let spec = OtcMarginSpec::usd_bilateral()
             .expect("margin spec")
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn explicit_non_qualifying_classification_routes_credit_delta_to_cnq() {
-        use finstack_quant_margin::SimmCreditClassification;
+        use finstack_quant_margin::types::SimmCreditClassification;
 
         let spec = OtcMarginSpec::usd_bilateral()
             .expect("margin spec")

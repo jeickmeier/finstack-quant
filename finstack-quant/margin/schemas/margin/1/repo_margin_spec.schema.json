@@ -105,7 +105,7 @@
     },
     "EligibleCollateralSchedule": {
       "additionalProperties": false,
-      "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```\nuse finstack_quant_margin::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```\nuse finstack_quant_margin::types::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_quant_core::Error>(())\n```",
       "properties": {
         "default_haircut": {
           "description": "Default haircut for unlisted collateral (if accepted)\n\nIf None, only explicitly listed collateral types are accepted.",

@@ -6,9 +6,12 @@
 //! - CSA bilateral vs cleared margin requirements
 
 use finstack_quant_core::{currency::Currency, dates::Date, money::Money, types::InstrumentId};
-use finstack_quant_margin::{
+use finstack_quant_margin::calculators::im::schedule::ScheduleImCalculator;
+use finstack_quant_margin::calculators::im::SimmCalculator;
+use finstack_quant_margin::calculators::VmCalculator;
+use finstack_quant_margin::types::{
     ClearingStatus, CsaSpec, ImMethodology, ImParameters, MarginCallTiming, MarginTenor,
-    OtcMarginSpec, ScheduleImCalculator, SimmCalculator, VmCalculator, VmParameters,
+    OtcMarginSpec, VmParameters,
 };
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_rates::irs::InterestRateSwap;
@@ -172,7 +175,7 @@ fn test_simm_calculator_exists() {
         .expect("embedded registry");
 
     // Test IR delta calculation with empty sensitivities (edge case)
-    let empty = finstack_quant_margin::SimmSensitivities::new(Currency::USD);
+    let empty = finstack_quant_margin::types::SimmSensitivities::new(Currency::USD);
     let (ir_margin, _) = simm
         .calculate_from_sensitivities_parts(&empty, Currency::USD)
         .expect("empty sensitivities");

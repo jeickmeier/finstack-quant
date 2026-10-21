@@ -8,11 +8,11 @@ use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_margin::constants;
+use finstack_quant_margin::types::NettingSetId;
+use finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_margin::types::RepoMarginSpec;
+use finstack_quant_margin::types::SimmSensitivities;
 use finstack_quant_margin::Marginable;
-use finstack_quant_margin::NettingSetId;
-use finstack_quant_margin::OtcMarginSpec;
-use finstack_quant_margin::RepoMarginSpec;
-use finstack_quant_margin::SimmSensitivities;
 
 impl Marginable for Repo {
     fn id(&self) -> &str {

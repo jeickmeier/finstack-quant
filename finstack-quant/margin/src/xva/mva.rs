@@ -58,7 +58,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 
-use crate::calculators::im::simm::SimmCalculator;
+use crate::calculators::im::SimmCalculator;
 use crate::types::SimmSensitivities;
 
 /// Deterministic decay applied to today's SIMM IM to approximate `E[IM(t)]`.
@@ -455,8 +455,9 @@ fn validate_spread_curve(curve: &[(f64, f64)]) -> finstack_quant_core::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::calculators::im::simm::{SimmCalculator, SimmVersion};
+    use crate::calculators::im::SimmCalculator;
     use crate::types::SimmSensitivities;
+    use crate::SimmVersion;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};

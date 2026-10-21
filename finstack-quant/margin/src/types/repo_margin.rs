@@ -70,7 +70,7 @@ impl std::str::FromStr for RepoMarginType {
 /// # Example
 ///
 /// ```
-/// use finstack_quant_margin::{EligibleCollateralSchedule, MarginTenor, RepoMarginSpec, RepoMarginType};
+/// use finstack_quant_margin::types::{EligibleCollateralSchedule, MarginTenor, RepoMarginSpec, RepoMarginType};
 ///
 /// let margin_spec = RepoMarginSpec {
 ///     margin_type: RepoMarginType::MarkToMarket,

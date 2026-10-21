@@ -74,10 +74,7 @@ impl MarginCallTiming {
 /// # Example
 ///
 /// ```
-/// use finstack_quant_margin::{
-///     CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule,
-///     MarginCallTiming, ImMethodology, MarginTenor,
-/// };
+/// use finstack_quant_margin::types::{CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule, MarginCallTiming, ImMethodology, MarginTenor};
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::money::Money;
 ///

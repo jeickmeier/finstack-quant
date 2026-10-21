@@ -9,10 +9,10 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_margin::constants::DURATION_APPROXIMATION_FACTOR;
 use finstack_quant_margin::constants::STANDARD_CDS_MATURITY_YEARS;
+use finstack_quant_margin::types::NettingSetId;
+use finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_margin::types::SimmSensitivities;
 use finstack_quant_margin::Marginable;
-use finstack_quant_margin::NettingSetId;
-use finstack_quant_margin::OtcMarginSpec;
-use finstack_quant_margin::SimmSensitivities;
 use finstack_quant_valuations_core::instruments::common_impl::margin::add_classified_credit_delta;
 use finstack_quant_valuations_core::instruments::common_impl::margin::assign_credit_tenor_bucket;
 use finstack_quant_valuations_core::instruments::common_impl::margin::extract_reference_entity;
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn cds_marginable_uses_explicit_sector_classification() {
-        use finstack_quant_margin::{SimmCreditClassification, SimmCreditSector};
+        use finstack_quant_margin::types::{SimmCreditClassification, SimmCreditSector};
 
         let mut cds = CreditDefaultSwap::example().expect("example");
         cds.margin_spec = Some(

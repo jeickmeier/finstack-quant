@@ -2,13 +2,14 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
+use finstack_quant_margin::schema::MarginEnvelope;
 use finstack_quant_margin::schema::{
     generated_margin_schema, MARGIN_SCHEMA_BASE, MARGIN_SCHEMA_DESCRIPTION, MARGIN_SCHEMA_FILENAME,
     MARGIN_SCHEMA_TITLE,
 };
-use finstack_quant_margin::{
+use finstack_quant_margin::types::{
     CollateralAssetClass, CollateralEligibility, CsaSpec, EligibleCollateralSchedule, ImParameters,
-    MarginCall, MarginCallTiming, MarginEnvelope, MaturityConstraints, OtcMarginSpec,
+    MarginCall, MarginCallTiming, MaturityConstraints, OtcMarginSpec,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -539,7 +540,7 @@ fn assert_wire_matches_registered_schema<T: Serialize + DeserializeOwned>(
 
 #[test]
 fn schedule_asset_class_schema_matches_its_string_wire() {
-    use finstack_quant_margin::ScheduleAssetClass;
+    use finstack_quant_margin::calculators::im::schedule::ScheduleAssetClass;
 
     for class in [
         ScheduleAssetClass::InterestRate,

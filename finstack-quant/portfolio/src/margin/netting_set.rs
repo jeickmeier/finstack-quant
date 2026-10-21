@@ -4,7 +4,7 @@
 //! other for margin calculation purposes, typically defined by a master
 //! agreement (CSA) or clearing membership.
 
-use finstack_quant_margin::{NettingSetId, OtcMarginSpec};
+use finstack_quant_margin::types::{NettingSetId, OtcMarginSpec};
 
 use crate::position::Position;
 

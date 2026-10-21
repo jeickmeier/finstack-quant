@@ -25,7 +25,7 @@ use pyo3::types::PyDict;
 )]
 #[derive(Clone)]
 pub struct PyVmResult {
-    pub(super) inner: fm::VmResult,
+    pub(super) inner: fm::calculators::VmResult,
 }
 
 #[pymethods]
@@ -235,7 +235,7 @@ impl PyVmResult {
 )]
 #[derive(Clone)]
 pub struct PyVmCalculator {
-    inner: fm::VmCalculator,
+    inner: fm::calculators::VmCalculator,
 }
 
 /// Convert ``list[tuple[date-like, float]] | pandas.Series`` into dated
@@ -269,7 +269,7 @@ impl PyVmCalculator {
     #[new]
     fn new(csa: &PyCsaSpec) -> Self {
         Self {
-            inner: fm::VmCalculator::new(csa.inner.clone()),
+            inner: fm::calculators::VmCalculator::new(csa.inner.clone()),
         }
     }
 
@@ -442,11 +442,11 @@ impl PyVmCalculator {
 )]
 #[derive(Clone)]
 pub struct PyImResult {
-    pub(super) inner: fm::ImResult,
+    pub(super) inner: fm::calculators::ImResult,
 }
 
 impl PyImResult {
-    pub(super) fn from_inner(inner: fm::ImResult) -> Self {
+    pub(super) fn from_inner(inner: fm::calculators::ImResult) -> Self {
         Self { inner }
     }
 }

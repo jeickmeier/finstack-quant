@@ -29,7 +29,7 @@ use wasm_bindgen::prelude::*;
 /// Throws if `result` is malformed.
 #[wasm_bindgen(js_name = imResultBreakdownKeys)]
 pub fn im_result_breakdown_keys(result: JsValue) -> Result<Vec<String>, JsValue> {
-    let result: fm::ImResult = from_js_json(&result, "result")?;
+    let result: fm::calculators::ImResult = from_js_json(&result, "result")?;
     Ok(result.breakdown.keys().cloned().collect())
 }
 
@@ -43,7 +43,7 @@ pub fn im_result_breakdown_keys(result: JsValue) -> Result<Vec<String>, JsValue>
 /// Throws if `result` is malformed or `key` is not a string.
 #[wasm_bindgen(js_name = imResultBreakdownAmount)]
 pub fn im_result_breakdown_amount(result: JsValue, key: JsValue) -> Result<Option<f64>, JsValue> {
-    let result: fm::ImResult = from_js_json(&result, "result")?;
+    let result: fm::calculators::ImResult = from_js_json(&result, "result")?;
     let key = js_string(&key, "key")?;
     Ok(result.breakdown.get(&key).map(|money| money.amount()))
 }
@@ -74,12 +74,12 @@ pub fn im_result_breakdown_amount(result: JsValue, key: JsValue) -> Result<Optio
 #[wasm_bindgen(js_name = SimmSensitivities)]
 #[derive(Clone)]
 pub struct JsSimmSensitivities {
-    pub(crate) inner: fm::SimmSensitivities,
+    pub(crate) inner: fm::types::SimmSensitivities,
 }
 
-fn credit_sector(value: &JsValue, label: &str) -> Result<fm::SimmCreditSector, JsValue> {
+fn credit_sector(value: &JsValue, label: &str) -> Result<fm::types::SimmCreditSector, JsValue> {
     js_string(value, label)?
-        .parse::<fm::SimmCreditSector>()
+        .parse::<fm::types::SimmCreditSector>()
         .map_err(to_js_err)
 }
 
@@ -94,7 +94,7 @@ impl JsSimmSensitivities {
     #[wasm_bindgen(constructor)]
     pub fn new(base_currency: JsValue) -> Result<JsSimmSensitivities, JsValue> {
         Ok(Self {
-            inner: fm::SimmSensitivities::new(js_currency(&base_currency, "baseCurrency")?),
+            inner: fm::types::SimmSensitivities::new(js_currency(&base_currency, "baseCurrency")?),
         })
     }
 
@@ -110,7 +110,7 @@ impl JsSimmSensitivities {
     pub fn from_json(json: JsValue) -> Result<JsSimmSensitivities, JsValue> {
         let json = crate::utils::input::json_text(&json, "json")?;
         Ok(Self {
-            inner: fm::SimmSensitivities::from_json(&json).map_err(to_js_err)?,
+            inner: fm::types::SimmSensitivities::from_json(&json).map_err(to_js_err)?,
         })
     }
 
@@ -369,7 +369,8 @@ impl JsSimmSensitivities {
     /// risk class or tenor, non-finite vega).
     #[wasm_bindgen(js_name = addCurvature)]
     pub fn add_curvature(&mut self, sensitivity: JsValue) -> Result<(), JsValue> {
-        let sensitivity: fm::SimmCurvatureSensitivity = from_js_json(&sensitivity, "sensitivity")?;
+        let sensitivity: fm::types::SimmCurvatureSensitivity =
+            from_js_json(&sensitivity, "sensitivity")?;
         sensitivity.validate().map_err(to_js_err)?;
         self.inner.add_curvature(sensitivity);
         Ok(())
@@ -481,7 +482,7 @@ impl JsSimmSensitivities {
 /// ```
 #[wasm_bindgen(js_name = SimmCalculator)]
 pub struct JsSimmCalculator {
-    pub(crate) inner: fm::SimmCalculator,
+    pub(crate) inner: fm::calculators::im::SimmCalculator,
 }
 
 #[wasm_bindgen(js_class = SimmCalculator)]
@@ -505,7 +506,7 @@ impl JsSimmCalculator {
             .map_err(to_js_err)?
             .unwrap_or_default();
         let mpor_days: Option<u32> = js_opt_uint(mpor_days.as_ref(), "mporDays")?;
-        let mut inner = fm::SimmCalculator::new(version).map_err(to_js_err)?;
+        let mut inner = fm::calculators::im::SimmCalculator::new(version).map_err(to_js_err)?;
         if let Some(days) = mpor_days {
             inner = inner.with_mpor(days);
         }
@@ -530,7 +531,8 @@ impl JsSimmCalculator {
             .parse::<fm::SimmVersion>()
             .map_err(to_js_err)?;
         let inner =
-            fm::SimmCalculator::from_finstack_config(version, &config.inner).map_err(to_js_err)?;
+            fm::calculators::im::SimmCalculator::from_finstack_config(version, &config.inner)
+                .map_err(to_js_err)?;
         Ok(Self { inner })
     }
 

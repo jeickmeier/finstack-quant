@@ -13,10 +13,11 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
-use finstack_quant_margin::{
-    Marginable, NettingSetId, SimmCalculator, SimmCurvatureSensitivity, SimmRiskClass,
-    SimmSensitivities,
+use finstack_quant_margin::calculators::im::SimmCalculator;
+use finstack_quant_margin::types::{
+    NettingSetId, SimmCurvatureSensitivity, SimmRiskClass, SimmSensitivities,
 };
+use finstack_quant_margin::Marginable;
 use finstack_quant_portfolio::types::DUMMY_ENTITY_ID;
 use finstack_quant_portfolio::{
     margin::portfolio_margin, position::Position, position::PositionUnit, types::Entity, Portfolio,
@@ -80,7 +81,7 @@ impl Marginable for BenchMarginableInstrument {
     fn id(&self) -> &str {
         &self.id
     }
-    fn margin_spec(&self) -> Option<&finstack_quant_margin::OtcMarginSpec> {
+    fn margin_spec(&self) -> Option<&finstack_quant_margin::types::OtcMarginSpec> {
         None
     }
     fn netting_set_id(&self) -> Option<NettingSetId> {

@@ -1,6 +1,6 @@
 //! Traits and result types for margin calculators.
 
-use crate::traits::Marginable;
+use crate::Marginable;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -169,7 +169,7 @@ pub struct SimmWeightedSensitivity {
     pub tenor: Option<String>,
 
     /// Net input sensitivity for this factor, in the units documented on
-    /// [`SimmSensitivities`](crate::SimmSensitivities) (calculation currency
+    /// [`SimmSensitivities`](crate::types::SimmSensitivities) (calculation currency
     /// per unit move).
     pub sensitivity: f64,
 
@@ -230,7 +230,9 @@ impl ImResult {
 /// # Example Implementation
 ///
 /// ```
-/// use finstack_quant_margin::{ImCalculator, ImMethodology, ImResult, Marginable};
+/// use finstack_quant_margin::Marginable;
+/// use finstack_quant_margin::calculators::{ImCalculator, ImResult};
+/// use finstack_quant_margin::types::ImMethodology;
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::money::Money;

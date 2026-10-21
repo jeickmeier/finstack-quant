@@ -1013,7 +1013,7 @@
           "type": "number"
         },
         "sensitivity": {
-          "description": "Net input sensitivity for this factor, in the units documented on\n[`SimmSensitivities`](crate::SimmSensitivities) (calculation currency\nper unit move).",
+          "description": "Net input sensitivity for this factor, in the units documented on\n[`SimmSensitivities`](crate::types::SimmSensitivities) (calculation currency\nper unit move).",
           "format": "double",
           "type": "number"
         },

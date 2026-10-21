@@ -54,12 +54,12 @@ use crate::registry::{
     SimmParams,
 };
 use crate::regulatory::frtb::aggregation::{correlated_norm, inter_bucket_pairwise};
-use crate::traits::Marginable;
 use crate::types::ImMethodology;
 use crate::types::{
     ordered_credit_sector_pair, ordered_risk_class_pair, ordered_tenor_pair, SimmCreditSector,
     SimmRiskClass, SimmSensitivities,
 };
+use crate::Marginable;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -1198,7 +1198,9 @@ impl SimmCalculator {
     ///
     /// ```rust
     /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_margin::{SimmCalculator, SimmSensitivities, SimmVersion};
+    /// use finstack_quant_margin::SimmVersion;
+    /// use finstack_quant_margin::calculators::im::SimmCalculator;
+    /// use finstack_quant_margin::types::SimmSensitivities;
     ///
     /// # fn main() -> finstack_quant_core::Result<()> {
     /// let calc = SimmCalculator::new(SimmVersion::V2_6)?;
@@ -1538,7 +1540,7 @@ mod tests {
             .collect()
     }
     use super::*;
-    use crate::traits::Marginable;
+    use crate::Marginable;
 
     #[test]
     fn simm_version_display() {
@@ -1824,7 +1826,7 @@ mod tests {
             None
         }
 
-        fn netting_set_id(&self) -> Option<crate::NettingSetId> {
+        fn netting_set_id(&self) -> Option<crate::types::NettingSetId> {
             None
         }
 
@@ -2288,7 +2290,7 @@ mod tests {
             .map(String::as_str)
             .collect();
         registry.sort_unstable();
-        let mut published: Vec<&str> = crate::SIMM_TENORS.to_vec();
+        let mut published: Vec<&str> = crate::types::SIMM_TENORS.to_vec();
         published.sort_unstable();
         assert_eq!(registry, published, "registry tenors drifted");
     }

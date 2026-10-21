@@ -119,9 +119,13 @@ impl MarginConstants {
                 bucket_15y: tenor_buckets::BUCKET_15Y,
                 bucket_20y: tenor_buckets::BUCKET_20Y,
             },
-            bcbs_iosco_schedule_id: crate::BCBS_IOSCO_SCHEDULE_ID.to_string(),
+            bcbs_iosco_schedule_id: crate::calculators::im::schedule::BCBS_IOSCO_SCHEDULE_ID
+                .to_string(),
             haircut_mpor_days: crate::calculators::im::HAIRCUT_MPOR_DAYS,
-            simm_tenors: crate::SIMM_TENORS.iter().map(ToString::to_string).collect(),
+            simm_tenors: crate::types::SIMM_TENORS
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
             simm_commodity_bucket_count: crate::types::SIMM_COMMODITY_BUCKET_COUNT,
         }
     }

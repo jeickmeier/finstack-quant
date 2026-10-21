@@ -4,8 +4,8 @@
 //! where IM is calculated as a percentage of collateral value.
 
 use crate::calculators::traits::{ImCalculator, ImResult};
-use crate::traits::Marginable;
 use crate::types::{CollateralAssetClass, EligibleCollateralSchedule, ImMethodology};
+use crate::Marginable;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -40,7 +40,10 @@ pub const HAIRCUT_MPOR_DAYS: u32 = 2;
 /// # Example
 ///
 /// ```no_run
-/// use finstack_quant_margin::{EligibleCollateralSchedule, HaircutImCalculator, ImCalculator, Marginable};
+/// use finstack_quant_margin::Marginable;
+/// use finstack_quant_margin::types::EligibleCollateralSchedule;
+/// use finstack_quant_margin::calculators::im::HaircutImCalculator;
+/// use finstack_quant_margin::calculators::ImCalculator;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use time::macros::date;
@@ -363,7 +366,7 @@ mod tests {
 
     #[test]
     fn calculate_respects_currency_mismatch_runtime_flag() {
-        use crate::traits::Marginable;
+        use crate::Marginable;
         use finstack_quant_core::market_data::context::MarketContext;
         use time::macros::date;
 
@@ -374,18 +377,18 @@ mod tests {
             fn id(&self) -> &str {
                 "TEST"
             }
-            fn margin_spec(&self) -> Option<&crate::OtcMarginSpec> {
+            fn margin_spec(&self) -> Option<&crate::types::OtcMarginSpec> {
                 None
             }
-            fn netting_set_id(&self) -> Option<crate::NettingSetId> {
+            fn netting_set_id(&self) -> Option<crate::types::NettingSetId> {
                 None
             }
             fn simm_sensitivities(
                 &self,
                 _m: &MarketContext,
                 _a: Date,
-            ) -> Result<crate::SimmSensitivities> {
-                Ok(crate::SimmSensitivities::new(self.value.currency()))
+            ) -> Result<crate::types::SimmSensitivities> {
+                Ok(crate::types::SimmSensitivities::new(self.value.currency()))
             }
             fn mtm_for_vm(&self, _m: &MarketContext, _a: Date) -> Result<Money> {
                 Ok(self.value)
@@ -450,7 +453,7 @@ mod tests {
 
     #[test]
     fn calculate_uses_im_exposure_base_not_net_mtm() {
-        use crate::traits::Marginable;
+        use crate::Marginable;
         use finstack_quant_core::market_data::context::MarketContext;
         use time::macros::date;
 
@@ -462,18 +465,20 @@ mod tests {
             fn id(&self) -> &str {
                 "REPO"
             }
-            fn margin_spec(&self) -> Option<&crate::OtcMarginSpec> {
+            fn margin_spec(&self) -> Option<&crate::types::OtcMarginSpec> {
                 None
             }
-            fn netting_set_id(&self) -> Option<crate::NettingSetId> {
+            fn netting_set_id(&self) -> Option<crate::types::NettingSetId> {
                 None
             }
             fn simm_sensitivities(
                 &self,
                 _m: &MarketContext,
                 _a: Date,
-            ) -> Result<crate::SimmSensitivities> {
-                Ok(crate::SimmSensitivities::new(self.exposure_base.currency()))
+            ) -> Result<crate::types::SimmSensitivities> {
+                Ok(crate::types::SimmSensitivities::new(
+                    self.exposure_base.currency(),
+                ))
             }
             fn mtm_for_vm(&self, _m: &MarketContext, _a: Date) -> Result<Money> {
                 Ok(self.mtm)

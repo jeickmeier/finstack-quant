@@ -6,7 +6,9 @@
 //! These replace incorrectly attributed self-captured values, not external
 //! Bloomberg/QuantLib vectors. Formula checks live in production_simm_csa_audit.
 
-use finstack_quant_margin::{SimmCalculator, SimmRiskClass, SimmVersion, SIMM_TENORS};
+use finstack_quant_margin::calculators::im::SimmCalculator;
+use finstack_quant_margin::types::{SimmRiskClass, SIMM_TENORS};
+use finstack_quant_margin::SimmVersion;
 
 #[test]
 fn published_ir_weights_and_correlations() {

@@ -4,11 +4,11 @@
 //! on derivative portfolios.
 
 mod add_on;
-pub mod engine;
+pub(crate) mod engine;
 mod maturity_factor;
 mod pfe;
 mod replacement_cost;
-pub mod types;
+pub(crate) mod types;
 
 pub use engine::{saccr_ead, SaCcrEngine};
 pub use types::{

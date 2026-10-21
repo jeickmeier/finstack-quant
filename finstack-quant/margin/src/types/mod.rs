@@ -2,27 +2,27 @@
 //!
 //! This module defines the fundamental types for margin and collateral management:
 //!
-//! - [`CsaSpec`]: Credit Support Annex specification
-//! - [`VmParameters`]: Variation margin parameters
-//! - [`ImParameters`]: Initial margin parameters
-//! - [`EligibleCollateralSchedule`]: Eligible collateral with haircuts
-//! - [`MarginCall`]: Margin call event representation
-//! - [`OtcMarginSpec`]: OTC derivative margin specification
+//! - [`CsaSpec`](crate::types::CsaSpec): Credit Support Annex specification
+//! - [`VmParameters`](crate::types::VmParameters): Variation margin parameters
+//! - [`ImParameters`](crate::types::ImParameters): Initial margin parameters
+//! - [`EligibleCollateralSchedule`](crate::types::EligibleCollateralSchedule): Eligible collateral with haircuts
+//! - [`MarginCall`](crate::types::MarginCall): Margin call event representation
+//! - [`OtcMarginSpec`](crate::types::OtcMarginSpec): OTC derivative margin specification
 
 mod call;
 mod collateral;
 mod csa;
 mod enums;
 /// Netting-set identifiers and per-instrument margin aggregation outputs.
-pub mod netting;
+pub(crate) mod netting;
 mod otc;
 mod repo_cashflows;
 /// Repo-specific margining conventions and helper calculations.
-pub mod repo_margin;
+pub(crate) mod repo_margin;
 mod serde_validation;
 pub(crate) mod simm_curvature;
 /// SIMM risk-class and sensitivity container types.
-pub mod simm_types;
+pub(crate) mod simm_types;
 mod thresholds;
 
 fn default_margin_calendar(currency: finstack_quant_core::currency::Currency) -> &'static str {

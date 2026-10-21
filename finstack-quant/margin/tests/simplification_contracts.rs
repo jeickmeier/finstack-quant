@@ -3,7 +3,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_margin::regulatory::frtb::{
     DrcPosition, DrcSector, DrcSeniority, FrtbSbaEngine, FrtbSensitivities,
 };
-use finstack_quant_margin::{CsaSpec, MarginTenor, OtcMarginSpec};
+use finstack_quant_margin::types::{CsaSpec, MarginTenor, OtcMarginSpec};
 
 fn position() -> DrcPosition {
     DrcPosition {
@@ -91,7 +91,7 @@ fn otc_uses_csa_elections_and_preserves_no_im() {
 
 #[test]
 fn generic_ccp_wire_describes_only_the_actual_proxy() {
-    use finstack_quant_margin::calculators::CcpMethodology;
+    use finstack_quant_margin::calculators::im::CcpMethodology;
     assert_eq!(
         CcpMethodology::from_ccp_name("unknown CCP"),
         CcpMethodology::GenericProxy
@@ -108,8 +108,10 @@ fn generic_ccp_wire_describes_only_the_actual_proxy() {
 
 #[test]
 fn published_simm_wire_examples_are_accepted_by_the_calculator() {
+    use finstack_quant_margin::calculators::im::SimmCalculator;
+    use finstack_quant_margin::types::SimmSensitivities;
     use finstack_quant_margin::types::SimmSensitivitiesJson;
-    use finstack_quant_margin::{SimmCalculator, SimmSensitivities, SimmVersion};
+    use finstack_quant_margin::SimmVersion;
     let artifact = finstack_quant_margin::schema::ARTIFACTS
         .iter()
         .find(|a| {

@@ -92,7 +92,7 @@ impl VmResult {
 ///
 /// # ISDA CSA Formula
 ///
-/// Credit support follows [`crate::VmParameters::calculate_margin_call`] (symmetric
+/// Credit support follows [`crate::types::VmParameters::calculate_margin_call`] (symmetric
 /// threshold in `|Exposure|`, bilateral handling of signed exposure). Delivery
 /// and collection amounts split that signed amount by cashflow direction.
 ///
@@ -103,7 +103,8 @@ impl VmResult {
 /// # Example
 ///
 /// ```
-/// use finstack_quant_margin::{VmCalculator, CsaSpec};
+/// use finstack_quant_margin::calculators::VmCalculator;
+/// use finstack_quant_margin::types::CsaSpec;
 /// use finstack_quant_core::money::Money;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
@@ -333,8 +334,8 @@ impl VmCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::MarginCallType;
     use crate::types::{EligibleCollateralSchedule, VmParameters};
-    use crate::MarginCallType;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::types::CurveId;
     use time::Month;

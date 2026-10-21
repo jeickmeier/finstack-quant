@@ -2,10 +2,12 @@
 //! ISDA source: September 2023 methodology, paragraphs 33, 39, 69, 74, 79.
 
 use finstack_quant_core::{currency::Currency, FxHashMap};
-use finstack_quant_margin::regulatory::frtb::types::{
+use finstack_quant_margin::calculators::im::SimmCalculator;
+use finstack_quant_margin::regulatory::frtb::{
     CorrelationScenario, FrtbRiskClass, FrtbSensitivities,
 };
-use finstack_quant_margin::{SimmCalculator, SimmCreditSector, SimmVersion};
+use finstack_quant_margin::types::SimmCreditSector;
+use finstack_quant_margin::SimmVersion;
 
 fn close(actual: f64, expected: f64) {
     assert!(
@@ -111,7 +113,7 @@ fn girr_vega_uses_one_percent_decay_for_both_maturities() {
 
 #[test]
 fn curvature_scales_expiries_before_factor_netting_and_ir_uses_hvr() {
-    use finstack_quant_margin::{SimmCurvatureSensitivity, SimmRiskClass};
+    use finstack_quant_margin::types::{SimmCurvatureSensitivity, SimmRiskClass};
     let calc = SimmCalculator::new(finstack_quant_margin::SimmVersion::default())
         .expect("embedded registry");
     let mut inputs: Vec<_> = [("2W", 1000.0), ("1Y", -1000.0)]
@@ -171,7 +173,7 @@ fn vega_charge(
 }
 
 fn ir_delta(calc: &SimmCalculator, values: &FxHashMap<(Currency, String), f64>) -> f64 {
-    let mut sens = finstack_quant_margin::SimmSensitivities::new(Currency::USD);
+    let mut sens = finstack_quant_margin::types::SimmSensitivities::new(Currency::USD);
     sens.ir_delta = values.clone();
     calc.calculate_from_sensitivities_parts(&sens, Currency::USD)
         .expect("valid IR fixture")
@@ -181,14 +183,14 @@ fn credit_delta(
     calc: &SimmCalculator,
     values: &FxHashMap<(SimmCreditSector, String, String), f64>,
 ) -> f64 {
-    let mut sens = finstack_quant_margin::SimmSensitivities::new(Currency::USD);
+    let mut sens = finstack_quant_margin::types::SimmSensitivities::new(Currency::USD);
     sens.credit_qualifying_delta = values.clone();
     calc.calculate_from_sensitivities_parts(&sens, Currency::USD)
         .expect("valid credit fixture")
         .0
 }
 fn fx_delta(calc: &SimmCalculator, values: &FxHashMap<Currency, f64>) -> f64 {
-    let mut sens = finstack_quant_margin::SimmSensitivities::new(Currency::USD);
+    let mut sens = finstack_quant_margin::types::SimmSensitivities::new(Currency::USD);
     sens.fx_delta = values.clone();
     calc.calculate_from_sensitivities_parts(&sens, Currency::USD)
         .expect("valid FX fixture")
@@ -196,9 +198,9 @@ fn fx_delta(calc: &SimmCalculator, values: &FxHashMap<Currency, f64>) -> f64 {
 }
 fn curvature(
     calc: &SimmCalculator,
-    values: &[finstack_quant_margin::SimmCurvatureSensitivity],
+    values: &[finstack_quant_margin::types::SimmCurvatureSensitivity],
 ) -> finstack_quant_core::Result<f64> {
-    let mut sens = finstack_quant_margin::SimmSensitivities::new(Currency::USD);
+    let mut sens = finstack_quant_margin::types::SimmSensitivities::new(Currency::USD);
     sens.curvature = values.to_vec();
     Ok(calc
         .calculate_from_sensitivities_parts(&sens, Currency::USD)?

@@ -4,6 +4,12 @@ use finstack_quant_core::{
     cashflow::CFKind, currency::Currency, market_data::term_structures::DiscountCurve,
     money::Money, types::CreditRating,
 };
+use finstack_quant_margin::calculators::im::schedule::{ScheduleAssetClass, ScheduleImCalculator};
+use finstack_quant_margin::calculators::im::{HaircutImCalculator, SimmCalculator};
+use finstack_quant_margin::calculators::VmCalculator;
+use finstack_quant_margin::types::{
+    CollateralAssetClass, CsaSpec, NettingSetId, RepoMarginSpec, SimmSensitivities,
+};
 use finstack_quant_margin::{
     metrics::MarginUtilization,
     regulatory::{
@@ -18,9 +24,7 @@ use finstack_quant_margin::{
     },
     types::generate_margin_cashflows,
     xva::{cva::compute_fva, types::ExposureProfile},
-    CollateralAssetClass, CsaSpec, HaircutImCalculator, NettingSetId, RepoMarginSpec,
-    ScheduleAssetClass, ScheduleImCalculator, SimmCalculator, SimmSensitivities, SimmVersion,
-    VmCalculator,
+    SimmVersion,
 };
 
 fn usd(amount: f64) -> Money {

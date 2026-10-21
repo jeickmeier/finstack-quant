@@ -25,13 +25,13 @@ mod validation;
 use validation::{to_validation, validate_haircut, validate_non_negative, validate_rate};
 
 use crate::calculators::im::schedule::{MaturityBucket, ScheduleAssetClass};
-use crate::calculators::im::simm::SimmVersion;
 use crate::types::{
     ordered_credit_sector_pair, ordered_risk_class_pair, ordered_tenor_pair, CollateralAssetClass,
     CollateralEligibility, EligibleCollateralSchedule, ImMethodology, ImParameters,
     MarginCallTiming, MarginTenor, MaturityConstraints, VmParameters,
 };
-use crate::{SimmCreditSector, SimmRiskClass};
+use crate::types::{SimmCreditSector, SimmRiskClass};
+use crate::SimmVersion;
 
 mod embedded;
 mod merge;
@@ -1298,7 +1298,7 @@ fn validate_cq_tables(p: &SimmParams) -> Result<()> {
 /// value (see `SimmParams::correlation` / `cq_inter_bucket_correlation`) so the
 /// validated matrix is the one the calculator will actually observe at runtime.
 fn validate_simm_correlations_psd(p: &SimmParams) -> Result<()> {
-    use crate::SimmRiskClass::{
+    use crate::types::SimmRiskClass::{
         Commodity, CreditNonQualifying, CreditQualifying, Equity, Fx, InterestRate,
     };
 
