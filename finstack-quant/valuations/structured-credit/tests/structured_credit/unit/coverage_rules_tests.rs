@@ -14,12 +14,12 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
 use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_fixed_income::bond::{Bond, CashflowSpec};
 use finstack_quant_valuations_structured_credit::structured_credit::{
     run_simulation, run_simulation_with_diagnostics, AssetPool, CccBucketRule, CoverageRules,
     CoverageTestSpec, DealType, DefaultedValuation, DiscountObligationRule, InstrumentCollateral,
-    PoolAsset, StructuredCredit, TestContext, Tranche, TrancheCashflows, TrancheSeniority,
-    TrancheStructure,
+    PoolAsset, StructuredCredit, TestContext, Tranche, TrancheCashflows, TrancheStructure,
 };
 use time::macros::date;
 use time::Month;

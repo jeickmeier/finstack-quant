@@ -11,6 +11,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_fixed_income::bond::{Bond, CallPut, CallPutSchedule, CashflowSpec};
 use finstack_quant_valuations_fixed_income::revolving_credit::{
     DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
@@ -18,8 +19,7 @@ use finstack_quant_valuations_fixed_income::revolving_credit::{
 use finstack_quant_valuations_fixed_income::term_loan::TermLoan;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     run_simulation_with_diagnostics, AssetPool, CallExercisePolicy, DealType, InstrumentCollateral,
-    PutExercisePolicy, SimulationRun, StructuredCredit, Tranche, TrancheSeniority,
-    TrancheStructure,
+    PutExercisePolicy, SimulationRun, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::macros::date;
 

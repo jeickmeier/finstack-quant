@@ -8,14 +8,16 @@ use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_models::credit::pool::StochasticDefaultSpec;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::results::structured_credit::{
+    StochasticPricingResult, StructuredCreditPricingMode,
+};
 use finstack_quant_valuations_fixed_income::bond::Bond;
 use finstack_quant_valuations_fixed_income::revolving_credit::{
     CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit, RevolvingCreditFees,
     StochasticUtilizationSpec, UtilizationProcess,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_tranche_oas, CallExercisePolicy, InstrumentCollateral, OasConfig,
-    StochasticPricingResult, StructuredCredit, StructuredCreditPricingMode,
+    calculate_tranche_oas, CallExercisePolicy, InstrumentCollateral, OasConfig, StructuredCredit,
 };
 use time::macros::date;
 

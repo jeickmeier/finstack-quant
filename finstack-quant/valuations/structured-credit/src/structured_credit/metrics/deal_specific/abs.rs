@@ -1,8 +1,9 @@
 //! ABS-specific metrics (speed, delinquency, excess spread, credit enhancement).
 
-use crate::structured_credit::{StructuredCredit, TrancheSeniority};
+use crate::structured_credit::StructuredCredit;
 use finstack_quant_core::math::units::DECIMAL_TO_PERCENT;
 use finstack_quant_valuations_core::metrics::MetricContext;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 
 /// ABS delinquency rate: the pool's delinquent balance (every
 /// `PoolAsset::delinquency_buckets` entry) as a percent of the total pool

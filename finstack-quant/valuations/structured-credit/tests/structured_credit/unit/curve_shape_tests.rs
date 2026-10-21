@@ -10,9 +10,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::FxHashMap;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     calculate_tranche_wal, run_simulation, AssetPool, AssetType, DealType, DelinquencyModel,
-    PoolAsset, StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority, TrancheStructure,
+    PoolAsset, StructuredCredit, Tranche, TrancheCashflows, TrancheStructure,
 };
 use time::Month;
 
@@ -174,7 +175,7 @@ fn timing_curve_defaults_sum_to_the_lifetime_rate_on_a_level_pay_pool() {
 /// instead of silently approximating.
 #[test]
 fn stochastic_pricing_rejects_lifetime_curves_and_severity_vectors() {
-    use finstack_quant_valuations_structured_credit::structured_credit::StructuredCreditPricingMode;
+    use finstack_quant_valuations_core::results::structured_credit::StructuredCreditPricingMode;
 
     let mode = StructuredCreditPricingMode::MonteCarlo {
         num_paths: 8,

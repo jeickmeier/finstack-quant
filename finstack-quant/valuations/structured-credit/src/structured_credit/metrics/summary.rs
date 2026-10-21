@@ -12,7 +12,6 @@ use crate::structured_credit::metrics::{
 };
 use crate::structured_credit::{
     CallAssumption, CallScope, StructuredCredit, TrancheAccrualPeriod, TrancheCashflows,
-    TrancheSeniority,
 };
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
@@ -26,6 +25,7 @@ use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use serde::{Deserialize, Serialize};
 
 /// Per-tranche risk and spread metrics, all computed from one tranche's own

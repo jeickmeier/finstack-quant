@@ -13,10 +13,11 @@ use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::FxHashMap;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     calculate_tranche_metrics, run_simulation, AssetPool, CallAssumption, DealType, PoolAsset,
     ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows,
-    TrancheMetrics, TrancheSeniority, TrancheStructure,
+    TrancheMetrics, TrancheStructure,
 };
 use time::Month;
 

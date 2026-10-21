@@ -180,12 +180,13 @@ pub mod rates {
     pub use finstack_quant_valuations_rates::*;
 }
 
+pub use fixed_income::asset_backed_facility::AssetBackedFacility;
+pub use fixed_income::cmo::{AgencyCmo, CmoTranche, CmoTrancheType, CmoWaterfall};
+pub use fixed_income::structured_credit::StructuredCredit;
 pub use fixed_income::{
-    AgencyCmo, AgencyMbsPassthrough, AgencyProgram, AgencyTba, AssetBackedFacility, Bond,
-    BondFuture, BondFutureBuilder, BondFutureSpecs, BondSettlementConvention, CmoTranche,
-    CmoTrancheType, CmoWaterfall, ConvertibleBond, DeliverableBond, DollarRoll,
-    FiIndexTotalReturnSwap, InflationLinkedBond, PoolType, RevolvingCredit, StructuredCredit,
-    TbaTerm, TermLoan,
+    AgencyMbsPassthrough, AgencyProgram, AgencyTba, Bond, BondFuture, BondFutureBuilder,
+    BondFutureSpecs, BondSettlementConvention, ConvertibleBond, DeliverableBond, DollarRoll,
+    FiIndexTotalReturnSwap, InflationLinkedBond, PoolType, RevolvingCredit, TbaTerm, TermLoan,
 };
 
 pub use rates::{

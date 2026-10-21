@@ -47,7 +47,7 @@ use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond:
     DeflationProtection, IndexationMethod, InflationLinkedBond,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind, FxOption,
@@ -63,6 +63,7 @@ use finstack_quant_valuations::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType, SettlementType};
 use finstack_quant_valuations::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
 use finstack_quant_valuations::market::conventions::{CdsConvention, CdsValuationConvention};
+use finstack_quant_valuations::results::structured_credit::TrancheSeniority;
 use rust_decimal_macros::dec;
 use std::sync::Arc;
 use time::Month;

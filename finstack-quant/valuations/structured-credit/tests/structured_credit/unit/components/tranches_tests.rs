@@ -14,8 +14,9 @@ use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    CoverageTrigger, Tranche, TrancheSeniority, TrancheStructure, TriggerConsequence,
+    CoverageTrigger, Tranche, TrancheStructure, TriggerConsequence,
 };
 use rust_decimal_macros::dec;
 use time::Month;

@@ -48,7 +48,7 @@ clo.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(
 ## Pricing
 
 ```rust
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditPricingMode;
+use finstack_quant_valuations::results::structured_credit::StructuredCreditPricingMode;
 
 let result = clo.price_stochastic_with_mode(
     &market,

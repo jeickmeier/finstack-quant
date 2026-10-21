@@ -16,9 +16,10 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     run_simulation, AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche,
-    TrancheSeniority, TrancheStructure,
+    TrancheStructure,
 };
 use time::Month;
 

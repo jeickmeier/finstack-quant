@@ -44,7 +44,8 @@
 //!
 //! ```rust
 //! use finstack_quant_valuations_core::instruments::Instrument;
-//! use finstack_quant_valuations_structured_credit::{AgencyCmo, StructuredCredit};
+//! use finstack_quant_valuations_structured_credit::cmo::AgencyCmo;
+//! use finstack_quant_valuations_structured_credit::structured_credit::StructuredCredit;
 //!
 //! let deal = StructuredCredit::example().unwrap();
 //! let cmo = AgencyCmo::example().unwrap();
@@ -59,10 +60,6 @@ pub mod asset_backed_facility;
 pub mod cmo;
 /// Structured credit module - ABS, RMBS, CMBS, CLO.
 pub mod structured_credit;
-
-pub use asset_backed_facility::AssetBackedFacility;
-pub use cmo::{AgencyCmo, CmoTranche, CmoTrancheType, CmoWaterfall};
-pub use structured_credit::{StructuredCredit, STRUCTURED_CREDIT};
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///
