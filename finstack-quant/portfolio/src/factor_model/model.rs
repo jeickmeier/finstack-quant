@@ -32,6 +32,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
+use finstack_quant_factor::matching::MatchingConfig;
 use finstack_quant_factor::matching::ISSUER_ID_META_KEY;
 use finstack_quant_factor::risk::{
     apply_residual_contributions, decompose_factors, PositionResidualContribution,
@@ -40,7 +41,7 @@ use finstack_quant_factor::risk::{
 use finstack_quant_factor::SensitivityMatrix;
 use finstack_quant_factor::{
     BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorModelConfig, FactorType,
-    MarketDependency, MatchingConfig, RiskMeasure, UnmatchedPolicy,
+    MarketDependency, RiskMeasure, UnmatchedPolicy,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::recalibration::QuoteBump;
@@ -54,7 +55,7 @@ pub struct FactorModel {
     credit_idiosyncratic_variance: BTreeMap<finstack_quant_core::types::IssuerId, f64>,
     factors: Vec<FactorDefinition>,
     covariance: FactorCovarianceMatrix,
-    matcher: Box<dyn finstack_quant_factor::FactorMatcher>,
+    matcher: Box<dyn finstack_quant_factor::matching::FactorMatcher>,
     sensitivity_engine: Box<dyn FactorSensitivityEngine>,
     risk_measure: RiskMeasure,
     unmatched_policy: UnmatchedPolicy,
@@ -1045,7 +1046,7 @@ pub(super) mod tests {
                     curve_type: Some(CurveType::Discount),
                     id: None,
                 },
-                attribute_filter: finstack_quant_factor::AttributeFilter::default(),
+                attribute_filter: finstack_quant_factor::matching::AttributeFilter::default(),
                 factor_id: FactorId::new("Rates"),
             }]),
 
@@ -1128,7 +1129,7 @@ pub(super) mod tests {
         let mut config = simple_config();
         config.matching = MatchingConfig::MappingTable(vec![MappingRule {
             dependency_filter: DependencyFilter::default(),
-            attribute_filter: finstack_quant_factor::AttributeFilter::default(),
+            attribute_filter: finstack_quant_factor::matching::AttributeFilter::default(),
             factor_id: FactorId::new("MissingFactor"),
         }]);
 
@@ -1146,7 +1147,7 @@ pub(super) mod tests {
         let mut config = simple_config();
         config.matching = MatchingConfig::MappingTable(vec![MappingRule {
             dependency_filter: DependencyFilter::default(),
-            attribute_filter: finstack_quant_factor::AttributeFilter::default(),
+            attribute_filter: finstack_quant_factor::matching::AttributeFilter::default(),
             factor_id: FactorId::new("MissingFactor"),
         }]);
         let Err(error) = FactorModel::from_config(config) else {

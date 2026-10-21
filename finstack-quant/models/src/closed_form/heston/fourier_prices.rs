@@ -278,7 +278,7 @@ pub(crate) fn heston_put_price_fourier(
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_models::OptionType;
+/// use finstack_quant_models::types::OptionType;
 /// use finstack_quant_models::closed_form::{heston_price, HestonPricingParams};
 ///
 /// let params = HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)?;

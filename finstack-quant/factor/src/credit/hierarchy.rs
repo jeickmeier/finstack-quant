@@ -1144,9 +1144,9 @@ impl CreditFactorModel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::matching::MatchingConfig;
     use crate::{
         FactorCovarianceMatrix, FactorDefinition, FactorModelConfig, FactorType, MarketMapping,
-        MatchingConfig,
     };
     use finstack_quant_core::dates::create_date;
     use time::Month;

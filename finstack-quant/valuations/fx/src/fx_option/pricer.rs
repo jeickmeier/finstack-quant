@@ -127,7 +127,7 @@ pub(crate) fn implied_vol(
 
     let target_unit = target_price / inst.notional.amount();
 
-    finstack_quant_models::bs_implied_vol(
+    finstack_quant_models::closed_form::bs_implied_vol(
         spot,
         inst.strike,
         r_d,

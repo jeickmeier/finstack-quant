@@ -30,7 +30,7 @@ use finstack_quant_models::closed_form::{
     vanilla_expiry_payoff as vanilla_expiry_payoff_core, HestonPricingParams,
     DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
 };
-use finstack_quant_models::OptionType;
+use finstack_quant_models::types::OptionType;
 use wasm_bindgen::prelude::*;
 
 /// Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.

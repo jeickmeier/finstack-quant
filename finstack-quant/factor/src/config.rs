@@ -351,9 +351,9 @@ fn check_no_duplicate_issuer_rows(matching: &MatchingConfig) -> finstack_quant_c
 mod tests {
     use super::*;
 
+    use crate::matching::MatchingConfig;
     use crate::{
-        FactorCovarianceMatrix, FactorDefinition, FactorType, MarketMapping, MatchingConfig,
-        UnmatchedPolicy,
+        FactorCovarianceMatrix, FactorDefinition, FactorType, MarketMapping, UnmatchedPolicy,
     };
     use finstack_quant_core::market_data::bumps::BumpUnits;
     use finstack_quant_core::types::CurveId;

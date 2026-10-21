@@ -26,7 +26,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use finstack_quant_models::OptionType;
+//! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_models::closed_form::{black76_greeks, black76_price};
 //!
 //! let price = black76_price(100.0, 100.0, 0.95, 0.2, 1.0, OptionType::Call)?;
@@ -58,7 +58,7 @@ use crate::types::OptionType;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_models::OptionType;
+/// use finstack_quant_models::types::OptionType;
 /// use finstack_quant_models::closed_form::bachelier_greeks;
 ///
 /// let g = bachelier_greeks(0.03, 0.03, 0.0075, 1.0, OptionType::Call)?;

@@ -29,7 +29,7 @@ use finstack_quant_models::closed_form::{
     vanilla_expiry_payoff, BsGreeks, ForwardGreeks, HestonPricingParams, DEFAULT_ASIAN_AVERAGING,
     DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
 };
-use finstack_quant_models::OptionType;
+use finstack_quant_models::types::OptionType;
 use pyo3::prelude::*;
 
 const BS_GREEK_LABELS: [&str; 6] = ["delta", "gamma", "vega", "theta", "rho_r", "rho_q"];

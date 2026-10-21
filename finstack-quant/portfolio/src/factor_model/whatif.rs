@@ -950,7 +950,7 @@ mod tests {
                     curve_type: Some(CurveType::Discount),
                     id: None,
                 },
-                attribute_filter: finstack_quant_factor::AttributeFilter::default(),
+                attribute_filter: finstack_quant_factor::matching::AttributeFilter::default(),
                 factor_id: FactorId::new("Rates"),
             }]),
 

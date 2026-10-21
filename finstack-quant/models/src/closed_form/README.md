@@ -322,7 +322,7 @@ Decimal/f64 split.
 
 ```rust
 use finstack_quant_core::types::BarrierType;
-use finstack_quant_models::OptionType;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::closed_form::{
     barrier::{barrier_price, BarrierParams},
     bs_greeks, bs_price,

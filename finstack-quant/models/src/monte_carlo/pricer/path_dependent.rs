@@ -651,7 +651,7 @@ impl PathDependentPricer {
     #[allow(clippy::too_many_arguments)]
     pub fn price_gbm_asian(
         &self,
-        option_type: crate::OptionType,
+        option_type: crate::types::OptionType,
         spot: f64,
         strike: f64,
         rate: f64,
@@ -714,7 +714,7 @@ impl PathDependentPricer {
     #[allow(clippy::too_many_arguments)]
     pub fn price_gbm_asian_with_lrm_greeks(
         &self,
-        option_type: crate::OptionType,
+        option_type: crate::types::OptionType,
         spot: f64,
         strike: f64,
         rate: f64,
@@ -1322,7 +1322,7 @@ mod tests {
             PathDependentPricer::new(PathDependentPricerConfig::new(2).with_parallel(false));
         let gbm = GbmProcess::with_params(0.0, 0.0, 0.2).unwrap();
         let asian = Asian::new(
-            crate::OptionType::Call,
+            crate::types::OptionType::Call,
             90.0,
             1.0,
             AveragingMethod::Arithmetic,
@@ -1343,7 +1343,7 @@ mod tests {
                 0.2,
             )
             .expect_err("a time-zero fixing has an explicit spot derivative");
-        let lookback = Lookback::new(crate::OptionType::Call, 90.0, 1.0, 1);
+        let lookback = Lookback::new(crate::types::OptionType::Call, 90.0, 1.0, 1);
         let lookback_error = pricer
             .price_with_lrm_greeks(
                 &gbm,
@@ -1375,7 +1375,7 @@ mod tests {
         // Monthly fixings
         let fixing_steps: Vec<usize> = (0..=12).map(|i| i * 21).collect();
         let asian = Asian::new(
-            crate::OptionType::Call,
+            crate::types::OptionType::Call,
             100.0,
             1.0,
             AveragingMethod::Arithmetic,
@@ -1402,7 +1402,7 @@ mod tests {
 
         for averaging in [AveragingMethod::Arithmetic, AveragingMethod::Geometric] {
             let call = Asian::with_history(
-                crate::OptionType::Call,
+                crate::types::OptionType::Call,
                 100.0,
                 2.0,
                 averaging,
@@ -1413,7 +1413,7 @@ mod tests {
             )
             .expect("fully observed call");
             let put = Asian::with_history(
-                crate::OptionType::Put,
+                crate::types::OptionType::Put,
                 120.0,
                 2.0,
                 averaging,
@@ -1568,7 +1568,7 @@ mod tests {
         let pricer = PathDependentPricer::new(config);
         let gbm = GbmProcess::new(GbmParams::new(r, q, sigma).unwrap());
         let payoff = Asian::new(
-            crate::OptionType::Call,
+            crate::types::OptionType::Call,
             k,
             1.0,
             AveragingMethod::Arithmetic,
@@ -1622,7 +1622,7 @@ mod tests {
         );
         let price = |spot: f64, vol: f64, expiry: f64, num_steps: usize| {
             pricer.price_gbm_asian_with_lrm_greeks(
-                crate::OptionType::Call,
+                crate::types::OptionType::Call,
                 spot,
                 100.0,
                 0.03,
@@ -1670,7 +1670,10 @@ mod tests {
                 .with_seed(7)
                 .with_parallel(false),
         );
-        for option_type in [crate::OptionType::Call, crate::OptionType::Put] {
+        for option_type in [
+            crate::types::OptionType::Call,
+            crate::types::OptionType::Put,
+        ] {
             let plain = |spot: f64, vol: f64| -> f64 {
                 pricer
                     .price_gbm_asian(
@@ -1786,7 +1789,7 @@ mod tests {
         let pricer = PathDependentPricer::new(config);
 
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.3).unwrap());
-        let lookback = Lookback::new(crate::OptionType::Call, 100.0, 1.0, 252);
+        let lookback = Lookback::new(crate::types::OptionType::Call, 100.0, 1.0, 252);
 
         let result = pricer
             .price(&gbm, 100.0, 1.0, 252, &lookback, Currency::USD, 1.0)
@@ -1807,7 +1810,7 @@ mod tests {
         let time_grid = TimeGrid::uniform(1.0, 4).expect("grid should build");
         let fixing_steps = vec![1, 2, 3, 4];
         let asian = Asian::new(
-            crate::OptionType::Call,
+            crate::types::OptionType::Call,
             100.0,
             1.0,
             AveragingMethod::Arithmetic,
@@ -1845,7 +1848,7 @@ mod tests {
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.2).unwrap());
         let fixing_steps = vec![1, 2, 3, 4];
         let asian = Asian::new(
-            crate::OptionType::Call,
+            crate::types::OptionType::Call,
             100.0,
             1.0,
             AveragingMethod::Arithmetic,
@@ -1928,7 +1931,7 @@ mod tests {
         let time_grid = TimeGrid::from_times(vec![0.0, 0.2, 0.55, 1.0]).expect("grid should build");
         let fixing_steps = vec![1, 2, 3];
         let asian = Asian::new(
-            crate::OptionType::Call,
+            crate::types::OptionType::Call,
             100.0,
             1.0,
             AveragingMethod::Arithmetic,
@@ -1954,7 +1957,7 @@ mod tests {
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.2).unwrap());
         let fixing_steps = vec![MAX_SOBOL_DIMENSION + 1];
         let asian = Asian::new(
-            crate::OptionType::Call,
+            crate::types::OptionType::Call,
             100.0,
             1.0,
             AveragingMethod::Arithmetic,
@@ -1986,7 +1989,7 @@ mod tests {
         );
         let estimate = pricer
             .price_gbm_asian(
-                crate::OptionType::Call,
+                crate::types::OptionType::Call,
                 100.0,
                 100.0,
                 0.05,
@@ -2009,7 +2012,7 @@ mod tests {
         );
         let estimate = pricer
             .price_gbm_asian(
-                crate::OptionType::Put,
+                crate::types::OptionType::Put,
                 100.0,
                 100.0,
                 0.05,
@@ -2077,7 +2080,7 @@ mod tests {
             for (strike, num_steps) in [(100.0, 12), (90.0, 5), (115.0, 30)] {
                 let call = pricer
                     .price_gbm_asian(
-                        crate::OptionType::Call,
+                        crate::types::OptionType::Call,
                         100.0,
                         strike,
                         0.05,
@@ -2090,7 +2093,7 @@ mod tests {
                     .expect("call");
                 let put = pricer
                     .price_gbm_asian(
-                        crate::OptionType::Put,
+                        crate::types::OptionType::Put,
                         100.0,
                         strike,
                         0.05,
@@ -2113,7 +2116,10 @@ mod tests {
                 .with_parallel(false)
                 .with_antithetic(false),
         );
-        for option_type in [crate::OptionType::Call, crate::OptionType::Put] {
+        for option_type in [
+            crate::types::OptionType::Call,
+            crate::types::OptionType::Put,
+        ] {
             let greeks = lrm_pricer
                 .price_gbm_asian_with_lrm_greeks(
                     option_type,

@@ -4,10 +4,13 @@ use finstack_quant_core::contract::{ContractError, LoadLimits};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::bumps::BumpUnits;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_factor::matching::{
+    AttributeFilter, DependencyFilter, MappingRule, MatchingConfig,
+};
 use finstack_quant_factor::{
-    AttributeFilter, BumpSizeConfig, DependencyFilter, DependencyType, FactorCovarianceMatrix,
-    FactorDefinition, FactorId, FactorModelConfig, FactorModelConfigEnvelope, FactorType,
-    MappingRule, MarketMapping, MatchingConfig, RiskMeasure, UnmatchedPolicy,
+    BumpSizeConfig, DependencyType, FactorCovarianceMatrix, FactorDefinition, FactorId,
+    FactorModelConfig, FactorModelConfigEnvelope, FactorType, MarketMapping, RiskMeasure,
+    UnmatchedPolicy,
 };
 
 #[test]

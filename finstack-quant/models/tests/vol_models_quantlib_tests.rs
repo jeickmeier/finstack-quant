@@ -467,7 +467,7 @@ fn test_vol_models_quantlib_parity() {
                         q: *dividend_yield,
                         model: params,
                     },
-                    finstack_quant_models::OptionType::Put,
+                    finstack_quant_models::types::OptionType::Put,
                     None,
                 )
                 .expect("checked Heston price");

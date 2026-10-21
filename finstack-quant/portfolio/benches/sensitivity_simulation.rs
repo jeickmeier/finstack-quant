@@ -340,7 +340,7 @@ fn factor_stress_model() -> finstack_quant_portfolio::factor_model::FactorModel 
                 curve_type: Some(CurveType::Discount),
                 id: Some(CURVE_ID.to_string()),
             },
-            attribute_filter: finstack_quant_factor::AttributeFilter::default(),
+            attribute_filter: finstack_quant_factor::matching::AttributeFilter::default(),
             factor_id,
         }]),
 

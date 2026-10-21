@@ -136,8 +136,8 @@ impl BsGreeks {
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_models::OptionType;
-/// use finstack_quant_models::vanilla_expiry_payoff;
+/// use finstack_quant_models::types::OptionType;
+/// use finstack_quant_models::closed_form::vanilla_expiry_payoff;
 ///
 /// let payoff = vanilla_expiry_payoff(110.0, 100.0, OptionType::Call).expect("valid strike");
 /// assert!((payoff - 10.0).abs() < 1e-12);

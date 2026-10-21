@@ -219,7 +219,7 @@ forward-based call prices; carry is already in the smile's forward.
 ## Example
 
 ```rust
-use finstack_quant_models::OptionType;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_core::math::norm_cdf;
 use finstack_quant_models::closed_form::{bachelier_price_with_annuity, d1_d2, d1_d2_black76};
 use finstack_quant_models::volatility::sabr::{SabrCalibrator, SabrParameters, SabrSmile};

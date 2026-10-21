@@ -708,9 +708,10 @@ mod tests {
         DateRange, FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
         IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
     };
+    use finstack_quant_factor::matching::MatchingConfig;
     use finstack_quant_factor::{
         FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
-        MarketMapping, MatchingConfig,
+        MarketMapping,
     };
     use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::{Attributes, Bond};

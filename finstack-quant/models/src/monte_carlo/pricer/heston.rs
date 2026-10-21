@@ -75,7 +75,7 @@ use finstack_quant_core::Result;
 ///
 /// ```
 /// use finstack_quant_models::monte_carlo::pricer::heston::price_heston;
-/// use finstack_quant_models::OptionType;
+/// use finstack_quant_models::types::OptionType;
 ///
 /// let estimate = price_heston(
 ///     OptionType::Call,

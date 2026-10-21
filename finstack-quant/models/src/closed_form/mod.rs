@@ -92,7 +92,7 @@
 //! ## Black-Scholes Greeks
 //!
 //! ```rust
-//! use finstack_quant_models::OptionType;
+//! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_models::closed_form::bs_greeks;
 //!
 //! let spot = 100.0;

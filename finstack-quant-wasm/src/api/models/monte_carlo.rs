@@ -24,7 +24,7 @@ use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::simulate::PathSimulationSpec;
-use finstack_quant_models::OptionType;
+use finstack_quant_models::types::OptionType;
 use wasm_bindgen::prelude::*;
 
 #[allow(clippy::too_many_arguments)]

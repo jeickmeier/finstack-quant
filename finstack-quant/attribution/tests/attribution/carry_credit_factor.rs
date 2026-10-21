@@ -17,7 +17,8 @@ use finstack_quant_factor::credit::hierarchy::{
     IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelAnchor, LevelsAtAnchor,
     VolState,
 };
-use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
+use finstack_quant_factor::matching::MatchingConfig;
+use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig};
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::{Attributes, Bond};
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};

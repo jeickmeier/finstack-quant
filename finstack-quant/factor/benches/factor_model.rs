@@ -157,14 +157,14 @@ fn bench_hierarchical_matcher(c: &mut Criterion) {
             if depth == 0 {
                 return FactorNode {
                     factor_id: Some(FactorId::new(format!("{prefix}-leaf"))),
-                    filter: finstack_quant_factor::AttributeFilter::default(),
+                    filter: finstack_quant_factor::matching::AttributeFilter::default(),
                     children: vec![],
                 };
             }
             let children = (0..branching)
                 .map(|i| {
                     let child_prefix = format!("{prefix}-{i}");
-                    let filter = finstack_quant_factor::AttributeFilter {
+                    let filter = finstack_quant_factor::matching::AttributeFilter {
                         tags: vec![format!("sector-{i}")],
                         meta: vec![],
                     };
@@ -175,7 +175,7 @@ fn bench_hierarchical_matcher(c: &mut Criterion) {
                 .collect();
             FactorNode {
                 factor_id: Some(FactorId::new(format!("{prefix}-node"))),
-                filter: finstack_quant_factor::AttributeFilter::default(),
+                filter: finstack_quant_factor::matching::AttributeFilter::default(),
                 children,
             }
         }
@@ -221,22 +221,22 @@ fn bench_cascade_matcher(c: &mut Criterion) {
     let mut group = c.benchmark_group("cascade_matcher");
 
     let exact_rules = vec![finstack_quant_factor::matching::MappingRule {
-        dependency_filter: finstack_quant_factor::DependencyFilter {
+        dependency_filter: finstack_quant_factor::matching::DependencyFilter {
             dependency_type: Some(finstack_quant_factor::DependencyType::Credit),
             curve_type: None,
             id: Some("ACME-HAZARD".into()),
         },
-        attribute_filter: finstack_quant_factor::AttributeFilter::default(),
+        attribute_filter: finstack_quant_factor::matching::AttributeFilter::default(),
         factor_id: FactorId::new("ACME-Specific"),
     }];
 
     let fallback_rules = vec![finstack_quant_factor::matching::MappingRule {
-        dependency_filter: finstack_quant_factor::DependencyFilter {
+        dependency_filter: finstack_quant_factor::matching::DependencyFilter {
             dependency_type: Some(finstack_quant_factor::DependencyType::Credit),
             curve_type: None,
             id: None,
         },
-        attribute_filter: finstack_quant_factor::AttributeFilter::default(),
+        attribute_filter: finstack_quant_factor::matching::AttributeFilter::default(),
         factor_id: FactorId::new("Generic-Credit"),
     }];
 

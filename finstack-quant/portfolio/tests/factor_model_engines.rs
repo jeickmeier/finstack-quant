@@ -289,7 +289,7 @@ fn portfolio_wrap_uses_scale_factor_weight_for_eur_fx_factor() -> Result<()> {
     let model = FactorModel::from_config(FactorModelConfig {
         factors: vec![factor],
         covariance,
-        matching: finstack_quant_factor::MatchingConfig::MappingTable(vec![]),
+        matching: finstack_quant_factor::matching::MatchingConfig::MappingTable(vec![]),
 
         risk_measure: RiskMeasure::Variance,
         bump_config: None,
