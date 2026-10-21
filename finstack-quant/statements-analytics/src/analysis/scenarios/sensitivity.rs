@@ -46,9 +46,10 @@ use indexmap::IndexMap;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_statements::{Error, Result};
-/// use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
-/// use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec};
+/// use finstack_quant_core::dates::PeriodId;
+/// use finstack_quant_statements::builder::ModelBuilder;
+/// use finstack_quant_statements::types::AmountOrScalar;
+/// use finstack_quant_statements::Result;
 /// use finstack_quant_statements_analytics::analysis::{run_sensitivity, SensitivityConfig, SensitivityMode, ParameterSpec};
 ///
 /// # fn main() -> Result<()> {
