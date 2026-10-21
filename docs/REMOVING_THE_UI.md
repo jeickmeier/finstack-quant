@@ -35,7 +35,7 @@ in place until the package directory is deleted.
 In `mise.toml`:
 
 - Remove `npm --prefix finstack-quant-ui run generate` from `[tasks.gen-write]`.
-- Remove `npm --prefix finstack-quant-ui run generate -- --check` from
+- Remove the `[tasks.gen-check-ui]` task and its `gen-check-ui` entry in
   `[tasks.gen-check]`.
 
 In `scripts/generation_digest.py`, remove every `finstack-quant-ui/...` path

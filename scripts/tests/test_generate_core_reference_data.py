@@ -40,7 +40,11 @@ def test_check_detects_drift_without_overwriting_it(tmp_path: Path, table: str) 
         *[f"{name}.csv" for name in reference_data.FESTIVAL_TABLES],
     ]:
         (tmp_path / "data" / filename).write_bytes((reference_data.CRATE_ROOT / "data" / filename).read_bytes())
-    with patch.object(reference_data, "CRATE_ROOT", tmp_path), patch("sys.argv", ["generate"]):
+    with (
+        patch.object(reference_data, "CRATE_ROOT", tmp_path),
+        patch.object(reference_data, "WASM_CURRENCY_STATICS", tmp_path / "currency_statics.rs"),
+        patch("sys.argv", ["generate"]),
+    ):
         reference_data.main()
         output = tmp_path / "src/generated" / table
         output.write_text("stale table\n")
